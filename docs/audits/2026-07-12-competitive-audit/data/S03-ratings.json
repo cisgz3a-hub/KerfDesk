@@ -1,0 +1,57 @@
+{
+  "sector": 3,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/03-image-trace.md",
+  "ratings": [
+    { "cat": "3.1", "product": "KerfDesk", "score": 7, "star": false, "tag": "PERC", "note": "IoU 0.953 real logo, worst vertex 1.41px, maintainer reference-loop pass; no LightBurn side-by-side, so parity unproven" },
+    { "cat": "3.1", "product": "LightBurn", "score": 8, "star": false, "tag": "COMM", "note": "Potrace-based roster reference; clean on high-contrast logos, community-confirmed weak on fine detail (upscale workaround)" },
+    { "cat": "3.1", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "Doc-identical dialog to LightBurn; engine identity and quality inferred [INF], no community data — soft score" },
+    { "cat": "3.1", "product": "LaserGRBL", "score": 6, "star": false, "tag": "COMM", "note": "Potrace Vectorize rated well for logos; classic double-line outline problem on stroke art" },
+    { "cat": "3.1", "product": "XCS", "score": 5, "star": false, "tag": "COMM", "note": "Auto-trace exists with live preview; XCS-era consensus rated LightBurn stronger; Studio-specific quality unknown" },
+    { "cat": "3.1", "product": "Easel", "score": 4, "star": false, "tag": "COMM", "note": "High-contrast two-tone only; small lettering traces blurry, low-res clipart poor per community" },
+    { "cat": "3.2", "product": "KerfDesk", "score": 8, "star": false, "tag": "PERC", "note": "Best in roster; sub-pixel synthetic bars (maxDev 0.79px) re-run; synthetic-only proof and pending ADR-058 polish hold it below 9" },
+    { "cat": "3.2", "product": "LightBurn", "score": 0, "star": false, "tag": "COMM", "note": "Absent in 2.1; long-standing open feature request; users pointed to Inkscape" },
+    { "cat": "3.2", "product": "MillMage", "score": 0, "star": false, "tag": "OFF", "note": "No centerline mode in the complete documented dialog; absence inferred [INF]" },
+    { "cat": "3.2", "product": "LaserGRBL", "score": 4, "star": false, "tag": "OFF", "note": "Documented centerline option; official docs concede lower accuracy, no fill option" },
+    { "cat": "3.2", "product": "XCS", "score": 5, "star": false, "tag": "OFF", "note": "Documented Center tracing mode for single-color bitmaps and line drawings; quality unverified" },
+    { "cat": "3.2", "product": "Easel", "score": 0, "star": false, "tag": "COMM", "note": "Outline only; community resolves single-line needs via Inkscape/Hershey text" },
+    { "cat": "3.3", "product": "KerfDesk", "score": 7, "star": false, "tag": "CODE", "note": "LightBurn-model dialog plus five presets and shared-grid live preview; loses on no sliders, no shortcut, S9-F1 silent override" },
+    { "cat": "3.3", "product": "LightBurn", "score": 8, "star": false, "tag": "OFF", "note": "Richest documented dialog: Cutoff/Threshold sliders, boundary select, fade/show-points, zoom/pan preview; no presets" },
+    { "cat": "3.3", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Identical documented control set to LightBurn; hands-on UX unverified" },
+    { "cat": "3.3", "product": "LaserGRBL", "score": 6, "star": false, "tag": "OFF", "note": "Utilitarian WinForms controls incl. spot removal, downsampling, adaptive quality, fill pass; no presets" },
+    { "cat": "3.3", "product": "XCS", "score": 6, "star": false, "tag": "OFF", "note": "Live blue-line preview, three sliders plus Layer-by-Color switch; fewer knobs than LightBurn" },
+    { "cat": "3.3", "product": "Easel", "score": 4, "star": false, "tag": "OFF", "note": "Minimal: Threshold, Smoothing, Invert, Trace Outlines; JPG/PNG only, no boundary select or presets" },
+    { "cat": "3.4", "product": "KerfDesk", "score": 6, "star": false, "tag": "PERC", "note": "Edge/sketch lanes perceptually covered (noisy-photo benchmark, region-enhance); photos route to Image Mode; no multi-tone/multi-colour vectorization reachable" },
+    { "cat": "3.4", "product": "LightBurn", "score": 6, "star": false, "tag": "OFF", "note": "High-contrast only by design; Sketch Trace for unevenly-lit sketches; photos routed to Image mode" },
+    { "cat": "3.4", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "Same limited story as LightBurn per docs: Sketch Trace, high-contrast sources recommended" },
+    { "cat": "3.4", "product": "LaserGRBL", "score": 2, "star": false, "tag": "OFF", "note": "Single-threshold B/W with brightness/contrast prep only; photos routed to raster importer" },
+    { "cat": "3.4", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "Strongest documented multi-tone story: color-block auto-trace plus Layer-by-Color split; quality unverified, photos excluded" },
+    { "cat": "3.4", "product": "Easel", "score": 2, "star": false, "tag": "COMM", "note": "Single threshold on grayscale; community confirms photos and low-res sources trace poorly" },
+    { "cat": "3.5", "product": "KerfDesk", "score": 7, "star": false, "tag": "TEST", "note": "Measured 2.2s at 1024px; decode-bomb guards, worker fallback, fail-closed parsing, budget caps; only one size datapoint" },
+    { "cat": "3.5", "product": "LightBurn", "score": -1, "star": false, "tag": "COMM", "note": "U — no 2.1 size/performance data; only historical 1.x crash/freeze reports" },
+    { "cat": "3.5", "product": "MillMage", "score": -1, "star": false, "tag": "OFF", "note": "U — no robustness or speed evidence found for 0.8.x" },
+    { "cat": "3.5", "product": "LaserGRBL", "score": 6, "star": false, "tag": "OFF", "note": "Only competitor with documented at-size mitigations (Downsampling, Adaptive Quality); no independent benchmarks" },
+    { "cat": "3.5", "product": "XCS", "score": -1, "star": false, "tag": "OFF", "note": "U — no at-size or degenerate-input evidence found for xTool Studio" },
+    { "cat": "3.5", "product": "Easel", "score": -1, "star": false, "tag": "OFF", "note": "U — SaaS; no published upload size limit or performance data" }
+  ],
+  "wins": [
+    { "cat": "3.2", "vs": "LightBurn", "delta": 8, "claim": "KerfDesk ships the roster's only perceptually-measured medial-axis centerline trace; LightBurn 2.1 has none (years-open feature request, users routed to Inkscape)." },
+    { "cat": "3.2", "vs": "LaserGRBL", "delta": 4, "claim": "KerfDesk's centerline holds sub-pixel deviation on re-run ground-truth strokes; LaserGRBL's own docs concede its centerline is less accurate with no fill option." },
+    { "cat": "3.2", "vs": "XCS", "delta": 3, "claim": "KerfDesk's centerline carries measured perceptual proof; xTool Studio's Center tracing is documented existence-only with no quality evidence." },
+    { "cat": "3.5", "vs": "LaserGRBL", "delta": 1, "claim": "Measured 2.2s trace at the 2048px cap plus code-verified decode-bomb/worker/fail-closed guards edge LaserGRBL's documented mitigations — LOW-CONFIDENCE, 4 of 5 competitor cells are U." }
+  ],
+  "gaps": [
+    { "cat": "3.1", "vs": "LightBurn", "delta": -1, "claim": "Outline fidelity is perceptually proven in isolation (IoU 0.953, maintainer reference-loop pass) but never compared side-by-side with LightBurn's Potrace output, so parity is unproven." },
+    { "cat": "3.3", "vs": "LightBurn", "delta": -1, "claim": "Number inputs instead of sliders, no trace keyboard shortcut, and the default Line Art preset's auto-sketch silently disables Cutoff/Threshold with no off switch (S9-F1, un-ADR'd)." },
+    { "cat": "3.4", "vs": "XCS", "delta": -1, "claim": "No multi-tone or multi-colour vectorization is reachable from KerfDesk's UI (imagetracerjs lane is dead code), while xTool Studio documents color-block auto-trace with per-color layer splitting." }
+  ],
+  "notVerified": [
+    "3.1: no side-by-side vs LightBurn trace output (ADR-123/ADR-030 record it outstanding); no physical burn; env-gated ARCH_LOOP rendered reference loop not re-run this session (maintainer pass cited from ADR-128)",
+    "3.2: perceptual proof is synthetic ground-truth strokes and benchmark fixtures only — no real handwriting/signature/sketch verified; no maintainer visual pass ADR-recorded for centerline specifically",
+    "3.3: dialog not run live this session (read-only, rule 4) — UX statements are from code; LightBurn slider/Alt+T behavior is prior-audit knowledge, not re-verified; S9-F6 operationOverride not re-traced",
+    "3.4: no perceptual fixture of an actual photograph exists in the harness (photo-class fixtures are procedural; real-image fixtures are logos); LightBurn photo-trace not compared",
+    "3.5: single measured datapoint (1024x1024, 2182ms); no multi-megapixel or adversarial-input timing; worker offload/cancel/fallback not exercised in a real browser; guard unit tests not re-run this session",
+    "3.5 competitors: LightBurn, MillMage, XCS and Easel at-size behavior all U (4 of 5 cells) — category LOW-CONFIDENCE for cross-roster conclusions",
+    "MillMage (all rows): every cell is [OFF]-docs with the shared-LightBurn-engine assumption explicitly [INF]; no MillMage cell may anchor a headline",
+    "XCS: 3.1 comparative signal is XCS-era community consensus, not xTool-Studio-specific; 3.2 and 3.4 are [OFF] existence-level only"
+  ]
+}

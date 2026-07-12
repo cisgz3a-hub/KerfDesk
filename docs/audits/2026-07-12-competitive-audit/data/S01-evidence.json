@@ -1,0 +1,99 @@
+{
+  "sector": 1,
+  "categories": [
+    {
+      "id": "1.1",
+      "summary": "Drag-drawn rect/ellipse/polygon(6 sides)/star(5 points) plus click-driven polyline pen; Shift=regular, Ctrl=from-center; sub-0.5mm degenerate guard. Shapes are parametric core objects, but no UI edits the spec after creation — corner radius is hard-coded 0 and sides/points frozen (recorded ADR-051 P2 deferral; audit S2-F4 still current at pinned commit).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/shapes/shape-from-drag.ts:12-27,39-58 (four kinds, DEFAULT_POLYGON_SIDES=6, DEFAULT_STAR_POINTS=5, cornerRadiusMm:0, MIN_DRAW_SIZE_MM=0.5, Shift/Ctrl modifiers)" },
+        { "tag": "CODE", "cite": "src/ui/workspace/ToolStrip.tsx:17-27 (left tool palette: select/node/measure/rect/ellipse/polygon/star/polyline/position-laser)" },
+        { "tag": "CODE", "cite": "grep cornerRadius|polygonSides|starPoints in src/ui -> test fixtures only; no shape-property editor exists (confirms 2026-07-10-full-sweep-audit.md:271-279 S2-F4)" },
+        { "tag": "TEST", "cite": "src/ui/workspace/draw-tool.test.ts + src/ui/state/draw-shape-mutation.test.ts pass (vitest run 2026-07-12, 9 tests green in draw-tool.test.ts)" }
+      ],
+      "notVerified": "On-screen geometry of drawn stars/polygons/draft previews not perceptually verified (no render run); parametric re-edit absence confirmed by grep, but a differently-named editor could theoretically be missed."
+    },
+    {
+      "id": "1.2",
+      "summary": "Pen draws straight-segment polylines only (rubber-band preview, Shift 45-degree constrain); no bezier drawing or curve-handle control anywhere. Node editor: select/multi-select within one object, drag, nudge, delete — no insert-node, smooth/corner, line-curve conversion, or break/join. Only imported-svg, traced-image, and polyline shapes are node-editable; primitives/text silently require Convert to Path with no hint (S2-F5 unchanged).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/ui/workspace/draw-pen-preview.ts:1-26 (pen = in-progress polyline, straight segments); src/ui/state/ui-store.ts:72-76 (PenDraft = vertices array)" },
+        { "tag": "CODE", "cite": "src/ui/state/path-node-edit-actions.ts:27-35 (action surface: select/nudge/delete/drag only); grep insertNode|addNode|smoothNode|breakPath in src -> no matches" },
+        { "tag": "CODE", "cite": "src/ui/workspace/path-node-hit-test.ts:76-80 (isEditablePathObject: imported-svg | traced-image | shape.spec.kind==='polyline' only)" },
+        { "tag": "TEST", "cite": "src/ui/state/path-node-edit-actions.test.ts 11 tests pass (vitest run 2026-07-12)" }
+      ],
+      "notVerified": "Node-drag feel and handle rendering not perceptually verified; whether an undocumented ADR records the node-editor scope (greps of DECISIONS.md found none, per prior audit S2-F5)."
+    },
+    {
+      "id": "1.3",
+      "summary": "clipper2-backed Weld, Subtract, Intersect, Exclude, Convert to Path, Break Apart, plus design-time inward/outward offset (result added as new object). Post-audit fix landed: ops return canonical Result (ADR-131) and failures now surface as warning toasts — the 2026-07-10 silent-swallow finding (S2-F1/S2-F9) is fixed and test-asserted. Offset remains a selection-gated panel row, absent from the Tools menu (S2-F8 unchanged).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/ui/state/vector-path-actions.ts:126-204 (weld/boolean/offset mutations; error branch pushes warning toast, comment cites CNV-04/CNV-10)" },
+        { "tag": "CODE", "cite": "DECISIONS.md:6311-6337 (ADR-131 canonical Result<T,E>; supersedes throw-and-swallow); src/core/geometry/vector-path-tools.ts:14-22" },
+        { "tag": "TEST", "cite": "src/ui/state/vector-path-actions.test.ts:182-215 asserts warning toast on failed boolean/offset; 9 tests pass (vitest run 2026-07-12)" },
+        { "tag": "CODE", "cite": "src/ui/commands/AppMenuBar.tsx:156 (Tools group: convert-to-path/weld/subtract/intersect/exclude — no offset); src/ui/layers/OffsetPathsRow.tsx:16-27 (panel-only, returns null when ineligible)" },
+        { "tag": "CODE", "cite": "src/ui/commands/selection-command-state.ts:77-97 (closed-contour + metadata-compatibility gating for weld/booleans)" }
+      ],
+      "notVerified": "Geometric correctness of boolean results (holes, shared edges, near-tangent cases) not perceptually verified; only structural tests run. No 'union' labeled op — weld serves that role; naming parity vs competitors is a rater judgment."
+    },
+    {
+      "id": "1.4",
+      "summary": "Text is a modal Add Text dialog: 4 bundled fonts only (Roboto, Inconsolata, Pacifico, Dancing Script; ADR-012 bans system fonts), size, left/center/right alignment, line-height, letter-spacing, diacritic buttons; double-click re-edits with transform preserved. No bold/italic variants, no text-on-path/arc text (ADR-103 roadmap item), no on-canvas typing, no text tool in the palette. Text objects carry vector paths so generic Weld accepts them.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/text/font-registry.ts:25-53 (exactly four KnownFontKeys, single Regular weight each)" },
+        { "tag": "CODE", "cite": "src/ui/text/AddTextDialog.tsx:87-170,211 (content/font/size/alignment/lineHeight/letterSpacing fields; add+edit modes)" },
+        { "tag": "CODE", "cite": "grep textOnPath|arcText|curvedText|bold|italic in src/core/text -> no matches; src/ui/workspace/ToolStrip.tsx:17-27 (no text tool in palette; Tools menu command tools.add-text at src/ui/commands/command-families.ts:75)" },
+        { "tag": "CODE", "cite": "src/core/geometry/vector-path-tools.ts:14-17 (VectorSceneObject = any SceneObject with paths, includes text -> weld-eligible); prior audit detail 2026-07-10-full-sweep-audit.md:251-259 (S2-F2 CONFIRMED)" },
+        { "tag": "TEST", "cite": "src/ui/text/AddTextDialog.test.tsx 5 tests pass (vitest run 2026-07-12)" }
+      ],
+      "notVerified": "Glyph rendering fidelity and kerning quality not perceptually verified; weld-on-text exercised only via type-level eligibility, not a rendered glyph-weld case."
+    },
+    {
+      "id": "1.5",
+      "summary": "Numeric Edits toolbar: X/Y/W/H/Rotation entry in mm/deg against a 9-point anchor grid (reference-point model), aspect-ratio lock, finite-input validation, and explicit error toasts (unlocked resize blocked on rotated selections; multi-object rotation blocked). Flip Horizontal/Vertical commands; keyboard nudge; Shift constrains moves to 45 degrees. No skew transform exists (skew appears only in SVG import parsing).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/ui/commands/NumericEditsBar.tsx:18,94-168,281-289 (anchor grid, X/Y/W/H/R fields, AR lock, error messages)" },
+        { "tag": "CODE", "cite": "src/ui/commands/arrange-command-family.ts:51-89 (flip-horizontal / flip-vertical commands with disabled reasons)" },
+        { "tag": "CODE", "cite": "grep -i skew in src -> only io/svg/parse-svg.ts, core/camera/rodrigues.ts, ui/camera (no editing-surface skew)" },
+        { "tag": "CODE", "cite": "src/ui/workspace/drag-state.ts:331-365 (Shift 45-degree move constrain, audit C4)" },
+        { "tag": "TEST", "cite": "src/ui/commands/NumericEditsBar.test.tsx 4 tests + src/ui/app/shortcuts.test.ts 23 tests pass (vitest run 2026-07-12)" }
+      ],
+      "notVerified": "Rotated-selection W/H limitation vs LightBurn behavior not compared hands-on; interactive scale/rotate handle accuracy not perceptually verified."
+    },
+    {
+      "id": "1.6",
+      "summary": "Seven align kinds (left/center-x/right/top/center-y/bottom/both-centers) and four distribute kinds (horizontal/vertical, centers or spacing) as gated commands with disabled-reason tooltips (2-object / 3-object minimums). Dedicated Measure tool in the palette reports distance, delta, and angle with Shift line-snap. Extra: align/center/fit to a captured registration board (ADR-124/125).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/scene/selection-align.ts:5-12; src/core/scene/selection-distribute.ts:5-9 (kind unions)" },
+        { "tag": "CODE", "cite": "src/ui/commands/arrange-command-family.ts:4-26 (align/distribute command registration with disabled reasons)" },
+        { "tag": "CODE", "cite": "src/ui/help/help-topics.ts:85-88 (Measure tooltip: distance, delta, angle, Shift snap); src/ui/workspace/drag-state.ts:88-90 (measure drag state)" },
+        { "tag": "CODE", "cite": "src/ui/state/selection-transform-actions.ts:28-61 (alignSelection/distributeSelection/alignSelectionToRegistrationBox/fitSelectionToBoard)" },
+        { "tag": "TEST", "cite": "src/ui/state/selection-transform-actions.test.ts 7 tests pass (vitest run 2026-07-12)" }
+      ],
+      "notVerified": "Measure readout rendering and align results on rotated objects (AABB-based bounds) not perceptually verified — prior audit flagged AABB marquee/bounds on rotated shapes as statically untestable."
+    },
+    {
+      "id": "1.7",
+      "summary": "Object edge/center + grid snapping with rendered guide lines, per-axis, excluding locked objects; Ctrl temporarily bypasses (LightBurn-consistent). But snapping applies to move drags ONLY — not draw, scale, pen, or node drags; snap distance (2mm) and snap-grid (10mm) have no editing UI and don't persist; the toggle is an unlabeled '#' button in the zoom chip; canvas grid is fixed 10mm; no user-placed guides or rulers. Audit S2-F10 unchanged.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/ui/workspace/snapping.ts:12-28,42-48 (SnapSettings, defaults 2mm/10mm, pure snapMoveTransform emitting guides)" },
+        { "tag": "CODE", "cite": "src/ui/workspace/drag-snap.ts:35-48 (non-move drags return guides:[]; Ctrl/Cmd bypass)" },
+        { "tag": "CODE", "cite": "src/ui/workspace/overlays.tsx:39-54 ('#' toggle, only snap UI; only enabled is togglable); grep setSnapSettings -> overlays.tsx only" },
+        { "tag": "CODE", "cite": "src/ui/workspace/draw-scene.ts:226-241 (hard-coded 10mm grid lines); grep guide|ruler in overlays -> no user-guide surface" },
+        { "tag": "TEST", "cite": "src/ui/workspace/snapping.test.ts 4 tests pass (vitest run 2026-07-12)" }
+      ],
+      "notVerified": "Guide-line rendering and snap feel not perceptually verified; snap-settings persistence absence inferred from ui-store (no persist wiring found) but not exercised in a live session."
+    },
+    {
+      "id": "1.8",
+      "summary": "Ctrl+D duplicates in place (post-audit fix — the unrecorded 10mm stagger flagged as S2-F3 was removed and is test-asserted; Ctrl+U ungroup alias also added); copy/cut/paste with stagger. Step-and-repeat array exists (explicit rows x cols or fit-as-many-as-fit, gap control, 100/axis and 500-total caps, ADR-125 A2) but only tiles onto a captured/placed board in the board-capture panel — no board-independent design-time grid array, no circular array, no offset-duplicate.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/ui/state/scene-mutations.ts:213-238 (applyDuplicate clones exactly over source, comment cites LightBurn parity)" },
+        { "tag": "TEST", "cite": "src/ui/state/duplicate.test.ts:10-27 (asserts in-place, no stagger) + src/ui/app/shortcuts.test.ts:411-417 (Ctrl+U ungroup) pass (vitest run 2026-07-12)" },
+        { "tag": "CODE", "cite": "src/core/scene/tile-into-region.ts:10-29 (TileLayout grid|fill, MAX_TILE_PER_AXIS=100, MAX_TILE_TOTAL=500); src/ui/laser/board-capture/BoardArrayForm.tsx:1-32 (array UI lives in board-capture panel, ADR-125 A2)" },
+        { "tag": "CODE", "cite": "DECISIONS.md:6055 (ADR-125 fill-the-board: auto-fit + array onto the placed board); grep circular in src/ui -> no circular-array feature" },
+        { "tag": "TEST", "cite": "src/ui/state/board-tile-actions.test.ts 7 tests + src/core/scene/tile-into-region.test.ts 13 tests pass (vitest run 2026-07-12)" }
+      ],
+      "notVerified": "Array placement not visually verified; whether the board-capture array is reachable without hardware (a jig/board can be placed without a machine, but the flow was not live-run)."
+    }
+  ]
+}

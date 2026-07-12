@@ -1,0 +1,152 @@
+{
+  "sector": 3,
+  "categories": [
+    {
+      "id": "3.1",
+      "summary": "Own clean-room contour engine (ADR-123) with ADR-128 measured-boundary upgrade: sub-pixel iso-line extraction, 2x supersample, Whittaker-Henderson fair-then-fit cubic fitting; maintainer-approved perceptual reference-loop pass. Re-run this session: real-logo IoU 0.953 (precision 0.979 / recall 0.973), zero open polylines, worst vertex 1.41px from ink, six-benchmark loop rated 10/10. Known trade: IoU deliberately drops on textured art (fairness over ink roughness).",
+      "evidence": [
+        {
+          "tag": "PERC",
+          "cite": "ADR-128, DECISIONS.md:6192-6267 — measured-boundary pipeline; 'Perceptually verified against the reference on letters, serifs, arch bands, waves and roof lines' via the maintainer reference-pair loop (15 iterations per memory/PR #51); 'NOT verified on physical laser output'"
+        },
+        {
+          "tag": "PERC",
+          "cite": "pnpm vitest run this session (2026-07-12): src/__fixtures__/perceptual/arch-house-baseline.test.ts — 4/4 pass on the real 1024x1024 logo: mask IoU=0.953, precision=0.979, recall=0.973 (floor 0.9); 72 closed / 0 open polylines; LANGEBAAN word-band ink 3545px (floor 3000)"
+        },
+        {
+          "tag": "PERC",
+          "cite": "pnpm vitest run this session: src/__fixtures__/perceptual/arch-house-apex-fidelity.test.ts — worst traced-vertex distance to drawn ink: Line Art 1.41px, Smooth 1.71px, Sharp 3.41px (no fabricated spikes)"
+        },
+        {
+          "tag": "PERC",
+          "cite": "pnpm vitest run this session: src/__fixtures__/perceptual/trace-benchmark-loop.test.ts — 6-benchmark rated loop (edge-square-canny-quality, edge-noisy-photo-controls, edge-segmented-curve-linking, arch-house-edge-curve-cleanup, centerline-landed-regression, arch-house-line-art-baseline) audits at rating 10/10, zero findings"
+        },
+        {
+          "tag": "TEST",
+          "cite": "pnpm vitest run this session: src/core/trace/trace-perceptual.test.ts — 7/7 pass; synthetic analytic-ground-truth IoU floors 0.95-0.97 (solid-square, filled-disc, ring-annulus, plus-stroke, square-glyph); file header states scope: geometric coverage, 'NOT as good as LightBurn'"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/contour-trace.ts:113 (shared finisher), src/core/trace/fair-chain.ts, fit-cubics.ts, flatten-straight-runs.ts (fair-then-fit stack); src/core/trace/trace-presets.ts:14-57 (Line Art: supersampleContour, fillPinholeCracks, auto-upscale)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "ADR-025, DECISIONS.md:868-927 — perceptual harness design (analytic ground truth, even-odd rasterizer, IoU/precision/recall instruments, instrument-first testing)"
+        }
+      ],
+      "notVerified": "No side-by-side against LightBurn's trace output (ADR-123/ADR-030 record that as outstanding). No physical burn of any traced output (ADR-128: geometry only). The full ARCH_LOOP rendered-artifact reference loop (arch-house-reference-loop.test.ts, env-gated ARCH_LOOP=1) was not re-run this session — the maintainer-approved pass is cited from ADR-128, not reproduced. Instrument caveat: IoU/chamfer are blind to fairness; ADR-128 accepts a small IoU drop on textured art by design."
+    },
+    {
+      "id": "3.2",
+      "summary": "From-scratch medial-axis centerline lane (distance field, medial thinning, stroke graph, spur pruning, junction condensing/pairing, chain smoothing, curve fit/refine, loop closure); Centerline preset with Otsu binarize, pinhole fill, join-gap control. Perceptual bar re-run this session: max deviation 0.79px, max gap 0.96px, zero short fragments across straight/diagonal/corner/cross/arc ground-truth strokes. Untouched by ADR-128; ADR-058 records corner/arc thinning polish as pending.",
+      "evidence": [
+        {
+          "tag": "PERC",
+          "cite": "pnpm vitest run this session (2026-07-12): src/__fixtures__/perceptual/centerline-bar.test.ts — 6/6 pass; measured: h-stroke maxDev 0.69px/maxGap 0.88px, diagonal 0.19px/0.31px, l-corner 0.69px/0.88px, cross 0.69px/0.88px (2 fragments = 2 expected strokes), arc 0.79px/0.96px, noisy-spur 0.69px — all inside (mostly well inside) the pinned limits, 0 short fragments everywhere"
+        },
+        {
+          "tag": "PERC",
+          "cite": "pnpm vitest run this session: src/__fixtures__/perceptual/trace-benchmark-loop.test.ts — 'centerline-landed-regression' benchmark passes inside the 10/10 rated loop"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/centerline/ — 24-module pipeline (distance-field.ts, medial-thinning.ts, stroke-graph.ts, spur-pruning.ts, junction-condense.ts, junction-pairing.ts, chain-smoothing.ts, curve-fit.ts, curve-refine.ts, loop-closure.ts, seam-repair.ts, sharpen-bends.ts, thick-blob.test.ts...); entry src/core/trace/centerline/trace-centerline.ts:26 shares preprocessForTrace binarization"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/trace-presets.ts:58-86 — Centerline preset: traceMode 'centerline', Otsu, despeckle 12, fillPinholeCracks (crack down a stroke would split the skeleton), centerlineJoinGapPx 3, deliberate opt-OUT of whole-size upscale (adds sub-pixel wobble to flat centerlines, per trace-pipeline integration test)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "ADR-128 scope note, DECISIONS.md:6244-6245 — 'Centerline (the skeleton lane) is untouched' by the measured-boundary upgrade; centerline-bar.test.ts:38-51 pins ADR-058's pending corner/arc thinning work with relaxed limits (l-corner 1.6px, arc maxGap 3.5px) so it cannot regress silently"
+        }
+      ],
+      "notVerified": "Perceptual proof is synthetic ground-truth strokes (bars, corners, crosses, arcs) plus benchmark fixtures only — no real hand-drawing, script/signature, or complex sketch was perceptually verified this session, and no maintainer visual pass is ADR-recorded for centerline specifically (ADR-128's reference-loop pass covers the contour/edge lanes). No LightBurn centerline side-by-side. No physical burn."
+    },
+    {
+      "id": "3.3",
+      "summary": "ADR-030 LightBurn-model dialog: five presets, Cutoff/Threshold band, Ignore Less Than, Smoothness, Optimize, alpha mask, sketch trace, drag boundary crop/enhance, opt-in delete-after; 300ms-debounced live preview shares the exact commit trace function and 2048px pixel grid. Defects still in tree: number inputs not sliders, no keyboard shortcut, and Line Art's auto-sketch silently disables Cutoff/Threshold with no off switch (S9-F1).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/trace/TraceSettingsControls.tsx:100-144 (Ignore Less Than / Smoothness / Optimize / alpha mask / sketch controls + reset); ADR-030 at DECISIONS.md:1219 (LightBurn Cutoff/Threshold control model)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/trace/use-trace-preview.ts:6-19 — preview and commit share the SAME trace function (traceImageWithFallback), 300ms debounce, latest-call-wins token; src/ui/trace/image-loader.ts:27-30 — PREVIEW_MAX_EDGE_PX pinned to the 2048 commit cap so preview and commit use one pixel grid"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/trace/ImportImageDialog.tsx:90-161 + use-boundary-selection.ts + BoundaryModePicker.tsx — drag-a-boundary crop/region-enhance with clear; src/core/trace/trace-presets.ts:13-182 — five tuned presets (Line Art default, Centerline, Edge Detection, Smooth, Sharp)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DEFECT S9-F1 still present at pinned commit: src/core/trace/trace-image.ts:128 (sketch branch runs before applyThreshold at :143), trace-presets.ts:39 (Line Art autoSketchTrace:true), TraceSettingsControls.tsx:135-143 (Line Art renders an explanatory note instead of the Force Sketch Trace checkbox — no off switch); 'Force Sketch Trace' checkbox exists for the other presets"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DEFECT S9-F9 still present: all trace settings are type=\"number\" fields (TraceSettingsControls.tsx:246, single NumberRow component) — no sliders; no trace keyboard shortcut found (grep of src/ui/commands for a trace shortcut: none); LightBurn uses draggable sliders + Alt+T (full-sweep audit S9-F9, product knowledge, not re-verified)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/trace/use-trace-preview.test.ts, ImportImageDialog.test.ts + ImportImageDialog.workflow.test.ts, trace-options.test.ts, TracePreview.test.tsx — dialog/preview behavior under automated test (not run this session; suite green at merge 3e453074 per repo record)"
+        }
+      ],
+      "notVerified": "The dialog was not run live this session (read-only; no dev-server interaction per rule 4) — all UX statements are from code. LightBurn's current slider/shortcut behavior is from the prior audit's product knowledge, not re-verified. Whether S9-F6 (trace commits an object-level Fill operationOverride, bypassing layer-mode semantics) still holds was not re-traced this session."
+    },
+    {
+      "id": "3.4",
+      "summary": "Photos deliberately route to Image Mode raster, not trace. Non-binary sources get: auto-sketch local-contrast promotion, Edge Detection preset (shares the ADR-128 measured-boundary finisher), brightness/contrast/gamma/invert adjustments, region-enhance boxed re-trace (ADR-113). No multi-tone or multi-colour vectorization is reachable from the UI — the imagetracerjs lane is dead code. Noisy-photo edge-controls and real-logo region-enhance perceptual benchmarks pass; the auto-sketch trap (S9-F1) hits exactly colour-rich sources.",
+      "evidence": [
+        {
+          "tag": "PERC",
+          "cite": "pnpm vitest run this session (2026-07-12): trace-benchmark-loop.test.ts 'edge-noisy-photo-controls' benchmark (procedural noisy-photo fixture, buildNoisyPhotoControlsBenchmark) passes inside the 10/10 rated loop; src/__fixtures__/perceptual/region-enhance-recovery.test.ts passes on the real logo — enhanced region censuses 2 closed loops per 'A' (counter preserved), geometry outside the region untouched"
+        },
+        {
+          "tag": "PERC",
+          "cite": "ADR-128, DECISIONS.md:6206,6244 — the edge lane (the multi-tone/colour-art trace path) shares the measured-boundary finisher and is covered by the maintainer-approved reference-loop perceptual pass"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/trace-image.ts:104-108 — 'Trace creates vectors; raster dither/photo processing belongs to Image Mode, not Trace' (deliberate scope split); :128-137 auto-sketch local-contrast branch (SKETCH_RADIUS_PX 8, scaled by pixelScale); :253-274 brightness/contrast/gamma/invert adjustments with non-finite normalization"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/trace-to-paths.ts:207-217 — dispatchTrace routes centerline/edge/binary-contour in-house; imagetracerjs fires only for multi-colour non-preset options no UI produces (all five presets are 2-colour fixed-palette, trace-presets.ts; full-sweep S9-F12: the fallback's DEFAULT_TRACE_OPTIONS path degenerates on binary input)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/region-enhance.ts + src/ui/trace/region-enhance-trace.ts (ADR-113 boxed supersampled re-trace patch); src/core/trace/local-contrast-mask.ts + edge-trace.ts (Edge Detection lane for full-colour art); DEFECT S9-F1 (auto-sketch silently overrides the user's Cutoff/Threshold on colour-rich images) confirmed still present, see 3.3"
+        }
+      ],
+      "notVerified": "No perceptual evidence of tracing an actual photograph exists anywhere in the harness — photo-class fixtures are procedural (noise-over-shapes), and the real-image fixtures are logos. Multi-tone (grayscale-band/posterize) and multi-colour trace are absent as capabilities, not unverified: no UI path produces them. LightBurn's photo-trace behavior was not compared. Note S3 photo ENGRAVING lives in sector S4 (Image Mode), where the prior audit found zero perceptual coverage."
+    },
+    {
+      "id": "3.5",
+      "summary": "2048px decode cap shared by preview and commit; header-probe decode-bomb guards (32768px edge / 100M pixel); Web Worker tracing with inline fallback and timeout tests; malformed-buffer fail-closed guard; non-finite settings normalize to neutral; supersample budget cap keeps the 4x cost off large photos. Measured this session: 2.2s Line Art on the 1024x1024 real logo (ADR-128 records the 0.6s-to-2-3.5s cost increase as accepted). Multi-file batch trace exists.",
+      "evidence": [
+        {
+          "tag": "TEST",
+          "cite": "pnpm vitest run this session (2026-07-12): arch-house-baseline.test.ts logged '1024x1024 Line Art: 2182ms, 72 closed polylines, 0 open polylines, 27423 points' — real measured speed at size on this machine, consistent with ADR-128's stated 2-3.5s cost (DECISIONS.md:6261-6263)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/trace/image-loader.ts:27-35 — MAX_EDGE_PX 2048 (rationale + registration-safety documented), MAX_SAFE_DECODE_EDGE_PX 32768 and MAX_SAFE_DECODE_PIXELS 100M header-probe guards before decode"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/trace-image.ts:113-117 — preprocessForTrace fails closed on malformed RawImageData; :255-261 non-finite brightness/contrast/gamma normalize to neutral instead of blackening; src/core/trace/trace-to-paths.ts:196-199 — MAX_UPSCALE_SOURCE_PIXELS budget cap keeps 2x supersample off photos/huge scans"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/trace/trace-image-guards.test.ts:30-66 (fail-closed malformed image; non-finite adjustment fuzz), src/ui/trace/use-trace-worker-client-timeout.test.ts + use-trace-worker-client.test.ts (worker timeout/fallback), src/ui/trace/image-loader.test.ts — exist in tree; NOT run this session (targeted perceptual subset only); green at merge 3e453074 per repo record"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/trace/trace-worker.ts (dedicated Web Worker, inline fallback per full-sweep audit: keeps 50-500ms+ trace off the main thread, module/tracer cache reuse); src/ui/commands/multi-file-trace-action.ts + src/core/trace/batch-trace.ts (multi-file batch trace); src/core/trace/auto-upscale.ts (small/thin-source supersampling)"
+        }
+      ],
+      "notVerified": "No multi-megapixel photo or adversarial large-input trace was timed this session — the only measured datapoint is the 1024x1024 logo. Worker behavior (offload, cancellation, fallback) was not exercised in a real browser, only via its unit tests (which were not re-run). The prior audit's degenerate-input claims (e.g. imagetracerjs quantizer degeneration on the unreachable fallback path) were re-read in code, not executed."
+    }
+  ]
+}
