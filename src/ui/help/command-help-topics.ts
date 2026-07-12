@@ -274,6 +274,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'arrange',
     tooltip: 'Create a bounded grid or circular array from the selected artwork.',
   },
+  'arrange.quick-nest': {
+    family: 'arrange',
+    tooltip: 'Pack selected groups and objects deterministically without overlap.',
+  },
   'arrange.flip-horizontal': {
     family: 'arrange',
     tooltip: 'Mirror the selected artwork horizontally around its center.',

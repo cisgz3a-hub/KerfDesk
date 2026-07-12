@@ -85,6 +85,7 @@ export type CommandId =
   | 'arrange.distribute-vertical-spacing'
   | 'arrange.break-apart'
   | 'arrange.array'
+  | 'arrange.quick-nest'
   | 'arrange.flip-horizontal'
   | 'arrange.flip-vertical'
   | 'laser.connect'
@@ -214,6 +215,7 @@ export type AppCommandContext = {
   readonly canBreakApartSelection: boolean;
   readonly breakApartSelection: () => void;
   readonly createArray: () => void;
+  readonly quickNest: () => void;
   readonly flipHorizontal: () => void;
   readonly flipVertical: () => void;
   readonly connectLaser: () => void;

@@ -251,6 +251,7 @@ function arrangeCommandContext(
   | 'flipHorizontal'
   | 'flipVertical'
   | 'createArray'
+  | 'quickNest'
 > {
   return {
     alignSelection: app.alignSelection,
@@ -259,6 +260,7 @@ function arrangeCommandContext(
     flipHorizontal: () => app.flipSelection('horizontal'),
     flipVertical: () => app.flipSelection('vertical'),
     createArray: callbacks.requestArray,
+    quickNest: callbacks.requestQuickNest,
   };
 }
 

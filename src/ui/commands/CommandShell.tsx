@@ -48,8 +48,9 @@ import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
+import { QuickNestDialogHost } from './QuickNestDialogHost';
 
-type SettingsDialogKind = 'optimization' | 'array' | 'labs' | 'rotary' | null;
+type SettingsDialogKind = 'optimization' | 'array' | 'nest' | 'labs' | 'rotary' | null;
 
 export function CommandShell(): JSX.Element {
   const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
@@ -83,6 +84,7 @@ export function CommandShell(): JSX.Element {
     requestFocusTest: () => jobAwareAlert(FOCUS_TEST_UNAVAILABLE_MESSAGE),
     requestOptimizationSettings: () => setSettingsDialog('optimization'),
     requestArray: () => setSettingsDialog('array'),
+    requestQuickNest: () => setSettingsDialog('nest'),
     requestRotarySetup: () => setSettingsDialog('rotary'),
     requestLabsSettings: () => setSettingsDialog('labs'),
     requestProjectNotes: () => setProjectNotesOpen(true),
@@ -132,6 +134,7 @@ function SettingsDialogHost(props: {
 }): JSX.Element | null {
   if (props.current === 'optimization') return <OptimizationDialog onClose={props.onClose} />;
   if (props.current === 'array') return <ArrayDialogHost onClose={props.onClose} />;
+  if (props.current === 'nest') return <QuickNestDialogHost onClose={props.onClose} />;
   if (props.current === 'labs') return <LabsSettingsDialog onClose={props.onClose} />;
   if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;
   return null;

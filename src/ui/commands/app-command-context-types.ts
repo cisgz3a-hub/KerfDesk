@@ -14,6 +14,7 @@ export type CommandShellCallbacks = {
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
   readonly requestArray: () => void;
+  readonly requestQuickNest: () => void;
   readonly requestRotarySetup: () => void;
   readonly requestLabsSettings: () => void;
   readonly requestProjectNotes: () => void;

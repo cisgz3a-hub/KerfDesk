@@ -118,6 +118,7 @@ import {
 } from './store-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
+import { nestActions, type NestActions } from './nest-actions';
 
 export type { ImportOutcome } from './scene-mutations';
 
@@ -133,6 +134,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 
 export type AppState = ObjectPropertiesActions &
   ArrayActions &
+  NestActions &
   VariableDataActions &
   ImageMaskActions &
   ProjectOptimizationActions &
@@ -466,6 +468,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...pathNodeEditActions(set),
   ...objectDeleteActions(set),
   ...arrayActions(set),
+  ...nestActions(set, get),
   ...variableDataActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
