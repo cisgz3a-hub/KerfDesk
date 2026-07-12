@@ -24,6 +24,7 @@ export type ResumeProgramError = {
 export type ResumeProgramResult = ResumeProgram | ResumeProgramError;
 
 export type ResumeOptions = {
+  readonly machineKind: 'laser' | 'cnc';
   readonly safeZMm: number;
   readonly spindleSpinupSec: number;
   readonly plungeMmPerMin: number;
@@ -32,6 +33,7 @@ export type ResumeOptions = {
 type ModalState = {
   units: 'G20' | 'G21';
   spindle: 'M3' | 'M4' | 'M5';
+  lastActiveSpindle: 'M3' | 'M4' | null;
   // Modal motion mode. A G0 rapid ignores F; only a G1 feed move carries a real
   // plunge feed. null until the first G0/G1 word is seen.
   motionMode: 'G0' | 'G1' | null;
@@ -63,6 +65,7 @@ export function buildResumeProgram(
   const state: ModalState = {
     units: 'G21',
     spindle: 'M5',
+    lastActiveSpindle: null,
     motionMode: null,
     sValue: null,
     feed: null,
@@ -75,7 +78,17 @@ export function buildResumeProgram(
     const issue = applyLine(state, lines[i] ?? '');
     if (issue !== null) return { kind: 'error', reason: `Line ${i + 1}: ${issue}` };
   }
-  const tail = lines.slice(fromLine - 1);
+  const recoveryLine =
+    options.machineKind === 'cnc'
+      ? findCncSafeBoundary(lines, fromLine, state.units, options.safeZMm)
+      : fromLine;
+  if (recoveryLine === null) {
+    return {
+      kind: 'error',
+      reason: 'No prior safe retract boundary exists for this CNC resume point.',
+    };
+  }
+  const tail = lines.slice(recoveryLine - 1);
   if (tail.every((line) => stripComments(line).trim() === '')) {
     return { kind: 'error', reason: 'Nothing left to run from that line.' };
   }
@@ -83,7 +96,7 @@ export function buildResumeProgram(
   return {
     kind: 'ok',
     lines: [...preamble, ...tail],
-    fromLine,
+    fromLine: recoveryLine,
     preambleCount: preamble.length,
   };
 }
@@ -153,44 +166,38 @@ function applyGWord(state: ModalState, value: number): string | null {
 }
 
 function applyMWord(state: ModalState, value: number): void {
-  if (value === 3) state.spindle = 'M3';
-  if (value === 4) state.spindle = 'M4';
+  if (value === 3) {
+    state.spindle = 'M3';
+    state.lastActiveSpindle = 'M3';
+  }
+  if (value === 4) {
+    state.spindle = 'M4';
+    state.lastActiveSpindle = 'M4';
+  }
   if (value === 5) state.spindle = 'M5';
 }
 
 function buildPreamble(state: ModalState, options: ResumeOptions): ReadonlyArray<string> {
   const header: string[] = ['; KerfDesk resume preamble', state.units, 'G90'];
-  // Z words mean the program is Z-aware (CNC/router); their absence means laser.
-  // The spindle ORDER differs by machine and is safety-critical: a router spins
-  // up BEFORE it moves (bit at speed before the plunge), but a laser must travel
-  // to the resume point BEFORE the beam is ever armed. Sharing the CNC order on
-  // a laser fired a stationary dot at the parked position and then travelled with
-  // the beam armed, because M3 constant power (and the spin-up G4 dwell) turns the
-  // diode on the instant it is issued (audit C1).
-  const body = state.z !== null ? cncResumeBody(state, options) : laserResumeBody(state);
+  // Recovery order is machine-specific. CNC extracts Z before commanding a
+  // spindle restart; laser positions with the beam off before it is armed.
+  const body =
+    options.machineKind === 'cnc' ? cncResumeBody(state, options) : laserResumeBody(state);
   return [...header, ...body];
 }
 
-// CNC/router re-entry: arm + spin up the spindle, retract to safe Z, travel to
-// the resume XY, then feed back down to the recorded depth. Byte-identical to the
-// pre-audit shared preamble for Z-aware programs.
+// CNC recovery rewinds to a pure safe-Z boundary. Extract first so a stopped
+// spindle is never asked to accelerate while the bit is embedded; then spin up
+// at clearance. The replayed boundary owns XY positioning and the plunge.
 function cncResumeBody(state: ModalState, options: ResumeOptions): string[] {
-  const lines: string[] = [];
-  if (state.spindle !== 'M5' && state.sValue !== null) {
-    lines.push(`${state.spindle} S${formatNumber(state.sValue)}`);
+  const safeZ = programUnitsFromMm(options.safeZMm, state.units);
+  const fallbackFeed = programUnitsFromMm(options.plungeMmPerMin, state.units);
+  const extractionFeed = state.plungeMmPerMin ?? fallbackFeed;
+  const lines: string[] = [`G1 Z${formatNumber(safeZ)} F${formatNumber(extractionFeed)}`];
+  if (state.lastActiveSpindle !== null && state.sValue !== null) {
+    lines.push(`${state.lastActiveSpindle} S${formatNumber(state.sValue)}`);
     lines.push(`G4 P${options.spindleSpinupSec.toFixed(3)}`);
   }
-  lines.push(`G0 Z${formatNumber(options.safeZMm)}`);
-  const move = positionMove(state);
-  if (move !== null) lines.push(move);
-  // Feed back down to the recorded depth so XY-only cut lines that follow
-  // resume in the material, not at safe height — at the job's own plunge feed
-  // (options.plungeMmPerMin is only a fallback when no plunge was seen).
-  if (state.z !== null && state.z < options.safeZMm) {
-    const plunge = state.plungeMmPerMin ?? options.plungeMmPerMin;
-    lines.push(`G1 Z${formatNumber(state.z)} F${formatNumber(plunge)}`);
-  }
-  if (state.feed !== null) lines.push(`F${formatNumber(state.feed)}`);
   return lines;
 }
 
@@ -215,6 +222,35 @@ function positionMove(state: ModalState): string | null {
   const x = state.x === null ? '' : ` X${formatNumber(state.x)}`;
   const y = state.y === null ? '' : ` Y${formatNumber(state.y)}`;
   return `G0${x}${y}`;
+}
+
+function findCncSafeBoundary(
+  lines: ReadonlyArray<string>,
+  fromLine: number,
+  units: ModalState['units'],
+  safeZMm: number,
+): number | null {
+  const safeZ = programUnitsFromMm(safeZMm, units);
+  for (let index = fromLine - 1; index >= 0; index -= 1) {
+    if (isPureSafeRetract(lines[index] ?? '', safeZ)) return index + 1;
+  }
+  return null;
+}
+
+function isPureSafeRetract(rawLine: string, safeZ: number): boolean {
+  const words: GcodeWord[] = [...stripComments(rawLine).matchAll(WORD_RE)].map((match) => ({
+    letter: (match[1] ?? '').toUpperCase(),
+    value: Number(match[2]),
+  }));
+  const isRapid = words.some((word) => word.letter === 'G' && word.value === 0);
+  const z = words.find((word) => word.letter === 'Z')?.value;
+  const hasLateralMotion = words.some((word) => word.letter === 'X' || word.letter === 'Y');
+  return isRapid && z !== undefined && z >= safeZ && !hasLateralMotion;
+}
+
+function programUnitsFromMm(value: number, units: ModalState['units']): number {
+  const mmPerInch = 25.4;
+  return units === 'G20' ? value / mmPerInch : value;
 }
 
 function stripComments(line: string): string {
