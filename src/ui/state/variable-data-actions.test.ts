@@ -67,4 +67,42 @@ describe('variable data advancement', () => {
     useStore.getState().setVariableCsv(undefined);
     expect(useStore.getState().project.variables?.csv).toBeUndefined();
   });
+
+  it('wraps automatic advancement and supports Previous and Reset', () => {
+    const project = {
+      ...createProject(),
+      variables: {
+        advancement: 'after-successful-export' as const,
+        recordIndex: 2,
+        serialValue: 12,
+        csv: { sourceName: 'jobs.csv', headers: ['name'], records: [['A'], ['B'], ['C']] },
+        sequence: {
+          recordStartIndex: 1,
+          recordEndIndex: 2,
+          serialStartValue: 10,
+          serialEndValue: 12,
+          advanceBy: 1,
+        },
+      },
+    };
+    useStore.setState({ project });
+
+    useStore.getState().advanceVariablesAfter(project, 'successful-export');
+    expect(useStore.getState().project.variables).toMatchObject({
+      recordIndex: 1,
+      serialValue: 10,
+    });
+
+    useStore.getState().retreatVariablesManually();
+    expect(useStore.getState().project.variables).toMatchObject({
+      recordIndex: 2,
+      serialValue: 12,
+    });
+
+    useStore.getState().resetVariablesManually();
+    expect(useStore.getState().project.variables).toMatchObject({
+      recordIndex: 1,
+      serialValue: 10,
+    });
+  });
 });

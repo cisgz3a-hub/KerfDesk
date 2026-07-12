@@ -3,7 +3,9 @@ import {
   type Project,
   type VariableAdvancementPolicy,
   type VariableCsvDataset,
+  type VariableSequenceSettings,
 } from '../../core/scene';
+import { advanceVariableSequence, resolveVariableSequence } from '../../core/variables';
 import { pushUndo } from './scene-mutations';
 
 export type VariableAdvanceTrigger = 'successful-export' | 'successful-stream';
@@ -27,8 +29,11 @@ export type VariableDataActions = {
     readonly recordIndex?: number;
     readonly serialValue?: number;
     readonly advancement?: VariableAdvancementPolicy;
+    readonly sequence?: VariableSequenceSettings;
   }) => void;
   readonly advanceVariablesManually: () => void;
+  readonly retreatVariablesManually: () => void;
+  readonly resetVariablesManually: () => void;
   readonly advanceVariablesAfter: (
     expectedProject: Project,
     trigger: VariableAdvanceTrigger,
@@ -39,29 +44,51 @@ export function variableDataActions(
   set: (mutate: (state: VariableDataState) => VariableDataMutation) => void,
 ): VariableDataActions {
   return {
-    setVariableCsv: (csv) => set((state) => variableMutation(state, { csv, recordIndex: 0 })),
+    setVariableCsv: (csv) =>
+      set((state) => {
+        const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
+        const { csv: _previousCsv, ...withoutCsv } = variables;
+        const withCsv =
+          csv === undefined
+            ? { ...withoutCsv, recordIndex: 0 }
+            : { ...variables, csv, recordIndex: 0 };
+        const resolved = resolveVariableSequence(withCsv);
+        return variableMutation(state, {
+          csv,
+          recordIndex: 0,
+          sequence: {
+            ...resolved,
+            recordStartIndex: 0,
+            recordEndIndex: Math.max(0, (csv?.records.length ?? 1) - 1),
+          },
+        });
+      }),
     setVariableSettings: (settings) => set((state) => variableMutation(state, settings)),
     advanceVariablesManually: () =>
       set((state) => {
         const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
-        return variableMutation(state, {
-          recordIndex: variables.recordIndex + (variables.csv === undefined ? 0 : 1),
-          serialValue: variables.serialValue + 1,
-        });
+        return variableMutation(state, advanceVariableSequence(variables, 'next'));
+      }),
+    retreatVariablesManually: () =>
+      set((state) => {
+        const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
+        return variableMutation(state, advanceVariableSequence(variables, 'previous'));
+      }),
+    resetVariablesManually: () =>
+      set((state) => {
+        const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
+        return variableMutation(state, advanceVariableSequence(variables, 'reset'));
       }),
     advanceVariablesAfter: (expectedProject, trigger) =>
       set((state) => {
         if (state.project !== expectedProject) return {};
         const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
         if (!policyMatches(variables.advancement, trigger)) return {};
+        const advanced = advanceVariableSequence(variables, 'next');
         return {
           project: {
             ...state.project,
-            variables: {
-              ...variables,
-              recordIndex: variables.recordIndex + (variables.csv === undefined ? 0 : 1),
-              serialValue: variables.serialValue + 1,
-            },
+            variables: advanced,
           },
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],

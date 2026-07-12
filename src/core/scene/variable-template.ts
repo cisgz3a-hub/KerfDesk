@@ -26,11 +26,20 @@ export type VariableAdvancementPolicy =
   | 'after-successful-stream'
   | 'after-successful-export';
 
+export type VariableSequenceSettings = {
+  readonly recordStartIndex: number;
+  readonly recordEndIndex: number;
+  readonly serialStartValue: number;
+  readonly serialEndValue?: number;
+  readonly advanceBy: number;
+};
+
 export type ProjectVariableData = {
   readonly csv?: VariableCsvDataset;
   readonly recordIndex: number;
   readonly serialValue: number;
   readonly advancement: VariableAdvancementPolicy;
+  readonly sequence?: VariableSequenceSettings;
 };
 
 export const DEFAULT_PROJECT_VARIABLE_DATA: ProjectVariableData = {
