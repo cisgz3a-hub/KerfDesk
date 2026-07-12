@@ -7,6 +7,7 @@ import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  normalizeLaserFireControl,
   normalizeGcodeDialectSelection,
   normalizeGrblRxBufferBytes,
   normalizeGrblStreamingMode,
@@ -230,6 +231,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     // dropped to undefined rather than trusted; JSON.stringify omits the undefined.
     cameraCalibration: normalizeCameraCalibration(dev['cameraCalibration']),
     cameraAlignment: normalizeCameraAlignment(dev['cameraAlignment']),
+    fireControl: normalizeLaserFireControl(dev['fireControl']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...(dev['cameraProfile'] !== undefined
       ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }

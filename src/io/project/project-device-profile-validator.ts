@@ -1,5 +1,9 @@
 import { validateCameraProfileShape } from '../../core/camera';
-import { PROFILE_CAPABILITIES, type ProfileCapability } from '../../core/devices';
+import {
+  HARD_MAX_FIRE_POWER_PERCENT,
+  PROFILE_CAPABILITIES,
+  type ProfileCapability,
+} from '../../core/devices';
 import {
   firstError,
   isObject,
@@ -74,6 +78,25 @@ export function optionalRotarySetup(obj: Record<string, unknown>, path: string):
     requirePositiveNumber(value, `${path}.objectDiameterMm`),
     optionalBoolean(value, `${path}.reverseAxis`),
   ]);
+}
+
+export function optionalLaserFireControl(
+  obj: Record<string, unknown>,
+  path: string,
+): string | null {
+  const value = valueAtPath(obj, path);
+  if (value === undefined) return null;
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  const maxPower = valueAtPath(value, `${path}.maxPowerPercent`);
+  if (
+    typeof maxPower !== 'number' ||
+    !Number.isFinite(maxPower) ||
+    maxPower <= 0 ||
+    maxPower > HARD_MAX_FIRE_POWER_PERCENT
+  ) {
+    return `missing or invalid \`${path}.maxPowerPercent\``;
+  }
+  return requireBoolean(value, `${path}.enabled`);
 }
 
 function optionalLaserSpotSize(obj: Record<string, unknown>, path: string): string | null {

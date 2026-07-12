@@ -4,6 +4,7 @@
 
 import type { CameraAlignment, CameraCalibration } from '../camera';
 import type { RotarySetup } from './rotary';
+import type { LaserFireControl } from './fire-control';
 import type { ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
@@ -55,7 +56,8 @@ export type ProfileCapability =
   | 'verified-origin'
   | 'z-axis'
   | 'camera'
-  | 'rotary';
+  | 'rotary'
+  | 'low-power-fire';
 export const PROFILE_CAPABILITIES = [
   'grbl',
   'wcs',
@@ -66,6 +68,7 @@ export const PROFILE_CAPABILITIES = [
   'z-axis',
   'camera',
   'rotary',
+  'low-power-fire',
 ] as const satisfies ReadonlyArray<ProfileCapability>;
 export type ProfileEvidenceStatus =
   | 'default-starter'
@@ -173,6 +176,7 @@ export type DeviceProfile = {
   // Rotary attachment (ADR-127). Absent = no rotary configured; scaling
   // applies only while `rotary.enabled` — disabled output is byte-identical.
   readonly rotary?: RotarySetup;
+  readonly fireControl?: LaserFireControl;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. The firmware still enforces its
@@ -284,6 +288,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
     'scan-offsets',
     'no-go-zones',
     'rotary',
+    'low-power-fire',
   ],
   evidence: [
     {

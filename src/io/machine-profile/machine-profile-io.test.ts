@@ -28,6 +28,7 @@ function profileWithCalibration(): DeviceProfile {
       basis: 'rectified',
       alignedAt: 1_788_000_100_000,
     },
+    fireControl: { enabled: true, maxPowerPercent: 1.5 },
     scanningOffsets: [
       { speedMmPerMin: 6000, offsetMm: 0.18 },
       { speedMmPerMin: 3000, offsetMm: 0.09 },
@@ -96,6 +97,7 @@ describe('LaserForge machine profile documents', () => {
           homography: [1, 0, 2, 0, 1, 3, 0, 0, 1],
           basis: 'rectified',
         },
+        fireControl: { enabled: true, maxPowerPercent: 1.5 },
         scanningOffsets: [
           { speedMmPerMin: 3000, offsetMm: 0.09 },
           { speedMmPerMin: 6000, offsetMm: 0.18 },
@@ -134,6 +136,7 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.cameraAlignment).toEqual(
       profileWithCalibration().cameraAlignment,
     );
+    expect(result.document.profile.fireControl).toEqual({ enabled: true, maxPowerPercent: 1.5 });
     expect(result.document.profile.noGoZones).toHaveLength(1);
   });
 
@@ -244,6 +247,12 @@ describe('LaserForge machine profile documents', () => {
     ).toEqual({
       kind: 'invalid',
       reason: 'profile.cameraAlignment is invalid',
+    });
+    expect(
+      deserializeProfilePatch({ fireControl: { enabled: true, maxPowerPercent: 50 } }),
+    ).toEqual({
+      kind: 'invalid',
+      reason: 'profile.fireControl is invalid',
     });
   });
 

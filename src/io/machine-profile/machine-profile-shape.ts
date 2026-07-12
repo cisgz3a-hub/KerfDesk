@@ -3,6 +3,7 @@ import {
   isGrblRxBufferBytes,
   isGrblStreamingMode,
   isKnownControllerKind,
+  normalizeLaserFireControl,
   type LaserAirAssistHardware,
   type LaserFocusMode,
   type LaserHeadMetadataConfidence,
@@ -54,7 +55,8 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateLaserSubProfile(value['laserSubProfile']) ??
     validateCameraProfile(value['cameraProfile']) ??
     validateCameraCalibration(value['cameraCalibration']) ??
-    validateCameraAlignment(value['cameraAlignment'])
+    validateCameraAlignment(value['cameraAlignment']) ??
+    validateLaserFireControl(value['fireControl'])
   );
 }
 
@@ -204,6 +206,11 @@ function validateCameraAlignment(value: unknown): string | null {
   return normalizeCameraAlignment(value) === undefined
     ? 'profile.cameraAlignment is invalid'
     : null;
+}
+
+function validateLaserFireControl(value: unknown): string | null {
+  if (value === undefined) return null;
+  return normalizeLaserFireControl(value) === undefined ? 'profile.fireControl is invalid' : null;
 }
 
 function validateLaserSubProfileIdentity(value: Record<string, unknown>): string | null {

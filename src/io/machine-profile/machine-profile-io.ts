@@ -3,6 +3,7 @@ import {
   normalizeGcodeDialectSelection,
   normalizeGrblRxBufferBytes,
   normalizeGrblStreamingMode,
+  normalizeLaserFireControl,
   normalizeScanOffsetTable,
   validateMachineProfile,
   type DeviceProfile,
@@ -265,6 +266,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...canonicalCameraCalibration(profile),
     ...canonicalCameraAlignment(profile),
     ...(profile.rotary !== undefined ? { rotary: { ...profile.rotary } } : {}),
+    ...canonicalFireControl(profile),
     origin: profile.origin,
     homing: { ...profile.homing },
     autofocusCommand: profile.autofocusCommand,
@@ -283,6 +285,11 @@ function canonicalCameraCalibration(profile: DeviceProfile): Partial<DeviceProfi
 function canonicalCameraAlignment(profile: DeviceProfile): Partial<DeviceProfile> {
   const alignment = normalizeCameraAlignment(profile.cameraAlignment);
   return alignment === undefined ? {} : { cameraAlignment: alignment };
+}
+
+function canonicalFireControl(profile: DeviceProfile): Partial<DeviceProfile> {
+  const fireControl = normalizeLaserFireControl(profile.fireControl);
+  return fireControl === undefined ? {} : { fireControl };
 }
 
 function canonicalIdentityMetadata(profile: DeviceProfile): Partial<DeviceProfile> {

@@ -18,6 +18,7 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
     'scan-offsets',
     'no-go-zones',
     'rotary',
+    'low-power-fire',
   ],
   evidence: [
     {
@@ -46,6 +47,7 @@ export const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
     'scan-offsets',
     'no-go-zones',
     'rotary',
+    'low-power-fire',
   ],
   evidence: [
     {

@@ -4,13 +4,7 @@ import {
   isGrblRxBufferBytes,
   isScanOffsetTable,
 } from '../../core/devices';
-import {
-  optionalCameraProfile,
-  optionalLaserSubProfile,
-  optionalNoGoZones,
-  optionalProfileCapabilities,
-  optionalRotarySetup,
-} from './project-device-profile-validator';
+import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
@@ -90,18 +84,19 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalGcodeDialect(device, 'device.gcodeDialect'),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
-    optionalProfileCapabilities(device, 'device.capabilities'),
-    optionalLaserSubProfile(device, 'device.laserSubProfile'),
-    optionalCameraProfile(device, 'device.cameraProfile'),
+    profileField.optionalProfileCapabilities(device, 'device.capabilities'),
+    profileField.optionalLaserSubProfile(device, 'device.laserSubProfile'),
+    profileField.optionalCameraProfile(device, 'device.cameraProfile'),
     optionalScanOffsetTable(device, 'device.scanningOffsets'),
-    optionalNoGoZones(device, 'device.noGoZones'),
+    profileField.optionalNoGoZones(device, 'device.noGoZones'),
     optionalPositiveNumber(device, 'device.zTravelMm'),
     optionalBoolean(device, 'device.zTravelConfirmed'),
     optionalBoolean(device, 'device.zProbePresent'),
     optionalPositiveNumber(device, 'device.framingFeedMmPerMin'),
     optionalPositiveNumber(device, 'device.accelMmPerSec2'),
     optionalPositiveNumber(device, 'device.junctionDeviationMm'),
-    optionalRotarySetup(device, 'device.rotary'),
+    profileField.optionalRotarySetup(device, 'device.rotary'),
+    profileField.optionalLaserFireControl(device, 'device.fireControl'),
   ]);
 }
 
