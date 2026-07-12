@@ -1,9 +1,9 @@
-// LaserForge 2.0 desktop auto-update wiring (ADR-024).
+// LaserForge 2.0 desktop auto-update wiring (ADR-024, ADR-135).
 //
 // electron-updater runs in the MAIN process against our own self-hosted generic
 // feed (see `publish` in electron-builder.yml). Design constraints:
-//   * Runs ONLY in the packaged app (`app.isPackaged`). A dev run
-//     (`pnpm dev:desktop`) must never touch the network or the updater singleton.
+//   * Runs ONLY in a packaged app with a trusted, code-signed update channel.
+//     Dev and unsigned builds must never touch the updater singleton.
 //   * `autoDownload` + `autoInstallOnAppQuit`: download in the background and
 //     apply the update on the next natural quit.
 //   * We NEVER call `quitAndInstall()`. Force-installing mid-session could abort
@@ -27,18 +27,21 @@ export type DesktopUpdater = {
 export type ConfigureAutoUpdateOptions = {
   // Pass `app.isPackaged`. Guards every side effect so unpackaged runs are inert.
   readonly isPackaged: boolean;
+  // Keep false until production installers and updates are code-signed by the
+  // same trusted publisher. Unsigned channels must not execute remote updates.
+  readonly isChannelTrusted: boolean;
   // Optional sink for a failed update check (e.g. offline). Defaults to swallowing
   // the error — a missing update feed must never crash or block app startup.
   readonly onError?: (error: unknown) => void;
 };
 
 // Configure and kick off the one background update check. No-op that touches
-// nothing unless packaged.
+// nothing unless the app is both packaged and backed by a trusted channel.
 export function configureAutoUpdater(
   updater: DesktopUpdater,
   options: ConfigureAutoUpdateOptions,
 ): void {
-  if (!options.isPackaged) return;
+  if (!options.isPackaged || !options.isChannelTrusted) return;
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
   void updater.checkForUpdatesAndNotify().catch((error: unknown) => {

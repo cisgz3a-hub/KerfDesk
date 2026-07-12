@@ -10,7 +10,7 @@ function repoFile(path: string): string {
 // prove the installer runs, but it CAN pin the invariants that keep the release
 // correct: tag-gated, verified before packaging, version-pinned, unsigned until
 // a cert exists, and publishing to the exact origin electron-updater reads from.
-describe('Desktop release workflow gate (ADR-024)', () => {
+describe('Desktop release workflow gate (ADR-024/135)', () => {
   const workflow = repoFile('.github/workflows/release-desktop.yml');
 
   it('builds only on version tags, on a Windows runner', () => {
@@ -34,6 +34,12 @@ describe('Desktop release workflow gate (ADR-024)', () => {
   it('keeps signing opt-in — unsigned until CSC secrets exist (ADR-024 §5)', () => {
     expect(workflow).toContain('CSC_LINK: ${{ secrets.CSC_LINK }}');
     expect(workflow).toContain('CSC_IDENTITY_AUTO_DISCOVERY');
+  });
+
+  it('keeps automatic updates disabled while releases may be unsigned', () => {
+    expect(repoFile('electron/main.ts')).toContain(
+      'const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = false',
+    );
   });
 
   it('publishes to R2 only for tag pushes, never a manual dry run', () => {
