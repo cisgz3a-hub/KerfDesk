@@ -76,6 +76,8 @@ const RENDERER_RUNTIME = resolveRendererRuntime({
 });
 const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
 const CAMERA_BRIDGE_ORIGIN = `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`;
+// ADR-135: enable only after CI signs both the installer and update artifacts.
+const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = false;
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
@@ -408,11 +410,12 @@ void app
     const distRoot = path.join(__dirname, '..', 'dist', 'web');
     protocol.handle('app', makeAppProtocolHandler(distRoot));
     await startCameraBridgeSafely();
-    // Background auto-update against our self-hosted feed (ADR-024). No-op unless
-    // packaged; installs on quit, never mid-burn. Errors (e.g. offline) are logged,
-    // never fatal to startup.
+    // Background auto-update against our self-hosted feed (ADR-024/135). This is
+    // inert until production artifacts are code-signed; once trusted, updates
+    // install on quit and never mid-burn. Check errors are never fatal to startup.
     configureAutoUpdater(autoUpdater, {
       isPackaged: app.isPackaged,
+      isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
       onError: (error: unknown) => console.warn('Desktop update check failed:', error),
     });
     return createWindow();

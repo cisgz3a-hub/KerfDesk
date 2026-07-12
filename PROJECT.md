@@ -257,7 +257,7 @@ phase; tracked here so they don't get lost.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
 7. **Power scale honest** — `S` values match the device profile's max-power scale (`$30`). Property-tested.
-8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024) — it transmits no user data and no telemetry, is confined to that origin, and is disablable. The web app and every CAM/preview/streaming path stay fully offline.
+8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the trusted desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024/135) — it transmits no user data and no telemetry, is confined to that origin, and stays disabled until production code signing is operational. The web app and every CAM/preview/streaming path stay fully offline.
 9. **E-stop reachable always** — Stop button reachable from any window state during a job. No modal can block it.
 
 ### Architectural (anti-shotgun-surgery)
@@ -427,7 +427,7 @@ an assumption that every folder must have an `index.ts`.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
-- **No auto-update from arbitrary URLs.** The desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin — never arbitrary (ADR-024). No `quitAndInstall`; updates apply on quit only, never mid-burn.
+- **No auto-update from arbitrary or unsigned channels.** The desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). No `quitAndInstall`; trusted updates apply on quit only, never mid-burn.
 - **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. A dependency CVE blocks releases until patched. NOTE: the CI `audit:deps` gate (`pnpm audit --audit-level=low`, part of `release:check`) fails on ANY advisory (direct OR transitive) at low+ severity - stricter than "direct only", and time-dependent (a new transitive advisory can block deploys with no code change).
 
 ---
