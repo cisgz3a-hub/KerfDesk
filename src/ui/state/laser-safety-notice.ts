@@ -27,6 +27,7 @@ export type LaserSafetyAction =
   | 'jog'
   | 'home'
   | 'air-assist'
+  | 'fire'
   | 'unlock'
   | 'wake'
   | 'console'
@@ -42,6 +43,10 @@ export type LaserSafetyNotice =
     }
   | {
       readonly kind: 'disconnect-during-job';
+      readonly message: string;
+    }
+  | {
+      readonly kind: 'disconnect-during-fire';
       readonly message: string;
     }
   | {
@@ -101,6 +106,14 @@ export function disconnectDuringJobNotice(): LaserSafetyNotice {
   return { kind: 'disconnect-during-job', message: DISCONNECT_DURING_JOB_MESSAGE };
 }
 
+export const DISCONNECT_DURING_FIRE_MESSAGE =
+  'USB connection was lost while the momentary Fire beam was requested. Software can no longer ' +
+  'confirm M5 reached the controller. Use physical E-stop or power cutoff now.';
+
+export function disconnectDuringFireNotice(): LaserSafetyNotice {
+  return { kind: 'disconnect-during-fire', message: DISCONNECT_DURING_FIRE_MESSAGE };
+}
+
 // ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the
 // job box, i.e. the job does not fit the travel from this hand-set origin. The
 // alarm cleared the origin (G92) and the verification, so the operator must
@@ -141,6 +154,12 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
     return (
       'A mid-job send failed, so the stream was stopped. The machine may still be executing ' +
       'buffered commands — press Stop; use physical E-stop or power cutoff now if unsafe.'
+    );
+  }
+  if (action === 'fire') {
+    return (
+      'The Fire command was not written to the controller. Release the Fire control and use ' +
+      'physical E-stop or power cutoff now if the beam may still be on.'
     );
   }
   return (
