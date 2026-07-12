@@ -6628,3 +6628,32 @@ rail emphasis. Do not auto-open either dialog.
   unconfigured.
 - Disconnected profiles do not receive a setup-required warning; the existing passive nudge remains
   connection-aware.
+
+---
+
+## ADR-141 - Lead Job Controls with primary and active machine actions
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The machine rail rendered placement mode, job origin, and work-origin controls before Home,
+Auto-focus, Frame, and Start. During framing or streaming, Cancel or Pause/Stop appeared even later,
+after recovery and start-from-line sections. On short displays, operators had to scroll past setup
+details to reach the action that starts, cancels, pauses, or stops machine motion.
+
+### Decision
+
+Within Job Controls, render the existing Home/Auto-focus/Frame/Start row first. Render active motion,
+controller-operation, and job recovery controls immediately afterward. Placement, origin, recovery,
+and start-from-line details follow those actions. Preserve every existing handler, capability check,
+busy predicate, disabled state, safety message, and progress behavior.
+
+### Consequences
+
+- Primary and active safety actions appear earlier in the machine rail without duplication.
+- Placement and origin settings remain available in the same Job Controls section but no longer lead
+  it.
+- The change produces no controller commands and no G-code differences by itself.
+- DOM-order tests cover idle, framing, and streaming states in addition to the existing behavioral
+  tests.
