@@ -8,7 +8,7 @@ import {
   type ShapeObject,
   type Transform,
 } from '../scene';
-import { ellipseToPolylines, type EllipseSpec } from './ellipse';
+import { ellipseToCurve, ellipseToPolylines, type EllipseSpec } from './ellipse';
 
 export function createEllipse(args: {
   readonly id: string;
@@ -17,7 +17,9 @@ export function createEllipse(args: {
   readonly transform?: Transform;
 }): ShapeObject {
   const polylines = ellipseToPolylines(args.spec);
-  const paths: ReadonlyArray<ColoredPath> = [{ color: args.color, polylines }];
+  const paths: ReadonlyArray<ColoredPath> = [
+    { color: args.color, polylines, curves: [ellipseToCurve(args.spec)] },
+  ];
   return {
     kind: 'shape',
     id: args.id,

@@ -4,7 +4,8 @@
 // bounds). Segment count is adaptive: it scales with the larger radius to keep
 // the chord-height facet under ELLIPSE_TOLERANCE_MM at any laser scale.
 
-import type { Polyline, Vec2 } from '../scene';
+import { parametricEllipseCurve } from '../geometry';
+import type { CurveSubpath, Polyline, Vec2 } from '../scene';
 
 export type EllipseSpec = {
   readonly widthMm: number;
@@ -29,6 +30,22 @@ export function ellipseToPolylines(spec: EllipseSpec): ReadonlyArray<Polyline> {
   const first = points[0];
   if (first !== undefined) points.push(first);
   return [{ points, closed: true }];
+}
+
+export function ellipseToCurve(spec: EllipseSpec): CurveSubpath {
+  const radiusX = Math.max(0, spec.widthMm) / 2;
+  const radiusY = Math.max(0, spec.heightMm) / 2;
+  if (radiusX === 0 || radiusY === 0) {
+    return { start: { x: 0, y: 0 }, segments: [], closed: true };
+  }
+  return parametricEllipseCurve({
+    center: { x: radiusX, y: radiusY },
+    majorAxis: { x: radiusX, y: 0 },
+    ratio: radiusY / radiusX,
+    startParam: 0,
+    sweep: Math.PI * 2,
+    closed: true,
+  });
 }
 
 // Chord-tolerance segment count for a circle of radius r: keeping the sagitta

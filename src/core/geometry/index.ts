@@ -16,3 +16,4 @@ export {
 } from './vector-path-booleans';
 export { DOGBONE_MAX_CORNER_DEG, dogboneVectorObject } from './dogbone';
 export { arcStepRad, sampleArcPoints } from './arc-sampling';
+export { parametricEllipseCurve } from './ellipse-curve';

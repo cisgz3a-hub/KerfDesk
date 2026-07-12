@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { starToPolylines } from './star';
+import { createStar } from './create-star';
 
 describe('starToPolylines', () => {
   it('creates a closed five-point star with alternating outer and inner vertices', () => {
@@ -25,5 +26,19 @@ describe('starToPolylines', () => {
     expect(radii[1]).toBeCloseTo(5, 5);
     expect(radii[2]).toBeCloseTo(10, 5);
     expect(radii[3]).toBeCloseTo(5, 5);
+  });
+});
+
+describe('createStar', () => {
+  it('materializes star edges as canonical line segments', () => {
+    const shape = createStar({
+      id: 'star',
+      color: '#000000',
+      spec: { points: 5, outerRadiusMm: 10, innerRadiusRatio: 0.5 },
+    });
+    expect(shape.paths[0]?.curves?.[0]?.segments).toHaveLength(10);
+    expect(shape.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'line')).toBe(
+      true,
+    );
   });
 });
