@@ -10,7 +10,11 @@ import {
   type NoGoZone,
   type Origin,
 } from '../../core/devices';
-import { normalizeCameraProfile } from '../../core/camera';
+import {
+  normalizeCameraAlignment,
+  normalizeCameraCalibration,
+  normalizeCameraProfile,
+} from '../../core/camera';
 import { validateMachineProfileShape } from './machine-profile-shape';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
@@ -246,6 +250,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     name: profile.name,
     ...canonicalMachineMetadata(profile),
     gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
+    ...(profile.baudRate !== undefined ? { baudRate: profile.baudRate } : {}),
     streamingMode: normalizeGrblStreamingMode(profile.streamingMode),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
@@ -257,6 +262,8 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     airAssistCommand: profile.airAssistCommand,
     scanningOffsets: normalizeScanOffsetTable(profile.scanningOffsets),
     noGoZones: profile.noGoZones.map((zone) => ({ ...zone })),
+    ...canonicalCameraCalibration(profile),
+    ...canonicalCameraAlignment(profile),
     ...(profile.rotary !== undefined ? { rotary: { ...profile.rotary } } : {}),
     origin: profile.origin,
     homing: { ...profile.homing },
@@ -266,6 +273,16 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     junctionDeviationMm: profile.junctionDeviationMm,
     ...canonicalZMetadata(profile),
   };
+}
+
+function canonicalCameraCalibration(profile: DeviceProfile): Partial<DeviceProfile> {
+  const calibration = normalizeCameraCalibration(profile.cameraCalibration);
+  return calibration === undefined ? {} : { cameraCalibration: calibration };
+}
+
+function canonicalCameraAlignment(profile: DeviceProfile): Partial<DeviceProfile> {
+  const alignment = normalizeCameraAlignment(profile.cameraAlignment);
+  return alignment === undefined ? {} : { cameraAlignment: alignment };
 }
 
 function canonicalIdentityMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
