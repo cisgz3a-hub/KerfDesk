@@ -47,6 +47,9 @@ import { selectedConvertibleVectors, selectedObjectIds } from './selection-comma
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
+import { ArrayDialogHost } from './ArrayDialogHost';
+
+type SettingsDialogKind = 'optimization' | 'array' | 'labs' | 'rotary' | null;
 
 export function CommandShell(): JSX.Element {
   const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
@@ -58,9 +61,7 @@ export function CommandShell(): JSX.Element {
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
-  const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
-  const [labsDialogOpen, setLabsDialogOpen] = useState(false);
-  const [rotaryDialogOpen, setRotaryDialogOpen] = useState(false);
+  const [settingsDialog, setSettingsDialog] = useState<SettingsDialogKind>(null);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
@@ -80,9 +81,10 @@ export function CommandShell(): JSX.Element {
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
     requestFocusTest: () => jobAwareAlert(FOCUS_TEST_UNAVAILABLE_MESSAGE),
-    requestOptimizationSettings: () => setOptimizationDialogOpen(true),
-    requestRotarySetup: () => setRotaryDialogOpen(true),
-    requestLabsSettings: () => setLabsDialogOpen(true),
+    requestOptimizationSettings: () => setSettingsDialog('optimization'),
+    requestArray: () => setSettingsDialog('array'),
+    requestRotarySetup: () => setSettingsDialog('rotary'),
+    requestLabsSettings: () => setSettingsDialog('labs'),
     requestProjectNotes: () => setProjectNotesOpen(true),
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
@@ -114,11 +116,7 @@ export function CommandShell(): JSX.Element {
         scanOffsetOpen={scanOffsetTestDialogOpen}
         onScanOffsetClose={() => setScanOffsetTestDialogOpen(false)}
       />
-      {optimizationDialogOpen ? (
-        <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
-      ) : null}
-      {labsDialogOpen ? <LabsSettingsDialog onClose={() => setLabsDialogOpen(false)} /> : null}
-      {rotaryDialogOpen ? <RotarySetupHost onClose={() => setRotaryDialogOpen(false)} /> : null}
+      <SettingsDialogHost current={settingsDialog} onClose={() => setSettingsDialog(null)} />
       {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
       {undoHistoryOpen ? <UndoHistoryPanel onClose={() => setUndoHistoryOpen(false)} /> : null}
       {closeToleranceDialogOpen ? (
@@ -126,6 +124,17 @@ export function CommandShell(): JSX.Element {
       ) : null}
     </>
   );
+}
+
+function SettingsDialogHost(props: {
+  readonly current: SettingsDialogKind;
+  readonly onClose: () => void;
+}): JSX.Element | null {
+  if (props.current === 'optimization') return <OptimizationDialog onClose={props.onClose} />;
+  if (props.current === 'array') return <ArrayDialogHost onClose={props.onClose} />;
+  if (props.current === 'labs') return <LabsSettingsDialog onClose={props.onClose} />;
+  if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;
+  return null;
 }
 
 const FOCUS_TEST_UNAVAILABLE_MESSAGE =

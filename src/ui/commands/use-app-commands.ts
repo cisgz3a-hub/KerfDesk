@@ -102,7 +102,7 @@ function appCommandContext(
     ...fileCommandContext(callbacks, platform, app, laser, pushToast),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
-    ...arrangeCommandContext(app),
+    ...arrangeCommandContext(app, callbacks),
     ...laserCommandContext(platform, laser),
     ...windowHelpCommandContext(callbacks, app),
     machineKind: machineKindOf(app.project.machine),
@@ -242,6 +242,7 @@ function editCommandContext(
 
 function arrangeCommandContext(
   app: ReturnType<typeof useStore.getState>,
+  callbacks: CommandShellCallbacks,
 ): Pick<
   AppCommandContext,
   | 'alignSelection'
@@ -249,6 +250,7 @@ function arrangeCommandContext(
   | 'breakApartSelection'
   | 'flipHorizontal'
   | 'flipVertical'
+  | 'createArray'
 > {
   return {
     alignSelection: app.alignSelection,
@@ -256,6 +258,7 @@ function arrangeCommandContext(
     breakApartSelection: app.breakApartSelection,
     flipHorizontal: () => app.flipSelection('horizontal'),
     flipVertical: () => app.flipSelection('vertical'),
+    createArray: callbacks.requestArray,
   };
 }
 

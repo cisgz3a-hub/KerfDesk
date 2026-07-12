@@ -131,6 +131,14 @@ export {
   type TileLayout,
   type TileOffset,
 } from './tile-into-region';
+export {
+  MAX_ARRAY_COPIES,
+  arrayPlacements,
+  type ArrayPlacement,
+  type ArraySpec,
+  type CircularArraySpec,
+  type GridArraySpec,
+} from './array-layout';
 export { sceneObjectHasVisibleLayer, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 export type { Scene, SceneGroup } from './scene';

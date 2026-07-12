@@ -270,6 +270,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'arrange',
     tooltip: 'Split selected imported SVG paths into separate selectable objects.',
   },
+  'arrange.array': {
+    family: 'arrange',
+    tooltip: 'Create a bounded grid or circular array from the selected artwork.',
+  },
   'arrange.flip-horizontal': {
     family: 'arrange',
     tooltip: 'Mirror the selected artwork horizontally around its center.',

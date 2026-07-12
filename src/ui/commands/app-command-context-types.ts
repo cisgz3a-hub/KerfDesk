@@ -13,6 +13,7 @@ export type CommandShellCallbacks = {
   readonly requestScanOffsetTest: () => void;
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
+  readonly requestArray: () => void;
   readonly requestRotarySetup: () => void;
   readonly requestLabsSettings: () => void;
   readonly requestProjectNotes: () => void;

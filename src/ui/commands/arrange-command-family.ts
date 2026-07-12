@@ -24,10 +24,23 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
   return [
     ...align,
     ...distribute,
+    arrayCommand(ctx),
     breakApartCommand(ctx),
     flipHorizontalCommand(ctx),
     flipVerticalCommand(ctx),
   ];
+}
+
+function arrayCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasSelection
+    ? enabled(
+        'arrange.array',
+        'arrange',
+        'Array...',
+        'Create a grid or circular array',
+        ctx.createArray,
+      )
+    : disabled('arrange.array', 'arrange', 'Array...', 'Select artwork to array.', ctx.createArray);
 }
 
 function breakApartCommand(ctx: AppCommandContext): AppCommand {

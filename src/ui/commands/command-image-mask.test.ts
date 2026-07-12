@@ -114,6 +114,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     distributeSelection: vi.fn(),
     canBreakApartSelection: false,
     breakApartSelection: vi.fn(),
+    createArray: vi.fn(),
     flipHorizontal: vi.fn(),
     flipVertical: vi.fn(),
     ...overrides,
