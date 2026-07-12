@@ -107,12 +107,7 @@ export function LaserWindow(): JSX.Element {
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void runStartJobFlow()}
       />
-      <CollapsibleRailSection
-        label="Console"
-        title="Show advanced controller commands and communication history."
-      >
-        <ConsolePanel />
-      </CollapsibleRailSection>
+      <MachineConsoleSection />
     </aside>
   );
 }
@@ -157,6 +152,17 @@ function MachineRailHeading(props: {
       collapseDisabled={props.jobActive}
       collapseDisabledReason="Machine controls stay visible while a job is active so Stop remains reachable."
     />
+  );
+}
+
+function MachineConsoleSection(): JSX.Element {
+  return (
+    <CollapsibleRailSection
+      label="Console"
+      title="Show advanced controller commands and communication history."
+    >
+      <ConsolePanel />
+    </CollapsibleRailSection>
   );
 }
 
