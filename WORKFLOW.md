@@ -2954,18 +2954,21 @@ desktop target — getting it, updating it, and proving it works.
    both **Download for Windows** and the PWA **Install app** button — you don't
    download or PWA-install the app from within itself.
 
-### F-DESK2. Auto-update (background, install-on-quit, burn-safe)
+### F-DESK2. Desktop updates (trust-gated, burn-safe)
 
-1. On each packaged launch, the main process checks the R2 feed's `latest.yml`
-   (`electron/auto-update.ts` → `checkForUpdatesAndNotify`).
-2. A newer version downloads in the background; the OS shows a native "update
-   ready" notification. The current session is never interrupted.
-3. The update installs on the **next quit** (`autoInstallOnAppQuit`), and the
-   app relaunches on the new version.
+1. An unsigned build performs no automatic update check, download, or install
+   (ADR-135). The operator downloads a newer installer from the pinned KerfDesk
+   download page and runs it after ending the current session.
+2. Once production signing is enabled and verified, each packaged launch checks
+   the R2 feed's `latest.yml` (`electron/auto-update.ts`).
+3. A newer signed version downloads in the background; the OS shows a native
+   "update ready" notification. The current session is never interrupted.
+4. The signed update installs on the **next quit** (`autoInstallOnAppQuit`), and
+   the app relaunches on the new version.
 
 #### Error — offline or feed unreachable
-1. The check fails silently (logged via `onError`, never fatal). The app runs
-   normally on the installed version.
+1. For a signed build, the check fails silently (logged via `onError`, never
+   fatal). The app runs normally on the installed version.
 
 #### Edge — a job is streaming
 1. Updates NEVER install mid-burn: the app never calls `quitAndInstall`, and a
@@ -2990,9 +2993,12 @@ runs this on real Windows:
       export saves.
 - [ ] **Camera (optional):** a USB webcam previews (getUserMedia); an RTSP/IP
       camera previews only if `ffmpeg` is on PATH (documented optional dep).
-- [ ] **Auto-update:** publish a higher `vX.Y.Z`; a running older install
-      downloads it, notifies, and on quit installs + relaunches on the new
-      version. Confirm **no install occurs while a job streams**.
+- [ ] **Unsigned update gate:** an unsigned packaged build performs no update
+      network request, download, or install.
+- [ ] **Signed auto-update (after signing lands):** publish a higher `vX.Y.Z`;
+      a running older signed install downloads it, notifies, and on quit installs
+      + relaunches on the new version. Confirm **no install occurs while a job
+      streams** and a wrong-publisher update is refused.
 - [ ] **Download surface:** `/download` serves the installer on the web; inside
       the desktop app the Download/Install affordances are hidden.
 

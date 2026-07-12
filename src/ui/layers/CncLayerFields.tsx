@@ -4,10 +4,11 @@
 // setLayerParam action as a whole `cnc` patch, so undo/dirty tracking and
 // .lf2 persistence come for free.
 //
-// Basic fields (material, cut type, bit, cut depth, tabs) are always shown;
-// the advanced field set (feeds, stepover, pocket fill, cut-type tails) is
-// gated behind the ui-store Basic/Advanced toggle (ADR-111). Shared row/input
-// controls live in CncLayerPrimitives; the advanced group in
+// Basic fields (material, cut type, bit, cut depth, depth-per-pass, feed,
+// plunge, spindle, tabs) are always shown — the core numbers every cut needs;
+// the advanced field set (feeds preset + calculator, stepover, pocket fill,
+// cut-type tails) is gated behind the ui-store Basic/Advanced toggle (ADR-111).
+// Shared row/input controls live in CncLayerPrimitives; the advanced group in
 // CncLayerAdvancedFields.
 
 import {
@@ -20,7 +21,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
+import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
@@ -76,13 +77,18 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         stockThicknessMm={stockThicknessMm}
         onCommit={commit}
       />
+      <CncCoreCutFields
+        layer={layer}
+        settings={settings}
+        maxFeed={maxFeed}
+        spindleMaxRpm={spindleMaxRpm}
+        onCommit={commit}
+      />
       {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
       {showAdvanced ? (
         <CncLayerAdvancedGroup
           layer={layer}
           settings={settings}
-          maxFeed={maxFeed}
-          spindleMaxRpm={spindleMaxRpm}
           hasReliefObjects={hasReliefObjects}
           onCommit={commit}
           onCommitSettings={commitSettings}

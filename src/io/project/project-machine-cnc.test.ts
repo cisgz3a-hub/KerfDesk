@@ -162,4 +162,23 @@ describe('.lf2 machine / cnc round-trip', () => {
     const dropped = deserializeOk(`${JSON.stringify(raw)}\n`);
     expect(dropped.scene.layers[0]?.cnc).toBeUndefined();
   });
+
+  it('round-trips a flood coolant setting', () => {
+    const project: Project = {
+      ...cncProject(),
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, coolant: 'flood' },
+      },
+    };
+    const loaded = deserializeOk(serializeProject(project));
+    expect(loaded.machine?.kind === 'cnc' ? loaded.machine.params.coolant : null).toBe('flood');
+  });
+
+  it('drops an unknown coolant value to off', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    (raw['machine'] as { params: Record<string, unknown> }).params['coolant'] = 'liquid-nitrogen';
+    const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
+    expect(loaded.machine?.kind === 'cnc' ? loaded.machine.params.coolant : null).toBe('off');
+  });
 });

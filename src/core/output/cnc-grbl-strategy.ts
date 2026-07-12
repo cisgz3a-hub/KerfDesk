@@ -12,8 +12,9 @@
 // running); XY follow the same machine coordinates as the laser pipeline.
 // S maps to spindle RPM — GRBL $30 should equal the machine's max RPM.
 //
-// Preamble:  G21, G90, G94, M3 S<rpm>, G4 P<spinup>, G0 Z<safe>.
-// Postamble: G0 Z<safe>, M5, G0 X0 Y0 (park, still at safe Z).
+// Preamble:  G21, G90, G94, M3 S<rpm>, G4 P<spinup>, G0 Z<safe>, [M7/M8].
+// Postamble: G0 Z<safe>, M5, [M9], G0 X0 Y0 (park, still at safe Z).
+// The M7/M8/M9 coolant lines appear only when the machine's coolant is on.
 //
 // Optimization kept deliberately simple and safe: when the next pass plunges
 // at the SAME XY the head is already at (successive depth passes of a closed
@@ -27,7 +28,7 @@ import {
   sampleCircularArcPoints,
 } from '../geometry/circular-arc';
 import type { CncArcPass, CncContourPass, CncGroup, CncPass, CncPath3dPass, Job } from '../job';
-import { assertNever } from '../scene';
+import { assertNever, type CncCoolantMode } from '../scene';
 import type { OutputStrategy } from './output-strategy';
 import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
 
@@ -86,6 +87,11 @@ function emitJob(job: Job, _device: DeviceProfile): string {
   // the stock and can grab (Easel's post lifts first, then M3).
   appendRetract(lines, head, firstGroup.safeZMm);
   appendSpindleStart(lines, firstGroup.spindleRpm, firstGroup.spindleSpinupSec);
+  // Coolant is machine-wide for the job: turn it on right after the spindle
+  // spins up (never while the bit is still resting on the stock during
+  // touch-off), and off at job end after M5. 'off'/absent emits nothing, so
+  // output stays byte-identical to a job with no coolant.
+  const coolantIsOn = appendCoolantStart(lines, firstGroup.coolant);
 
   const state: EmitState = {
     isMultiTool,
@@ -98,10 +104,50 @@ function emitJob(job: Job, _device: DeviceProfile): string {
     appendGroup(lines, head, group);
   }
 
-  appendRetract(lines, head, state.maxSafeZ);
-  lines.push('M5');
-  lines.push(parkLine(cncGroups[cncGroups.length - 1]));
+  appendPostamble(lines, head, state.maxSafeZ, cncGroups[cncGroups.length - 1], coolantIsOn);
   return lines.join(LINE_END) + LINE_END;
+}
+
+// Job end: retract to the highest safe Z any group used, stop the spindle,
+// turn coolant off (mirror of the spindle-up ordering — M9 only when a coolant
+// was actually turned on), and park.
+function appendPostamble(
+  lines: string[],
+  head: Head,
+  maxSafeZ: number,
+  lastGroup: CncGroup | undefined,
+  coolantIsOn: boolean,
+): void {
+  appendRetract(lines, head, maxSafeZ);
+  lines.push('M5');
+  if (coolantIsOn) lines.push('M9');
+  lines.push(parkLine(lastGroup));
+}
+
+// Emit the coolant-on command for the machine's mode and report whether one was
+// emitted (so the postamble knows to close it with M9). 'off'/absent emits
+// nothing and returns false — byte-identical to a job with no coolant.
+function appendCoolantStart(lines: string[], mode: CncCoolantMode | undefined): boolean {
+  const command = cncCoolantOnCommand(mode);
+  if (command === null) return false;
+  lines.push(command);
+  return true;
+}
+
+// Coolant-on command for the machine's mode: mist runs the mist-coolant
+// relay (M7), flood the flood-coolant relay (M8). 'off'/absent ⇒ null.
+function cncCoolantOnCommand(mode: CncCoolantMode | undefined): 'M7' | 'M8' | null {
+  switch (mode) {
+    case 'mist':
+      return 'M7';
+    case 'flood':
+      return 'M8';
+    case 'off':
+    case undefined:
+      return null;
+    default:
+      return assertNever(mode, 'CncCoolantMode');
+  }
 }
 
 // H.9 parking parity: the configured park position, or the machine origin

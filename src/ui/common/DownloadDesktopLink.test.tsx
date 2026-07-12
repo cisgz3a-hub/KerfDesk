@@ -39,7 +39,7 @@ describe('DownloadDesktopLink', () => {
   it('links to the static download page in a new tab in the browser', async () => {
     const host = await renderInProvider('web');
     const link = host.querySelector('a');
-    expect(link?.getAttribute('href')).toBe('/download.html');
+    expect(link?.getAttribute('href')).toBe('/download');
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.getAttribute('rel')).toContain('noopener');
     expect(link?.textContent).toBe('Download for Windows');

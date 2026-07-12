@@ -25,6 +25,8 @@
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
+| ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
+| ADR-136 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
 
 ---
 
@@ -6407,11 +6409,54 @@ The rectify runs once per source/alignment change (memoized), not per zoom/pan r
 
 Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.
 
-## ADR-135 - Trace reliability: latest request wins and completed work is reusable (2026-07-11)
+---
+
+## ADR-135 - Gate desktop auto-update on a trusted, code-signed channel
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+### Context
+
+ADR-024 allowed unsigned Windows builds to download an update from the pinned
+R2 feed and install it on quit. The feed's SHA-512 value proves only that the
+download matches `latest.yml`; both files come from the same origin. An attacker
+who can replace the feed can therefore publish a higher-version installer and a
+matching hash. With `autoDownload` and `autoInstallOnAppQuit` enabled, that code
+would be accepted without an independent publisher identity check.
+
+### Decision
+
+Desktop auto-update is fail-closed behind an explicit trust gate. The updater
+may run only when both conditions hold:
+
+1. Electron reports a packaged build through `app.isPackaged`.
+2. `IS_DESKTOP_UPDATE_CHANNEL_TRUSTED` is true because production installers
+   and update artifacts are code-signed by the same approved Windows publisher.
+
+Until signing is operational, the trust constant stays false. Packaged builds
+remain fully usable but perform no update check, download, or install. Operators
+update manually from the pinned KerfDesk download page. Enabling the constant
+requires a separate release change that configures signing in CI, fails closed
+when signing credentials are absent, and verifies a packaged update on Windows.
+
+Once trusted, ADR-024's burn-safe behavior remains: background download,
+install-on-natural-quit, and no `quitAndInstall()` call.
+
+### Consequences
+
+- An unsigned release-feed compromise cannot become a silent code-install path.
+- Unsigned builds do not notify about new versions; manual download is the safe
+  interim experience.
+- The R2 publishing workflow may continue producing artifacts, but clients do
+  not consume its update metadata until the signing gate is deliberately opened.
+- Code signing is now a functional prerequisite for automatic updates, not only
+  a SmartScreen/reputation improvement.
+
+## ADR-136 - Trace reliability: latest request wins and completed work is reusable (2026-07-11)
 
 **Status:** accepted.
 
-> **Numbering note.** ADR-134 (camera overlay alignment basis) was the last used; **ADR-135** is the next free.
+> **Numbering note.** ADR-135 (trusted desktop auto-update channel) was the last used; **ADR-136** is the next free.
 
 ### Context
 

@@ -15,9 +15,11 @@ import {
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
+  type CncCoolantMode,
   type CncTiling,
   DEFAULT_PROJECT_OPTIMIZATION,
   DEFAULT_CNC_TOOLS,
+  isCncCoolantMode,
   PROJECT_SCHEMA_VERSION,
   type Project,
 } from '../../core/scene';
@@ -145,6 +147,9 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
         params['spindleSpinupSec'],
         d.params.spindleSpinupSec,
       ),
+      // Machine-wide coolant: keep a valid mode, else 'off'. Always present so
+      // a loaded config equals the default config (whose coolant is 'off').
+      coolant: coolantModeOrOff(params['coolant']),
       // H.9 park position: optional, any finite mm value.
       ...(isFiniteNumber(params['parkXMm']) ? { parkXMm: params['parkXMm'] } : {}),
       ...(isFiniteNumber(params['parkYMm']) ? { parkYMm: params['parkYMm'] } : {}),
@@ -306,6 +311,12 @@ function nonNegativeNumberOrDefault(value: unknown, fallback: number): number {
 
 function booleanOrDefault(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+// A valid coolant mode survives; anything else (absent, junk, a legacy pre-
+// coolant project) resolves to 'off' — the type's "absent means off" contract.
+function coolantModeOrOff(value: unknown): CncCoolantMode {
+  return isCncCoolantMode(value) ? value : 'off';
 }
 
 function normalizeOptimization(value: unknown): Project['optimization'] {

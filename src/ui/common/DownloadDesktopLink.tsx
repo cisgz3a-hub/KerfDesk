@@ -8,7 +8,7 @@
 
 import { usePlatformOptional } from '../app/platform-context';
 
-const DOWNLOAD_PAGE_PATH = '/download.html';
+const DOWNLOAD_PAGE_PATH = '/download';
 
 const linkStyle: React.CSSProperties = { textDecoration: 'none' };
 
