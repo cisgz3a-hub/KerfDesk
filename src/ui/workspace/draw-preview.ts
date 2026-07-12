@@ -22,7 +22,12 @@ import {
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
-import { prepareOutput } from '../../io/gcode';
+import {
+  prepareOutput,
+  prepareOutputSnapshot,
+  type PreparedOutput,
+  type PrepareOutputSnapshotOptions,
+} from '../../io/gcode';
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
@@ -133,6 +138,30 @@ export function buildPreviewToolpath(
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
+  return previewFromPrepared(project, prepared);
+}
+
+export async function buildPreviewToolpathSnapshot(
+  project: Project,
+  options: Pick<
+    PrepareOutputSnapshotOptions,
+    'clock' | 'renderVariableText' | 'jobOrigin' | 'outputScope'
+  >,
+): Promise<PreviewToolpath> {
+  const scoped =
+    options.outputScope === undefined
+      ? null
+      : validateOutputScope(project.scene, options.outputScope);
+  if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
+  const complexityScene = scoped === null ? project.scene : scoped.scene;
+  if (scenePreparationTooComplex(complexityScene)) {
+    return emptyPreviewToolpath({ kind: 'too-complex' });
+  }
+  const prepared = await prepareOutputSnapshot(project, options);
+  return previewFromPrepared(project, prepared);
+}
+
+function previewFromPrepared(project: Project, prepared: PreparedOutput): PreviewToolpath {
   if (!prepared.ok) return buildToolpath(EMPTY_JOB);
   // The prepared job is in machine/work coordinates; the canvas (ghost +
   // raster sim) draws in scene space. Map back so the overlay registers with

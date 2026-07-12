@@ -317,6 +317,7 @@ function saveGcodeAction(
       allowRotaryRaster:
         useExperimentalLaserFeatures.getState().features.rotaryRaster &&
         profileSupportsCapability(app.project.device, 'rotary'),
+      advanceVariablesAfter: app.advanceVariablesAfter,
       pushToast,
     });
 }

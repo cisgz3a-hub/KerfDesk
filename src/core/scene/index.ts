@@ -149,6 +149,16 @@ export {
 
 export type { Project, ProjectOptimizationSettings, Workspace } from './project';
 export { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION, createProject } from './project';
+export type {
+  ProjectVariableData,
+  VariableAdvancementPolicy,
+  VariableCsvDataset,
+  VariableCutSettingField,
+  VariableDateTimeFormat,
+  VariableTemplate,
+  VariableTemplateToken,
+} from './variable-template';
+export { DEFAULT_PROJECT_VARIABLE_DATA } from './variable-template';
 
 export type {
   CncCutDirection,

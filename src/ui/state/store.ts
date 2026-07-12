@@ -116,6 +116,7 @@ import {
   sceneActions,
   viewActions,
 } from './store-actions';
+import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 
 export type { ImportOutcome } from './scene-mutations';
 
@@ -130,6 +131,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 };
 
 export type AppState = ObjectPropertiesActions &
+  VariableDataActions &
   ImageMaskActions &
   ProjectOptimizationActions &
   ProjectNotesActions &
@@ -461,6 +463,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...boardTileActions(set),
   ...pathNodeEditActions(set),
   ...objectDeleteActions(set),
+  ...variableDataActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

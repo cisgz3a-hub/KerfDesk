@@ -4,6 +4,8 @@
 // this module's switch arms. `assertNever` enforces exhaustiveness at compile
 // time so the missing arm is the only compile error when a new variant lands.
 
+import type { VariableTemplate } from './variable-template';
+
 export type Vec2 = { readonly x: number; readonly y: number };
 
 export type Polyline = {
@@ -107,6 +109,7 @@ export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
   readonly content: string;
+  readonly variableTemplate?: VariableTemplate;
   readonly fontKey: FontKey;
   readonly sizeMm: number;
   readonly alignment: TextAlignment;

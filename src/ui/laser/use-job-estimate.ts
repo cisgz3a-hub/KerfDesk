@@ -11,7 +11,12 @@
 import { useEffect, useState } from 'react';
 import type { Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
-import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
+import {
+  estimateLiveJob,
+  estimateLiveJobSnapshot,
+  type LiveJobEstimate,
+} from './live-job-estimate';
+import { renderVariableText } from '../text/render-variable-text';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -34,14 +39,25 @@ export function useJobEstimate(): LiveJobEstimate {
   }));
   useEffect(() => {
     if (settled.project === project && settled.outputScopeKey === outputScopeKey) return undefined;
+    let cancelled = false;
     const handle = setTimeout(() => {
-      setSettled({
-        project,
-        outputScopeKey,
-        estimate: estimateLiveJob(project, outputScope),
+      const estimate = hasVariableText(project)
+        ? estimateLiveJobSnapshot(project, outputScope, () => new Date(), renderVariableText)
+        : Promise.resolve(estimateLiveJob(project, outputScope));
+      void estimate.then((value) => {
+        if (!cancelled) setSettled({ project, outputScopeKey, estimate: value });
       });
     }, JOB_ESTIMATE_DEBOUNCE_MS);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [project, outputScope, outputScopeKey, settled.project, settled.outputScopeKey]);
   return settled.estimate;
+}
+
+function hasVariableText(project: Project): boolean {
+  return project.scene.objects.some(
+    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
+  );
 }

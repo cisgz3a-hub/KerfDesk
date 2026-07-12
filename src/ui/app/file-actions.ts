@@ -7,7 +7,7 @@
 import { selectControllerDriver } from '../../core/controllers';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
-import { emitGcode } from '../../io/gcode';
+import { emitGcodeSnapshot } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { parseSvg } from '../../io/svg';
@@ -34,6 +34,7 @@ import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
+import { renderVariableText } from '../text/render-variable-text';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -116,6 +117,7 @@ export type SaveGcodeCtx = {
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly allowRotaryRaster?: boolean;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
 };
 
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
@@ -160,7 +162,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
-  const { gcode, preflight } = emitSaveGcode(ctx, placement);
+  const { gcode, preflight } = await emitSaveGcode(ctx, placement);
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
@@ -180,11 +182,17 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   if (target === null) return;
   try {
     await target.write(gcode);
+    advanceExportVariables(ctx);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
     pushPostSaveAdvisories(ctx);
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
+}
+
+function advanceExportVariables(ctx: SaveGcodeCtx): void {
+  if (ctx.advanceVariablesAfter === undefined) return;
+  ctx.advanceVariablesAfter(ctx.project, 'successful-export');
 }
 
 // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
@@ -204,12 +212,14 @@ function pushPostSaveAdvisories(ctx: SaveGcodeCtx): void {
   }
 }
 
-function emitSaveGcode(
+async function emitSaveGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
-): ReturnType<typeof emitGcode> {
+): ReturnType<typeof emitGcodeSnapshot> {
   const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
-  return emitGcode(ctx.project, {
+  return emitGcodeSnapshot(ctx.project, {
+    clock: () => new Date(),
+    renderVariableText,
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),

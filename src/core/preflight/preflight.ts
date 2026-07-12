@@ -49,6 +49,7 @@ export type PreflightCode =
   | 'raster-too-large'
   | 'registration-both-output'
   | 'selected-output-empty'
+  | 'variable-evaluation-failed'
   | 'cnc-settings-invalid'
   | 'cnc-layer-empty'
   | 'cnc-depth-exceeds-stock'

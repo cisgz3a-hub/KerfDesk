@@ -27,13 +27,15 @@ import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-s
 import { useLaserStore } from '../state/laser-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { isActiveJob } from '../state/laser-store-helpers';
-import { prepareStartJob } from './start-job-readiness';
+import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
+import { renderVariableText } from '../text/render-variable-text';
+import { armVariableStreamAdvancement } from './variable-stream-advancement';
 
 export async function runStartJobFlow(): Promise<void> {
   const app = useStore.getState();
   const { project, jobPlacement } = app;
   const laser = useLaserStore.getState();
-  const prepared = prepareStartJob(
+  const prepared = await prepareStartJobSnapshot(
     project,
     laser.controllerSettings,
     {
@@ -52,8 +54,8 @@ export async function runStartJobFlow(): Promise<void> {
     },
     jobPlacement,
     currentOutputScope(app),
-    undefined,
     rotaryRasterAllowed(project),
+    { clock: () => new Date(), renderVariableText },
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -70,6 +72,7 @@ export async function runStartJobFlow(): Promise<void> {
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });
+    armVariableStreamAdvancement(project);
     // Checkpoint the run only once the stream is actually under way
     // (ADR-118); a refused start must not overwrite an older recovery
     // record. useJobCheckpoint advances it from streamer acks.

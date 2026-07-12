@@ -7,9 +7,10 @@ import type { Project } from '../../core/scene';
 import { resolveJobPlacement } from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { buildPreviewToolpath } from './draw-preview';
+import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-preview';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
+import { renderVariableText } from '../text/render-variable-text';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -59,16 +60,27 @@ export function usePreviewToolpath(
         return;
       }
       const resolved = placementRef.current;
-      const next: PreviewToolpath = !resolved.ok
-        ? {
-            ...buildToolpath(EMPTY_JOB),
-            previewIssue: { kind: 'placement-unavailable', messages: resolved.messages },
-          }
-        : buildPreviewToolpath(project, {
-            ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
-            outputScope,
-          });
-      if (!cancelled) setToolpath(next);
+      if (!resolved.ok) {
+        setToolpath({
+          ...buildToolpath(EMPTY_JOB),
+          previewIssue: { kind: 'placement-unavailable', messages: resolved.messages },
+        });
+        return;
+      }
+      const options = {
+        ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
+        outputScope,
+      };
+      const next = hasVariableText(project)
+        ? buildPreviewToolpathSnapshot(project, {
+            ...options,
+            clock: () => new Date(),
+            renderVariableText,
+          })
+        : Promise.resolve(buildPreviewToolpath(project, options));
+      void next.then((built) => {
+        if (!cancelled) setToolpath(built);
+      });
     });
     return () => {
       cancelled = true;
@@ -77,6 +89,12 @@ export function usePreviewToolpath(
   }, [previewMode, project, outputScope, externalGcodePreview, placementKey, scheduleBuild]);
 
   return toolpath;
+}
+
+function hasVariableText(project: Project): boolean {
+  return project.scene.objects.some(
+    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
+  );
 }
 
 function schedulePreviewBuild(work: () => void): () => void {

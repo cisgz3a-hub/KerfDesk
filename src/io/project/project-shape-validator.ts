@@ -8,6 +8,7 @@ import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
 import { validateOptimization } from './project-optimization-validator';
+import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import {
@@ -58,6 +59,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateDevice(device),
     validateWorkspace(workspace),
     validateOptimization(raw['optimization']),
+    validateProjectVariables(raw['variables']),
     optionalString(raw, 'notes'),
     validateScene(scene),
   ]);
@@ -232,6 +234,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     optionalNumber(obj, `${path}.letterSpacing`),
+    validateVariableTemplate(obj['variableTemplate'], `${path}.variableTemplate`),
     requireString(obj, `${path}.color`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
