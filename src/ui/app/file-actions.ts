@@ -10,6 +10,7 @@ import { machineKindOf, type OutputScope, type Project, type SceneObject } from 
 import { emitGcodeSnapshot } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, serializeProject } from '../../io/project';
+import { importLightBurnProject } from '../../io/lightburn';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
@@ -295,7 +296,10 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     readonly text: () => Promise<string>;
   }>;
   try {
-    files = await ctx.platform.pickFilesForOpen({ accept: ['.lf2'], multiple: false });
+    files = await ctx.platform.pickFilesForOpen({
+      accept: ['.lf2', '.lbrn', '.lbrn2'],
+      multiple: false,
+    });
   } catch (err) {
     ctx.pushToast(`Could not open project: ${errMsg(err)}`, 'error');
     return;
@@ -307,6 +311,10 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     text = await file.text();
   } catch (err) {
     ctx.pushToast(`Could not open ${file.name}: ${errMsg(err)}`, 'error');
+    return;
+  }
+  if (/\.lbrn2?$/i.test(file.name)) {
+    openLightBurnMigration(ctx, file.name, text);
     return;
   }
   const result = deserializeProject(text);
@@ -329,6 +337,23 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     return;
   }
   ctx.pushToast(`Could not open ${file.name}: ${describeResult(result)}`, 'error');
+}
+
+function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: string): void {
+  const result = importLightBurnProject(text, fileName);
+  if (!result.ok) {
+    ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
+    return;
+  }
+  ctx.setProject(result.project);
+  ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'));
+  clearAutosave();
+  const unsupported = result.report.unsupportedShapeTypes.length;
+  const warnings = result.report.warnings.length;
+  ctx.pushToast(
+    `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${unsupported + warnings === 0 ? '' : `, ${unsupported + warnings} warning(s)`}. Save as .lf2 to keep changes.`,
+    unsupported + warnings === 0 ? 'success' : 'warning',
+  );
 }
 
 function errMsg(err: unknown): string {

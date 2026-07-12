@@ -24,7 +24,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       },
       'Ctrl+N',
     ),
-    enabled('file.open', 'file', 'Open...', 'Open .lf2 project', ctx.openProject, 'Ctrl+O'),
+    enabled('file.open', 'file', 'Open...', 'Open project', ctx.openProject, 'Ctrl+O'),
     enabled('file.save', 'file', 'Save', 'Save project', ctx.saveProject, 'Ctrl+S'),
     enabled(
       'file.save-as',
