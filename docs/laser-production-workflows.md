@@ -37,6 +37,14 @@
 4. Apply registration and keep absolute placement active. Job-origin placement is disabled while registered.
 5. Re-register after disconnect, alarm, reset, release-motors, or any trusted-position loss.
 
+## Camera sources
+
+1. Open **Camera** and start a USB camera directly, or expand **RTSP camera** for a private-network `rtsp://` source.
+2. Browser RTSP use requires `pnpm camera:bridge` in a separate terminal; KerfDesk Desktop starts the loopback bridge automatically.
+3. Open **Diagnostics** and confirm the bridge, frame proxy, FFmpeg, active source, and readable-pixel capture before calibration.
+4. Calibrate the lens, align the camera to the bed, and repeat alignment after camera position or resolution changes.
+5. Treat an unavailable bridge, missing FFmpeg, failed capture, or stale preview as a blocked camera workflow; reconnect and rerun Diagnostics before alignment or trace.
+
 ## Material libraries
 
 1. Open **Saved Libraries** in the Cuts / Layers panel.
@@ -58,4 +66,3 @@
 2. Use Preview to inspect cut order, travel, curves, arrays, variables, nesting, and registration.
 3. Frame on the connected machine with the laser off.
 4. Start only after bounds, position, controller readiness, raster, curve-segment, and safety checks pass.
-
