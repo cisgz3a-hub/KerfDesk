@@ -26,15 +26,20 @@ type Matrix = {
 type ParsedVertex = { readonly point: Vec2; readonly left?: Vec2; readonly right?: Vec2 };
 type Primitive = { readonly kind: 'L' | 'B'; readonly from: number; readonly to: number };
 type BuildingPath = { startIndex: number; endIndex: number; segments: PathSegment[] };
+type PathTables = {
+  readonly vertices: ReadonlyMap<number, ReadonlyArray<ParsedVertex>>;
+  readonly primitives: ReadonlyMap<number, ReadonlyArray<Primitive>>;
+};
 const IDENTITY: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
 export function importLbrnGeometry(root: Element, sourceName: string): LbrnGeometryResult {
   const objects: ImportedSvg[] = [];
   const unsupported = new Set<string>();
   const warnings: string[] = [];
+  const pathTables = buildPathTables(root);
   const topShapes = [...root.children].filter((element) => normalized(element.tagName) === 'shape');
   for (const shape of topShapes)
-    visitShape(shape, IDENTITY, sourceName, objects, unsupported, warnings);
+    visitShape(shape, IDENTITY, sourceName, objects, unsupported, warnings, pathTables);
   return { objects, unsupportedShapeTypes: [...unsupported].sort(), warnings };
 }
 
@@ -45,6 +50,7 @@ function visitShape(
   objects: ImportedSvg[],
   unsupported: Set<string>,
   warnings: string[],
+  pathTables: PathTables,
 ): void {
   const type = shape.getAttribute('Type') ?? shape.getAttribute('type') ?? '';
   if (normalized(type) === 'group') {
@@ -52,7 +58,7 @@ function visitShape(
     const children = directChild(shape, 'children');
     for (const child of children === null ? [] : [...children.children]) {
       if (normalized(child.tagName) === 'shape')
-        visitShape(child, matrix, sourceName, objects, unsupported, warnings);
+        visitShape(child, matrix, sourceName, objects, unsupported, warnings, pathTables);
     }
     return;
   }
@@ -62,11 +68,11 @@ function visitShape(
       unsupported.add('Text without BackupPath');
       return;
     }
-    visitVectorShape(backup, parent, sourceName, shape, objects, warnings);
+    visitVectorShape(backup, parent, sourceName, shape, objects, warnings, pathTables);
     return;
   }
   if (['rect', 'ellipse', 'path'].includes(normalized(type))) {
-    visitVectorShape(shape, parent, sourceName, shape, objects, warnings);
+    visitVectorShape(shape, parent, sourceName, shape, objects, warnings, pathTables);
     return;
   }
   unsupported.add(type || shape.tagName);
@@ -79,6 +85,7 @@ function visitVectorShape(
   layerSource: Element,
   objects: ImportedSvg[],
   warnings: string[],
+  pathTables: PathTables,
 ): void {
   const matrix = multiply(parent, parseXForm(shape));
   const type = normalized(shape.getAttribute('Type') ?? shape.getAttribute('type') ?? 'path');
@@ -87,7 +94,7 @@ function visitVectorShape(
       ? rectangleCurves(shape)
       : type === 'ellipse'
         ? ellipseCurves(shape)
-        : pathCurves(shape);
+        : pathCurves(shape, pathTables);
   if (curves.length === 0) {
     warnings.push(`${type || 'shape'} contained no supported geometry.`);
     return;
@@ -101,12 +108,21 @@ function visitVectorShape(
   const bounds = combinedBounds(transformed);
   objects.push({
     kind: 'imported-svg',
-    id: crypto.randomUUID(),
+    id: importedObjectId(sourceName, objects.length),
     source: sourceName,
     bounds,
     transform: IDENTITY_TRANSFORM,
     paths: [{ color, polylines, curves: transformed }],
   });
+}
+
+function importedObjectId(sourceName: string, index: number): string {
+  const source = sourceName
+    .replace(/\.lbrn2?$/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `lbrn-${source || 'project'}-${index + 1}`;
 }
 
 function rectangleCurves(shape: Element): CurveSubpath[] {
@@ -147,9 +163,9 @@ function ellipseCurves(shape: Element): CurveSubpath[] {
   ];
 }
 
-function pathCurves(shape: Element): CurveSubpath[] {
-  const vertices = parseVertices(directChild(shape, 'vertlist')?.textContent ?? '');
-  const primitives = parsePrimitives(directChild(shape, 'primlist')?.textContent ?? '');
+function pathCurves(shape: Element, pathTables: PathTables): CurveSubpath[] {
+  const vertices = pathVertices(shape, pathTables);
+  const primitives = pathPrimitives(shape, pathTables);
   const curves: CurveSubpath[] = [];
   let current: BuildingPath | null = null;
   for (const primitive of primitives) {
@@ -160,6 +176,36 @@ function pathCurves(shape: Element): CurveSubpath[] {
   }
   if (current !== null) curves.push(finishPath(current, vertices));
   return curves;
+}
+
+function pathVertices(shape: Element, pathTables: PathTables): ReadonlyArray<ParsedVertex> {
+  const list = directChild(shape, 'vertlist');
+  if (list !== null) return parseVertices(list.textContent ?? '');
+  return pathTables.vertices.get(integerAttribute(shape, 'VertID') ?? -1) ?? [];
+}
+
+function pathPrimitives(shape: Element, pathTables: PathTables): ReadonlyArray<Primitive> {
+  const list = directChild(shape, 'primlist');
+  if (list !== null) return parsePrimitives(list.textContent ?? '');
+  return pathTables.primitives.get(integerAttribute(shape, 'PrimID') ?? -1) ?? [];
+}
+
+function buildPathTables(root: Element): PathTables {
+  const vertices = new Map<number, ReadonlyArray<ParsedVertex>>();
+  const primitives = new Map<number, ReadonlyArray<Primitive>>();
+  for (const element of [...root.querySelectorAll('*')]) {
+    const vertexId = integerAttribute(element, 'VertID');
+    const vertexList = directChild(element, 'vertlist');
+    if (vertexId !== null && vertexList !== null) {
+      vertices.set(vertexId, parseVertices(vertexList.textContent ?? ''));
+    }
+    const primitiveId = integerAttribute(element, 'PrimID');
+    const primitiveList = directChild(element, 'primlist');
+    if (primitiveId !== null && primitiveList !== null) {
+      primitives.set(primitiveId, parsePrimitives(primitiveList.textContent ?? ''));
+    }
+  }
+  return { vertices, primitives };
 }
 
 function appendPrimitive(

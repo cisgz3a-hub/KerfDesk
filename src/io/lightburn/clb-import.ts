@@ -170,7 +170,9 @@ function field(element: Element, names: ReadonlyArray<string>): string | null {
     if (allowed.has(normalized(node.name))) return node.value;
   }
   for (const child of [...element.children]) {
-    if (allowed.has(normalized(child.tagName))) return child.textContent?.trim() ?? null;
+    if (allowed.has(normalized(child.tagName))) {
+      return attribute(child, ['value']) ?? child.textContent?.trim() ?? null;
+    }
   }
   return null;
 }

@@ -41,6 +41,19 @@ describe('importLightBurnProject', () => {
     expect(result).toMatchObject({ ok: true, report: { unsupportedShapeTypes: ['Image'] } });
   });
 
+  it('resolves shared VertID and PrimID geometry tables used by LightBurn 2 projects', () => {
+    const xml = `<LightBurnProject AppVersion="2.0.05"><Shape Type="Group"><Children>
+      <Shape Type="Path" VertID="1" PrimID="7"><VertList>V0 0c0x1c1x1V10 0c0x1c1x1V10 10c0x1c1x1V0 10c0x1c1x1</VertList><PrimList>L0 1L1 2L2 3L3 0</PrimList></Shape>
+      <Shape Type="Path" VertID="2" PrimID="7"><VertList>V20 0c0x1c1x1V30 0c0x1c1x1V30 10c0x1c1x1V20 10c0x1c1x1</VertList></Shape>
+      <Shape Type="Path" VertID="1" PrimID="7"><XForm>1 0 0 1 40 0</XForm></Shape>
+    </Children></Shape></LightBurnProject>`;
+    const result = importLightBurnProject(xml, 'shared-tables.lbrn2');
+    expect(result).toMatchObject({
+      ok: true,
+      report: { importedObjects: 3, warnings: [] },
+    });
+  });
+
   it.each(['<!DOCTYPE x><LightBurnProject/>', '<!ENTITY x "boom"><LightBurnProject/>'])(
     'rejects active XML declarations',
     (xml) => expect(importLightBurnProject(xml, 'unsafe.lbrn2')).toMatchObject({ ok: false }),
