@@ -47,6 +47,7 @@ export type PreflightCode =
   | 'long-blank-feed'
   | 'no-go-zone-collision'
   | 'raster-too-large'
+  | 'vector-segment-budget-exceeded'
   | 'registration-both-output'
   | 'selected-output-empty'
   | 'variable-evaluation-failed'

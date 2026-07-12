@@ -10,9 +10,37 @@ import {
   IDENTITY_TRANSFORM,
   type Project,
   type RasterImage,
+  type SceneObject,
 } from '../scene';
 import { createRectangle, createRegistrationBox } from '../shapes';
 import { runPreEmitPreflight } from './pre-emit';
+
+it('rejects canonical curve geometry above the bounded machine segment budget', () => {
+  const base = createProject();
+  const color = '#ff0000';
+  const segments = Array.from({ length: 100_001 }, (_, index) => ({
+    kind: 'line' as const,
+    to: { x: index % 100, y: Math.floor(index / 100) },
+  }));
+  const object: SceneObject = {
+    kind: 'imported-svg',
+    id: 'over-budget',
+    source: 'over-budget.svg',
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 1001 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color,
+        polylines: [{ points: [{ x: 0, y: 0 }], closed: false }],
+        curves: [{ start: { x: 0, y: 0 }, segments, closed: false }],
+      },
+    ],
+  };
+  const scene = addLayer(addObject(base.scene, object), createLayer({ id: 'curve', color }));
+  expect(runPreEmitPreflight({ ...base, scene }).issues).toContainEqual(
+    expect.objectContaining({ code: 'vector-segment-budget-exceeded' }),
+  );
+});
 
 function projectWithJig(opts: {
   readonly regOutput: boolean;

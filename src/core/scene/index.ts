@@ -69,9 +69,11 @@ export {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   MAX_FLATTENED_CURVE_SEGMENTS,
   curveSubpathBounds,
+  flattenColoredPathCurves,
   flattenCurveSubpath,
   polylineToCurveSubpath,
   type FlattenCurveOptions,
+  type FlattenColoredPathResult,
   type FlattenCurveResult,
 } from './curve-path';
 export {

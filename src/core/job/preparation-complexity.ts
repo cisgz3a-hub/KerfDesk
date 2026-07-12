@@ -5,6 +5,8 @@
 
 import {
   applyTransform,
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  flattenColoredPathCurves,
   isClosedEnough,
   type ColoredPath,
   type Layer,
@@ -108,11 +110,13 @@ function vectorTransform(obj: SceneObject): Transform | null {
 }
 
 function countPathSegments(path: ColoredPath): number {
-  let count = 0;
-  for (const polyline of path.polylines) {
-    count += Math.max(0, polyline.points.length - 1);
-  }
-  return count;
+  const flattened = flattenColoredPathCurves(path, {
+    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    segmentBudget: PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
+  });
+  return flattened.kind === 'ok'
+    ? flattened.segmentCount
+    : PREPARATION_RAW_VECTOR_SEGMENT_BUDGET + 1;
 }
 
 function estimateHatchRows(

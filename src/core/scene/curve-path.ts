@@ -1,5 +1,6 @@
 import type {
   Bounds,
+  ColoredPath,
   CubicPathSegment,
   CurveSubpath,
   EllipticalArcPathSegment,
@@ -20,6 +21,43 @@ export type FlattenCurveResult =
   | { readonly kind: 'ok'; readonly polyline: Polyline; readonly segmentCount: number }
   | { readonly kind: 'segment-budget-exceeded'; readonly segmentBudget: number };
 
+export type FlattenColoredPathResult =
+  | {
+      readonly kind: 'ok';
+      readonly polylines: ReadonlyArray<Polyline>;
+      readonly segmentCount: number;
+    }
+  | { readonly kind: 'segment-budget-exceeded'; readonly segmentBudget: number };
+
+export function flattenColoredPathCurves(
+  path: ColoredPath,
+  options: FlattenCurveOptions,
+): FlattenColoredPathResult {
+  if (path.curves === undefined) {
+    return {
+      kind: 'ok',
+      polylines: path.polylines,
+      segmentCount: path.polylines.reduce(
+        (count, polyline) => count + Math.max(0, polyline.points.length - 1),
+        0,
+      ),
+    };
+  }
+  const budget = Math.max(1, Math.floor(options.segmentBudget ?? MAX_FLATTENED_CURVE_SEGMENTS));
+  const polylines: Polyline[] = [];
+  let segmentCount = 0;
+  for (const curve of path.curves) {
+    const result = flattenCurveSubpath(curve, {
+      ...options,
+      segmentBudget: budget - segmentCount,
+    });
+    if (result.kind !== 'ok') return { kind: 'segment-budget-exceeded', segmentBudget: budget };
+    polylines.push(result.polyline);
+    segmentCount += result.segmentCount;
+  }
+  return { kind: 'ok', polylines, segmentCount };
+}
+
 export function polylineToCurveSubpath(polyline: Polyline): CurveSubpath {
   const start = polyline.points[0] ?? { x: 0, y: 0 };
   return {
@@ -38,8 +76,8 @@ export function flattenCurveSubpath(
   const points: Vec2[] = [path.start];
   let current = path.start;
   for (const segment of path.segments) {
-    const additions = flattenSegment(current, segment, tolerance);
-    if (points.length - 1 + additions.length > budget) {
+    const additions = flattenSegment(current, segment, tolerance, budget - (points.length - 1));
+    if (additions === null) {
       return { kind: 'segment-budget-exceeded', segmentBudget: budget };
     }
     points.push(...additions);
@@ -58,16 +96,37 @@ export function curveSubpathBounds(path: CurveSubpath): Bounds {
   return boundsOf(points);
 }
 
-function flattenSegment(from: Vec2, segment: PathSegment, tolerance: number): Vec2[] {
+function flattenSegment(
+  from: Vec2,
+  segment: PathSegment,
+  tolerance: number,
+  budget: number,
+): Vec2[] | null {
+  if (budget < 1) return null;
   if (segment.kind === 'line') return [segment.to];
-  if (segment.kind === 'cubic') return flattenCubic(from, segment, tolerance);
-  return flattenArc(from, segment, tolerance);
+  if (segment.kind === 'cubic') return flattenCubic(from, segment, tolerance, budget);
+  return flattenArc(from, segment, tolerance, budget);
 }
 
-function flattenCubic(from: Vec2, segment: CubicPathSegment, tolerance: number): Vec2[] {
+function flattenCubic(
+  from: Vec2,
+  segment: CubicPathSegment,
+  tolerance: number,
+  budget: number,
+): Vec2[] | null {
   const out: Vec2[] = [];
-  subdivideCubic(from, segment.control1, segment.control2, segment.to, tolerance, 0, out);
-  return out;
+  return subdivideCubic(
+    from,
+    segment.control1,
+    segment.control2,
+    segment.to,
+    tolerance,
+    0,
+    budget,
+    out,
+  )
+    ? out
+    : null;
 }
 
 function subdivideCubic(
@@ -77,14 +136,16 @@ function subdivideCubic(
   p3: Vec2,
   tolerance: number,
   depth: number,
+  budget: number,
   out: Vec2[],
-): void {
+): boolean {
   if (
     depth >= 24 ||
     Math.max(pointLineDistance(p1, p0, p3), pointLineDistance(p2, p0, p3)) <= tolerance
   ) {
+    if (out.length >= budget) return false;
     out.push(p3);
-    return;
+    return true;
   }
   const p01 = midpoint(p0, p1);
   const p12 = midpoint(p1, p2);
@@ -92,17 +153,25 @@ function subdivideCubic(
   const p012 = midpoint(p01, p12);
   const p123 = midpoint(p12, p23);
   const p0123 = midpoint(p012, p123);
-  subdivideCubic(p0, p01, p012, p0123, tolerance, depth + 1, out);
-  subdivideCubic(p0123, p123, p23, p3, tolerance, depth + 1, out);
+  return (
+    subdivideCubic(p0, p01, p012, p0123, tolerance, depth + 1, budget, out) &&
+    subdivideCubic(p0123, p123, p23, p3, tolerance, depth + 1, budget, out)
+  );
 }
 
-function flattenArc(from: Vec2, segment: EllipticalArcPathSegment, tolerance: number): Vec2[] {
+function flattenArc(
+  from: Vec2,
+  segment: EllipticalArcPathSegment,
+  tolerance: number,
+  budget: number,
+): Vec2[] | null {
   const arc = endpointArc(from, segment);
   if (arc === null) return [segment.to];
   const maxRadius = Math.max(arc.radiusX, arc.radiusY);
   const ratio = Math.max(-1, Math.min(1, 1 - tolerance / maxRadius));
   const maxStep = Math.max(1e-6, 2 * Math.acos(ratio));
   const count = Math.max(1, Math.ceil(Math.abs(arc.delta) / maxStep));
+  if (count > budget) return null;
   return Array.from({ length: count }, (_, index) =>
     pointOnArc(arc, arc.theta1 + (arc.delta * (index + 1)) / count),
   );

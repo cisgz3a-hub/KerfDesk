@@ -16,6 +16,8 @@ import { effectiveObjectPowerPercent, objectPowerScalePercent } from './object-p
 import {
   applyTransform,
   assertNever,
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  flattenColoredPathCurves,
   type ColoredPath,
   type Layer,
   layerOperationSettingsEqual,
@@ -376,7 +378,7 @@ function appendFillPathContours(
 ): void {
   for (const path of paths) {
     if (path.color !== layer.color) continue;
-    for (const polyline of path.polylines) {
+    for (const polyline of compilationPolylines(path)) {
       out.push({
         points: polyline.points.map((p) => toMachineCoords(applyTransform(p, transform), device)),
         closed: polyline.closed,
@@ -404,7 +406,7 @@ function appendPathSegments(
   for (const path of paths) {
     if (path.color !== layer.color) continue;
     const closedForKerf: Polyline[] = [];
-    for (const polyline of path.polylines) {
+    for (const polyline of compilationPolylines(path)) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, transform), device),
       );
@@ -422,6 +424,16 @@ function appendPathSegments(
       out.push({ polyline: offset.points, closed: true });
     }
   }
+}
+
+function compilationPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
+  const flattened = flattenColoredPathCurves(path, {
+    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    segmentBudget: 100_000,
+  });
+  // Normal output reaches this only after the matching pre-emit budget check.
+  // Direct pure-core callers retain the compatibility view on over-budget data.
+  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
