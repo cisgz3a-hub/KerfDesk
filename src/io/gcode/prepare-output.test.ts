@@ -80,9 +80,14 @@ describe('prepareOutput', () => {
   });
 
   it('preserves source cut order when reduce travel moves is disabled', () => {
-    const project = {
-      ...travelOptimizationProject(),
-      optimization: { reduceTravelMoves: false },
+    const base = travelOptimizationProject();
+    const project: Project = {
+      ...base,
+      optimization: {
+        ...base.optimization,
+        reduceTravelMoves: false,
+        travelPolicy: 'source-order',
+      },
     };
 
     const prepared = prepareOutput(project);

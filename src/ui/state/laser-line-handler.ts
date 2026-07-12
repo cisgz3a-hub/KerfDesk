@@ -230,6 +230,7 @@ function handleAlarmLine(
     ...originUnknownAfterControllerReset(prev),
     motionOperation: null,
     controllerOperation: null,
+    fireActive: false,
     frameVerification: null,
     // The alarmed controller discards its pending work; owed acks are gone.
     pendingUntrackedAcks: 0,

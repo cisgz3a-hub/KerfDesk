@@ -11,7 +11,7 @@ import {
 } from '../../core/controllers/grbl';
 import { grblDriver, type ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
-import { disconnectDuringJobNotice } from './laser-safety-notice';
+import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 
 const LOG_MAX = 200;
@@ -23,6 +23,8 @@ export const UNKNOWN_IDLE_STATUS_MESSAGE =
   'Controller status is not known yet. Wait for an Idle status report before jogging or framing.';
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
+export const FIRE_ACTIVE_COMMAND_MESSAGE =
+  'Release the momentary Fire control before sending another machine command.';
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
 
@@ -84,6 +86,7 @@ export function hasUnsettledStreamAcks(streamer: StreamerState | null): boolean 
 }
 
 export function motionOperationCommandBlockMessage(state: LaserState): string | null {
+  if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
   return state.motionOperation !== null
     ? MOTION_OPERATION_ACTIVE_MESSAGE
     : controllerOperationCommandBlockMessage(state.controllerOperation);
@@ -113,12 +116,17 @@ export function disconnectStopCommands(
   state: LaserState,
   driver: ControllerDriver,
 ): ReadonlyArray<string> {
+  const fireOff = state.fireActive ? ['M5\n'] : [];
   if (isActiveJob(state.streamer)) {
     const softReset = driver.realtime.softReset;
     return [
       ...(softReset === null ? [] : [softReset]),
+      ...fireOff,
       ...driver.commands.stopLaserLines.map((line) => `${line}\n`),
     ];
+  }
+  if (state.fireActive) {
+    return [...fireOff, ...driver.commands.stopLaserLines.map((line) => `${line}\n`)];
   }
   if (state.airAssistOn) return driver.commands.stopLaserLines.map((line) => `${line}\n`);
   if (state.motionOperation === null) return [];
@@ -223,6 +231,7 @@ export function initialLaserState(): Pick<
   | 'lastWriteError'
   | 'safetyNotice'
   | 'airAssistOn'
+  | 'fireActive'
   | 'autofocusBusy'
   | 'probeBusy'
   | 'motionOperation'
@@ -258,6 +267,7 @@ export function initialLaserState(): Pick<
     lastWriteError: null,
     safetyNotice: null,
     airAssistOn: false,
+    fireActive: false,
     autofocusBusy: false,
     probeBusy: false,
     motionOperation: null,
@@ -291,7 +301,10 @@ export function initialLaserState(): Pick<
 export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
   const wasActiveJob = isActiveJob(state.streamer);
   const wasUnsafeActive =
-    wasActiveJob || state.motionOperation !== null || state.controllerOperation !== null;
+    wasActiveJob ||
+    state.fireActive ||
+    state.motionOperation !== null ||
+    state.controllerOperation !== null;
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
   return {
@@ -312,10 +325,15 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     motionOperation: null,
     controllerOperation: null,
     airAssistOn: false,
+    fireActive: false,
     homingState: 'unknown',
     streamer: stream,
     // Replies owed by the dead controller will never arrive.
     pendingUntrackedAcks: 0,
-    ...(wasUnsafeActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),
+    ...(state.fireActive
+      ? { safetyNotice: disconnectDuringFireNotice() }
+      : wasUnsafeActive
+        ? { safetyNotice: disconnectDuringJobNotice() }
+        : {}),
   };
 }

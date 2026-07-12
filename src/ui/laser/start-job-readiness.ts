@@ -91,6 +91,7 @@ export function prepareStartJob(
   // head XY and its checkpoint fingerprint) while the live machine is still
   // re-validated through the origin's mode (R1).
   resolvedJobOrigin?: JobOriginPlacement,
+  allowRotaryRaster?: boolean,
 ): StartJobPreparation {
   const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
@@ -109,6 +110,7 @@ export function prepareStartJob(
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    allowRotaryRaster: allowRotaryRaster === true,
   });
   if (!preflight.ok) {
     return { ok: false, messages: preflight.issues.map((i) => i.message) };

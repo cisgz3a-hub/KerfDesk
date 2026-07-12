@@ -28,6 +28,7 @@ export const ruidaDriver: ControllerDriver = {
     firmwareSetupPanel: 'none',
     probing: false,
     cncJobs: false,
+    lowPowerFire: false,
     overrides: false,
   },
   realtime: {
