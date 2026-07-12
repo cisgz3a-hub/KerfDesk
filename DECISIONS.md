@@ -6450,3 +6450,35 @@ install-on-natural-quit, and no `quitAndInstall()` call.
   not consume its update metadata until the signing gate is deliberately opened.
 - Code signing is now a functional prerequisite for automatic updates, not only
   a SmartScreen/reputation improvement.
+
+
+## ADR-136 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
+
+Context. A profile cut removes the full wall across its depth passes, so the
+finished edge carries the roughing tool's deflection and chatter. Production CNC
+work leaves a small "stock to leave" allowance on roughing and removes it with a
+light finishing pass along the true contour for a cleaner wall.
+
+Decision. Optional per-layer `finishAllowanceMm` on CncLayerSettings, for
+profile-outside / profile-inside cuts only (0/absent = off, byte-identical).
+When > 0:
+- Roughing offsets the contour by tool-radius + allowance, staying that far
+  proud of the finished wall (profileToolpathPolylines gained an allowance arg).
+- One finishing pass at the true contour (tool-radius offset, allowance 0) at
+  full depth is appended after the roughing passes.
+- Holding tabs: the finishing pass runs through the SAME tab split the deepest
+  roughing pass uses, so tabs are preserved and the part stays attached.
+
+Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
+(which already has its own H.8 finishing skim) are out of scope, documented in
+code, and covered by a test showing those cut types are unaffected.
+
+Consequences.
+- Determinism (#5): allowance 0/absent is byte-identical (tested).
+- HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
+- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
+  same perimeter-fraction logic on concentric contours, so they align for
+  typical convex profiles; on complex/concave geometry clipper's offset can pick
+  a different start vertex and misalign them, which could sever the part. Verify
+  with a test cut before trusting tabs + finish allowance together on intricate
+  parts.
