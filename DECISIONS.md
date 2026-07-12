@@ -6661,3 +6661,28 @@ busy predicate, disabled state, safety message, and progress behavior.
 - The change produces no controller commands and no G-code differences by itself.
 - DOM-order tests cover idle, framing, and streaming states in addition to the existing behavioral
   tests.
+
+---
+
+## ADR-142 - Numeric Edits overflow remains inside its toolbar
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Numeric Edits contains a 3x3 anchor grid and five fixed-width numeric fields. At compact widths or
+the CSS-pixel equivalent of 200% browser zoom, that intrinsic width expanded the whole document to
+787 px inside a 625 px viewport. The primary toolbar and canvas were responsive, but the page still
+acquired horizontal overflow.
+
+### Decision
+
+Constrain Numeric Edits to the available width with `min-width: 0`, `max-width: 100%`, and border-box
+sizing. Keep every control and field width unchanged, and expose any remaining width through local
+horizontal scrolling on the Numeric Edits toolbar rather than document scrolling.
+
+### Consequences
+
+- Compact and zoomed layouts no longer widen the page.
+- Numeric values retain stable field dimensions and remain reachable by scrolling the toolbar.
+- Selection-transform behavior, keyboard handling, and project output are unchanged.
