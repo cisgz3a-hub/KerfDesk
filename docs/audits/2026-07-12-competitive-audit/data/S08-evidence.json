@@ -1,0 +1,175 @@
+{
+  "sector": 8,
+  "categories": [
+    {
+      "id": "8.1",
+      "summary": "One pure prepareOutput pipeline feeds Preview, Save, Start, Estimate, and .rd export (ADR-040); a parity test locks the preview deep-equal to the prepared job; raster preview reuses the compile-path dither (ADR-028). Perceptual mask tests compare preview toolpath AND emitted G-code against source geometry (IoU 0.78-0.9), re-run green this audit. Prior empty-preview-on-placement-failure defect (S4-F1) now fixed.",
+      "evidence": [
+        {
+          "tag": "PERC",
+          "cite": "src/__fixtures__/perceptual/toolpath-rasterize.test.ts:27-97 - rasterizes the compiled preview toolpath AND the emitted grbl G-code into ink masks and diffs both against source-geometry truth masks: solid fill IoU/recall >=0.9, annulus hole present at the correct pixels (IoU >=0.85), cross-hatch IoU >=0.78. Re-run 2026-07-13 via targeted vitest: 3/3 pass."
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/workspace/draw-preview.parity.test.ts:56-81 - buildPreviewToolpath must deep-equal the SAME prepared (optimized) job Save/Start emit, whole-project and output-scoped; re-run 2026-07-13, 2/2 pass. Proves order/geometry identity, not on-screen looks."
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/__fixtures__/perceptual/gcode-rasterize.test.ts:7-56 - the G-code burn rasterizer used as the emitted-side instrument honors modal S values, M3/M4/M5 state, and skips rapids; 4/4 pass 2026-07-13."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/draw-preview.ts:116-149 - buildPreviewToolpath runs prepareOutput (compile + jobOrigin + optimize) and maps the machine-frame result back to scene space (mapToolpathToScene) so the overlay registers with the design."
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:1988 (ADR-040 shared prepared-output pipeline: preview = save = start = estimate); DECISIONS.md:1111 (ADR-028 raster engrave preview renders via the compile path's own dither)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/use-preview-toolpath.ts:61-70 and src/ui/workspace/preview-overlays.tsx:33 - placement-resolution failure now yields previewIssue kind 'placement-unavailable' with the real messages rendered as a banner; the 2026-07-10 full-sweep S4-F1 false 'enable Output' diagnosis is fixed in the current tree."
+        }
+      ],
+      "notVerified": "The actual canvas-rendered pixels (draw-preview.ts stroke code) were never diffed against a rendered screenshot or LightBurn preview; the perceptual masks cover fill/cross-hatch compiled toolpaths on 32 px synthetic rectangles only. Line-mode vector preview, on-canvas raster-image dither alignment, rotary-transformed (ADR-127) jobs, and Y-flip registration are structurally tested but have no perceptual proof. No maintainer-approved visual pass exists for the preview specifically (ADR-128's reference loop covers trace, not preview)."
+    },
+    {
+      "id": "8.2",
+      "summary": "Scrubber, Play/Pause, three speed presets, travel-visibility toggle, CNC Prev/Next pass stepper, 3D-at-scrubber dialog; raster rows scrub in emitted order with per-span provenance; external .nc programs are playable in the same simulator. Defect still present: playback is distance-compressed over fixed 60/30/10 s wall durations, not time-based - slow engraves and rapid travels animate identically; no per-command step-through.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/use-preview-playback.ts:6-10,42-59 - PLAYBACK_DURATION_MS slow/normal/fast = 60/30/10 s regardless of job; scrubber advances by wall-time fraction of total arc length (full-sweep S4-F3, confirmed unchanged in the current tree)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/preview-overlays.tsx:142-234 - Play/Pause button, scrubber, Speed select, and the CNC Prev/Next pass stepper (jumps the scrubber to plunge-derived pass boundaries; laser toolpaths have none, buttons hidden)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/draw-preview.ts:100-113 - sliceToolpath truncates at the scrubber fraction with a partial step and red head marker; future route ghosted at 0.18 alpha."
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/workspace/use-preview-playback.test.tsx - 3/3 pass on targeted run 2026-07-13 (playback state mechanics only, not animation feel)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/external-gcode-actions.ts:1-28 - Phase H.6b/F-CNC10 external .nc preview slot: a parsed G-code program is shown in the simulator instead of the compiled toolpath, session-only; parser at src/io/gcode/parse-gcode-program.ts."
+        }
+      ],
+      "notVerified": "No live-app run: animation smoothness, scrubber feel, and head-marker behavior were not observed. There is no per-line/per-command stepping (only CNC pass jumps), and no time-based slider - the physics planner's per-block times exist (planner.ts) but do not drive playback."
+    },
+    {
+      "id": "8.3",
+      "summary": "Clean-room grbl physics planner: per-edge blocks, $11 junction-deviation cornering, two-pass lookahead, trapezoid/triangle block times, plus raster sweep and CNC plunge/retract terms; the prior exit-velocity underestimate (M-30) is fixed. Still open: raster ETA duplicates the sweep model and ignores unidirectional scanning; the estimate ignores job placement; no elapsed/remaining label during a running job. Never validated against a real machine runtime.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/planner.ts:1-34,209-273 - grbl planner algorithm (block decomposition, junction velocity v_j = sqrt(a*d*sin(t/2)/(1-sin(t/2))), backward+forward lookahead); lines 241-244 clamp junction velocity to BOTH adjacent blocks' target speeds - the M-30 fix."
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-11-consolidated-audit-v2-fix-verification.md:74 - 'M-30 planner ETA exit velocity: Fixed - junction velocity is clamped to both adjacent blocks' target speeds.'"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/planner.test.ts (18 tests) + src/core/job/estimate-duration.test.ts (22 tests) - all pass on targeted run 2026-07-13; these assert planner math and estimator structure, not real-world accuracy."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/estimate-duration.ts:48,143-166 - estimator re-implements raster span/sweep extraction (own RASTER_GAP_RAPID_THRESHOLD_MM=5) and alternates sweep direction unconditionally (sweepIndex % SWEEP_DIRECTION_PERIOD); group.bidirectional is not read - full-sweep S4-F5 still open."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/live-job-estimate.ts:46 - estimateLiveJob calls prepareOutput(project, { outputScope }) WITHOUT the resolved jobOrigin, while the preview stats panel's Cut/Travel distances come from the placed toolpath (preview-overlays.tsx:60,81-95) - full-sweep S4-F6 estimate half still open."
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep of src/ui/laser (JobControls.tsx, JobRunControls.tsx): no elapsed/remaining-time label during streaming - full-sweep S4-F8 still open; progress remains lines-completed only."
+        }
+      ],
+      "notVerified": "Estimate accuracy against a real burn: zero hardware timing measurements exist anywhere in the tree (hardware ledger is CLAIMED throughout); the planner is verified on paper and by unit tests only. Whether the fixed junction clamp brings ETA within any percentage of real GRBL runtime is unknown."
+    },
+    {
+      "id": "8.4",
+      "summary": "Travels drawn dashed with a visibility toggle; cut vs travel vs head clearly distinct; raster preview is a WYSIWYG grayscale of the compile path's own dither with device sMax (ADR-028). Defect unchanged: vector cuts stroke in one fixed theme blue - drawCut ignores its layer-color parameter, no shade-by-power and no toggle, so 10% and 90% power look identical, diverging from WORKFLOW F-A8 and the LightBurn baseline ADR-028 records, with no ADR for the divergence.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/draw-preview.ts:259-265 - drawCut(_color ignored) strokes every cut with canvasTheme.previewCut; no power on ToolpathStep cut steps and no shading path (full-sweep S4-F2, confirmed unchanged 2026-07-13)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/draw-preview.ts:243-257 (dashed travel rendering) and src/ui/workspace/preview-overlays.tsx:67-80 ('Traversal moves' checkbox, preview-only)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/draw-raster-preview.ts:1,108 - raster engrave preview renders the dithered/grayscale burn via the compile-path dither; cache key includes layer.ditherAlgorithm, minPower-power, and device.maxPowerS, so preview shading tracks emitted S values (ADR-028)."
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/workspace/draw-raster-preview.test.ts - 9/9 pass on targeted run 2026-07-13 (structural: caching, gating, scene-space placement - not on-screen appearance)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:1123 - ADR-028 itself records LightBurn's preview 'shades according to power'; honored for raster images only, vector shade-by-power absent and un-ADR'd (per design SS5.6 this classifies as a bug, not a choice)."
+        }
+      ],
+      "notVerified": "No perceptual proof of the raster grayscale as displayed on canvas (the dither itself has perceptual tests; the canvas composite does not). No LightBurn side-by-side comparison. Direction indicators (arrowheads on cut direction) were not found and not claimed either way beyond the head marker."
+    },
+    {
+      "id": "8.5",
+      "summary": "Genuine removal-grid simulation: tool kernels (flat/ball/v-bit) stamped along cut and plunge steps with linear Z interpolation, scrubber-coupled (120 quantized buckets, ~1M-cell cap); depth-shaded 2D preview, persistent Easel-style three.js 3D result pane, and a 3D dialog at the scrubber position. V-carve output is perceptually verified against an analytic V-groove; re-imported .nc must reproduce the native removal footprint (IoU parity).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/sim/stamp-toolpath.ts:37-73 - computeRemovalGrid stamps kernels with Z interpolation and an uptoLengthMm budget for partial-progress scrubbing; src/ui/workspace/use-cnc-removal-grid.ts:21-65 - 120 scrub buckets, UI_TARGET_CELLS_PER_AXIS=1000 (~1M cells)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/Cnc3DPane.tsx:1-38 - persistent collapsible 3D result pane (ADR-105 G9, Easel split-view) continuously simulating compile->toolpath->removal grid through the ADR-102 three.js scene; Cut3DPreviewDialog at src/ui/relief-viewer/Cut3DPreviewDialog.tsx opens at the current scrubber position (preview-overlays.tsx:120-127)."
+        },
+        {
+          "tag": "PERC",
+          "cite": "src/core/cnc/vcarve-perceptual.test.ts:18-36 - V-carves a 10 mm square with a 90-degree bit through the REAL pipeline and compares the removal grid against the analytic pyramid-frustum groove z(x,y) = -min(distToBoundary, maxDepth) (ADR-025 pattern); 2/2 pass on targeted run 2026-07-13."
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/gcode/gcode-reimport-parity.test.ts:1-70 - parsing KerfDesk's own emitted CNC .nc must produce the same removal footprint (cut-footprint IoU + deepest-cell) as the native compile pipeline; 1/1 pass 2026-07-13. src/core/sim/stamp-toolpath.test.ts 4/4 pass (analytic ground-truth cells)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:4083 (ADR-098 CNC track, removal grid = Phase H.2 verification instrument); DECISIONS.md:4303 (ADR-102 three.js for the 3D viewer, explicit ADR-098 SS2 override)."
+        }
+      ],
+      "notVerified": "The three.js 3D rendering was never screenshot or visually inspected - grid math is perceptually proven, the rendered scene is not. Simulation vs an actual cut is unproven (all hardware CLAIMED). The grid is a 2.5D heightfield: no undercut, side-wall, or tool-deflection modeling; stock is a flat rect only."
+    },
+    {
+      "id": "8.6",
+      "summary": "Layered budgets: a 100k raw-segment gate runs before synchronous compile; preview builds are scheduled off-render with cancellation; routes above 120k segments stride-sample with an explicit 'too large to draw safely' banner; over-budget rasters fail as preflight verdicts, not freezes. Two prior hot loops are fixed (250 ms status-poll preview rebuild; 3D-pane hover recompile). Scrub grids memoized per bucket. No production-scale runtime measurement exists.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/preparation-complexity.ts:17 (PREPARATION_RAW_VECTOR_SEGMENT_BUDGET = 100_000, gating compile in both preview and live estimate - live-job-estimate.ts:37-42) and src/ui/workspace/draw-complexity.ts:10-22 (LARGE_SCENE_SEGMENT_THRESHOLD = 120_000 stride sampling)."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/use-preview-toolpath.ts:31-45 - rebuilds keyed on the RESOLVED placement, not the raw 250 ms statusReport poll, closing the consolidated audit's '250 ms preview recompile' hot loop; builds run via cancellable scheduler (lines 47-77) and keep the previous route painted during rebuilds."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/Cnc3DPane.tsx:32-38 - PRF-01 fix: value-stable outputScope subscription stops the ~500x500 removal grid recompiling on every pointer move; pane uses useDeferredValue and a coarser grid (PANE_TARGET_CELLS_PER_AXIS=500) than the Preview grid."
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/preview-overlays.tsx:27-29 ('Route preview is too large to draw safely' banner for the too-complex previewIssue); src/ui/workspace/use-cnc-removal-grid.ts:21-23 (SCRUB_BUCKETS=120, ~1M-cell / ~4 MB grid target)."
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/workspace/draw-preview-complexity.test.ts (2 tests), draw-raster-preview async/cache tests (within the 9-test file) - pass on targeted run 2026-07-13; they assert gating/stride/cache behavior, not frame rates."
+        }
+      ],
+      "notVerified": "No profiling or live measurement at production scale this audit: frame rates, memory, and responsiveness with a real large scene were not observed (no dev-server interaction permitted). Budget constants' adequacy is design-asserted; the 2026-07-10 consolidated audit's remaining perf items (e.g. Start/Save/Frame compiling synchronously on the main thread, P1-d marked Fixed in the 07-11 verification) were re-checked only via that verification document, not re-profiled."
+    }
+  ]
+}
