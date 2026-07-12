@@ -27,6 +27,7 @@ import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-s
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { prepareStartJob } from './start-job-readiness';
+import { resumeConfirmation } from './resume-confirmation';
 
 export async function runStartJobFlow(): Promise<void> {
   const app = useStore.getState();
@@ -179,6 +180,7 @@ async function streamResumeFromRawLine(
 ): Promise<void> {
   const machine = project.machine;
   const resume = buildResumeProgram(gcode, fromLine, {
+    machineKind: machineKindOf(project.machine),
     safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
     spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
     plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
@@ -188,7 +190,7 @@ async function streamResumeFromRawLine(
     return;
   }
   const proceed = jobAwareConfirm(
-    `Resume from line ${fromLine}?\n\nThe machine will restart the spindle, move to the recorded position at safe height, feed back to depth, and replay the rest of the job. The work zero must be UNCHANGED since the original run.`,
+    resumeConfirmation(machineKindOf(project.machine), fromLine, resume.fromLine),
   );
   if (!proceed) return;
   const checkpoint = readJobCheckpoint();

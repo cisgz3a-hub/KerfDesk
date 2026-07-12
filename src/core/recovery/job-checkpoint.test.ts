@@ -15,6 +15,7 @@ import {
   rawResumeLine,
   serializeJobCheckpoint,
 } from './job-checkpoint';
+import { withJobInterruption } from './job-interruption';
 
 // Shaped like real emitted G-code: comments and blanks interleaved, so raw
 // line numbers (1-based) diverge from sendable numbering. Sendable lines are
@@ -151,6 +152,24 @@ describe('markResumeInFlight', () => {
     expect(marked.resumeInFlight).toBe(true);
     expect(marked.updatedAtIso).toBe(LATER);
     expect(markResumeInFlight(marked, '2026-07-07T05:00:00.000Z')).toBe(marked);
+  });
+});
+
+describe('interruption evidence', () => {
+  it('round-trips the terminal reason and rejected command without a schema break', () => {
+    const interrupted = withJobInterruption(
+      checkpoint(),
+      {
+        kind: 'controller-error',
+        message: 'GRBL rejected error:20.',
+        rejectedLine: 'G2 X1 Y1',
+      },
+      LATER,
+    );
+
+    expect(parseJobCheckpoint(serializeJobCheckpoint(interrupted))?.interruption).toEqual(
+      interrupted.interruption,
+    );
   });
 });
 

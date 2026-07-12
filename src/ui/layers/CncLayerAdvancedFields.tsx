@@ -1,9 +1,11 @@
-// CncLayerAdvancedFields — the advanced portion of the CNC layer card:
-// depth-per-pass / feed / plunge / spindle + feeds preset + calculator
-// (DepthAndFeedFields), and the cut-type-specific tails (relief rows, v-carve
-// options, H.9 motion polish, tabs — CutTypeSections). Extracted from
-// CncLayerFields so that file stays under the size cap and so a Basic/Advanced
-// toggle can gate this whole group with one conditional (ADR-111).
+// CncLayerAdvancedFields — the advanced portion of the CNC layer card: the
+// feeds helpers (preset picker + chip-load calculator — FeedHelperRows),
+// stepover / pocket fill, and the cut-type-specific tails (relief rows,
+// v-carve options, H.9 motion polish — CutTypeSections). The core per-cut
+// numbers (depth-per-pass / feed / plunge / spindle) live in CncCoreCutFields,
+// which the parent now renders in the always-visible Basic group. Extracted
+// from CncLayerFields to keep that file under the size cap and so the
+// Basic/Advanced toggle gates this group with one conditional (ADR-111).
 
 import { activeCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
@@ -22,21 +24,13 @@ import { PocketFillRow } from './PocketFillRow';
 export function CncLayerAdvancedGroup(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
-  readonly maxFeed: number;
-  readonly spindleMaxRpm: number;
   readonly hasReliefObjects: boolean;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
     <>
-      <DepthAndFeedFields
-        layer={props.layer}
-        settings={props.settings}
-        maxFeed={props.maxFeed}
-        spindleMaxRpm={props.spindleMaxRpm}
-        onCommit={props.onCommit}
-      />
+      <FeedHelperRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
       <StepoverField
         layer={props.layer}
         settings={props.settings}
@@ -55,7 +49,11 @@ export function CncLayerAdvancedGroup(props: {
   );
 }
 
-export function DepthAndFeedFields(props: {
+// The core per-cut parameters, promoted to the always-visible Basic group:
+// the numbers every CNC cut needs. Previously gated behind Advanced (ADR-111);
+// surfaced per maintainer request so depth-per-pass / feed / plunge / spindle
+// are always in reach without opening Advanced.
+export function CncCoreCutFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly maxFeed: number;
@@ -109,8 +107,22 @@ export function DepthAndFeedFields(props: {
         title="Spindle running speed for this layer's cut (up to the machine's Spindle max in Material & Bit)."
         onCommit={(spindleRpm) => onCommit({ spindleRpm })}
       />
-      <FeedPresetRow layer={layer} settings={settings} onCommit={onCommit} />
-      <FeedsCalculatorRow layer={layer} settings={settings} onCommit={onCommit} />
+    </>
+  );
+}
+
+// The feeds HELPERS (preset picker + chip-load calculator) stay in Advanced —
+// they assist dialing in the core numbers above rather than being cut params
+// themselves, so beginners are not confronted with them by default.
+function FeedHelperRows(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  return (
+    <>
+      <FeedPresetRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <FeedsCalculatorRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
     </>
   );
 }

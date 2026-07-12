@@ -115,6 +115,31 @@ describe('cncGrblStrategy', () => {
     expect(cncGrblStrategy.emit(laserJob, dev)).toBe('');
   });
 
+  describe('coolant (M7/M8/M9)', () => {
+    it('off / absent emit no coolant command and are byte-identical', () => {
+      const absent = cncGrblStrategy.emit({ groups: [group()] }, dev);
+      const off = cncGrblStrategy.emit({ groups: [group({ coolant: 'off' })] }, dev);
+      expect(off).toBe(absent);
+      expect(absent).not.toMatch(/^M[789]$/m);
+    });
+
+    it('mist turns coolant on with M7 after the spindle start, off with M9 after M5', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [group({ coolant: 'mist' })] }, dev);
+      // Spindle spins up (M3 + dwell), THEN coolant on — never while the bit
+      // is still touched off on the stock.
+      expect(gcode).toContain('M3 S12000\nG4 P3.000\nM7\n');
+      expect(gcode.endsWith('M5\nM9\nG0 X0.000 Y0.000\n')).toBe(true);
+      expect(gcode).not.toContain('M8');
+    });
+
+    it('flood turns coolant on with M8 and off with M9', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [group({ coolant: 'flood' })] }, dev);
+      expect(gcode).toContain('M3 S12000\nG4 P3.000\nM8\n');
+      expect(gcode.endsWith('M5\nM9\nG0 X0.000 Y0.000\n')).toBe(true);
+      expect(gcode).not.toContain('M7');
+    });
+  });
+
   describe('arc passes', () => {
     it('emits native G2/G3 arcs with I/J center offsets at the cut feed', () => {
       const gcode = cncGrblStrategy.emit(

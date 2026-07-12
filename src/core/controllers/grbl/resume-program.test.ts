@@ -4,7 +4,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildResumeProgram, type ResumeOptions } from './resume-program';
 
-const OPTIONS: ResumeOptions = { safeZMm: 5, spindleSpinupSec: 3, plungeMmPerMin: 300 };
+const OPTIONS: ResumeOptions = {
+  machineKind: 'cnc',
+  safeZMm: 5,
+  spindleSpinupSec: 3,
+  plungeMmPerMin: 300,
+};
+const LASER_OPTIONS: ResumeOptions = { ...OPTIONS, machineKind: 'laser' };
 
 const PROGRAM = [
   'G21',
@@ -23,7 +29,7 @@ const PROGRAM = [
 ].join('\n');
 
 describe('buildResumeProgram', () => {
-  it('rebuilds units, spindle, position, depth, and feed for a mid-cut resume', () => {
+  it('rewinds a mid-cut CNC resume to safe Z and extracts before spindle start', () => {
     // Resume at line 9 (G1 Y40) — the machine was at X50 Y20 Z-2, F1000.
     const result = buildResumeProgram(PROGRAM, 9, OPTIONS);
     if (result.kind !== 'ok') throw new Error(result.reason);
@@ -31,14 +37,12 @@ describe('buildResumeProgram', () => {
       '; KerfDesk resume preamble',
       'G21',
       'G90',
+      'G1 Z5 F300',
       'M3 S12000',
       'G4 P3.000',
-      'G0 Z5',
-      'G0 X50 Y20',
-      'G1 Z-2 F300',
-      'F1000',
     ]);
-    expect(result.lines[result.preambleCount]).toBe('G1 Y40.000');
+    expect(result.fromLine).toBe(5);
+    expect(result.lines[result.preambleCount]).toBe('G0 Z5.000');
     expect(result.lines.at(-1)).toBe('G0 X0.000 Y0.000');
   });
 
@@ -60,8 +64,8 @@ describe('buildResumeProgram', () => {
     if (result.kind !== 'ok') throw new Error(result.reason);
     const preamble = result.lines.slice(0, result.preambleCount);
     // formatNumber renders a non-integer Z with 3 decimals (-1.5 -> -1.500).
-    expect(preamble).toContain('G1 Z-1.500 F250');
-    expect(preamble).not.toContain('G1 Z-1.500 F300');
+    expect(preamble).toContain('G1 Z5 F250');
+    expect(preamble).not.toContain('G1 Z5 F300');
   });
 
   it('recovers the plunge feed from a ramp/relief move (X/Y/Z/F), not the fallback (Codex audit)', () => {
@@ -80,8 +84,8 @@ describe('buildResumeProgram', () => {
     const result = buildResumeProgram(program, 7, { ...OPTIONS, plungeMmPerMin: 300 });
     if (result.kind !== 'ok') throw new Error(result.reason);
     const preamble = result.lines.slice(0, result.preambleCount);
-    expect(preamble).toContain('G1 Z-1 F400');
-    expect(preamble).not.toContain('G1 Z-1 F300');
+    expect(preamble).toContain('G1 Z5 F400');
+    expect(preamble).not.toContain('G1 Z5 F300');
   });
 
   it('never lets an upward retract or a G0 rapid hijack the plunge feed', () => {
@@ -104,7 +108,7 @@ describe('buildResumeProgram', () => {
     // The Z-descent re-entry uses the real downward plunge feed (250) — never the
     // upward retract (3000) or the rapid's F word (9000). (Restoring 9000 as the
     // bare modal feed afterward is correct and separate.)
-    expect(preamble.some((line) => /^G1 Z.* F250$/.test(line))).toBe(true);
+    expect(preamble).toContain('G1 Z5 F250');
     expect(preamble.some((line) => /^G1 Z.* F(3000|9000)$/.test(line))).toBe(false);
   });
 
@@ -116,7 +120,7 @@ describe('buildResumeProgram', () => {
     // parked position and then travels with the beam armed (audit C1).
     const laser =
       'G21\nG90\nM3 S0\nG0 X10 Y10 S0\nG1 X20 Y10 F1500 S300\nG1 X20 Y20\nG1 X10 Y20\nM5';
-    const result = buildResumeProgram(laser, 6, OPTIONS); // resume at 'G1 X20 Y20'
+    const result = buildResumeProgram(laser, 6, LASER_OPTIONS); // resume at 'G1 X20 Y20'
     if (result.kind !== 'ok') throw new Error(result.reason);
     const preamble = result.lines.slice(0, result.preambleCount);
     const moveIndex = preamble.findIndex((line) => line.startsWith('G0 X'));
@@ -128,30 +132,28 @@ describe('buildResumeProgram', () => {
     expect(preamble.some((line) => line.startsWith('G4'))).toBe(false);
   });
 
-  it('leaves the spindle off when it was off at the resume point', () => {
+  it('refuses a CNC resume before any safe retract boundary exists', () => {
     const result = buildResumeProgram(PROGRAM, 2, OPTIONS);
-    if (result.kind !== 'ok') throw new Error(result.reason);
-    const preamble = result.lines.slice(0, result.preambleCount);
-    expect(preamble.some((line) => line.startsWith('M3'))).toBe(false);
-    expect(preamble.some((line) => line.startsWith('G4'))).toBe(false);
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') expect(result.reason).toMatch(/safe retract boundary/i);
   });
 
-  it('does not feed down when the recorded Z is at/above safe height', () => {
+  it('replays the complete pass when interruption occurs at its plunge', () => {
     // Resume at line 7 (the plunge itself): last Z seen is +5.
     const result = buildResumeProgram(PROGRAM, 7, OPTIONS);
     if (result.kind !== 'ok') throw new Error(result.reason);
-    const preamble = result.lines.slice(0, result.preambleCount);
-    expect(preamble.some((line) => line.startsWith('G1 Z'))).toBe(false);
+    expect(result.fromLine).toBe(5);
+    expect(result.lines[result.preambleCount]).toBe('G0 Z5.000');
   });
 
   it('refuses out-of-range lines, G91 programs, and empty tails', () => {
     expect(buildResumeProgram(PROGRAM, 0, OPTIONS).kind).toBe('error');
     expect(buildResumeProgram(PROGRAM, 999, OPTIONS).kind).toBe('error');
     const relative = 'G21\nG91\nG1 X5 F100\nG1 X5';
-    const refused = buildResumeProgram(relative, 4, OPTIONS);
+    const refused = buildResumeProgram(relative, 4, LASER_OPTIONS);
     expect(refused.kind).toBe('error');
     if (refused.kind === 'error') expect(refused.reason).toMatch(/G91/);
-    const emptyTail = buildResumeProgram('G21\nG1 X5 F100\n; done\n', 3, OPTIONS);
+    const emptyTail = buildResumeProgram('G21\nG1 X5 F100\n; done\n', 3, LASER_OPTIONS);
     expect(emptyTail.kind).toBe('error');
   });
 
@@ -160,22 +162,22 @@ describe('buildResumeProgram', () => {
   // point. KerfDesk's emitters never produce them; imported G-code can.
   it('refuses programs with G53/G28/G30 before the resume point', () => {
     const withG53 = 'G21\nG90\nG53 G0 Z-5\nG1 X5 F100\nG1 X6';
-    const g53 = buildResumeProgram(withG53, 5, OPTIONS);
+    const g53 = buildResumeProgram(withG53, 5, LASER_OPTIONS);
     expect(g53.kind).toBe('error');
     if (g53.kind === 'error') expect(g53.reason).toMatch(/G53/);
 
     const withG28 = 'G21\nG90\nG28 X0\nG1 X5 F100\nG1 X6';
-    const g28 = buildResumeProgram(withG28, 5, OPTIONS);
+    const g28 = buildResumeProgram(withG28, 5, LASER_OPTIONS);
     expect(g28.kind).toBe('error');
     if (g28.kind === 'error') expect(g28.reason).toMatch(/G28/);
 
     const withG30 = 'G21\nG90\nG30\nG1 X5 F100\nG1 X6';
-    expect(buildResumeProgram(withG30, 5, OPTIONS).kind).toBe('error');
+    expect(buildResumeProgram(withG30, 5, LASER_OPTIONS).kind).toBe('error');
   });
 
   it('ignores comments and percent markers while scanning', () => {
     const withComments = 'G21\n(header) G90\n; note\nM3 S5000\nG1 X1 Y1 F500\nG1 X2';
-    const result = buildResumeProgram(withComments, 6, OPTIONS);
+    const result = buildResumeProgram(withComments, 6, LASER_OPTIONS);
     if (result.kind !== 'ok') throw new Error(result.reason);
     expect(result.lines.slice(0, result.preambleCount)).toContain('M3 S5000');
   });

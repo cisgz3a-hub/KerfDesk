@@ -28,6 +28,7 @@ import {
   type SceneObject,
 } from '../scene';
 import { kernelForTool } from '../sim';
+import { coolantFields } from './coolant-fields';
 import { parkFields } from './motion-polish';
 
 const MIN_FEED_MM_PER_MIN = 1;
@@ -82,6 +83,7 @@ function reliefGroup(
     plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: Math.min(Math.max(0, settings.spindleRpm), config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
+    ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
     passes,
