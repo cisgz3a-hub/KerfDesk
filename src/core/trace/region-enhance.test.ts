@@ -27,12 +27,12 @@ function square(x0: number, y0: number, x1: number, y1: number, closed = true) {
 
 describe('computeRegionUpscaleFactor', () => {
   it('returns 2x for a typical detail crop', () => {
-    expect(computeRegionUpscaleFactor(blankImage(100, 80))).toBe(2);
+    expect(computeRegionUpscaleFactor(blankImage(100, 80), DEFAULT_TRACE_OPTIONS)).toBe(2);
   });
 
   it('returns 1x when 2x would exceed the upscale pixel budget', () => {
-    // 700*2 * 700*2 = 1.96M > 1.5M cap.
-    expect(computeRegionUpscaleFactor(blankImage(700, 700))).toBe(1);
+    // 1501*2 * 1000*2 = 6.004M > the contour backend's 6M cap.
+    expect(computeRegionUpscaleFactor(blankImage(1501, 1000), DEFAULT_TRACE_OPTIONS)).toBe(1);
   });
 });
 
@@ -95,9 +95,17 @@ describe('enhanceRegionPaths', () => {
     // UPSCALED CROP coordinates: a genuine interior loop plus a fragment
     // hugging the crop edge (x=0), which a real tracer produces when a larger
     // shape is clipped by the crop.
-    const trace = vi.fn((cropped: RawImageData) => {
+    const trace = vi.fn((cropped: RawImageData, scaledOptions: TraceOptions) => {
       expect(cropped.width).toBe(80);
       expect(cropped.height).toBe(80);
+      expect(scaledOptions).toEqual(
+        expect.objectContaining({
+          autoUpscaleSmallSources: false,
+          pixelScale: 2,
+          supersampleContour: false,
+          upscaleSmallSmoothSources: false,
+        }),
+      );
       return Promise.resolve<ColoredPath[]>([
         {
           color: '#000000',

@@ -11,10 +11,9 @@
 // Small test-sized images can fall back inline; large images report a
 // recoverable error instead of pinning the main thread.
 //
-// One worker per app lifetime — cheaper than spawning per-trace
-// because imagetracerjs's lazy load only pays its cost once. The
-// pending-promise map keys responses by an incrementing request id
-// so overlapping calls (debounced preview re-traces) don't crosstalk.
+// One worker is reused while it is healthy and idle. A new trace supersedes an
+// unfinished trace by retiring its worker: synchronous tracing code cannot
+// process a cooperative cancellation message until the obsolete work returns.
 
 import type { Bounds, ColoredPath } from '../../core/scene';
 import {
@@ -30,6 +29,18 @@ export type TraceResult = {
   readonly paths: ColoredPath[];
   readonly bounds: Bounds;
 };
+
+export class TraceRequestSupersededError extends Error {
+  override readonly name = 'TraceRequestSupersededError';
+
+  constructor() {
+    super('Trace request superseded by a newer request');
+  }
+}
+
+export function isTraceRequestSuperseded(error: unknown): boolean {
+  return error instanceof TraceRequestSupersededError;
+}
 
 type Pending = {
   readonly resolve: (result: TraceResult) => void;
@@ -72,12 +83,9 @@ function ensureWorker(): Worker | null {
       // Worker crashed (e.g. module-resolution failure, syntax error
       // in worker bundle). Same shape as a kind:'error' response —
       // reject every in-flight promise so callers can fall back.
-      const pendings = Array.from(pendingByRequestId.values());
-      pendingByRequestId.clear();
-      retireWorker();
-      for (const p of pendings) {
-        p.reject(new Error('Trace worker errored — falling back to inline tracing'));
-      }
+      rejectAllPendingAndRetireWorker(
+        new Error('Trace worker errored — falling back to inline tracing'),
+      );
     };
     return workerInstance;
   } catch {
@@ -109,12 +117,12 @@ function retireWorker(): void {
   }
 }
 
-function rejectAllPendingAndRetireWorker(message: string): void {
+function rejectAllPendingAndRetireWorker(error: Error): void {
   const pendings = Array.from(pendingByRequestId.values());
   pendingByRequestId.clear();
   retireWorker();
   for (const pending of pendings) {
-    pending.reject(new Error(message));
+    pending.reject(error);
   }
 }
 
@@ -127,6 +135,9 @@ function rejectAllPendingAndRetireWorker(message: string): void {
 // is small enough. Without it, every commit through the dialog would
 // error-toast after a bounded inline path could have succeeded.
 export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
+  if (pendingByRequestId.size > 0) {
+    rejectAllPendingAndRetireWorker(new TraceRequestSupersededError());
+  }
   const worker = ensureWorker();
   if (worker === null) {
     return traceInlineIfSafe(image, options);
@@ -134,6 +145,7 @@ export async function traceImage(image: RawImageData, options: TraceOptions): Pr
   try {
     return await traceInWorker(worker, image, options);
   } catch (err) {
+    if (isTraceRequestSuperseded(err)) throw err;
     if (canTraceInline(image)) {
       return traceInline(image, options);
     }
@@ -174,7 +186,7 @@ function traceInWorker(
     // A timed-out worker cannot answer sibling requests already queued to it.
     const timer = setTimeout(() => {
       if (!pendingByRequestId.has(id)) return;
-      rejectAllPendingAndRetireWorker('Trace worker timed out');
+      rejectAllPendingAndRetireWorker(new Error('Trace worker timed out'));
     }, TRACE_WORKER_TIMEOUT_MS);
     pendingByRequestId.set(id, {
       resolve: (result) => {
@@ -186,11 +198,19 @@ function traceInWorker(
         reject(err);
       },
     });
-    const request: TraceWorkerRequest = { id, image, options };
+    // Keep the decoded source alive for subsequent preview changes, but move a
+    // dedicated copy into the worker. Supplying its buffer as a transferable
+    // avoids the browser making a second structured-clone copy during send.
+    const transferredData = new Uint8ClampedArray(image.data);
+    const request: TraceWorkerRequest = {
+      id,
+      image: { width: image.width, height: image.height, data: transferredData },
+      options,
+    };
     try {
-      worker.postMessage(request);
+      worker.postMessage(request, [transferredData.buffer]);
     } catch (err) {
-      rejectAllPendingAndRetireWorker(traceWorkerSendErrorMessage(err));
+      rejectAllPendingAndRetireWorker(new Error(traceWorkerSendErrorMessage(err)));
     }
   });
 }

@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./use-trace-worker-client', () => ({
   traceImageWithFallback: vi.fn(),
+  isTraceRequestSuperseded: (error: unknown) =>
+    error instanceof Error && error.name === 'TraceRequestSupersededError',
 }));
 
 import type { ColoredPath } from '../../core/scene';
@@ -53,6 +55,22 @@ describe('runTrace stale-result guard (P2-A)', () => {
     await runTrace({ img, options, isCurrent: () => true, setState });
     expect(setState).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'ready', paths: tracedPaths }),
+    );
+  });
+
+  it('retains the matching request and trace result for commit reuse', async () => {
+    vi.mocked(traceImageWithFallback).mockResolvedValue(traceResult);
+    const file = new File(['image'], 'logo.png', { type: 'image/png' });
+    const request = { file, options, boundary: null, boundaryMode: 'crop' as const };
+    const setState = vi.fn();
+
+    await runTrace({ img, options, request, isCurrent: () => true, setState });
+
+    expect(setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'ready',
+        preparedTrace: { request, result: traceResult },
+      }),
     );
   });
 
@@ -111,6 +129,15 @@ describe('runTrace stale-result guard (P2-A)', () => {
     vi.mocked(traceImageWithFallback).mockRejectedValue(new Error('boom'));
     const setState = vi.fn();
     await runTrace({ img, options, isCurrent: () => false, setState });
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('does not show a superseded request as an error while still current', async () => {
+    const superseded = new Error('superseded');
+    superseded.name = 'TraceRequestSupersededError';
+    vi.mocked(traceImageWithFallback).mockRejectedValue(superseded);
+    const setState = vi.fn();
+    await runTrace({ img, options, isCurrent: () => true, setState });
     expect(setState).not.toHaveBeenCalled();
   });
 

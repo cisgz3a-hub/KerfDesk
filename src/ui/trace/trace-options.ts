@@ -32,7 +32,10 @@ export function mergeLightBurnTraceSettings(
 ): TraceOptions {
   const out: Record<string, unknown> = { ...preset };
   const manualThreshold = settings.cutoffLuma !== undefined || settings.thresholdLuma !== undefined;
-  if (manualThreshold) delete out['useOtsuThreshold'];
+  if (manualThreshold) {
+    delete out['useOtsuThreshold'];
+    out['autoSketchTrace'] = false;
+  }
   if (settings.cutoffLuma !== undefined) out['cutoffLuma'] = clampByte(settings.cutoffLuma);
   if (settings.thresholdLuma !== undefined) {
     out['thresholdLuma'] = clampByte(settings.thresholdLuma);

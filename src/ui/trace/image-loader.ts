@@ -43,6 +43,15 @@ export async function loadImageAsRawData(
   const headerDimensions = await readHeaderImageDimensions(file);
   if (headerDimensions !== null) {
     assertSafeDecodeDimensions(headerDimensions);
+    const target = scaleToCap(headerDimensions.width, headerDimensions.height, maxEdge);
+    const resizedBitmap = await decodeResizedImageBitmap(file, headerDimensions, target);
+    if (resizedBitmap !== null) {
+      try {
+        return rasterizeImage(resizedBitmap, target.width, target.height);
+      } finally {
+        resizedBitmap.close();
+      }
+    }
   }
   // The try/finally pairing around createObjectURL + revokeObjectURL is
   // load-bearing: each createObjectURL allocation pins the underlying
@@ -54,23 +63,47 @@ export async function loadImageAsRawData(
   try {
     const img = await decodeImage(url);
     const { width, height } = scaleToCap(img.width, img.height, maxEdge);
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (ctx === null) {
-      throw new Error('Could not create 2D canvas context for image decoding.');
-    }
-    ctx.drawImage(img, 0, 0, width, height);
-    const imgd = ctx.getImageData(0, 0, width, height);
-    return compositeRgbOverWhitePreservingAlpha({
-      width: imgd.width,
-      height: imgd.height,
-      data: imgd.data,
-    });
+    return rasterizeImage(img, width, height);
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+async function decodeResizedImageBitmap(
+  file: File,
+  source: ImageDimensions,
+  target: ImageDimensions,
+): Promise<ImageBitmap | null> {
+  const needsResize = source.width !== target.width || source.height !== target.height;
+  if (!needsResize || typeof createImageBitmap !== 'function') return null;
+  try {
+    return await createImageBitmap(file, {
+      resizeWidth: target.width,
+      resizeHeight: target.height,
+      resizeQuality: 'high',
+    });
+  } catch {
+    // Safari/WebView variants may expose createImageBitmap without supporting
+    // resize options. The object-URL HTMLImageElement path remains compatible.
+    return null;
+  }
+}
+
+function rasterizeImage(source: CanvasImageSource, width: number, height: number): RawImageData {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx === null) {
+    throw new Error('Could not create 2D canvas context for image decoding.');
+  }
+  ctx.drawImage(source, 0, 0, width, height);
+  const imgd = ctx.getImageData(0, 0, width, height);
+  return compositeRgbOverWhitePreservingAlpha({
+    width: imgd.width,
+    height: imgd.height,
+    data: imgd.data,
+  });
 }
 
 export function compositeRgbOverWhitePreservingAlpha(image: RawImageData): RawImageData {

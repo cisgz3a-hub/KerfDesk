@@ -25,10 +25,11 @@
 // a direct core tracer).
 
 import type { ColoredPath, Polyline } from '../scene';
-import { downscaleTracedPaths, MAX_UPSCALE_SOURCE_PIXELS, upscaleBy } from './auto-upscale';
+import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
 import type { RawImageData, TraceOptions } from './trace-image';
+import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 
 // 2x is mkbitmap's documented sweet spot ("a greyscale image contains more
 // detail than a bilevel image at the same resolution"); 3x+ invents detail.
@@ -58,9 +59,10 @@ export type EnhanceRegionArgs = {
 
 /** Supersample factor for a region crop: 2x unless that would exceed the
  *  upscale pixel budget, then 1 (trace the crop at native size). */
-export function computeRegionUpscaleFactor(crop: RawImageData): number {
-  const upscaledPixels = crop.width * REGION_UPSCALE_FACTOR * (crop.height * REGION_UPSCALE_FACTOR);
-  return upscaledPixels > MAX_UPSCALE_SOURCE_PIXELS ? 1 : REGION_UPSCALE_FACTOR;
+export function computeRegionUpscaleFactor(crop: RawImageData, options: TraceOptions): number {
+  return fitsTraceWorkingPixelBudget(crop, REGION_UPSCALE_FACTOR, options)
+    ? REGION_UPSCALE_FACTOR
+    : 1;
 }
 
 /** Re-trace `region` of `image` supersampled and return `fullTracePaths` with
@@ -70,8 +72,11 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
   const region = normalizeTraceBoundary(args.region, args.image.width, args.image.height);
   if (region === null) return [...args.fullTracePaths];
   const crop = cropRawImageData(args.image, region);
-  const factor = computeRegionUpscaleFactor(crop);
-  const traced = await args.trace(factor > 1 ? upscaleBy(crop, factor) : crop, args.options);
+  const factor = computeRegionUpscaleFactor(crop, args.options);
+  const traced = await args.trace(
+    factor > 1 ? upscaleBy(crop, factor) : crop,
+    optionsForRegionScale(args.options, factor),
+  );
   const inSource = offsetColoredPaths(downscaleTracedPaths(traced, factor), region.x, region.y);
   const interior = shrinkRegion(region, REGION_EDGE_MARGIN_PX);
   const replacement = inSource
@@ -81,6 +86,21 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
     }))
     .filter((path) => path.polylines.length > 0);
   return replacePathsInRegion(args.fullTracePaths, interior, replacement);
+}
+
+function optionsForRegionScale(options: TraceOptions, factor: number): TraceOptions {
+  if (factor <= 1) return options;
+  const priorScale =
+    options.pixelScale !== undefined && Number.isFinite(options.pixelScale)
+      ? Math.max(1, options.pixelScale)
+      : 1;
+  return {
+    ...options,
+    autoUpscaleSmallSources: false,
+    pixelScale: priorScale * factor,
+    supersampleContour: false,
+    upscaleSmallSmoothSources: false,
+  };
 }
 
 /** Merge: drop existing polylines fully inside `interior`, then add the
