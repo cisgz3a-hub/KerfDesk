@@ -103,9 +103,10 @@ export async function runHomeAction(
         ? {
             controllerOperation: null,
             homingState: 'confirmed',
+            alarmCode: null,
             log: pushLog(state, '[lf2] Homing confirmed after fresh Idle.'),
           }
-        : { homingState: 'confirmed' },
+        : { homingState: 'confirmed', alarmCode: null },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

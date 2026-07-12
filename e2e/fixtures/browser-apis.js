@@ -6,6 +6,7 @@ const state = {
   events: [],
   openFiles: [{ name: 'project-basic.lf2', text: BASIC_PROJECT }],
   savedFiles: {},
+  autoAcknowledge: true,
 };
 
 function record(kind, detail = {}) {
@@ -66,7 +67,13 @@ function installSerial() {
       },
     },
   });
-  return { emitLine };
+  return {
+    emitLine,
+    acknowledge(count) {
+      for (let index = 0; index < count; index += 1) emitLine('ok');
+      emitIdle();
+    },
+  };
 }
 
 function respondToSerialWrite(text, emitLine) {
@@ -80,6 +87,10 @@ function respondToSerialWrite(text, emitLine) {
     emitLine('$32=1');
   }
   const acknowledgements = [...text].filter((character) => character === '\n').length;
+  if (!state.autoAcknowledge && acknowledgements > 0) {
+    record('serial-acks-held', { count: acknowledgements });
+    return;
+  }
   setTimeout(() => {
     for (let index = 0; index < acknowledgements; index += 1) emitLine('ok');
     emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
@@ -181,6 +192,11 @@ window.__KERFDESK_E2E__ = {
   events: state.events,
   savedFiles: state.savedFiles,
   emitSerialLine: serial.emitLine,
+  acknowledgeSerial: serial.acknowledge,
+  setAutoAcknowledge: (enabled) => {
+    state.autoAcknowledge = enabled;
+    record('serial-auto-ack', { enabled });
+  },
   setOpenFiles: (files) => {
     state.openFiles = files;
   },

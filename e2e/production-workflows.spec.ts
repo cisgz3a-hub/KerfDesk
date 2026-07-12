@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures/kerfdesk-test';
+import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -228,6 +228,53 @@ test('imports a generated bitmap and traces it through the production worker wor
   ).toBe(true);
 });
 
+test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready state', async ({
+  page,
+  kerfdesk,
+}) => {
+  await connectAndHome(page, kerfdesk);
+
+  await kerfdesk.setAutoAcknowledge(false);
+  await page.getByRole('button', { name: 'Frame', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Cancel frame' })).toBeVisible();
+  for (let line = 1; line <= 5; line += 1) {
+    await expect
+      .poll(async () => frameWriteCount(await kerfdesk.events()))
+      .toBeGreaterThanOrEqual(line);
+    await kerfdesk.acknowledgeSerial(1);
+  }
+  await kerfdesk.setAutoAcknowledge(true);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('button', { name: 'Frame', exact: true })).toBeEnabled();
+
+  await kerfdesk.setAutoAcknowledge(false);
+  page.on('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Start job' }).click();
+  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause' }).click();
+  await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('!');
+  await page.getByRole('button', { name: 'Resume' }).click();
+  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('~');
+
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('\u0018');
+  await expect(page.getByRole('button', { name: 'Start job' })).toBeVisible();
+
+  await kerfdesk.emitSerialLine('ALARM:3');
+  await expect(page.getByRole('alert')).toContainText('Alarm 3');
+  await kerfdesk.setAutoAcknowledge(true);
+  const settleWritesBeforeRecovery = exactSerialWriteCount(await kerfdesk.events(), 'G4 P0.01\n');
+  await page.getByRole('button', { name: 'Home ($H)' }).click();
+  await expect
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), 'G4 P0.01\n'))
+    .toBeGreaterThan(settleWritesBeforeRecovery);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('alert')).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start job' })).toBeEnabled();
+});
+
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
 }
@@ -241,6 +288,37 @@ async function enableLab(page: Page, label: string): Promise<void> {
   await runMenuCommand(page, 'Tools', 'Labs...');
   await page.getByText(label, { exact: true }).click();
   await page.getByRole('button', { name: 'Done' }).click();
+}
+
+async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  await page.getByRole('button', { name: /^Connect/ }).click();
+  await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+}
+
+function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): string {
+  return events
+    .filter((event) => event['kind'] === 'serial-write')
+    .map((event) => String(event['text']))
+    .join('');
+}
+
+function frameWriteCount(events: readonly Readonly<Record<string, unknown>>[]): number {
+  return events.filter(
+    (event) => event['kind'] === 'serial-write' && String(event['text']).startsWith('$J=G90 G21'),
+  ).length;
+}
+
+function exactSerialWriteCount(
+  events: readonly Readonly<Record<string, unknown>>[],
+  text: string,
+): number {
+  return events.filter(
+    (event) => event['kind'] === 'serial-write' && String(event['text']) === text,
+  ).length;
 }
 
 async function savedProject(kerfdesk: {
