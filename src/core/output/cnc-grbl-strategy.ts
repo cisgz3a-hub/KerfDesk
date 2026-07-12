@@ -27,8 +27,17 @@ import {
   isCircularArcFullCircle,
   sampleCircularArcPoints,
 } from '../geometry/circular-arc';
-import type { CncArcPass, CncContourPass, CncGroup, CncPass, CncPath3dPass, Job } from '../job';
+import type {
+  CncArcPass,
+  CncContourPass,
+  CncGroup,
+  CncHelicalContourPass,
+  CncPass,
+  CncPath3dPass,
+  Job,
+} from '../job';
 import { assertNever, type CncCoolantMode } from '../scene';
+import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-helical';
 import type { OutputStrategy } from './output-strategy';
 import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
 
@@ -255,8 +264,67 @@ function appendPass(
     case 'arc':
       appendArcPass(lines, head, pass, safeZMm, feed, plunge);
       break;
+    case 'helical-contour':
+      appendHelicalContourPass(lines, head, pass, safeZMm, feed, plunge);
+      break;
     default:
       assertNever(pass, 'CncPass');
+  }
+}
+
+function appendHelicalContourPass(
+  lines: string[],
+  head: Head,
+  pass: CncHelicalContourPass,
+  safeZMm: number,
+  feed: number,
+  plunge: number,
+): void {
+  const prepared = prepareHelicalMotion(pass, plunge);
+  if (prepared === null) return;
+  positionForHelix(lines, head, prepared, safeZMm, plunge);
+  lines.push(...prepared.arcLines);
+  head.z = prepared.finalZ;
+  linkHelixToContour(lines, head, prepared, feed);
+  appendCutMoves(
+    lines,
+    head,
+    { kind: 'contour', zMm: pass.zMm, polyline: pass.polyline, closed: pass.closed },
+    feed,
+  );
+}
+
+function positionForHelix(
+  lines: string[],
+  head: Head,
+  prepared: PreparedHelicalMotion,
+  safeZMm: number,
+  plunge: number,
+): void {
+  appendRetract(lines, head, safeZMm);
+  if (head.x !== prepared.startX || head.y !== prepared.startY) {
+    lines.push(`G0 X${prepared.startX} Y${prepared.startY}`);
+    head.x = prepared.startX;
+    head.y = prepared.startY;
+  }
+  if (head.z !== prepared.startZ) {
+    lines.push(`G1 Z${prepared.startZ} F${plunge}`);
+    head.z = prepared.startZ;
+  }
+}
+
+function linkHelixToContour(
+  lines: string[],
+  head: Head,
+  prepared: PreparedHelicalMotion,
+  feed: number,
+): void {
+  const contourStartX = fmt(prepared.first.x);
+  const contourStartY = fmt(prepared.first.y);
+  if (head.x !== contourStartX || head.y !== contourStartY) {
+    lines.push(`G1 X${contourStartX} Y${contourStartY} F${feed}`);
+    head.x = contourStartX;
+    head.y = contourStartY;
   }
 }
 

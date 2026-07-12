@@ -198,6 +198,40 @@ describe('cncGrblStrategy', () => {
     });
   });
 
+  describe('helical contour passes', () => {
+    it('descends through native full-circle arcs before linking into the contour', () => {
+      const gcode = cncGrblStrategy.emit(
+        {
+          groups: [
+            group({
+              cutType: 'pocket',
+              passes: [
+                {
+                  kind: 'helical-contour',
+                  start: { x: 15, y: 10 },
+                  center: { x: 10, y: 10 },
+                  clockwise: false,
+                  startZMm: 0,
+                  zMm: -2,
+                  revolutions: 2,
+                  polyline: squareLoop(0, 20),
+                  closed: true,
+                },
+              ],
+            }),
+          ],
+        },
+        dev,
+      );
+
+      expect(gcode).toContain('G0 X15.000 Y10.000\nG1 Z0.000 F300');
+      expect(gcode).toContain('G3 X15.000 Y10.000 Z-1.000 I-5.000 J0.000 F300');
+      expect(gcode).toContain('G3 X15.000 Y10.000 Z-2.000 I-5.000 J0.000 F300');
+      expect(gcode).toContain('G1 X0.000 Y0.000 F1000\nG1 X20.000 Y0.000 F1000');
+      expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
+    });
+  });
+
   describe('path3d passes (Phase H.1)', () => {
     const ramp = group({
       passes: [

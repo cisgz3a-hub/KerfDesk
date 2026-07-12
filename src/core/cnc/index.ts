@@ -1,6 +1,13 @@
 // core/cnc — CNC (router/mill) toolpath compilation. Public API.
 
-export { compileCncJob, findDroppedCncLayers, isProfileCutType } from './compile-cnc-job';
+export {
+  compileCncJob,
+  findCncHelicalEntryIssues,
+  findDroppedCncLayers,
+  isProfileCutType,
+  type CncHelicalEntryIssue,
+} from './compile-cnc-job';
+export { planHelicalPocketPasses, type HelicalEntryPlan } from './helical-entry';
 export { zPassDepths } from './depth-passes';
 export { profileToolpathPolylines, type ProfileSide } from './profile-paths';
 export { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';

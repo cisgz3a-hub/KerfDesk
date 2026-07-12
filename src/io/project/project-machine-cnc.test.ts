@@ -29,6 +29,43 @@ function deserializeOk(text: string): Project {
 }
 
 describe('.lf2 machine / cnc round-trip', () => {
+  it('round-trips valid helical-entry settings and drops malformed values', () => {
+    const project = cncProject();
+    const layer = project.scene.layers[0];
+    if (layer?.cnc === undefined) throw new Error('CNC layer missing');
+    const withHelix: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...layer,
+            cnc: {
+              ...layer.cnc,
+              helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+            },
+          },
+        ],
+      },
+    };
+    expect(deserializeOk(serializeProject(withHelix)).scene.layers[0]?.cnc?.helixEntry).toEqual({
+      minDiameterMm: 2,
+      maxDiameterMm: 8,
+      angleDeg: 3,
+    });
+
+    const raw = JSON.parse(serializeProject(withHelix)) as Record<string, unknown>;
+    const scene = raw['scene'] as { layers: Array<{ cnc: Record<string, unknown> }> };
+    scene.layers[0]!.cnc['helixEntry'] = {
+      minDiameterMm: 12,
+      maxDiameterMm: 4,
+      angleDeg: 'steep',
+    };
+    expect(
+      deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc?.helixEntry,
+    ).toBeUndefined();
+  });
+
   it('round-trips a CNC project: machine config and layer cnc settings', () => {
     const project = cncProject();
     const loaded = deserializeOk(serializeProject(project));

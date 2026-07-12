@@ -92,6 +92,8 @@ export type RasterGroup = {
 //     imported .nc toolpaths)
 //   - arc:     one XY circular arc at one constant Z depth (native G2/G3 when
 //     valid, sampled G1 fallback where needed)
+//   - helical-contour: one or more full G2/G3 circles descending in Z, a
+//     level link, then a closed pocket contour at the reached depth
 export type CncContourPass = {
   readonly kind: 'contour';
   readonly zMm: number; // cutting depth for this pass; negative below stock top
@@ -116,7 +118,19 @@ export type CncArcPass = {
   readonly closed: boolean;
 };
 
-export type CncPass = CncContourPass | CncPath3dPass | CncArcPass;
+export type CncHelicalContourPass = {
+  readonly kind: 'helical-contour';
+  readonly start: Vec2;
+  readonly center: Vec2;
+  readonly clockwise: boolean;
+  readonly startZMm: number;
+  readonly zMm: number;
+  readonly revolutions: number;
+  readonly polyline: ReadonlyArray<Vec2>;
+  readonly closed: boolean;
+};
+
+export type CncPass = CncContourPass | CncPath3dPass | CncArcPass | CncHelicalContourPass;
 
 // XY projection of a pass — for bounds, origin translation, and the 2D
 // preview. Vec3 is structurally assignable to Vec2, so path3d points pass
@@ -129,6 +143,8 @@ export function cncPassXyPoints(pass: CncPass): ReadonlyArray<Vec2> {
       return pass.points;
     case 'arc':
       return sampleCircularArcPoints(pass);
+    case 'helical-contour':
+      return [...sampleCircularArcPoints({ ...pass, end: pass.start }), ...pass.polyline];
     default:
       return assertNever(pass, 'CncPass');
   }
@@ -144,6 +160,8 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
       return pass.points[0]?.z ?? 0;
     case 'arc':
       return pass.zMm;
+    case 'helical-contour':
+      return pass.startZMm;
     default:
       return assertNever(pass, 'CncPass');
   }

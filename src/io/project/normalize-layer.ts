@@ -81,6 +81,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
       ? { reliefScallopMm: raw['reliefScallopMm'] }
       : {}),
     ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
+    ...normalizeHelixEntry(raw['helixEntry']),
     ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
       ? { cutDirection: raw['cutDirection'] }
       : {}),
@@ -89,6 +90,25 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(isNonNegativeNumber(raw['finishAllowanceMm'])
       ? { finishAllowanceMm: raw['finishAllowanceMm'] }
       : {}),
+  };
+}
+
+function normalizeHelixEntry(value: unknown): Record<string, unknown> {
+  if (!isObject(value)) return {};
+  if (
+    !isPositiveNumber(value['maxDiameterMm']) ||
+    !isPositiveNumber(value['minDiameterMm']) ||
+    !isPositiveNumber(value['angleDeg']) ||
+    value['minDiameterMm'] > value['maxDiameterMm']
+  ) {
+    return {};
+  }
+  return {
+    helixEntry: {
+      maxDiameterMm: value['maxDiameterMm'],
+      minDiameterMm: value['minDiameterMm'],
+      angleDeg: value['angleDeg'],
+    },
   };
 }
 

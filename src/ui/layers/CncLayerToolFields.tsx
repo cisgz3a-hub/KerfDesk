@@ -223,7 +223,8 @@ export function MotionPolishRows(props: {
             const { rampEntryDeg: _removed, ...rest } = props.settings;
             props.onCommitSettings(rest);
           } else {
-            props.onCommit({ rampEntryDeg: deg });
+            const { helixEntry: _removed, ...rest } = props.settings;
+            props.onCommitSettings({ ...rest, rampEntryDeg: deg });
           }
         }}
         ariaLabel={`Ramp entry angle for ${props.layer.color}`}
@@ -231,6 +232,104 @@ export function MotionPolishRows(props: {
         style={rampInputStyle}
       />
       <span style={rampUnitStyle}>° ramp</span>
+    </Row>
+  );
+}
+
+export function HelicalEntryRows(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
+}): JSX.Element {
+  const helix = props.settings.helixEntry;
+  return (
+    <>
+      <Row label="Helical entry">
+        <input
+          type="checkbox"
+          checked={helix !== undefined}
+          onChange={(event) => {
+            if (!event.target.checked) {
+              const { helixEntry: _removed, ...rest } = props.settings;
+              props.onCommitSettings(rest);
+              return;
+            }
+            const { rampEntryDeg: _removed, ...rest } = props.settings;
+            props.onCommitSettings({
+              ...rest,
+              helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+            });
+          }}
+          aria-label={`Helical entry for ${props.layer.color}`}
+          title="Descend into offset pockets with native G2/G3 circles instead of plunging."
+        />
+        <span style={helixLabelStyle}>Use circular ramp</span>
+      </Row>
+      {helix === undefined ? null : (
+        <>
+          <HelixNumberRow
+            label="Helix diameter"
+            ariaLabel={`Maximum helix diameter for ${props.layer.color}`}
+            value={helix.maxDiameterMm}
+            min={helix.minDiameterMm}
+            max={100}
+            step={0.5}
+            unit="mm max"
+            onCommit={(maxDiameterMm) =>
+              props.onCommit({ helixEntry: { ...helix, maxDiameterMm } })
+            }
+          />
+          <HelixNumberRow
+            label="Minimum fit"
+            ariaLabel={`Minimum helix diameter for ${props.layer.color}`}
+            value={helix.minDiameterMm}
+            min={0.1}
+            max={helix.maxDiameterMm}
+            step={0.5}
+            unit="mm"
+            onCommit={(minDiameterMm) =>
+              props.onCommit({ helixEntry: { ...helix, minDiameterMm } })
+            }
+          />
+          <HelixNumberRow
+            label="Helix angle"
+            ariaLabel={`Helix angle for ${props.layer.color}`}
+            value={helix.angleDeg}
+            min={0.5}
+            max={15}
+            step={0.5}
+            unit="deg"
+            onCommit={(angleDeg) => props.onCommit({ helixEntry: { ...helix, angleDeg } })}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function HelixNumberRow(props: {
+  readonly label: string;
+  readonly ariaLabel: string;
+  readonly value: number;
+  readonly min: number;
+  readonly max: number;
+  readonly step: number;
+  readonly unit: string;
+  readonly onCommit: (value: number) => void;
+}): JSX.Element {
+  return (
+    <Row label={props.label}>
+      <ClearableNumberField
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        value={props.value}
+        onCommit={props.onCommit}
+        ariaLabel={props.ariaLabel}
+        style={helixInputStyle}
+      />
+      <span style={rampUnitStyle}>{props.unit}</span>
     </Row>
   );
 }
@@ -317,6 +416,8 @@ const directionSelectStyle: React.CSSProperties = {
   padding: '2px 4px',
 };
 const rampInputStyle: React.CSSProperties = { width: 52, padding: '2px 6px' };
+const helixInputStyle: React.CSSProperties = { width: 72, padding: '2px 6px' };
+const helixLabelStyle: React.CSSProperties = { fontSize: 12 };
 const rampUnitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const reliefHintStyle: React.CSSProperties = {
   fontSize: 11,

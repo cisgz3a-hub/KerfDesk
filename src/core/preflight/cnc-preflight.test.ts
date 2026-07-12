@@ -54,6 +54,43 @@ function squareObject(id: string, color: string, size: number): SceneObject {
 }
 
 describe('runCncPreflight', () => {
+  it('blocks a requested helix that cannot fit instead of silently plunging', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      helixEntry: { minDiameterMm: 50, maxDiameterMm: 60, angleDeg: 3 },
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-helix-entry-invalid',
+        message: expect.stringContaining('does not fit'),
+      }),
+    );
+  });
+
+  it('blocks helical entry with a raster pocket strategy', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      pocketStrategy: 'raster-x',
+      helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-helix-entry-invalid',
+        message: expect.stringContaining('Offset pocket fill'),
+      }),
+    );
+  });
+
   it('flags a layer whose shapes are too narrow for the bit instead of dropping it silently', () => {
     // Default bit is 3.175 mm: a 2 mm pocket offsets away entirely and used
     // to vanish from the job with no message while other layers still cut.

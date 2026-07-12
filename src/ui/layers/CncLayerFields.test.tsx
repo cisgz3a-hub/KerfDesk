@@ -161,6 +161,30 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
     }
   });
 
+  it('enables pocket helical entry and removes a conflicting along-path ramp', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket', rampEntryDeg: 5 },
+    };
+    installProject(layer, false);
+    const { host, root } = await render(layer);
+    try {
+      const checkbox = host.querySelector(`input[aria-label="Helical entry for ${layer.color}"]`);
+      if (!(checkbox instanceof HTMLInputElement)) throw new Error('Helical entry toggle missing');
+      await act(async () => checkbox.click());
+      const settings = useStore.getState().project.scene.layers[0]?.cnc;
+      expect(settings?.rampEntryDeg).toBeUndefined();
+      expect(settings?.helixEntry).toEqual({
+        minDiameterMm: 2,
+        maxDiameterMm: 8,
+        angleDeg: 3,
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('the Through cut button sets depth to the stock thickness', async () => {
     const layer = profileLayer();
     installProject(layer, false); // default CNC stock thickness = 6.35 mm
