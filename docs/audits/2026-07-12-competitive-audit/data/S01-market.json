@@ -1,0 +1,524 @@
+{
+  "sector": 1,
+  "categories": [
+    {
+      "id": "1.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Rect/ellipse/triangle/polygon(n-sides)/star/dual-radius-star; parametric re-edit after creation via Shape Properties (corner radius, sides, points, bulge, ratio) persists through resize.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/PrimaryShapes/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Same LightBurn-family shape suite (Draw Shapes, Draw Lines) plus a Tangent Circle Generator; documented in the current docs nav. Depth of parametric re-editing not independently verified.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/PrimaryShapes/, Reference/DrawLines/, Reference/TangentCircleGenerator/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No design canvas at all; usage docs cover only load/send G-code plus raster import. Design must happen in external software (Inkscape workflow is the community norm).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" },
+            { "tag": "COMM", "cite": "https://medium.com/@urban.pistek/a-complete-workflow-for-laser-cutting-using-inkscape-lasergrbl-open-source-free-6f014803fce4" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio V1.7: line/rectangle/circle/polygon/star primitives plus a ready-made shapes panel; numeric corner-radius editing documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Basic set only: square, circle, triangle, star from the toolbar, plus a large clip-art icon library; no polygon/star parameter richness documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012847633-How-to-Use-Easel-s-Design-Tools" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/sections/40879645194003-Basic-Shape-and-Object-Tools" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Shape creation covered by an official course lesson; primitive breadth and post-creation parametric editing not verified in this pass.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/shapes/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Richest primitive set of the roster: rectangle, circle, ellipse, polygon, star, line/polyline, arc, freehand draw, each with its own documented form dialog.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Pen (Draw Lines) plus Edit Nodes, convert-to-path, close-path tools. Community consensus: 'stripped-down Illustrator' - covers what matters for laser work, but complex path drawing is still commonly done in Inkscape/Illustrator.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/EditNodes/" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/modifying-paths-with-the-edit-node-tool/123750" },
+            { "tag": "COMM", "cite": "https://craftgineer.com/blog/inkscape-vs-illustrator-laser-cnc" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Edit Nodes, Draw Lines, Convert to Path, Close Path and Trim Shapes all present in the current docs nav (LightBurn-family editor).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/EditNodes/, Reference/DrawLines/, Reference/ConvertToPath/, Reference/TrimShapes/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No pen or node editing; only automated bitmap vectorization of imported images.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: vector-path drawing, node editing with four node types (sharp/symmetric/asymmetric/angled), coordinate entry per node, path simplification and path splitting between nodes.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1305" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Pen tool (official walkthrough) and Edit Points editor: move points, toggle curved/straight segments. Simpler node model than desktop editors; no handle-type richness documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/5860985338131-Edit-Points" },
+            { "tag": "OFF", "cite": "https://inventables.zendesk.com/hc/en-us/articles/360012593333-Walkthrough-Tutorial-Pen-Tool" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Polyline and Curve tools plus node editing; vendor blog documents a reworked node-editing experience with more consistent snapping.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/blog/carbide-create-node-editing/" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/how-to-draw-curved-lines/86105" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Dedicated node-editing mode plus Fit Curves to Vectors (arc/bezier refit); community regards VCarve 2D drawing as sufficient for most CNC design work.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" },
+            { "tag": "COMM", "cite": "https://forum.vectric.com/viewtopic.php?t=10136" },
+            { "tag": "COMM", "cite": "https://forum.onefinitycnc.com/t/vcarve-and-designing-with-cad/6838" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Boolean Tools (union/subtract/intersect), Cut Shapes, Auto-Join, Break Apart, and design-time Offset Shapes are all documented reference pages.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/BooleanTools/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/OffsetShapes/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Boolean Tools, Cut Shapes, Break Apart, Trim Shapes and Offset Shapes all in the current docs nav - full LightBurn-family modify suite.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/BooleanTools/, Reference/CutShapes/, Reference/OffsetShapes/, Reference/TrimShapes/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No boolean or vector-modify operations; not a design tool.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio pathfinder: Unite, Subtract, Unite-at-Overlap, Subtract-at-Overlap with real-time preview; plus offset-at-distance and compound-vector editing.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/3376" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Design-time boolean limited to 'Combine' (union-style merge, then outline/edit points); subtract/intersect not documented as design ops - depth-per-shape carving substitutes at cut time.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012724974-Aligning-and-combining-shapes" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Boolean operations and Offsets each have an official course lesson; community wiki calls booleans 'a very powerful ability to modify paths'.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/boolean/" },
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/Offsets/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Weld, Subtract, Overlap, Join Open Vectors, Offset, Extend, and Create Fillets - each a documented form dialog; the broadest modify set in the roster.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "System fonts + Font Manager (2.1: search, favorites, categories); HSpace/VSpace spacing, bold/italic, auto-weld overlapping script characters, Bend Text around circles, Apply Path to Text, Variable Text, post-creation editing.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Text/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Create and Edit Text, Variable Text, and Apply Path to Text all present in the docs nav - LightBurn-family text engine.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/Text/, Reference/VariableText/, Reference/ApplyPathToText/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No text creation tool documented anywhere in the official usage docs.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: font selection with weight/style, leading and character spacing, alignment, rotation, curve effects, and Weld/Unweld of overlapping characters.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Text editor with font menu (Pro tier adds 300+ fonts); curved text exists but only via apps (Curve Text/Path Warp) - community threads report multi-word curved text is clunky.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4415815546003-How-to-Curve-Text" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/curving-multi-word-text-has-to-be-a-better-way/117118" },
+            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/curve-text-app-issues/72594" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Text tool with spacing controls and convert-to-curves; curved/arched text shipped in V7 but community threads repeatedly report inconsistent availability and seek workarounds in later builds.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://my.carbide3d.com/pdf/carbide-create-v5.pdf" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/can-carbide-create-curve-words/102018" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/how-can-i-put-text-on-arc-or-circle-in-carbide-create/32808" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Create Text, Text On A Curve, and Convert Text to Curves are each documented form dialogs; sign-making is a core VCarve marketing use case.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" },
+            { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Numeric Edits Toolbar for exact position/size, Two-Point Rotate/Scale for reference-point transforms, plus Radius/Fillet - all documented reference pages.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/NumericEditsToolbar/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/TwoPointRotateScale/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Numeric Edits Toolbar, Transform Controls, Two-Point Rotate/Scale, Flip/Mirror, and Radius/Fillet all in the docs nav.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/NumericEditsToolbar/, Reference/TransformControls/, Reference/TwoPointRotateScale/, Reference/FlipMirror/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No object transforms; only whole-image sizing during raster import (not design-time object editing).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: numeric X/Y position, width/height, rotation angle, and corner radius entry documented in the official overview.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Shape panel with numeric X/Y (selectable reference dot: corners/center), numeric size, angle rotation, plus a quick-rotate button.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725054-Shape-position-and-size" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Scale/rotate/move covered by the V5 manual and the Object Manipulation course lesson; skew/reference-point richness not verified.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/object-manipulation/" },
+            { "tag": "OFF", "cite": "https://my.carbide3d.com/pdf/carbide-create-v5.pdf" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Move Selection, Rotate, Mirror, Set Size, Distort Object, and an interactive Transform Mode - each a documented form dialog.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Align Tools and Distribute/Move Together documented as reference pages; dedicated measurement tooling not verified in this pass.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Align/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Distribute/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Align Tools and Distribute/Move Together both in the docs nav.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/Align/, Reference/Distribute/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No alignment/distribution tooling; single-image workflow.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: horizontal/vertical/center alignment and even-spacing distribution documented in the official overview.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Dedicated Alignment Tools menu (align, distribute, layout) plus Edit > Center to Material.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/45810283261587-Alignment-Tools" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012724974-Aligning-and-combining-shapes" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Align Vectors tool (center-in-shape, align along X/Y); an Align/Space (distribute) tool appeared in build 764 per community threads.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/align-space-tool-in-cc-764/71019" },
+            { "tag": "COMM", "cite": "https://www.circuitist.com/carbide-create-tutorial/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Alignment Tools form dialog documented; grouping/ungrouping supports layout workflows.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.7",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Snapping reference page plus Automatic Guidelines documented in current 2.x docs.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Snapping/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/AutomaticGuidelines/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Snapping and Automatic Guidelines both in the docs nav.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/Snapping/, Reference/AutomaticGuidelines/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No canvas snapping/guides; not a design tool.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: auto-snapping toggle and configurable grid visibility/colors documented; draggable ruler guides not evidenced in this pass.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Snap alignment guides (to other shapes' centers/edges and material center/edge) are an official feature; grid snapping discussed in community threads.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://easel.com/features/snap-alignment" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/snap-alignment/163188" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/snapping-to-grid/88553" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "View > Snap to Grid with adjustable grid spacing, plus shape-to-shape snapping; community threads note grid snap can fight precise placement (workaround: enlarge grid spacing).",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/carbide-create-snap-to-grid/17017" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/snap-to-grid-bypass/13150" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Dedicated Snapping Options dialog documented (object and grid snapping configuration).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1.8",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Grid Array, Circular Array, and Copy Along Path all documented as reference pages - full design-time array suite.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/GridArray/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CircularArray/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CopyAlongPath/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Grid Array and Circular Array in the docs nav; Copy Along Path not listed there (present in LightBurn).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/ (nav lists Reference/GridArray/, Reference/CircularArray/)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No duplication/array tooling; single loaded file or image per job.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: grid array and circular array available via the Applications panel.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Grid replication only via the add-on Replicator app (App Library), not a native canvas tool; no circular array evidenced. Community threads ask for better rectangular-array workflows.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://github.com/inventables/easel-replicator" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/new-replicator-app/13052" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/rectangular-arrays/105558" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Object Arrays have an official course lesson; linear vs circular breadth not verified in this pass.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/arrays/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Array Copy, Circular Copy, and Copy Along Vectors - each a documented form dialog.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" }
+          ]
+        }
+      ]
+    }
+  ]
+}
