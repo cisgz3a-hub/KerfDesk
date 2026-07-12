@@ -124,28 +124,37 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
     };
   }
 
-  it('Basic hides Feed but keeps Material + Cut depth', async () => {
+  it('Basic always shows the core cut params + material + cut depth', async () => {
     const layer = profileLayer();
     installProject(layer, false);
     useUiStore.getState().setShowCncAdvanced(false);
     const { host, root } = await render(layer);
     try {
-      expect(host.querySelector(`input[aria-label="Feed for ${layer.color}"]`)).toBeNull();
+      for (const field of ['Cut depth', 'Depth per pass', 'Feed', 'Plunge', 'Spindle']) {
+        expect(
+          host.querySelector(`input[aria-label="${field} for ${layer.color}"]`),
+        ).not.toBeNull();
+      }
       expect(host.querySelector(`select[aria-label="Material for ${layer.color}"]`)).not.toBeNull();
-      expect(host.querySelector(`input[aria-label="Cut depth for ${layer.color}"]`)).not.toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
     }
   });
 
-  it('Advanced reveals Feed', async () => {
-    const layer = profileLayer();
+  it('Advanced still gates a genuinely-advanced field (Stepover on a pocket layer)', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' },
+    };
     installProject(layer, false);
-    useUiStore.getState().setShowCncAdvanced(true);
+    useUiStore.getState().setShowCncAdvanced(false);
     const { host, root } = await render(layer);
     try {
+      // Core cut params are visible without the toggle...
       expect(host.querySelector(`input[aria-label="Feed for ${layer.color}"]`)).not.toBeNull();
+      // ...but Stepover (pocket ring spacing) is still Advanced-only.
+      expect(stepoverInput(host, layer.color)).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
