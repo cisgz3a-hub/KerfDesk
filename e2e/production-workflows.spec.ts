@@ -121,6 +121,24 @@ test('captures two machine points and persists print-and-cut design targets', as
   });
 });
 
+test('imports a CLB library and links its preset to a cut layer', async ({ page, kerfdesk }) => {
+  await kerfdesk.setOpenFiles([
+    {
+      name: 'birch.clb',
+      text: '<LightBurnLibrary><Material Name="Birch"><Entry Thickness="3" Desc="Clean cut"><CutSetting Type="Cut" Speed="8" MaxPower="75" MinPower="5" NumPasses="2" AirAssist="1" /></Entry></Material></LightBurnLibrary>',
+    },
+  ]);
+  await page.getByRole('button', { name: 'Open saved libraries' }).click();
+  await page.getByRole('button', { name: 'Import LightBurn CLB' }).click();
+  await expect(page.getByText('birch', { exact: false }).first()).toBeVisible();
+
+  await expect(page.getByRole('combobox', { name: 'Material library preset' })).toContainText(
+    'Birch',
+  );
+  await page.getByRole('button', { name: 'Link selected material preset to layer' }).click();
+  await expect(page.getByText('Layer is linked to the selected material library.')).toBeVisible();
+});
+
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
 }
