@@ -6450,3 +6450,43 @@ install-on-natural-quit, and no `quitAndInstall()` call.
   not consume its update metadata until the signing gate is deliberately opened.
 - Code signing is now a functional prerequisite for automatic updates, not only
   a SmartScreen/reputation improvement.
+
+---
+
+## ADR-136 - CNC interruption recovery rewinds to a retract-first safe boundary
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+### Context
+
+ADR-103/118 rebuilt modal state at the first unconfirmed line and emitted a CNC
+preamble that started the spindle while the bit could still be embedded, then
+rapid-retracted and plunged back to the recorded depth. A stopped spindle may
+not accelerate under cutting load. GRBL acknowledgements also prove parsing or
+planner admission, not physical execution, so an exact acknowledgement-line
+resume can skip accepted-but-unexecuted motion. Finally, the checkpoint kept
+progress but discarded the terminal safety reason after reload/reconnect.
+
+### Decision
+
+- CNC recovery treats the first unconfirmed line as an interruption vicinity,
+  scans backward to the previous pure `G0 Z<safe>` retract, and replays from
+  that semantic boundary. No safe boundary means no automatic resume.
+- Its preamble emits a controlled `G1 Z<safe> F<recovered plunge>` extraction
+  before any `M3`/`M4`, then starts the last active spindle mode and waits for
+  the configured dwell at clearance. The replayed boundary owns XY travel and
+  the plunge. Laser recovery keeps its beam-off position-first order.
+- The checkpoint optionally persists the terminal safety category, operator
+  message, and rejected line without a schema bump; existing schema-v3 records
+  remain readable.
+- A final `ok` advances progress but does not clear recovery. Clearing requires
+  the completed stream to be released while connected at physical `Idle`.
+
+### Consequences
+
+Router recovery deliberately recuts from the start of a cutting segment rather
+than trusting an arbitrary buffered line. This can mark already-cut material,
+but avoids both gaps and a spindle restart while embedded. The operator still
+must preserve work zero and pass all normal readiness checks. The behavior is
+unit/integration verified; real interruption and embedded-tool hardware tests
+remain unverified and must use the standing air-cut/scrap protocol first.

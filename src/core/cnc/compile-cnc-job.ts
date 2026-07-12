@@ -35,6 +35,7 @@ import {
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
 import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
+import { coolantFields } from './coolant-fields';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
@@ -187,6 +188,7 @@ function cncGroupForLayer(
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
+    ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
     passes,
@@ -226,6 +228,7 @@ function vcarveClearanceGroupForLayer(
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
+    ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
     passes: depthMajorPasses(toolpaths, depths),

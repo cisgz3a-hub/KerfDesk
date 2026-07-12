@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createStreamer, step, type StreamerState } from '../../core/controllers/grbl';
+import {
+  createStreamer,
+  step,
+  type StatusReport,
+  type StreamerState,
+} from '../../core/controllers/grbl';
 import { createJobCheckpoint, markResumeInFlight } from '../../core/recovery';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import type { LaserState } from '../state/laser-store';
@@ -14,6 +19,15 @@ const GCODE = ['; layer test', ...Array.from({ length: 60 }, (_, i) => `G1 X${i}
 const OTHER_GCODE = Array.from({ length: 10 }, (_, i) => `G1 Y${i} S50`).join('\n');
 const NOW = '2026-07-07T03:00:00.000Z';
 const LATER = '2026-07-07T04:00:00.000Z';
+const IDLE_STATUS: StatusReport = {
+  state: 'Idle',
+  subState: null,
+  mPos: { x: 0, y: 0, z: 0 },
+  wPos: null,
+  feed: 0,
+  spindle: 0,
+  wco: null,
+};
 
 function baseStreamer(gcode: string): StreamerState {
   return step(createStreamer(gcode)).state;
@@ -73,7 +87,7 @@ describe('installJobCheckpointTracking', () => {
     expect(readJobCheckpoint()?.ackedLines).toBe(3);
   });
 
-  it('keeps the checkpoint on cancel but clears it on done', () => {
+  it('keeps the checkpoint through the final ack and clears only after physical Idle', () => {
     install();
     writeJobCheckpoint(freshCheckpoint());
     const base = baseStreamer(GCODE);
@@ -81,17 +95,67 @@ describe('installJobCheckpointTracking', () => {
     patchStreamer({ ...base, completed: 30, status: 'cancelled' });
     expect(readJobCheckpoint()?.ackedLines).toBe(30);
     patchStreamer({ ...base, completed: 60, status: 'done' });
+    expect(readJobCheckpoint()).not.toBeNull();
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: IDLE_STATUS,
+      streamer: null,
+    });
     expect(readJobCheckpoint()).toBeNull();
   });
 
-  it('freezes updates while a resume run is in flight, but its done still clears', () => {
+  it('freezes updates while a resume run is in flight, then clears after settled Idle', () => {
     install();
     writeJobCheckpoint(markResumeInFlight(freshCheckpoint(), NOW));
     const base = baseStreamer(GCODE);
     patchStreamer({ ...base, completed: 30 });
     expect(readJobCheckpoint()?.ackedLines).toBe(0);
     patchStreamer({ ...base, completed: 60, status: 'done' });
+    expect(readJobCheckpoint()).not.toBeNull();
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: IDLE_STATUS,
+      streamer: null,
+    });
     expect(readJobCheckpoint()).toBeNull();
+  });
+
+  it('persists the disconnect reason with the interrupted checkpoint', () => {
+    install();
+    writeJobCheckpoint(freshCheckpoint());
+    const base = baseStreamer(GCODE);
+    patchStreamer({ ...base, completed: 12 });
+    useLaserStore.setState({
+      safetyNotice: {
+        kind: 'disconnect-during-job',
+        message: 'USB connection was lost during an active job.',
+      },
+      streamer: { ...base, completed: 12, status: 'disconnected' },
+    });
+
+    expect(readJobCheckpoint()?.interruption).toEqual({
+      kind: 'disconnect',
+      message: 'USB connection was lost during an active job.',
+    });
+  });
+
+  it('normalizes a Fire disconnect as a connection-loss interruption', () => {
+    install();
+    writeJobCheckpoint(freshCheckpoint());
+    const base = baseStreamer(GCODE);
+    patchStreamer({ ...base, completed: 12 });
+    useLaserStore.setState({
+      safetyNotice: {
+        kind: 'disconnect-during-fire',
+        message: 'USB connection was lost while low-power Fire was active.',
+      },
+      streamer: { ...base, completed: 12, status: 'disconnected' },
+    });
+
+    expect(readJobCheckpoint()?.interruption).toEqual({
+      kind: 'disconnect',
+      message: 'USB connection was lost while low-power Fire was active.',
+    });
   });
 
   it('freezes updates for a run with a foreign sendable total', () => {
