@@ -54,6 +54,58 @@ function squareObject(id: string, color: string, size: number): SceneObject {
 }
 
 describe('runCncPreflight', () => {
+  it('blocks rest machining when the roughing bit is not larger', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      pocketRoughToolId: 'em-1588',
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-rest-machining-invalid',
+        message: expect.stringContaining('must be larger'),
+      }),
+    );
+  });
+
+  it('accepts a valid larger-rougher and smaller-rest-bit pocket setup', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      toolId: 'em-1588',
+      pocketRoughToolId: 'em-6350',
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues.some((issue) => issue.code === 'cnc-rest-machining-invalid')).toBe(false);
+  });
+
+  it('blocks the temporary rest-machining and helical-entry conflict', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      toolId: 'em-1588',
+      pocketRoughToolId: 'em-6350',
+      helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-rest-machining-invalid',
+        message: expect.stringContaining('cannot be combined'),
+      }),
+    );
+  });
+
   it('blocks a requested helix that cannot fit instead of silently plunging', () => {
     const base = projectWithCnc({
       cutType: 'pocket',

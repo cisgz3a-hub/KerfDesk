@@ -255,7 +255,11 @@ export function HelicalEntryRows(props: {
               props.onCommitSettings(rest);
               return;
             }
-            const { rampEntryDeg: _removed, ...rest } = props.settings;
+            const {
+              rampEntryDeg: _removed,
+              pocketRoughToolId: _removedRougher,
+              ...rest
+            } = props.settings;
             props.onCommitSettings({
               ...rest,
               helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
