@@ -113,6 +113,7 @@ function ToggleRow(props: {
         className="lf-checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.currentTarget.checked)}
+        title={props.label}
       />
       <span>{props.label}</span>
     </label>
@@ -166,6 +167,7 @@ function SegmentButton(props: {
       type="button"
       className="lf-button"
       aria-pressed={props.active}
+      title="Select the rotary attachment type."
       onClick={props.onClick}
       style={{ ...segmentButtonStyle, ...(props.active ? segmentActiveStyle : {}) }}
     >

@@ -75,6 +75,7 @@ function FeatureRow(props: {
         className="lf-checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.currentTarget.checked)}
+        title={props.row.detail}
       />
       <span>
         <strong style={labelStyle}>{props.row.label}</strong>

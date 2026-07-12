@@ -111,6 +111,7 @@ export function FireControlRow({ device, update }: DeviceRowsProps): JSX.Element
               update({ fireControl: { ...control, enabled: event.target.checked } })
             }
             aria-label="Enable low-power Fire for this machine"
+            title="Enable the capped momentary Fire positioning beam for this machine profile."
           />
           <span>Enabled</span>
         </label>

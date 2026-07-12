@@ -120,6 +120,7 @@ function PlannerSelect(props: {
         name={props.name}
         value={props.value}
         onChange={(event) => props.onChange(event.currentTarget.value)}
+        title={`Choose ${props.label.toLowerCase()}.`}
       >
         {props.options.map(([value, label]) => (
           <option key={value} value={value}>
