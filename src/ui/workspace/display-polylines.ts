@@ -1,4 +1,9 @@
-import type { Polyline } from '../../core/scene';
+import {
+  flattenColoredPathCurves,
+  type ColoredPath,
+  type CurveSubpath,
+  type Polyline,
+} from '../../core/scene';
 import {
   countPolylineSegments,
   LARGE_SCENE_SEGMENT_THRESHOLD,
@@ -13,12 +18,15 @@ export type DisplayPolylines = {
 
 export type DisplayPolylineCache = {
   readonly get: (polylines: ReadonlyArray<Polyline>, budget?: number) => DisplayPolylines;
+  readonly getPath: (path: ColoredPath, toleranceMm: number, budget?: number) => DisplayPolylines;
 };
 
 type CacheEntry = DisplayPolylines & { readonly budget: number };
+type CurveCacheEntry = CacheEntry & { readonly toleranceMm: number };
 
 export function createDisplayPolylineCache(): DisplayPolylineCache {
   const bySource = new WeakMap<ReadonlyArray<Polyline>, CacheEntry>();
+  const byCurves = new WeakMap<ReadonlyArray<CurveSubpath>, CurveCacheEntry>();
   return {
     get(polylines, budget = LARGE_SCENE_SEGMENT_THRESHOLD) {
       const cached = bySource.get(polylines);
@@ -26,6 +34,22 @@ export function createDisplayPolylineCache(): DisplayPolylineCache {
       const display = buildDisplayPolylines(polylines, budget);
       const entry: CacheEntry = { ...display, budget };
       bySource.set(polylines, entry);
+      return entry;
+    },
+    getPath(path, toleranceMm, budget = LARGE_SCENE_SEGMENT_THRESHOLD) {
+      if (path.curves === undefined) return this.get(path.polylines, budget);
+      const cached = byCurves.get(path.curves);
+      if (cached !== undefined && cached.budget === budget && cached.toleranceMm === toleranceMm) {
+        return cached;
+      }
+      const flattened = flattenColoredPathCurves(path, {
+        toleranceMm,
+        segmentBudget: Math.max(budget, LARGE_SCENE_SEGMENT_THRESHOLD),
+      });
+      const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+      const display = buildDisplayPolylines(polylines, budget);
+      const entry: CurveCacheEntry = { ...display, budget, toleranceMm };
+      byCurves.set(path.curves, entry);
       return entry;
     },
   };

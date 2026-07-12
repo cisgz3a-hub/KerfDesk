@@ -8,7 +8,9 @@ import { canvasTheme } from '../theme/canvas-theme';
 import type { Toolpath } from '../../core/job';
 import {
   isRegistrationBox,
+  flattenColoredPathCurves,
   sceneObjectHasVisibleLayerFromMap,
+  type ColoredPath,
   type Layer,
   type Polyline,
   type Project,
@@ -355,7 +357,9 @@ function drawObjectPolylines(
     const effectiveLayer =
       obj.operationOverride === undefined ? layer : { ...layer, ...obj.operationOverride };
     if (effectiveLayer.mode === 'fill') {
-      drawFilledDesignGeometry(ctx, obj, path.polylines, effectiveLayer, view, path.color);
+      const display = displayPathFor(path, obj, view, displayPolylineCache);
+      simplified = includesSimplifiedDisplay(simplified, display);
+      drawFilledDesignGeometry(ctx, obj, display.polylines, effectiveLayer, view, path.color);
       continue;
     }
     ctx.strokeStyle = path.color;
@@ -365,18 +369,31 @@ function drawObjectPolylines(
     // 5000-polyline traced image emitted 5000 syncs per redraw at
     // 60 Hz → canvas chokes. Batching to one stroke per color drops
     // that to O(colors) ≈ 1-8. Standard Canvas2D pattern (MDN).
-    const display = displayPolylinesFor(path.polylines, displayPolylineCache);
-    if (display.isSimplified) simplified = true;
+    const display = displayPathFor(path, obj, view, displayPolylineCache);
+    simplified = includesSimplifiedDisplay(simplified, display);
     strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
   return simplified;
 }
 
-function displayPolylinesFor(
-  polylines: ReadonlyArray<Polyline>,
+function displayPathFor(
+  path: ColoredPath,
+  object: SceneObject,
+  view: ViewTransform,
   cache: DisplayPolylineCache | undefined,
 ): DisplayPolylines {
-  return cache?.get(polylines) ?? buildDisplayPolylines(polylines);
+  const objectScale = Math.max(
+    Math.abs(object.transform.scaleX),
+    Math.abs(object.transform.scaleY),
+  );
+  const toleranceMm = 0.25 / Math.max(1e-9, view.scale * objectScale);
+  if (cache !== undefined) return cache.getPath(path, toleranceMm);
+  const flattened = flattenColoredPathCurves(path, { toleranceMm });
+  return buildDisplayPolylines(flattened.kind === 'ok' ? flattened.polylines : path.polylines);
+}
+
+function includesSimplifiedDisplay(current: boolean, display: DisplayPolylines): boolean {
+  return current || display.isSimplified;
 }
 
 function drawFilledDesignGeometry(
