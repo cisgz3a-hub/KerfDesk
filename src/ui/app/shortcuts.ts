@@ -49,10 +49,7 @@ export type FileCtx = {
   readonly markSaved: (target: SaveTarget) => void;
   readonly markLoaded: (filename: string) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
-  readonly advanceVariablesAfter?: (
-    expectedProject: Project,
-    trigger: 'successful-export',
-  ) => void;
+  readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
   // F-A13 dirty-check. Resolves false to abort destructive actions (New /
   // Open). Wired in use-shortcuts.ts to the Save / Don't Save / Cancel
   // dialog flow (LU18); tests can stub an async true-returning fn.

@@ -119,10 +119,7 @@ import {
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
-import {
-  printCutProjectActions,
-  type PrintCutProjectActions,
-} from './print-cut-project-actions';
+import { printCutProjectActions, type PrintCutProjectActions } from './print-cut-project-actions';
 
 export type { ImportOutcome } from './scene-mutations';
 
