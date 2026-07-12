@@ -151,6 +151,7 @@ export type { Project, ProjectOptimizationSettings, Workspace } from './project'
 export { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION, createProject } from './project';
 
 export type {
+  CncCoolantMode,
   CncCutDirection,
   CncCutType,
   CncLayerSettings,
@@ -165,6 +166,7 @@ export type {
   MachineKind,
 } from './machine';
 export {
+  CNC_COOLANT_MODES,
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_TILING,
@@ -174,6 +176,7 @@ export {
   DEFAULT_CNC_TOOLS,
   LASER_MACHINE_CONFIG,
   activeCncTool,
+  isCncCoolantMode,
   layerCncTool,
   cutTypeLabel,
   machineKindOf,

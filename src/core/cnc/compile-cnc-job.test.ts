@@ -76,6 +76,22 @@ describe('compileCncJob', () => {
     expect(group.passes.every((pass) => pass.closed)).toBe(true);
   });
 
+  it('copies the machine coolant mode onto the compiled group; off/absent stays absent', () => {
+    const scene = sceneWith(
+      [cncLayer('L1', '#ff0000', { cutType: 'profile-on-path', depthMm: 2, depthPerPassMm: 2 })],
+      [squareObject('O1', '#ff0000', 20)],
+    );
+    const flood = {
+      ...config,
+      params: { ...config.params, coolant: 'flood' as const },
+    };
+    const floodGroup = compileCncJob(scene, dev, flood).groups[0];
+    expect(floodGroup?.kind === 'cnc' ? floodGroup.coolant : null).toBe('flood');
+    // The default config's coolant is 'off' → no field on the group (byte- and
+    // shape-identical to a pre-coolant job).
+    expect(onlyGroup(scene).coolant).toBeUndefined();
+  });
+
   it('closes rings: every closed pass polyline ends at its start', () => {
     const scene = sceneWith(
       [cncLayer('L1', '#ff0000', { cutType: 'profile-outside', depthMm: 2, depthPerPassMm: 2 })],
