@@ -1,10 +1,15 @@
-// DXF entity → Polyline converters (Phase H.6). Every converter takes the
-// entity's own tag run plus the drawing→mm scale and returns geometry in
+// DXF entity → canonical curve plus compatibility-polyline converters.
+// Every converter takes the entity's own tag run plus the drawing→mm scale and returns geometry in
 // millimeters, still in DXF's Y-up frame — parse-dxf flips and normalizes
 // once at the end. Z coordinates (codes 30/38) are deliberately ignored:
 // this is a 2.5D import (F-CNC9 edge 4).
 
-import type { Polyline, Vec2 } from '../../core/scene';
+import {
+  polylineToCurveSubpath,
+  type CurveSubpath,
+  type Polyline,
+  type Vec2,
+} from '../../core/scene';
 import type { DxfTag } from './dxf-tags';
 import {
   bulgeSegment,
@@ -14,6 +19,7 @@ import {
   sampleEllipse,
 } from './dxf-curve-sampling';
 import { sampleSpline } from './dxf-spline';
+import { bulgeCurveSegment, circleCurve, ellipseArcCurve } from './dxf-native-curves';
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
 const FULL_TURN = Math.PI * 2;
@@ -22,7 +28,7 @@ const POLYLINE_MESH_FLAG_BITS = 16 | 64; // polygon/polyface meshes — 3D, skip
 const MIN_POLYLINE_POINTS = 2;
 
 export type EntityConversion =
-  | { readonly kind: 'ok'; readonly polyline: Polyline }
+  | { readonly kind: 'ok'; readonly polyline: Polyline; readonly curve: CurveSubpath }
   | { readonly kind: 'skip'; readonly reason?: string };
 
 const SKIP: EntityConversion = { kind: 'skip' };
@@ -31,14 +37,19 @@ export function lineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): Enti
   const start: Vec2 = { x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale };
   const end: Vec2 = { x: firstNumber(tags, 11) * scale, y: firstNumber(tags, 21) * scale };
   if (start.x === end.x && start.y === end.y) return SKIP;
-  return { kind: 'ok', polyline: { points: [start, end], closed: false } };
+  const polyline = { points: [start, end], closed: false };
+  return { kind: 'ok', polyline, curve: polylineToCurveSubpath(polyline) };
 }
 
 export function circleToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const radius = firstNumber(tags, 40) * scale;
   if (!(radius > 0)) return SKIP;
   const center: Vec2 = { x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale };
-  return { kind: 'ok', polyline: { points: sampleCircle(center, radius), closed: true } };
+  return {
+    kind: 'ok',
+    polyline: { points: sampleCircle(center, radius), closed: true },
+    curve: circleCurve(center, radius),
+  };
 }
 
 export function arcToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
@@ -53,6 +64,7 @@ export function arcToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): Entit
   return {
     kind: 'ok',
     polyline: { points: sampleArc(center, radius, startRad, sweep), closed: false },
+    curve: ellipseArcCurve(center, { x: radius, y: 0 }, 1, startRad, sweep, false),
   };
 }
 
@@ -100,11 +112,20 @@ export function ellipseToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): E
   const startParam = firstNumber(tags, 41);
   const endParam = firstNumber(tags, 42, FULL_TURN);
   const points = sampleEllipse(center, majorAxis, ratio, startParam, endParam);
+  const sweep = normalizedSweep(startParam, endParam);
   if (isFullEllipseSweep(startParam, endParam)) {
     points.pop(); // drop the seam duplicate; `closed` joins it
-    return { kind: 'ok', polyline: { points, closed: true } };
+    return {
+      kind: 'ok',
+      polyline: { points, closed: true },
+      curve: ellipseArcCurve(center, majorAxis, ratio, startParam, sweep, true),
+    };
   }
-  return { kind: 'ok', polyline: { points, closed: false } };
+  return {
+    kind: 'ok',
+    polyline: { points, closed: false },
+    curve: ellipseArcCurve(center, majorAxis, ratio, startParam, sweep, false),
+  };
 }
 
 export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
@@ -138,7 +159,10 @@ export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): En
     points.pop();
   }
   if (points.length < MIN_POLYLINE_POINTS) return SKIP;
-  return { kind: 'ok', polyline: { points, closed } };
+  // General NURBS knot decomposition is not yet part of the curve kernel;
+  // preserve the evaluated spline exactly as deterministic line segments.
+  const polyline = { points, closed };
+  return { kind: 'ok', polyline, curve: polylineToCurveSubpath(polyline) };
 }
 
 function bulgeVerticesToPolyline(
@@ -148,16 +172,28 @@ function bulgeVerticesToPolyline(
   if (vertices.length < MIN_POLYLINE_POINTS) return SKIP;
   const first = vertices[0] as BulgeVertex;
   const points: Vec2[] = [{ x: first.x, y: first.y }];
+  const segments: CurveSubpath['segments'][number][] = [];
   const segmentCount = closed ? vertices.length : vertices.length - 1;
   for (let i = 0; i < segmentCount; i += 1) {
     const from = vertices[i] as BulgeVertex;
     const to = vertices[(i + 1) % vertices.length] as BulgeVertex;
     points.push(...bulgeSegment({ x: from.x, y: from.y }, { x: to.x, y: to.y }, from.bulge));
+    segments.push(...bulgeCurveSegment({ x: from.x, y: from.y }, { x: to.x, y: to.y }, from.bulge));
   }
   // A closed run ends back on the first vertex; drop the seam duplicate.
   if (closed && points.length > 1) points.pop();
   if (points.length < MIN_POLYLINE_POINTS) return SKIP;
-  return { kind: 'ok', polyline: { points, closed } };
+  return {
+    kind: 'ok',
+    polyline: { points, closed },
+    curve: { start: { x: first.x, y: first.y }, segments, closed },
+  };
+}
+
+function normalizedSweep(startParam: number, endParam: number): number {
+  let sweep = endParam - startParam;
+  while (sweep <= 0) sweep += FULL_TURN;
+  return Math.min(sweep, FULL_TURN);
 }
 
 export function firstNumber(tags: ReadonlyArray<DxfTag>, code: number, fallback = 0): number {

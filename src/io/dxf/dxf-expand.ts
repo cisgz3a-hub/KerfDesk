@@ -3,7 +3,7 @@
 // merges. Colors resolve here because BYBLOCK (ACI 0) needs the inserting
 // entity's color flowing down the recursion.
 
-import type { Polyline, Vec2 } from '../../core/scene';
+import type { CurveSubpath, Polyline, Vec2 } from '../../core/scene';
 import { aciToHex, DXF_DEFAULT_COLOR, trueColorToHex } from './dxf-colors';
 import {
   arcToPolyline,
@@ -35,6 +35,7 @@ export type DxfBlock = {
 export type ColoredPolyline = {
   readonly color: string;
   readonly polyline: Polyline;
+  readonly curve: CurveSubpath;
 };
 
 export type ExpandOutcome = {
@@ -120,6 +121,7 @@ export function expandEntities(
     polylines.push({
       color: resolveEntityColor(entity.tags, ctx.layerColors, inheritedColor),
       polyline: conversion.polyline,
+      curve: conversion.curve,
     });
   }
   return { polylines, skipped, notes };
@@ -212,24 +214,45 @@ function placeInsertInstances(
       const gridX = column * columnSpacing;
       const gridY = row * rowSpacing;
       for (const child of children) {
+        const point = (p: Vec2): Vec2 => {
+          const localX = (p.x - base.x) * scaleX + gridX;
+          const localY = (p.y - base.y) * scaleY + gridY;
+          return {
+            x: insert.x + localX * cos - localY * sin,
+            y: insert.y + localX * sin + localY * cos,
+          };
+        };
         out.push({
           color: child.color,
           polyline: {
             closed: child.polyline.closed,
-            points: child.polyline.points.map((p) => {
-              const localX = (p.x - base.x) * scaleX + gridX;
-              const localY = (p.y - base.y) * scaleY + gridY;
-              return {
-                x: insert.x + localX * cos - localY * sin,
-                y: insert.y + localX * sin + localY * cos,
-              };
-            }),
+            points: child.polyline.points.map(point),
           },
+          curve: transformCurve(child.curve, point),
         });
       }
     }
   }
   return out;
+}
+
+function transformCurve(curve: CurveSubpath, point: (value: Vec2) => Vec2): CurveSubpath {
+  return {
+    start: point(curve.start),
+    segments: curve.segments.map((segment) => {
+      if (segment.kind === 'line') return { ...segment, to: point(segment.to) };
+      if (segment.kind === 'cubic') {
+        return {
+          ...segment,
+          control1: point(segment.control1),
+          control2: point(segment.control2),
+          to: point(segment.to),
+        };
+      }
+      return { ...segment, to: point(segment.to) };
+    }),
+    closed: curve.closed,
+  };
 }
 
 function resolveEntityColor(

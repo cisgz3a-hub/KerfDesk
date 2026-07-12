@@ -60,6 +60,10 @@ describe('parseDxf entities', () => {
     );
     const polyline = object.paths[0]?.polylines[0];
     expect(polyline?.closed).toBe(true);
+    expect(object.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
+    expect(
+      object.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'cubic'),
+    ).toBe(true);
     expect(object.bounds.maxX).toBeCloseTo(20, 6);
     expect(object.bounds.maxY).toBeCloseTo(20, 6);
   });
@@ -77,6 +81,8 @@ describe('parseDxf entities', () => {
     );
     const polyline = object.paths[0]?.polylines[0];
     expect(polyline?.closed).toBe(false);
+    expect(object.paths[0]?.curves?.[0]?.segments).toHaveLength(1);
+    expect(object.paths[0]?.curves?.[0]?.segments[0]?.kind).toBe('cubic');
     expect(object.bounds.maxX).toBeCloseTo(10, 6);
     expect(object.bounds.maxY).toBeCloseTo(10, 6);
   });
@@ -127,6 +133,9 @@ describe('parseDxf entities', () => {
       ),
     );
     expect(bulged.bounds.maxY).toBeCloseTo(5, 3);
+    expect(
+      bulged.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'cubic'),
+    ).toBe(true);
   });
 
   it('imports a classic POLYLINE/VERTEX/SEQEND triangle as closed', () => {
@@ -147,6 +156,7 @@ describe('parseDxf entities', () => {
     );
     const polyline = object.paths[0]?.polylines[0];
     expect(polyline?.closed).toBe(true);
+    expect(object.paths[0]?.curves?.[0]?.segments).toHaveLength(3);
     expect(polyline?.points).toHaveLength(3);
   });
 
@@ -171,6 +181,7 @@ describe('parseDxf entities', () => {
     );
     const polyline = object.paths[0]?.polylines[0];
     expect(polyline?.closed).toBe(true);
+    expect(object.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
     // Sampled extremes land within the 0.05 mm chord tolerance of the axes.
     expect(Math.abs(object.bounds.maxX - 40)).toBeLessThanOrEqual(0.12);
     expect(Math.abs(object.bounds.maxY - 20)).toBeLessThanOrEqual(0.12);
@@ -208,6 +219,9 @@ describe('parseDxf entities', () => {
     // flips Y: start (0,10), end (10,0).
     expect(polyline.points[0]).toEqual({ x: 0, y: 10 });
     expect(polyline.points.at(-1)).toEqual({ x: 10, y: 0 });
+    expect(object.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'line')).toBe(
+      true,
+    );
   });
 });
 
@@ -277,6 +291,40 @@ describe('parseDxf blocks', () => {
     // magnitudes after flip.
     expect(object.bounds.maxX).toBeCloseTo(100, 6);
     expect(object.bounds.maxY).toBeCloseTo(10, 6);
+  });
+
+  it('preserves cubic controls through non-uniform INSERT transforms', () => {
+    const blocks = [
+      tags([0, 'SECTION'], [2, 'BLOCKS']),
+      tags([0, 'BLOCK'], [2, 'RING'], [10, '0'], [20, '0']),
+      tags([0, 'CIRCLE'], [10, '0'], [20, '0'], [40, '10']),
+      tags([0, 'ENDBLK']),
+      tags([0, 'ENDSEC']),
+    ].join('\n');
+    const object = okObject(
+      parse(
+        dxf(
+          blocks,
+          entitiesSection(
+            tags(
+              [0, 'INSERT'],
+              [2, 'RING'],
+              [10, '0'],
+              [20, '0'],
+              [41, '2'],
+              [42, '1'],
+              [50, '90'],
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(object.bounds.maxX).toBeCloseTo(20, 6);
+    expect(object.bounds.maxY).toBeCloseTo(40, 6);
+    expect(object.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
+    expect(
+      object.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'cubic'),
+    ).toBe(true);
   });
 
   it('notes unknown blocks and survives INSERT cycles via the depth cap', () => {
