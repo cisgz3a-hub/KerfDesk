@@ -1,4 +1,4 @@
-/* global Blob, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, TextDecoder, TextEncoder, window, WritableStream */
+/* global Blob, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
 
 const BASIC_PROJECT = '__KERFDESK_E2E_PROJECT_FIXTURE__';
 
@@ -80,8 +80,10 @@ function respondToSerialWrite(text, emitLine) {
     emitLine('$32=1');
   }
   const acknowledgements = [...text].filter((character) => character === '\n').length;
-  for (let index = 0; index < acknowledgements; index += 1) emitLine('ok');
-  emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  setTimeout(() => {
+    for (let index = 0; index < acknowledgements; index += 1) emitLine('ok');
+    emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  }, 0);
 }
 
 function installFilePickers() {

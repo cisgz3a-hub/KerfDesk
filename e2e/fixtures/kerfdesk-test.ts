@@ -8,6 +8,9 @@ export interface KerfDeskFixture {
   readonly events: () => Promise<readonly FixtureEvent[]>;
   readonly savedFiles: () => Promise<Readonly<Record<string, string>>>;
   readonly emitSerialLine: (line: string) => Promise<void>;
+  readonly setOpenFiles: (
+    files: readonly { readonly name: string; readonly text: string }[],
+  ) => Promise<void>;
 }
 
 const browserFixturePath = fileURLToPath(new URL('./browser-apis.js', import.meta.url));
@@ -61,6 +64,16 @@ function createFixtureControl(page: Page, pageErrors: readonly Error[]): KerfDes
           }
         ).__KERFDESK_E2E__.emitSerialLine(value);
       }, line),
+    setOpenFiles: (files) =>
+      page.evaluate((value) => {
+        (
+          window as typeof window & {
+            __KERFDESK_E2E__: {
+              setOpenFiles: (files: readonly { name: string; text: string }[]) => void;
+            };
+          }
+        ).__KERFDESK_E2E__.setOpenFiles(value);
+      }, files),
   };
 }
 

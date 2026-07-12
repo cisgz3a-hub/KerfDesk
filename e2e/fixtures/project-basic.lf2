@@ -6,11 +6,78 @@
     "bedHeight": 300,
     "maxFeed": 6000,
     "maxPowerS": 1000,
+    "capabilities": ["grbl", "wcs", "verified-origin", "rotary"],
     "origin": "front-left",
-    "homing": { "enabled": false, "direction": "front-left" },
+    "homing": { "enabled": true, "direction": "front-left" },
     "autofocusCommand": ""
   },
   "workspace": { "width": 300, "height": 300, "units": "mm" },
   "notes": "Deterministic Playwright fixture",
-  "scene": { "objects": [], "layers": [] }
+  "scene": {
+    "objects": [
+      {
+        "kind": "imported-svg",
+        "id": "e2e-square",
+        "source": "e2e-square.svg",
+        "bounds": { "minX": 10, "minY": 10, "maxX": 30, "maxY": 30 },
+        "transform": {
+          "x": 0,
+          "y": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotationDeg": 0,
+          "mirrorX": false,
+          "mirrorY": false
+        },
+        "paths": [
+          {
+            "color": "#ff0000",
+            "polylines": [
+              {
+                "points": [
+                  { "x": 10, "y": 10 },
+                  { "x": 30, "y": 10 },
+                  { "x": 30, "y": 30 },
+                  { "x": 10, "y": 30 }
+                ],
+                "closed": true
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "e2e-red",
+        "color": "#ff0000",
+        "mode": "line",
+        "minPower": 0,
+        "power": 30,
+        "speed": 1500,
+        "passes": 1,
+        "visible": true,
+        "output": true,
+        "airAssist": false,
+        "kerfOffsetMm": 0,
+        "tabsEnabled": false,
+        "tabSizeMm": 0.5,
+        "tabsPerShape": 4,
+        "tabSkipInnerShapes": true,
+        "hatchAngleDeg": 0,
+        "hatchSpacingMm": 0.1,
+        "fillOverscanMm": 5,
+        "fillStyle": "scanline",
+        "fillBidirectional": true,
+        "fillCrossHatch": false,
+        "ditherAlgorithm": "floyd-steinberg",
+        "linesPerMm": 10,
+        "imageBidirectional": true,
+        "negativeImage": false,
+        "passThrough": false,
+        "dotWidthCorrectionMm": 0,
+        "subLayers": []
+      }
+    ]
+  }
 }
