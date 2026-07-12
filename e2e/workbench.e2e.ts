@@ -114,7 +114,7 @@ test('an interrupted-job checkpoint surfaces recovery before normal work', async
   });
   await page.goto('/');
   await expect(page.getByText('Interrupted laser job', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Resume interrupted job' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review safe recovery' })).toBeVisible();
 });
 
 async function installFileSystemMocks(page: Page): Promise<void> {
