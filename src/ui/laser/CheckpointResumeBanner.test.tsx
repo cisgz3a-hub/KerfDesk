@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createStreamer, step } from '../../core/controllers/grbl';
-import { advanceJobCheckpoint, createJobCheckpoint } from '../../core/recovery';
+import {
+  advanceJobCheckpoint,
+  createJobCheckpoint,
+  withJobInterruption,
+} from '../../core/recovery';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
@@ -32,14 +36,30 @@ function render(): void {
   root = r;
 }
 
-function storedCheckpoint(acked: number): void {
+function storedCheckpoint(acked: number, machineKind: 'laser' | 'cnc' = 'laser'): void {
   const cp = createJobCheckpoint({
     gcode: GCODE,
-    machineKind: 'laser',
+    machineKind,
     outputScope: DEFAULT_OUTPUT_SCOPE,
     nowIso: NOW,
   });
   writeJobCheckpoint(advanceJobCheckpoint(cp, acked, NOW));
+}
+
+function storedDisconnectedCncCheckpoint(): void {
+  const cp = createJobCheckpoint({
+    gcode: GCODE,
+    machineKind: 'cnc',
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    nowIso: NOW,
+  });
+  writeJobCheckpoint(
+    withJobInterruption(
+      advanceJobCheckpoint(cp, 2, NOW),
+      { kind: 'disconnect', message: 'USB connection was lost during the router job.' },
+      NOW,
+    ),
+  );
 }
 
 afterEach(() => {
@@ -61,7 +81,7 @@ describe('CheckpointResumeBanner', () => {
 
     expect(host?.textContent).toContain('Interrupted laser job');
     expect(host?.textContent).toContain('2 of 4 motion lines confirmed');
-    expect(host?.querySelector('button')?.textContent).toBe('Resume interrupted job');
+    expect(host?.querySelector('button')?.textContent).toBe('Review safe recovery');
   });
 
   it('renders nothing without a checkpoint or without progress', () => {
@@ -74,6 +94,23 @@ describe('CheckpointResumeBanner', () => {
     storedCheckpoint(0);
     render();
     expect(host?.textContent).toBe('');
+  });
+
+  it('explains retract-first safe-boundary recovery for a CNC interruption', () => {
+    storedCheckpoint(2, 'cnc');
+    render();
+
+    expect(host?.textContent).toContain('previous safe retract boundary');
+    expect(host?.textContent).toContain('extracts Z before starting the spindle');
+    expect(host?.textContent).not.toContain('first unconfirmed line');
+  });
+
+  it('shows the persisted interruption cause after reconnect or reload', () => {
+    storedDisconnectedCncCheckpoint();
+    render();
+
+    expect(host?.textContent).toContain('Recorded cause:');
+    expect(host?.textContent).toContain('USB connection was lost during the router job.');
   });
 
   it('renders nothing while a job is active', () => {

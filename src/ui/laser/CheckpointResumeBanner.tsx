@@ -31,18 +31,27 @@ export function CheckpointResumeBanner(props: {
         Interrupted {checkpoint.machineKind === 'cnc' ? 'router' : 'laser'} job
         {startedAt === null ? '' : ` from ${startedAt}`}: {checkpoint.ackedLines} of{' '}
         {checkpoint.sendableLines} motion lines confirmed. Resume re-checks that the project still
-        produces the same G-code, then replays from the first unconfirmed line. If the machine also
-        lost power, a few confirmed lines may not have run — backing up re-burns, skipping leaves
-        gaps.
+        produces the same G-code.{' '}
+        {checkpoint.machineKind === 'cnc'
+          ? 'Router recovery rewinds to the previous safe retract boundary, extracts Z before starting the spindle, waits for spin-up at safe height, then recuts that complete segment.'
+          : 'Laser recovery replays from the first unconfirmed line. If the controller lost power, a few confirmed lines may not have run.'}
       </p>
+      {checkpoint.interruption === undefined ? null : (
+        <p style={causeStyle}>
+          <strong>Recorded cause:</strong> {checkpoint.interruption.message}
+          {checkpoint.interruption.rejectedLine === undefined
+            ? ''
+            : ` Rejected command: ${checkpoint.interruption.rejectedLine}`}
+        </p>
+      )}
       <div style={rowStyle}>
         <button
           type="button"
           disabled={props.disabled || props.busy}
           onClick={() => void runCheckpointResumeFlow(checkpoint)}
-          title="Verify the project still compiles to the interrupted program, then resume at the first unconfirmed line. Work zero must be unchanged."
+          title="Verify the project, review the safe recovery point, and continue only if work zero is unchanged."
         >
-          Resume interrupted job
+          Review safe recovery
         </button>
         <button
           type="button"
@@ -77,3 +86,8 @@ const textStyle: React.CSSProperties = {
   margin: '0 0 6px 0',
 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6 };
+const causeStyle: React.CSSProperties = {
+  ...textStyle,
+  color: 'var(--lf-danger)',
+  fontWeight: 500,
+};
