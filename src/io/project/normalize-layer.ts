@@ -74,6 +74,9 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...enumPassthrough('pocketStrategy', raw['pocketStrategy'], POCKET_STRATEGIES),
     ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
+    ...(typeof raw['pocketRoughToolId'] === 'string'
+      ? { pocketRoughToolId: raw['pocketRoughToolId'] }
+      : {}),
     ...(typeof raw['reliefFinishToolId'] === 'string'
       ? { reliefFinishToolId: raw['reliefFinishToolId'] }
       : {}),
