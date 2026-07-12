@@ -15,6 +15,22 @@ export function curveNodePoint(path: CurveSubpath, nodeIndex: number): Vec2 | nu
   return nodeIndex === 0 ? path.start : (path.segments[nodeIndex - 1]?.to ?? null);
 }
 
+export function curveControlPoint(
+  path: CurveSubpath,
+  nodeIndex: number,
+  side: 'incoming' | 'outgoing',
+): Vec2 | null {
+  if (curveNodePoint(path, nodeIndex) === null) return null;
+  const segmentIndex =
+    side === 'incoming'
+      ? incomingSegmentIndex(path, nodeIndex)
+      : outgoingSegmentIndex(path, nodeIndex);
+  if (segmentIndex === null) return null;
+  const segment = path.segments[segmentIndex];
+  if (segment?.kind !== 'cubic') return null;
+  return side === 'incoming' ? segment.control2 : segment.control1;
+}
+
 export function moveCurveAnchor(
   path: CurveSubpath,
   nodeIndex: number,

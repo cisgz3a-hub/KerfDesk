@@ -81,6 +81,7 @@ export {
 export {
   breakCurveAtNode,
   convertCurveSegment,
+  curveControlPoint,
   curveNodeCount,
   curveNodePoint,
   joinCurveSubpaths,

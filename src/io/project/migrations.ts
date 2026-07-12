@@ -1,9 +1,6 @@
-// Migration dispatch — promotes older .lf2 documents to the current schema
-// version (WORKFLOW.md F-A12). Phase A's PROJECT_SCHEMA_VERSION is 1, so
-// no migrators ship yet — but the registry, the chain runner, and the
-// "schema-too-old when no migrator covers this version" failure path all
-// exist now so the first real migration (Phase D or Phase E) is a single
-// table entry rather than rewriting deserialize-project.
+// Migration dispatch promotes older .lf2 documents to the current schema.
+// The registry and chain runner apply each version step in order and remain
+// the stable extension point for future project formats.
 //
 // A migrator is a pure function: it takes the raw JSON-parsed object
 // (a generic record) at version N and returns the equivalent at N+1.

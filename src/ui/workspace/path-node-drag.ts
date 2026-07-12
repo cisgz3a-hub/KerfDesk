@@ -18,7 +18,7 @@ export function beginPathNodeDrag(args: {
     options?: { readonly additive?: boolean },
   ) => void;
 }): PathNodeDragState | null {
-  const ref = hitPathNode(args.project.scene, args.scenePoint, args.pxToMm);
+  const ref = hitPathNode(args.project.scene, args.scenePoint, args.pxToMm, args.selectedPathNodes);
   if (ref === null) {
     args.selectPathNode(null);
     return null;
