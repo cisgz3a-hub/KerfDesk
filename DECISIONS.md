@@ -6688,3 +6688,32 @@ document scrolling.
 - Numeric values and status readouts retain stable dimensions and remain reachable by scrolling
   their row.
 - Selection-transform behavior, keyboard handling, and project output are unchanged.
+
+---
+
+## ADR-143 - Real-browser UX smoke runs separately from the release gate
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Vitest runs the UI under jsdom with a no-op canvas shim. It can verify handlers and DOM contracts,
+but it cannot prove native Tab traversal, `:focus-visible`, responsive browser layout, or that the
+workspace canvas contains painted pixels. Manual in-app browser automation also could not advance
+Tab focus reliably enough to serve as acceptance evidence.
+
+### Decision
+
+Add a Playwright Chromium suite for keyboard focus, disclosure activation, compact rail behavior,
+document reflow, primary-action visibility, and nonblank canvas pixels. Run it in a separate Browser
+smoke workflow and expose `pnpm test:e2e` locally. Keep `release:check` unchanged while the browser
+suite establishes stability; the separate workflow is visible on pull requests but is not a
+deployment prerequisite yet.
+
+### Consequences
+
+- UX claims can cite real Chromium behavior instead of jsdom inference.
+- Browser traces, screenshots, and video are retained only on failure.
+- CI installs one Chromium runtime, adding time and bandwidth outside the existing release gate.
+- Promotion into `release:check` requires a later decision after the suite is stable across repeated
+  pull requests.

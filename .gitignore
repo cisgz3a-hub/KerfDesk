@@ -11,6 +11,9 @@ out/
 # Vite / Vitest
 .vite/
 coverage/
+playwright-report/
+test-results/
+blob-report/
 
 # Cloudflare wrangler (pages dev) — cache + temp worker shims
 .wrangler/
