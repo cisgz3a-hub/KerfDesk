@@ -291,6 +291,11 @@ function messageForError(reason: string): string {
 const barStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
+  minWidth: 0,
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+  overflowX: 'auto',
+  overflowY: 'hidden',
   gap: 8,
   padding: '4px 12px',
   background: 'var(--lf-bg-1)',
