@@ -3,7 +3,12 @@
 // bed, which bit is in the spindle, and the machine's Z/spindle parameters.
 
 import { CHIPLOAD_MATERIALS } from '../../core/cnc';
-import { activeCncTool, type CncMachineConfig } from '../../core/scene';
+import {
+  activeCncTool,
+  isCncCoolantMode,
+  type CncCoolantMode,
+  type CncMachineConfig,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { ProbeControls } from '../laser/ProbeControls';
@@ -189,6 +194,25 @@ function CncMachineParamsFields(props: { readonly machine: CncMachineConfig }): 
         title="Dwell after starting the spindle before the first plunge."
         onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
       />
+      <Row label="Coolant">
+        <select
+          value={machine.params.coolant ?? 'off'}
+          onChange={(e) =>
+            updateCncMachine({
+              params: { coolant: isCncCoolantMode(e.target.value) ? e.target.value : 'off' },
+            })
+          }
+          aria-label="Coolant"
+          title="Machine-wide coolant for the whole job. Mist emits M7, Flood emits M8, both turned off with M9 at job end."
+          style={selectStyle}
+        >
+          {COOLANT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </Row>
       <NumberRow
         label="Park X"
         unit="mm"
@@ -259,6 +283,14 @@ function NumberRow(props: {
     </Row>
   );
 }
+
+// Coolant modes with their G-code mapping shown so the operator knows which
+// relay fires (matches LightBurn/Easel-style labeling of the M-command).
+const COOLANT_OPTIONS: ReadonlyArray<{ readonly value: CncCoolantMode; readonly label: string }> = [
+  { value: 'off', label: 'Off' },
+  { value: 'mist', label: 'Mist (M7)' },
+  { value: 'flood', label: 'Flood (M8)' },
+];
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--lf-bg-2)',

@@ -120,10 +120,23 @@ export type CncLayerSettings = {
   readonly tabsPerShape: number;
 };
 
+// Machine-wide flood/mist coolant for the whole CNC job (a router setting,
+// not per-operation): mist → M7, flood → M8, off → no coolant command.
+// Absent behaves exactly as 'off' (byte-identical output).
+export type CncCoolantMode = 'off' | 'mist' | 'flood';
+
+export const CNC_COOLANT_MODES: ReadonlyArray<CncCoolantMode> = ['off', 'mist', 'flood'];
+
+export function isCncCoolantMode(value: unknown): value is CncCoolantMode {
+  return CNC_COOLANT_MODES.some((mode) => mode === value);
+}
+
 export type CncMachineParams = {
   readonly safeZMm: number; // travel clearance above stock top
   readonly spindleMaxRpm: number; // GRBL $30 equivalent — max S value
   readonly spindleSpinupSec: number; // dwell after M3 before first plunge
+  // Machine-wide coolant for the job. Absent = 'off' (no M7/M8/M9 emitted).
+  readonly coolant?: CncCoolantMode;
   // H.9 parking parity: where the head parks after the job (and during
   // M0 bit changes). Absent = the machine origin, the pre-H.9 behavior.
   readonly parkXMm?: number;
@@ -210,6 +223,7 @@ export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
   safeZMm: 3.81, // Easel's 0.150 in safety height
   spindleMaxRpm: 12000,
   spindleSpinupSec: 3,
+  coolant: 'off',
 };
 
 // Conservative wood/MDF starting point for a 1/8 in bit — same spirit as

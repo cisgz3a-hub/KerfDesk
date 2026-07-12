@@ -10,7 +10,13 @@
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
 import { sampleCircularArcPoints } from '../geometry/circular-arc';
-import { assertNever, type CncCutType, type LayerFillStyle, type Vec2 } from '../scene';
+import {
+  assertNever,
+  type CncCoolantMode,
+  type CncCutType,
+  type LayerFillStyle,
+  type Vec2,
+} from '../scene';
 import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 
@@ -159,6 +165,10 @@ export type CncGroup = {
   readonly plungeMmPerMin: number;
   readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm
   readonly spindleSpinupSec: number; // dwell after spindle start / speed change
+  // Machine-wide coolant (a job-level setting copied onto every group). Absent
+  // = 'off'; the emitter reads the first group's value once. Optional so 'off'
+  // jobs keep byte-identical output and unchanged group shape.
+  readonly coolant?: CncCoolantMode;
   readonly safeZMm: number; // retract height for travel between passes
   // H.9 parking parity: postamble/tool-change park position. Absent = the
   // machine origin (pre-H.9 output stays byte-identical).
