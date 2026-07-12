@@ -34,6 +34,7 @@
 | ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
+| ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 
 ---
 
@@ -6522,11 +6523,6 @@ Make the tracing pipeline explicitly single-flight and latest-wins. Starting a n
 - Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
 
 ## ADR-138 - The primary toolbar is icon-first and never wraps
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Context
-
 The primary toolbar had fourteen text buttons and wrapped into a second row at
 compact desktop widths. That reduced canvas height, shifted the numeric toolbar
 and workspace during resize, and made the command surface visually dominant.
@@ -6720,3 +6716,34 @@ but the application will not guess physical cutter state from transport-level
 acknowledgements. A future CNC recovery feature requires machine-specific,
 hardware-validated state acquisition and a supervised recovery state machine;
 re-enabling the old retract-first preamble is not an acceptable shortcut.
+
+---
+
+## ADR-144 - Parametric shape edits rematerialize canonical geometry
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Rectangle, ellipse, polygon, and star objects retain their generating parameters, but those
+parameters were immutable after the initial canvas drag. The selected-object panel exposed only
+laser output overrides, despite calling itself Shape Properties, and disappeared entirely in CNC
+mode. Resizing could change the overall transform but could not change a rectangle corner radius,
+polygon side count, or star inset.
+
+### Decision
+
+- A single selected parametric shape exposes validated geometry fields in Shape Properties for
+  both laser and CNC projects. Multi-selection and polyline node editing keep their existing tools.
+- Each edit sanitizes the complete discriminated shape spec, then regenerates bounds,
+  compatibility polylines, and schema-v2 canonical curves through the established shape factories.
+- Rematerialization preserves object ID, transform, color, power scale, operation override,
+  provenance, stacking order, and group ownership.
+- One committed field edit creates one undo frame. Invalid or unchanged input creates none.
+
+### Consequences
+
+Parametric objects remain editable instead of becoming effectively baked after creation. Preview,
+save, laser compilation, and CNC compilation continue to consume the same materialized paths, so
+no downstream shape-specific branch is added. Width and radius values remain object-local geometry;
+the existing selection transform controls continue to own whole-object scale, rotation, and mirror.
