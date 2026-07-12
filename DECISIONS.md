@@ -6564,3 +6564,36 @@ The workspace no longer jumps between one-row and two-row chrome. Common
 desktop widths gain vertical space while specialist labels remain available
 where room permits. Operators on narrow windows may need to horizontally scroll
 the command group, but every command also remains available from the menus.
+
+---
+
+## ADR-139 - Collapse the advanced machine Console by default
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The 300 px machine rail stacks setup, connection, status, jogging, probing, job controls, and the
+full controller Console in one scrolling column. The Console is primarily an advanced diagnostic
+surface, but it was permanently expanded, lengthening an already dense rail and requiring extra
+scrolling to move between its bottom diagnostics and the common controls above. Job Controls,
+including Frame, Start, Pause, and Stop, are a separate section above the Console and must remain
+outside any advanced disclosure.
+
+### Decision
+
+Wrap the Console in a native `details`/`summary` disclosure labelled "Console" and leave it closed
+by default. Keep `ConsolePanel` mounted inside the disclosure so transcript state, command guards,
+and its existing accessibility metadata are unchanged. Keep all Job Controls outside the
+disclosure. Do not persist the open state: each application session starts with the beginner-safe,
+lower-density rail, while opening the Console remains a single keyboard- and pointer-accessible
+action.
+
+### Consequences
+
+- The machine rail is shorter and less visually dense on laptop-height displays.
+- Advanced commands and communication history remain available without changing controller or
+  G-code behavior.
+- Closing or reopening the disclosure does not clear the transcript.
+- A regression test requires the Console to default closed and requires Start job to remain outside
+  the disclosure.
