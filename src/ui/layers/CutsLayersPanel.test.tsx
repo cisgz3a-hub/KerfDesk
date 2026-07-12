@@ -7,6 +7,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
+import { useUiStore } from '../state/ui-store';
 import { CutsLayersPanel } from './CutsLayersPanel';
 
 (
@@ -53,9 +54,31 @@ async function renderPanel(): Promise<{
 
 afterEach(() => {
   resetStore();
+  useUiStore.getState().setRailPanelVisible('layers', true);
 });
 
 describe('CutsLayersPanel layer order controls', () => {
+  it('collapses to a narrow strip and expands from the same location', async () => {
+    const { host, unmount } = await renderPanel();
+    try {
+      const collapse = host.querySelector('button[aria-label="Collapse Cuts / Layers panel"]');
+      if (!(collapse instanceof HTMLButtonElement)) throw new Error('collapse button missing');
+
+      await act(async () => collapse.click());
+      expect(
+        host.querySelector('aside[aria-label="Cuts / Layers panel collapsed"]'),
+      ).not.toBeNull();
+
+      const expand = host.querySelector('button[aria-label="Expand Cuts / Layers panel"]');
+      if (!(expand instanceof HTMLButtonElement)) throw new Error('expand button missing');
+      await act(async () => expand.click());
+
+      expect(host.querySelector('aside[aria-label="Cuts / Layers panel"]')).not.toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
   it('edits only selected artwork from the selected artwork settings', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));

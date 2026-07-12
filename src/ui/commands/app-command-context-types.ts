@@ -35,6 +35,10 @@ export type CommandDialogs = {
   readonly toggleBoardCapturePanel: () => void;
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
+  readonly layersPanelOpen: boolean;
+  readonly toggleLayersPanel: () => void;
+  readonly machinePanelOpen: boolean;
+  readonly toggleMachinePanel: () => void;
 };
 
 export type CommandSelection = {

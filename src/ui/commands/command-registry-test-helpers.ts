@@ -26,6 +26,7 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     serialSupported: true,
     connected: false,
     machineBusy: false,
+    jobActive: false,
     homingEnabled: true,
     canUndo: false,
     canRedo: false,
@@ -54,6 +55,8 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     canBreakApartSelection: false,
     previewActive: false,
     hasPreviewableContent: true,
+    layersPanelOpen: true,
+    machinePanelOpen: true,
   };
 }
 
@@ -118,6 +121,8 @@ function baseCtxActions(): Partial<AppCommandContext> {
     disconnectLaser: vi.fn(),
     homeLaser: vi.fn(),
     togglePreview: vi.fn(),
+    toggleLayersPanel: vi.fn(),
+    toggleMachinePanel: vi.fn(),
     resetView: vi.fn(),
     projectNotes: vi.fn(),
     undoHistory: vi.fn(),
