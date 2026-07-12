@@ -16,8 +16,10 @@
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   applyTransform,
   assertNever,
+  flattenColoredPathCurves,
   layerCncTool,
   type CncCutType,
   type CncLayerSettings,
@@ -141,7 +143,12 @@ function appendObjectPolylines(
 ): void {
   for (const path of paths) {
     if (path.color !== layerColor) continue;
-    for (const polyline of path.polylines) {
+    const flattened = flattenColoredPathCurves(path, {
+      toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+      segmentBudget: 100_000,
+    });
+    const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+    for (const polyline of polylines) {
       if (polyline.points.length < 2) continue;
       out.push({
         points: polyline.points.map((p) => toMachineCoords(applyTransform(p, transform), device)),

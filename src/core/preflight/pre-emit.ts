@@ -33,7 +33,7 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
         'Registration jig: the box and your artwork are both set to burn. In the Registration Jig panel pick "Burn Box Only" or "Burn Artwork Only" so they do not burn in the same pass.',
     });
   }
-  for (const obj of project.scene.objects) {
+  for (const obj of project.machine?.kind === 'cnc' ? [] : project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
     const layers = project.scene.layers
       .flatMap((l) => outputOperationLayers(l))
