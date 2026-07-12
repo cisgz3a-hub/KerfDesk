@@ -123,4 +123,41 @@ describe('emitGcode rotary (ADR-127)', () => {
     expect(result.preflight.issues[0]?.code).toBe('rotary-raster-unsupported');
     expect(result.gcode).toBe('');
   });
+
+  it('scales rotary raster row spacing only with explicit permission', () => {
+    const color = '#808080';
+    const raster: SceneObject = {
+      kind: 'raster-image',
+      id: 'R2',
+      color,
+      source: 'allowed.png',
+      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      pixelWidth: 4,
+      pixelHeight: 4,
+      dither: 'floyd-steinberg',
+      linesPerMm: 4,
+      lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
+      bounds: { minX: 10, minY: 10, maxX: 20, maxY: 20 },
+      transform: IDENTITY_TRANSFORM,
+    } as SceneObject;
+    const base = createProject({ ...DEFAULT_DEVICE_PROFILE, rotary: CHUCK });
+    const project: Project = {
+      ...base,
+      scene: addLayer(
+        addObject(base.scene, raster),
+        createLayer({ id: 'L2', color, mode: 'image' }),
+      ),
+    };
+    const result = emitGcode(project, { allowRotaryRaster: true });
+    expect(result.preflight.issues).toEqual([]);
+    expect(result.preflight.ok).toBe(true);
+    expect(result.gcode).not.toBe('');
+    const yValues = [...result.gcode.matchAll(/Y(-?\d+(?:\.\d+)?)/g)].map((match) =>
+      Number(match[1]),
+    );
+    expect(yValues.length).toBeGreaterThan(1);
+    expect(Math.min(...yValues)).toBeCloseTo(0, 3);
+    expect(Math.max(...yValues)).toBeGreaterThan(15);
+    expect(Math.max(...yValues)).toBeLessThanOrEqual(10 * (360 / (Math.PI * 60)));
+  });
 });

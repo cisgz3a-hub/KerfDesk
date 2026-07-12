@@ -36,4 +36,18 @@ describe('experimental laser feature gates', () => {
     useExperimentalLaserFeatures.getState().resetFeatures();
     expect(readExperimentalLaserFeatures()).toEqual(DEFAULT_EXPERIMENTAL_LASER_FEATURES);
   });
+
+  it('keeps rotary raster dependent on the base rotary gate', () => {
+    useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', true);
+    expect(useExperimentalLaserFeatures.getState().features).toMatchObject({
+      rotary: true,
+      rotaryRaster: true,
+    });
+
+    useExperimentalLaserFeatures.getState().setFeature('rotary', false);
+    expect(useExperimentalLaserFeatures.getState().features).toMatchObject({
+      rotary: false,
+      rotaryRaster: false,
+    });
+  });
 });

@@ -29,7 +29,7 @@ export const useExperimentalLaserFeatures = create<ExperimentalLaserFeatureState
   features: readExperimentalLaserFeatures(),
   setFeature: (feature, enabled) =>
     set((state) => {
-      const features = { ...state.features, [feature]: enabled };
+      const features = withFeatureDependency(state.features, feature, enabled);
       writeExperimentalLaserFeatures(features);
       return { features };
     }),
@@ -48,9 +48,10 @@ export function readExperimentalLaserFeatures(
     if (raw === null) return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
+    const rotary = parsed['rotary'] === true;
     return {
-      rotary: parsed['rotary'] === true,
-      rotaryRaster: parsed['rotaryRaster'] === true,
+      rotary,
+      rotaryRaster: rotary && parsed['rotaryRaster'] === true,
       lowPowerFire: parsed['lowPowerFire'] === true,
       printAndCut: parsed['printAndCut'] === true,
       cameraAlignmentV2: parsed['cameraAlignmentV2'] === true,
@@ -58,6 +59,20 @@ export function readExperimentalLaserFeatures(
   } catch {
     return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
   }
+}
+
+function withFeatureDependency(
+  current: ExperimentalLaserFeatures,
+  feature: ExperimentalLaserFeature,
+  enabled: boolean,
+): ExperimentalLaserFeatures {
+  if (feature === 'rotary' && !enabled) {
+    return { ...current, rotary: false, rotaryRaster: false };
+  }
+  if (feature === 'rotaryRaster' && enabled) {
+    return { ...current, rotary: true, rotaryRaster: true };
+  }
+  return { ...current, [feature]: enabled };
 }
 
 function writeExperimentalLaserFeatures(

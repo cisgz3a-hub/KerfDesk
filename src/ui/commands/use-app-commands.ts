@@ -314,6 +314,9 @@ function saveGcodeAction(
         wcoCache: laser.wcoCache,
       },
       controllerSettings: laser.controllerSettings,
+      allowRotaryRaster:
+        useExperimentalLaserFeatures.getState().features.rotaryRaster &&
+        profileSupportsCapability(app.project.device, 'rotary'),
       pushToast,
     });
 }
