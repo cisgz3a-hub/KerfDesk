@@ -10,7 +10,15 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   controllerKind: 'grblhal',
   maxFeed: 10000,
   framingFeedMmPerMin: 10000,
-  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: [
+    'grbl',
+    'wcs',
+    'air-assist',
+    'verified-origin',
+    'scan-offsets',
+    'no-go-zones',
+    'rotary',
+  ],
   evidence: [
     {
       label: 'Falcon A1 Pro grblHAL hardware',
@@ -30,7 +38,15 @@ export const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
   controllerKind: 'grbl-v1.1',
   maxFeed: 10000,
   framingFeedMmPerMin: 10000,
-  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: [
+    'grbl',
+    'wcs',
+    'air-assist',
+    'verified-origin',
+    'scan-offsets',
+    'no-go-zones',
+    'rotary',
+  ],
   evidence: [
     {
       label: 'KerfDesk Falcon-compatible fallback',

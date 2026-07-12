@@ -13,6 +13,7 @@ export type CommandShellCallbacks = {
   readonly requestScanOffsetTest: () => void;
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
+  readonly requestRotarySetup: () => void;
   readonly requestLabsSettings: () => void;
   readonly requestProjectNotes: () => void;
   readonly requestUndoHistory: () => void;
@@ -36,6 +37,8 @@ export type CommandDialogs = {
   readonly toggleBoardCapturePanel: () => void;
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
+  readonly rotaryFeatureEnabled: boolean;
+  readonly rotaryProfileSupported: boolean;
 };
 
 export type CommandSelection = {

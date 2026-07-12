@@ -145,6 +145,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Adjust path ordering and travel optimization for output.',
   },
+  'tools.rotary-setup': {
+    family: 'tools',
+    tooltip: 'Configure and calibrate a roller or chuck rotary attachment.',
+  },
   'tools.labs': {
     family: 'tools',
     tooltip: 'Enable experimental machine workflows that are still being hardware-validated.',

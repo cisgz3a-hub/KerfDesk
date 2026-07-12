@@ -54,7 +54,8 @@ export type ProfileCapability =
   | 'scan-offsets'
   | 'verified-origin'
   | 'z-axis'
-  | 'camera';
+  | 'camera'
+  | 'rotary';
 export const PROFILE_CAPABILITIES = [
   'grbl',
   'wcs',
@@ -64,6 +65,7 @@ export const PROFILE_CAPABILITIES = [
   'verified-origin',
   'z-axis',
   'camera',
+  'rotary',
 ] as const satisfies ReadonlyArray<ProfileCapability>;
 export type ProfileEvidenceStatus =
   | 'default-starter'
@@ -225,7 +227,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   model: 'GRBL 400x400',
   profileSource: 'built-in',
   catalogVersion: '2026-06-17',
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'KerfDesk default',
@@ -274,7 +276,15 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   gcodeDialect: { dialectId: 'neotronics-4040-safe' },
   framingFeedMmPerMin: 2000,
   noGoZones: [],
-  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: [
+    'grbl',
+    'wcs',
+    'air-assist',
+    'verified-origin',
+    'scan-offsets',
+    'no-go-zones',
+    'rotary',
+  ],
   evidence: [
     {
       label: 'User-provided 4040 profile',

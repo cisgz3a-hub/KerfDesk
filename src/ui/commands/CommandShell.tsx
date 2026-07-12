@@ -22,6 +22,7 @@ import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
+import { RotarySetupHost } from '../laser/RotarySetupHost';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
@@ -48,8 +49,6 @@ import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 
 export function CommandShell(): JSX.Element {
-  // Convert-to-Bitmap open state lives in the ui-store (not local state) so
-  // the Ctrl/Cmd+Shift+B shortcut in use-shortcuts can open it too.
   const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
   const openConvertBitmapDialog = useUiStore((s) => s.openConvertBitmapDialog);
   const closeConvertBitmapDialog = useUiStore((s) => s.closeConvertBitmapDialog);
@@ -61,6 +60,7 @@ export function CommandShell(): JSX.Element {
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
   const [labsDialogOpen, setLabsDialogOpen] = useState(false);
+  const [rotaryDialogOpen, setRotaryDialogOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
@@ -79,11 +79,9 @@ export function CommandShell(): JSX.Element {
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
-    requestFocusTest: () =>
-      jobAwareAlert(
-        'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
-      ),
+    requestFocusTest: () => jobAwareAlert(FOCUS_TEST_UNAVAILABLE_MESSAGE),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
+    requestRotarySetup: () => setRotaryDialogOpen(true),
     requestLabsSettings: () => setLabsDialogOpen(true),
     requestProjectNotes: () => setProjectNotesOpen(true),
     requestUndoHistory: () => setUndoHistoryOpen(true),
@@ -120,6 +118,7 @@ export function CommandShell(): JSX.Element {
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
       {labsDialogOpen ? <LabsSettingsDialog onClose={() => setLabsDialogOpen(false)} /> : null}
+      {rotaryDialogOpen ? <RotarySetupHost onClose={() => setRotaryDialogOpen(false)} /> : null}
       {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
       {undoHistoryOpen ? <UndoHistoryPanel onClose={() => setUndoHistoryOpen(false)} /> : null}
       {closeToleranceDialogOpen ? (
@@ -128,6 +127,9 @@ export function CommandShell(): JSX.Element {
     </>
   );
 }
+
+const FOCUS_TEST_UNAVAILABLE_MESSAGE =
+  'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.';
 
 // The four scene-generator dialog mounts, grouped so CommandShell itself
 // stays inside the complexity cap.
