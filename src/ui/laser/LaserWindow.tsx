@@ -98,13 +98,19 @@ export function LaserWindow(): JSX.Element {
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void runStartJobFlow()}
       />
-      <CollapsibleRailSection
-        label="Console"
-        title="Show advanced controller commands and communication history."
-      >
-        <ConsolePanel />
-      </CollapsibleRailSection>
+      <MachineConsoleSection />
     </aside>
+  );
+}
+
+function MachineConsoleSection(): JSX.Element {
+  return (
+    <CollapsibleRailSection
+      label="Console"
+      title="Show advanced controller commands and communication history."
+    >
+      <ConsolePanel />
+    </CollapsibleRailSection>
   );
 }
 
