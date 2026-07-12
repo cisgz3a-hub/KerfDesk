@@ -24,6 +24,7 @@ import { contourPolylinesFromMask, flattenStrengthFromSmoothness } from './conto
 import { localContrastCrackField, localContrastInkBitmap } from './local-contrast-mask';
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
+import { withCanonicalTraceCurves } from './trace-curves';
 
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
@@ -87,7 +88,7 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
       crackField,
     },
   );
-  return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];
+  return polylines.length === 0 ? [] : withCanonicalTraceCurves([{ color: EDGE_COLOR, polylines }]);
 }
 
 function maskDelta(options: TraceOptions): number {

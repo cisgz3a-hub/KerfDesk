@@ -29,6 +29,46 @@ export type FlattenColoredPathResult =
     }
   | { readonly kind: 'segment-budget-exceeded'; readonly segmentBudget: number };
 
+export type UniformCurveTransform = {
+  readonly scale: number;
+  readonly translateX?: number;
+  readonly translateY?: number;
+};
+
+export function transformCurveSubpathUniform(
+  path: CurveSubpath,
+  transform: UniformCurveTransform,
+): CurveSubpath {
+  const scale = finitePositive(transform.scale, 1);
+  const translateX = Number.isFinite(transform.translateX) ? (transform.translateX ?? 0) : 0;
+  const translateY = Number.isFinite(transform.translateY) ? (transform.translateY ?? 0) : 0;
+  const point = (value: Vec2): Vec2 => ({
+    x: value.x * scale + translateX,
+    y: value.y * scale + translateY,
+  });
+  return {
+    start: point(path.start),
+    segments: path.segments.map((segment) => {
+      if (segment.kind === 'line') return { ...segment, to: point(segment.to) };
+      if (segment.kind === 'cubic') {
+        return {
+          ...segment,
+          control1: point(segment.control1),
+          control2: point(segment.control2),
+          to: point(segment.to),
+        };
+      }
+      return {
+        ...segment,
+        radiusX: segment.radiusX * scale,
+        radiusY: segment.radiusY * scale,
+        to: point(segment.to),
+      };
+    }),
+    closed: path.closed,
+  };
+}
+
 export function flattenColoredPathCurves(
   path: ColoredPath,
   options: FlattenCurveOptions,

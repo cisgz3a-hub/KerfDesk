@@ -29,6 +29,7 @@ import { fairChainSegments } from './fair-chain';
 import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
+import { withCanonicalTraceCurves } from './trace-curves';
 import {
   crackFieldForTrace,
   effectivePixelScale,
@@ -127,7 +128,9 @@ export function traceImageToContourColoredPaths(
     pixelScale: scale,
     ...(crackField === null ? {} : { crackField }),
   });
-  return polylines.length === 0 ? [] : [{ color: CONTOUR_COLOR, polylines }];
+  return polylines.length === 0
+    ? []
+    : withCanonicalTraceCurves([{ color: CONTOUR_COLOR, polylines }]);
 }
 
 export type ContourFinishOptions = {

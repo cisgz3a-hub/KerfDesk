@@ -72,9 +72,11 @@ export {
   flattenColoredPathCurves,
   flattenCurveSubpath,
   polylineToCurveSubpath,
+  transformCurveSubpathUniform,
   type FlattenCurveOptions,
   type FlattenColoredPathResult,
   type FlattenCurveResult,
+  type UniformCurveTransform,
 } from './curve-path';
 export {
   DITHER_ALGORITHMS,

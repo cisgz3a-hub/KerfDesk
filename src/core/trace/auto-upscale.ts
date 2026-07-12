@@ -11,7 +11,7 @@
 //
 // Pure-core compliant: no clock, no random, no I/O. Data in, data out.
 
-import type { ColoredPath, Polyline, Vec2 } from '../scene';
+import { transformCurveSubpathUniform, type ColoredPath, type Polyline, type Vec2 } from '../scene';
 import type { RawImageData } from './trace-image';
 
 // Above this source area we do NOT supersample. Rationale: quadrupling an
@@ -162,6 +162,13 @@ export function downscaleTracedPaths(
   return paths.map((path) => ({
     color: path.color,
     polylines: path.polylines.map((pl) => scalePolyline(pl, factor)),
+    ...(path.curves === undefined
+      ? {}
+      : {
+          curves: path.curves.map((curve) =>
+            transformCurveSubpathUniform(curve, { scale: 1 / factor }),
+          ),
+        }),
   }));
 }
 
