@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_PROJECT_OPTIMIZATION } from '../scene';
 import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, FillGroup, FillSegment, Job } from './job';
 import { MAX_NEAREST_NEIGHBOR_SEGMENTS, optimizePaths } from './optimize-paths';
@@ -91,6 +92,60 @@ describe('optimizePaths', () => {
     const result = optimizePaths(j);
     const firstSeg = asCut(result)?.segments[0];
     expect(firstSeg?.polyline[0]).toEqual({ x: 0, y: 0 });
+  });
+
+  it('preserves source order when that travel policy is selected', () => {
+    const far = seg([100, 100], [101, 100]);
+    const near = seg([0, 0], [1, 0]);
+    const result = optimizePaths(
+      { groups: [group([far, near])] },
+      { ...DEFAULT_PROJECT_OPTIMIZATION, travelPolicy: 'source-order' },
+    );
+
+    expect(asCut(result)?.segments).toEqual([far, near]);
+  });
+
+  it('preserves open-path direction when reversal is disabled', () => {
+    const backwards = seg([10, 0], [0, 0]);
+    const result = optimizePaths(
+      { groups: [group([backwards])] },
+      { ...DEFAULT_PROJECT_OPTIMIZATION, pathDirection: 'preserve' },
+    );
+
+    expect(asCut(result)?.segments[0]?.polyline).toEqual(backwards.polyline);
+  });
+
+  it('can reverse layer priority without changing order inside each layer', () => {
+    const first = group([seg([0, 0], [1, 0])]);
+    const second = { ...group([seg([2, 0], [3, 0])]), layerId: 'L2' };
+    const result = optimizePaths(
+      { groups: [first, second] },
+      { ...DEFAULT_PROJECT_OPTIMIZATION, layerPriority: 'reverse-project-order' },
+    );
+
+    expect(result.groups.map((candidate) => candidate.layerId)).toEqual(['L2', 'L1']);
+  });
+
+  it('uses the selected planning start point as the nearest-neighbor seed', () => {
+    const farFirst = seg([100, 0], [101, 0]);
+    const nearSecond = seg([0, 0], [1, 0]);
+    const result = optimizePaths(
+      { groups: [group([farFirst, nearSecond])] },
+      { ...DEFAULT_PROJECT_OPTIMIZATION, startPoint: 'job-center' },
+    );
+
+    expect(asCut(result)?.segments[0]).toEqual(farFirst);
+  });
+
+  it('can disable inside-first ordering', () => {
+    const outer = closedSeg([0, 0], [10, 0], [10, 10], [0, 10]);
+    const inner = closedSeg([4, 4], [6, 4], [6, 6], [4, 6]);
+    const result = optimizePaths(
+      { groups: [group([outer, inner])] },
+      { ...DEFAULT_PROJECT_OPTIMIZATION, insideFirst: false },
+    );
+
+    expect(asCut(result)?.segments[0]).toEqual(outer);
   });
 
   it('leaves scanline fill groups in source order', () => {

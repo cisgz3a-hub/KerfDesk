@@ -7,6 +7,7 @@ import {
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
+import { validateOptimization } from './project-optimization-validator';
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import {
@@ -60,12 +61,6 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     optionalString(raw, 'notes'),
     validateScene(scene),
   ]);
-}
-
-function validateOptimization(value: unknown): string | null {
-  if (value === undefined) return null;
-  if (!isObject(value)) return 'missing or invalid `optimization`';
-  return optionalBoolean(value, 'optimization.reduceTravelMoves');
 }
 
 function validateDevice(device: Record<string, unknown>): string | null {

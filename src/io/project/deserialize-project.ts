@@ -312,11 +312,29 @@ function booleanOrDefault(value: unknown, fallback: boolean): boolean {
 
 function normalizeOptimization(value: unknown): Project['optimization'] {
   if (!isObject(value)) return DEFAULT_PROJECT_OPTIMIZATION;
+  const legacyReduce =
+    typeof value['reduceTravelMoves'] === 'boolean'
+      ? value['reduceTravelMoves']
+      : DEFAULT_PROJECT_OPTIMIZATION.reduceTravelMoves;
+  const travelPolicy =
+    value['travelPolicy'] === 'nearest-neighbor' || value['travelPolicy'] === 'source-order'
+      ? value['travelPolicy']
+      : legacyReduce
+        ? 'nearest-neighbor'
+        : 'source-order';
   return {
-    reduceTravelMoves:
-      typeof value['reduceTravelMoves'] === 'boolean'
-        ? value['reduceTravelMoves']
-        : DEFAULT_PROJECT_OPTIMIZATION.reduceTravelMoves,
+    reduceTravelMoves: travelPolicy === 'nearest-neighbor',
+    travelPolicy,
+    insideFirst: booleanOrDefault(value['insideFirst'], DEFAULT_PROJECT_OPTIMIZATION.insideFirst),
+    layerPriority:
+      value['layerPriority'] === 'reverse-project-order'
+        ? 'reverse-project-order'
+        : 'project-order',
+    pathDirection: value['pathDirection'] === 'preserve' ? 'preserve' : 'allow-reverse',
+    startPoint:
+      value['startPoint'] === 'job-lower-left' || value['startPoint'] === 'job-center'
+        ? value['startPoint']
+        : 'machine-origin',
   };
 }
 
