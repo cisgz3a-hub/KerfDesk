@@ -10,9 +10,8 @@ name: Release Desktop
 # for exercising the workflow without cutting a real release; it produces a
 # throwaway-versioned artifact and does NOT publish to the update feed.
 #
-# v1 builds are UNSIGNED (CSC_IDENTITY_AUTO_DISCOVERY: false makes that
-# deterministic — otherwise electron-builder auto-discovers any machine cert).
-# Code signing is added later behind secret-gating (Stage 7 / ADR-024 §5).
+# Production tag releases must be signed. Manual dispatch remains an unsigned
+# packaging dry run so contributors can exercise the workflow without secrets.
 on:
   push:
     tags: ['v*']
@@ -27,7 +26,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows installer (unsigned)
+    name: Build Windows installer
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -69,6 +68,18 @@ jobs:
         # dist-electron, which electron-builder then packages.
         run: pnpm release:check
 
+      - name: Require signing certificate for a production release
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "${CSC_LINK}" ] || [ -z "${CSC_KEY_PASSWORD}" ]; then
+            echo "Production desktop tags require CSC_LINK and CSC_KEY_PASSWORD." >&2
+            exit 1
+          fi
+
       - name: Build Windows installer + update feed
         shell: bash
         # dist/web + dist-electron already exist from release:check; package
@@ -78,16 +89,22 @@ jobs:
         # to R2 happens in a later step.
         run: pnpm exec electron-builder --win --x64 -c.extraMetadata.version="${{ steps.version.outputs.version }}" --publish never
         env:
-          # Code signing (ADR-024 §5) is OPT-IN via repo secrets and a no-op
-          # until they exist — v1 ships unsigned. When CSC_LINK (a base64 .pfx or
-          # a path) + CSC_KEY_PASSWORD are set, electron-builder signs with them.
-          # When absent, auto-discovery is forced OFF for a deterministic unsigned
-          # build (no accidental machine-cert pickup). Azure Trusted Signing is an
-          # alternative path: it needs a `win.azureSignOptions` block in
-          # electron-builder.yml plus AZURE_* secrets instead of CSC_*.
+          # Tag releases are secret-gated above and must be signed. Manual
+          # dispatch is a deterministic unsigned dry run.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
+
+      - name: Verify production installer signature
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "release/${{ steps.version.outputs.version }}" -Filter '*.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'Installer was not produced.' }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer.FullName
+          if ($signature.Status -ne 'Valid') {
+            throw "Installer signature is not valid: $($signature.Status)"
+          }
 
       - name: Upload installer + update feed as workflow artifact
         uses: actions/upload-artifact@v7

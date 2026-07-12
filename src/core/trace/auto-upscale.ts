@@ -21,6 +21,11 @@ import type { RawImageData } from './trace-image';
 // Exported for the region-enhance path, which budgets its crop by the same cap.
 export const MAX_UPSCALE_SOURCE_PIXELS = 1_500_000;
 
+// Contour supersampling has a separately measured working-raster budget. The
+// 1024² acceptance source needs 2× sampling for apex fidelity (4.19M pixels),
+// while a 1200² source would reach 5.76M and is refused before allocation.
+export const MAX_CONTOUR_SUPERSAMPLE_PIXELS = 4_500_000;
+
 // Mean ink stroke half-width proxy below which a source counts as thin. For a
 // long stroke of width w, inkArea / inkPerimeter ~= w/2, so 1.5 targets
 // strokes thinner than ~3 px — precisely the range every tracer degrades on.
@@ -95,11 +100,31 @@ export function computeUpscaleFactor(image: RawImageData): number {
   const maxDim = Math.max(1, image.width, image.height);
   const ideal = Math.ceil(SMALL_SOURCE_TARGET_EDGE_PX / maxDim);
   let factor = Math.max(MIN_UPSCALE_FACTOR, Math.min(MAX_UPSCALE_FACTOR, ideal));
-  const pixels = image.width * image.height;
-  while (factor > MIN_UPSCALE_FACTOR && pixels * factor * factor > MAX_UPSCALE_SOURCE_PIXELS) {
+  while (factor > MIN_UPSCALE_FACTOR && !fitsUpscalePixelBudget(image, factor)) {
     factor -= 1;
   }
   return factor;
+}
+
+/** True when the WORKING raster, after scaling, stays inside the trace budget. */
+export function fitsUpscalePixelBudget(
+  image: Pick<RawImageData, 'width' | 'height'>,
+  factor: number,
+): boolean {
+  return (
+    isValidUpscaleFactor(factor) &&
+    image.width * image.height * factor * factor <= MAX_UPSCALE_SOURCE_PIXELS
+  );
+}
+
+export function fitsContourSupersampleBudget(
+  image: Pick<RawImageData, 'width' | 'height'>,
+  factor: number,
+): boolean {
+  return (
+    isValidUpscaleFactor(factor) &&
+    image.width * image.height * factor * factor <= MAX_CONTOUR_SUPERSAMPLE_PIXELS
+  );
 }
 
 // The factor contract for both supersample helpers: a finite integer >= 1.

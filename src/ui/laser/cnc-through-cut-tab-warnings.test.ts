@@ -19,17 +19,27 @@ function cncProjectWithLayerCnc(cnc: CncLayerSettings | undefined): Project {
 }
 
 describe('detectCncThroughCutTabWarnings', () => {
-  it('warns for the out-of-box default layer (profile, depth == stock, tabs off)', () => {
-    // No layer.cnc → the compile fallback DEFAULT_CNC_LAYER_SETTINGS applies:
-    // profile-outside, 6.35 mm, tabs off — against 6.35 mm default stock.
+  it('keeps the out-of-box profile safe with a shallow starter depth', () => {
+    // No layer.cnc uses the compile fallback: the starter profile stays above
+    // the stock bottom, so it cannot release the part.
     const warnings = detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(undefined));
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('no holding tabs');
+    expect(warnings).toEqual([]);
   });
 
   it('is silent when holding tabs are enabled', () => {
     const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: true };
     expect(detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc))).toEqual([]);
+  });
+
+  it('warns when the operator disables tabs on a through-cut profile', () => {
+    const cnc = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm,
+      tabsEnabled: false,
+    };
+    const warnings = detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('no holding tabs');
   });
 
   it('is silent when the cut depth stays inside the stock', () => {

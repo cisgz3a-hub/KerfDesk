@@ -18,6 +18,12 @@ const SOFT_CAP = 10;
 const HARD_CAP = 20;
 const SCAN_ROOT = 'src';
 const BARREL_NAME = 'index.ts';
+const BASELINE_PATH = 'scripts/index-export-baseline.json';
+const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+
+function portablePath(path) {
+  return path.replaceAll('\\', '/');
+}
 
 function* walk(dir) {
   if (!existsSync(dir)) return;
@@ -72,7 +78,7 @@ function countExportedSymbols(src) {
 const barrels = [];
 for (const path of walk(SCAN_ROOT)) {
   const { count, starReexports } = countExportedSymbols(readFileSync(path, 'utf8'));
-  barrels.push({ path: relative(process.cwd(), path), count, starReexports });
+  barrels.push({ path: portablePath(relative(process.cwd(), path)), count, starReexports });
 }
 barrels.sort((a, b) => b.count - a.count);
 
@@ -80,7 +86,7 @@ const overHard = barrels.filter((b) => b.count > HARD_CAP);
 const overSoft = barrels.filter((b) => b.count > SOFT_CAP && b.count <= HARD_CAP);
 
 console.log(
-  `index.ts export-count report (ADR-015: ${SOFT_CAP} soft / ${HARD_CAP} hard). Report-only.`,
+  `index.ts export-count gate (ADR-015: ${SOFT_CAP} soft / ${HARD_CAP} hard; legacy no-growth ratchet).`,
 );
 console.log(`Scanned ${barrels.length} barrels under ${SCAN_ROOT}/.\n`);
 
@@ -98,7 +104,27 @@ if (overSoft.length > 0) {
   console.log('');
 }
 
+const regressions = overHard.filter((barrel) => barrel.count > (baseline[barrel.path] ?? HARD_CAP));
+const staleBaseline = Object.keys(baseline).filter(
+  (path) => !barrels.some((barrel) => barrel.path === path && barrel.count > HARD_CAP),
+);
+
+if (regressions.length > 0) {
+  console.error('Public-export ratchet failed:');
+  for (const barrel of regressions) {
+    console.error(
+      `  ${barrel.path}: ${barrel.count} exports (allowed ${baseline[barrel.path] ?? HARD_CAP})`,
+    );
+  }
+  process.exit(1);
+}
+
+if (staleBaseline.length > 0) {
+  console.log('Baseline entries now at/below the hard cap (remove them in the same change):');
+  for (const path of staleBaseline) console.log(`  ${path}`);
+}
+
 console.log(
-  `${overHard.length} over hard cap, ${overSoft.length} over soft cap. ` +
-    `Report-only — not gating the build yet (ARC-06 PR5 will).`,
+  `Public-export ratchet passed: ${overHard.length} legacy over-cap barrels did not grow; ` +
+    `new barrels are capped at ${HARD_CAP}.`,
 );

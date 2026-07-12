@@ -23,10 +23,10 @@ import {
   preprocessForTrace,
 } from './trace-image';
 import {
-  MAX_UPSCALE_SOURCE_PIXELS,
   THIN_STROKE_UPSCALE_FACTOR,
   computeUpscaleFactor,
   downscaleTracedPaths,
+  fitsContourSupersampleBudget,
   shouldAutoUpscale,
   shouldUpscaleSmallSource,
   upscaleBy,
@@ -196,7 +196,7 @@ function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
   const contourQuality =
     options.supersampleContour === true &&
     (isBinaryContourPreset(options) || options.traceMode === 'edge') &&
-    image.width * image.height <= MAX_UPSCALE_SOURCE_PIXELS;
+    fitsContourSupersampleBudget(image, THIN_STROKE_UPSCALE_FACTOR);
   const contourFactor = contourQuality ? THIN_STROKE_UPSCALE_FACTOR : 1;
   return Math.max(thinFactor, smallFactor, contourFactor);
 }
