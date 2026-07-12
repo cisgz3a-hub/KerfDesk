@@ -79,6 +79,17 @@ export {
   type UniformCurveTransform,
 } from './curve-path';
 export {
+  breakCurveAtNode,
+  convertCurveSegment,
+  curveNodeCount,
+  curveNodePoint,
+  joinCurveSubpaths,
+  moveCurveAnchor,
+  moveCurveControl,
+  setCurveStartNode,
+  smoothCurveNode,
+} from './curve-edit';
+export {
   DITHER_ALGORITHMS,
   DEFAULT_RASTER_LAYER_COLOR,
   DEFAULT_RELIEF_LAYER_COLOR,
