@@ -334,6 +334,7 @@ function openTextEditForSelectedText(): void {
     alignment: obj.alignment,
     lineHeight: obj.lineHeight,
     letterSpacing: obj.letterSpacing,
+    bendDeg: obj.bendDeg ?? 0,
     color: obj.color,
   });
 }

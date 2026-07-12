@@ -48,6 +48,7 @@ export type TextDialogState =
       readonly alignment: TextAlignment;
       readonly lineHeight: number;
       readonly letterSpacing: number;
+      readonly bendDeg?: number;
       readonly color: string;
     };
 

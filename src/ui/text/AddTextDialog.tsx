@@ -14,6 +14,7 @@
 import { useRef, useState } from 'react';
 import {
   DEFAULT_FONT_KEY,
+  bendTextRender,
   encodeEmbeddedFont,
   FONT_REGISTRY,
   textToPolylines,
@@ -40,6 +41,7 @@ import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
 import {
   initialTextLetterSpacing,
+  initialTextBend,
   initialTextLineHeight,
   initialTextSizeMm,
   sanitizeTextDialogNumericValues,
@@ -104,6 +106,7 @@ type DialogFields = {
   readonly setAlignment: (v: TextAlignment) => void;
   readonly setLineHeight: (v: number) => void;
   readonly setLetterSpacing: (v: number) => void;
+  readonly setBendDeg: (v: number) => void;
   readonly importFont: (file: File) => Promise<void>;
   readonly fontAvailable: boolean;
 };
@@ -130,6 +133,9 @@ function useTextDialogFields(
       state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
     ),
   );
+  const [bendDeg, setBendDeg] = useState(
+    initialTextBend(state.mode === 'edit' ? (state.bendDeg ?? 0) : 0),
+  );
   const [importedFont, setImportedFont] = useState<EmbeddedFont | undefined>();
   const embeddedFonts = importedFont === undefined ? projectFonts : [...projectFonts, importedFont];
   const importFont = async (file: File): Promise<void> => {
@@ -150,6 +156,7 @@ function useTextDialogFields(
       alignment,
       lineHeight,
       letterSpacing,
+      bendDeg,
       embeddedFonts,
       ...(importedFont === undefined ? {} : { importedFont }),
     },
@@ -159,6 +166,7 @@ function useTextDialogFields(
     setAlignment,
     setLineHeight,
     setLetterSpacing,
+    setBendDeg,
     importFont,
     fontAvailable:
       FONT_REGISTRY.some((font) => font.key === fontKey) ||
@@ -185,7 +193,7 @@ async function commitText(
   ctx.setSubmitting(true);
   try {
     const buffer = await loadFont(v.fontKey, v.embeddedFonts);
-    const rendered = await textToPolylines({
+    const rawRendered = await textToPolylines({
       fontBuffer: buffer,
       content: normalizedContent,
       sizeMm: safeValues.sizeMm,
@@ -194,6 +202,7 @@ async function commitText(
       letterSpacing: safeValues.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
     });
+    const rendered = bendTextRender(rawRendered, safeValues.bendDeg);
     const obj: TextObject = {
       kind: 'text',
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
@@ -203,6 +212,7 @@ async function commitText(
       alignment: v.alignment,
       lineHeight: safeValues.lineHeight,
       letterSpacing: safeValues.letterSpacing,
+      bendDeg: safeValues.bendDeg,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
       bounds: rendered.bounds,
       transform: IDENTITY_TRANSFORM,
@@ -229,6 +239,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
     setAlignment,
     setLineHeight,
     setLetterSpacing,
+    setBendDeg,
   } = props.fields;
   return (
     <>
@@ -249,6 +260,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
         setSizeMm={setSizeMm}
         setLineHeight={setLineHeight}
         setLetterSpacing={setLetterSpacing}
+        setBendDeg={setBendDeg}
       />
     </>
   );

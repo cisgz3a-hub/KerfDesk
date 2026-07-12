@@ -13,6 +13,7 @@ import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '.
 export type VariableTextRenderInput = {
   readonly text: TextObject;
   readonly content: string;
+  readonly project: Project;
 };
 export type VariableTextRenderResult = {
   readonly bounds: Bounds;
@@ -140,7 +141,7 @@ async function materializeObject(
   const evaluated = evaluateVariableTemplate(object.variableTemplate, object, project, context);
   if (!evaluated.ok) return { ...evaluated, fallback: object };
   try {
-    const rendered = await renderer({ text: object, content: evaluated.value });
+    const rendered = await renderer({ text: object, content: evaluated.value, project });
     const { variableTemplate: _template, ...plainText } = object;
     return {
       ok: true,

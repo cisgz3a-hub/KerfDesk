@@ -239,6 +239,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     optionalNumber(obj, `${path}.letterSpacing`),
+    optionalNumber(obj, `${path}.bendDeg`),
     validateVariableTemplate(obj['variableTemplate'], `${path}.variableTemplate`),
     requireString(obj, `${path}.color`),
     validateBounds(obj['bounds'], `${path}.bounds`),

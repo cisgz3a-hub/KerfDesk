@@ -2,6 +2,9 @@ import {
   DEFAULT_TEXT_LETTER_SPACING,
   DEFAULT_TEXT_LINE_HEIGHT,
   DEFAULT_TEXT_SIZE_MM,
+  TEXT_BEND_MAX_DEG,
+  TEXT_BEND_MIN_DEG,
+  clampBend,
 } from '../../core/text';
 import { NumberField } from '../common/NumberField';
 
@@ -16,6 +19,7 @@ export type TextDialogNumericValues = {
   readonly sizeMm: number;
   readonly lineHeight: number;
   readonly letterSpacing: number;
+  readonly bendDeg: number;
 };
 
 export function initialTextSizeMm(value: number): number {
@@ -40,12 +44,17 @@ export function initialTextLetterSpacing(value: number): number {
   );
 }
 
+export function initialTextBend(value: number): number {
+  return clampBend(value);
+}
+
 export function sanitizeTextDialogNumericValues<T extends TextDialogNumericValues>(values: T): T {
   return {
     ...values,
     sizeMm: initialTextSizeMm(values.sizeMm),
     lineHeight: initialTextLineHeight(values.lineHeight),
     letterSpacing: initialTextLetterSpacing(values.letterSpacing),
+    bendDeg: initialTextBend(values.bendDeg),
   };
 }
 
@@ -54,6 +63,7 @@ export function TextDialogNumericFields(props: {
   readonly setSizeMm: (v: number) => void;
   readonly setLineHeight: (v: number) => void;
   readonly setLetterSpacing: (v: number) => void;
+  readonly setBendDeg: (v: number) => void;
 }): JSX.Element {
   const { values } = props;
   return (
@@ -99,6 +109,20 @@ export function TextDialogNumericFields(props: {
           debounceMs={0}
         />
         <span className="lf-field-unit">x size (0 = natural)</span>
+      </Field>
+      <Field label="Bend">
+        <NumberField
+          ariaLabel="Text bend"
+          value={values.bendDeg}
+          min={TEXT_BEND_MIN_DEG}
+          max={TEXT_BEND_MAX_DEG}
+          step={5}
+          onCommit={props.setBendDeg}
+          style={numStyle}
+          title="Bend text along a circular arc. Negative bends upward; positive bends downward."
+          debounceMs={0}
+        />
+        <span className="lf-field-unit">deg</span>
       </Field>
     </>
   );

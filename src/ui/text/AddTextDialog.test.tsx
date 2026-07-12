@@ -268,9 +268,12 @@ describe('AddTextDialog unknown font safety', () => {
       const size = requireInput(host, 'input[aria-label="Text size"]');
       const lineHeight = requireInput(host, 'input[aria-label="Text line height"]');
       const letterSpacing = requireInput(host, 'input[aria-label="Text letter spacing"]');
+      const bend = requireInput(host, 'input[aria-label="Text bend"]');
       expect(size.max).toBe('300');
       expect(lineHeight.max).toBe('5');
       expect(letterSpacing.min).toBe('-0.5');
+      expect(bend.min).toBe('-180');
+      expect(bend.max).toBe('180');
 
       await act(async () => {
         textarea.value = 'Hello';
@@ -281,6 +284,8 @@ describe('AddTextDialog unknown font safety', () => {
         Simulate.change(lineHeight);
         letterSpacing.value = '-99';
         Simulate.change(letterSpacing);
+        bend.value = '999';
+        Simulate.change(bend);
       });
 
       const form = requireForm(host);
@@ -308,6 +313,7 @@ describe('AddTextDialog unknown font safety', () => {
         sizeMm: 300,
         lineHeight: 5,
         letterSpacing: -0.5,
+        bendDeg: 180,
       });
     } finally {
       if (root !== null) {
@@ -332,6 +338,7 @@ describe('AddTextDialog unknown font safety', () => {
         requireInput(host, 'input[aria-label="Text size"]'),
         requireInput(host, 'input[aria-label="Text line height"]'),
         requireInput(host, 'input[aria-label="Text letter spacing"]'),
+        requireInput(host, 'input[aria-label="Text bend"]'),
       ];
 
       for (const input of fields) {
