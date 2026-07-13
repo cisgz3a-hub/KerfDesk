@@ -1,0 +1,90 @@
+{
+  "sector": 11,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/11-job-execution.md",
+  "ratings": [
+    { "cat": "11.1", "product": "KerfDesk", "score": 8, "star": false, "tag": "CODE", "note": "Four-mode discriminated union (absolute/current/user/verified-origin) plus anchors; verified-frame bounds check beyond LightBurn. Confirmed friction: jobPlacement not persisted to .lf2, resets to absolute each session." },
+    { "cat": "11.1", "product": "LightBurn", "score": 9, "star": false, "tag": "OFF", "note": "Absolute/Current/User Origin start modes plus a 9-dot job-origin anchor selector; roster's most complete positioning surface." },
+    { "cat": "11.1", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "CNC origin from four corners or center, Z-zero top/bottom, set by jog+Zero or Probing Wizard; no current/user-origin toggle." },
+    { "cat": "11.1", "product": "LaserGRBL", "score": 4, "star": false, "tag": "OFF", "note": "Basic GRBL zeroing at current head position, homing/unlock, jog panel; no absolute/user-origin start-mode selector." },
+    { "cat": "11.1", "product": "XCS", "score": 5, "star": false, "tag": "OFF", "note": "Manual positioning by moving the module and recording vertices; live coordinate readout; homed machines use absolute bed placement." },
+    { "cat": "11.1", "product": "Easel", "score": 5, "star": false, "tag": "OFF", "note": "Work Zero vs Home distinction; carve wizard sets work zero at material lower-left; homing switches establish machine home." },
+    { "cat": "11.1", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Per-axis/combined zeroing, Go-To-zero, probe-to-zero, plus work coordinate systems; solid grbl/grblHAL origin handling, no explicit start-mode toggle." },
+
+    { "cat": "11.2", "product": "KerfDesk", "score": 8, "star": true, "tag": "TEST", "note": "Feed hold gated on proven $32=1 for beam safety; laser-vs-CNC resume ordering; plunge feed from modal state. Physical beam-off HW-CLAIMED, unverified." },
+    { "cat": "11.2", "product": "LightBurn", "score": 8, "star": true, "tag": "OFF", "note": "Mature Pause/Resume + Ctrl+Break; GRBL feed-hold resume is firmware-dependent and community reports occasionally imperfect restarts." },
+    { "cat": "11.2", "product": "MillMage", "score": 7, "star": true, "tag": "OFF", "note": "Pause/Resume/Ctrl+Break issued as feed-hold to the CNC controller; standard, works, no special safety differentiation documented." },
+    { "cat": "11.2", "product": "LaserGRBL", "score": 6, "star": true, "tag": "OFF", "note": "Feed-hold and Resume buttons issue grbl pause/resume; functional but no documented position-hold guarantees." },
+    { "cat": "11.2", "product": "XCS", "score": 6, "star": true, "tag": "OFF", "note": "Hardware-driven auto-pause on flame/move/tilt; explicit user pause/resume of an active job thinly documented." },
+    { "cat": "11.2", "product": "Easel", "score": 6, "star": true, "tag": "OFF", "note": "X-Carve Pro raises to safety height, stops spindle, resumes at location; community reports spindle sometimes not restarting on resume." },
+    { "cat": "11.2", "product": "gSender", "score": 7, "star": true, "tag": "OFF", "note": "Clear documented model: Pause resumes from where you left off, Stop cancels completely." },
+
+    { "cat": "11.3", "product": "KerfDesk", "score": 8, "star": false, "tag": "CODE", "note": "Soft-reset stop wipes in-flight ack accounting, defers beam-off cleanup to boot banner, drops WCO/air; failed write names physical control. Buffer-halt unmeasured." },
+    { "cat": "11.3", "product": "LightBurn", "score": 8, "star": false, "tag": "OFF", "note": "Stop immediately aborts a currently running job; Ctrl+Break keyboard shortcut also stops." },
+    { "cat": "11.3", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Stop sends an abort command; docs stress a physical E-stop must not be the sole stop method." },
+    { "cat": "11.3", "product": "LaserGRBL", "score": 6, "star": false, "tag": "OFF", "note": "Soft-reset/stop button halts grbl and resets the controller; combined with feed-hold for interruption." },
+    { "cat": "11.3", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "Enclosure-open interlock stops the laser; device button and lid abort processing; safe and hardware-backed." },
+    { "cat": "11.3", "product": "Easel", "score": 7, "star": false, "tag": "OFF", "note": "Cancel button aborts the carve from the panel; spindle stops and bit raises to safety height." },
+    { "cat": "11.3", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Stop cancels the job completely and distinctly from Pause; documented clearly." },
+
+    { "cat": "11.4", "product": "KerfDesk", "score": 8, "star": true, "tag": "TEST", "note": "Automatic fingerprint-gated checkpoint resume (schema v3, scope+resolved origin), refuses on byte diff; exceeds LightBurn. HW-CLAIMED; single global slot; buffer lines may not have run." },
+    { "cat": "11.4", "product": "LightBurn", "score": 5, "star": true, "tag": "OFF", "note": "No automatic recovery; Preview 'Start Here' time-slider scrub is a documented manual resume-partway workaround." },
+    { "cat": "11.4", "product": "MillMage", "score": 5, "star": true, "tag": "OFF", "note": "Stopped jobs recoverable via 'Start Here' in Preview; manual resume-from-point, mirroring LightBurn's approach." },
+    { "cat": "11.4", "product": "LaserGRBL", "score": 0, "star": true, "tag": "COMM", "note": "No built-in resume; community consensus continuing an interrupted job is impossible—only manual G-code editing or a full restart." },
+    { "cat": "11.4", "product": "XCS", "score": 0, "star": true, "tag": "OFF", "note": "No resume-after-failure or start-from-line; interrupted jobs restart; move/flame events pause but do not recover position." },
+    { "cat": "11.4", "product": "Easel", "score": 0, "star": true, "tag": "OFF", "note": "No reliable resume-from-line; official guidance and community confirm you re-home, re-zero and re-carve." },
+    { "cat": "11.4", "product": "gSender", "score": 9, "star": true, "tag": "OFF", "note": "'Start from Line' purpose-built for power-loss/USB-disconnect/overnight recovery; replays accessories/power/macros to the chosen line—roster's field-proven strongest recovery." },
+
+    { "cat": "11.5", "product": "KerfDesk", "score": 9, "star": false, "tag": "TEST", "note": "Deepest preflight: NaN/Infinity guard, layer-mode mismatch, open contours, no-go zones, laser-on-travel, live $30/$32 readiness, CNC depth-vs-stock. Open M-17 through-cut default unwarned." },
+    { "cat": "11.5", "product": "LightBurn", "score": 7, "star": false, "tag": "OFF", "note": "Framing (bounding-box and rubber-band) plus out-of-bounds warnings surface config and position problems before running." },
+    { "cat": "11.5", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "Framing and a wireframe Preview catch problems before starting; no documented soft-limit or bounds warning." },
+    { "cat": "11.5", "product": "LaserGRBL", "score": 2, "star": false, "tag": "OFF", "note": "No built-in preflight or soft-limit/bounds validation; perimeter checks only via user-defined custom-button macros." },
+    { "cat": "11.5", "product": "XCS", "score": 6, "star": false, "tag": "OFF", "note": "Framing walks the border pre-job; Preview shows toolpath and time; enclosure/lid must be closed to start." },
+    { "cat": "11.5", "product": "Easel", "score": 6, "star": false, "tag": "OFF", "note": "Carve wizard checklist (material secure, bit size, work zero) plus toolpath simulation and soft-limit pausing." },
+    { "cat": "11.5", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Strong preflight: on-load G-code warnings, a Soft-Limits work-area warning, and an Outline perimeter trace." },
+
+    { "cat": "11.6", "product": "KerfDesk", "score": 6, "star": false, "tag": "CODE", "note": "Lines/percent progress plus 'Machine finishing'; alarms 1-13 humanized with recovery actions. Confirmed gap: no mid-job elapsed/remaining ETA or run timer." },
+    { "cat": "11.6", "product": "LightBurn", "score": 7, "star": false, "tag": "OFF", "note": "Busy status shows streaming progress with time; console surfaces status and decoded alarms; current-line via console." },
+    { "cat": "11.6", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Busy progress bar shows percent of commands streamed with elapsed time and estimated remaining streaming time." },
+    { "cat": "11.6", "product": "LaserGRBL", "score": 7, "star": false, "tag": "OFF", "note": "Filename+progress, line counter, live time projection from actual speed, status/alarm readout, moving position marker on canvas." },
+    { "cat": "11.6", "product": "XCS", "score": 5, "star": false, "tag": "OFF", "note": "Preview shows estimated time and a scrubbable progress bar; live real-processing progress and current-line telemetry limited in docs." },
+    { "cat": "11.6", "product": "Easel", "score": 5, "star": false, "tag": "OFF", "note": "Carve panel shows job progress while carving; provides toolpath time estimates; live line-level telemetry thin." },
+    { "cat": "11.6", "product": "gSender", "score": 9, "star": false, "tag": "OFF", "note": "Fullest in-run telemetry: animated percent bar, estimated time remaining, line counter, running timer, decoded grbl alarm/error codes." },
+
+    { "cat": "11.7", "product": "KerfDesk", "score": 8, "star": false, "tag": "TEST", "note": "Both cut-selected+selection-origin (LightBurn parity) and start-from-line modal replay (gSender-style), scope frozen into checkpoint; both share full readiness gate. Re-entry accuracy HW-CLAIMED." },
+    { "cat": "11.7", "product": "LightBurn", "score": 9, "star": false, "tag": "OFF", "note": "'Cut Selected Graphics'+'Use Selection Origin' plus Preview 'Start Here' from an arbitrary point; roster's most complete run-subset control." },
+    { "cat": "11.7", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "'Start Here' in Preview runs the job from a chosen point; object-level cut-selected not documented." },
+    { "cat": "11.7", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "Runs the whole loaded G-code file only; no run-selected and no run-from-here." },
+    { "cat": "11.7", "product": "XCS", "score": 6, "star": false, "tag": "OFF", "note": "Per-object Output toggle—disabled objects aren't framed/previewed/processed—effectively runs only the enabled objects; no run-from-line." },
+    { "cat": "11.7", "product": "Easel", "score": 0, "star": false, "tag": "OFF", "note": "Carves the entire design; no documented run-selected-only or mid-file run-from-here." },
+    { "cat": "11.7", "product": "gSender", "score": 6, "star": false, "tag": "OFF", "note": "'Start from Line' runs from any chosen line; no object-level cut-selected since it's a sender, not CAM." },
+
+    { "cat": "11.8", "product": "KerfDesk", "score": 8, "star": false, "tag": "CODE", "note": "Deepest software posture: laser-off-travel x3, $30/$32 gate, six runtime e-stop-naming banners, USB watchdog, Door-interlock awareness. Dents: on-demand not mandatory gate; M-17 default." },
+    { "cat": "11.8", "product": "LightBurn", "score": 6, "star": false, "tag": "OFF", "note": "Software posture—framing, out-of-bounds warnings, safety docs—but no hardware interlock; fire safety relies on user and hardware." },
+    { "cat": "11.8", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Prominent in-app warnings: CNC injury risk, never leave unattended, always keep a physical E-stop, software stop not sole." },
+    { "cat": "11.8", "product": "LaserGRBL", "score": 3, "star": false, "tag": "OFF", "note": "Thin posture—homing/alarm handling but no documented interlock awareness or fire-risk guidance; safety left to user/hardware." },
+    { "cat": "11.8", "product": "XCS", "score": 9, "star": false, "tag": "OFF", "note": "Strongest hardware safety: flame/spark detection, tilt/move stop, enclosure-open interlock, plus LSO safety-training gating." },
+    { "cat": "11.8", "product": "Easel", "score": 7, "star": false, "tag": "OFF", "note": "Wizard enforces bit/material/work-zero confirmation and raises to safety height; soft-limit pausing; procedural, no software interlock." },
+    { "cat": "11.8", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Router+vacuum-on reminder before Start, Soft-Limits/G-code warnings, homing/limits, decoded alarms; no hardware interlock (third-party CNCs)." }
+  ],
+  "wins": [
+    { "cat": "11.5", "vs": "gSender", "delta": 2, "claim": "Deepest pre-write preflight in the roster—NaN/Infinity guard, layer-mode-mismatch, open-contour, no-go-zone and live $30/$32 controller-readiness checks—vs gSender's on-load G-code and soft-limit warnings on already-compiled G-code." },
+    { "cat": "11.4", "vs": "LightBurn", "delta": 3, "claim": "Automatic fingerprint-gated crash/power-loss checkpoint resume (refuses on any byte diff) vs LightBurn's manual Preview 'Start Here' scrub; design-intent star, physical recovery HW-CLAIMED, and gSender's field-proven Start-from-Line still edges KerfDesk by one." },
+    { "cat": "11.7", "vs": "gSender", "delta": 2, "claim": "Carries both object-level cut-selected+selection-origin and start-from-line, with the selective scope frozen into the checkpoint, where gSender (a sender) offers only run-from-line." },
+    { "cat": "11.8", "vs": "LightBurn", "delta": 2, "claim": "Deepest software safety posture—laser-off-travel enforced three ways, $30/$32 gate, six e-stop-naming runtime banners, USB watchdog, Door-interlock awareness—vs LightBurn's framing-plus-docs; XCS's enforceable hardware interlock still leads the category outright." }
+  ],
+  "gaps": [
+    { "cat": "11.6", "vs": "gSender", "delta": -3, "claim": "No mid-job elapsed/remaining ETA or run timer (progress is lines/percent only; WORKFLOW F-B11 Phase-C never landed); gSender, LightBurn, MillMage and LaserGRBL all show live remaining time." },
+    { "cat": "11.1", "vs": "LightBurn", "delta": -1, "claim": "jobPlacement is not persisted to .lf2, so start-position resets to absolute/front-left every session—confirmed friction defect, no ADR." }
+  ],
+  "notVerified": [
+    "11.2 and 11.4 are section 5.4 hardware-dependent — all cells starred, no machine used; KerfDesk's beam-off on hold, position hold, byte-clean resume (11.2) and resume-at-correct-line/position after real power loss (11.4) are HW-CLAIMED, and acked-but-unexecuted buffer lines may not have run on resume.",
+    "11.1 — physical landing accuracy of each origin mode is HW-CLAIMED, not measured; jobPlacement non-persistence across sessions is a confirmed present friction defect.",
+    "11.3 — physical halt latency not measured: GRBL keeps executing its 127-byte buffer after a soft reset; the app documents this but cannot prove the machine stopped.",
+    "11.5 — M-17 CNC through-cut-with-tabs-off default is accepted by preflight with no warning (present defect); G2/G3 arc-bulge past the bed is not caught by the text bounds scanner (latent); physical bed-fit unverified.",
+    "11.6 — mid-job elapsed/remaining ETA confirmed absent (present gap); time-estimate accuracy vs real runtime is unmeasured (estimation-only planner, hardware ledger CLAIMED).",
+    "11.7 — physical accuracy of a run-from-line re-entry (correct position/depth) is HW-CLAIMED; start-from-line is deliberately ungated (the operator vouches for the line).",
+    "11.8 — software reflects but cannot enforce a hardware interlock; the safety notice is on-demand (Help) plus install EULA, not a mandatory first-run gate; fire/test-pulse alignment control is absent (rated in 10.4).",
+    "Both sides documentary/code, never hardware — every competitor cell is [OFF]/[COMM], none [HANDS]; the lone [INF] cite (LaserGRBL 11.8) is not load-bearing (that cell anchors on [OFF]); no win/lose bullet rests on an [INF] cell.",
+    "U cells: none in this sector — all 56 cells have code or documentary evidence."
+  ]
+}

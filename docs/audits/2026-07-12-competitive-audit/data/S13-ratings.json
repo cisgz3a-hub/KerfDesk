@@ -1,0 +1,240 @@
+{
+  "sector": 13,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/13-rotary-specialty.md",
+  "ratings": [
+    {
+      "cat": "13.1",
+      "product": "KerfDesk",
+      "score": 2,
+      "star": false,
+      "tag": "CODE",
+      "note": "Full rotary data model + math + .lf2/profile round-trip, but zero UI; setup only by hand-editing files. ADR-127 deferred the dialog."
+    },
+    {
+      "cat": "13.1",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Reference Rotary Setup (Ctrl+R): roller/chuck, axis assignment, mm-per-rotation, diameter, mirror, and a Test button that spins one revolution."
+    },
+    {
+      "cat": "13.1",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "CNC app; docs state 'does not support rotaries at this time.' No 4th-axis/rotary operation exists. Competes in-sector, so 0 not N/R."
+    },
+    {
+      "cat": "13.1",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "COMM",
+      "note": "No rotary UI or wizard; rotary runs only by hand-editing GRBL $101 steps/mm in the console. No diameter entry."
+    },
+    {
+      "cat": "13.1",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Roller or Chuck/Jaw mode with perimeter/diameter entry and roller S/M/L levels; framing preview before run. No documented test-spin."
+    },
+    {
+      "cat": "13.1",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "COMM",
+      "note": "No native 4th-axis/rotary support; X-Carve GRBL lacks a 4th axis; community treats rotary as DIY-only."
+    },
+    {
+      "cat": "13.2",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": true,
+      "tag": "HW-CLAIMED",
+      "note": "Chuck circumference scale + roller 1:1 + reverse-mirror + wrap-refuse, one source into G-code/Ruida/preflight. Never HW-verified; no wrapped preview."
+    },
+    {
+      "cat": "13.2",
+      "product": "LightBurn",
+      "score": 9,
+      "star": true,
+      "tag": "OFF",
+      "note": "Circumference from mm-per-rotation + measured diameter; Test button validates one revolution; wrong values shrink/stretch. No visual wrapped preview. HW-unverified here."
+    },
+    {
+      "cat": "13.2",
+      "product": "MillMage",
+      "score": 0,
+      "star": true,
+      "tag": "OFF",
+      "note": "No rotary support, so there is no rotary output path to assess."
+    },
+    {
+      "cat": "13.2",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": true,
+      "tag": "COMM",
+      "note": "Correctness depends entirely on manual $101 calibration; no diameter mapping, recalibrate per diameter, no over-circumference wrap protection. HW-unverified."
+    },
+    {
+      "cat": "13.2",
+      "product": "XCS",
+      "score": 8,
+      "star": true,
+      "tag": "OFF",
+      "note": "Perimeter/diameter entry maps circumference; roller-level presets; framing traces placement before run. Vendor-documented; circumference accuracy not HW-verified here."
+    },
+    {
+      "cat": "13.2",
+      "product": "Easel",
+      "score": 0,
+      "star": true,
+      "tag": "COMM",
+      "note": "No rotary support; Easel outputs flat 2.5D toolpaths only."
+    },
+    {
+      "cat": "13.3",
+      "product": "KerfDesk",
+      "score": 4,
+      "star": false,
+      "tag": "CODE",
+      "note": "Real autofocus command + AutofocusEditor presets ($HZ1 / G38.2). But Focus Test is a permanently-disabled stub and no laser material-thickness/focus-offset field."
+    },
+    {
+      "cat": "13.3",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Dedicated Focus Test generator (Z-stepped labeled lines), material-thickness field, per-layer Z offset, Z-step-per-pass, per-lens autofocus, relative/absolute Z."
+    },
+    {
+      "cat": "13.3",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Laser focus N/A; solid CNC Z tooling: XYZ/puck probe, tool-length probing, depth-per-pass. Stock thickness via origin, no focus-ramp test."
+    },
+    {
+      "cat": "13.3",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No focus test, material-thickness, or autofocus tooling; diode focus set manually on hardware; Z jog only if machine has a Z axis."
+    },
+    {
+      "cat": "13.3",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Standout autofocus: Auto-measure drives on-machine distance measurement, reports thickness, overlaps red/blue spots; manual fallback. No focus-ramp generator."
+    },
+    {
+      "cat": "13.3",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Laser focus N/A; Z-probe auto-zeroing, stock thickness in workpiece, two-stage roughing+detail carves. Beginner Z handling, no focus-ramp test."
+    },
+    {
+      "cat": "13.4",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "TEST",
+      "note": "Automated air assist: device M7/M8, per-layer flag, per-object override, defaults-sync, M7/M8/M9 emission around cut groups, safety-locked. No curved-surface compensation."
+    },
+    {
+      "cat": "13.4",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Automated per-layer Air Assist (emits M7/M8 when the layer runs, disable per layer) is the headline toggle. No curved/tilted-surface compensation."
+    },
+    {
+      "cat": "13.4",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "No laser air assist; CNC analog present: per-operation automated Coolant and Vacuum toggles that switch on when the operation begins."
+    },
+    {
+      "cat": "13.4",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No automated air-assist toggle; only user-defined Custom Buttons emit M7/M8/M9 macros manually. No curved/tilted-surface mode."
+    },
+    {
+      "cat": "13.4",
+      "product": "XCS",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Richest specialty set: Curve Process height-maps curved/uneven surfaces, and Smart Air Assist Auto auto-varies airflow between engrave and cut."
+    },
+    {
+      "cat": "13.4",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "No air assist, no curved/tilted-surface compensation, no rotary specialty; Easel targets flat 2.5D stock only. INF documentary absence."
+    }
+  ],
+  "wins": [
+    {
+      "cat": "13.4",
+      "vs": "LaserGRBL",
+      "delta": 5,
+      "claim": "KerfDesk ships automated per-layer + per-object air assist with a job safety-lock, versus LaserGRBL's manual-only M7/M8 custom-button macros."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "13.1",
+      "vs": "LightBurn",
+      "delta": -8,
+      "claim": "No rotary setup UI at all; the data model and math exist but are reachable only by hand-editing project/profile files (ADR-127 deferred the dialog)."
+    },
+    {
+      "cat": "13.3",
+      "vs": "LightBurn",
+      "delta": -6,
+      "claim": "No focus-test generator (permanently-disabled stub) and no laser material-thickness/focus-offset field; only autofocus exists."
+    },
+    {
+      "cat": "13.2",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "Rotary output transform is structurally tested but never hardware-verified, has no wrapped preview, and is unreachable without file editing."
+    },
+    {
+      "cat": "13.4",
+      "vs": "XCS",
+      "delta": -3,
+      "claim": "No curved/tilted/conical-surface compensation; specialty coverage stops at automated air assist (which reaches LightBurn parity)."
+    }
+  ],
+  "notVerified": [
+    "13.2 [HW-star] KerfDesk: circumference/scale mapping, reverse-mirror sign, and wrap limit are unit-tested only, never run on a physical rotary; wrong calibration silently distorts the burn (ADR-127 CLAIMED).",
+    "13.2 KerfDesk: no perceptual/preview proof of the wrapped result — on-canvas preview stays surface-true and does not apply rotary scaling (rotary-job.ts:8-9).",
+    "13.2 competitors (LightBurn 9*, XCS 8*, LaserGRBL 3*): all rotary-output-correctness cells are documentary/design-intent and HW-unverified in this audit (starred).",
+    "13.3 KerfDesk: autofocus never run on hardware here (ledger CLAIMED); live UI not exercised (side-effect-free constraint); Focus Test generator does not exist.",
+    "13.4 KerfDesk: only the M7/M8/M9 emission sequence is verified, not that a solenoid fires; absence of curved-surface compensation is a negative grep result (not exhaustively provable).",
+    "All competitor ratings are documentary (OFF/COMM); no hands-on (HANDS) runs. Easel 13.4 rests on INF (absence not in docs) and cannot anchor conclusions."
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "sector": 15,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/15-layout-production.md",
+  "ratings": [
+    { "cat": "15.1", "product": "KerfDesk", "score": 5, "star": false, "tag": "CODE", "note": "Board-array tiles ONE design rows x cols or fit-as-many with mm spacing, double-burn-guarded; board-only, single-design, no circular/radial or design-time array; Duplicate otherwise" },
+    { "cat": "15.1", "product": "LightBurn", "score": 10, "star": false, "tag": "OFF", "note": "Grid Array, radial/circular, Virtual synced clones, Copy-Along-Path -- roster's most complete design-time array toolset" },
+    { "cat": "15.1", "product": "MillMage", "score": 9, "star": false, "tag": "OFF", "note": "Inherits LightBurn grid + circular/radial array; auto-increment offsets pair with Variable Text for serialized copies" },
+    { "cat": "15.1", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "No built-in array/replication; loads a single image or G-code file; users build grids in Inkscape before import" },
+    { "cat": "15.1", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "Array tool duplicates an element in grid or circular layout with configurable counts and spacing" },
+    { "cat": "15.1", "product": "Easel", "score": 3, "star": false, "tag": "COMM", "note": "No native array dialog; grid replication via community 'Replicator' app plus manual copy/paste" },
+    { "cat": "15.1", "product": "VCarve", "score": 9, "star": false, "tag": "OFF", "note": "Array Copy (rows/cols, gap/offset), Copy-Along-Vectors, linked Array-Copy-Toolpath with minimize-tool-changes; strong production replication" },
+
+    { "cat": "15.2", "product": "KerfDesk", "score": 5, "star": false, "tag": "CODE", "note": "Fit-to-board + auto-count fill-the-board for ONE design, rotation-safe (rotated-footprint AABB); no multi-part packing or cross-part stock optimization" },
+    { "cat": "15.2", "product": "LightBurn", "score": 8, "star": false, "tag": "OFF", "note": "Quick Nest auto-packs different parts' bounding boxes into a rectangular container with padding/rotation; Core in 2.1" },
+    { "cat": "15.2", "product": "MillMage", "score": 8, "star": false, "tag": "OFF", "note": "Quick Nest bounding-box auto-packing into a rectangular container, same engine as LightBurn" },
+    { "cat": "15.2", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "No auto-fit or fill-the-board; single-file sender with no multi-part layout engine" },
+    { "cat": "15.2", "product": "XCS", "score": 0, "star": false, "tag": "OFF", "note": "No auto-fit or nesting; Array tool is manual grid/circular only; Batch swaps content but does not auto-pack" },
+    { "cat": "15.2", "product": "Easel", "score": 0, "star": false, "tag": "OFF", "note": "No auto-fit/nesting engine; 'Tiling' only splits an oversized job across the bed" },
+    { "cat": "15.2", "product": "VCarve", "score": 9, "star": false, "tag": "OFF", "note": "True Shape Nesting (Pro) auto-arranges vectors into the material for optimal usage; VCarve Desktop has no nesting" },
+
+    { "cat": "15.3", "product": "KerfDesk", "score": 0, "star": false, "tag": "CODE", "note": "True/irregular nesting absent and explicitly deferred (ADR-125); only rectangular-cell grid tiling of a single design exists; grep confirms no bin-pack/NFP code" },
+    { "cat": "15.3", "product": "LightBurn", "score": 4, "star": false, "tag": "OFF", "note": "Native Quick Nest bounding-box only; true-shape via built-in SVGnest.com round-trip; native true-shape slated 2.2 Pro (unreleased)" },
+    { "cat": "15.3", "product": "MillMage", "score": 0, "star": false, "tag": "OFF", "note": "True Nest (contour, four levels) only in 0.9 early-access Pro, not yet on sale; rated stable 0.8.02 has bounding-box Quick Nest only" },
+    { "cat": "15.3", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "No nesting of any kind" },
+    { "cat": "15.3", "product": "XCS", "score": 0, "star": false, "tag": "OFF", "note": "No true-shape nesting and no nesting engine at all" },
+    { "cat": "15.3", "product": "Easel", "score": 0, "star": false, "tag": "OFF", "note": "No nesting; no irregular-shape packing capability" },
+    { "cat": "15.3", "product": "VCarve", "score": 10, "star": false, "tag": "OFF", "note": "True Shape Nesting (Pro) packs by actual contours into sheets -- the roster's reference-quality irregular nesting; absent from Desktop" },
+
+    { "cat": "15.4", "product": "KerfDesk", "score": 8, "star": false, "tag": "CODE", "note": "Rect + circle board stock (ADR-126) plus CNC job-tiling; only roster product with circle stock; no custom-outline/offcut, and circle uses only the inscribed square" },
+    { "cat": "15.4", "product": "LightBurn", "score": 6, "star": false, "tag": "OFF", "note": "Rectangular bed/workspace only; Quick Nest container 'rectangle only'; no circular/custom stock or offcuts" },
+    { "cat": "15.4", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "Rectangular workspace and rectangle-only nesting container; 0.9 adds Multi-Page; no circular/custom stock or offcuts" },
+    { "cat": "15.4", "product": "LaserGRBL", "score": 3, "star": false, "tag": "OFF", "note": "Only a rectangular working-area preview; no stock/material model, custom shapes, or offcuts -- token-level" },
+    { "cat": "15.4", "product": "XCS", "score": 6, "star": false, "tag": "OFF", "note": "Rectangular work area/baseplate per machine; flat-material workflow; no custom/circular stock outlines or offcut nesting" },
+    { "cat": "15.4", "product": "Easel", "score": 6, "star": false, "tag": "COMM", "note": "Rectangular material dimensions only (Workpieces splits a project into parts); no circular/custom stock or offcuts" },
+    { "cat": "15.4", "product": "VCarve", "score": 6, "star": false, "tag": "OFF", "note": "Material Setup defines a rectangular block; nesting targets material or user-area across sheets; no circular/offcut; Desktop capped 24x24in" },
+
+    { "cat": "15.5", "product": "KerfDesk", "score": 0, "star": false, "tag": "CODE", "note": "Absent: no variable text, serial, CSV/data-merge, or barcode/QR anywhere; text objects static; replication produces identical clones only" },
+    { "cat": "15.5", "product": "LightBurn", "score": 10, "star": false, "tag": "OFF", "note": "Variable Text (serial, date, CSV merge, cut-setting) + auto-advance, plus QR and Barcode generators with variable data; roster-leading batch personalization" },
+    { "cat": "15.5", "product": "MillMage", "score": 8, "star": false, "tag": "OFF", "note": "Variable Text (serial, date, CSV merge) with auto-advance, substituted on Preview/Start/Export; inherits LightBurn engine; no barcode/QR documented" },
+    { "cat": "15.5", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "No variable text, serialization, or CSV merge; not a design environment" },
+    { "cat": "15.5", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "Batch Processing assigns per-copy text, images (PNG/JPG/BMP/WEBP) and vectors (SVG/DXF) via template or manual rows; strong for a consumer tool" },
+    { "cat": "15.5", "product": "Easel", "score": 0, "star": false, "tag": "OFF", "note": "No documented variable-text, serialization, or CSV merge; text tool static; batch needs manual duplication" },
+    { "cat": "15.5", "product": "VCarve", "score": 7, "star": false, "tag": "OFF", "note": "Plate Production drives batch badges from a text-file list using !!variable!! placeholders with consecutive numbering; solid serialized engraving" },
+
+    { "cat": "15.6", "product": "KerfDesk", "score": 6, "star": false, "tag": "CODE", "note": "Project save/load (.lf2), first-party Design Library of editable-vector templates, parametric Box Generator; but no recent-files, saved-job preset, or re-run-last command" },
+    { "cat": "15.6", "product": "LightBurn", "score": 7, "star": false, "tag": "OFF", "note": "Reusable .lbrn2 projects, Material Library presets, serial-state persistence across runs; no dedicated saved-job/template queue" },
+    { "cat": "15.6", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Reusable .mage projects, serial persistence; 0.9 Multi-Page projects for multi-sheet jobs; no formal saved-job template system" },
+    { "cat": "15.6", "product": "LaserGRBL", "score": 4, "star": false, "tag": "OFF", "note": "Recent-files list, reload-and-rerun the loaded G-code, custom-button macros; no job templates or saved-job manager -- token-level" },
+    { "cat": "15.6", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "Cloud/local project files, recent projects, Batch Processing templates, re-run last job; no dedicated production job-queue" },
+    { "cat": "15.6", "product": "Easel", "score": 6, "star": false, "tag": "COMM", "note": "Cloud-saved projects, copy-a-project-to-customize workflow, shareable community templates; no formal job-template or serial-run system" },
+    { "cat": "15.6", "product": "VCarve", "score": 10, "star": false, "tag": "OFF", "note": "Toolpath Templates, Job Setup Sheets, and Gadgets automating task sequences (all Pro) -- the roster's strongest repeat-job tooling" }
+  ],
+  "wins": [
+    { "cat": "15.4", "vs": "LightBurn", "delta": 2, "claim": "KerfDesk is the only roster product that models circular stock (rect + circle board capture, ADR-126, respected by fit/array); every competitor is rectangular-workspace-only. Caveat: circle layout uses only the inscribed square and no product does custom-outline/offcut stock." },
+    { "cat": "15.2", "vs": "XCS", "delta": 5, "claim": "KerfDesk has a genuine board-aware auto-fill (rotation-safe fit-to-board + auto-count fill-the-board); XCS, Easel and LaserGRBL have no auto-fit engine at all (XCS batch swaps content but never auto-packs)." },
+    { "cat": "15.1", "vs": "LaserGRBL", "delta": 5, "claim": "KerfDesk ships a real production grid array (rows x cols or fit-as-many, mm spacing, double-burn-guarded); LaserGRBL has no array/replication and needs Inkscape, Easel relies on a community app (+2 vs Easel)." }
+  ],
+  "gaps": [
+    { "cat": "15.5", "vs": "LightBurn", "delta": -10, "claim": "No variable text, serial numbers, CSV/data-merge, or barcode/QR anywhere in KerfDesk (grep + ADR-confirmed); the whole paid/consumer field personalizes copies and even consumer XCS beats us 7-0. P1." },
+    { "cat": "15.3", "vs": "VCarve", "delta": -10, "claim": "No true/irregular-shape nesting; only rectangular-cell grid tiling exists (explicitly deferred, ADR-125). Ties MillMage/XCS/Easel/LaserGRBL at 0, so shared-absence tempers severity to P2." },
+    { "cat": "15.1", "vs": "LightBurn", "delta": -5, "claim": "Array is production-time, board-bound and single-design; no circular/radial array, copy-along-path, or free-canvas design-time step-and-repeat (also -4 vs MillMage/VCarve). P2." },
+    { "cat": "15.2", "vs": "VCarve", "delta": -4, "claim": "Fill-the-board handles identical copies of one design only; no multi-part bounding-box packing or cross-part stock optimization (also -3 vs LightBurn/MillMage). P2." },
+    { "cat": "15.6", "vs": "VCarve", "delta": -4, "claim": "No recent-files list, saved-job/cut-settings preset, or re-run-last-job command; repeat means manually reopening a .lf2 project (also -1 vs LightBurn/MillMage/XCS). P3." }
+  ],
+  "notVerified": [
+    "No fidelity (SS5.3) and no hardware (SS5.4 [HW]) categories exist in S15; every score is a plain capability rating with no PERC cap and no '*' design-intent stars.",
+    "15.1/15.2 board array and fit/fill were NOT perceptually rendered or run in the live app this audit; ADR-125 states the tiled/fitted sheet was never eyeballed at authoring -- green tests assert geometry (counts, centering, guards, inscribed-square) only, not that the sheet looks right.",
+    "15.4 CNC tiling physical re-indexing (registration-hole/dowel accuracy when stock is slid and re-zeroed between tiles) is a hardware behavior -- CLAIMED, never machine-verified; the circle-stock win rests on code + ADR-126, not a live board capture; no custom-polygon or offcut stock exists to test.",
+    "15.5/15.3 absence confirmed by repo-wide grep + ADR-125; nothing to verify. (MEMORY: a 'variable text' feature appeared in Codex PR #58 but was flagged out-of-scope and is NOT on the pinned/merged tree.)",
+    "15.6 Design Library, Box Generator, and the .lf2 repeat-job round-trip (whether every cut setting survives re-open) were code-derived, not exercised live this audit.",
+    "All competitor cells are documentary ([OFF]/[COMM]); no [HANDS] runs. MillMage rated at stable 0.8.02 -- its 0.9 early-access Pro features (True Nest, serialized Variable Text, Multi-Page) are documented but not scored as shipping. VCarve leads (nesting/Plate-Production/Templates) are Pro-tier; Desktop lacks them. No win/lose bullet rests on an [INF] cell.",
+    "U cells: none in this sector."
+  ]
+}
