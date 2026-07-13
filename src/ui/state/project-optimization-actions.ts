@@ -29,11 +29,29 @@ export function projectOptimizationActions(
       set((state) => ({
         project: {
           ...state.project,
-          optimization: { ...state.project.optimization, ...patch },
+          optimization: {
+            ...state.project.optimization,
+            ...synchronizeTravelPolicy(patch),
+          },
         },
         undoStack: pushUndo(state.project, state.undoStack),
         redoStack: [],
         dirty: true,
       })),
   };
+}
+
+function synchronizeTravelPolicy(
+  patch: Partial<ProjectOptimizationSettings>,
+): Partial<ProjectOptimizationSettings> {
+  if (patch.travelPolicy !== undefined) {
+    return { ...patch, reduceTravelMoves: patch.travelPolicy === 'nearest-neighbor' };
+  }
+  if (patch.reduceTravelMoves !== undefined) {
+    return {
+      ...patch,
+      travelPolicy: patch.reduceTravelMoves ? 'nearest-neighbor' : 'source-order',
+    };
+  }
+  return patch;
 }

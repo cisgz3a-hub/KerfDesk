@@ -15,6 +15,7 @@ import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { JogPadAirAssist } from './JogPadAirAssist';
+import { MomentaryFireControl } from './MomentaryFireControl';
 
 const STEPS_MM = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100] as const;
 const FOCUS_STEPS_MM = [0.1, 0.5, 1, 2, 5] as const;
@@ -76,6 +77,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
       <div style={jogRowStyle}>
         <JogArrowGrid disabled={disabled} onJog={send} labelFor={jogLabel} />
         <JogPadAirAssist />
+        <MomentaryFireControl />
       </div>
       <FocusJogControls
         device={device}

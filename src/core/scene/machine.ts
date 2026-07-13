@@ -118,6 +118,12 @@ export type CncLayerSettings = {
   readonly tabHeightMm: number; // material left under a tab
   readonly tabWidthMm: number; // tab length along the path
   readonly tabsPerShape: number;
+  // Finish allowance ("stock to leave"): the depth-stepped roughing passes stay
+  // this many mm PROUD of the finished wall, then one full-depth finishing pass
+  // cleans the true contour. Profile-outside / profile-inside only (pocket,
+  // profile-on-path, and relief are out of scope). 0 / absent = off (no
+  // finishing pass; output is byte-identical to pre-allowance jobs).
+  readonly finishAllowanceMm?: number;
 };
 
 // Machine-wide flood/mist coolant for the whole CNC job (a router setting,

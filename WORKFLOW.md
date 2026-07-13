@@ -893,12 +893,34 @@ The guided alternative to hunting through the Device Profile panel and the seven
 
 ---
 
-## Phase E flows — STUB
+## Phase E flows
 
-- F-E1. Import raster image
-- F-E2. Open trace dialog
-- F-E3. Adjust trace parameters with live preview
-- F-E4. Apply trace → produces Scene object
+### F-E1. Import and trace a raster image
+
+**Success**:
+1. Choose a raster image and open the trace dialog. The image is decoded at the
+   preview budget and the selected preset starts tracing in a worker.
+2. Adjust a preset, threshold, or boundary control. Changes are debounced; the
+   newest request supersedes and cancels any older trace still running.
+3. The preview displays only the newest completed result. A late response from
+   a retired worker is ignored and cannot replace the current preview.
+4. Click **Trace** after the preview is ready. When the file, options, and
+   boundary still match, the ready preview geometry is reused instead of traced
+   a second time. The result is imported as a Scene object.
+
+**Error — worker stalls or crashes**:
+- A worker request has a bounded execution timeout. The failed worker is
+  retired, the current request reports a recoverable error, and the next trace
+  starts with a fresh worker. Small images may use the bounded inline fallback.
+
+**Edge — rapid preset changes**:
+- At most one trace job is live. Starting the newest job rejects the older job
+  as superseded; supersession is not shown as a user-facing error.
+
+**Edge — source changes before commit**:
+- Reuse is allowed only when file identity, options, boundary, and boundary mode
+  match the ready preview. Otherwise commit decodes and traces the current
+  source normally. Existing source-revalidation checks still apply.
 
 ---
 

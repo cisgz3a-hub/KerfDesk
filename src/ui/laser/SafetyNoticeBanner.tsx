@@ -16,11 +16,13 @@ export function SafetyNoticeBanner(): JSX.Element | null {
   const title =
     notice.kind === 'disconnect-during-job'
       ? 'Connection lost mid-job'
-      : notice.kind === 'controller-error'
-        ? 'Controller rejected a command'
-        : notice.kind === 'controller-reboot'
-          ? 'Controller rebooted mid-job'
-          : 'Command may not have sent';
+      : notice.kind === 'disconnect-during-fire'
+        ? 'Connection lost during Fire'
+        : notice.kind === 'controller-error'
+          ? 'Controller rejected a command'
+          : notice.kind === 'controller-reboot'
+            ? 'Controller rebooted mid-job'
+            : 'Command may not have sent';
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>

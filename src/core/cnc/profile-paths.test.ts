@@ -69,4 +69,27 @@ describe('profileToolpathPolylines', () => {
     const dot: Polyline = { closed: false, points: [{ x: 1, y: 1 }] };
     expect(profileToolpathPolylines([dot], 'outside', TOOL_DIAMETER_MM)).toHaveLength(0);
   });
+
+  it('offsets outward by radius + allowance when a finish allowance is set (outside)', () => {
+    // radius 1 + allowance 3 → 4 per side → 20 + 8 = 28 span (stays proud).
+    const out = profileToolpathPolylines([square(0, 0, 20)], 'outside', TOOL_DIAMETER_MM, 3);
+    expect(span(out[0] as Polyline)).toBeCloseTo(28, 6);
+  });
+
+  it('offsets inward by radius + allowance when a finish allowance is set (inside)', () => {
+    const out = profileToolpathPolylines([square(0, 0, 20)], 'inside', TOOL_DIAMETER_MM, 3);
+    expect(span(out[0] as Polyline)).toBeCloseTo(12, 6);
+  });
+
+  it('ignores the finish allowance for on-path profiles (always centered)', () => {
+    const out = profileToolpathPolylines([square(0, 0, 20)], 'on-path', TOOL_DIAMETER_MM, 3);
+    expect(span(out[0] as Polyline)).toBeCloseTo(20, 6);
+  });
+
+  it('is identical to the no-allowance call when the allowance is 0 (determinism #5)', () => {
+    const source = [square(0, 0, 20), square(5, 5, 10)];
+    expect(profileToolpathPolylines(source, 'outside', TOOL_DIAMETER_MM, 0)).toEqual(
+      profileToolpathPolylines(source, 'outside', TOOL_DIAMETER_MM),
+    );
+  });
 });

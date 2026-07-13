@@ -30,9 +30,8 @@ import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import {
-  crackFieldForTrace,
   effectivePixelScale,
-  preprocessForTrace,
+  prepareTraceForContour,
   type RawImageData,
   type TraceOptions,
 } from './trace-image';
@@ -87,6 +86,8 @@ const FIT_TOLERANCE_PX = 0.35;
 const FIT_TOLERANCE_ORGANIC_PX = 0.55;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
+const DEFAULT_OPTIMIZE = 0.2;
+const OPTIMIZE_TOLERANCE_SLOPE = 0.75;
 
 /** The dialog's Smoothness knob doubles as the wobble-flattening / arc-
  *  evening strength. Default ON at the conservative 1px amplitude cap — the
@@ -104,25 +105,34 @@ export function flattenStrengthFromSmoothness(smoothness: number | undefined): n
   return Math.max(0, 6 * s - 5);
 }
 
+/** Optimize scales geometry tolerances around the established neutral 0.2. */
+export function optimizationToleranceScaleFromOptimize(optimize: number | undefined): number {
+  const value = Number.isFinite(optimize) ? (optimize as number) : DEFAULT_OPTIMIZE;
+  const bounded = Math.min(2, Math.max(0, value));
+  return Math.max(0.25, 1 + (bounded - DEFAULT_OPTIMIZE) * OPTIMIZE_TOLERANCE_SLOPE);
+}
+
 /** Trace filled ink regions as smooth closed outlines (holes stay hollow
  *  via even-odd filling downstream). */
 export function traceImageToContourColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): ColoredPath[] {
-  const prepared = preprocessForTrace(image, options);
+  const { prepared, crackField } = prepareTraceForContour(image, options);
   const mask = inkMaskFromPrepared(prepared);
   // Sub-pixel crack interpolation: vertex POSITIONS come from the
   // pre-threshold scalar field while loop TOPOLOGY stays on the cleaned
   // binary mask (despeckle / pinhole fill decide what exists; the AA ramp
   // decides exactly where its edge lies).
-  const crackField = crackFieldForTrace(image, options);
   // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
   // trace: areas scale by scale², lengths (simplify ε) by scale.
   const scale = effectivePixelScale(options);
+  const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
   const polylines = contourPolylinesFromMask(mask, {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0) * scale * scale,
-    epsilonPx: SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale,
+    epsilonPx:
+      SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
+    fitToleranceScale: toleranceScale,
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
     pixelScale: scale,
     ...(crackField === null ? {} : { crackField }),
@@ -137,6 +147,7 @@ export type ContourFinishOptions = {
   readonly epsilonPx: number;
   /** Wobble-flattening strength (see flatten-straight-runs.ts); 0 = off. */
   readonly flattenStrength: number;
+  readonly fitToleranceScale?: number;
   /** Supersampling factor of the mask; scales the sharpener's chain-length
    *  regime bounds so glyphs stay in the same regime they were tuned in. */
   readonly pixelScale?: number;
@@ -158,6 +169,7 @@ export function contourPolylinesFromMask(mask: InkMask, options: ContourFinishOp
     width: mask.width,
     epsilonPx: options.epsilonPx,
     flattenStrength: options.flattenStrength,
+    fitToleranceScale: options.fitToleranceScale ?? 1,
     pixelScale,
     crackField: options.crackField,
   };
@@ -177,6 +189,7 @@ type LoopFinish = {
   readonly width: number;
   readonly epsilonPx: number;
   readonly flattenStrength: number;
+  readonly fitToleranceScale: number;
   readonly pixelScale: number;
   readonly crackField: CrackSubPixelField | undefined;
 };
@@ -300,7 +313,12 @@ function fitLoopTail(
   finish: LoopFinish,
   tolerancePx: number,
 ): Polyline | null {
-  const cubics = fitCubicsThroughPoints(chain, true, corners, tolerancePx * finish.pixelScale);
+  const cubics = fitCubicsThroughPoints(
+    chain,
+    true,
+    corners,
+    tolerancePx * finish.pixelScale * finish.fitToleranceScale,
+  );
   const sampled = sampleCubics(cubics, true);
   if (sampled.length < MIN_LOOP_POINTS) return null;
   const closed = closeRingEndpoints([{ points: sampled, closed: true }]);

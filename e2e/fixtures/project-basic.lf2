@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "device": {
+    "name": "E2E GRBL 300x300",
+    "bedWidth": 300,
+    "bedHeight": 300,
+    "maxFeed": 6000,
+    "maxPowerS": 1000,
+    "origin": "front-left",
+    "homing": { "enabled": false, "direction": "front-left" },
+    "autofocusCommand": ""
+  },
+  "workspace": { "width": 300, "height": 300, "units": "mm" },
+  "notes": "Deterministic Playwright fixture",
+  "scene": { "objects": [], "layers": [] }
+}
