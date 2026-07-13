@@ -2098,7 +2098,10 @@ F-CNC19 tiling.
    machine's active bit. Run is enabled only when connected and Idle.
 2. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
    `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
-   underside) — and a retract. The toast confirms "work zero is set".
+   underside) — and a retract. Every line owns the controller response
+   arbiter exclusively; after the retract, the active driver's planner
+   fence plus two fresh Idle reports complete before the toast confirms
+   "work zero is set and motion is settled".
 3. XYZ corner cycle: Z first over the plate center, then each side face
    (two-stage, flank contact below the plate top), zeroing X and Y one
    bit-radius outside the stock faces, ending parked just outside the
@@ -2110,18 +2113,24 @@ F-CNC19 tiling.
 2. ALARM:4 (already triggered): named toast — check for a short /
    already-touching bit, `$X`, retry.
 3. Any error:N stops the sequence immediately; nothing further is sent.
-4. No `ok` within 45 s: timeout toast names the pending line and warns
-   the machine may still be moving (physical stop if unsafe).
+4. No `ok` within 45 s, or failure to settle at fresh Idle: timeout toast
+   names the pending boundary, invalidates work-Z/status evidence, and
+   warns that motion state is unknown (physical stop if unsafe).
 
 #### Empty
 1. The panel does not render in laser mode (auto-focus owns that flow).
 
 #### Edge — busy machine / mid-job
 1. Probing refuses while a job streams, a jog/frame is in flight,
-   auto-focus runs, or another probe is running (preflight toast, no
-   bytes written).
+   auto-focus runs, another probe is running, or another controller
+   acknowledgement/Idle wait is outstanding (preflight toast, no bytes
+   written). Start, Console, settings, origin, and other motion remain
+   blocked until the probe fence and fresh Idle complete.
 2. The status poll keeps running during the cycle; an Alarm status seen
    mid-cycle aborts with the unlock hint even if the ALARM line raced.
+3. Disconnect/port loss during probing is treated as unsafe active motion;
+   commanded Disconnect uses the controller stop/reset cleanup, and an
+   unexpected close raises the physical-stop safety notice.
 
 ### F-CNC21. Adjust feed/spindle/rapids during a job — Phase H.11 (ADR-103 G3)
 
