@@ -19,6 +19,10 @@ import {
 import type { ControllerDriver } from '../../core/controllers';
 import { extractToolChangeLabels } from '../../core/output';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
+import {
+  CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
+  cncSetupAttestationMatches,
+} from './cnc-setup-attestation';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -72,6 +76,7 @@ export function jobActions(
         // the synchronous double-start protection below still holds.
         assertStartAllowed(set, get);
       }
+      assertCncSetupAttested(gcode, options);
       // M13: a line longer than the RX buffer can never send — step() would
       // break silently, leaving a phantom idle job and a frozen progress bar.
       const streamOptions = normalizeStartJobOptions(options);
@@ -160,6 +165,12 @@ export function jobActions(
       }
     },
   };
+}
+
+function assertCncSetupAttested(gcode: string, options: StartJobOptions): void {
+  if (options.machineKind !== 'cnc') return;
+  if (cncSetupAttestationMatches(options.cncSetupAttestation, gcode)) return;
+  throw new Error(CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE);
 }
 
 function toolChangeManifest(

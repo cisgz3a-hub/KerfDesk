@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_HOLD } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -103,9 +104,11 @@ describe('laser-store pause safety', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });
-    await useLaserStore
-      .getState()
-      .startJob('G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n', { machineKind: 'cnc' });
+    const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
+    await useLaserStore.getState().startJob(gcode, {
+      machineKind: 'cnc',
+      cncSetupAttestation: createCncSetupAttestation(gcode),
+    });
     writes.length = 0;
 
     await useLaserStore.getState().pauseJob();
