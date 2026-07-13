@@ -25,8 +25,7 @@ import {
   assertAutofocusIdle,
   pushLog,
   setupCommandBlockMessage,
-  toolChangeReady,
-  TOOL_CHANGE_NOT_IDLE_MESSAGE,
+  toolChangeContinueBlockMessage,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
@@ -100,6 +99,10 @@ export function jobActions(
         activeJobMachineKind: options.machineKind ?? 'laser',
         toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
         pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
+        // A short first tool section can reach M0 in this synchronous initial
+        // step, before advanceStream sees an ack transition. Invalidate the old
+        // tool's Z evidence here too so Continue never inherits it.
+        ...(entersHoldNow ? { workZZeroKnown: false, toolChangeIdleSeen: false } : {}),
       });
       if (stepped.toSend.length === 0) return;
       try {
@@ -254,7 +257,7 @@ async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn
 }
 
 // Leave a tool-change hold: drop the swallowed M0 and pump the stream from the
-// emitter's M3/G4 spin-up. Unlike resume there is NO realtime resume byte — the
+// emitter's spindle-off safe-Z lift, followed by M3/G4. Unlike resume there is NO realtime resume byte — the
 // controller was never held (the M0 was never sent); it is idling at the park
 // position and simply needs the next lines fed. Functional set for the same
 // at-write-time snapshot reason as runResumeJob.
@@ -263,13 +266,13 @@ async function runContinueToolChange(
   get: GetFn,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
-  // Refuse Continue until the hold is actually ready — the pre-M0 retract/park
-  // has drained to a fresh Idle. Otherwise the resumed spindle-restart and
-  // post-change cutting lines queue behind still-moving pre-change motion, or the
-  // operator resumes into a machine that never reached the tool-change position
-  // (Codex audit P1).
-  if (get().streamer?.status === 'tool-change' && !toolChangeReady(get())) {
-    set({ lastWriteError: TOOL_CHANGE_NOT_IDLE_MESSAGE });
+  if (get().streamer?.status !== 'tool-change') return;
+  // Fresh Idle proves the pre-M0 retract/park completed; fresh work-Z evidence
+  // proves the replacement bit was touched off. Both are required before the
+  // stream may issue its spindle-off safe-Z lift and later M3/G4.
+  const blockMessage = toolChangeContinueBlockMessage(get());
+  if (blockMessage !== null) {
+    set({ lastWriteError: blockMessage });
     return;
   }
   let toSend = '';

@@ -7,6 +7,7 @@ import { createProject } from '../../core/scene';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
+import { TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE } from './laser-store-helpers';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
@@ -53,7 +54,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await flush();
 }
 
-// pre-M0 section, M0 boundary, spin-up + second section.
+// pre-M0 section, M0 boundary, spindle-off clearance, spin-up + second section.
 const CNC_MULTI_TOOL = [
   'G1 X1 Y1 F600',
   'G0 Z5',
@@ -63,6 +64,7 @@ const CNC_MULTI_TOOL = [
   // streamer strips it, so the sender extracts it at Start to name the hold.
   `${TOOL_CHANGE_LOAD_PREFIX}6.35 mm end mill`,
   'M0',
+  'G0 Z5',
   'M3 S12000',
   'G1 X2 Y2',
 ].join('\n');
@@ -89,10 +91,14 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await connectWith(connection);
 
     writes.length = 0;
+    // Simulate valid Z evidence for the first tool. Entering even a synchronous
+    // first hold must invalidate it for the replacement tool.
+    useLaserStore.setState({ workZZeroKnown: true });
     await useLaserStore.getState().startJob(CNC_MULTI_TOOL, { machineKind: 'cnc' });
 
     // The pre-M0 lines went out; the M0 did NOT, and the stream is held.
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
     expect(writes.join('')).toContain('G0 X0 Y0');
     expect(writes.join('')).not.toContain('M0');
 
@@ -112,11 +118,22 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await flush();
 
+    // Fresh Idle unlocks setup, but Continue still refuses until the new tool
+    // has been zeroed. Tool-change entry invalidated the old tool's Z evidence.
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
     writes.length = 0;
     await useLaserStore.getState().continueToolChange();
+    expect(writes.join('')).toBe('');
+    expect(useLaserStore.getState().lastWriteError).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
 
-    // The M0 is dropped and the emitter's spin-up is fed next.
-    expect(writes.join('')).toContain('M3 S12000');
+    // Simulate a successful Zero Z/probe action, then Continue. The first
+    // resumed command is the spindle-off safe-Z lift; M3 follows it.
+    useLaserStore.setState({ workZZeroKnown: true });
+    await useLaserStore.getState().continueToolChange();
+    const resumed = writes.join('');
+    expect(resumed).toContain('G0 Z5');
+    expect(resumed).toContain('M3 S12000');
+    expect(resumed.indexOf('G0 Z5')).toBeLessThan(resumed.indexOf('M3 S12000'));
     expect(useLaserStore.getState().streamer?.status).not.toBe('tool-change');
   });
 

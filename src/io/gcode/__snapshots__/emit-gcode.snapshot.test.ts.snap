@@ -91,10 +91,10 @@ G0 X0.000 Y0.000
 ; tool change: load 6.35 mm (1/4") end mill
 ; re-zero Z on the stock top, then cycle-start to resume
 M0
+G0 Z3.810
 M3 S12000
 G4 P3.000
 ; cnc layer profile profile-outside tool 6.350 mm feed 1000 plunge 300 spindle 12000 rpm passes 5
-G0 Z3.810
 G0 X66.825 Y286.825
 G1 Z-2.000 F300
 G1 X66.825 Y333.175 F1000

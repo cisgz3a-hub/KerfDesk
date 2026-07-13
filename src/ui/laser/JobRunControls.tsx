@@ -6,6 +6,7 @@
 // (no realtime feed hold) and may lack jog cancel — the copy says so.
 
 import { useLaserStore } from '../state/laser-store';
+import { toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
 import { rowStyle, runningSafetyStyle, stopBtnStyle } from './JobControls.styles';
 import { OverrideControls } from './OverrideControls';
 
@@ -32,6 +33,7 @@ export function RunningControls(props: {
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const pendingToolLabel = useLaserStore((s) => s.pendingToolLabel);
+  const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
   const pauseMessage = hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;
   const safetyMessage = props.isToolChange ? toolChangeMessage(pendingToolLabel) : pauseMessage;
   return (
@@ -63,7 +65,11 @@ export function RunningControls(props: {
           <button
             type="button"
             onClick={() => void continueToolChange().catch(() => undefined)}
-            title="Resume the job after loading and re-zeroing the new bit"
+            disabled={toolChangeBlockMessage !== null}
+            title={
+              toolChangeBlockMessage ??
+              'Lift the re-zeroed bit to safe Z with the spindle off, then spin up and resume'
+            }
           >
             Continue
           </button>
@@ -76,7 +82,12 @@ export function RunningControls(props: {
         >
           Stop
         </button>
-        <span style={runningSafetyStyle}>{safetyMessage}</span>
+        <span style={runningSafetyStyle}>
+          {safetyMessage}{' '}
+          {props.isToolChange
+            ? 'Continue unlocks only after fresh Idle and Z zero; it lifts to safe Z before spindle start.'
+            : ''}
+        </span>
       </div>
       {shouldShowOverrides(props.isStreaming, props.isPaused, hasOverrides) && <OverrideControls />}
     </>

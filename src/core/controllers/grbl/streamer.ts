@@ -42,8 +42,8 @@ export const DEFAULT_RX_BUFFER_BYTES = DEFAULT_GRBL_RX_BUFFER_BYTES;
 // and settles to Idle — the only state in which it will accept the jog/probe/
 // G92 the operator needs to re-zero the new bit. A plain GRBL feed-hold (M0's
 // own effect) leaves the controller in Hold, where re-zeroing is impossible.
-// continueToolChange() drops the M0 and resumes; the emitter's own M3/G4
-// spin-up follows it, so the spindle restarts from the stream.
+// continueToolChange() drops the M0 and resumes; the emitter's spindle-off
+// safe-Z lift precedes its M3/G4 spin-up.
 export type StreamerStatus =
   | 'idle'
   | 'streaming'
@@ -243,7 +243,7 @@ export function step(state: StreamerState): StepResult {
 // Leave a tool-change hold: drop the un-sent M0 from the queue head and count
 // it complete (it is a sendable line, so `total` counted it; never sending it
 // would otherwise strand `completed/total` one short forever), then hand back
-// to step() to resume from the M3/G4 spin-up the emitter placed after the M0.
+// to step() to resume from the safe-Z/M3/G4 sequence placed after the M0.
 export function continueToolChange(state: StreamerState): StreamerState {
   if (state.status !== 'tool-change') return state;
   return {

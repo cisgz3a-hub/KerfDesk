@@ -1971,13 +1971,16 @@ F-CNC19 tiling.
 1. Every M0 change block carries "; re-zero Z on the stock top, then
    cycle-start to resume". The operator swaps the bit, jogs Z to touch
    the stock top, zeros Z (or probes), and resumes.
-2. The spindle restarts (M3 + spin-up dwell) after the pause, before
-   any motion.
+2. **Continue remains disabled** until the pre-change retract/park has drained
+   to a fresh controller Idle and the new tool's Z zero has been established.
+3. Continue first emits `G0 Z<safe>` with the spindle off. Only after that
+   clearance move does it emit M3 + spin-up dwell and resume cutting.
 
 #### Error — resumed without re-zeroing
-1. Not detectable in software: the wrong Z persists until the next
-   change. The comment sequence is the guard; this flow documents the
-   risk (manual GRBL tool changes are inherently operator-owned).
+1. Continue remains blocked with "establish its Z zero" until Zero Z or a
+   successful probe records fresh work-Z evidence for the replacement bit.
+2. Tool identity, clamping, touch-plate removal, and actual spindle-at-speed
+   remain operator/machine responsibilities; this host gate does not prove them.
 
 #### Empty
 1. Single-bit jobs never pause.
