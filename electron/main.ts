@@ -62,6 +62,7 @@ import {
   type RtspCameraBridgeHandle,
 } from './rtsp-camera-bridge.js';
 import { configureAutoUpdater } from './auto-update.js';
+import { readDesktopUpdateChannelTrust } from './update-channel-trust.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,8 +77,9 @@ const RENDERER_RUNTIME = resolveRendererRuntime({
 });
 const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
 const CAMERA_BRIDGE_ORIGIN = `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`;
-// ADR-135: enable only after CI signs both the installer and update artifacts.
-const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = false;
+// ADR-171: tag releases embed this flag only after forceCodeSigning succeeds.
+// Missing, malformed, and manual-build metadata all fail closed.
+const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = readDesktopUpdateChannelTrust(app.getAppPath());
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",

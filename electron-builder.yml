@@ -15,6 +15,9 @@ files:
   - package.json
 
 win:
+  # electron-updater verifies downloaded NSIS updates against the publisher
+  # identity from the installed signed build. Keep this explicit in config.
+  verifyUpdateCodeSignature: true
   target:
     - target: nsis
       arch:

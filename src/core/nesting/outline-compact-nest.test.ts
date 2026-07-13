@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import {
   compactOutlineNest,
   isOutlineNestWithinWorkBudget,
@@ -8,6 +9,7 @@ import {
 import type { NestPlacement, NestRect } from './quick-nest';
 
 const bin: NestRect = { minX: 0, minY: 0, maxX: 100, maxY: 60 };
+const FORTY_PART_BUDGET_MS = ciBudgetMs(3_000, 9_000);
 
 describe('compactOutlineNest', () => {
   it('interlocks complementary triangles that rectangular packing keeps apart', () => {
@@ -225,26 +227,30 @@ describe('compactOutlineNest', () => {
     expect(isOutlineNestWithinWorkBudget(detailed)).toBe(false);
   });
 
-  it('packs a deterministic thirty-two-part production corpus within its budget', () => {
-    const items = Array.from({ length: 32 }, (_, index) =>
-      item(
-        String(index).padStart(2, '0'),
-        [
-          [0, 0],
-          [10, 0],
-          [0, 10],
-        ],
-        10,
-        10,
-      ),
-    );
-    const started = performance.now();
-    const result = outlineNest({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, items, {
-      padding: 0.5,
-    });
-    expect(result.ok).toBe(true);
-    expect(performance.now() - started).toBeLessThan(2_000);
-  });
+  it(
+    'packs a deterministic forty-part production corpus within its budget',
+    { timeout: ciBudgetMs(5_000, 15_000) },
+    () => {
+      const items = Array.from({ length: 40 }, (_, index) =>
+        item(
+          String(index).padStart(2, '0'),
+          [
+            [0, 0],
+            [10, 0],
+            [0, 10],
+          ],
+          10,
+          10,
+        ),
+      );
+      const started = performance.now();
+      const result = outlineNest({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, items, {
+        padding: 0.5,
+      });
+      expect(result.ok).toBe(true);
+      expect(performance.now() - started).toBeLessThan(FORTY_PART_BUDGET_MS);
+    },
+  );
 });
 
 function item(

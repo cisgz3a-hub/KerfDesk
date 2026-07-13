@@ -1,6 +1,6 @@
 # Contributing to KerfDesk (LaserForge 2.0)
 
-KerfDesk is MIT-licensed (ADR-120); by submitting a contribution you agree it is licensed under the project's MIT license. The project is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`) are live: typecheck, lint, prettier, license-check, vitest, build, file-size discipline. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
+KerfDesk is MIT-licensed (ADR-120); by submitting a contribution you agree it is licensed under the project's MIT license. The project is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`) are live: typecheck, lint, prettier, dependency-license and vulnerability checks, Vitest, Playwright browser workflows, web/Electron builds, and file-size discipline. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
 
 ## Before you open a PR
 
@@ -8,6 +8,7 @@ KerfDesk is MIT-licensed (ADR-120); by submitting a contribution you agree it is
 2. Read [`PROJECT.md`](./PROJECT.md) — the current phase and scope. Anything outside the current phase needs a `PROJECT.md` revision and a `DECISIONS.md` entry before code lands.
 3. Read [`WORKFLOW.md`](./WORKFLOW.md) — if your change touches UI, the success / error / empty / edge states for the affected flow must already be documented (or you must update this file first).
 4. Read [`DECISIONS.md`](./DECISIONS.md) — architectural changes (module boundaries, state shape, build setup) require a new ADR.
+5. Read [`SECURITY.md`](./SECURITY.md) before reporting or testing a security-sensitive issue.
 
 ## Process gates
 
