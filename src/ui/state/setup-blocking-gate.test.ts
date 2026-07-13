@@ -47,7 +47,12 @@ function statusReport(state: StatusReport['state']): StatusReport {
 }
 // The gates read only these fields; a partial cast keeps the test focused.
 function gateState(partial: Partial<LaserState>): LaserState {
-  return { motionOperation: null, controllerOperation: null, ...partial } as LaserState;
+  return {
+    motionOperation: null,
+    controllerOperation: null,
+    workZReferenceEpoch: 0,
+    ...partial,
+  } as LaserState;
 }
 
 describe('setupBlockingJobCommandBlockMessage (CNC-03)', () => {
@@ -113,17 +118,32 @@ describe('toolChangeContinueBlockMessage', () => {
     const notSettled = gateState({
       streamer: toolChangeStreamer(),
       toolChangeIdleSeen: false,
-      workZZeroKnown: false,
+      workZZeroEvidence: null,
     });
     expect(toolChangeContinueBlockMessage(notSettled)).toBe(TOOL_CHANGE_NOT_IDLE_MESSAGE);
 
     const needsZZero = gateState({
       streamer: drainedToolChangeStreamer(),
       toolChangeIdleSeen: true,
-      workZZeroKnown: false,
+      workZZeroEvidence: null,
     });
     expect(toolChangeContinueBlockMessage(needsZZero)).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
+    expect(
+      toolChangeContinueBlockMessage({
+        ...needsZZero,
+        workZReferenceEpoch: 1,
+        workZZeroEvidence: { source: 'probe', referenceEpoch: 0 },
+      }),
+    ).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
 
-    expect(toolChangeContinueBlockMessage({ ...needsZZero, workZZeroKnown: true })).toBeNull();
+    expect(
+      toolChangeContinueBlockMessage({
+        ...needsZZero,
+        workZZeroEvidence: {
+          source: 'manual-zero',
+          referenceEpoch: needsZZero.workZReferenceEpoch,
+        },
+      }),
+    ).toBeNull();
   });
 });

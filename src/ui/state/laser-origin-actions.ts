@@ -7,6 +7,7 @@
 // import — no runtime cycle.
 
 import { inferCurrentMachinePosition } from './infer-machine-position';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { type ControllerLifecycleRefs } from './laser-interactive-command';
 import {
@@ -138,7 +139,9 @@ async function zeroZHere(
     safeWrite,
     'Zero work Z',
     (write) => zeroZHereAction(write, usesPrimaryWcs(get())),
-    () => ({ workZZeroKnown: true }),
+    () => ({
+      workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', get().workZReferenceEpoch),
+    }),
   );
 }
 
@@ -238,7 +241,8 @@ function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
     workOriginSource: 'g54-persistent',
     // G92.1 clears every transient axis. The boolean does not encode whether
     // Z came from G92 or persistent G54, so conservatively require a new touch-off.
-    workZZeroKnown: false,
+    // Any Z-reference loss also voids work-Z evidence (fail-closed for CNC start).
+    workZZeroEvidence: null,
     // G10 L20 P1 writes X/Y only. Z cannot be reconstructed from MPos after
     // G92.1, so wait for a fresh WCO-bearing status instead of fabricating it.
     wcoCache: null,
@@ -251,7 +255,7 @@ function clearedOriginPatch(): Partial<LaserState> {
     workOriginActive: false,
     workOriginSource: 'none',
     // clearOrigin (G92.1) drops ALL G92 offsets, Z included, so work Z0 is void.
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,
   };

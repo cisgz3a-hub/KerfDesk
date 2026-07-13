@@ -48,6 +48,13 @@ async function flushConnect(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
 
+function currentWorkZEvidence() {
+  return {
+    source: 'manual-zero' as const,
+    referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+  };
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -72,7 +79,7 @@ afterEach(async () => {
     wcoCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     frameVerification: null,
     homingState: 'unknown',
     trustedPositionEpoch: 0,
@@ -134,7 +141,8 @@ describe('laser-store console commands', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: { x: 12, y: 34, z: 5 },
       trustedPositionEpoch: 7,
     });
@@ -144,7 +152,8 @@ describe('laser-store console commands', () => {
     expect(useLaserStore.getState()).toMatchObject({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: { x: 12, y: 34, z: 5 },
       trustedPositionEpoch: 7,
       statusReport: { state: 'Idle' },
@@ -158,7 +167,8 @@ describe('laser-store console commands', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: { x: 12, y: 34, z: 5 },
       frameVerification: {
         boundsSignature: '0,0,10,10',
@@ -174,7 +184,8 @@ describe('laser-store console commands', () => {
     expect(useLaserStore.getState()).toMatchObject({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: { x: 12, y: 34, z: 5 },
       frameVerification: null,
       homingState: 'confirmed',
@@ -190,7 +201,8 @@ describe('laser-store console commands', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: { x: 12, y: 34, z: 5 },
       frameVerification: {
         boundsSignature: '0,0,10,10',
@@ -205,7 +217,8 @@ describe('laser-store console commands', () => {
     expect(useLaserStore.getState()).toMatchObject({
       workOriginActive: false,
       workOriginSource: 'none',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: null,
       frameVerification: null,
       statusReport: null,
@@ -220,7 +233,8 @@ describe('laser-store console commands', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
       wcoCache: { x: 12, y: 34, z: 5 },
       trustedPositionEpoch: 7,
     });
@@ -230,7 +244,8 @@ describe('laser-store console commands', () => {
     expect(useLaserStore.getState()).toMatchObject({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: false,
+      workZZeroEvidence: null,
+      workZReferenceEpoch: 8,
       wcoCache: null,
       statusReport: null,
       trustedPositionEpoch: 8,
@@ -294,7 +309,7 @@ describe('laser-store console commands', () => {
       lastSettingsReadAt: 123,
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: currentWorkZEvidence(),
       wcoCache: { x: 1, y: 2, z: 3 },
       homingState: 'confirmed',
     });
@@ -308,7 +323,7 @@ describe('laser-store console commands', () => {
       lastSettingsReadAt: null,
       workOriginActive: false,
       workOriginSource: 'none',
-      workZZeroKnown: false,
+      workZZeroEvidence: null,
       wcoCache: null,
       homingState: 'unknown',
       statusReport: null,

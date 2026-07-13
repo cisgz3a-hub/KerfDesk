@@ -141,16 +141,31 @@ function consoleStateEffectPatch(
       };
     case 'coordinates-z':
     case 'tool':
-      return { ...base, workZZeroKnown: false, wcoCache: null };
+      return {
+        ...base,
+        workZZeroEvidence: null,
+        workZReferenceEpoch: state.workZReferenceEpoch + 1,
+        wcoCache: null,
+      };
     case 'coordinates-all':
-      return { ...base, ...unknownCoordinatePatch() };
+      return {
+        ...base,
+        ...unknownCoordinatePatch(),
+        workZReferenceEpoch: state.workZReferenceEpoch + 1,
+      };
     case 'reference':
-      return { ...base, ...unknownCoordinatePatch(), homingState: 'unknown' };
+      return {
+        ...base,
+        ...unknownCoordinatePatch(),
+        homingState: 'unknown',
+        workZReferenceEpoch: state.workZReferenceEpoch + 1,
+      };
     case 'configuration':
       return {
         ...base,
         ...unknownCoordinatePatch(),
         homingState: 'unknown',
+        workZReferenceEpoch: state.workZReferenceEpoch + 1,
         detectedSettings: null,
         controllerSettings: null,
         grblSettingsRows: [],
@@ -163,7 +178,7 @@ function unknownCoordinatePatch(): Partial<LaserState> {
   return {
     workOriginActive: false,
     workOriginSource: 'none',
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     wcoCache: null,
   };
 }

@@ -88,7 +88,7 @@ afterEach(async () => {
     wcoCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     frameVerification: null,
     controllerOperation: null,
     pendingUntrackedAcks: 0,
@@ -151,13 +151,13 @@ describe('laser-store origin actions', () => {
     connection.emitLine('<Idle|MPos:12.000,34.000,5.000|FS:0,0>');
     useLaserStore.setState({
       wcoCache: { x: 1, y: 2, z: 7 },
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
     });
 
     await acknowledge(connection, useLaserStore.getState().setOriginHere());
 
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 7 });
-    expect(useLaserStore.getState().workZZeroKnown).toBe(true);
+    expect(useLaserStore.getState().workZZeroEvidence).not.toBeNull();
   });
 
   it('Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)', async () => {
@@ -167,19 +167,19 @@ describe('laser-store origin actions', () => {
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
 
     // G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
-    // advisory (which keys on workZZeroKnown) must stay live.
+    // advisory (which keys on workZZeroEvidence) must stay live.
     await acknowledge(connection, useLaserStore.getState().setOriginHere());
     expect(useLaserStore.getState().workOriginActive).toBe(true);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
 
     // Zero Z (G92 Z0) is what establishes the stock-top contract.
     const zeroZ = useLaserStore.getState().zeroZHere();
     await flush();
     expect(write).toHaveBeenCalledWith('G54 G92 Z0\n');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     connection.emitLine('ok');
     await zeroZ;
-    expect(useLaserStore.getState().workZZeroKnown).toBe(true);
+    expect(useLaserStore.getState().workZZeroEvidence).not.toBeNull();
   });
 
   it('marks the XY origin persistent but invalidates Z cleared by G92.1', async () => {
@@ -188,7 +188,7 @@ describe('laser-store origin actions', () => {
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
     useLaserStore.setState({
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
       wcoCache: { x: 1, y: 2, z: 5 },
       frameVerification: {
         boundsSignature: 'old',
@@ -212,7 +212,7 @@ describe('laser-store origin actions', () => {
 
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().wcoCache).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
   });
@@ -237,7 +237,7 @@ describe('laser-store origin actions', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
       wcoCache: { x: 12, y: 34, z: 0 },
     });
 
@@ -246,7 +246,7 @@ describe('laser-store origin actions', () => {
     expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().workOriginSource).toBe('none');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().wcoCache).toBeNull();
   });
 
@@ -257,7 +257,7 @@ describe('laser-store origin actions', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g54-persistent',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
       wcoCache: { x: 12, y: 34, z: 5 },
     });
 
@@ -266,7 +266,7 @@ describe('laser-store origin actions', () => {
     expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().wcoCache).toBeNull();
   });
 
@@ -305,7 +305,7 @@ describe('laser-store origin actions', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
-      workZZeroKnown: true,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
       wcoCache: { x: 12, y: 34, z: 5 },
     });
 
@@ -321,7 +321,7 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('unknown');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().wcoCache).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
