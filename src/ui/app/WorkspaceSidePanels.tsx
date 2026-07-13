@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CutsLayersPanel } from '../layers';
 import { LaserWindow } from '../laser';
+import { Icon, type IconName } from '../kit';
 
 type PanelId = 'cuts' | 'machine';
 
@@ -53,11 +54,13 @@ export function WorkspaceSidePanels(): JSX.Element {
       <div style={collapseBarStyle}>
         <PanelToggle
           label="Layers"
+          icon="panel-left"
           expanded={cutsOpen}
           onToggle={() => setCutsOpen((open) => !open)}
         />
         <PanelToggle
           label="Machine"
+          icon="panel-right"
           expanded={machineOpen}
           onToggle={() => setMachineOpen((open) => !open)}
         />
@@ -97,20 +100,27 @@ function PanelTab(props: {
   );
 }
 
+// The label stays constant; aria-pressed drives the accent fill (via
+// .lf-btn[aria-pressed='true']) so the button reads as "on" when the panel is
+// shown — the panel-toggle convention in VS Code / Figma / LightBurn, clearer
+// than a label that flips between Hide and Show.
 function PanelToggle(props: {
   readonly label: string;
+  readonly icon: IconName;
   readonly expanded: boolean;
   readonly onToggle: () => void;
 }): JSX.Element {
   return (
     <button
       type="button"
-      className="lf-btn lf-btn--ghost"
-      aria-expanded={props.expanded}
+      className="lf-btn"
+      style={panelToggleStyle}
+      aria-pressed={props.expanded}
       title={`${props.expanded ? 'Hide' : 'Show'} ${props.label} panel`}
       onClick={props.onToggle}
     >
-      {props.expanded ? 'Hide' : 'Show'} {props.label}
+      <Icon name={props.icon} size={14} />
+      {props.label}
     </button>
   );
 }
@@ -135,10 +145,15 @@ const desktopShellStyle: React.CSSProperties = {
 const collapseBarStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
-  gap: 4,
+  gap: 6,
   padding: 4,
   borderBottom: '1px solid var(--lf-border)',
   background: 'var(--lf-bg-0)',
+};
+const panelToggleStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
 };
 const desktopPanelsStyle: React.CSSProperties = { display: 'flex', minHeight: 0, flex: 1 };
 const resizablePanelStyle: React.CSSProperties = {

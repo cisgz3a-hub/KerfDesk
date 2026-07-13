@@ -49,12 +49,16 @@ describe('WorkspaceSidePanels', () => {
       expect(host.textContent).toContain('Layer rail');
       expect(host.textContent).toContain('Machine rail');
       expect(host.querySelectorAll('[aria-label$="resizable panel"]')).toHaveLength(2);
-      const hideLayers = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Hide Layers',
+      const layersToggle = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Layers',
       );
-      await act(async () => hideLayers?.click());
+      // Constant label; the shown/hidden state is carried by aria-pressed (the
+      // accent-fill toggle) and the title, not by flipping the label text.
+      expect(layersToggle?.getAttribute('aria-pressed')).toBe('true');
+      await act(async () => layersToggle?.click());
       expect(host.textContent).not.toContain('Layer rail');
-      expect(host.textContent).toContain('Show Layers');
+      expect(layersToggle?.getAttribute('aria-pressed')).toBe('false');
+      expect(layersToggle?.getAttribute('title')).toBe('Show Layers panel');
     } finally {
       await act(async () => root.unmount());
     }
