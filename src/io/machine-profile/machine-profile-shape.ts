@@ -2,6 +2,7 @@ import {
   isGcodeDialectSelection,
   isGrblRxBufferBytes,
   isGrblStreamingMode,
+  isEstimateTimeScale,
   isKnownControllerKind,
   normalizeLaserFireControl,
   type LaserAirAssistHardware,
@@ -122,6 +123,11 @@ function validateProfileScalarMachineFields(value: Record<string, unknown>): str
   if (!isNonNegativeFinite(value['minPowerS'])) return 'profile.minPowerS must be non-negative';
   if (!isNonNegativeFinite(value['junctionDeviationMm'])) {
     return 'profile.junctionDeviationMm must be non-negative';
+  }
+  for (const field of ['estimateCutTimeScale', 'estimateTravelTimeScale'] as const) {
+    if (value[field] !== undefined && !isEstimateTimeScale(value[field])) {
+      return `profile.${field} must be between 0.1 and 5`;
+    }
   }
   if (typeof value['laserModeEnabled'] !== 'boolean') {
     return 'profile.laserModeEnabled must be a boolean';

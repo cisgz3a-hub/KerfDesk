@@ -93,6 +93,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalPositiveNumber(device, 'device.framingFeedMmPerMin'),
     optionalPositiveNumber(device, 'device.accelMmPerSec2'),
     optionalPositiveNumber(device, 'device.junctionDeviationMm'),
+    profileField.optionalEstimateTimeScales(device, 'device'),
     profileField.optionalRotarySetup(device, 'device.rotary'),
     profileField.optionalLaserFireControl(device, 'device.fireControl'),
   ]);

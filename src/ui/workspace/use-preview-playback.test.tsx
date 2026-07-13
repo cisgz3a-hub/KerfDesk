@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Toolpath } from '../../core/job';
+import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore } from '../state/ui-store';
 import { usePreviewPlayback } from './use-preview-playback';
 
@@ -25,6 +26,13 @@ const toolpath: Toolpath = {
   ],
 };
 
+const estimate: LiveJobEstimate = {
+  kind: 'estimated',
+  label: '30s',
+  totalSeconds: 30,
+  breakdown: { cutSeconds: 30, travelSeconds: 0 },
+};
+
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 let rafCallbacks: FrameRequestCallback[] = [];
@@ -41,7 +49,7 @@ beforeEach(() => {
   globalThis.cancelAnimationFrame = vi.fn();
   useUiStore.getState().setScrubberT(0);
   useUiStore.getState().setPreviewPlaying(false);
-  useUiStore.getState().setPreviewPlaybackSpeed('normal');
+  useUiStore.getState().setPreviewPlaybackSpeed('slow');
 });
 
 afterEach(async () => {
@@ -58,7 +66,7 @@ afterEach(async () => {
 
 describe('usePreviewPlayback', () => {
   it('advances the preview scrubber while route playback is running', async () => {
-    await renderHarness(true, toolpath);
+    await renderHarness(true, toolpath, estimate);
 
     await act(async () => useUiStore.getState().setPreviewPlaying(true));
     await flushNextFrame(0);
@@ -68,7 +76,7 @@ describe('usePreviewPlayback', () => {
   });
 
   it('stops at the end of the route', async () => {
-    await renderHarness(true, toolpath);
+    await renderHarness(true, toolpath, estimate);
 
     await act(async () => useUiStore.getState().setPreviewPlaying(true));
     await flushNextFrame(0);
@@ -79,10 +87,10 @@ describe('usePreviewPlayback', () => {
   });
 
   it('pauses playback when preview mode exits', async () => {
-    await renderHarness(true, toolpath);
+    await renderHarness(true, toolpath, estimate);
 
     await act(async () => useUiStore.getState().setPreviewPlaying(true));
-    await renderHarness(false, toolpath);
+    await renderHarness(false, toolpath, estimate);
 
     expect(useUiStore.getState().previewPlaying).toBe(false);
   });
@@ -91,6 +99,7 @@ describe('usePreviewPlayback', () => {
 async function renderHarness(
   previewMode: boolean,
   previewToolpath: Toolpath | null,
+  jobEstimate: LiveJobEstimate,
 ): Promise<void> {
   if (host === null) {
     host = document.createElement('div');
@@ -98,15 +107,18 @@ async function renderHarness(
     root = createRoot(host);
   }
   await act(async () => {
-    root?.render(<Harness previewMode={previewMode} toolpath={previewToolpath} />);
+    root?.render(
+      <Harness previewMode={previewMode} toolpath={previewToolpath} estimate={jobEstimate} />,
+    );
   });
 }
 
 function Harness(props: {
   readonly previewMode: boolean;
   readonly toolpath: Toolpath | null;
+  readonly estimate: LiveJobEstimate;
 }): JSX.Element | null {
-  usePreviewPlayback(props.previewMode, props.toolpath);
+  usePreviewPlayback(props.previewMode, props.toolpath, props.estimate);
   return null;
 }
 

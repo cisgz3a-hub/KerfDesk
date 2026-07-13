@@ -46,6 +46,33 @@ describe('project device profile metadata persistence', () => {
     expect(result.project.device.rxBufferBytes).toBe(96);
   });
 
+  it('roundtrips independent preview timing calibration factors', () => {
+    const project = createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      estimateCutTimeScale: 1.18,
+      estimateTravelTimeScale: 1.07,
+    });
+
+    const result = deserializeProject(serializeProject(project));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.estimateCutTimeScale).toBe(1.18);
+    expect(result.project.device.estimateTravelTimeScale).toBe(1.07);
+  });
+
+  it('rejects malformed preview timing calibration factors', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.estimateCutTimeScale = 0;
+    raw.device.estimateTravelTimeScale = 'slow';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.reason).toMatch(/estimateCutTimeScale|estimateTravelTimeScale/);
+  });
+
   it('backfills old projects without profile streaming settings to safe defaults', () => {
     const raw = JSON.parse(serializeProject(createProject()));
     delete raw.device.streamingMode;
