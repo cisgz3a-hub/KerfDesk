@@ -9,6 +9,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import type { StatusReport } from '../../core/controllers/grbl';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import {
   advanceJobCheckpoint,
   createJobCheckpoint,
@@ -116,6 +117,27 @@ describe('runStartJobFlow', () => {
       machineKind: 'laser',
     });
     expect(jobAwareAlert).not.toHaveBeenCalled();
+  });
+
+  it('forces ping-pong when a legacy Marlin profile retained char-counted streaming', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          controllerKind: 'marlin',
+          streamingMode: 'char-counted',
+        },
+      },
+    }));
+
+    await runStartJobFlow();
+
+    expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(expect.any(String), {
+      streamingMode: 'ping-pong',
+      rxBufferBytes: 96,
+      machineKind: 'laser',
+    });
   });
 });
 
@@ -344,5 +366,36 @@ describe('job checkpoint integration (ADR-118)', () => {
     await runStartFromLineFlow(2);
 
     expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
+  });
+
+  it('refuses manual CNC start-from-line before compiling or streaming', async () => {
+    useStore.getState().setMachineKind('cnc');
+
+    await runStartFromLineFlow(2);
+
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+    expect(jobAwareAlert).toHaveBeenCalledWith(
+      expect.stringContaining(CNC_AUTOMATIC_RECOVERY_DISABLED_REASON),
+    );
+  });
+
+  it('keeps a CNC checkpoint as evidence and refuses to execute it', async () => {
+    const checkpoint = createJobCheckpoint({
+      gcode: 'G21\nG90\nM3 S12000\nG1 X10 F500\nM5',
+      machineKind: 'cnc',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      nowIso: '2026-07-13T01:00:00.000Z',
+    });
+    writeJobCheckpoint(advanceJobCheckpoint(checkpoint, 2, '2026-07-13T01:01:00.000Z'));
+
+    const stored = readJobCheckpoint();
+    if (stored === null) throw new Error('unreachable');
+    await runCheckpointResumeFlow(stored);
+
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+    expect(jobAwareAlert).toHaveBeenCalledWith(
+      expect.stringContaining(CNC_AUTOMATIC_RECOVERY_DISABLED_REASON),
+    );
+    expect(readJobCheckpoint()).toEqual(stored);
   });
 });

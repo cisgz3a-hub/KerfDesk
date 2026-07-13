@@ -31,6 +31,7 @@ type Props = {
 };
 
 export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const streamer = useLaserStore((s) => s.streamer);
   const status = streamer?.status;
   const isStreaming = status === 'streaming';
@@ -62,7 +63,7 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
       )}
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner disabled={disabled} busy={controlsBusy} />
-      <StartFromLineControl disabled={disabled} busy={controlsBusy} />
+      <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       {jobNeedsRecovery && (
         <RunningControls
           isStreaming={isStreaming}

@@ -16,6 +16,8 @@ import {
   shouldAutoUpscale,
   shouldUpscaleSmallSource,
   computeUpscaleFactor,
+  fitsContourSupersampleBudget,
+  fitsUpscalePixelBudget,
   upscaleBy,
   upscaleDouble,
   downscaleTracedPaths,
@@ -112,6 +114,20 @@ describe('computeUpscaleFactor', () => {
     const image = barImage(200, 200, 6);
     const factor = computeUpscaleFactor(image);
     expect(image.width * factor * (image.height * factor)).toBeLessThanOrEqual(1_500_000);
+  });
+});
+
+describe('fitsUpscalePixelBudget', () => {
+  it('budgets the working raster rather than only the source pixels', () => {
+    expect(fitsUpscalePixelBudget({ width: 600, height: 600 }, 2)).toBe(true);
+    expect(fitsUpscalePixelBudget({ width: 1200, height: 1200 }, 2)).toBe(false);
+  });
+});
+
+describe('fitsContourSupersampleBudget', () => {
+  it('preserves the 1024² quality path but rejects a 1200² 2x raster', () => {
+    expect(fitsContourSupersampleBudget({ width: 1024, height: 1024 }, 2)).toBe(true);
+    expect(fitsContourSupersampleBudget({ width: 1200, height: 1200 }, 2)).toBe(false);
   });
 });
 

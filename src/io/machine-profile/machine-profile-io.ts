@@ -3,6 +3,7 @@ import {
   normalizeGcodeDialectSelection,
   normalizeGrblRxBufferBytes,
   normalizeGrblStreamingMode,
+  streamingModeForController,
   normalizeLaserFireControl,
   normalizeScanOffsetTable,
   validateMachineProfile,
@@ -250,9 +251,13 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...canonicalIdentityMetadata(profile),
     name: profile.name,
     ...canonicalMachineMetadata(profile),
+    ...canonicalCameraGeometry(profile),
     gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
     ...(profile.baudRate !== undefined ? { baudRate: profile.baudRate } : {}),
-    streamingMode: normalizeGrblStreamingMode(profile.streamingMode),
+    streamingMode: streamingModeForController(
+      profile.controllerKind,
+      normalizeGrblStreamingMode(profile.streamingMode),
+    ),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,
@@ -310,12 +315,22 @@ function canonicalMachineMetadata(profile: DeviceProfile): Partial<DeviceProfile
   return {
     ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
     ...(profile.controllerKind !== undefined ? { controllerKind: profile.controllerKind } : {}),
+    ...(profile.baudRate !== undefined ? { baudRate: profile.baudRate } : {}),
     ...(profile.laserSubProfile !== undefined
       ? { laserSubProfile: { ...profile.laserSubProfile } }
       : {}),
     ...(profile.cameraProfile !== undefined
       ? { cameraProfile: normalizeCameraProfile(profile.cameraProfile) }
       : {}),
+  };
+}
+
+function canonicalCameraGeometry(profile: DeviceProfile): Partial<DeviceProfile> {
+  const cameraCalibration = normalizeCameraCalibration(profile.cameraCalibration);
+  const cameraAlignment = normalizeCameraAlignment(profile.cameraAlignment);
+  return {
+    ...(cameraCalibration === undefined ? {} : { cameraCalibration }),
+    ...(cameraAlignment === undefined ? {} : { cameraAlignment }),
   };
 }
 

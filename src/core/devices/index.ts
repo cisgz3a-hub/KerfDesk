@@ -66,6 +66,7 @@ export type { MachineBounds } from './machine-bounds';
 export { machineBoundsForDevice } from './machine-bounds';
 export type { ProfileControllerFactMergeInput } from './profile-application';
 export { profileWithControllerFacts } from './profile-application';
+export { isStreamingModeCompatible, streamingModeForController } from './controller-streaming-mode';
 export type {
   MachineProfileSuggestion,
   MachineProfileSuggestionConfidence,

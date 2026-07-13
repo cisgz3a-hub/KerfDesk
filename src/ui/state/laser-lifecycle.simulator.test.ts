@@ -278,6 +278,10 @@ describe('GRBL-family variants against the simulator', () => {
       /does not accept numeric \$ setting writes/i,
     );
     expect(sim.outbound()).not.toContain('$30=1000\n');
+    await expect(
+      useLaserStore.getState().sendConsoleCommand('$30=1000', { confirmed: true }),
+    ).rejects.toThrow(/does not accept numeric \$ setting writes/i);
+    expect(sim.outbound()).not.toContain('$30=1000\n');
   });
 
   it('logs an advisory when the banner disagrees with the selected profile', async () => {

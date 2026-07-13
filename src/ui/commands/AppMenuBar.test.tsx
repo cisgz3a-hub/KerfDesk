@@ -289,6 +289,9 @@ describe('AppMenuBar', () => {
       for (const label of ['Measure', 'Material Test...', 'Trace Image...', 'Future Tool']) {
         expect(menu.textContent).toContain(label);
       }
+      for (const group of ['Create & measure', 'Calibrate', 'Trace', 'Other']) {
+        expect(menu.textContent).toContain(group);
+      }
       // Fallback commands render last.
       const items = [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent);
       expect(items[items.length - 1]).toBe('Future Tool');
@@ -333,6 +336,76 @@ describe('AppMenuBar', () => {
 
       expect(openFamilyLabels(host)).toEqual([]);
       expect(host.querySelector('.lf-menu')).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('implements menubar arrow, Home/End, and menu-item navigation', async () => {
+    const runMeasure = vi.fn();
+    const appCommands: ReadonlyArray<AppCommand> = [
+      ...commands(),
+      {
+        id: 'tools.measure',
+        family: 'tools',
+        label: 'Measure',
+        title: 'Measure',
+        enabled: true,
+        active: false,
+        invoke: runMeasure,
+      },
+      {
+        id: 'tools.material-test',
+        family: 'tools',
+        label: 'Material Test...',
+        title: 'Material Test',
+        enabled: true,
+        invoke: vi.fn(),
+      },
+    ];
+    const { host, root } = await renderMenu(appCommands);
+    try {
+      const bar = host.querySelector('[role="menubar"]');
+      const file = host.querySelector<HTMLElement>('[data-menu-family-summary="file"]');
+      const tools = host.querySelector<HTMLElement>('[data-menu-family-summary="tools"]');
+      expect(bar).not.toBeNull();
+      expect(file?.tabIndex).toBe(0);
+      expect(tools?.tabIndex).toBe(-1);
+      file?.focus();
+
+      await act(async () => {
+        file?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+      });
+      expect(document.activeElement).toBe(tools);
+      expect(tools?.tabIndex).toBe(0);
+
+      await act(async () => {
+        tools?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+      });
+      expect(openFamilyLabels(host)).toEqual(['Tools']);
+      expect(document.activeElement?.textContent).toBe('Measure');
+
+      await act(async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }),
+        );
+      });
+      expect(document.activeElement?.textContent).toBe('Material Test...');
+
+      await act(async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }),
+        );
+      });
+      expect(document.activeElement?.textContent).toBe('Measure');
+
+      await act(async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }),
+        );
+      });
+      expect(openFamilyLabels(host)).toEqual([]);
+      expect(document.activeElement).toBe(tools);
     } finally {
       await act(async () => root.unmount());
     }

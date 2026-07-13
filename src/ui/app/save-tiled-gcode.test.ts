@@ -115,6 +115,24 @@ describe('handleSaveTiledGcode', () => {
     expect(maxX(written.join('\n'))).toBeGreaterThan(55);
   });
 
+  it('prepends provenance, machine assumptions, and tile identity to every file', async () => {
+    const written: string[] = [];
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: tiledCncProject(),
+      savedName: 'job',
+      pushToast: () => undefined,
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    for (const file of written) {
+      expect(file).toContain('; commit:');
+      expect(file).toContain('; emitter:');
+      expect(file).toContain('GRBL $30=12000');
+      expect(file).toMatch(/; tile: row \d+, column \d+/);
+    }
+  });
+
   // GCO-02 (Codex M-04): the tiled path must run the same controller-readiness
   // gate as single-file Save. $32=1 (laser mode) on a CNC controller is a
   // blocking plunge hazard; declining the confirm must write NO tiles.
