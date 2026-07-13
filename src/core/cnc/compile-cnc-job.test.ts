@@ -83,6 +83,20 @@ describe('compileCncJob', () => {
     expect(group.passes.every((pass) => pass.kind === 'helical-contour')).toBe(true);
     expect(group.passes[0]).toMatchObject({ startZMm: 0, zMm: -2 });
     expect(group.passes.at(-1)).toMatchObject({ startZMm: -2, zMm: -4 });
+    const firstDepthPasses = group.passes.filter(
+      (pass) => pass.kind === 'helical-contour' && pass.zMm === -2,
+    );
+    expect(firstDepthPasses.length).toBeGreaterThan(1);
+    expect(
+      new Set(
+        firstDepthPasses.map((pass) =>
+          pass.kind === 'helical-contour' ? `${pass.center.x},${pass.center.y}` : '',
+        ),
+      ).size,
+    ).toBeGreaterThan(1);
+    for (const pass of firstDepthPasses) {
+      if (pass.kind === 'helical-contour') expect(pass.polyline[0]).toEqual(pass.start);
+    }
   });
 
   it('expands depth passes shallow to deep with an exact floor', () => {

@@ -7,7 +7,6 @@ export type HelicalEntryPlan =
 
 const MIN_ANGLE_DEG = 0.5;
 const MAX_ANGLE_DEG = 15;
-const FIT_MARGIN = 0.98;
 const EPSILON = 1e-7;
 
 export function planHelicalPocketPasses(
@@ -34,8 +33,8 @@ export function planHelicalPocketPasses(
       reason: 'Helical entry currently requires one island-free pocket per layer.',
     };
   }
-  const entry = entryForToolpath(entryBoundary, settings);
-  if (entry === null) {
+  const entries = toolpaths.map((toolpath) => entryForToolpath(toolpath, entryBoundary, settings));
+  if (entries.some((entry) => entry === null)) {
     return { ok: false, reason: 'The configured minimum helix diameter does not fit this pocket.' };
   }
 
@@ -44,8 +43,10 @@ export function planHelicalPocketPasses(
     const zMm = depths[depthIndex];
     if (zMm === undefined) continue;
     const startZMm = depthIndex === 0 ? 0 : (depths[depthIndex - 1] ?? 0);
-    for (const toolpath of toolpaths) {
-      passes.push(helicalPass(toolpath, entry, startZMm, zMm, settings.angleDeg));
+    for (const entry of entries) {
+      if (entry !== null) {
+        passes.push(helicalPass(entry, startZMm, zMm, settings.angleDeg));
+      }
     }
   }
   return { ok: true, passes };
@@ -83,18 +84,44 @@ function toolpathInsideBoundary(toolpath: Polyline, boundary: Polyline): boolean
   return probe !== undefined && pointInPolygon(probe, boundary.points);
 }
 
-type EntryCircle = { readonly center: Vec2; readonly radiusMm: number };
+type EntryCircle = {
+  readonly start: Vec2;
+  readonly center: Vec2;
+  readonly radiusMm: number;
+  readonly polyline: ReadonlyArray<Vec2>;
+};
 
-function entryForToolpath(toolpath: Polyline, settings: CncHelixEntrySettings): EntryCircle | null {
-  const center = polygonCentroid(toolpath.points);
-  if (center === null || !pointInPolygon(center, toolpath.points)) return null;
-  const clearance = minimumEdgeDistance(center, toolpath.points) * FIT_MARGIN;
-  const radiusMm = Math.min(settings.maxDiameterMm / 2, clearance);
-  return radiusMm * 2 + EPSILON < settings.minDiameterMm ? null : { center, radiusMm };
+function entryForToolpath(
+  toolpath: Polyline,
+  pocketBoundary: Polyline,
+  settings: CncHelixEntrySettings,
+): EntryCircle | null {
+  const points = normalizedRingPoints(toolpath.points);
+  const boundaryPoints = normalizedRingPoints(pocketBoundary.points);
+  const orientation = Math.sign(signedArea(points));
+  if (orientation === 0) return null;
+  let best: EntryCircle | null = null;
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    if (start === undefined || end === undefined) continue;
+    const candidate = tangentEntryOnEdge(
+      points,
+      boundaryPoints,
+      index,
+      start,
+      end,
+      orientation,
+      settings,
+    );
+    if (candidate !== null && (best === null || candidate.radiusMm > best.radiusMm + EPSILON)) {
+      best = candidate;
+    }
+  }
+  return best;
 }
 
 function helicalPass(
-  toolpath: Polyline,
   entry: EntryCircle,
   startZMm: number,
   zMm: number,
@@ -105,15 +132,78 @@ function helicalPass(
   const revolutions = Math.max(1, Math.ceil((startZMm - zMm) / dropPerRevolution));
   return {
     kind: 'helical-contour',
-    start: { x: entry.center.x + entry.radiusMm, y: entry.center.y },
+    start: entry.start,
     center: entry.center,
     clockwise: false,
     startZMm,
     zMm,
     revolutions,
-    polyline: ensureClosed(toolpath),
+    polyline: entry.polyline,
     closed: true,
   };
+}
+
+function tangentEntryOnEdge(
+  ring: ReadonlyArray<Vec2>,
+  pocketBoundary: ReadonlyArray<Vec2>,
+  edgeIndex: number,
+  edgeStart: Vec2,
+  edgeEnd: Vec2,
+  orientation: number,
+  settings: CncHelixEntrySettings,
+): EntryCircle | null {
+  const dx = edgeEnd.x - edgeStart.x;
+  const dy = edgeEnd.y - edgeStart.y;
+  const edgeLength = Math.hypot(dx, dy);
+  if (edgeLength <= EPSILON) return null;
+  const start = { x: (edgeStart.x + edgeEnd.x) / 2, y: (edgeStart.y + edgeEnd.y) / 2 };
+  const inward =
+    orientation > 0
+      ? { x: -dy / edgeLength, y: dx / edgeLength }
+      : { x: dy / edgeLength, y: -dx / edgeLength };
+  const minRadius = settings.minDiameterMm / 2;
+  const maxRadius = settings.maxDiameterMm / 2;
+  const circleAt = (radiusMm: number): EntryCircle => ({
+    start,
+    center: { x: start.x + inward.x * radiusMm, y: start.y + inward.y * radiusMm },
+    radiusMm,
+    polyline: reorderClosedRing(ring, edgeIndex, start),
+  });
+  const fits = (entry: EntryCircle): boolean =>
+    pointInPolygon(entry.center, pocketBoundary) &&
+    minimumEdgeDistance(entry.center, pocketBoundary) + EPSILON >= entry.radiusMm;
+
+  const maximum = circleAt(maxRadius);
+  if (fits(maximum)) return maximum;
+  const minimum = circleAt(minRadius);
+  if (!fits(minimum)) return null;
+
+  let low = minRadius;
+  let high = maxRadius;
+  for (let iteration = 0; iteration < 32; iteration += 1) {
+    const middle = (low + high) / 2;
+    if (fits(circleAt(middle))) low = middle;
+    else high = middle;
+  }
+  return circleAt(low);
+}
+
+function normalizedRingPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  const first = points[0];
+  const last = points[points.length - 1];
+  return first !== undefined &&
+    last !== undefined &&
+    Math.hypot(first.x - last.x, first.y - last.y) <= EPSILON
+    ? points.slice(0, -1)
+    : points;
+}
+
+function reorderClosedRing(
+  points: ReadonlyArray<Vec2>,
+  edgeIndex: number,
+  start: Vec2,
+): ReadonlyArray<Vec2> {
+  return [start, ...points.slice(edgeIndex + 1), ...points.slice(0, edgeIndex + 1), start];
 }
 
 function polygonCentroid(points: ReadonlyArray<Vec2>): Vec2 | null {
@@ -178,15 +268,6 @@ function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
     if (point.x < crossingX) inside = !inside;
   }
   return inside;
-}
-
-function ensureClosed(toolpath: Polyline): ReadonlyArray<Vec2> {
-  const first = toolpath.points[0];
-  const last = toolpath.points[toolpath.points.length - 1];
-  if (first === undefined || last === undefined) return toolpath.points;
-  return Math.hypot(first.x - last.x, first.y - last.y) <= EPSILON
-    ? toolpath.points
-    : [...toolpath.points, first];
 }
 
 function validSettings(settings: CncHelixEntrySettings): boolean {

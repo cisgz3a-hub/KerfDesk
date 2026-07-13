@@ -12,8 +12,18 @@ const square: Polyline = {
   ],
 };
 
+const insetSquare: Polyline = {
+  closed: true,
+  points: [
+    { x: 4, y: 4 },
+    { x: 16, y: 4 },
+    { x: 16, y: 16 },
+    { x: 4, y: 16 },
+  ],
+};
+
 describe('planHelicalPocketPasses', () => {
-  it('centers a bounded circle and creates a depth ladder of native helix passes', () => {
+  it('places a bounded tangent circle and creates a depth ladder of native helix passes', () => {
     const result = planHelicalPocketPasses([square], [-2, -4], {
       maxDiameterMm: 10,
       minDiameterMm: 4,
@@ -24,13 +34,42 @@ describe('planHelicalPocketPasses', () => {
     expect(result.passes).toHaveLength(2);
     expect(result.passes[0]).toMatchObject({
       kind: 'helical-contour',
-      start: { x: 15, y: 10 },
-      center: { x: 10, y: 10 },
+      start: { x: 10, y: 0 },
+      center: { x: 10, y: 5 },
       startZMm: 0,
       zMm: -2,
       revolutions: 1,
     });
+    expect(result.passes[0]?.kind === 'helical-contour' && result.passes[0].polyline[0]).toEqual({
+      x: 10,
+      y: 0,
+    });
     expect(result.passes[1]).toMatchObject({ startZMm: -2, zMm: -4 });
+  });
+
+  it('uses a local tangent helix for every offset ring instead of reusing one center entry', () => {
+    const result = planHelicalPocketPasses([square, insetSquare], [-2], {
+      maxDiameterMm: 4,
+      minDiameterMm: 2,
+      angleDeg: 5,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.passes).toHaveLength(2);
+    expect(result.passes[0]).toMatchObject({
+      kind: 'helical-contour',
+      start: { x: 10, y: 0 },
+      center: { x: 10, y: 2 },
+    });
+    expect(result.passes[1]).toMatchObject({
+      kind: 'helical-contour',
+      start: { x: 10, y: 4 },
+      center: { x: 10, y: 6 },
+    });
+    for (const pass of result.passes) {
+      expect(pass.kind).toBe('helical-contour');
+      if (pass.kind === 'helical-contour') expect(pass.polyline[0]).toEqual(pass.start);
+    }
   });
 
   it('adds revolutions until the configured maximum ramp angle is respected', () => {
