@@ -18,4 +18,18 @@ describe('variable template source', () => {
     expect(parseVariableTemplateSource('{{serial:0}}')).toMatchObject({ ok: false });
     expect(parseVariableTemplateSource('plain text')).toMatchObject({ ok: false });
   });
+
+  it('preserves configured serial fields and CSV column names verbatim', () => {
+    const template = {
+      tokens: [
+        { kind: 'serial' as const, prefix: 'LOT {{A}}: ', width: 6, offset: -3 },
+        { kind: 'literal' as const, value: ' / ' },
+        { kind: 'csv' as const, column: '  fixture {{name}} %  ' },
+      ],
+    };
+
+    const result = parseVariableTemplateSource(variableTemplateToSource(template));
+
+    expect(result).toEqual({ ok: true, template });
+  });
 });

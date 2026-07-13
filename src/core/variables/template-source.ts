@@ -35,6 +35,8 @@ function parseTag(
   | { readonly ok: false; readonly message: string } {
   const simple = SIMPLE_TAGS[tag];
   if (simple !== undefined) return { ok: true, token: simple };
+  if (tag.startsWith('csv-json:')) return parseEncodedCsv(tag.slice(9));
+  if (tag.startsWith('serial-json:')) return parseEncodedSerial(tag.slice(12));
   if (tag.startsWith('csv:')) {
     const column = tag.slice(4).trim();
     return column === ''
@@ -48,6 +50,55 @@ function parseTag(
       : { ok: false, message: 'Serial width must be an integer from 1 to 20.' };
   }
   return { ok: false, message: `Unknown variable field "${tag}".` };
+}
+
+function parseEncodedCsv(
+  source: string,
+):
+  | { readonly ok: true; readonly token: VariableTemplateToken }
+  | { readonly ok: false; readonly message: string } {
+  const column = decodeJson(source);
+  return typeof column === 'string' && column !== ''
+    ? { ok: true, token: { kind: 'csv', column } }
+    : { ok: false, message: 'Choose a valid CSV column for the variable field.' };
+}
+
+function parseEncodedSerial(
+  source: string,
+):
+  | { readonly ok: true; readonly token: VariableTemplateToken }
+  | { readonly ok: false; readonly message: string } {
+  const value = decodeJson(source);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { ok: false, message: 'Choose valid serial field settings.' };
+  }
+  const { prefix, width, offset } = value as Record<string, unknown>;
+  if (
+    typeof prefix !== 'string' ||
+    !Number.isInteger(width) ||
+    Number(width) < 1 ||
+    Number(width) > 20 ||
+    (offset !== undefined && !Number.isSafeInteger(offset))
+  ) {
+    return { ok: false, message: 'Choose valid serial field settings.' };
+  }
+  return {
+    ok: true,
+    token: {
+      kind: 'serial',
+      prefix,
+      width: Number(width),
+      ...(offset === undefined ? {} : { offset: Number(offset) }),
+    },
+  };
+}
+
+function decodeJson(source: string): unknown {
+  try {
+    return JSON.parse(decodeURIComponent(source));
+  } catch {
+    return undefined;
+  }
 }
 
 const SIMPLE_TAGS: Readonly<Record<string, VariableTemplateToken>> = {
@@ -67,8 +118,16 @@ function tokenToSource(token: VariableTemplateToken): string {
       token.format === 'date-iso' ? 'date' : token.format === 'time-24h' ? 'time' : 'datetime';
     return `{{${tag}}}`;
   }
-  if (token.kind === 'serial') return `{{serial:${token.width}}}`;
-  if (token.kind === 'csv') return `{{csv:${token.column}}}`;
+  if (token.kind === 'serial') {
+    return token.prefix === '' && token.offset === undefined
+      ? `{{serial:${token.width}}}`
+      : encodedTag('serial-json', token);
+  }
+  if (token.kind === 'csv') {
+    return token.column.trim() === token.column && !/[{}]/.test(token.column)
+      ? `{{csv:${token.column}}}`
+      : encodedTag('csv-json', token.column);
+  }
   const tags = {
     'power-percent': 'power',
     'speed-mm-min': 'speed',
@@ -76,4 +135,8 @@ function tokenToSource(token: VariableTemplateToken): string {
     'air-assist': 'air',
   } as const;
   return `{{${tags[token.field]}}}`;
+}
+
+function encodedTag(kind: 'csv-json' | 'serial-json', value: unknown): string {
+  return `{{${kind}:${encodeURIComponent(JSON.stringify(value))}}}`;
 }

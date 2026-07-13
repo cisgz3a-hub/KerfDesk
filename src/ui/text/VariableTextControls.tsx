@@ -3,7 +3,7 @@ import type {
   VariableAdvancementPolicy,
   VariableCsvDataset,
 } from '../../core/scene';
-import { parseVariableCsv } from '../../core/variables';
+import { parseVariableCsv, variableTemplateToSource } from '../../core/variables';
 import { Button, NumberInput } from '../kit';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
@@ -29,7 +29,9 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
         {props.firstColumn === undefined ? null : (
           <Insert
             label={`CSV: ${props.firstColumn}`}
-            source={`{{csv:${props.firstColumn}}}`}
+            source={variableTemplateToSource({
+              tokens: [{ kind: 'csv', column: props.firstColumn }],
+            })}
             insert={props.onInsert}
           />
         )}
