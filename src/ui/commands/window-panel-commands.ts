@@ -32,5 +32,29 @@ export function windowPanelCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
         ),
         active: ctx.machinePanelOpen,
       };
-  return [layers, machine];
+  const toggleSidePanels = ctx.jobActive
+    ? disabled(
+        'window.toggle-side-panels',
+        'window',
+        'Toggle Side Panels',
+        'Side panels stay visible while a job is active so Stop remains reachable',
+        ctx.toggleSidePanels,
+        'F12',
+      )
+    : enabled(
+        'window.toggle-side-panels',
+        'window',
+        'Toggle Side Panels',
+        'Show or hide both side panels',
+        ctx.toggleSidePanels,
+        'F12',
+      );
+  const resetLayout = enabled(
+    'window.reset-layout',
+    'window',
+    'Reset Workspace Layout',
+    'Restore both side panels to the standard workspace layout',
+    ctx.resetWorkspaceLayout,
+  );
+  return [layers, machine, toggleSidePanels, resetLayout];
 }

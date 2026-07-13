@@ -27,6 +27,15 @@ afterEach(async () => {
 });
 
 describe('NumericEditsBar', () => {
+  it('contains fixed-width fields with local horizontal scrolling', async () => {
+    const container = await render(<NumericEditsBar />);
+    const toolbar = container.querySelector('section[aria-label="Numeric Edits Toolbar"]');
+    expect(toolbar).toBeInstanceOf(HTMLElement);
+    expect((toolbar as HTMLElement).style.overflowX).toBe('auto');
+    expect((toolbar as HTMLElement).style.minWidth).toBe('0');
+    expect((toolbar as HTMLElement).style.maxWidth).toBe('100%');
+  });
+
   it('renders disabled numeric fields when nothing is selected', async () => {
     const container = await render(<NumericEditsBar />);
 

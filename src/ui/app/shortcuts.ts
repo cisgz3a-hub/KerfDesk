@@ -94,6 +94,7 @@ export type ViewCtx = {
   // default F behaviour at the call site? No — the binding skips so
   // the bare F keypress still fires next).
   readonly fitToSelection: () => void;
+  readonly toggleSidePanels: () => void;
 };
 
 function hasMeta(e: KeyboardEvent): boolean {
@@ -396,6 +397,7 @@ function tryShiftFitToSelection(e: KeyboardEvent, ctx: ViewCtx): boolean {
 
 export function handleViewShortcut(e: KeyboardEvent, ctx: ViewCtx): boolean {
   if (isEditableTarget(e)) return false;
+  if (tryToggleSidePanels(e, ctx)) return true;
   if (tryShiftFitToSelection(e, ctx)) return true;
   if (hasMeta(e) || e.shiftKey) return false;
   const key = e.key.toLowerCase();
@@ -424,4 +426,11 @@ export function handleViewShortcut(e: KeyboardEvent, ctx: ViewCtx): boolean {
     default:
       return false;
   }
+}
+
+function tryToggleSidePanels(e: KeyboardEvent, ctx: ViewCtx): boolean {
+  if (e.key !== 'F12' || hasMeta(e) || e.altKey || e.shiftKey) return false;
+  e.preventDefault();
+  ctx.toggleSidePanels();
+  return true;
 }

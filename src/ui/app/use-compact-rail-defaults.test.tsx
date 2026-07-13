@@ -2,7 +2,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useUiStore } from '../state/ui-store';
-import { COMPACT_RAIL_QUERY, useCompactRailDefaults } from './use-compact-rail-defaults';
+import {
+  COMPACT_RAIL_QUERY,
+  NARROW_RAIL_QUERY,
+  useCompactRailDefaults,
+} from './use-compact-rail-defaults';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -16,14 +20,16 @@ afterEach(() => {
 
 describe('useCompactRailDefaults', () => {
   it('starts compact layouts collapsed but allows a rail to be reopened', async () => {
-    const media = fakeMediaQuery(true);
+    const compact = fakeMediaQuery(COMPACT_RAIL_QUERY, true);
+    const narrow = fakeMediaQuery(NARROW_RAIL_QUERY, true);
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => media.query),
+      vi.fn((query: string) => (query === COMPACT_RAIL_QUERY ? compact.query : narrow.query)),
     );
     const view = await renderProbe();
     try {
       expect(window.matchMedia).toHaveBeenCalledWith(COMPACT_RAIL_QUERY);
+      expect(window.matchMedia).toHaveBeenCalledWith(NARROW_RAIL_QUERY);
       expect(useUiStore.getState().railPanelVisibility).toEqual({
         layers: false,
         machine: false,
@@ -36,16 +42,35 @@ describe('useCompactRailDefaults', () => {
     }
   });
 
-  it('collapses the rails each time the viewport enters compact mode', async () => {
-    const media = fakeMediaQuery(false);
+  it('keeps layers visible but collapses machine controls at laptop widths', async () => {
+    const compact = fakeMediaQuery(COMPACT_RAIL_QUERY, false);
+    const narrow = fakeMediaQuery(NARROW_RAIL_QUERY, true);
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => media.query),
+      vi.fn((query: string) => (query === COMPACT_RAIL_QUERY ? compact.query : narrow.query)),
+    );
+    const view = await renderProbe();
+    try {
+      expect(useUiStore.getState().railPanelVisibility).toEqual({
+        layers: true,
+        machine: false,
+      });
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('collapses the rails each time the viewport enters compact mode', async () => {
+    const compact = fakeMediaQuery(COMPACT_RAIL_QUERY, false);
+    const narrow = fakeMediaQuery(NARROW_RAIL_QUERY, false);
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => (query === COMPACT_RAIL_QUERY ? compact.query : narrow.query)),
     );
     const view = await renderProbe();
     try {
       expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: true });
-      act(() => media.emit(true));
+      act(() => compact.emit(true));
       expect(useUiStore.getState().railPanelVisibility).toEqual({
         layers: false,
         machine: false,
@@ -77,14 +102,17 @@ async function renderProbe(): Promise<{ readonly unmount: () => Promise<void> }>
   };
 }
 
-function fakeMediaQuery(initial: boolean): {
+function fakeMediaQuery(
+  media: string,
+  initial: boolean,
+): {
   readonly query: MediaQueryList;
   readonly emit: (matches: boolean) => void;
 } {
   let listener: ((event: MediaQueryListEvent) => void) | null = null;
   const query = {
     matches: initial,
-    media: COMPACT_RAIL_QUERY,
+    media,
     onchange: null,
     addEventListener: (_type: string, next: (event: MediaQueryListEvent) => void) => {
       listener = next;

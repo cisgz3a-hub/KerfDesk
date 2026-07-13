@@ -4,6 +4,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open...' }).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
+  await dismissNotifications(page);
 });
 
 test('creates arrays, nests them, previews them, and saves one undoable project', async ({
@@ -335,7 +336,8 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   page,
   kerfdesk,
 }) => {
-  await page.getByRole('button', { name: 'Set up device' }).click();
+  await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+  await page.getByRole('button', { name: 'Run guided setup', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Device Setup' })).toContainText('Step 1 of 7');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
@@ -480,7 +482,10 @@ test('shares jog speed across buttons, keyboard movement, and return to work zer
     .toBe(1);
   await kerfdesk.emitSerialLine('<Idle|MPos:50.000,40.000,0.000|WCO:10.000,20.000,0.000|FS:0,0>');
 
-  await page.getByRole('button', { name: 'Go to work zero' }).click();
+  const goToWorkZero = page.getByRole('button', { name: 'Go to work zero' });
+  await expect(goToWorkZero).toBeEnabled();
+  await dismissNotifications(page);
+  await goToWorkZero.click();
   await expect
     .poll(async () =>
       exactSerialWriteCount(await kerfdesk.events(), '$J=G91 G21 X-40.000 Y-20.000 F1000\n'),
@@ -490,6 +495,13 @@ test('shares jog speed across buttons, keyboard movement, and return to work zer
 
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
+}
+
+async function dismissNotifications(page: Page): Promise<void> {
+  const notifications = page.getByRole('button', { name: /^Dismiss notification:/ });
+  while ((await notifications.count()) > 0) {
+    await notifications.first().click();
+  }
 }
 
 async function fillAndCommit(page: Page, name: string, value: string): Promise<void> {

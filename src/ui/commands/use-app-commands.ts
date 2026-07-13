@@ -1,6 +1,7 @@
 import { profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
 import { confirmDiscardAsync } from '../app/confirm-discard';
+import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
 import {
   handleImportDxf,
@@ -85,6 +86,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       printAndCutFeatureEnabled,
       printAndCutProfileSupported: app.project.device.homing.enabled,
       printAndCut: callbacks.requestPrintAndCut,
+      toggleSidePanels: () => toggleWorkspaceSidePanels(useUiStore.getState()),
+      resetWorkspaceLayout: () => resetWorkspaceLayout(useUiStore.getState()),
     }),
   );
 }
@@ -103,13 +106,7 @@ function appCommandContext(
   const selection = { selected, selectedIds, imageMaskPair };
   const hasMaskedRasterSelection =
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
-  const activeStreamer =
-    laser.streamer !== null &&
-    // 'tool-change' is an active hold: Frame/Home/Start and other job-active
-    // commands must stay blocked (the jog/probe/Zero-Z the operator needs at a
-    // tool change are gated separately by the setup gate). Codex audit: this
-    // status list was not updated when tool-change landed.
-    ['streaming', 'paused', 'done', 'errored', 'tool-change'].includes(laser.streamer.status);
+  const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
   return {
     ...fileCommandContext(callbacks, platform, app, laser, pushToast),
     ...editCommandContext(app, dialogs),
@@ -163,6 +160,15 @@ function appCommandContext(
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
   };
+}
+
+function isActiveStreamerStatus(status: string | undefined): boolean {
+  // A tool change is an active hold: job-active commands remain blocked while
+  // the setup controls needed to continue are gated separately.
+  return (
+    status !== undefined &&
+    ['streaming', 'paused', 'done', 'errored', 'tool-change'].includes(status)
+  );
 }
 
 function connectionCommandContext(

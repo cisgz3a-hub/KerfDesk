@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { useConfirmSaveStore } from '../state/confirm-save-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { useUiStore } from '../state/ui-store';
 import { PlatformProvider } from './platform-context';
 import { useShortcuts } from './use-shortcuts';
 
@@ -70,6 +71,8 @@ afterEach(() => {
   useConfirmSaveStore.getState().choose('cancel'); // resolve any dangling request
   useStore.getState().newProject();
   useLaserStore.setState({ streamer: null } as Partial<ReturnType<typeof useLaserStore.getState>>);
+  useUiStore.getState().setRailPanelVisible('layers', true);
+  useUiStore.getState().setRailPanelVisible('machine', true);
   for (const toast of useToastStore.getState().toasts) {
     useToastStore.getState().dismissToast(toast.id);
   }
@@ -97,6 +100,29 @@ describe('file shortcuts while a job is streaming (H13)', () => {
       true,
     );
 
+    await unmount();
+  });
+});
+
+describe('F12 workspace panels while a job is streaming', () => {
+  it('does not hide machine controls while Stop must remain reachable', async () => {
+    useLaserStore.setState({
+      streamer: step(createStreamer('G1 X1 S100')).state,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const unmount = await renderHarness();
+
+    await pressKey({ key: 'F12' });
+
+    expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: true });
+    await unmount();
+  });
+
+  it('toggles both panels together while idle', async () => {
+    const unmount = await renderHarness();
+
+    await pressKey({ key: 'F12' });
+
+    expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: false, machine: false });
     await unmount();
   });
 });

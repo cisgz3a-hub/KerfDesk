@@ -44,6 +44,8 @@ export type CommandDialogs = {
   readonly toggleLayersPanel: () => void;
   readonly machinePanelOpen: boolean;
   readonly toggleMachinePanel: () => void;
+  readonly toggleSidePanels: () => void;
+  readonly resetWorkspaceLayout: () => void;
   readonly rotaryFeatureEnabled: boolean;
   readonly rotaryProfileSupported: boolean;
   readonly printAndCutFeatureEnabled: boolean;

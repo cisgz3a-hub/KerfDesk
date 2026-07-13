@@ -6,7 +6,13 @@ export function railPanelCommandContext(
   jobActive: boolean,
 ): Pick<
   AppCommandContext,
-  'jobActive' | 'layersPanelOpen' | 'toggleLayersPanel' | 'machinePanelOpen' | 'toggleMachinePanel'
+  | 'jobActive'
+  | 'layersPanelOpen'
+  | 'toggleLayersPanel'
+  | 'machinePanelOpen'
+  | 'toggleMachinePanel'
+  | 'toggleSidePanels'
+  | 'resetWorkspaceLayout'
 > {
   return {
     jobActive,
@@ -14,5 +20,7 @@ export function railPanelCommandContext(
     toggleLayersPanel: dialogs.toggleLayersPanel,
     machinePanelOpen: dialogs.machinePanelOpen,
     toggleMachinePanel: dialogs.toggleMachinePanel,
+    toggleSidePanels: dialogs.toggleSidePanels,
+    resetWorkspaceLayout: dialogs.resetWorkspaceLayout,
   };
 }

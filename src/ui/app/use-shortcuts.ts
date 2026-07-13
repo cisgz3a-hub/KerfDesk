@@ -16,6 +16,7 @@ import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { confirmDiscardAsync } from './confirm-discard';
 import { usePlatform } from './platform-context';
+import { toggleWorkspaceSidePanels } from './workspace-panel-actions';
 import {
   type EditCtx,
   type FileCtx,
@@ -123,6 +124,15 @@ function useTransformViewShortcuts(): void {
   const fitToSelection = useStore((s) => s.fitToSelection);
   const resetView = useUiStore((s) => s.resetView);
   const zoomBy = useUiStore((s) => s.zoomBy);
+  const toggleSidePanels = (): void => {
+    const streamer = useLaserStore.getState().streamer;
+    if (
+      streamer !== null &&
+      ['streaming', 'paused', 'done', 'errored', 'tool-change'].includes(streamer.status)
+    )
+      return;
+    toggleWorkspaceSidePanels(useUiStore.getState());
+  };
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;
@@ -138,7 +148,13 @@ function useTransformViewShortcuts(): void {
         })
       )
         return;
-      handleViewShortcut(e, { togglePreview, resetView, zoomBy, fitToSelection });
+      handleViewShortcut(e, {
+        togglePreview,
+        resetView,
+        zoomBy,
+        fitToSelection,
+        toggleSidePanels,
+      });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

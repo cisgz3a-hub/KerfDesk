@@ -12,6 +12,7 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { machineControlsLabel, machineDisplayName, machineNoun } from '../machine/machine-labels';
 import { ConnectionBar } from './ConnectionBar';
+import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { DeviceSetupControls } from './device-setup';
@@ -106,7 +107,7 @@ export function LaserWindow(): JSX.Element {
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void runStartJobFlow()}
       />
-      <ConsolePanel />
+      <MachineConsoleSection />
     </aside>
   );
 }
@@ -151,6 +152,17 @@ function MachineRailHeading(props: {
       collapseDisabled={props.jobActive}
       collapseDisabledReason="Machine controls stay visible while a job is active so Stop remains reachable."
     />
+  );
+}
+
+function MachineConsoleSection(): JSX.Element {
+  return (
+    <CollapsibleRailSection
+      label="Console"
+      title="Show advanced controller commands and communication history."
+    >
+      <ConsolePanel />
+    </CollapsibleRailSection>
   );
 }
 
