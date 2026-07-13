@@ -42,6 +42,7 @@
 | ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
+| ADR-174 | 2026-07-13 | Accepted | Probe-derived Z evidence requires plate-removal acknowledgement |
 
 ---
 
@@ -7118,3 +7119,32 @@ could unlock Continue. Comment labels improved operator guidance but were not st
 Changing the selected cutter or compiling a different first section can no longer reuse unrelated
 Z evidence. The host proves consistency between operator-selected tool identity, Z evidence, and
 the compiled plan; it still cannot physically sense the cutter, clamp, touch plate, or spindle.
+
+---
+
+## ADR-174 - Probe-derived Z evidence requires plate-removal acknowledgement
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+A successful touch-plate probe established valid Z0 and immediately satisfied the Start/Continue
+datum gate. The conductive plate and clip can still be physically attached or lying on the stock.
+The first safe-Z lift does not remove that later collision/electrical hazard, and the host has no
+plate-presence sensor.
+
+### Decision
+
+- Successful probe evidence is created with plate removal unconfirmed. Manual Zero Z is unaffected.
+- The probe panel presents a persistent, explicit removal action after the transaction settles:
+  remove the plate and lead, then click **Confirm plate removed**.
+- CNC Start and M0 Continue reject otherwise-current probe evidence until that acknowledgement is
+  recorded. Reference/tool invalidation discards it together with the parent Z evidence.
+- Confirmation is accepted only for current probe evidence and is logged as operator evidence, not
+  described as sensor verification.
+
+### Consequences
+
+Probe success can no longer flow directly into spindle/cutting motion while the setup accessory is
+known to be unresolved. The gate adds one deliberate operator step and improves error-proofing, but
+cannot detect a false confirmation; machine-integrated plate-presence sensing remains future work.

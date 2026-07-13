@@ -200,6 +200,7 @@ export type LaserState = {
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   // ADR-103 G2 - run a prepared touch-plate probing sequence.
   readonly probe: (lines: ReadonlyArray<string>) => Promise<ProbeResult>;
+  readonly confirmProbePlateRemoved: () => void;
   // ADR-103 G3 - send a real-time override byte (legal mid-job by design).
   readonly sendRealtimeOverride: (byte: RealtimeOverrideByte) => Promise<void>;
   readonly unlockAlarm: () => Promise<void>;

@@ -132,7 +132,7 @@ describe('toolChangeContinueBlockMessage', () => {
       toolChangeContinueBlockMessage({
         ...needsZZero,
         workZReferenceEpoch: 1,
-        workZZeroEvidence: { source: 'probe', referenceEpoch: 0 },
+        workZZeroEvidence: { source: 'probe', referenceEpoch: 0, probePlateRemoved: true },
       }),
     ).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
 

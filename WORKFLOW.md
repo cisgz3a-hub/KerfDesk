@@ -1990,7 +1990,10 @@ F-CNC19 tiling.
    Start compares it with the first bit in the exact compiled tool-section plan;
    missing or mismatched identity blocks until the planned bit is loaded,
    selected, and referenced again.
-3. Set Origin establishes XY only and does not satisfy this gate. Laser Start
+3. Probe-derived evidence starts with touch-plate removal unconfirmed. Start
+   remains blocked until the operator removes both plate and probe lead and
+   clicks **Confirm plate removed** in the probe panel.
+4. Set Origin establishes XY only and does not satisfy this gate. Laser Start
    is unaffected.
 
 #### Success
@@ -1999,7 +2002,8 @@ F-CNC19 tiling.
    as Active, jogs Z to touch the stock top, zeros Z (or probes), and resumes.
 2. **Continue remains disabled** until the pre-change retract/park has drained
    to a fresh controller Idle and the new tool's Z zero has been established
-   with the stable tool ID expected by the compiled section plan.
+   with the stable tool ID expected by the compiled section plan. A probe also
+   requires explicit plate-removal confirmation.
 3. Continue first emits `G0 Z<safe>` with the spindle off. Only after that
    clearance move does it emit M3 + spin-up dwell and resume cutting.
 
@@ -2009,8 +2013,9 @@ F-CNC19 tiling.
    That evidence records whether it came from manual Zero Z or a settled probe
    and must match the current work-Z reference epoch.
 2. KerfDesk proves agreement between the selected Active-bit ID, the Z evidence,
-   and the compiled plan. It cannot sense the physical cutter; truthful tool
-   selection, clamping, touch-plate removal, and actual spindle-at-speed remain
+   and the compiled plan, and records an explicit plate-removal acknowledgement.
+   It cannot sense the physical cutter or plate; truthful tool selection,
+   removal confirmation, clamping, and actual spindle-at-speed remain
    operator/machine responsibilities.
 
 #### Empty

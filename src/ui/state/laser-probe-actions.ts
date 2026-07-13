@@ -46,8 +46,9 @@ export function probeActions(
   get: GetFn,
   refs: ProbeRefs,
   safeWrite: SafeWriteFn,
-): Pick<LaserState, 'probe'> {
+): Pick<LaserState, 'probe' | 'confirmProbePlateRemoved'> {
   return {
+    confirmProbePlateRemoved: () => set(confirmProbePlateRemovedPatch),
     probe: async (lines): Promise<ProbeResult> => {
       const preflight = probePreflight(get(), refs, lines);
       if (preflight !== null) return preflight;
@@ -118,6 +119,21 @@ export function probeActions(
         return result;
       }
     },
+  };
+}
+
+function confirmProbePlateRemovedPatch(state: LaserState): Partial<LaserState> {
+  const evidence = state.workZZeroEvidence;
+  if (
+    evidence?.source !== 'probe' ||
+    evidence.referenceEpoch !== state.workZReferenceEpoch ||
+    evidence.probePlateRemoved === true
+  ) {
+    return {};
+  }
+  return {
+    workZZeroEvidence: { ...evidence, probePlateRemoved: true },
+    log: pushLog(state, '[lf2] Operator confirmed the touch plate and probe lead are removed.'),
   };
 }
 
