@@ -2490,6 +2490,26 @@ F-CNC19 tiling.
    set their material on the layer card, or re-pick the project material to
    apply to all.
 
+### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
+
+#### Success
+1. Set Origin changes X/Y only. If KerfDesk already knows the prior Z offset,
+   it preserves that Z; otherwise it waits for a fresh WCO-bearing status
+   instead of copying machine Z into the work-offset cache.
+2. Reset Origin and persistent-origin flows that send `G92.1` invalidate
+   work-Z evidence because GRBL clears every transient G92 axis.
+
+#### Error — acknowledgement or readback failure
+1. Existing origin transaction rules remain fail-closed: a rejected, alarmed,
+   timed-out, or disconnected mutation leaves origin truth unknown and Z
+   evidence unavailable.
+
+#### Edge — persistent probe-derived Z
+1. The current store records work-Z as a boolean, not its controller offset
+   source. After `G92.1`, KerfDesk conservatively requires a new touch-off even
+   when a persistent G54 Z may still exist; later `$#` readback may prove and
+   preserve that distinction.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

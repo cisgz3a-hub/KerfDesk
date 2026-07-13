@@ -138,8 +138,26 @@ describe('laser-store origin actions', () => {
 
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g92');
-    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
+    // The command proves X/Y zero, but the pre-command Z offset was unknown.
+    // Wait for a WCO-bearing status instead of inventing WCO.z from MPos.z.
+    expect(useLaserStore.getState().wcoCache).toBeNull();
     expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
+  it('preserves a known Z offset when Set Origin changes X/Y only', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,5.000|FS:0,0>');
+    useLaserStore.setState({
+      wcoCache: { x: 1, y: 2, z: 7 },
+      workZZeroKnown: true,
+    });
+
+    await acknowledge(connection, useLaserStore.getState().setOriginHere());
+
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 7 });
+    expect(useLaserStore.getState().workZZeroKnown).toBe(true);
   });
 
   it('Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)', async () => {
@@ -164,12 +182,14 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().workZZeroKnown).toBe(true);
   });
 
-  it('marks the work origin persistent after advanced Set Persistent Origin succeeds', async () => {
+  it('marks the XY origin persistent but invalidates Z cleared by G92.1', async () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
     useLaserStore.setState({
+      workZZeroKnown: true,
+      wcoCache: { x: 1, y: 2, z: 5 },
       frameVerification: {
         boundsSignature: 'old',
         wco: { x: 12, y: 34, z: 0 },
@@ -192,7 +212,8 @@ describe('laser-store origin actions', () => {
 
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
-    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().wcoCache).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
   });
 
@@ -216,6 +237,7 @@ describe('laser-store origin actions', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g92',
+      workZZeroKnown: true,
       wcoCache: { x: 12, y: 34, z: 0 },
     });
 
@@ -224,6 +246,7 @@ describe('laser-store origin actions', () => {
     expect(write).toHaveBeenCalledWith('G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().workOriginSource).toBe('none');
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
     expect(useLaserStore.getState().wcoCache).toBeNull();
   });
 
@@ -234,7 +257,8 @@ describe('laser-store origin actions', () => {
     useLaserStore.setState({
       workOriginActive: true,
       workOriginSource: 'g54-persistent',
-      wcoCache: { x: 12, y: 34, z: 0 },
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
     });
 
     await acknowledge(connection, useLaserStore.getState().resetOrigin());
@@ -242,7 +266,8 @@ describe('laser-store origin actions', () => {
     expect(write).toHaveBeenCalledWith('G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
-    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().wcoCache).toBeNull();
   });
 
   it('clears persistent G54 origin through the advanced clear action', async () => {
