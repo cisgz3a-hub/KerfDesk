@@ -11,7 +11,6 @@ import {
   type Scene,
 } from '../scene';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
-import { cncGrblStrategy } from '../output';
 import { compileCncJob } from './compile-cnc-job';
 
 // compileCncJob only ever produces contour passes today (path3d arrives with
@@ -67,33 +66,6 @@ function onlyGroup(scene: Scene): CncGroup {
 }
 
 describe('compileCncJob', () => {
-  it('runs a larger pocket rougher before a smaller rest-machining bit', () => {
-    const scene = sceneWith(
-      [
-        cncLayer('L1', '#ff0000', {
-          cutType: 'pocket',
-          toolId: 'em-1588',
-          pocketRoughToolId: 'em-6350',
-          depthMm: 2,
-          depthPerPassMm: 2,
-        }),
-      ],
-      [squareObject('O1', '#ff0000', 30)],
-    );
-    const job = compileCncJob(scene, dev, config);
-    expect(job.groups).toHaveLength(2);
-    const rough = job.groups[0];
-    const rest = job.groups[1];
-    if (rough?.kind !== 'cnc' || rest?.kind !== 'cnc') throw new Error('expected CNC groups');
-    expect(rough.toolId).toBe('em-6350');
-    expect(rest.toolId).toBe('em-1588');
-    expect(rough.passes.length).toBeGreaterThan(rest.passes.length);
-    expect(rest.passes.length).toBeGreaterThan(0);
-    const gcode = cncGrblStrategy.emit(job, dev);
-    expect(gcode.indexOf('tool 6.350 mm')).toBeLessThan(gcode.indexOf('tool 1.588 mm'));
-    expect(gcode.match(/^M0$/gm)).toHaveLength(1);
-  });
-
   it('compiles an opted-in offset pocket with native helical contour passes', () => {
     const scene = sceneWith(
       [

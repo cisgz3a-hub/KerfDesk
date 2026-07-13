@@ -54,6 +54,62 @@ function squareObject(id: string, color: string, size: number): SceneObject {
 }
 
 describe('runCncPreflight', () => {
+  it('accepts a verified island-free adaptive pocket', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      pocketStrategy: 'adaptive',
+      adaptiveOptimalLoadMm: 0.4,
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues.some((issue) => issue.code === 'cnc-adaptive-clearing-invalid')).toBe(
+      false,
+    );
+  });
+
+  it('blocks adaptive island pockets instead of crossing uncleared stock', () => {
+    const base = projectWithCnc({ cutType: 'pocket', pocketStrategy: 'adaptive' });
+    const outer = squareObject('outer', '#ff0000', 30);
+    const island = squareObject('island', '#ff0000', 10);
+    const movedIsland: SceneObject = {
+      ...island,
+      transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+    };
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [outer, movedIsland] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-adaptive-clearing-invalid',
+        message: expect.stringContaining('island-free'),
+      }),
+    );
+  });
+
+  it('blocks adaptive clearing when optimal load exceeds half the bit diameter', () => {
+    const base = projectWithCnc({
+      cutType: 'pocket',
+      pocketStrategy: 'adaptive',
+      adaptiveOptimalLoadMm: 2,
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-adaptive-clearing-invalid',
+        message: expect.stringContaining('half the bit diameter'),
+      }),
+    );
+  });
+
   it('blocks rest machining when the roughing bit is not larger', () => {
     const base = projectWithCnc({
       cutType: 'pocket',

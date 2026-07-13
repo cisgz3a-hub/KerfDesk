@@ -21,6 +21,7 @@ import { RestPocketToolSelect } from './CncRestPocketFields';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
+import { AdaptivePocketFields } from './AdaptivePocketFields';
 
 // The whole advanced field set, gated by one conditional in the parent
 // (ADR-111 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
@@ -41,6 +42,11 @@ export function CncLayerAdvancedGroup(props: {
         onCommit={props.onCommit}
       />
       <PocketFillRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <AdaptivePocketFields
+        layer={props.layer}
+        settings={props.settings}
+        onCommit={props.onCommit}
+      />
       <CutTypeSections
         layer={props.layer}
         settings={props.settings}
@@ -138,6 +144,13 @@ export function StepoverField(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element | null {
   if (props.settings.cutType !== 'pocket' && !props.hasReliefObjects) return null;
+  if (
+    props.settings.cutType === 'pocket' &&
+    props.settings.pocketStrategy === 'adaptive' &&
+    !props.hasReliefObjects
+  ) {
+    return null;
+  }
   return (
     <NumberField
       layer={props.layer}
@@ -190,17 +203,21 @@ export function CutTypeSections(props: {
       ) : null}
       {settings.cutType === 'pocket' ? (
         <>
-          <RestPocketToolSelect
-            layer={layer}
-            settings={settings}
-            onCommitSettings={onCommitSettings}
-          />
-          <HelicalEntryRows
-            layer={layer}
-            settings={settings}
-            onCommit={onCommit}
-            onCommitSettings={onCommitSettings}
-          />
+          {settings.pocketStrategy !== 'adaptive' ? (
+            <>
+              <RestPocketToolSelect
+                layer={layer}
+                settings={settings}
+                onCommitSettings={onCommitSettings}
+              />
+              <HelicalEntryRows
+                layer={layer}
+                settings={settings}
+                onCommit={onCommit}
+                onCommitSettings={onCommitSettings}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
       {showPolish ? (
