@@ -26,7 +26,11 @@ import {
   type CncControllerEpoch,
 } from './cnc-setup-attestation';
 import { cncResumeBlockMessage } from './cnc-pause-resume-policy';
-import { assertCncLiveStartReady, refreshCncLiveStartState } from './cnc-live-start-readiness';
+import {
+  assertCncLiveStartReady,
+  assertCncMpgInactive,
+  refreshCncLiveStartState,
+} from './cnc-live-start-readiness';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
@@ -85,6 +89,7 @@ export function jobActions(
         }
         assertCncSetupAttested(gcode, options, setupEpoch);
         const machineKind = options.machineKind ?? 'laser';
+        assertCncMpgInactive(set, get, machineKind);
         if (machineKind === 'cnc') {
           await startControllerCommand(refs, safeWrite, {
             kind: 'start-arming',

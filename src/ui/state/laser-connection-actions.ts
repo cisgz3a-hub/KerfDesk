@@ -64,6 +64,7 @@ export function connectionActions(
         capabilities: refs.driver.capabilities,
         activeControllerKind: refs.driver.kind,
         detectedControllerKind: null,
+        mpgActive: null,
       }));
       try {
         // Inside the try: requestPort throws on browsers without Web Serial
@@ -146,6 +147,7 @@ async function runDisconnect(
     fireActive: false,
     wcoCache: null,
     accessoryCache: null,
+    mpgActive: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,

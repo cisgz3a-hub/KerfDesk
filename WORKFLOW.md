@@ -2718,6 +2718,29 @@ F-CNC19 tiling.
    lease and machine-level selector/interlock design before CNC Start can claim
    enforced ownership.
 
+### F-CNC43. Refuse CNC Start while grblHAL MPG owns input - Phase H.11
+
+#### Success - explicit MPG release or no MPG telemetry
+1. `MPG:0` records that grblHAL released manual-pulse-generator ownership for
+   the current controller session. CNC Start continues through all other gates.
+2. Controllers that do not implement the field remain unknown and use the
+   operator exclusive-access contract in F-CNC42.
+
+#### Error - known competing owner
+1. A latched `MPG:1` blocks CNC Start before the queue fence, status query, or
+   job bytes and tells the operator to return control to KerfDesk.
+2. If `MPG:1` arrives during the fresh live-state phase, the final Start gate
+   refuses before any job byte is armed.
+
+#### Edge - intermittent reports and reset
+1. A status frame without `MPG:` does not clear prior evidence. Only explicit
+   `MPG:0` or a new controller/transport session clears the active latch.
+2. First `MPG:1` invalidates trusted-position, work-Z, Verified Frame, and the
+   prior epoch-bound setup confirmation. `MPG:0` removes the owner blocker but
+   does not restore that evidence.
+3. `MPG:0` covers the grblHAL MPG stream only; WebUI, network, second serial,
+   PLC, macro, and physical inputs remain under F-CNC42 and external interlocks.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)
