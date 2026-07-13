@@ -4,7 +4,7 @@
   "src/core/camera/index.ts": 90,
   "src/core/job/index.ts": 88,
   "src/core/devices/index.ts": 83,
-  "src/core/cnc/index.ts": 40,
+  "src/core/cnc/index.ts": 44,
   "src/core/trace/index.ts": 33,
   "src/core/raster/index.ts": 32,
   "src/core/relief/index.ts": 25,
