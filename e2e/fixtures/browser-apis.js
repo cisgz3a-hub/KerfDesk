@@ -1,4 +1,4 @@
-/* global Blob, document, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
+/* global Blob, document, Event, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
 
 const BASIC_PROJECT = '__KERFDESK_E2E_PROJECT_FIXTURE__';
 
@@ -72,6 +72,10 @@ function installSerial() {
     acknowledge(count) {
       for (let index = 0; index < count; index += 1) emitLine('ok');
       emitIdle();
+    },
+    disconnect() {
+      record('serial-disconnect');
+      port.dispatchEvent(new Event('disconnect'));
     },
   };
 }
@@ -193,6 +197,7 @@ window.__KERFDESK_E2E__ = {
   savedFiles: state.savedFiles,
   emitSerialLine: serial.emitLine,
   acknowledgeSerial: serial.acknowledge,
+  disconnectSerial: serial.disconnect,
   setAutoAcknowledge: (enabled) => {
     state.autoAcknowledge = enabled;
     record('serial-auto-ack', { enabled });
