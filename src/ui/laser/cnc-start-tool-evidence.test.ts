@@ -64,6 +64,7 @@ function prepareFor(toolId: string | undefined) {
     workZZeroEvidence: {
       source: 'probe',
       referenceEpoch: 7,
+      probePlateRemoved: true,
       ...(toolId === undefined ? {} : { toolId }),
     },
   });

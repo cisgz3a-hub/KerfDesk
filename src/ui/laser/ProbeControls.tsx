@@ -18,6 +18,7 @@ import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
+import { probePlateRemovalRequired } from '../state/work-z-zero-evidence';
 import { useToastStore } from '../state/toast-store';
 
 type ProbeMode = 'z' | 'corner';
@@ -104,7 +105,23 @@ export function ProbeControls(): JSX.Element | null {
       >
         {probeBusy ? 'Probing…' : 'Run probe'}
       </button>
+      <ProbePlateRemovalConfirmation />
     </>
+  );
+}
+
+function ProbePlateRemovalConfirmation(): JSX.Element | null {
+  const required = useLaserStore((state) => probePlateRemovalRequired(state.workZZeroEvidence));
+  const confirm = useLaserStore((state) => state.confirmProbePlateRemoved);
+  if (!required) return null;
+  return (
+    <div role="alert" style={plateRemovalStyle}>
+      <strong>Probe complete — spindle start is still blocked.</strong>
+      <span>Remove the touch plate and probe lead from the stock and cutter.</span>
+      <button type="button" onClick={confirm} title="Confirm the touch plate and probe lead are clear of the stock and cutter before the spindle starts.">
+        Confirm plate removed
+      </button>
+    </div>
   );
 }
 
@@ -217,6 +234,17 @@ const hintStyle: React.CSSProperties = {
   fontSize: 12,
   color: 'var(--lf-text-muted)',
   margin: '6px 0',
+};
+const plateRemovalStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 6,
+  marginTop: 8,
+  padding: 8,
+  border: '1px solid var(--lf-warning)',
+  borderRadius: 4,
+  fontSize: 12,
 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, marginBottom: 6 };
 const fieldStyle: React.CSSProperties = {

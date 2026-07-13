@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject, type Project } from '../../core/scene';
+import { PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE } from '../state/work-z-zero-evidence';
 import { CNC_NO_WORK_ZERO_START_MESSAGE, cncWorkZeroStartIssue } from './cnc-start-advisories';
 
 const cncProject: Project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
@@ -17,6 +18,19 @@ describe('cncWorkZeroStartIssue', () => {
   it('is silent only for evidence bound to the current work-Z reference epoch', () => {
     expect(
       cncWorkZeroStartIssue(cncProject, { source: 'manual-zero', referenceEpoch: 7 }, 7),
+    ).toBeNull();
+  });
+
+  it('keeps probe-derived evidence blocked until plate removal is confirmed', () => {
+    expect(cncWorkZeroStartIssue(cncProject, { source: 'probe', referenceEpoch: 7 }, 7)).toBe(
+      PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
+    );
+    expect(
+      cncWorkZeroStartIssue(
+        cncProject,
+        { source: 'probe', referenceEpoch: 7, probePlateRemoved: true },
+        7,
+      ),
     ).toBeNull();
   });
 

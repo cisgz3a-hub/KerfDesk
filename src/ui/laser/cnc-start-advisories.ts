@@ -4,7 +4,12 @@
 
 import { machineKindOf, type Project } from '../../core/scene';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
-import { isWorkZZeroEvidenceCurrent, type WorkZZeroEvidence } from '../state/work-z-zero-evidence';
+import {
+  isWorkZZeroEvidenceCurrent,
+  probePlateRemovalRequired,
+  PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
+  type WorkZZeroEvidence,
+} from '../state/work-z-zero-evidence';
 
 export const CNC_NO_WORK_ZERO_START_MESSAGE =
   'No work zero is set — the CNC toolpath assumes Z0 is the stock top. Jog to the ' +
@@ -25,8 +30,10 @@ export function cncWorkZeroStartIssue(
   referenceEpoch: number | undefined,
 ): string | null {
   if (machineKindOf(project.machine) !== 'cnc') return null;
-  if (isWorkZZeroEvidenceCurrent(evidence, referenceEpoch)) return null;
-  return CNC_NO_WORK_ZERO_START_MESSAGE;
+  if (!isWorkZZeroEvidenceCurrent(evidence, referenceEpoch)) {
+    return CNC_NO_WORK_ZERO_START_MESSAGE;
+  }
+  return probePlateRemovalRequired(evidence) ? PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE : null;
 }
 
 export function cncWorkZeroToolStartIssue(

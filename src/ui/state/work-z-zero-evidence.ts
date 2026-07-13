@@ -2,6 +2,9 @@ import { activeCncTool, type Project } from '../../core/scene';
 
 export type WorkZZeroEvidenceSource = 'manual-zero' | 'probe';
 
+export const PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE =
+  'Remove the touch plate and probe lead from the stock and cutter, then confirm removal before continuing.';
+
 /**
  * Session-scoped proof that the active bit was referenced to the stock-top Z0.
  *
@@ -14,6 +17,8 @@ export type WorkZZeroEvidence = {
   readonly referenceEpoch: number;
   /** Cutter selected as physically loaded when the Z reference began. */
   readonly toolId?: string;
+  /** Probe plates are a collision hazard until the operator removes them. */
+  readonly probePlateRemoved?: boolean;
 };
 
 export function captureWorkZZeroEvidence(
@@ -25,6 +30,7 @@ export function captureWorkZZeroEvidence(
     source,
     referenceEpoch: referenceEpoch ?? 0,
     ...(toolId === undefined ? {} : { toolId }),
+    ...(source === 'probe' ? { probePlateRemoved: false } : {}),
   };
 }
 
@@ -40,4 +46,8 @@ export function isWorkZZeroEvidenceCurrent(
   return (
     evidence !== null && evidence !== undefined && evidence.referenceEpoch === (referenceEpoch ?? 0)
   );
+}
+
+export function probePlateRemovalRequired(evidence: WorkZZeroEvidence | null | undefined): boolean {
+  return evidence?.source === 'probe' && evidence.probePlateRemoved !== true;
 }

@@ -173,7 +173,14 @@ describe('probe controller transaction lifecycle', () => {
       source: 'probe',
       referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
       toolId: 'em-3175',
+      probePlateRemoved: false,
     });
+    useLaserStore.getState().confirmProbePlateRemoved();
+    expect(useLaserStore.getState().workZZeroEvidence).toMatchObject({
+      source: 'probe',
+      probePlateRemoved: true,
+    });
+    expect(useLaserStore.getState().log.at(-1)).toContain('touch plate');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
