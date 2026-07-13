@@ -9,11 +9,11 @@ import {
   findOutOfBoundsCoords,
   findOverdeepCutIssues,
   findPlungedTravelIssues,
-  findSpindleStartClearanceIssues,
   isGcodeCommand,
   parseGcodeWord,
   stripGcodeComment,
 } from '../invariants';
+import { findSpindleStartClearanceIssues } from '../invariants/cnc-motion';
 import type { CncMachineConfig } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 

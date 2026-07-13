@@ -12,7 +12,7 @@ import {
 } from '../../core/cnc';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
-import { emitStandaloneCncGcode } from '../../io/gcode';
+import { emitStandaloneCncGcode } from '../../io/gcode/standalone-cnc-gcode';
 import { buildGcodeMetadata } from '../app/build-info';
 import { confirmControllerReadiness } from '../app/confirm-controller-readiness';
 import { usePlatform } from '../app/platform-context';

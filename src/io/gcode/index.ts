@@ -16,5 +16,3 @@ export type {
 export { prepareOutputSnapshot } from './prepare-output-snapshot';
 export type { GcodeProgramSummary, ParseGcodeProgramResult } from './parse-gcode-program';
 export { GCODE_PREVIEW_CUT_COLOR, parseGcodeProgram } from './parse-gcode-program';
-export type { EmitStandaloneCncGcodeResult } from './standalone-cnc-gcode';
-export { emitStandaloneCncGcode } from './standalone-cnc-gcode';
