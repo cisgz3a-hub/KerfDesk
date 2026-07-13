@@ -1,8 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../../core/scene';
+import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { OriginRow } from './OriginRow';
+import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
+import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -14,6 +18,7 @@ const originalActions = {
   setPersistentOriginHere: useLaserStore.getState().setPersistentOriginHere,
   clearPersistentOrigin: useLaserStore.getState().clearPersistentOrigin,
   releaseMotors: useLaserStore.getState().releaseMotors,
+  jogToMachinePosition: useLaserStore.getState().jogToMachinePosition,
 };
 
 type LaserStatusReport = NonNullable<ReturnType<typeof useLaserStore.getState>['statusReport']>;
@@ -53,6 +58,11 @@ afterEach(() => {
     frameVerification: null,
     streamer: null,
     motionOperation: null,
+  });
+  useStore.setState({ project: createProject() });
+  useJogControlPreferences.setState({
+    stepMm: DEFAULT_JOG_STEP_MM,
+    requestedFeedMmPerMin: DEFAULT_JOG_FEED_MM_PER_MIN,
   });
   vi.restoreAllMocks();
 });
@@ -126,6 +136,51 @@ describe('OriginRow persistent origin controls', () => {
 
       expect(buttonByText(host, 'Set persistent origin').disabled).toBe(true);
       expect(buttonByText(host, 'Clear persistent origin').disabled).toBe(true);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('returns to the known work zero with a beam-off jog', async () => {
+    const jogToMachinePosition = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      statusReport: statusReport('Idle'),
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 72, y: 31, z: 0 },
+      jogToMachinePosition,
+    });
+    useStore.getState().updateDeviceProfile({ maxFeed: 6000 });
+    useJogControlPreferences.setState({ requestedFeedMmPerMin: 1000 });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+
+      await act(async () => buttonByText(host, 'Go to work zero').click());
+
+      expect(jogToMachinePosition).toHaveBeenCalledWith(72, 31, 1000);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('disables return-to-zero until the origin position is known and Idle', async () => {
+    useLaserStore.setState({
+      statusReport: statusReport('Run'),
+      workOriginActive: true,
+      workOriginSource: 'unknown',
+      wcoCache: null,
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      expect(buttonByText(host, 'Go to work zero').disabled).toBe(true);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
