@@ -221,8 +221,13 @@ describe('cncGrblStrategy tool changes', () => {
     const lines = gcode.split('\n');
     const m0Index = lines.indexOf('M0');
     expect(lines.slice(0, m0Index)).toContain('M5');
-    // Spindle restarts after the pause.
-    expect(lines.slice(m0Index + 1).some((line) => line.startsWith('M3 S'))).toBe(true);
+    // Touch-off leaves the replacement bit at the stock surface. Continue must
+    // lift it with the spindle off before the spindle restart is even emitted.
+    const afterPause = lines.slice(m0Index + 1);
+    const clearanceIndex = afterPause.findIndex((line) => line.startsWith('G0 Z'));
+    const spindleIndex = afterPause.findIndex((line) => line.startsWith('M3 S'));
+    expect(clearanceIndex).toBe(0);
+    expect(spindleIndex).toBeGreaterThan(clearanceIndex);
   });
 
   it('lifts to safe Z before the spindle starts at job begin', () => {
@@ -259,6 +264,10 @@ describe('cncGrblStrategy tool changes', () => {
       .slice(m0Index + 1)
       .find((line) => line.startsWith('G0') || line.startsWith('G1'));
     expect(firstMotion).toMatch(/^G0 Z/);
+    const afterPause = lines.slice(m0Index + 1);
+    expect(afterPause.findIndex((line) => line.startsWith('G0 Z'))).toBeLessThan(
+      afterPause.findIndex((line) => line.startsWith('M3 S')),
+    );
   });
 
   it('single-bit jobs contain no M0 and no tool comments', () => {
