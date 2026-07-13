@@ -43,6 +43,7 @@
 | ADR-155 | 2026-07-13 | Accepted | Straight inlays compile as one radius-matched linked pair |
 | ADR-156 | 2026-07-13 | Accepted | Manual CNC tabs use persisted normalized contour anchors |
 | ADR-157 | 2026-07-13 | Accepted | Detected controller identity gates profile transport and output |
+| ADR-158 | 2026-07-13 | Accepted | Browser smoke is independent from the release and deploy gate |
 | ADR-159 | 2026-07-13 | Accepted | Schema v2 curves are canonical and compatibility polylines are invalidated |
 | ADR-160 | 2026-07-13 | Accepted | Rotary raster is an explicit experimental amendment to ADR-127 |
 | ADR-161 | 2026-07-13 | Accepted | Labs gates experimental laser features locally and fail closed |
@@ -7063,6 +7064,35 @@ Profile selection, connection diagnostics, persisted transport fields, output st
 readiness now share one controller contract. Operators may need to reconnect after changing profile
 families, and unsafe cross-family combinations fail visibly rather than being corrected only at
 stream time. The policy expands safety coverage without claiming a broader hardware ecosystem.
+
+---
+## ADR-158 - Browser smoke is independent from the release and deploy gate
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+`release:check` installed and launched a full browser test environment before every core CI and
+Cloudflare deployment. Browser provisioning has different failure modes and runtime variance from
+the deterministic unit, type, lint, build, and policy gates; a browser timeout could therefore block
+an otherwise verified production build and duplicate the same expensive work during deployment.
+
+### Decision
+
+- Keep Playwright as the real-browser smoke framework and type-check its suite explicitly.
+- Run browser smoke in a dedicated pull-request and manually dispatched workflow with its own
+  concurrency cancellation and failure artifacts.
+- Remove Playwright installation and execution from `release:check`, the core CI workflow, and the
+  Cloudflare deploy workflow. Deployment continues to require a successful core CI revision.
+- Browser smoke remains an enforceable review signal when branch protection requires its named
+  check, but browser provisioning is not a production deploy dependency.
+
+### Consequences
+
+Core verification and deployment have bounded infrastructure requirements, while browser failures
+remain visible with traces and screenshots in their own workflow. A repository that wants browser
+smoke to block merging must require `Chrome UX smoke` explicitly rather than relying on the release
+gate to run it incidentally.
 
 ---
 ## ADR-159 - Schema v2 curves are canonical and compatibility polylines are invalidated

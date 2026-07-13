@@ -115,4 +115,4 @@ function formatPageErrors(errors: readonly Error[]): string {
     : errors.map((error) => error.stack).join('\n');
 }
 
-export { expect };
+export { expect, type Page };

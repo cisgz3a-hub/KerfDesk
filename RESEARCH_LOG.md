@@ -743,6 +743,18 @@ compiler.
 - Verify licenses against the actual `LICENSE` file in the upstream repo, not against npm metadata or reputation.
 - A library is not added to `package.json` until its row exists here. CI enforces this with a custom lint rule cross-checking `package.json` against this file.
 
+### Playwright - adopted for isolated browser smoke (2026-07-13, ADR-158)
+
+- **Version:** ^1.61.1 (dev dependency; Apache-2.0).
+- **Role:** deterministic Chrome workflow smoke in `.github/workflows/e2e.yml`; it is not a runtime
+  dependency and does not participate in production builds.
+- **Operational boundary:** browser installation and execution are isolated from `release:check`
+  and Cloudflare deployment. Failures retain Playwright traces and screenshots for review.
+- **Alternatives considered:** keeping browser smoke in every release/deploy run was rejected because
+  browser provisioning adds unrelated timeout and infrastructure failures to the production gate;
+  removing browser coverage was rejected because real interaction checks catch failures outside
+  jsdom and pure-core tests.
+
 ## Phase H kickoff — CNC router mode (2026-07-02)
 
 ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
