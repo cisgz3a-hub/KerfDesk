@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment } from 'react';
 import type { MachineKind } from '../../core/scene';
 import { machineDisplayName } from '../machine/machine-labels';
 import {
@@ -9,48 +9,48 @@ import {
   type CommandId,
 } from './command-registry';
 import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
+import { handleMenuKeyDown } from './menu-keyboard';
+import { useMenuBarState } from './use-menu-bar-state';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
   readonly machineKind: MachineKind;
 }): JSX.Element {
-  const [openFamily, setOpenFamily] = useState<CommandFamily | null>(null);
-  const menuBarRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (openFamily === null) return;
-    const closeOnOutsidePointerDown = (event: PointerEvent): void => {
-      const target = event.target;
-      if (target instanceof Node && menuBarRef.current?.contains(target)) return;
-      setOpenFamily(null);
-    };
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpenFamily(null);
-    };
-    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true);
-    document.addEventListener('keydown', closeOnEscape, true);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true);
-      document.removeEventListener('keydown', closeOnEscape, true);
-    };
-  }, [openFamily]);
+  const menu = useMenuBarState();
 
   return (
-    <nav ref={menuBarRef} aria-label="Application menu" style={menuBarStyle}>
+    <nav
+      ref={menu.menuBarRef}
+      role="menubar"
+      aria-label="Application menu"
+      style={menuBarStyle}
+      onKeyDown={(event) =>
+        handleMenuKeyDown(event, {
+          root: menu.menuBarRef.current,
+          openFamily: menu.openFamily,
+          setOpenFamily: menu.setOpenFamily,
+          setFocusedFamily: menu.setFocusedFamily,
+          pendingMenuFocus: menu.pendingMenuFocus,
+          pendingFamilyReturn: menu.pendingFamilyReturn,
+        })
+      }
+    >
       {COMMAND_FAMILY_ORDER.map((family) => (
         <MenuFamily
           key={family}
           family={family}
           machineKind={props.machineKind}
           commands={props.commands}
-          open={openFamily === family}
+          open={menu.openFamily === family}
+          tabIndex={menu.focusedFamily === family ? 0 : -1}
+          onFocus={() => menu.setFocusedFamily(family)}
           onOpenChange={(open) =>
-            setOpenFamily((current) => {
+            menu.setOpenFamily((current) => {
               if (open) return family;
               return current === family ? null : current;
             })
           }
-          onCommandRun={() => setOpenFamily(null)}
+          onCommandRun={() => menu.setOpenFamily(null)}
         />
       ))}
     </nav>
@@ -62,6 +62,8 @@ function MenuFamily(props: {
   readonly machineKind: MachineKind;
   readonly commands: ReadonlyArray<AppCommand>;
   readonly open: boolean;
+  readonly tabIndex: number;
+  readonly onFocus: () => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly onCommandRun: () => void;
 }): JSX.Element | null {
@@ -70,8 +72,13 @@ function MenuFamily(props: {
   const toggle = (): void => props.onOpenChange(!props.open);
   const familyHelpId = menuHelpId(props.family);
   return (
-    <details open={props.open} style={familyStyle}>
+    <details open={props.open} style={familyStyle} data-menu-family={props.family}>
       <summary
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={props.open}
+        tabIndex={props.tabIndex}
+        data-menu-family-summary={props.family}
         style={summaryStyle}
         title={controlHelp(familyHelpId)}
         data-help-id={familyHelpId}
@@ -84,17 +91,23 @@ function MenuFamily(props: {
           event.preventDefault();
           toggle();
         }}
+        onFocus={props.onFocus}
       >
         {familyLabel(props.family, props.machineKind)}
       </summary>
       {props.open ? (
-        <div role="menu" className="lf-menu" style={menuStyle}>
+        <div role="menu" className="lf-menu" style={menuStyle} data-family-menu={props.family}>
           {groupCommands(props.family, commands).map((group, index) => (
             <Fragment key={index}>
               {index > 0 ? <div role="separator" style={menuSeparatorStyle} /> : null}
-              {group.map((command) => (
-                <MenuItem key={command.id} command={command} onCommandRun={props.onCommandRun} />
-              ))}
+              <div role="group" aria-label={group.label}>
+                {group.label === undefined ? null : (
+                  <div style={menuGroupLabelStyle}>{group.label}</div>
+                )}
+                {group.commands.map((command) => (
+                  <MenuItem key={command.id} command={command} onCommandRun={props.onCommandRun} />
+                ))}
+              </div>
             </Fragment>
           ))}
         </div>
@@ -137,52 +150,86 @@ function MenuItem(props: {
 // Presentation-only grouping: separators render between these blocks, in this
 // order. Commands a family registers that are NOT listed here fall into a
 // trailing block — grouping must never hide a command.
-const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<ReadonlyArray<CommandId>>>> = {
+type MenuGroupLayout = { readonly label: string; readonly ids: ReadonlyArray<CommandId> };
+
+const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>> = {
   tools: [
-    [
-      'tools.measure',
-      'tools.add-text',
-      'tools.registration-jig',
-      'tools.camera',
-      'tools.place-board',
-      'tools.rotary-setup',
-      'tools.print-and-cut',
-      'tools.box-generator',
-    ],
-    ['tools.material-test', 'tools.interval-test', 'tools.scan-offset-test', 'tools.focus-test'],
-    ['tools.optimization-settings', 'tools.labs'],
-    [
-      'tools.adjust-image',
-      'tools.apply-image-mask',
-      'tools.crop-image',
-      'tools.remove-image-mask',
-      'tools.save-processed-bitmap',
-    ],
-    ['tools.trace-image', 'tools.retrace-original', 'tools.multi-file-trace'],
-    ['tools.convert-to-path', 'tools.weld', 'tools.subtract', 'tools.intersect', 'tools.exclude'],
-    [
-      'tools.fill-selection',
-      'tools.close-open-fill-contours',
-      'tools.close-fill-contours-with-tolerance',
-    ],
-    ['tools.convert-to-bitmap'],
+    {
+      label: 'Create & measure',
+      ids: [
+        'tools.measure',
+        'tools.add-text',
+        'tools.registration-jig',
+        'tools.camera',
+        'tools.place-board',
+        'tools.rotary-setup',
+        'tools.print-and-cut',
+        'tools.box-generator',
+      ],
+    },
+    {
+      label: 'Calibrate',
+      ids: [
+        'tools.material-test',
+        'tools.interval-test',
+        'tools.scan-offset-test',
+        'tools.focus-test',
+      ],
+    },
+    { label: 'Settings', ids: ['tools.optimization-settings', 'tools.labs'] },
+    {
+      label: 'Image',
+      ids: [
+        'tools.adjust-image',
+        'tools.apply-image-mask',
+        'tools.crop-image',
+        'tools.remove-image-mask',
+        'tools.save-processed-bitmap',
+      ],
+    },
+    {
+      label: 'Trace',
+      ids: ['tools.trace-image', 'tools.retrace-original', 'tools.multi-file-trace'],
+    },
+    {
+      label: 'Vector',
+      ids: [
+        'tools.convert-to-path',
+        'tools.weld',
+        'tools.subtract',
+        'tools.intersect',
+        'tools.exclude',
+      ],
+    },
+    {
+      label: 'Fill repair',
+      ids: [
+        'tools.fill-selection',
+        'tools.close-open-fill-contours',
+        'tools.close-fill-contours-with-tolerance',
+      ],
+    },
+    { label: 'Bitmap', ids: ['tools.convert-to-bitmap'] },
   ],
 };
 
 function groupCommands(
   family: CommandFamily,
   commands: ReadonlyArray<AppCommand>,
-): ReadonlyArray<ReadonlyArray<AppCommand>> {
+): ReadonlyArray<{ readonly label?: string; readonly commands: ReadonlyArray<AppCommand> }> {
   const layout = MENU_GROUPS[family];
-  if (layout === undefined) return [commands];
-  const grouped = layout.map((ids) =>
-    ids
+  if (layout === undefined) return [{ commands }];
+  const grouped = layout.map((group) => ({
+    label: group.label,
+    commands: group.ids
       .map((id) => commands.find((command) => command.id === id))
       .filter((command): command is AppCommand => command !== undefined),
-  );
-  const placed = new Set(layout.flat());
+  }));
+  const placed = new Set(layout.flatMap((group) => group.ids));
   const leftovers = commands.filter((command) => !placed.has(command.id));
-  return [...grouped, leftovers].filter((group) => group.length > 0);
+  return [...grouped, { label: 'Other', commands: leftovers }].filter(
+    (group) => group.commands.length > 0,
+  );
 }
 
 function familyLabel(family: CommandFamily, machineKind: MachineKind): string {
@@ -247,6 +294,14 @@ const menuSeparatorStyle: React.CSSProperties = {
   flexShrink: 0,
   background: 'var(--lf-border)',
   margin: '3px 6px',
+};
+const menuGroupLabelStyle: React.CSSProperties = {
+  padding: '5px 9px 2px',
+  color: 'var(--lf-text-faint)',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
 };
 const menuItemStyle: React.CSSProperties = {
   display: 'flex',

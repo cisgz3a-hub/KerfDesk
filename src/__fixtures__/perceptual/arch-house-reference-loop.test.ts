@@ -1,11 +1,11 @@
 // arch-house-reference-loop — dev-loop scorer for the Arch House logo trace.
-// Traces the real source logo and scores + renders the result against the
-// maintainer's idealized reference pair (outline drawing + filled drawing),
-// which define the acceptance bar: "our trace overlaid on the outline
-// reference must look identical".
+// Traces the real source logo and enforces fidelity to each preset's processed
+// source mask. The separately authored outline/filled drawings remain useful
+// visual direction, but they change geometry and typography and therefore are
+// diagnostic comparisons, not pixel-registered acceptance truth.
 //
-// Run explicitly (never in CI — env-gated):
-//   ARCH_LOOP=1 PERCEPTUAL_ARTIFACTS=1 npx vitest run \
+// Render optional review artifacts with:
+//   PERCEPTUAL_ARTIFACTS=1 npx vitest run \
 //     src/__fixtures__/perceptual/arch-house-reference-loop.test.ts
 //
 // Artifacts land in perceptual-artifacts/ (gitignored):
@@ -37,102 +37,114 @@ const FILLED_REF_PATH = join(ASSETS_DIR, 'arch-house-filled-reference.png');
 const ARTIFACT_DIR = 'perceptual-artifacts';
 
 const INK_LUMA_MAX = 128;
-const LOOP_ENABLED = process.env['ARCH_LOOP'] === '1';
 const PRESETS_UNDER_TEST = ['Line Art', 'Smooth', 'Sharp', 'Edge Detection'] as const;
+const MIN_INPUT_IOU: Readonly<Record<(typeof PRESETS_UNDER_TEST)[number], number>> = {
+  'Line Art': 0.94,
+  Smooth: 0.95,
+  Sharp: 0.97,
+  'Edge Detection': 0.8,
+};
 
-describe.skipIf(!LOOP_ENABLED)('arch-house reference-pair loop', () => {
-  it('scores each contour preset against the reference pair', { timeout: 600_000 }, async () => {
-    const source = decodePngFile(SOURCE_PATH);
-    const outlineRef = inkMaskFromImage(decodePngFile(OUTLINE_REF_PATH));
-    const filledRef = inkMaskFromImage(decodePngFile(FILLED_REF_PATH));
-    const scale = filledRef.width / source.width;
+describe('arch-house real-source trace fidelity', () => {
+  it(
+    'enforces input fidelity and reports the diagnostic reference pair',
+    { timeout: 600_000 },
+    async () => {
+      const source = decodePngFile(SOURCE_PATH);
+      const outlineRef = inkMaskFromImage(decodePngFile(OUTLINE_REF_PATH));
+      const filledRef = inkMaskFromImage(decodePngFile(FILLED_REF_PATH));
+      const scale = filledRef.width / source.width;
 
-    // Upper bound context: the references were generated separately from the
-    // source, so first measure how well the source's OWN ink aligns with the
-    // filled reference. No tracer can beat this ceiling on ref-vs-trace IoU.
-    const lineArt = TRACE_PRESETS['Line Art']!;
-    const engineTruth = monoToMask(preprocessForTrace(source, lineArt));
-    const truthScaled = scaleMaskNearest(engineTruth, filledRef.width, filledRef.height);
-    const alignment = compareMasks(truthScaled, filledRef);
-    console.log(
-      `[align] source-ink vs filled-ref: IoU=${alignment.iou.toFixed(3)} ` +
-        `precision=${alignment.precision.toFixed(3)} recall=${alignment.recall.toFixed(3)} ` +
-        `(ceiling for any tracer scored against the refs)`,
-    );
-
-    const outlineDt = chamferDistance(outlineRef);
-
-    for (const presetName of PRESETS_UNDER_TEST) {
-      const preset = TRACE_PRESETS[presetName];
-      if (preset === undefined) continue;
-      const start = performance.now();
-      const paths = await traceImageToColoredPaths(source, preset);
-      const elapsedMs = performance.now() - start;
-
-      // Fidelity to the input (this preset's own binarized truth).
-      const presetTruth = monoToMask(preprocessForTrace(source, preset));
-      const fillMask = rasterizeColoredPaths(paths, source.width, source.height);
-      const inputFidelity = compareMasks(fillMask, presetTruth);
-
-      // Fidelity to the maintainer's filled reference.
-      const fillScaled = scaleMaskNearest(fillMask, filledRef.width, filledRef.height);
-      const refFidelity = compareMasks(fillScaled, filledRef);
-
-      // Stroke rendering vs the outline reference (the acceptance overlay).
-      const strokeMask = strokeRasterize(paths, scale, outlineRef.width, outlineRef.height);
-      const strokeToRef = distanceStats(strokeMask, outlineDt);
-      const refToStroke = distanceStats(outlineRef, chamferDistance(strokeMask));
-
+      // Upper bound context: the references were generated separately from the
+      // source, so first measure how well the source's OWN ink aligns with the
+      // filled reference. No tracer can beat this ceiling on ref-vs-trace IoU.
+      const lineArt = TRACE_PRESETS['Line Art']!;
+      const engineTruth = monoToMask(preprocessForTrace(source, lineArt));
+      const truthScaled = scaleMaskNearest(engineTruth, filledRef.width, filledRef.height);
+      const alignment = compareMasks(truthScaled, filledRef);
       console.log(
-        `[${presetName}] ${elapsedMs.toFixed(0)}ms ` +
-          `inputIoU=${inputFidelity.iou.toFixed(3)} refIoU=${refFidelity.iou.toFixed(3)} | ` +
-          `stroke->ref px mean=${strokeToRef.mean.toFixed(2)} p95=${strokeToRef.p95.toFixed(1)} ` +
-          `max=${strokeToRef.max.toFixed(1)} | ref->stroke mean=${refToStroke.mean.toFixed(2)} ` +
-          `p95=${refToStroke.p95.toFixed(1)} max=${refToStroke.max.toFixed(1)}`,
+        `[align] source-ink vs filled-ref: IoU=${alignment.iou.toFixed(3)} ` +
+          `precision=${alignment.precision.toFixed(3)} recall=${alignment.recall.toFixed(3)} ` +
+          `(ceiling for any tracer scored against the refs)`,
       );
 
-      const slug = presetName.toLowerCase().replace(/\s+/g, '-');
-      writePerceptualArtifact(`arch-loop-${slug}-fill`, fillScaled, filledRef);
-      writePerceptualArtifact(`arch-loop-${slug}-stroke`, strokeMask, outlineRef);
-      writeOverlayArtifact(`arch-loop-${slug}-overlay`, source, paths);
+      const outlineDt = chamferDistance(outlineRef);
 
-      // Zoomed defect crops: serif melt, corner rounding, and wobble are
-      // invisible at full scale; these are the images the loop is judged on.
-      const strokeSourceFrame = strokeRasterize(paths, 1, source.width, source.height);
-      for (const region of CROP_REGIONS) {
-        writeRegionCropArtifact(
-          `arch-loop-${slug}-crop-${region.name}`,
-          region,
-          source,
-          presetTruth,
-          fillMask,
-          strokeSourceFrame,
+      for (const presetName of PRESETS_UNDER_TEST) {
+        const preset = TRACE_PRESETS[presetName];
+        if (preset === undefined) continue;
+        const start = performance.now();
+        const paths = await traceImageToColoredPaths(source, preset);
+        const elapsedMs = performance.now() - start;
+
+        // Fidelity to the input (this preset's own binarized truth).
+        const presetTruth = monoToMask(preprocessForTrace(source, preset));
+        const fillMask = rasterizeColoredPaths(paths, source.width, source.height);
+        const inputFidelity = compareMasks(fillMask, presetTruth);
+
+        // Fidelity to the maintainer's filled reference.
+        const fillScaled = scaleMaskNearest(fillMask, filledRef.width, filledRef.height);
+        const refFidelity = compareMasks(fillScaled, filledRef);
+
+        // Stroke rendering vs the outline reference (the acceptance overlay).
+        const strokeMask = strokeRasterize(paths, scale, outlineRef.width, outlineRef.height);
+        const strokeToRef = distanceStats(strokeMask, outlineDt);
+        const refToStroke = distanceStats(outlineRef, chamferDistance(strokeMask));
+
+        console.log(
+          `[${presetName}] ${elapsedMs.toFixed(0)}ms ` +
+            `inputIoU=${inputFidelity.iou.toFixed(3)} refIoU=${refFidelity.iou.toFixed(3)} | ` +
+            `stroke->ref px mean=${strokeToRef.mean.toFixed(2)} p95=${strokeToRef.p95.toFixed(1)} ` +
+            `max=${strokeToRef.max.toFixed(1)} | ref->stroke mean=${refToStroke.mean.toFixed(2)} ` +
+            `p95=${refToStroke.p95.toFixed(1)} max=${refToStroke.max.toFixed(1)}`,
         );
-      }
 
-      // VECTOR-resolution crops: rasterize the traced paths at CROP_ZOOM×
-      // scale (what the canvas shows when zoomed) — sub-pixel spikes and
-      // scallops that vanish at 1024 rasterization are visible here.
-      const scaledPaths = scalePaths(paths, CROP_ZOOM);
-      const hiFill = rasterizeColoredPaths(
-        scaledPaths,
-        source.width * CROP_ZOOM,
-        source.height * CROP_ZOOM,
-      );
-      const hiStroke = strokeRasterize(
-        paths,
-        CROP_ZOOM,
-        source.width * CROP_ZOOM,
-        source.height * CROP_ZOOM,
-      );
-      for (const region of CROP_REGIONS) {
-        writeVectorCropArtifact(`arch-loop-${slug}-vec-${region.name}`, region, hiFill, hiStroke);
-      }
+        const slug = presetName.toLowerCase().replace(/\s+/g, '-');
+        writePerceptualArtifact(`arch-loop-${slug}-fill`, fillScaled, filledRef);
+        writePerceptualArtifact(`arch-loop-${slug}-stroke`, strokeMask, outlineRef);
+        writeOverlayArtifact(`arch-loop-${slug}-overlay`, source, paths);
 
-      expect(paths.length).toBeGreaterThan(0);
-      expect(Number.isFinite(strokeToRef.mean)).toBe(true);
-    }
-  });
+        // Zoomed defect crops: serif melt, corner rounding, and wobble are
+        // invisible at full scale; these are the images the loop is judged on.
+        const strokeSourceFrame = strokeRasterize(paths, 1, source.width, source.height);
+        for (const region of CROP_REGIONS) {
+          writeRegionCropArtifact(
+            `arch-loop-${slug}-crop-${region.name}`,
+            region,
+            source,
+            presetTruth,
+            fillMask,
+            strokeSourceFrame,
+          );
+        }
+
+        // VECTOR-resolution crops: rasterize the traced paths at CROP_ZOOM×
+        // scale (what the canvas shows when zoomed) — sub-pixel spikes and
+        // scallops that vanish at 1024 rasterization are visible here.
+        const scaledPaths = scalePaths(paths, CROP_ZOOM);
+        const hiFill = rasterizeColoredPaths(
+          scaledPaths,
+          source.width * CROP_ZOOM,
+          source.height * CROP_ZOOM,
+        );
+        const hiStroke = strokeRasterize(
+          paths,
+          CROP_ZOOM,
+          source.width * CROP_ZOOM,
+          source.height * CROP_ZOOM,
+        );
+        for (const region of CROP_REGIONS) {
+          writeVectorCropArtifact(`arch-loop-${slug}-vec-${region.name}`, region, hiFill, hiStroke);
+        }
+
+        expect(paths.length).toBeGreaterThan(0);
+        expect(inputFidelity.iou, `${presetName} input-mask IoU`).toBeGreaterThanOrEqual(
+          MIN_INPUT_IOU[presetName],
+        );
+        expect(Number.isFinite(strokeToRef.mean)).toBe(true);
+      }
+    },
+  );
 });
 
 // Regions of interest in SOURCE pixel coordinates (1024²), chosen from the
@@ -425,8 +437,6 @@ function writeOverlayArtifact(
 
 // Referenced so a missing asset fails loudly at collection time when the loop
 // is enabled, instead of a confusing decode error mid-test.
-if (LOOP_ENABLED) {
-  for (const path of [SOURCE_PATH, OUTLINE_REF_PATH, FILLED_REF_PATH]) {
-    if (!existsSync(path)) throw new Error(`arch-house loop asset missing: ${path}`);
-  }
+for (const path of [SOURCE_PATH, OUTLINE_REF_PATH, FILLED_REF_PATH]) {
+  if (!existsSync(path)) throw new Error(`arch-house loop asset missing: ${path}`);
 }

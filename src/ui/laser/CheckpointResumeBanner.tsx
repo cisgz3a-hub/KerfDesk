@@ -1,10 +1,8 @@
-// CheckpointResumeBanner (ADR-118) — offers to resume the interrupted job
-// recorded by use-job-checkpoint. Shown only when a checkpoint with real
-// progress exists and no job is active; Resume re-compiles the project and
-// refuses on a fingerprint mismatch (runCheckpointResumeFlow), Dismiss
-// discards the record explicitly.
+// CheckpointResumeBanner (ADR-118, ADR-141) — offers executable recovery for
+// interrupted laser jobs and diagnostic evidence only for CNC checkpoints.
 
 import { useEffect, useState } from 'react';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import type { JobCheckpoint } from '../../core/recovery';
 import { clearJobCheckpoint, readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
@@ -30,11 +28,10 @@ export function CheckpointResumeBanner(props: {
       <p style={textStyle}>
         Interrupted {checkpoint.machineKind === 'cnc' ? 'router' : 'laser'} job
         {startedAt === null ? '' : ` from ${startedAt}`}: {checkpoint.ackedLines} of{' '}
-        {checkpoint.sendableLines} motion lines confirmed. Resume re-checks that the project still
-        produces the same G-code.{' '}
+        {checkpoint.sendableLines} G-code lines acknowledged by the controller.{' '}
         {checkpoint.machineKind === 'cnc'
-          ? 'Router recovery rewinds to the previous safe retract boundary, extracts Z before starting the spindle, waits for spin-up at safe height, then recuts that complete segment.'
-          : 'Laser recovery replays from the first unconfirmed line. If the controller lost power, a few confirmed lines may not have run.'}
+          ? `${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON} The checkpoint is retained as diagnostic evidence until you dismiss it.`
+          : 'Resume re-checks that the project still produces the same G-code. Laser recovery replays from the first unconfirmed line. If the controller lost power, a few acknowledged lines may not have run.'}
       </p>
       {checkpoint.interruption === undefined ? null : (
         <p style={causeStyle}>
@@ -45,14 +42,16 @@ export function CheckpointResumeBanner(props: {
         </p>
       )}
       <div style={rowStyle}>
-        <button
-          type="button"
-          disabled={props.disabled || props.busy}
-          onClick={() => void runCheckpointResumeFlow(checkpoint)}
-          title="Verify the project, review the safe recovery point, and continue only if work zero is unchanged."
-        >
-          Review safe recovery
-        </button>
+        {checkpoint.machineKind === 'laser' ? (
+          <button
+            type="button"
+            disabled={props.disabled || props.busy}
+            onClick={() => void runCheckpointResumeFlow(checkpoint)}
+            title="Verify the project, review the safe recovery point, and continue only if work zero is unchanged."
+          >
+            Review safe recovery
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => {

@@ -43,7 +43,7 @@ These are enforced by ESLint, `tsc`, and CI scripts, not by judgment. ESLint's f
 | Function | 40 lines | 80 lines | If approaching, extract helpers. |
 | Cyclomatic complexity per function | 8 | 12 | Lint error at hard. |
 | Default exports per file | 1 | 1 | Named exports allowed if cohesive. |
-| Public exports from a module's `index.ts` | 10 | 20 | If exceeded, the module is doing too much; split it. |
+| Public exports from a module's `index.ts` | 10 | 20 | New barrels are capped at 20. Legacy over-cap barrels are CI-ratcheted to their checked-in baseline and may only shrink until they reach the cap. |
 
 If a generated file exceeds the soft limit during a session, **stop and split before continuing.** Do not finish the file then refactor.
 

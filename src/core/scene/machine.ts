@@ -236,7 +236,9 @@ export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
 // Easel's recommended settings.
 export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   cutType: 'profile-outside',
-  depthMm: 6.35,
+  // A new layer starts as a shallow profiling/engraving pass. Reaching stock
+  // bottom is an explicit operator edit, where the no-tabs warning still fires.
+  depthMm: 1,
   depthPerPassMm: 1.5,
   vResolutionMm: 0,
   feedMmPerMin: 1000,

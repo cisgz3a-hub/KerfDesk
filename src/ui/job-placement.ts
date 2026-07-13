@@ -2,7 +2,7 @@ import type { StatusReport } from '../core/controllers/grbl';
 import type { DeviceProfile } from '../core/devices';
 import type { JobOriginPlacement, JobPlacementSettings, JobStartMode } from '../core/job';
 import type { MotionBoundsOffset } from '../core/invariants';
-import { hasCustomOrigin, type WorkCoordinateOffset } from './state/origin-actions';
+import { hasCustomXyOrigin, type WorkCoordinateOffset } from './state/origin-actions';
 
 export type { JobPlacementSettings };
 
@@ -174,7 +174,7 @@ function defaultWco(machine: MachinePlacementSnapshot): Axis3 | null {
 }
 
 function customOriginIsActive(machine: MachinePlacementSnapshot): boolean {
-  return machine.workOriginActive === true || hasCustomOrigin(knownWco(machine));
+  return machine.workOriginActive === true || hasCustomXyOrigin(knownWco(machine));
 }
 
 function xyOffset(offset: Axis3): MotionBoundsOffset {

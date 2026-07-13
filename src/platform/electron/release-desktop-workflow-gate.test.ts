@@ -35,8 +35,12 @@ describe('Desktop release workflow gate (ADR-024/135)', () => {
     expect(workflow).toContain('--publish never');
   });
 
-  it('keeps signing opt-in — unsigned until CSC secrets exist (ADR-024 §5)', () => {
+  it('requires and verifies signing for production tags (ADR-137)', () => {
     expect(workflow).toContain('CSC_LINK: ${{ secrets.CSC_LINK }}');
+    expect(workflow).toContain('CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}');
+    expect(workflow).toContain('Production desktop tags require');
+    expect(workflow).toContain('Get-AuthenticodeSignature');
+    expect(workflow).toContain("$signature.Status -ne 'Valid'");
     expect(workflow).toContain('CSC_IDENTITY_AUTO_DISCOVERY');
   });
 

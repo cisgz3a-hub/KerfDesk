@@ -52,6 +52,8 @@ describe('JobControls machine gating (ADR-101 §5)', () => {
     const { host, unmount } = await renderJobControls();
     try {
       expect(buttonLabels(host)).toContain('Auto-focus');
+      expect(buttonLabels(host)).toContain('Resume from line');
+      expect(host.querySelector('input[aria-label="Resume from G-code line"]')).not.toBeNull();
     } finally {
       await unmount();
     }
@@ -66,6 +68,10 @@ describe('JobControls machine gating (ADR-101 §5)', () => {
       expect(labels).toContain('Home');
       expect(labels).toContain('Frame');
       expect(labels).toContain('Start job');
+      expect(labels).not.toContain('Resume from line');
+      expect(host.querySelector('input[aria-label="Resume from G-code line"]')).toBeNull();
+      expect(host.textContent).toContain('Automatic CNC recovery disabled');
+      expect(host.textContent).toContain('acknowledgements do not prove');
     } finally {
       await unmount();
     }

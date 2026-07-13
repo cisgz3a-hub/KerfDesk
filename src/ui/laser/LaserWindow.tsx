@@ -296,8 +296,9 @@ const panelStyle: React.CSSProperties = {
   // window the canvas (flex:1, minWidth:0) collapses to zero.
   // Surface chrome comes from .lf-rail; layout only here.
   padding: '8px 12px',
-  width: 300,
-  flexShrink: 0,
+  width: '100%',
+  height: '100%',
+  boxSizing: 'border-box',
   overflowY: 'auto',
   overflowX: 'hidden',
   fontFamily: 'system-ui, sans-serif',

@@ -27,6 +27,8 @@ export const FIRE_ACTIVE_COMMAND_MESSAGE =
   'Release the momentary Fire control before sending another machine command.';
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
+export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
+  'Load the new bit and establish its Z zero on the stock top before continuing.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -71,6 +73,15 @@ export function toolChangeReady(state: LaserState): boolean {
   const streamer = state.streamer;
   if (streamer === null || streamer.status !== 'tool-change') return false;
   return streamer.inFlight.length === 0 && state.toolChangeIdleSeen;
+}
+
+// Continue is stronger than setup readiness. Fresh Idle only proves the old
+// tool's retract/park completed; the new tool must also have a freshly
+// established Z zero before the emitted spindle-off clearance move can be
+// trusted to target the configured safe height.
+export function toolChangeContinueBlockMessage(state: LaserState): string | null {
+  if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
+  return state.workZZeroKnown ? null : TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
 }
 
 // True while stream acks are still outstanding — sending or paused, or any

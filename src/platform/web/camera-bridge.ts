@@ -9,7 +9,7 @@ import type {
 const DEFAULT_BRIDGE_ORIGIN = 'http://127.0.0.1:51731';
 
 const BRIDGE_NOT_RUNNING_REASON =
-  'The local camera bridge is not running. In browser/dev mode, run pnpm camera:bridge in a separate terminal, or use LaserForge Desktop where the bridge starts automatically.';
+  'The network-camera bridge is available only in LaserForge Desktop or local development. For local development, run pnpm camera:bridge in a separate terminal; hosted web builds support USB cameras only.';
 
 export function createHttpCameraBridge(bridgeOrigin = DEFAULT_BRIDGE_ORIGIN): CameraBridgeAdapter {
   const origin = bridgeOrigin.replace(/\/+$/, '');

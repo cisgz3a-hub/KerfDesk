@@ -3,10 +3,9 @@
 // and keyboard shortcuts live in dedicated hooks so this component stays a
 // thin layout shell.
 
-import { CutsLayersPanel } from '../layers';
 import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
-import { LaserWindow, useJobShortcuts } from '../laser';
+import { PersistentJobStop, useJobShortcuts } from '../laser';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
@@ -28,6 +27,7 @@ import { useSpacePan } from './use-space-pan';
 import { useUnloadStop } from './use-unload-stop';
 import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
 import { useWindowTitle } from './use-window-title';
+import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 
 export function App(): JSX.Element {
   // Recovery first — runs once on mount, prompts the user before any
@@ -53,6 +53,7 @@ export function App(): JSX.Element {
   return (
     <div style={shellStyle}>
       <CommandShell />
+      <PersistentJobStop />
       <main style={mainStyle}>
         <ToolStrip />
         <div style={canvasAreaStyle}>
@@ -63,8 +64,7 @@ export function App(): JSX.Element {
           <BoardCapturePanel />
         </div>
         <Cnc3DPane />
-        <CutsLayersPanel />
-        <LaserWindow />
+        <WorkspaceSidePanels />
       </main>
       <StatusBar />
       <Toasts />

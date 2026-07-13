@@ -8,6 +8,8 @@ export const PROJECT_SCENE_LIMITS = {
   coloredPaths: 50_000,
   polylines: 100_000,
   points: 250_000,
+  curveSubpaths: 100_000,
+  curveSegments: 250_000,
 } as const;
 
 type SceneArrays = {
@@ -20,6 +22,8 @@ type GeometryCounts = {
   readonly paths: number;
   readonly polylines: number;
   readonly points: number;
+  readonly curveSubpaths: number;
+  readonly curveSegments: number;
 };
 
 export function validateSceneBudgets(scene: Record<string, unknown>): string | null {
@@ -55,13 +59,19 @@ function validateSceneArrayBudgets(arrays: SceneArrays): string | null {
 }
 
 function validateSceneGeometryBudgets(objects: ReadonlyArray<unknown>): string | null {
-  let total: GeometryCounts = { paths: 0, polylines: 0, points: 0 };
+  let total: GeometryCounts = emptyGeometryCounts();
   for (const object of objects) {
     total = sumGeometryCounts(total, object);
     const error =
       overBudget('scene.objects.paths', total.paths, PROJECT_SCENE_LIMITS.coloredPaths) ??
       overBudget('scene.objects.polylines', total.polylines, PROJECT_SCENE_LIMITS.polylines) ??
-      overBudget('scene.objects.points', total.points, PROJECT_SCENE_LIMITS.points);
+      overBudget('scene.objects.points', total.points, PROJECT_SCENE_LIMITS.points) ??
+      overBudget('scene.objects.curves', total.curveSubpaths, PROJECT_SCENE_LIMITS.curveSubpaths) ??
+      overBudget(
+        'scene.objects.curves.segments',
+        total.curveSegments,
+        PROJECT_SCENE_LIMITS.curveSegments,
+      );
     if (error !== null) return error;
   }
   return null;
@@ -84,38 +94,72 @@ function sumGeometryCounts(total: GeometryCounts, object: unknown): GeometryCoun
     paths: total.paths + counts.paths,
     polylines: total.polylines + counts.polylines,
     points: total.points + counts.points,
+    curveSubpaths: total.curveSubpaths + counts.curveSubpaths,
+    curveSegments: total.curveSegments + counts.curveSegments,
   };
 }
 
 function geometryCountsForObject(object: unknown): GeometryCounts {
-  if (!isObject(object)) return { paths: 0, polylines: 0, points: 0 };
+  if (!isObject(object)) return emptyGeometryCounts();
   const pathCounts = geometryCountsForPaths(object['paths']);
   const shapeSpecCounts = geometryCountsForShapeSpec(object['spec']);
   return {
     paths: pathCounts.paths,
     polylines: pathCounts.polylines + shapeSpecCounts.polylines,
     points: pathCounts.points + shapeSpecCounts.points,
+    curveSubpaths: pathCounts.curveSubpaths,
+    curveSegments: pathCounts.curveSegments,
   };
 }
 
 function geometryCountsForPaths(paths: unknown): GeometryCounts {
-  if (!Array.isArray(paths)) return { paths: 0, polylines: 0, points: 0 };
-  return paths.reduce(sumPathGeometryCounts, { paths: paths.length, polylines: 0, points: 0 });
+  if (!Array.isArray(paths)) return emptyGeometryCounts();
+  return paths.reduce(sumPathGeometryCounts, {
+    ...emptyGeometryCounts(),
+    paths: paths.length,
+  });
 }
 
 function sumPathGeometryCounts(total: GeometryCounts, path: unknown): GeometryCounts {
-  if (!isObject(path) || !Array.isArray(path['polylines'])) return total;
-  return path['polylines'].reduce(sumPolylineGeometryCounts, {
-    paths: total.paths,
-    polylines: total.polylines + path['polylines'].length,
-    points: total.points,
+  if (!isObject(path)) return total;
+  const polylines = Array.isArray(path['polylines']) ? path['polylines'] : [];
+  const curves = Array.isArray(path['curves']) ? path['curves'] : [];
+  const withPolylines = polylines.reduce(sumPolylineGeometryCounts, {
+    ...total,
+    polylines: total.polylines + polylines.length,
   });
+  return addCurveGeometryCounts(
+    {
+      ...withPolylines,
+      curveSubpaths: withPolylines.curveSubpaths + curves.length,
+    },
+    curves,
+  );
 }
 
 function sumPolylineGeometryCounts(total: GeometryCounts, polyline: unknown): GeometryCounts {
   const points =
     isObject(polyline) && Array.isArray(polyline['points']) ? polyline['points'].length : 0;
   return { ...total, points: total.points + points };
+}
+
+function addCurveGeometryCounts(
+  total: GeometryCounts,
+  curves: ReadonlyArray<unknown>,
+): GeometryCounts {
+  if (total.curveSubpaths > PROJECT_SCENE_LIMITS.curveSubpaths) return total;
+  let curveSegments = total.curveSegments;
+  for (const curve of curves) {
+    if (isObject(curve) && Array.isArray(curve['segments'])) {
+      curveSegments += curve['segments'].length;
+      if (curveSegments > PROJECT_SCENE_LIMITS.curveSegments) break;
+    }
+  }
+  return { ...total, curveSegments };
+}
+
+function emptyGeometryCounts(): GeometryCounts {
+  return { paths: 0, polylines: 0, points: 0, curveSubpaths: 0, curveSegments: 0 };
 }
 
 function geometryCountsForShapeSpec(spec: unknown): Pick<GeometryCounts, 'polylines' | 'points'> {
