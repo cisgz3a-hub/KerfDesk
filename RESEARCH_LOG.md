@@ -820,3 +820,13 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
     no copyleft). Added to the `scripts/check-licenses.mjs` allow-list on
     adoption (maintainer-approved 2026-07-04), consistent with the existing
     permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).
+
+## GRBL inverse-time feed-mode audit (2026-07-13)
+
+- **Source snapshot:** [gnea/grbl at bfb67f0c](https://github.com/gnea/grbl/tree/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e)
+- GRBL defines G94 as units-per-minute and G93 as inverse-time feed. The parser carries the mode into
+  the planner, which multiplies an inverse-time F value by move length to derive programmed rate.
+- KerfDesk's normal CNC emitter already selected G94, but probe and surfacing builders did not.
+- **KerfDesk consequence:** both specialized sequences now select G94 before motion. The simulator's
+  hard-coded modal report does not exercise timing semantics, so exact output tests and later hardware
+  verification are the current evidence boundary.

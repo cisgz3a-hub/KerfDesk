@@ -2490,6 +2490,21 @@ F-CNC19 tiling.
    set their material on the layer card, or re-pick the project material to
    apply to all.
 
+### F-CNC39. Normalize probe and surfacing feed mode — Phase H.11
+
+#### Success
+1. Z/corner probe and spoilboard-surfacing programs emit `G94` before
+   their first motion, so every F word retains KerfDesk's mm/min meaning.
+
+#### Error — stale inverse-time mode
+1. A prior `G93` from a console command or controller startup block is
+   replaced before motion. The cycle does not rely on GRBL's reset default.
+
+#### Edge — simulator and physical controller
+1. The current simulator does not model G93/G94 timing. Exact line-order
+   tests prove output normalization; a physical controller test is still
+   required before this behavior is hardware-verified.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

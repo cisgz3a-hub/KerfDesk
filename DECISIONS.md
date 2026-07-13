@@ -34,6 +34,7 @@
 | ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
+| ADR-178 | 2026-07-13 | Accepted | Normalize probe and surfacing feed mode to G94 |
 
 ---
 
@@ -6838,3 +6839,28 @@ validation, legacy defaults, output tests, and a new complexity bound.
 These tested capabilities are intentional product scope rather than undocumented exceptions. Their
 offline, bounded persistence contracts remain release gates; this decision does not authorize the
 larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.
+
+---
+
+## ADR-178 - Normalize probe and surfacing feed mode to G94
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL's G93/G94 feed-rate mode is modal. In G94, KerfDesk's `F` values mean millimetres per minute.
+In G93, the same number is inverse time: the planner multiplies F by move length. A prior console or
+startup `G93` could therefore turn a 25 mm probe at F150 into a 3,750 mm/min request, or a 100 mm
+surfacing row at F2500 into a controller-limited maximum-speed cut.
+
+### Decision
+
+Every generated probe and surfacing sequence emits G94 after units/distance setup and before the
+first motion. Normal CNC job output already does this. Feed-mode normalization is part of the
+program's executable safety contract, not an assumed controller default.
+
+### Consequences
+
+Probe seek/re-touch and surfacing feeds retain their intended mm/min meaning even after external modal
+changes. This does not prove the controller honored the requested rate or model feed mode in the test
+simulator; physical hardware verification and richer modal readback remain separate work.
