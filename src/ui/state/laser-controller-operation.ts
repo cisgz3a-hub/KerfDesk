@@ -10,6 +10,11 @@ export type LaserControllerOperation =
       readonly idleReports: number;
     }
   | {
+      readonly kind: 'probe';
+      readonly phase: 'sequence' | 'settling' | 'awaiting-idle';
+      readonly idleReports: number;
+    }
+  | {
       readonly kind: 'interactive-command';
       readonly phase: 'command';
       readonly label: string;
@@ -39,6 +44,11 @@ export function describeControllerOperation(operation: LaserControllerOperation 
   if (operation.kind === 'post-job-settle') {
     if (operation.phase === 'dwell') return 'Settling after job';
     return 'Waiting for stable Idle after job';
+  }
+  if (operation.kind === 'probe') {
+    if (operation.phase === 'sequence') return 'Probing';
+    if (operation.phase === 'settling') return 'Settling after probe';
+    return 'Waiting for fresh Idle after probe';
   }
   if (operation.kind === 'recovery') {
     return operation.phase === 'reset' ? 'Recovering controller' : 'Waiting for Idle after reset';

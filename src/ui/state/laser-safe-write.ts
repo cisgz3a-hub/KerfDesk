@@ -25,6 +25,13 @@ export type SafeWrite = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
+const MOTION_TRANSCRIPT_ACTIONS: ReadonlyArray<LaserSafetyAction | undefined> = [
+  'frame',
+  'jog',
+  'home',
+  'probe',
+];
+
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
@@ -107,7 +114,7 @@ function transcriptSourceForWrite(
 ): TranscriptSource {
   if (statusQuery !== null && line === statusQuery) return 'poll';
   if (action === 'start' || action === 'resume') return 'job';
-  if (action === 'frame' || action === 'jog' || action === 'home') return 'motion';
+  if (MOTION_TRANSCRIPT_ACTIONS.includes(action)) return 'motion';
   if (action === 'origin') return 'origin';
   if (action === 'wake') return 'system';
   if (action === 'unlock' || action === 'console') return 'console';
