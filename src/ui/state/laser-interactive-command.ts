@@ -13,7 +13,12 @@ type CommandWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
-export type ControllerCommandKind = 'home' | 'post-job-settle' | 'interactive-command' | 'recovery';
+export type ControllerCommandKind =
+  | 'home'
+  | 'post-job-settle'
+  | 'probe'
+  | 'interactive-command'
+  | 'recovery';
 
 export type ControllerLifecycleRefs = {
   controllerCommand: ControllerCommandRequest | null;

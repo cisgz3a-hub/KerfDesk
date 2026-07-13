@@ -422,7 +422,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ),
   ...airAssistActions(set, get),
   ...fireActions(set, get, (line, action, source) => safeWrite(set, get, line, action, source)),
-  ...probeActions(set, get, refs),
+  ...probeActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
   ...overrideActions(
     (line) => safeWrite(set, get, line),
     () => get().capabilities.overrides,
