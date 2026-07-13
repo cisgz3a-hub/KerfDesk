@@ -5,12 +5,15 @@ import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { JogPad } from './JogPad';
+import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
+import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const originalJog = useLaserStore.getState().jog;
+const originalCancelJog = useLaserStore.getState().cancelJog;
 const originalSetAirAssistEnabled = useLaserStore.getState().setAirAssistEnabled;
 
 // jsdom's selector engine mis-parses '+' inside quoted attribute values, so
@@ -44,14 +47,21 @@ async function renderJogPad(disabled = false): Promise<{
 afterEach(() => {
   useLaserStore.setState({
     jog: originalJog,
+    cancelJog: originalCancelJog,
     setAirAssistEnabled: originalSetAirAssistEnabled,
     airAssistOn: false,
+    statusReport: null,
+    wcoCache: null,
   });
   // Reset the whole project INCLUDING the device profile. newProject() now
   // preserves the machine profile (DEV-01, LightBurn parity), so a
   // per-test airAssistCommand / Z-axis config would otherwise leak into the
   // next test and defeat the "no air command" / "no Z travel" isolation.
   useStore.setState({ project: createProject() });
+  useJogControlPreferences.setState({
+    stepMm: DEFAULT_JOG_STEP_MM,
+    requestedFeedMmPerMin: DEFAULT_JOG_FEED_MM_PER_MIN,
+  });
 });
 
 // Phase-0 discoverability: the arrow buttons were bare glyphs with no
