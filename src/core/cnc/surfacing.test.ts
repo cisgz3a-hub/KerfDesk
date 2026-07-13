@@ -58,7 +58,7 @@ describe('buildSurfacingProgram', () => {
   it('clears the touched surface before spin-up, brackets cutting with M5, and parks', () => {
     const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const lines = program.lines;
-    expect(lines.slice(3, 6)).toEqual(['G21', 'G90', 'G54']);
+    expect(lines.slice(3, 7)).toEqual(['G21', 'G90', 'G54', 'G94']);
     expect(lines).toContain('M3 S12000');
     expect(lines).toContain('G4 P3.000');
     expect(lines.at(-2)).toBe('M5');

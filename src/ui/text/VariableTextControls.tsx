@@ -7,6 +7,7 @@ import { parseVariableCsv, variableTemplateToSource } from '../../core/variables
 import { Button, NumberInput } from '../kit';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
+import { VariableSequenceControls } from './VariableSequenceControls';
 
 type ControlsProps = {
   readonly variables: ProjectVariableData;
@@ -16,6 +17,8 @@ type ControlsProps = {
   readonly setCsv: (csv: VariableCsvDataset | undefined) => void;
   readonly setSettings: ReturnType<typeof useStore.getState>['setVariableSettings'];
   readonly advance: () => void;
+  readonly retreat: () => void;
+  readonly reset: () => void;
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
 };
 
@@ -41,15 +44,23 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
         <Counter
           label="Record"
           value={props.variables.recordIndex + 1}
+          min={1}
           onChange={(value) => props.setSettings({ recordIndex: Math.max(0, value - 1) })}
         />
         <Counter
           label="Serial"
           value={props.variables.serialValue}
+          min={0}
           onChange={(serialValue) => props.setSettings({ serialValue })}
         />
         <Advancement value={props.variables.advancement} setSettings={props.setSettings} />
-        <Button onClick={props.advance}>Next record</Button>
+        <VariableSequenceControls
+          variables={props.variables}
+          setSettings={props.setSettings}
+          previous={props.retreat}
+          next={props.advance}
+          reset={props.reset}
+        />
       </div>
     </>
   );
@@ -123,6 +134,7 @@ function Insert(props: {
 function Counter(props: {
   readonly label: string;
   readonly value: number;
+  readonly min: number;
   readonly onChange: (value: number) => void;
 }): JSX.Element {
   return (
@@ -130,11 +142,11 @@ function Counter(props: {
       <span>{props.label}</span>
       <NumberInput
         aria-label={`Variable ${props.label.toLowerCase()}`}
-        min={1}
+        min={props.min}
         step={1}
         value={props.value}
         onChange={(event) =>
-          props.onChange(Math.max(1, Math.floor(event.currentTarget.valueAsNumber)))
+          props.onChange(Math.max(props.min, Math.floor(event.currentTarget.valueAsNumber)))
         }
       />
     </label>

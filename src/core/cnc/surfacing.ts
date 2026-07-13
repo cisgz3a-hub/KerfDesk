@@ -89,6 +89,9 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     'G21',
     'G90',
     'G54',
+    // A stale G93 would interpret every F word as inverse time and can turn
+    // ordinary surfacing feeds into controller-max motion.
+    'G94',
     `G0 Z${fmt(params.safeZMm)}`,
     `M3 S${Math.round(params.spindleRpm)}`,
     `G4 P${params.spindleSpinupSec.toFixed(3)}`,

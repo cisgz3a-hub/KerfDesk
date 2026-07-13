@@ -139,7 +139,10 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
   await expect(page.getByText('Layer is linked to the selected material library.')).toBeVisible();
 });
 
-test('builds variable text with embedded CSV and serial state', async ({ page, kerfdesk }) => {
+test('builds bounded variable text sequences with wrap, reverse, and reset', async ({
+  page,
+  kerfdesk,
+}) => {
   await page.getByRole('button', { name: 'Text...' }).click();
   await page.getByRole('textbox', { name: 'Text content' }).fill('Part-');
   await page.getByRole('checkbox', { name: 'Variable text' }).check();
@@ -150,6 +153,40 @@ test('builds variable text with embedded CSV and serial state', async ({ page, k
   });
   await page.getByRole('button', { name: 'CSV: name' }).click();
   await page.getByRole('button', { name: 'Serial' }).click();
+  await page.getByRole('spinbutton', { name: 'Variable serial start' }).fill('100');
+  await expect(
+    page.getByRole('spinbutton', { name: 'Variable serial', exact: true }),
+  ).toHaveAttribute('min', '0');
+  await page.getByRole('checkbox', { name: 'Wrap serial' }).check();
+  await page.getByRole('spinbutton', { name: 'Variable serial end' }).fill('101');
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Variable record', exact: true })).toHaveValue(
+    '1',
+  );
+  await expect(page.getByRole('spinbutton', { name: 'Variable serial', exact: true })).toHaveValue(
+    '100',
+  );
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Variable record', exact: true })).toHaveValue(
+    '2',
+  );
+  await expect(page.getByRole('spinbutton', { name: 'Variable serial', exact: true })).toHaveValue(
+    '101',
+  );
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Variable record', exact: true })).toHaveValue(
+    '1',
+  );
+  await expect(page.getByRole('spinbutton', { name: 'Variable serial', exact: true })).toHaveValue(
+    '100',
+  );
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Variable record', exact: true })).toHaveValue(
+    '2',
+  );
+  await expect(page.getByRole('spinbutton', { name: 'Variable serial', exact: true })).toHaveValue(
+    '101',
+  );
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Add or edit text' })).not.toBeVisible();
   await page.getByRole('button', { name: 'Save As...' }).click();
@@ -162,6 +199,17 @@ test('builds variable text with embedded CSV and serial state', async ({ page, k
       ['Bracket', 'Birch'],
       ['Panel', 'Acrylic'],
     ],
+  });
+  expect(saved.variables).toMatchObject({
+    recordIndex: 1,
+    serialValue: 101,
+    sequence: {
+      recordStartIndex: 0,
+      recordEndIndex: 1,
+      serialStartValue: 100,
+      serialEndValue: 101,
+      advanceBy: 1,
+    },
   });
   const text = saved.scene.objects.find((object) => object['kind'] === 'text');
   expect(text?.['variableTemplate']).toMatchObject({
@@ -349,6 +397,15 @@ interface SavedProject {
     readonly second: { readonly x: number; readonly y: number };
   };
   readonly variables?: {
+    readonly recordIndex?: number;
+    readonly serialValue?: number;
+    readonly sequence?: {
+      readonly recordStartIndex: number;
+      readonly recordEndIndex: number;
+      readonly serialStartValue: number;
+      readonly serialEndValue?: number;
+      readonly advanceBy: number;
+    };
     readonly csv?: {
       readonly sourceName: string;
       readonly headers: readonly string[];

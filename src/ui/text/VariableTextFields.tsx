@@ -14,6 +14,8 @@ export function VariableTextFields(props: {
   const setCsv = useStore((state) => state.setVariableCsv);
   const setSettings = useStore((state) => state.setVariableSettings);
   const advance = useStore((state) => state.advanceVariablesManually);
+  const retreat = useStore((state) => state.retreatVariablesManually);
+  const reset = useStore((state) => state.resetVariablesManually);
   const pushToast = useToastStore((state) => state.pushToast);
   const firstColumn = variables.csv?.headers[0];
   return (
@@ -36,6 +38,8 @@ export function VariableTextFields(props: {
           setCsv={setCsv}
           setSettings={setSettings}
           advance={advance}
+          retreat={retreat}
+          reset={reset}
           pushToast={pushToast}
         />
       ) : null}

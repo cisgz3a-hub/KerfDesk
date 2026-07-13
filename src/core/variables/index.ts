@@ -6,3 +6,8 @@ export {
 } from './evaluate-template';
 export { parseVariableTemplateSource, variableTemplateToSource } from './template-source';
 export type { VariableTemplateSourceResult } from './template-source';
+export {
+  advanceVariableSequence,
+  resolveVariableSequence,
+  type VariableSequenceDirection,
+} from './sequence';

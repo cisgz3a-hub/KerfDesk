@@ -16,7 +16,33 @@ export function validateProjectVariables(value: unknown): string | null {
   ) {
     return invalid('variables.advancement');
   }
+  const sequenceError = validateSequence(value['sequence']);
+  if (sequenceError !== null) return sequenceError;
   return validateCsvDataset(value['csv'], 'variables.csv');
+}
+
+function validateSequence(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!isObject(value)) return invalid('variables.sequence');
+  const recordStart = value['recordStartIndex'];
+  const recordEnd = value['recordEndIndex'];
+  const serialStart = value['serialStartValue'];
+  const serialEnd = value['serialEndValue'];
+  const advanceBy = value['advanceBy'];
+  if (!isNonNegativeInteger(recordStart)) return invalid('variables.sequence.recordStartIndex');
+  if (!isNonNegativeInteger(recordEnd) || Number(recordEnd) < Number(recordStart)) {
+    return invalid('variables.sequence.recordEndIndex');
+  }
+  if (!isNonNegativeInteger(serialStart)) return invalid('variables.sequence.serialStartValue');
+  if (
+    serialEnd !== undefined &&
+    (!isNonNegativeInteger(serialEnd) || Number(serialEnd) < Number(serialStart))
+  ) {
+    return invalid('variables.sequence.serialEndValue');
+  }
+  return Number.isSafeInteger(advanceBy) && Number(advanceBy) >= 1
+    ? null
+    : invalid('variables.sequence.advanceBy');
 }
 
 export function validateVariableTemplate(value: unknown, path: string): string | null {

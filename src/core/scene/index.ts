@@ -195,6 +195,7 @@ export type {
   ProjectVariableData,
   VariableAdvancementPolicy,
   VariableCsvDataset,
+  VariableSequenceSettings,
   VariableCutSettingField,
   VariableDateTimeFormat,
   VariableTemplate,

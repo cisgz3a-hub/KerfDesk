@@ -37,6 +37,13 @@ function projectWithVariables(): Project {
     variables: {
       ...DEFAULT_PROJECT_VARIABLE_DATA,
       csv: { sourceName: 'people.csv', headers: ['name'], records: [['Ada']] },
+      sequence: {
+        recordStartIndex: 0,
+        recordEndIndex: 0,
+        serialStartValue: 10,
+        serialEndValue: 99,
+        advanceBy: 2,
+      },
     },
     scene: { ...project.scene, objects: [text] },
   };
@@ -72,6 +79,19 @@ describe('project variable persistence', () => {
     expect(deserializeProject(JSON.stringify(badCsv))).toMatchObject({
       kind: 'invalid',
       reason: expect.stringContaining('records[0]'),
+    });
+  });
+
+  it('rejects inverted variable sequence ranges', () => {
+    const raw = JSON.parse(serializeProject(projectWithVariables())) as {
+      variables: { sequence: { recordStartIndex: number; recordEndIndex: number } };
+    };
+    raw.variables.sequence.recordStartIndex = 5;
+    raw.variables.sequence.recordEndIndex = 2;
+
+    expect(deserializeProject(JSON.stringify(raw))).toMatchObject({
+      kind: 'invalid',
+      reason: expect.stringContaining('recordEndIndex'),
     });
   });
 });
