@@ -78,7 +78,10 @@ export async function runStartJobFlow(): Promise<void> {
   }
   try {
     await laser.startJob(prepared.gcode, {
-      streamingMode: project.device.streamingMode,
+      streamingMode: streamingModeForController(
+        project.device.controllerKind,
+        project.device.streamingMode,
+      ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });
@@ -228,7 +231,10 @@ async function streamResumeFromRawLine(
   }
   try {
     await useLaserStore.getState().startJob(resume.lines.join('\n'), {
-      streamingMode: project.device.streamingMode,
+      streamingMode: streamingModeForController(
+        project.device.controllerKind,
+        project.device.streamingMode,
+      ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });
