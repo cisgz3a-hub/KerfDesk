@@ -1,15 +1,7 @@
-// DeviceSetupControls — the Laser-rail entry points for machine configuration:
-// the guided "Set up device" wizard (with a passive nudge when the connected
-// machine's active profile has not been set up yet) and the advanced Machine
-// Setup dialog. Extracted from LaserWindow so that component stays within its
-// size/complexity budget and the device-setup UI lives with the rest of the
-// feature. The nudge never auto-opens anything (FU-4).
-//
-// The two labels are near-synonyms, so each button carries a role caption, and
-// the wizard button holds primary emphasis only while the connected machine
-// still needs setup — once Finish records the profile, the rail stops
-// advertising a wizard the operator won't run again. Machine Setup's Overview
-// tab cross-links back to the wizard for operators who opened the wrong door.
+// DeviceSetupControls - one context-aware rail entry for machine configuration.
+// The button opens Machine Setup in every state and gains primary emphasis only
+// when the connected profile still needs guided setup. The Overview tab owns
+// the explicit wizard launch, removing two near-synonym buttons from the rail.
 
 import { useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
@@ -51,24 +43,16 @@ export function DeviceSetupControls(): JSX.Element {
     <>
       <Button
         variant={needsSetup ? 'primary' : 'default'}
-        onClick={() => setDeviceSetupOpen(true)}
-        {...helpProps('control:laser.device-setup.launch')}
-      >
-        Set up device
-      </Button>
-      <p style={mutedNoteStyle}>Guided wizard — prefills from what your controller reports.</p>
-      {needsSetup && (
-        <p style={mutedNoteStyle} role="note">
-          This machine isn&apos;t set up yet — run Set up device.
-        </p>
-      )}
-      <Button
         onClick={() => setMachineSetupOpen(true)}
         {...helpProps('control:laser.machine-setup.launch')}
       >
         Machine Setup
       </Button>
-      <p style={mutedNoteStyle}>All settings, firmware, and tools.</p>
+      {needsSetup && (
+        <p style={mutedNoteStyle} role="note">
+          This machine isn&apos;t set up yet.
+        </p>
+      )}
       {deviceSetupOpen && (
         <DeviceSetupWizard
           onClose={() => setDeviceSetupOpen(false)}
