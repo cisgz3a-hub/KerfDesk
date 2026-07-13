@@ -67,6 +67,7 @@ export type CncCutType =
   | 'pocket'
   | 'engrave'
   | 'v-carve'
+  | 'inlay-pair'
   | 'drill'
   | 'relief-rough'
   // H.8 finishing skim over the true relief surface. COMPILE-TIME ONLY,
@@ -80,6 +81,7 @@ export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'pocket',
   'engrave',
   'v-carve',
+  'inlay-pair',
   'drill',
 ];
 
@@ -115,6 +117,11 @@ export type CncLayerSettings = {
   // V-carve ring spacing (mm). 0 = auto (tool diameter / 8, floor 0.1 mm).
   // Smaller = finer walls, more rings, longer job.
   readonly vResolutionMm: number;
+  // Straight-sided inlay automation. depthMm cuts the male insert profile;
+  // the linked female pocket uses inlayPocketDepthMm.
+  readonly inlayPocketDepthMm?: number;
+  readonly inlayAllowanceMm?: number;
+  readonly inlayPairSpacingMm?: number;
   readonly feedMmPerMin: number; // XY cutting feed
   readonly plungeMmPerMin: number; // Z plunge feed
   readonly spindleRpm: number; // S value; GRBL $30 should equal spindleMaxRpm
@@ -319,6 +326,8 @@ export function cutTypeLabel(cutType: CncCutType): string {
       return 'Engrave (trace path)';
     case 'v-carve':
       return 'V-carve (angled bit)';
+    case 'inlay-pair':
+      return 'Inlay pair (pocket + insert)';
     case 'drill':
       return 'Drill (peck at centers)';
     case 'relief-rough':

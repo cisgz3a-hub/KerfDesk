@@ -161,6 +161,31 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
     }
   });
 
+  it('shows linked pocket, clearance, spacing, and tabs for an inlay pair', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'inlay-pair' },
+    };
+    installProject(layer, false);
+    const { host, root } = await render(layer);
+    try {
+      for (const field of ['Pocket depth', 'Fit clearance', 'Pair spacing']) {
+        expect(
+          host.querySelector(`input[aria-label="${field} for ${layer.color}"]`),
+        ).not.toBeNull();
+      }
+      expect(
+        host.querySelector(`input[aria-label="Holding tabs for ${layer.color}"]`),
+      ).not.toBeNull();
+      expect(
+        host.querySelector(`input[aria-label="Insert depth for ${layer.color}"]`),
+      ).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('enables pocket helical entry and removes a conflicting along-path ramp', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),

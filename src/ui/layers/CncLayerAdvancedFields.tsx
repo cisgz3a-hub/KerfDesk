@@ -22,6 +22,7 @@ import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
 import { AdaptivePocketFields } from './AdaptivePocketFields';
+import { CncInlayFields } from './CncInlayFields';
 
 // The whole advanced field set, gated by one conditional in the parent
 // (ADR-111 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
@@ -47,6 +48,7 @@ export function CncLayerAdvancedGroup(props: {
         settings={props.settings}
         onCommit={props.onCommit}
       />
+      <CncInlayFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
       <CutTypeSections
         layer={props.layer}
         settings={props.settings}

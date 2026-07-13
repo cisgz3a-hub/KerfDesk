@@ -75,6 +75,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(isPositiveNumber(raw['adaptiveOptimalLoadMm'])
       ? { adaptiveOptimalLoadMm: raw['adaptiveOptimalLoadMm'] }
       : {}),
+    ...normalizeInlayFields(raw),
     ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['pocketRoughToolId'] === 'string'
@@ -95,6 +96,20 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     // is dropped rather than inflating the roughing offset the wrong way.
     ...(isNonNegativeNumber(raw['finishAllowanceMm'])
       ? { finishAllowanceMm: raw['finishAllowanceMm'] }
+      : {}),
+  };
+}
+
+function normalizeInlayFields(raw: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...(isPositiveNumber(raw['inlayPocketDepthMm'])
+      ? { inlayPocketDepthMm: raw['inlayPocketDepthMm'] }
+      : {}),
+    ...(isNonNegativeNumber(raw['inlayAllowanceMm'])
+      ? { inlayAllowanceMm: raw['inlayAllowanceMm'] }
+      : {}),
+    ...(isPositiveNumber(raw['inlayPairSpacingMm'])
+      ? { inlayPairSpacingMm: raw['inlayPairSpacingMm'] }
       : {}),
   };
 }
