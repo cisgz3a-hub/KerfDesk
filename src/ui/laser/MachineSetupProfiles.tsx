@@ -1,7 +1,8 @@
 import {
   suggestMachineProfiles,
   profileConfidenceLabel,
-  profileWithControllerFacts,
+  profileWithControllerFactsResult,
+  controllerProfilesAreCompatible,
   type MachineProfileSuggestion,
 } from '../../core/devices';
 import { Button } from '../kit';
@@ -24,6 +25,15 @@ import {
 
 export function OverviewPanel(): JSX.Element {
   const device = useStore((s) => s.project.device);
+  const connection = useLaserStore((s) => s.connection);
+  const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
+  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
+  const connected = connection.kind === 'connected';
+  const configuredControllerKind = device.controllerKind ?? 'grbl-v1.1';
+  const mismatch =
+    connected &&
+    (configuredControllerKind !== activeControllerKind ||
+      (detectedControllerKind !== null && detectedControllerKind !== activeControllerKind));
   return (
     <div style={stackStyle}>
       <section style={sectionStyle}>
@@ -39,7 +49,23 @@ export function OverviewPanel(): JSX.Element {
           <dd>{device.profileSource ?? 'custom'}</dd>
           <dt>Capabilities</dt>
           <dd>{device.capabilities?.join(', ') ?? 'GRBL'}</dd>
+          <dt>Controller</dt>
+          <dd>{configuredControllerKind}</dd>
+          <dt>Connection</dt>
+          <dd>{connected ? activeControllerKind : 'Disconnected'}</dd>
+          <dt>Detected</dt>
+          <dd>{detectedControllerKind ?? 'Not detected'}</dd>
+          <dt>Streaming</dt>
+          <dd>
+            {device.streamingMode}
+            {device.streamingMode === 'char-counted' ? `, ${device.rxBufferBytes} bytes` : ''}
+          </dd>
         </dl>
+        {mismatch ? (
+          <p role="alert" style={warningStyle}>
+            Controller mismatch. Apply the detected firmware profile, then disconnect and reconnect.
+          </p>
+        ) : null}
       </section>
       <DeviceSettings />
     </div>
@@ -77,20 +103,28 @@ function CatalogCard({
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
+  const connectionKind = useLaserStore((s) => s.connection.kind);
+  const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
   const activeId = useStore((s) => s.project.device.profileId);
   const profile = suggestion.profile;
   const active = activeId === profile.profileId;
+  const knownControllerKind =
+    detectedControllerKind ??
+    (connectionKind === 'connected' && lastSettingsReadAt !== null ? activeControllerKind : null);
+  const controllerMismatch = !controllerProfilesAreCompatible(
+    profile.controllerKind,
+    knownControllerKind,
+  );
+  const application = profileWithControllerFactsResult({
+    profile,
+    current,
+    detectedSettings,
+    controllerSettings,
+    detectedControllerKind,
+    lastSettingsReadAt,
+  });
   const applyProfile = (): void => {
-    replaceDeviceProfile(
-      profileWithControllerFacts({
-        profile,
-        current,
-        detectedSettings,
-        controllerSettings,
-        detectedControllerKind,
-        lastSettingsReadAt,
-      }),
-    );
+    replaceDeviceProfile(application.profile);
   };
   return (
     <article style={cardStyle}>
@@ -117,11 +151,45 @@ function CatalogCard({
         {suggestion.warnings.map((warning) => (
           <li key={warning}>{warning}</li>
         ))}
+        {application.corrections.map((item) => (
+          <li key={`${item.field}-${item.to}`}>
+            Will set {item.field} to {item.to}: {item.reason}
+          </li>
+        ))}
       </ul>
-      <Button variant={active ? 'default' : 'primary'} disabled={active} onClick={applyProfile}>
-        {active ? 'Active profile' : `Use ${profile.name}`}
-      </Button>
+      <CatalogApplyButton
+        active={active}
+        controllerMismatch={controllerMismatch}
+        profileName={profile.name}
+        onApply={applyProfile}
+      />
     </article>
+  );
+}
+
+function CatalogApplyButton(props: {
+  readonly active: boolean;
+  readonly controllerMismatch: boolean;
+  readonly profileName: string;
+  readonly onApply: () => void;
+}): JSX.Element {
+  const title = props.controllerMismatch
+    ? 'This profile uses a different controller family than the connected firmware.'
+    : undefined;
+  const label = props.active
+    ? 'Active profile'
+    : props.controllerMismatch
+      ? 'Firmware mismatch'
+      : `Use ${props.profileName}`;
+  return (
+    <Button
+      variant={props.active ? 'default' : 'primary'}
+      disabled={props.active || props.controllerMismatch}
+      onClick={props.onApply}
+      title={title}
+    >
+      {label}
+    </Button>
   );
 }
 
@@ -130,3 +198,10 @@ function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confide
   if (confidence === 'possible') return 'Possible match';
   return 'Manual choice';
 }
+
+const warningStyle: React.CSSProperties = {
+  margin: '8px 0 0',
+  color: 'var(--lf-warning)',
+  fontSize: 12,
+  fontWeight: 600,
+};

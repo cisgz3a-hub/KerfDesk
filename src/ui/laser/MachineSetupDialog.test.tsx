@@ -82,6 +82,8 @@ afterEach(() => {
     statusReport: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    activeControllerKind: 'grbl-v1.1',
+    detectedControllerKind: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 

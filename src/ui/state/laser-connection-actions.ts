@@ -77,9 +77,8 @@ export function connectionActions(
           set({ connection: { kind: 'disconnected' } });
           return;
         }
-        const conn = await portRef.open({
-          baudRate: options.baudRate ?? refs.driver.defaultBaudRate,
-        });
+        const baudRate = options.baudRate ?? refs.driver.defaultBaudRate;
+        const conn = await portRef.open({ baudRate });
         refs.connection = conn;
         // Pass safeWrite through whole: the line handler attaches action and
         // source metadata to its writes (post-error stop escalation, frame
@@ -105,7 +104,7 @@ export function connectionActions(
           pendingTransportWrites: 0,
           unexpectedTerminalResponse: null,
         });
-        void runHandshake(set, get, refs, safeWrite).catch(() => undefined);
+        void runHandshake(set, get, refs, safeWrite, baudRate).catch(() => undefined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         set({ connection: { kind: 'failed', error: message } });
@@ -175,6 +174,7 @@ async function runHandshake(
   get: GetFn,
   refs: HandlerRefs,
   safeWrite: (line: string) => Promise<void>,
+  baudRate: number,
 ): Promise<void> {
   const HANDSHAKE_TIMEOUT_MS = 2000;
   const gotLine = await new Promise<boolean>((resolve) => {
@@ -195,7 +195,7 @@ async function runHandshake(
       appendSystemNotice(
         get(),
         refs,
-        `[lf2] No controller response within 2 s. Check baud rate (${driver.defaultBaudRate}) and that the device is ${driver.label}.`,
+        `[lf2] No controller response within 2 s. Check baud rate (${baudRate}) and that the device is ${driver.label}.`,
       ),
     );
     return;

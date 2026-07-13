@@ -7,6 +7,7 @@ import {
   validateMachineProfile,
 } from './profile-catalog';
 import { profileConfidenceLabel } from './profile-confidence';
+import { controllerCompatibleProfile } from './controller-profile-compatibility';
 
 describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
   it('ships the required built-in GRBL profiles with valid evidence', () => {
@@ -28,6 +29,14 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       expect(validateMachineProfile(entry.profile)).toEqual([]);
       expect(entry.evidence.length).toBeGreaterThan(0);
       expect(entry.profile.scanningOffsets).toEqual([]);
+    }
+  });
+
+  it('keeps every catalog profile coherent with its controller transport and dialect', () => {
+    for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
+      const result = controllerCompatibleProfile(entry.profile);
+      expect(result.corrections, entry.profile.name).toEqual([]);
+      expect(result.profile, entry.profile.name).toEqual(entry.profile);
     }
   });
 

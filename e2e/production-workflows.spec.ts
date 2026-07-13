@@ -39,7 +39,7 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   page,
   kerfdesk,
 }) => {
-  await page.getByRole('button', { name: 'Machine Setup' }).click();
+  await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   await page.getByText('Device Profile', { exact: true }).click();
   await page.getByText('Advanced: estimator tuning', { exact: true }).click();
   await fillAndCommit(page, 'Estimated cut time scale', '1.18');
@@ -355,6 +355,38 @@ test('configures the Creality Falcon profile through the complete setup wizard',
     bedWidth: 400,
     bedHeight: 400,
     framingFeedMmPerMin: 10000,
+  });
+});
+
+test('keeps detected firmware, catalog profile, and streaming transport coherent', async ({
+  page,
+  kerfdesk,
+}) => {
+  await page.getByRole('button', { name: /^Connect/ }).click();
+  await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  await kerfdesk.emitSerialLine("Grbl 1.1h ['$' for help]");
+
+  await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Machine Setup' })).toContainText(
+    'Detectedgrbl-v1.1',
+  );
+  await page.getByRole('button', { name: 'Profile Catalog' }).click();
+
+  const marlinCard = page.locator('article').filter({ hasText: 'Generic Marlin laser 300' });
+  await expect(marlinCard.getByRole('button', { name: 'Firmware mismatch' })).toBeDisabled();
+
+  const xToolCard = page.locator('article').filter({ hasText: 'xTool D1 Pro' });
+  await xToolCard.getByRole('button', { name: 'Use xTool D1 Pro' }).click();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Save As...' }).click();
+
+  const saved = await savedProject(kerfdesk);
+  expect(saved.device).toMatchObject({
+    profileId: 'xtool-d1-pro',
+    controllerKind: 'grbl-v1.1',
+    streamingMode: 'char-counted',
+    rxBufferBytes: 120,
+    gcodeDialect: { dialectId: 'grbl-dynamic' },
   });
 });
 
