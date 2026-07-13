@@ -340,4 +340,12 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: 'Machine-safety and liability information — read before running a job.',
   },
+  'help.report-bug': {
+    family: 'help',
+    tooltip: 'Open a pre-filled KerfDesk bug report on GitHub Issues.',
+  },
+  'help.discussions': {
+    family: 'help',
+    tooltip: 'Open KerfDesk Discussions on GitHub for feature ideas, questions, and feedback.',
+  },
 };
