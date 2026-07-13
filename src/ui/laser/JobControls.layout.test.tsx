@@ -55,6 +55,7 @@ describe('JobControls action hierarchy', () => {
         status: 'streaming',
         streamingMode: 'char-counted',
         queued: [],
+        queueIndex: 0,
         inFlight: [{ line: 'G1 X1 S100\n', bytes: 11 }],
         inFlightBytes: 11,
         completed: 0,

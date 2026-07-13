@@ -6,6 +6,7 @@
 
 import {
   disconnect as disconnectStreamer,
+  queuedLineCount,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
@@ -189,7 +190,7 @@ export function detectStreamStall(
     probe: {
       completed: streamer.completed,
       inFlightBytes: streamer.inFlightBytes,
-      queuedCount: streamer.queued.length,
+      queuedCount: queuedLineCount(streamer),
       statusReport,
       at,
     },
@@ -226,7 +227,7 @@ function streamPositionUnchanged(
     prev !== null &&
     prev.completed === streamer.completed &&
     prev.inFlightBytes === streamer.inFlightBytes &&
-    prev.queuedCount === streamer.queued.length
+    prev.queuedCount === queuedLineCount(streamer)
   );
 }
 

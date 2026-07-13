@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { nextQueuedLine, queuedLineCount } from '../../core/controllers/grbl';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 
@@ -285,8 +286,9 @@ describe('laser-store serial write failures', () => {
 
     const paused = useLaserStore.getState().streamer;
     expect(paused?.status).toBe('paused');
-    expect(paused?.queued.length).toBeGreaterThan(0);
-    const nextQueuedBytes = paused?.queued[0]?.length ?? Number.POSITIVE_INFINITY;
+    expect(paused === null ? 0 : queuedLineCount(paused)).toBeGreaterThan(0);
+    const nextQueuedBytes =
+      paused === null ? Number.POSITIVE_INFINITY : (nextQueuedLine(paused)?.length ?? Infinity);
     expect(
       (paused?.inFlightBytes ?? Number.POSITIVE_INFINITY) + nextQueuedBytes,
     ).toBeLessThanOrEqual(paused?.rxBufferBytes ?? 0);

@@ -3,7 +3,7 @@
 // jog/probe/G92 to re-zero the new bit are legal. continueToolChange() drops
 // the M0 and resumes from the emitter's own M3/G4 spin-up.
 import { describe, expect, it } from 'vitest';
-import { continueToolChange, createStreamer, onAck, step } from './streamer';
+import { continueToolChange, createStreamer, nextQueuedLine, onAck, step } from './streamer';
 
 // A two-section multi-tool program: cut, retract/off/park, M0, spin-up, cut.
 const MULTI_TOOL = [
@@ -25,7 +25,7 @@ describe('streamer tool-change pause (CNC-01)', () => {
     expect(r.state.status).toBe('tool-change');
     expect(r.toSend).toContain('G0 X0 Y0'); // pre-M0 lines flushed
     expect(r.toSend).not.toContain('M0'); // M0 never sent
-    expect(r.state.queued[0]).toBe('M0\n'); // left at queue head
+    expect(nextQueuedLine(r.state)).toBe('M0\n'); // left at queue head
   });
 
   it('step() sends nothing while held at a tool change (non-sending, non-terminal)', () => {
@@ -40,7 +40,7 @@ describe('streamer tool-change pause (CNC-01)', () => {
     const completedBefore = held.completed;
     const resumed = continueToolChange(held);
     expect(resumed.status).toBe('streaming');
-    expect(resumed.queued[0]).toBe('M3 S12000\n'); // M0 dropped, spin-up next
+    expect(nextQueuedLine(resumed)).toBe('M3 S12000\n'); // M0 dropped, spin-up next
     expect(resumed.completed).toBe(completedBefore + 1); // M0 counted so completed/total stays exact
     // ...and step() now sends the remaining section from the spin-up onward.
     expect(step(resumed).toSend).toContain('M3 S12000');
@@ -53,7 +53,7 @@ describe('streamer tool-change pause (CNC-01)', () => {
     const r = step(s);
     expect(r.state.status).toBe('tool-change');
     expect(r.toSend).toBe(''); // nothing sent — M0 was first
-    expect(r.state.queued[0]).toBe('M0\n');
+    expect(nextQueuedLine(r.state)).toBe('M0\n');
   });
 
   it('an ack draining the pre-M0 tail does NOT promote tool-change to done', () => {

@@ -4,6 +4,7 @@ import {
   RT_SOFT_RESET,
   cancel,
   createStreamer,
+  queuedLineCount,
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
@@ -164,7 +165,8 @@ describe('handleLine controller error (P0-1)', () => {
       }),
     );
     set({ streamer: firstStep.state });
-    expect(get().streamer?.queued.length).toBeGreaterThan(0);
+    const activeStream = get().streamer;
+    expect(activeStream === null ? 0 : queuedLineCount(activeStream)).toBeGreaterThan(0);
     const safeWrite = vi.fn(
       async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
     );

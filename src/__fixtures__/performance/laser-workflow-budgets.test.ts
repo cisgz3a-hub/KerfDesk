@@ -22,10 +22,12 @@ import { ciBudgetMs } from '../ci-budget';
 type Size = 'small' | 'medium' | 'large';
 type Phase = 'import' | 'trace' | 'editing' | 'preview' | 'save' | 'compile' | 'streaming';
 
-const FIXTURES: Readonly<Record<Size, { objects: number; traceEdge: number }>> = {
-  small: { objects: 10, traceEdge: 32 },
-  medium: { objects: 200, traceEdge: 96 },
-  large: { objects: 1_000, traceEdge: 192 },
+const FIXTURES: Readonly<
+  Record<Size, { objects: number; traceEdge: number; streamLines: number }>
+> = {
+  small: { objects: 10, traceEdge: 32, streamLines: 1_000 },
+  medium: { objects: 200, traceEdge: 96, streamLines: 10_000 },
+  large: { objects: 1_000, traceEdge: 192, streamLines: 100_000 },
 };
 
 const LOCAL_BUDGETS: Readonly<Record<Size, Readonly<Record<Phase, number>>>> = {
@@ -84,7 +86,13 @@ describe('laser workflow performance budgets', () => {
         timings.save = measured(() => serializeProject(project));
         const emitted = measuredValue(() => emitGcode(project));
         timings.compile = emitted.elapsed;
-        timings.streaming = measured(() => consumeStream(emitted.value.gcode));
+        timings.streaming = measured(() => consumeStream(streamFixture(fixture.streamLines)));
+
+        console.info(
+          `[workflow-perf] ${size}: ${Object.entries(timings)
+            .map(([phase, elapsed]) => `${phase}=${elapsed?.toFixed(1)}ms`)
+            .join(' ')}`,
+        );
 
         for (const phase of Object.keys(LOCAL_BUDGETS[size]) as Phase[]) {
           const elapsed = timings[phase];
@@ -169,6 +177,12 @@ function consumeStream(gcode: string): void {
     if (state.inFlight.length === 0) break;
     state = onAck(state, 'ok').state;
   }
+}
+
+function streamFixture(lineCount: number): string {
+  return Array.from({ length: lineCount }, (_unused, index) => `G1 X${index % 400} S100`).join(
+    '\n',
+  );
 }
 
 function measured(run: () => unknown): number {
