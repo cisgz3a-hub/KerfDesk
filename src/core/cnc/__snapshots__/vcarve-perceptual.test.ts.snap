@@ -3,6 +3,7 @@
 exports[`v-carve — perceptual (analytic pyramid field) > emits deterministic, invariant-clean G-code for the v-carve job (snapshot) 1`] = `
 "G21
 G90
+G54
 G94
 G0 Z3.810
 M3 S12000

@@ -7,6 +7,13 @@
 // import — no runtime cycle.
 
 import { inferCurrentMachinePosition } from './infer-machine-position';
+import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { type ControllerLifecycleRefs } from './laser-interactive-command';
+import {
+  runOriginTransaction,
+  unknownOriginPatch,
+  type OriginSafeWrite,
+} from './laser-origin-transaction';
 import {
   clearPersistentOrigin as clearPersistentOriginAction,
   releaseMotors as releaseMotorsAction,
@@ -15,7 +22,6 @@ import {
   setPersistentOriginHere as setPersistentOriginHereAction,
   zeroZHere as zeroZHereAction,
 } from './origin-actions';
-import { type LaserSafetyAction } from './laser-safety-notice';
 import {
   assertAutofocusIdle,
   assertNoActiveJob,
@@ -28,33 +34,57 @@ type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type GetFn = () => LaserState;
-type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+type SafeWriteFn = OriginSafeWrite;
 
-// All three origin actions require the same guards: autofocus idle, no active
-// job, and no motion operation (frame/jog) in flight. The motion guard mutates
-// state on block (so it isn't a pure predicate like the other two).
-function assertOriginActionReady(set: SetFn, get: GetFn): void {
+// Every origin action requires a known stationary controller and exclusive
+// acknowledgement ownership before it may start a transaction.
+function assertOriginActionReady(set: SetFn, get: GetFn, refs: ControllerLifecycleRefs): void {
   assertAutofocusIdle(get());
   assertNoActiveJob(get());
-  const blocked = motionOperationCommandBlockMessage(get());
-  if (blocked === null) return;
-  set({ lastWriteError: blocked, log: pushLog(get(), `[lf2] Motion command blocked: ${blocked}`) });
-  throw new Error(blocked);
+  const state = get();
+  const operationBlock =
+    motionOperationCommandBlockMessage(state) ??
+    controllerOperationCommandBlockMessage(state.controllerOperation);
+  if (operationBlock !== null) blockOriginAction(set, get, operationBlock);
+  if (state.pendingUntrackedAcks > 0 || refs.controllerCommand !== null) {
+    blockOriginAction(
+      set,
+      get,
+      'Wait for the previous controller command to be acknowledged before changing origin.',
+    );
+  }
+  if (refs.controllerIdleWait !== null) {
+    blockOriginAction(
+      set,
+      get,
+      'Wait for the active controller Idle check before changing origin.',
+    );
+  }
+  if (state.connection.kind !== 'connected') {
+    blockOriginAction(set, get, 'Connect to the controller before changing origin.');
+  }
+  if (state.statusReport?.state !== 'Idle') {
+    const current = state.statusReport?.state ?? 'unknown';
+    blockOriginAction(
+      set,
+      get,
+      `Machine must be Idle before changing origin (currently ${current}).`,
+    );
+  }
 }
 
-function assertPersistentOriginReady(set: SetFn, get: GetFn): void {
-  assertOriginActionReady(set, get);
-  const status = get().statusReport;
-  if (status !== null && status.state === 'Idle') return;
-  const current = status?.state ?? 'unknown';
-  const blocked = `Machine must be Idle before changing persistent origin (currently ${current}).`;
-  set({ lastWriteError: blocked, log: pushLog(get(), `[lf2] Origin command blocked: ${blocked}`) });
-  throw new Error(blocked);
+function blockOriginAction(set: SetFn, get: GetFn, message: string): never {
+  set({
+    lastWriteError: message,
+    log: pushLog(get(), `[lf2] Origin command blocked: ${message}`),
+  });
+  throw new Error(message);
 }
 
 export function originActions(
   set: SetFn,
   get: GetFn,
+  refs: ControllerLifecycleRefs,
   safeWrite: SafeWriteFn,
 ): Pick<
   LaserState,
@@ -66,69 +96,153 @@ export function originActions(
   | 'releaseMotors'
 > {
   return {
-    setOriginHere: async () => {
-      assertOriginActionReady(set, get);
-      await setOriginHereAction((out) => safeWrite(out, 'origin'));
-      const { statusReport, wcoCache } = get();
-      const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
-      set(activeOriginPatch('g92', inferredWco));
-    },
-    zeroZHere: async () => {
-      assertOriginActionReady(set, get);
-      await zeroZHereAction((out) => safeWrite(out, 'origin'));
-      // Z-only offset: XY origin state is untouched, and the WCO cache
-      // refreshes from the next WCO-bearing status frame. This is what
-      // establishes work Z0 (the CNC stock-top contract) for the Start advisory.
-      set({
-        workZZeroKnown: true,
-        log: pushLog(get(), '[lf2] Work Z zeroed at current bit height (G92 Z0).'),
-      });
-    },
-    resetOrigin: async () => {
-      assertOriginActionReady(set, get);
-      await resetOriginAction((out) => safeWrite(out, 'origin'));
-      if (get().workOriginSource === 'g54-persistent') {
-        set({ frameVerification: null });
-        return;
-      }
-      set(clearedOriginPatch());
-    },
-    setPersistentOriginHere: async () => {
-      assertPersistentOriginReady(set, get);
-      await setPersistentOriginHereAction((out) => safeWrite(out, 'origin'));
-      const { statusReport, wcoCache } = get();
-      const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
-      set(activeOriginPatch('g54-persistent', inferredWco));
-    },
-    clearPersistentOrigin: async () => {
-      assertPersistentOriginReady(set, get);
-      await clearPersistentOriginAction((out) => safeWrite(out, 'origin'));
-      set(clearedOriginPatch());
-    },
-    releaseMotors: async () => {
-      assertOriginActionReady(set, get);
-      await releaseMotorsAction((out) => safeWrite(out, 'origin'));
-      // The head is now hand-movable and waking ($SLP -> soft-reset) clears G92,
-      // so transient origin and any Verified Frame are void (ADR-053 P4). G54
-      // can survive, but the cached WCO is no longer trustworthy after hand move.
-      if (get().workOriginSource === 'g54-persistent') {
-        set(unknownOriginPatch());
-        return;
-      }
-      set(clearedOriginPatch());
-    },
+    setOriginHere: () => setOriginHere(set, get, refs, safeWrite),
+    zeroZHere: () => zeroZHere(set, get, refs, safeWrite),
+    resetOrigin: () => resetOrigin(set, get, refs, safeWrite),
+    setPersistentOriginHere: () => setPersistentOriginHere(set, get, refs, safeWrite),
+    clearPersistentOrigin: () => clearPersistentOrigin(set, get, refs, safeWrite),
+    releaseMotors: () => releaseMotors(set, get, refs, safeWrite),
   };
 }
 
-function activeOriginPatch(
-  workOriginSource: 'g92' | 'g54-persistent',
-  inferredWco: LaserState['wcoCache'],
+async function setOriginHere(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReady(set, get, refs);
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Set work origin',
+    (write) => setOriginHereAction(write, usesPrimaryWcs(get())),
+    () => {
+      const { statusReport, wcoCache } = get();
+      return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
+    },
+  );
+}
+
+async function zeroZHere(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReady(set, get, refs);
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Zero work Z',
+    (write) => zeroZHereAction(write, usesPrimaryWcs(get())),
+    () => ({ workZZeroKnown: true }),
+  );
+}
+
+async function resetOrigin(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReady(set, get, refs);
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Reset transient origin',
+    (write) => resetOriginAction(write, usesPrimaryWcs(get())),
+    () =>
+      get().workOriginSource === 'g54-persistent'
+        ? persistentOriginAfterTransientClearPatch()
+        : clearedOriginPatch(),
+  );
+}
+
+async function setPersistentOriginHere(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReady(set, get, refs);
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Set persistent origin',
+    (write) => setPersistentOriginHereAction(write, usesPrimaryWcs(get())),
+    persistentOriginAfterTransientClearPatch,
+  );
+}
+
+async function clearPersistentOrigin(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReady(set, get, refs);
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Clear persistent origin',
+    (write) => clearPersistentOriginAction(write, usesPrimaryWcs(get())),
+    clearedOriginPatch,
+  );
+}
+
+async function releaseMotors(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  assertOriginActionReady(set, get, refs);
+  await runOriginTransaction(set, refs, safeWrite, 'Release motors', releaseMotorsAction, () =>
+    get().workOriginSource === 'g54-persistent' ? unknownOriginPatch() : clearedOriginPatch(),
+  );
+}
+
+function usesPrimaryWcs(state: LaserState): boolean {
+  return state.capabilities.wcs === 'g92-and-g10';
+}
+
+function transientXyOriginPatch(
+  inferredMachinePosition: LaserState['wcoCache'],
+  priorWco: LaserState['wcoCache'],
 ): Partial<LaserState> {
+  const axisHonestWco =
+    inferredMachinePosition === null || priorWco === null
+      ? null
+      : {
+          x: inferredMachinePosition.x,
+          y: inferredMachinePosition.y,
+          z: priorWco.z,
+        };
   return {
     workOriginActive: true,
-    workOriginSource,
+    workOriginSource: 'g92',
+    wcoCache: axisHonestWco,
     frameVerification: null,
-    ...(inferredWco !== null ? { wcoCache: inferredWco } : {}),
+  };
+}
+
+function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
+  return {
+    workOriginActive: true,
+    workOriginSource: 'g54-persistent',
+    // G92.1 clears every transient axis. The boolean does not encode whether
+    // Z came from G92 or persistent G54, so conservatively require a new touch-off.
+    workZZeroKnown: false,
+    // G10 L20 P1 writes X/Y only. Z cannot be reconstructed from MPos after
+    // G92.1, so wait for a fresh WCO-bearing status instead of fabricating it.
+    wcoCache: null,
+    frameVerification: null,
   };
 }
 
@@ -137,17 +251,6 @@ function clearedOriginPatch(): Partial<LaserState> {
     workOriginActive: false,
     workOriginSource: 'none',
     // clearOrigin (G92.1) drops ALL G92 offsets, Z included, so work Z0 is void.
-    workZZeroKnown: false,
-    wcoCache: null,
-    frameVerification: null,
-  };
-}
-
-function unknownOriginPatch(): Partial<LaserState> {
-  return {
-    workOriginActive: true,
-    workOriginSource: 'unknown',
-    // Motors released / hand-moved: the bit-to-stock Z relationship is void.
     workZZeroKnown: false,
     wcoCache: null,
     frameVerification: null,

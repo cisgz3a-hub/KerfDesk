@@ -10,9 +10,15 @@ import {
   SURFACING_DEFAULT_STEPOVER_PCT,
   SURFACING_DEFAULT_TOTAL_DEPTH_MM,
 } from '../../core/cnc';
-import { activeCncTool, type CncMachineConfig } from '../../core/scene';
+import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
+import { emitStandaloneCncGcode } from '../../io/gcode/standalone-cnc-gcode';
+import { buildGcodeMetadata } from '../app/build-info';
+import { confirmControllerReadiness } from '../app/confirm-controller-readiness';
 import { usePlatform } from '../app/platform-context';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { useLaserStore } from '../state/laser-store';
+import { useStore } from '../state/store';
 import { useToastStore } from '../state/toast-store';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
@@ -22,6 +28,8 @@ const DEFAULT_PLUNGE_MM_PER_MIN = 600;
 export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const platform = usePlatform();
   const pushToast = useToastStore((s) => s.pushToast);
+  const project = useStore((s) => s.project);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const { machine } = props;
   const [widthMm, setWidthMm] = useState(machine.stock.widthMm);
   const [heightMm, setHeightMm] = useState(machine.stock.heightMm);
@@ -29,7 +37,7 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const [totalDepthMm, setTotalDepthMm] = useState(SURFACING_DEFAULT_TOTAL_DEPTH_MM);
 
   const save = (): void =>
-    void saveSurfacingProgram(platform, pushToast, machine, {
+    void saveSurfacingProgram(platform, pushToast, project, machine, controllerSettings, {
       widthMm,
       heightMm,
       stepoverPct,
@@ -88,7 +96,9 @@ type SurfacingInputs = {
 async function saveSurfacingProgram(
   platform: ReturnType<typeof usePlatform>,
   pushToast: (message: string, variant?: 'success' | 'error') => void,
+  project: Project,
   machine: CncMachineConfig,
+  controllerSettings: ControllerSettingsSnapshot | null,
   inputs: SurfacingInputs,
 ): Promise<void> {
   const tool = activeCncTool(machine);
@@ -96,8 +106,8 @@ async function saveSurfacingProgram(
     ...inputs,
     bitDiameterMm: tool.diameterMm,
     depthPerPassMm: SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-    feedMmPerMin: DEFAULT_FEED_MM_PER_MIN,
-    plungeMmPerMin: DEFAULT_PLUNGE_MM_PER_MIN,
+    feedMmPerMin: Math.min(DEFAULT_FEED_MM_PER_MIN, project.device.maxFeed),
+    plungeMmPerMin: Math.min(DEFAULT_PLUNGE_MM_PER_MIN, project.device.maxFeed),
     spindleRpm: machine.params.spindleMaxRpm,
     spindleSpinupSec: machine.params.spindleSpinupSec,
     safeZMm: machine.params.safeZMm,
@@ -107,15 +117,22 @@ async function saveSurfacingProgram(
     return;
   }
   const { program } = result;
+  const emitted = emitStandaloneCncGcode(project, program.lines.join('\n'), buildGcodeMetadata());
+  if (!emitted.preflight.ok) {
+    const reasons = emitted.preflight.issues.map((issue) => issue.message).join(' ');
+    pushToast(`Could not save the surfacing program: ${reasons}`, 'error');
+    return;
+  }
+  if (!confirmControllerReadiness(project, controllerSettings)) return;
   try {
     const target = await platform.pickFileForSave({
       suggestedName: 'surfacing.nc',
       extensions: GCODE_EXTENSIONS,
     });
     if (target === null) return;
-    await target.write(`${program.lines.join('\n')}\n`);
+    await target.write(emitted.gcode);
     pushToast(
-      `Saved surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Zero X/Y at the area's front-left corner and Z on the surface before running.`,
+      `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
       'success',
     );
   } catch (err) {

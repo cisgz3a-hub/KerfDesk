@@ -5,7 +5,9 @@ import type { CommandId } from './command-types';
 import { baseCtx } from './command-registry-test-helpers';
 
 // Machine-agnostic commands that must survive the CNC gate (ADR-101 §1):
-// geometry sources, edit/arrange, file, preview, connection.
+// geometry sources, edit/arrange, file, preview, connection. The Trace family
+// joined this set in the 2026-07-13 ADR-101 amendment — traced vectors are
+// cuttable on CNC, so Trace/Re-trace/Multi-file trace must stay visible in CNC.
 const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'file.new',
   'file.import-svg',
@@ -17,6 +19,9 @@ const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'tools.measure',
   'tools.convert-to-path',
   'tools.weld',
+  'tools.trace-image',
+  'tools.retrace-original',
+  'tools.multi-file-trace',
   'arrange.align-left',
   'arrange.break-apart',
   'laser.connect',
