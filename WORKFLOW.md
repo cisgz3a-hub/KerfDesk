@@ -1105,12 +1105,13 @@ existing SetupRow (Home / Auto-focus / Frame / Start) and the
 streaming controls. Two buttons:
 
 - **Set origin here** — sends `G92 X0 Y0`. Declares the current head
-  position as work-coord (0, 0). Toast confirms the write; the status
+  position as work-coord (0, 0). Toast confirms the controller's `ok`
+  acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
   next WCO-bearing status frame arrives. Frame and Start switch to
-  user-origin placement immediately after the write succeeds; they do
-  not wait for that later status frame.
+  user-origin placement only after that `ok`; they do not wait for the
+  later WCO-bearing status frame.
 - **Reset origin** — sends `G92.1`. Clears the offset, status returns
   to "machine 0,0". Disabled when no custom origin is active.
 
@@ -1120,12 +1121,19 @@ status frames). It must never read the raw `statusReport.wco` — GRBL
 only emits WCO every Nth frame, so the raw field is null on ~29
 frames out of 30 and would flicker the readout.
 
+Every origin command requires a connected controller with known Idle
+status and no outstanding acknowledgement. It exclusively owns the
+controller command arbiter until `ok`/`error`/`ALARM`, so Start,
+Console, settings, and other motion cannot steal its response. The two
+commands in a persistent-origin update are acknowledged one at a time;
+local origin truth changes atomically only after both succeed.
+
 The readout and Reset action treat any nonzero WCO axis as meaningful,
 but job placement is axis-specific: only a nonzero X or Y offset proves
 an XY custom origin. A Z-only touch-off remains visible and may establish
 work-Z evidence, but it cannot enable User Origin or Verified Origin.
 
-**The four states.**
+**The five states.**
 
 1. **Success.** Connected, idle, head jogged to a workpiece corner.
    Click Set origin here → toast "Origin set to current head position
@@ -1136,12 +1144,17 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 2. **No connection.** Both buttons disabled (`busy = props.disabled
    || streaming`; `disabled` set by `LaserWindow` when connection
    isn't `connected`). User must connect first.
-3. **Alarm clears origin mid-session.** Operator sets origin, then a
+3. **Rejected / interrupted update.** If a command is rejected, times
+   out, disconnects, or a multi-command persistent update fails after
+   its first `ok`, the cached WCO and frame proof are cleared and the
+   origin source becomes `unknown`. Start remains unable to resolve a
+   custom placement until the operator re-establishes or resets it.
+4. **Alarm clears origin mid-session.** Operator sets origin, then a
    limit switch triggers (or `\x18` is sent). GRBL clears G92
    internally; the alarm branch in `laser-line-handler.ts` clears
    `wcoCache`; the status row reverts to "Origin: machine 0,0". User
    re-jogs and re-sets if they want the offset back.
-4. **Off-bed risk.** Operator sets origin near the bed edge, then
+5. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
    *machine* once the offset is applied. When WCO is known, Frame and
    Start preflight check the physical bounds (`job bounds + WCO`) and
