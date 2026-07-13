@@ -120,7 +120,7 @@ async function setOriginHere(
     (write) => setOriginHereAction(write, usesPrimaryWcs(get())),
     () => {
       const { statusReport, wcoCache } = get();
-      return activeOriginPatch('g92', inferCurrentMachinePosition(statusReport, wcoCache));
+      return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
     },
   );
 }
@@ -157,7 +157,7 @@ async function resetOrigin(
     (write) => resetOriginAction(write, usesPrimaryWcs(get())),
     () =>
       get().workOriginSource === 'g54-persistent'
-        ? { frameVerification: null }
+        ? persistentOriginAfterTransientClearPatch()
         : clearedOriginPatch(),
   );
 }
@@ -175,13 +175,7 @@ async function setPersistentOriginHere(
     safeWrite,
     'Set persistent origin',
     (write) => setPersistentOriginHereAction(write, usesPrimaryWcs(get())),
-    () => {
-      const { statusReport, wcoCache } = get();
-      return activeOriginPatch(
-        'g54-persistent',
-        inferCurrentMachinePosition(statusReport, wcoCache),
-      );
-    },
+    persistentOriginAfterTransientClearPatch,
   );
 }
 
@@ -218,15 +212,37 @@ function usesPrimaryWcs(state: LaserState): boolean {
   return state.capabilities.wcs === 'g92-and-g10';
 }
 
-function activeOriginPatch(
-  workOriginSource: 'g92' | 'g54-persistent',
-  inferredWco: LaserState['wcoCache'],
+function transientXyOriginPatch(
+  inferredMachinePosition: LaserState['wcoCache'],
+  priorWco: LaserState['wcoCache'],
 ): Partial<LaserState> {
+  const axisHonestWco =
+    inferredMachinePosition === null || priorWco === null
+      ? null
+      : {
+          x: inferredMachinePosition.x,
+          y: inferredMachinePosition.y,
+          z: priorWco.z,
+        };
   return {
     workOriginActive: true,
-    workOriginSource,
+    workOriginSource: 'g92',
+    wcoCache: axisHonestWco,
     frameVerification: null,
-    ...(inferredWco !== null ? { wcoCache: inferredWco } : {}),
+  };
+}
+
+function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
+  return {
+    workOriginActive: true,
+    workOriginSource: 'g54-persistent',
+    // G92.1 clears every transient axis. The boolean does not encode whether
+    // Z came from G92 or persistent G54, so conservatively require a new touch-off.
+    workZZeroKnown: false,
+    // G10 L20 P1 writes X/Y only. Z cannot be reconstructed from MPos after
+    // G92.1, so wait for a fresh WCO-bearing status instead of fabricating it.
+    wcoCache: null,
+    frameVerification: null,
   };
 }
 

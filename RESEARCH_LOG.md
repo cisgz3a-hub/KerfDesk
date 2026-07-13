@@ -821,13 +821,13 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
     adoption (maintainer-approved 2026-07-04), consistent with the existing
     permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).
 
-## GRBL work-coordinate identity review (2026-07-13)
+## GRBL axis-specific origin semantics (2026-07-13)
 
-- **Primary source:** [GRBL v1.1 commands](https://github.com/gnea/grbl/blob/master/doc/markdown/commands.md)
-- `$G` reports the active modal state and documents G54-G59 as the coordinate-system selection group.
-- `$#` reports the stored G54-G59, G92, tool-length, and probe parameters; G10 L2/L20 writes the
-  selected P-indexed work coordinate.
-- **KerfDesk consequence:** an acknowledged setup write is insufficient if a prior startup block or
-  console command left G55-G59 active. App-controlled setup, probing, surfacing, and normal CNC output
-  therefore select G54 explicitly. Modal readback remains a later hardening step, not a prerequisite
-  for this deterministic normalization.
+- **Source snapshot:** [gnea/grbl at bfb67f0c](https://github.com/gnea/grbl/tree/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e)
+- GRBL's parser computes `WPos = MPos - WCS - G92 - TLO`. Its G92 path recalculates only named
+  axes and retains the prior offset for unnamed axes; G92.1 clears the transient offset.
+- `$#` reports stored WCS, G92, TLO, and probe parameters, while intermittent status WCO reports the
+  effective combined offset. A mutation `ok` proves acceptance, not the value of every untouched axis.
+- **KerfDesk consequence:** XY-only commands may derive X/Y but must preserve known Z or wait for
+  readback. Any G92.1 path invalidates unqualified Z evidence until a new touch-off or richer readback
+  proof exists.

@@ -2490,27 +2490,25 @@ F-CNC19 tiling.
    set their material on the layer card, or re-pick the project material to
    apply to all.
 
-### F-CNC37. Keep CNC setup and execution in one explicit WCS — Phase H.11
+### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
 
 #### Success
-1. KerfDesk treats G54 as the canonical GRBL-family work coordinate system.
-   Set Origin, Zero Z, and Reset Origin select G54 in the same parsed block as
-   their G92 mutation; persistent-origin actions clear transient offsets under
-   G54 before writing P1.
-2. Z and corner probe transactions select G54 before their first motion and
-   commit P0 only after the required contact succeeds.
-3. Every CNC program, including surfacing, emits `G54` before its first motion,
-   so a prior G55-G59 console command or startup block cannot redirect the job.
+1. Set Origin changes X/Y only. If KerfDesk already knows the prior Z offset,
+   it preserves that Z; otherwise it waits for a fresh WCO-bearing status
+   instead of copying machine Z into the work-offset cache.
+2. Reset Origin and persistent-origin flows that send `G92.1` invalidate
+   work-Z evidence because GRBL clears every transient G92 axis.
 
-#### Error — stale alternate WCS
-1. A controller left in G55-G59 is normalized before app-controlled setup and
-   again by the stream preamble. Missing work-Z evidence remains a separate
-   Start blocker.
+#### Error — acknowledgement or readback failure
+1. Existing origin transaction rules remain fail-closed: a rejected, alarmed,
+   timed-out, or disconnected mutation leaves origin truth unknown and Z
+   evidence unavailable.
 
-#### Edge — other controller families and multi-WCS workflows
-1. G92-only controllers retain their original origin commands and do not
-   receive G54. KerfDesk's current project model has no multi-WCS workflow;
-   jobs intentionally use G54, and CNC execution remains GRBL-family only.
+#### Edge — persistent probe-derived Z
+1. The current store records work-Z as a boolean, not its controller offset
+   source. After `G92.1`, KerfDesk conservatively requires a new touch-off even
+   when a persistent G54 Z may still exist; later `$#` readback may prove and
+   preserve that distinction.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 
