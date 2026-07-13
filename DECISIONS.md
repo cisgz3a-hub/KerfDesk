@@ -38,6 +38,7 @@
 | ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
 | ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
 | ADR-152 | 2026-07-13 | Accepted | Offset pockets may use locally tangent native helical entries |
+| ADR-153 | 2026-07-13 | Accepted | Two-tool pocket rest machining uses bounded 2D stock subtraction |
 
 ---
 
@@ -6844,3 +6845,38 @@ Supported pockets enter stock gradually while preserving safe relocation discipl
 contour joins. More arcs and retracts can increase output size and cycle time, but avoid ambiguous
 links through uncut material. Multi-pocket and island-aware planning remains deferred. The motion
 is software-verified and hardware-gated until the standing CNC air-cut and scrap protocol passes.
+
+---
+
+## ADR-153 - Two-tool pocket rest machining uses bounded 2D stock subtraction
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+A small end mill can reach pocket details that a larger rougher cannot, but clearing the entire
+pocket with the small tool wastes substantial time. Rest machining needs an explicit definition of
+remaining stock and tool-change order; calling ordinary offset rings "adaptive" would overstate the
+planner and hide failure cases.
+
+### Decision
+
+- A pocket layer may select one larger end mill to clear bulk material before its normal smaller
+  bit machines only the modeled remainder.
+- Remaining stock is computed in bounded 2D: inset legal rougher centers, dilate by the rougher
+  footprint, subtract that swept region, expand the remainder by the finishing radius, and intersect
+  it with the finishing tool's legal center region.
+- The larger-tool section runs first. The existing multi-tool contract inserts one manual M0 tool
+  change before the smaller rest section.
+- Missing tools, invalid diameter order, open contours, oversized roughers, geometry failures, and
+  combination with helical entry block preflight. No invalid request falls back to a full-pocket cut
+  with the small bit.
+- This feature is tool-diameter-based 2D rest machining, not in-process stock simulation or
+  constant-engagement adaptive clearing.
+
+### Consequences
+
+Large pockets can clear faster while retaining small-feature reach and island protection. The
+result depends on a deliberate manual tool change and correct Z touch-off. Software tests cover
+geometry, ordering, persistence, preview, and preflight; hardware remains CLAIMED until the standing
+two-tool air-cut and scrap protocol passes.
