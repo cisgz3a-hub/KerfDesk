@@ -196,6 +196,11 @@ export type DeviceProfile = {
   // smoother motion. Grbl's shipping default is 0.010 mm; rarely
   // overridden. Used by the planner's junction-velocity formula.
   readonly junctionDeviationMm: number;
+  // Preview/ETA calibration factors derived from measured jobs. These affect
+  // simulation time only, never emitted feed rates or machine motion. Absent
+  // values preserve legacy profiles at an exact 1.0 scale.
+  readonly estimateCutTimeScale?: number;
+  readonly estimateTravelTimeScale?: number;
   readonly origin: Origin;
   readonly homing: HomingConfig;
   // Multi-line G-code (or vendor M-code) sequence the "Auto-focus" button
@@ -205,6 +210,18 @@ export type DeviceProfile = {
   // proprietary touch-probe sequences) paste their machine's command here.
   readonly autofocusCommand: string;
 };
+
+export const MIN_ESTIMATE_TIME_SCALE = 0.1;
+export const MAX_ESTIMATE_TIME_SCALE = 5;
+
+export function isEstimateTimeScale(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= MIN_ESTIMATE_TIME_SCALE &&
+    value <= MAX_ESTIMATE_TIME_SCALE
+  );
+}
 
 // Autofocus is intentionally blank by default.
 //

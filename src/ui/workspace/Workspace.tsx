@@ -55,9 +55,9 @@ export function Workspace(): JSX.Element {
   const toolMode = useUiStore((s) => s.toolMode);
   const viewState = useViewState();
   const previewToolpath = usePreviewToolpath(project, previewMode);
-  usePreviewPlayback(previewMode, previewToolpath);
-  const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
   const jobEstimate = useJobEstimate();
+  usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
+  const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
   const canvasSize = useCanvasBitmapSize(ref);
   useWorkspaceDraw({
     ref,

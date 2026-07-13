@@ -22,7 +22,7 @@
 //
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
-import type { DeviceProfile } from '../devices';
+import { isEstimateTimeScale, type DeviceProfile } from '../devices';
 import {
   cncPassEntryDepthMm,
   cncPassXyPoints,
@@ -51,14 +51,21 @@ export function estimateJobDuration(job: Job, device: DeviceProfile): JobDuratio
   const plannerJob = jobWithCncAsCutGroups(jobWithRasterSweeps(job));
   const estimate = estimateWithPlanner(plannerJob, device);
   const plungeSeconds = cncPlungeSeconds(job, device);
-  if (plungeSeconds === 0) return estimate;
+  const cutSeconds =
+    (estimate.breakdown.cutSeconds + plungeSeconds) * timingScale(device.estimateCutTimeScale);
+  const travelSeconds =
+    estimate.breakdown.travelSeconds * timingScale(device.estimateTravelTimeScale);
   return {
-    totalSeconds: estimate.totalSeconds + plungeSeconds,
+    totalSeconds: cutSeconds + travelSeconds,
     breakdown: {
-      cutSeconds: estimate.breakdown.cutSeconds + plungeSeconds,
-      travelSeconds: estimate.breakdown.travelSeconds,
+      cutSeconds,
+      travelSeconds,
     },
   };
+}
+
+function timingScale(value: number | undefined): number {
+  return isEstimateTimeScale(value) ? value : 1;
 }
 
 // The XY planner knows nothing about Z. CNC groups estimate as cut groups at

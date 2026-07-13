@@ -93,9 +93,25 @@ export function PreviewStatsPanel(props: {
         <strong>{formatMm(stats.totalMm)}</strong>
         <span>Time</span>
         <strong>{formatEstimate(props.estimate)}</strong>
+        {props.estimate.kind === 'estimated' ? (
+          <>
+            <span>Cut time</span>
+            <strong>{formatSeconds(props.estimate.breakdown.cutSeconds)}</strong>
+            <span>Travel time</span>
+            <strong>{formatSeconds(props.estimate.breakdown.travelSeconds)}</strong>
+          </>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function formatSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+  const rounded = Math.round(seconds);
+  if (rounded < 60) return `${rounded}s`;
+  const minutes = Math.floor(rounded / 60);
+  return `${minutes}m ${rounded % 60}s`;
 }
 
 export function PreviewControlsPanel(props: {
@@ -222,9 +238,9 @@ export function PreviewRouteControls(
           data-help-id="control:preview.routeSpeed"
           onChange={(e) => setPreviewPlaybackSpeed(e.currentTarget.value as PreviewPlaybackSpeed)}
         >
-          <option value="slow">Slow</option>
-          <option value="normal">Normal</option>
-          <option value="fast">Fast</option>
+          <option value="slow">1x</option>
+          <option value="normal">10x</option>
+          <option value="fast">40x</option>
         </select>
       </label>
     </div>

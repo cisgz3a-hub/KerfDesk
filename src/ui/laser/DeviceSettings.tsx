@@ -77,8 +77,12 @@ export function DeviceSettings(): JSX.Element {
         <PlannerAdvanced
           accel={device.accelMmPerSec2}
           jd={device.junctionDeviationMm}
+          cutTimeScale={device.estimateCutTimeScale ?? 1}
+          travelTimeScale={device.estimateTravelTimeScale ?? 1}
           onAccelChange={(accelMmPerSec2) => update({ accelMmPerSec2 })}
           onJdChange={(junctionDeviationMm) => update({ junctionDeviationMm })}
+          onCutTimeScaleChange={(estimateCutTimeScale) => update({ estimateCutTimeScale })}
+          onTravelTimeScaleChange={(estimateTravelTimeScale) => update({ estimateTravelTimeScale })}
         />
       </div>
     </details>

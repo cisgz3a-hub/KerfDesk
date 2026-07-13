@@ -278,6 +278,12 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     framingFeedMmPerMin: profile.framingFeedMmPerMin,
     accelMmPerSec2: profile.accelMmPerSec2,
     junctionDeviationMm: profile.junctionDeviationMm,
+    ...(profile.estimateCutTimeScale === undefined
+      ? {}
+      : { estimateCutTimeScale: profile.estimateCutTimeScale }),
+    ...(profile.estimateTravelTimeScale === undefined
+      ? {}
+      : { estimateTravelTimeScale: profile.estimateTravelTimeScale }),
     ...canonicalZMetadata(profile),
   };
 }

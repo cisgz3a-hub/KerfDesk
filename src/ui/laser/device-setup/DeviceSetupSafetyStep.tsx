@@ -51,8 +51,14 @@ export function DeviceSetupSafetyStep({ state, dispatch }: DeviceSetupStepProps)
           <PlannerAdvanced
             accel={draft.accelMmPerSec2}
             jd={draft.junctionDeviationMm}
+            cutTimeScale={draft.estimateCutTimeScale ?? 1}
+            travelTimeScale={draft.estimateTravelTimeScale ?? 1}
             onAccelChange={(accelMmPerSec2) => update({ accelMmPerSec2 })}
             onJdChange={(junctionDeviationMm) => update({ junctionDeviationMm })}
+            onCutTimeScaleChange={(estimateCutTimeScale) => update({ estimateCutTimeScale })}
+            onTravelTimeScaleChange={(estimateTravelTimeScale) =>
+              update({ estimateTravelTimeScale })
+            }
           />
         </div>
       </details>

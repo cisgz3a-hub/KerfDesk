@@ -34,6 +34,31 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
   expect(saved.scene.objects.length).toBe(4);
 });
 
+test('calibrates machine timing and exposes cut and travel estimates in Preview', async ({
+  page,
+  kerfdesk,
+}) => {
+  await page.getByRole('button', { name: 'Machine Setup' }).click();
+  await page.getByText('Device Profile', { exact: true }).click();
+  await page.getByText('Advanced: estimator tuning', { exact: true }).click();
+  await fillAndCommit(page, 'Estimated cut time scale', '1.18');
+  await fillAndCommit(page, 'Estimated travel time scale', '1.07');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Preview' }).click();
+  const panel = page.getByRole('group', { name: 'Preview route controls and statistics' });
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Cut time');
+  await expect(panel).toContainText('Travel time');
+
+  await page.getByRole('button', { name: 'Save As...' }).click();
+  const saved = await savedProject(kerfdesk);
+  expect(saved.device).toMatchObject({
+    estimateCutTimeScale: 1.18,
+    estimateTravelTimeScale: 1.07,
+  });
+});
+
 test('outline-nests complementary vector parts that rectangular bounds cannot fit', async ({
   page,
   kerfdesk,
@@ -352,6 +377,13 @@ async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
 }
 
+async function fillAndCommit(page: Page, name: string, value: string): Promise<void> {
+  const input = page.getByRole('spinbutton', { name });
+  await input.fill(value);
+  await input.press('Tab');
+  await expect(input).toHaveValue(value);
+}
+
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   await page.getByText(family, { exact: true }).click();
   await page.getByRole('menuitem').filter({ hasText: command }).click();
@@ -410,6 +442,8 @@ interface SavedProject {
     readonly bedWidth?: number;
     readonly bedHeight?: number;
     readonly framingFeedMmPerMin?: number;
+    readonly estimateCutTimeScale?: number;
+    readonly estimateTravelTimeScale?: number;
     readonly rotary?: {
       readonly enabled: boolean;
       readonly type: string;
