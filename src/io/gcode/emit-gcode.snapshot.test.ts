@@ -181,11 +181,26 @@ function curveProject(): Project {
   });
 }
 
+function roundedRectangleAndEllipseProject(): Project {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
+  <rect x="10" y="10" width="35" height="25" rx="6" ry="9" stroke="#ff0000" fill="none"/>
+  <ellipse cx="72" cy="28" rx="16" ry="11" stroke="#ff0000" fill="none"/>
+</svg>`;
+  const parsed = parseSvg({ svgText: svg, id: 'rounded-shapes', source: 'rounded-shapes.svg' });
+  if (parsed.object === null) throw new Error('rounded shape fixture produced no geometry');
+  return projectWith({
+    ...EMPTY_SCENE,
+    objects: [parsed.object],
+    layers: [createLayer({ id: 'line-red', color: '#ff0000' })],
+  });
+}
+
 const CORPUS: ReadonlyArray<{ readonly id: string; readonly project: () => Project }> = [
   { id: 'fill-donut-with-overscan', project: fillDonutProject },
   { id: 'raster-2x2-threshold', project: rasterProject },
   { id: 'mixed-line-fill-image', project: mixedProject },
   { id: 'curve-bearing-svg', project: curveProject },
+  { id: 'rounded-rectangle-and-ellipse', project: roundedRectangleAndEllipseProject },
 ];
 
 describe('emitGcode production composition — fixture snapshots', () => {
