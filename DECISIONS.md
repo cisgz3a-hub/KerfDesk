@@ -6912,3 +6912,36 @@ Supported pockets receive deterministic, software-verified roughing paths with e
 boundaries. Large pockets and island geometry can be rejected even when an ordinary pocket strategy
 would compile; that fail-closed behavior is intentional until a scalable, island-aware verifier is
 adopted. The planner, verifier, persistence, preflight, preview, and emitted arcs remain release-gated.
+
+---
+
+## ADR-155 - Straight inlays compile as one radius-matched linked pair
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Producing a usable straight-sided inlay requires more than duplicating an outline: the pocket and
+insert must share the same machinable corner geometry, apply a deliberate fit clearance, run in a
+safe order, and retain independent depths. Treating the two halves as unrelated layers would make
+fit and placement easy to desynchronize.
+
+### Decision
+
+- One closed source shape may compile into a linked female pocket and mirrored male insert using the
+  same end mill and one radius-compensated canonical contour.
+- Fit allowance is specified in millimetres per side and split symmetrically between pocket expansion
+  and insert contraction. The insert is placed to the right by a configurable positive spacing.
+- The female pocket runs before the male profile. Pocket and insert depths remain independent, and
+  the insert may use the standard holding-tab contract.
+- Open or unusable geometry, non-end-mill tools, invalid depths or clearances, and offsets that erase
+  either half block preflight instead of producing a partial pair.
+- This decision covers straight-sided inlays only. Tapered V-carve plugs require a separate model for
+  glue gap, surface clearance, and plug stock depth.
+
+### Consequences
+
+The two halves cannot drift in tool radius, allowance, ordering, or persisted settings. Mirroring
+creates a ready-to-cut pair but increases required stock width, which preview and bed checks must
+still validate. Software verification covers geometry, compilation, ordering, persistence, and
+preflight; hardware remains CLAIMED until the standing CNC air-cut and scrap protocol passes.
