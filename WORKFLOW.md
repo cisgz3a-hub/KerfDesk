@@ -436,10 +436,10 @@ If all applicable checks pass, the save/start proceeds.
 
 #### Success — schema older
 1. Migration runs to current version.
-2. Toast (info): `Project migrated from v0 to v1.`
+2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Phase A note:** only `schemaVersion: 1` exists; this branch is forward-looking infrastructure (registered migrator function + dispatch table) and cannot trigger in Phase A. Test by feeding a `schemaVersion: 0` synthetic fixture through the migrator unit test.
+> **Current note:** project schema v2 stores canonical curve subpaths. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; synthetic v0 fixtures still exercise multi-step migration dispatch (ADR-159).
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
