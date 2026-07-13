@@ -1,17 +1,12 @@
 // compileCncJob — Scene + DeviceProfile + CncMachineConfig → Job of CncGroups.
 //
-// The CNC analog of compile-job.ts. Walks every output-enabled layer,
-// materializes its polylines in machine coordinates, converts them into XY
-// toolpaths for the layer's cut type (tool-radius profile offsets, pocket
-// clearing rings, on-path engraves), and expands depth passes (with holding
-// tabs on deep profile passes). Emission order is safety-driven:
+// Materialize layer geometry in machine coordinates and order passes safely:
 //
 //   1. Pockets and engraves first — they never free the part.
 //   2. Profiles last, inner contours before outer, so a part is machined
 //      completely before the cut that could let it move.
 //
-// Pure: no clock, no random, no I/O. Deterministic: indexed loops and
-// stable sorts only.
+// Pure and deterministic: no clock, random input, or I/O.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import {
@@ -21,7 +16,6 @@ import {
   assertNever,
   flattenColoredPathCurves,
   layerCncTool,
-  type CncCutType,
   type CncLayerSettings,
   type CncMachineConfig,
   type CncTool,
@@ -31,25 +25,28 @@ import {
   type Scene,
   type SceneObject,
   type Transform,
-  type Vec2,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
 import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
 import { coolantFields } from './coolant-fields';
-import { capFeed, capSpindle } from './compile-cnc-helpers';
+import {
+  capFeed,
+  capSpindle,
+  contourPassFromPolyline,
+  isProfileCutType,
+  orderInnerFirst,
+} from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { planHelicalPocketPasses } from './helical-entry';
 import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
+import { compileStraightInlayGroups } from './inlay-pair-operation';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
-import { orderInnerFirst } from './profile-ordering';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
-
-const COORD_EPS = 1e-9;
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
   const clearingGroups: CncGroup[] = [];
@@ -64,8 +61,19 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
     );
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
-    // H.7 two-stage v-carve: the flat-floor clearance pocket runs before
-    // the v-bit ladder, with its own bit.
+    const inlayGroups = compileStraightInlayGroups(
+      polylines,
+      settings,
+      config,
+      (groupSettings, tool, passes) =>
+        cncGroupForPasses(layer, groupSettings, tool, passes, device, config),
+    );
+    if (inlayGroups !== null) {
+      clearingGroups.push(inlayGroups.female);
+      profileGroups.push(inlayGroups.male);
+      continue;
+    }
+    // H.7 two-stage v-carve clearance runs before the v-bit ladder.
     const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
     if (clearance !== null) clearingGroups.push(clearance);
     const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
@@ -81,13 +89,6 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   // H.7 multi-tool: contiguous per-bit sections (one change per bit),
   // profile-carrying sections last so freed parts are never re-machined.
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
-}
-
-// Side-offset profiles are the only cut types eligible for holding tabs.
-export function isProfileCutType(cutType: CncCutType): boolean {
-  return (
-    cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'
-  );
 }
 
 export function collectLayerPolylines(
@@ -321,6 +322,7 @@ export function xyToolpathsForCutType(
         (polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline),
       );
     case 'v-carve':
+    case 'inlay-pair':
     case 'drill':
       // Handled by their dedicated branches upstream — unreachable here.
       return [];
@@ -357,7 +359,7 @@ function contourMajorPasses(
       if (needsTabs) {
         appendTabbedPasses(passes, toolpath, zMm, settings, toolDiameterMm);
       } else {
-        passes.push(passFromPolyline(toolpath, zMm));
+        passes.push(contourPassFromPolyline(toolpath, zMm));
       }
     }
   }
@@ -370,8 +372,8 @@ function depthsWithTabTopPass(
 ): ReadonlyArray<number> {
   const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
   // Degenerate tab heights (0, or >= depth) leave the ladder untouched.
-  if (tabTop >= -COORD_EPS || tabTop <= -settings.depthMm + COORD_EPS) return depths;
-  if (depths.some((z) => Math.abs(z - tabTop) <= COORD_EPS)) return depths;
+  if (tabTop >= -1e-9 || tabTop <= -settings.depthMm + 1e-9) return depths;
+  if (depths.some((z) => Math.abs(z - tabTop) <= 1e-9)) return depths;
   return [...depths, tabTop].sort((a, b) => b - a);
 }
 
@@ -387,7 +389,7 @@ function appendTabbedPasses(
     tabsPerShape: settings.tabsPerShape,
     toolDiameterMm,
   })) {
-    if (piece.points.length >= 2) passes.push(passFromPolyline(piece, zMm));
+    if (piece.points.length >= 2) passes.push(contourPassFromPolyline(piece, zMm));
   }
 }
 
@@ -400,25 +402,8 @@ function depthMajorPasses(
   const passes: CncPass[] = [];
   for (const zMm of depths) {
     for (const toolpath of toolpaths) {
-      passes.push(passFromPolyline(toolpath, zMm));
+      passes.push(contourPassFromPolyline(toolpath, zMm));
     }
   }
   return passes;
-}
-
-function passFromPolyline(polyline: Polyline, zMm: number): CncPass {
-  return { kind: 'contour', zMm, polyline: ensureRingClosure(polyline), closed: polyline.closed };
-}
-
-// Job convention (job.ts CutSegment): a closed pass's polyline ends where it
-// starts. Source polylines are not guaranteed to duplicate the first point.
-function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
-  const { points, closed } = polyline;
-  if (!closed || points.length < 3) return points;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first === undefined || last === undefined) return points;
-  const alreadyClosed =
-    Math.abs(first.x - last.x) <= COORD_EPS && Math.abs(first.y - last.y) <= COORD_EPS;
-  return alreadyClosed ? points : [...points, first];
 }

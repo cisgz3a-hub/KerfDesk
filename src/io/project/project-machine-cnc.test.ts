@@ -29,6 +29,29 @@ function deserializeOk(text: string): Project {
 }
 
 describe('.lf2 machine / cnc round-trip', () => {
+  it('round-trips inlay-pair settings and drops malformed values', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    const scene = raw['scene'] as { layers: Array<{ cnc: Record<string, unknown> }> };
+    scene.layers[0]!.cnc['cutType'] = 'inlay-pair';
+    scene.layers[0]!.cnc['inlayPocketDepthMm'] = 3;
+    scene.layers[0]!.cnc['inlayAllowanceMm'] = 0.1;
+    scene.layers[0]!.cnc['inlayPairSpacingMm'] = 10;
+    expect(deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc).toMatchObject({
+      cutType: 'inlay-pair',
+      inlayPocketDepthMm: 3,
+      inlayAllowanceMm: 0.1,
+      inlayPairSpacingMm: 10,
+    });
+
+    scene.layers[0]!.cnc['inlayPocketDepthMm'] = -1;
+    scene.layers[0]!.cnc['inlayAllowanceMm'] = -1;
+    scene.layers[0]!.cnc['inlayPairSpacingMm'] = 0;
+    const malformed = deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc;
+    expect(malformed?.inlayPocketDepthMm).toBeUndefined();
+    expect(malformed?.inlayAllowanceMm).toBeUndefined();
+    expect(malformed?.inlayPairSpacingMm).toBeUndefined();
+  });
+
   it('round-trips adaptive strategy and optimal load while dropping malformed load', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
     const scene = raw['scene'] as { layers: Array<{ cnc: Record<string, unknown> }> };

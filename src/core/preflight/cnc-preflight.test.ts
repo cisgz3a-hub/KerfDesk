@@ -54,6 +54,37 @@ function squareObject(id: string, color: string, size: number): SceneObject {
 }
 
 describe('runCncPreflight', () => {
+  it('accepts a machinable straight inlay pair', () => {
+    const base = projectWithCnc({
+      cutType: 'inlay-pair',
+      depthMm: 6.35,
+      inlayPocketDepthMm: 3,
+      inlayAllowanceMm: 0.1,
+      inlayPairSpacingMm: 10,
+    });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 30)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues.some((issue) => issue.code === 'cnc-inlay-invalid')).toBe(false);
+  });
+
+  it('blocks an inlay pair when the selected bit cannot reproduce the design', () => {
+    const base = projectWithCnc({ cutType: 'inlay-pair' });
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 2)] },
+    };
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-inlay-invalid',
+        message: expect.stringContaining('cannot reproduce'),
+      }),
+    );
+  });
+
   it('accepts a verified island-free adaptive pocket', () => {
     const base = projectWithCnc({
       cutType: 'pocket',

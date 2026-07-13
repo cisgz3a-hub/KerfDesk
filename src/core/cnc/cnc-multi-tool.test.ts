@@ -17,7 +17,8 @@ import {
   type Layer,
   type Scene,
 } from '../scene';
-import { compileCncJob, isProfileCutType } from './compile-cnc-job';
+import { isProfileCutType } from './compile-cnc-helpers';
+import { compileCncJob } from './compile-cnc-job';
 import { drillPeckPasses } from './drill-peck';
 
 const DEVICE = DEFAULT_DEVICE_PROFILE;
