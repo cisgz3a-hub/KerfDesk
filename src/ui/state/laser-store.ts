@@ -44,6 +44,7 @@ import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { CncToolPlanEntry } from './cnc-tool-plan';
+import type { CncSetupAttestation } from './cnc-setup-attestation';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
@@ -81,6 +82,7 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 export type StartJobOptions = CreateStreamerOptions & {
   readonly machineKind?: MachineKind;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
+  readonly cncSetupAttestation?: CncSetupAttestation;
 };
 
 export type LaserState = {

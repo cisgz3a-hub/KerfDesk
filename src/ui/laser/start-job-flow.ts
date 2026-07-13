@@ -21,13 +21,18 @@ import {
   type JobCheckpoint,
 } from '../../core/recovery';
 import type { JobOriginPlacement } from '../../core/job';
-import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
+import { machineKindOf, type MachineKind, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { isActiveJob } from '../state/laser-store-helpers';
+import {
+  CNC_SETUP_ATTESTATION_PROMPT,
+  createCncSetupAttestation,
+  type CncSetupAttestation,
+} from '../state/cnc-setup-attestation';
 import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
 import { renderVariableText } from '../text/render-variable-text';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
@@ -77,6 +82,9 @@ export async function runStartJobFlow(): Promise<void> {
     const lines = prepared.warnings.map((message) => `• ${message}`).join('\n');
     if (!jobAwareConfirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
   }
+  const machineKind = machineKindOf(project.machine);
+  const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode);
+  if (cncSetupAttestation === null) return;
   try {
     await laser.startJob(prepared.gcode, {
       streamingMode: streamingModeForController(
@@ -84,8 +92,9 @@ export async function runStartJobFlow(): Promise<void> {
         project.device.streamingMode,
       ),
       rxBufferBytes: project.device.rxBufferBytes,
-      machineKind: machineKindOf(project.machine),
+      machineKind,
       ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
+      ...(cncSetupAttestation === undefined ? {} : { cncSetupAttestation }),
     });
     armVariableStreamAdvancement(project);
     // Checkpoint the run only once the stream is actually under way
@@ -94,7 +103,7 @@ export async function runStartJobFlow(): Promise<void> {
     writeJobCheckpoint(
       createJobCheckpoint({
         gcode: prepared.gcode,
-        machineKind: machineKindOf(project.machine),
+        machineKind,
         // Capture the scope + RESOLVED origin THIS run compiled with so resume
         // reproduces identical bytes even after a crash resets the live values
         // (PST-02) and re-resolves current-position to the post-crash head (R1).
@@ -107,6 +116,15 @@ export async function runStartJobFlow(): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
+}
+
+function confirmCncSetup(
+  machineKind: MachineKind,
+  gcode: string,
+): CncSetupAttestation | null | undefined {
+  if (machineKind !== 'cnc') return undefined;
+  if (!jobAwareConfirm(CNC_SETUP_ATTESTATION_PROMPT)) return null;
+  return createCncSetupAttestation(gcode);
 }
 
 // Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC

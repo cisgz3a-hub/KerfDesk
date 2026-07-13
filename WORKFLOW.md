@@ -2520,6 +2520,30 @@ F-CNC19 tiling.
    set their material on the layer card, or re-pick the project material to
    apply to all.
 
+### F-CNC36. Confirm physical workholding and motion clearance — Phase H.11
+
+#### Success
+1. After CNC compilation, geometric/no-go-zone preflight, controller readiness,
+   work-Z/tool evidence, and any controller warnings pass, Start presents a
+   final physical-setup confirmation.
+2. The operator confirms that stock and spoilboard are secured; clamps,
+   fixtures, screws, and hold-downs are outside the cutter, rapid, retract, and
+   safe-Z envelope; and wrenches, probe hardware, leads, and loose objects have
+   been removed.
+3. Confirmation is fingerprint-bound to the exact prepared G-code. The live
+   stream store rejects a CNC start with missing, incomplete, or mismatched
+   evidence, so a future caller cannot bypass the normal Start flow by omission.
+
+#### Error — declined or stale confirmation
+1. Declining the prompt sends no job bytes. Editing or recompiling to different
+   bytes requires a new confirmation; evidence from another program fails
+   closed. Laser Start is unaffected.
+
+#### Edge — modeled clamps
+1. Machine-profile no-go zones continue to reject intersecting motion during
+   geometric preflight. The final confirmation covers the actual physical setup
+   that software cannot sense and does not claim sensor verification.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

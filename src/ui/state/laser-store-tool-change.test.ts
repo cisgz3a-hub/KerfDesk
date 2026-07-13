@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { createProject } from '../../core/scene';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
+import {
+  CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
+  createCncSetupAttestation,
+} from './cnc-setup-attestation';
 import { TOOL_CHANGE_PLAN_MISMATCH_MESSAGE } from './laser-job-actions';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
@@ -92,6 +96,19 @@ afterEach(async () => {
 });
 
 describe('CNC tool-change activation (CNC-01..03)', () => {
+  it('refuses a direct CNC stream without exact-program setup confirmation', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, { machineKind: 'cnc' }),
+    ).rejects.toThrow(CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE);
+
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
   it('refuses a structured tool plan that cannot align with every M0 boundary', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes));
@@ -100,6 +117,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
         cncToolPlan: CNC_TOOL_PLAN.slice(0, 1),
+        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(TOOL_CHANGE_PLAN_MISMATCH_MESSAGE);
     expect(useLaserStore.getState().streamer).toBeNull();
@@ -123,6 +141,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
       cncToolPlan: CNC_TOOL_PLAN,
+      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
     });
 
     // The pre-M0 lines went out; the M0 did NOT, and the stream is held.
@@ -200,6 +219,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
       cncToolPlan: CNC_TOOL_PLAN,
+      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
     });
 
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');

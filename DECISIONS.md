@@ -43,6 +43,7 @@
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-174 | 2026-07-13 | Accepted | Probe-derived Z evidence requires plate-removal acknowledgement |
+| ADR-175 | 2026-07-13 | Accepted | Bind CNC physical-setup acknowledgement to exact streamed bytes |
 
 ---
 
@@ -7148,3 +7149,37 @@ plate-presence sensor.
 Probe success can no longer flow directly into spindle/cutting motion while the setup accessory is
 known to be unresolved. The gate adds one deliberate operator step and improves error-proofing, but
 cannot detect a false confirmation; machine-integrated plate-presence sensing remains future work.
+
+---
+
+## ADR-175 - Bind CNC physical-setup acknowledgement to exact streamed bytes
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Geometric preflight rejects motion through clamp/no-go zones recorded in the machine profile, but
+KerfDesk cannot sense the actual stock, spoilboard, clamps, screws, wrenches, or loose setup items.
+Starting a valid program against an unsecured workpiece or an unmodeled fixture can still eject the
+stock, break the cutter, or collide during a rapid/retract move. A reusable session checkbox would
+also become stale as soon as the compiled program changed.
+
+### Decision
+
+- After compilation, geometric preflight, controller readiness, work-Z/tool checks, and advisory
+  handling succeed, every CNC Start presents a final physical-setup confirmation. Laser Start is
+  unaffected.
+- The operator confirms secured stock/spoilboard, a clear cutter/rapid/retract/safe-Z envelope, and
+  removal of wrenches, probe hardware, leads, and loose objects.
+- Accepted evidence includes all three claims and a fingerprint of the exact prepared G-code.
+  The live stream store independently refuses CNC Start if evidence is absent, incomplete, or does
+  not match the bytes it was asked to send.
+- This is explicitly operator evidence. Modeled no-go-zone preflight remains complementary and the
+  UI does not claim physical sensing.
+
+### Consequences
+
+Every fresh CNC program requires a deliberate last-step setup review, including callers added in
+the future. Evidence cannot be silently reused after recompilation or byte changes. The gate adds
+friction and cannot detect dishonest or mistaken confirmation; cameras, fixture probing, and
+machine-integrated workholding sensors remain future higher-assurance options.
