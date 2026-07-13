@@ -42,6 +42,7 @@ import type { ProbeResult } from './probe-actions';
 import type { OverrideValues, RealtimeOverrideByte } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
+import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
@@ -117,6 +118,7 @@ export type LaserState = {
   readonly pendingUntrackedAcks: number;
   readonly homingState: HomingState;
   readonly trustedPositionEpoch?: number;
+  readonly workZReferenceEpoch: number;
   readonly log: ReadonlyArray<string>;
   readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null
@@ -142,13 +144,11 @@ export type LaserState = {
   readonly ovCache: OverrideValues | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
-  // Whether work Z0 (the CNC stock-top contract) has been established THIS
-  // session and is still valid. Separate from workOriginActive (XY origin): Set
-  // Origin (G92 X0 Y0) sets XY but not Z; Zero Z / a successful probe set this.
-  // Invalidated by anything that voids the bit-to-stock relationship — reconnect,
-  // reset/alarm, homing, release-motors, clear-origin, and a tool change (Codex
-  // audit P1). Drives the CNC no-work-zero Start advisory.
-  readonly workZZeroKnown: boolean;
+  // Qualified evidence for the CNC stock-top contract. Separate from
+  // workOriginActive (XY origin): Set Origin (G92 X0 Y0) does not establish Z.
+  // The record is bound to workZReferenceEpoch so reconnect/reset/home and
+  // other reference-loss events make stale evidence fail closed at Start.
+  readonly workZZeroEvidence: WorkZZeroEvidence | null;
   // Tool-change readiness: true only once a FRESH Idle status report has been
   // observed since the streamer entered the tool-change hold (cleared on entry,
   // set when Idle arrives with the pre-M0 tail drained). Guards the setup gate

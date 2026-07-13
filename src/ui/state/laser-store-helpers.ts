@@ -14,6 +14,7 @@ import { grblDriver, type ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import { isWorkZZeroEvidenceCurrent } from './work-z-zero-evidence';
 
 const LOG_MAX = 200;
 const AUTOFOCUS_BUSY_MESSAGE =
@@ -82,7 +83,9 @@ export function toolChangeReady(state: LaserState): boolean {
 // trusted to target the configured safe height.
 export function toolChangeContinueBlockMessage(state: LaserState): string | null {
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
-  return state.workZZeroKnown ? null : TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
+  return isWorkZZeroEvidenceCurrent(state.workZZeroEvidence, state.workZReferenceEpoch)
+    ? null
+    : TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
 }
 
 // True while stream acks are still outstanding — sending or paused, or any
@@ -253,6 +256,7 @@ export function initialLaserState(): Pick<
   | 'pendingUntrackedAcks'
   | 'homingState'
   | 'trustedPositionEpoch'
+  | 'workZReferenceEpoch'
   | 'log'
   | 'transcript'
   | 'detectedSettings'
@@ -263,7 +267,7 @@ export function initialLaserState(): Pick<
   | 'ovCache'
   | 'workOriginActive'
   | 'workOriginSource'
-  | 'workZZeroKnown'
+  | 'workZZeroEvidence'
   | 'toolChangeIdleSeen'
   | 'toolChangeLabels'
   | 'pendingToolLabel'
@@ -290,6 +294,7 @@ export function initialLaserState(): Pick<
     pendingUntrackedAcks: 0,
     homingState: 'unknown',
     trustedPositionEpoch: 0,
+    workZReferenceEpoch: 0,
     log: [],
     transcript: [],
     detectedSettings: null,
@@ -300,7 +305,7 @@ export function initialLaserState(): Pick<
     ovCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     toolChangeIdleSeen: false,
     toolChangeLabels: [],
     pendingToolLabel: null,
@@ -343,6 +348,8 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     fireActive: false,
     homingState: 'unknown',
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    workZZeroEvidence: null,
     streamer: stream,
     // Replies owed by the dead controller will never arrive.
     pendingUntrackedAcks: 0,

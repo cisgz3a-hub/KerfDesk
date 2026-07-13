@@ -22,6 +22,7 @@ import {
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -49,12 +50,7 @@ export function probeActions(
     probe: async (lines): Promise<ProbeResult> => {
       const preflight = probePreflight(get(), refs, lines);
       if (preflight !== null) return preflight;
-      set((state) => ({
-        probeBusy: true,
-        controllerOperation: { kind: 'probe', phase: 'sequence', idleReports: 0 },
-        workZZeroKnown: false,
-        log: pushLog(state, '[lf2] Probe transaction started.'),
-      }));
+      set(probeStartedPatch);
       let pendingLine = lines[0] ?? '';
       try {
         for (let index = 0; index < lines.length; index += 1) {
@@ -90,7 +86,7 @@ export function probeActions(
           controllerOperation:
             state.controllerOperation?.kind === 'probe' ? null : state.controllerOperation,
           probeBusy: false,
-          workZZeroKnown: true,
+          workZZeroEvidence: captureWorkZZeroEvidence('probe', state.workZReferenceEpoch),
           alarmCode: null,
           lastWriteError: null,
           log: pushLog(state, '[lf2] Probe transaction settled at fresh Idle.'),
@@ -103,7 +99,7 @@ export function probeActions(
           controllerOperation:
             state.controllerOperation?.kind === 'probe' ? null : state.controllerOperation,
           probeBusy: false,
-          workZZeroKnown: false,
+          workZZeroEvidence: null,
           // A failed transaction may have executed only part of its motion or
           // coordinate mutation. Drop stale Idle/position evidence until the
           // normal poll receives a fresh report.
@@ -120,6 +116,16 @@ export function probeActions(
         return result;
       }
     },
+  };
+}
+
+function probeStartedPatch(state: LaserState): Partial<LaserState> {
+  return {
+    probeBusy: true,
+    controllerOperation: { kind: 'probe', phase: 'sequence', idleReports: 0 },
+    workZZeroEvidence: null,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    log: pushLog(state, '[lf2] Probe transaction started.'),
   };
 }
 

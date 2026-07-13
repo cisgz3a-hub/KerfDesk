@@ -117,13 +117,26 @@ function freshToolChangeIdlePatch(
 // origin may survive but is unverified until the next WCO frame.
 export function originUnknownAfterControllerReset(
   state: LaserState,
-): Pick<LaserState, 'workOriginActive' | 'workOriginSource' | 'workZZeroKnown'> {
+): Pick<
+  LaserState,
+  'workOriginActive' | 'workOriginSource' | 'workZZeroEvidence' | 'workZReferenceEpoch'
+> {
   // A controller reset/alarm/reboot voids the bit-to-stock Z relationship
   // regardless of what happens to the XY origin (Codex audit P1).
   if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return { workOriginActive: true, workOriginSource: 'unknown', workZZeroKnown: false };
+    return {
+      workOriginActive: true,
+      workOriginSource: 'unknown',
+      workZZeroEvidence: null,
+      workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    };
   }
-  return { workOriginActive: false, workOriginSource: 'none', workZZeroKnown: false };
+  return {
+    workOriginActive: false,
+    workOriginSource: 'none',
+    workZZeroEvidence: null,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+  };
 }
 
 function cancelActiveStreamerPatch(

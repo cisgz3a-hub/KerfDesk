@@ -63,6 +63,13 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 6; i += 1) await Promise.resolve();
 }
 
+function manualWorkZEvidence() {
+  return {
+    source: 'manual-zero' as const,
+    referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+  };
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -82,7 +89,7 @@ afterEach(async () => {
     controllerOperation: null,
     streamer: null,
     pendingUntrackedAcks: 0,
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     log: [],
   });
   vi.restoreAllMocks();
@@ -153,7 +160,10 @@ describe('probe controller transaction lifecycle', () => {
 
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(true);
+    expect(useLaserStore.getState().workZZeroEvidence).toEqual({
+      source: 'probe',
+      referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+    });
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
@@ -164,7 +174,7 @@ describe('probe controller transaction lifecycle', () => {
     });
     await connectWith(connection);
     writes.length = 0;
-    useLaserStore.setState({ workZZeroKnown: true });
+    useLaserStore.setState({ workZZeroEvidence: manualWorkZEvidence() });
 
     const probe = useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']);
     await flush();
@@ -174,7 +184,7 @@ describe('probe controller transaction lifecycle', () => {
     expect(writes).toEqual(['G38.2 Z-25.000 F150.000\n']);
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().alarmCode).toBe(5);
     expect(useLaserStore.getState().statusReport).toBeNull();
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
@@ -212,14 +222,14 @@ describe('probe controller transaction lifecycle', () => {
 
     await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
     expect(writes.some((line) => line.startsWith('G10 L20'))).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().statusReport).toBeNull();
   });
 
   it('aborts on a status-only Alarm even when no numbered ALARM line arrives', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    useLaserStore.setState({ workZZeroKnown: true });
+    useLaserStore.setState({ workZZeroEvidence: manualWorkZEvidence() });
 
     const probe = useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']);
     await flush();
@@ -228,7 +238,7 @@ describe('probe controller transaction lifecycle', () => {
     await expect(probe).resolves.toEqual({ kind: 'alarm', alarmCode: null });
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().statusReport).toBeNull();
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
   });
@@ -244,7 +254,7 @@ describe('probe controller transaction lifecycle', () => {
     await expect(probe).resolves.toMatchObject({ kind: 'preflight-failed' });
     expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().safetyNotice?.kind).toBe('disconnect-during-job');
   });
 
@@ -254,7 +264,7 @@ describe('probe controller transaction lifecycle', () => {
       if (failWrites) throw new Error('probe write failed');
     });
     await connectWith(connection);
-    useLaserStore.setState({ workZZeroKnown: true });
+    useLaserStore.setState({ workZZeroEvidence: manualWorkZEvidence() });
     failWrites = true;
 
     await expect(
@@ -263,7 +273,7 @@ describe('probe controller transaction lifecycle', () => {
 
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(useLaserStore.getState().statusReport).toBeNull();
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'write-failed',
@@ -290,6 +300,6 @@ describe('probe controller transaction lifecycle', () => {
     expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
   });
 });

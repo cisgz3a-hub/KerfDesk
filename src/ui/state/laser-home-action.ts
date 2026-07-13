@@ -53,6 +53,7 @@ export async function runHomeAction(
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
     wcoCache: null,
     workOriginActive:
       state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',
@@ -62,7 +63,7 @@ export async function runHomeAction(
         : 'none',
     // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
     // different physical height — work Z0 must be re-set (Codex audit P1).
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     frameVerification: null,
     log: pushLog(state, '[lf2] Homing started. Cleared origin and frame verification.'),
   }));
