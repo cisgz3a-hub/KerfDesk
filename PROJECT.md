@@ -74,6 +74,10 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 Job time estimates, settings panel, SVG re-import with diff, and a persisted deterministic Cut Planner (travel policy, inside-first, layer priority, path direction, and planning start), plus keyboard shortcuts, autosave + recovery, and a local-only crash reporter. The planner remains bounded nearest-neighbor rather than full 2-opt (ADR-163).
 
+Layout extension (ADR-151): Quick Nest can compact small/medium jobs against real closed outlines,
+with deterministic item/point/candidate budgets and immediate rectangular fallback for dense,
+invalid, or oversized inputs.
+
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 
 **MVP is complete at end of Phase C.**

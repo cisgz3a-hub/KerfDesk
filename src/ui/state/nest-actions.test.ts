@@ -47,9 +47,12 @@ describe('quickNestSelection', () => {
 
   it('packs unlocked selection around locked obstacles as one undo step', () => {
     const before = useStore.getState().project;
-    const result = useStore
-      .getState()
-      .quickNestSelection({ bin: 'workspace', padding: 2, allowRotation: true });
+    const result = useStore.getState().quickNestSelection({
+      bin: 'workspace',
+      padding: 2,
+      allowRotation: true,
+      method: 'fast',
+    });
     expect(result).toEqual({ ok: true, packedUnits: 2 });
     const state = useStore.getState();
     const a = state.project.scene.objects.find((object) => object.id === 'A')!;
@@ -60,6 +63,17 @@ describe('quickNestSelection', () => {
       before.scene.objects[2],
     );
     expect(state.undoStack).toEqual([before]);
+  });
+
+  it('discloses units that need conservative bounds in outline mode', () => {
+    expect(
+      useStore.getState().quickNestSelection({
+        bin: 'workspace',
+        padding: 2,
+        allowRotation: true,
+        method: 'outline',
+      }),
+    ).toEqual({ ok: true, packedUnits: 2, boundsFallbackUnits: 2 });
   });
 
   it('keeps a selected group rigid and refuses bins that cannot fit it', () => {
@@ -75,10 +89,72 @@ describe('quickNestSelection', () => {
         },
       },
     }));
-    const result = useStore
-      .getState()
-      .quickNestSelection({ bin: 'workspace', padding: 2, allowRotation: false });
+    const result = useStore.getState().quickNestSelection({
+      bin: 'workspace',
+      padding: 2,
+      allowRotation: false,
+      method: 'fast',
+    });
     expect(result).toEqual({ ok: false, reason: '1 selected unit(s) do not fit.' });
     expect(useStore.getState().undoStack).toEqual([]);
   });
+
+  it('uses closed outlines when bounding rectangles cannot fit the workspace', () => {
+    const upper = triangle('upper', 0, [
+      [0, 0],
+      [40, 0],
+      [0, 40],
+    ]);
+    const lower = triangle('lower', 40, [
+      [40, 40],
+      [40, 0],
+      [0, 40],
+    ]);
+    const project = {
+      ...createProject(),
+      workspace: { width: 40, height: 40, units: 'mm' as const },
+      scene: {
+        objects: [upper, lower],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    };
+    useStore.setState({
+      project,
+      selectedObjectId: upper.id,
+      additionalSelectedIds: new Set([lower.id]),
+      undoStack: [],
+      redoStack: [],
+      dirty: false,
+    });
+
+    expect(
+      useStore.getState().quickNestSelection({
+        bin: 'workspace',
+        padding: 0,
+        allowRotation: false,
+        method: 'outline',
+      }),
+    ).toEqual({ ok: true, packedUnits: 2 });
+    const [nestedUpper, nestedLower] = useStore.getState().project.scene.objects;
+    expect(nestedUpper?.transform.x).toBe(0);
+    expect(nestedLower?.transform.x).toBe(0);
+    expect(useStore.getState().undoStack).toEqual([project]);
+  });
 });
+
+function triangle(
+  id: string,
+  x: number,
+  vertices: ReadonlyArray<readonly [number, number]>,
+): SceneObject {
+  const points = vertices.map(([pointX, pointY]) => ({ x: pointX, y: pointY }));
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 },
+    transform: { ...IDENTITY_TRANSFORM, x },
+    paths: [{ color: '#000000', polylines: [{ closed: true, points }] }],
+  };
+}

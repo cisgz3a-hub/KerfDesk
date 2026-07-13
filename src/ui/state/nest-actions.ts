@@ -1,4 +1,12 @@
-import { quickNest, type NestItem, type NestPlacement, type NestRect } from '../../core/nesting';
+import { isVectorPathObject, materializeVectorObject } from '../../core/geometry';
+import {
+  outlineNest,
+  quickNest,
+  type NestOutline,
+  type OutlineNestItem,
+  type NestPlacement,
+  type NestRect,
+} from '../../core/nesting';
 import {
   boardFitRegion,
   combinedBBox,
@@ -14,10 +22,15 @@ export type QuickNestOptions = {
   readonly bin: 'workspace' | 'board';
   readonly padding: number;
   readonly allowRotation: boolean;
+  readonly method: 'fast' | 'outline';
 };
 
 export type QuickNestActionResult =
-  | { readonly ok: true; readonly packedUnits: number }
+  | {
+      readonly ok: true;
+      readonly packedUnits: number;
+      readonly boundsFallbackUnits?: number;
+    }
   | { readonly ok: false; readonly reason: string };
 
 export type NestActions = {
@@ -32,7 +45,13 @@ export function nestActions(set: Setter, get: () => AppState): NestActions {
       const planned = planNest(get(), options);
       if (!planned.ok) return planned;
       set((state) => applyNestPlan(state, planned));
-      return { ok: true, packedUnits: planned.placements.length };
+      return {
+        ok: true,
+        packedUnits: planned.placements.length,
+        ...(planned.boundsFallbackUnits === 0
+          ? {}
+          : { boundsFallbackUnits: planned.boundsFallbackUnits }),
+      };
     },
   };
 }
@@ -41,6 +60,7 @@ type NestUnit = {
   readonly id: string;
   readonly objects: ReadonlyArray<SceneObject>;
   readonly bounds: NestRect;
+  readonly outline?: NestOutline;
 };
 
 type NestPlan =
@@ -49,6 +69,7 @@ type NestPlan =
       readonly project: AppState['project'];
       readonly units: ReadonlyArray<NestUnit>;
       readonly placements: ReadonlyArray<NestPlacement>;
+      readonly boundsFallbackUnits: number;
     }
   | Extract<QuickNestActionResult, { readonly ok: false }>;
 
@@ -76,20 +97,34 @@ function planNest(state: AppState, options: QuickNestOptions): NestPlan {
   const obstacles = state.project.scene.objects
     .filter((object) => object.locked === true && object.id !== binBoxId)
     .map(transformedBBox);
-  const result = quickNest(
-    bin,
-    units.map(
-      (unit): NestItem => ({
-        id: unit.id,
-        width: unit.bounds.maxX - unit.bounds.minX,
-        height: unit.bounds.maxY - unit.bounds.minY,
-        canRotate: options.allowRotation,
-      }),
-    ),
-    { padding: options.padding, obstacles },
+  const items = units.map(
+    (unit): OutlineNestItem => ({
+      id: unit.id,
+      width: unit.bounds.maxX - unit.bounds.minX,
+      height: unit.bounds.maxY - unit.bounds.minY,
+      canRotate: options.allowRotation,
+      ...(unit.outline === undefined ? {} : { outline: unit.outline }),
+    }),
   );
+  const nestOptions = { padding: options.padding, obstacles };
+  const result =
+    options.method === 'outline'
+      ? outlineNest(bin, items, nestOptions)
+      : quickNest(bin, items, nestOptions);
+  const boundsFallbackUnits =
+    options.method !== 'outline'
+      ? 0
+      : result.ok && 'usedOutline' in result && !result.usedOutline
+        ? units.length
+        : units.filter((unit) => unit.outline === undefined).length;
   return result.ok
-    ? { ok: true, project: state.project, units, placements: result.placements }
+    ? {
+        ok: true,
+        project: state.project,
+        units,
+        placements: result.placements,
+        boundsFallbackUnits,
+      }
     : { ok: false, reason: `${result.unplacedIds.length} selected unit(s) do not fit.` };
 }
 
@@ -129,15 +164,54 @@ function nestUnits(state: AppState, movableIds: ReadonlySet<string>): NestUnit[]
     );
     const bounds = combinedBBox(objects);
     if (bounds === null) continue;
-    units.push({ id: `group:${group.id}`, objects, bounds });
+    units.push({
+      id: `group:${group.id}`,
+      objects,
+      bounds,
+      ...outlineForUnit(objects, bounds),
+    });
     group.objectIds.forEach((id) => consumed.add(id));
   }
   for (const object of state.project.scene.objects) {
     if (!movableIds.has(object.id) || consumed.has(object.id)) continue;
-    units.push({ id: `object:${object.id}`, objects: [object], bounds: transformedBBox(object) });
+    const bounds = transformedBBox(object);
+    units.push({
+      id: `object:${object.id}`,
+      objects: [object],
+      bounds,
+      ...outlineForUnit([object], bounds),
+    });
   }
   return units;
 }
+
+function outlineForUnit(
+  objects: ReadonlyArray<SceneObject>,
+  bounds: NestRect,
+): { readonly outline?: NestOutline } {
+  const outline: Array<Array<{ readonly x: number; readonly y: number }>> = [];
+  let pointCount = 0;
+  for (const object of objects) {
+    if (!isVectorPathObject(object)) return {};
+    const materialized = materializeVectorObject(object);
+    for (const path of materialized.paths) {
+      for (const polyline of path.polylines) {
+        if (!polyline.closed || polyline.points.length < 3) return {};
+        pointCount += polyline.points.length;
+        if (pointCount > MAX_OUTLINE_POINTS_PER_UNIT) return {};
+        outline.push(
+          polyline.points.map((point) => ({
+            x: point.x - bounds.minX,
+            y: point.y - bounds.minY,
+          })),
+        );
+      }
+    }
+  }
+  return outline.length === 0 ? {} : { outline };
+}
+
+const MAX_OUTLINE_POINTS_PER_UNIT = 20_000;
 
 function placeUnit(unit: NestUnit, placement: NestPlacement): SceneObject[] {
   const rotated = placement.rotated90 ? rotateUnit90(unit) : [...unit.objects];

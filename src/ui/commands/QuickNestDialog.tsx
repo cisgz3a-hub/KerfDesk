@@ -10,6 +10,7 @@ export function QuickNestDialog(props: {
   const [bin, setBin] = useState<QuickNestOptions['bin']>('workspace');
   const [padding, setPadding] = useState('2');
   const [allowRotation, setAllowRotation] = useState(true);
+  const [method, setMethod] = useState<QuickNestOptions['method']>('outline');
   return (
     <Dialog
       title="Quick Nest"
@@ -18,10 +19,11 @@ export function QuickNestDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        props.onApply({ bin, padding: nonNegative(padding), allowRotation });
+        props.onApply({ bin, padding: nonNegative(padding), allowRotation, method });
       }}
     >
       <div style={fieldsStyle}>
+        <NestingMethod value={method} onChange={setMethod} />
         <label style={fieldStyle}>
           <span>Nest into</span>
           <select
@@ -64,6 +66,33 @@ export function QuickNestDialog(props: {
   );
 }
 
+function NestingMethod(props: {
+  readonly value: QuickNestOptions['method'];
+  readonly onChange: (value: QuickNestOptions['method']) => void;
+}): JSX.Element {
+  return (
+    <div style={fieldStyle}>
+      <span>Nesting method</span>
+      <div role="group" aria-label="Nesting method" style={methodStyle}>
+        <Button
+          pressed={props.value === 'outline'}
+          title="Use closed vector outlines to compact concave parts and parts with holes."
+          onClick={() => props.onChange('outline')}
+        >
+          Outline
+        </Button>
+        <Button
+          pressed={props.value === 'fast'}
+          title="Use fast rectangular bounds for large or mixed raster selections."
+          onClick={() => props.onChange('fast')}
+        >
+          Fast
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function nonNegative(raw: string): number {
   const value = Number(raw);
   return Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -78,3 +107,8 @@ const fieldStyle: React.CSSProperties = {
   fontSize: 13,
 };
 const checkStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
+const methodStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 4,
+};
