@@ -2490,20 +2490,25 @@ F-CNC19 tiling.
    set their material on the layer card, or re-pick the project material to
    apply to all.
 
-### F-CNC39. Normalize probe and surfacing feed mode — Phase H.11
+### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
 
 #### Success
-1. Z/corner probe and spoilboard-surfacing programs emit `G94` before
-   their first motion, so every F word retains KerfDesk's mm/min meaning.
+1. Set Origin changes X/Y only. If KerfDesk already knows the prior Z offset,
+   it preserves that Z; otherwise it waits for a fresh WCO-bearing status
+   instead of copying machine Z into the work-offset cache.
+2. Reset Origin and persistent-origin flows that send `G92.1` invalidate
+   work-Z evidence because GRBL clears every transient G92 axis.
 
-#### Error — stale inverse-time mode
-1. A prior `G93` from a console command or controller startup block is
-   replaced before motion. The cycle does not rely on GRBL's reset default.
+#### Error — acknowledgement or readback failure
+1. Existing origin transaction rules remain fail-closed: a rejected, alarmed,
+   timed-out, or disconnected mutation leaves origin truth unknown and Z
+   evidence unavailable.
 
-#### Edge — simulator and physical controller
-1. The current simulator does not model G93/G94 timing. Exact line-order
-   tests prove output normalization; a physical controller test is still
-   required before this behavior is hardware-verified.
+#### Edge — persistent probe-derived Z
+1. The current store records work-Z as a boolean, not its controller offset
+   source. After `G92.1`, KerfDesk conservatively requires a new touch-off even
+   when a persistent G54 Z may still exist; later `$#` readback may prove and
+   preserve that distinction.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 
