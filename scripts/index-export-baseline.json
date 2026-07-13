@@ -1,17 +1,19 @@
 {
-  "src/core/scene/index.ts": 161,
+  "src/core/scene/index.ts": 205,
   "src/core/controllers/grbl/index.ts": 102,
   "src/core/camera/index.ts": 90,
-  "src/core/job/index.ts": 85,
-  "src/core/devices/index.ts": 78,
+  "src/core/job/index.ts": 87,
+  "src/core/devices/index.ts": 83,
   "src/core/cnc/index.ts": 36,
   "src/core/trace/index.ts": 33,
   "src/core/raster/index.ts": 32,
   "src/core/relief/index.ts": 25,
   "src/core/trace/centerline/index.ts": 25,
-  "src/core/shapes/index.ts": 24,
+  "src/core/shapes/index.ts": 26,
   "src/core/controllers/index.ts": 23,
   "src/core/controllers/ruida/index.ts": 23,
   "src/core/invariants/index.ts": 23,
-  "src/core/material-library/index.ts": 21
+  "src/core/material-library/index.ts": 21,
+  "src/core/text/index.ts": 25,
+  "src/io/gcode/index.ts": 22
 }
