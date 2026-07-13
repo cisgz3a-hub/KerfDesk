@@ -2045,6 +2045,10 @@ F-CNC19 tiling.
    the longest segment so witness marks land on a flat span.
 3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
    that angle; closed loops re-cut the ramped span level afterwards.
+4. Offset pockets can instead enable **Helical entry**. Each ring retracts,
+   relocates, and descends through a native tangent helix that ends at the
+   contour start. Raster pockets, islands, disconnected pockets, and a minimum
+   diameter that cannot fit are blocked before output.
    Depth ladders ramp each step from the previous level.
 
 #### Error — none (both options are clamped)

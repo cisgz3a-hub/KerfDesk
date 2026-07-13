@@ -37,6 +37,7 @@
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 | ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
 | ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
+| ADR-152 | 2026-07-13 | Accepted | Offset pockets may use locally tangent native helical entries |
 
 ---
 
@@ -6810,3 +6811,36 @@ Small and medium irregular jobs can save stock without changing the safe default
 jobs. The synchronous algorithm now has an enforceable upper bound, while rectangular fallback
 preserves responsiveness and deterministic placement. Moving outline search to a worker remains a
 future optimization, not a prerequisite for safe use.
+
+---
+
+## ADR-152 - Offset pockets may use locally tangent native helical entries
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Straight plunges load the cutter poorly in pocket stock. Phase H.9 therefore deferred helical entry
+until a dedicated decision could define fit validation, controller motion, preview/tiling behavior,
+and refusal boundaries. The first candidate used one shared center helix for every offset ring,
+which repeatedly bored cleared air and fed laterally at full depth to each contour.
+
+### Decision
+
+- Offset-ring pockets may opt into a native G2/G3 helical entry with bounded minimum/maximum
+  diameter and ramp angle. Raster pockets, open paths, islands, and disconnected pockets refuse the
+  option instead of silently reverting to a plunge.
+- Every clearing ring receives a deterministic tangent entry whose helix ends exactly at that
+  ring's contour start. The circle is fit against the enclosing pocket boundary, so very small
+  inner rings can retain the configured minimum diameter without leaving the pocket.
+- The emitter retracts to safe Z and relocates before every ring. No shared-center re-boring and no
+  full-depth connector move are emitted between the helix and its contour.
+- Preview, estimates, origin transforms, tiling, persistence, and preflight treat the helix as a
+  first-class descending CNC pass.
+
+### Consequences
+
+Supported pockets enter stock gradually while preserving safe relocation discipline and exact
+contour joins. More arcs and retracts can increase output size and cycle time, but avoid ambiguous
+links through uncut material. Multi-pocket and island-aware planning remains deferred. The motion
+is software-verified and hardware-gated until the standing CNC air-cut and scrap protocol passes.

@@ -134,7 +134,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
-| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry + arc leads deferred — DECISIONS.md) | Built |
+| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity, and opt-in offset-pocket helical entry (ADR-152; arc leads remain deferred) | Built |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |

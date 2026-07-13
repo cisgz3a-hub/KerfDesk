@@ -23,12 +23,12 @@ one removes the other.
 
 ## Motion Contract
 
-- The compiler selects a deterministic entry circle inside the supported
-  pocket boundary.
+- The compiler selects a deterministic tangent entry circle for every clearing
+  ring and fits it inside the supported pocket boundary.
 - Ramp angle controls the minimum whole-circle revolution count.
-- The emitter retracts to safe Z, rapids to the helix start, descends with
-  native full-circle G2/G3 moves at plunge feed, links at the reached depth,
-  and cuts the pocket contour at cutting feed.
+- The emitter retracts to safe Z and relocates for every ring, descends with
+  native full-circle G2/G3 moves at plunge feed, and reaches that ring's exact
+  contour start with no full-depth connector before cutting at feed.
 - Preview and estimates include true three-dimensional helix length and its Z
   span.
 - Job-origin transforms preserve the start, center, and contour geometry.

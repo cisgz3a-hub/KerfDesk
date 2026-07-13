@@ -81,75 +81,14 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
 }
 
-// Output layers whose vector shapes exist but compile to zero toolpaths —
-// usually a bit too wide for the geometry (pockets and inside profiles need
-// the bit to fit), or open shapes on a closed-only cut type. Preflight
-// surfaces these so a job never silently omits a layer the user drew.
-export function findDroppedCncLayers(
-  scene: Scene,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): ReadonlyArray<string> {
-  const dropped: string[] = [];
-  for (const layer of scene.layers) {
-    if (!layer.output) continue;
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    const polylines = collectLayerPolylines(scene.objects, layer, device);
-    if (polylines.length === 0) continue;
-    if (settings.cutType === 'pocket' && settings.helixEntry !== undefined) {
-      const tool = layerCncTool(config, settings);
-      if (xyToolpathsForCutType(polylines, settings, tool.diameterMm).length > 0) continue;
-    }
-    const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
-    const group = cncGroupForLayer(layer, settings, polylines, device, config);
-    if (clearance === null && group === null) dropped.push(layer.id);
-  }
-  return dropped;
-}
-
-export type CncHelicalEntryIssue = {
-  readonly layerId: string;
-  readonly reason: string;
-};
-
-// Helical entry is an explicit machining request, so it must never degrade to
-// a straight plunge when the selected pocket or settings cannot support it.
-export function findCncHelicalEntryIssues(
-  scene: Scene,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): ReadonlyArray<CncHelicalEntryIssue> {
-  const issues: CncHelicalEntryIssue[] = [];
-  for (const layer of scene.layers) {
-    if (!layer.output) continue;
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    if (settings.cutType !== 'pocket' || settings.helixEntry === undefined) continue;
-    if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
-      issues.push({
-        layerId: layer.id,
-        reason: 'Helical entry requires the Offset pocket fill method.',
-      });
-      continue;
-    }
-    const polylines = collectLayerPolylines(scene.objects, layer, device);
-    if (polylines.length === 0) continue;
-    const tool = layerCncTool(config, settings);
-    const toolpaths = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
-    const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-    if (toolpaths.length === 0 || depths.length === 0) continue;
-    const plan = planHelicalPocketPasses(toolpaths, depths, settings.helixEntry);
-    if (!plan.ok) issues.push({ layerId: layer.id, reason: plan.reason });
-  }
-  return issues;
-}
-
+// Side-offset profiles are the only cut types eligible for holding tabs.
 export function isProfileCutType(cutType: CncCutType): boolean {
   return (
     cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'
   );
 }
 
-function collectLayerPolylines(
+export function collectLayerPolylines(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
@@ -201,7 +140,7 @@ function appendObjectPolylines(
   }
 }
 
-function cncGroupForLayer(
+export function cncGroupForLayer(
   layer: Layer,
   settings: CncLayerSettings,
   polylines: ReadonlyArray<Polyline>,
@@ -239,7 +178,7 @@ function cncGroupForLayer(
 
 // The two-stage v-carve's clearing group (H.7): pocket the flat floors
 // with the layer's clearing bit before the v-bit ladder runs.
-function vcarveClearanceGroupForLayer(
+export function vcarveClearanceGroupForLayer(
   layer: Layer,
   settings: CncLayerSettings,
   polylines: ReadonlyArray<Polyline>,
@@ -380,7 +319,7 @@ function helicalPocketPasses(
   return plan.ok ? plan.passes : [];
 }
 
-function xyToolpathsForCutType(
+export function xyToolpathsForCutType(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
