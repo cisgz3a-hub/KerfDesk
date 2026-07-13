@@ -20,7 +20,7 @@ import { useStore } from '../state';
 import { AutofocusEditor } from './AutofocusEditor';
 import { Row } from './device-settings-shared';
 import { BasicRows, HomingEditor } from './DeviceProfileFields';
-import { AirAssistRow, LaserPowerRows } from './DeviceProfilePowerFields';
+import { AirAssistRow, FireControlRow, LaserPowerRows } from './DeviceProfilePowerFields';
 import { ProfileRows, ZRows } from './DeviceProfileRows';
 import { PlannerAdvanced } from './PlannerAdvanced';
 import { ScanOffsetEditor } from './ScanOffsetEditor';
@@ -52,6 +52,7 @@ export function DeviceSettings(): JSX.Element {
           <>
             <LaserPowerRows device={device} update={update} />
             <AirAssistRow device={device} update={update} />
+            <FireControlRow device={device} update={update} />
             <ScanOffsetEditor
               value={device.scanningOffsets}
               onChange={(scanningOffsets) => update({ scanningOffsets })}

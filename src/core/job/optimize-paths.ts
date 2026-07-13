@@ -39,23 +39,62 @@
 //
 // Pure-core compliant: no clock, no random, no I/O.
 
-import type { Vec2 } from '../scene';
+import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
 import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
+type PathOptimizationSettings = Pick<
+  ProjectOptimizationSettings,
+  'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
+>;
+const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
+  travelPolicy: 'nearest-neighbor',
+  insideFirst: true,
+  layerPriority: 'project-order',
+  pathDirection: 'allow-reverse',
+  startPoint: 'machine-origin',
+};
 
-export function optimizePaths(job: Job): Job {
-  return { groups: optimizeGroups(job.groups) };
+export function optimizePaths(
+  job: Job,
+  settings: PathOptimizationSettings = DEFAULT_PATH_OPTIMIZATION,
+): Job {
+  const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
+  return {
+    groups:
+      settings.travelPolicy === 'source-order'
+        ? prioritized
+        : optimizeGroups(prioritized, settings),
+  };
 }
 
-function optimizeGroups(groups: ReadonlyArray<Group>): Group[] {
+function prioritizeLayerGroups(
+  groups: ReadonlyArray<Group>,
+  policy: PathOptimizationSettings['layerPriority'],
+): Group[] {
+  if (policy === 'project-order') return [...groups];
+  const order: string[] = [];
+  const byLayer = new Map<string, Group[]>();
+  for (const group of groups) {
+    const bucket = byLayer.get(group.layerId);
+    if (bucket === undefined) {
+      order.push(group.layerId);
+      byLayer.set(group.layerId, [group]);
+    } else {
+      bucket.push(group);
+    }
+  }
+  return order.reverse().flatMap((layerId) => byLayer.get(layerId) ?? []);
+}
+
+function optimizeGroups(groups: ReadonlyArray<Group>, settings: PathOptimizationSettings): Group[] {
   const out: Group[] = [];
   let i = 0;
   while (i < groups.length) {
-    const group = optimizeGroupAny(groups[i] as Group);
+    const group = optimizeGroupAny(groups[i] as Group, settings);
     if (!isIslandFillGroup(group)) {
       out.push(group);
       i += 1;
@@ -65,12 +104,12 @@ function optimizeGroups(groups: ReadonlyArray<Group>): Group[] {
     const run: FillGroup[] = [group];
     i += 1;
     while (i < groups.length) {
-      const next = optimizeGroupAny(groups[i] as Group);
+      const next = optimizeGroupAny(groups[i] as Group, settings);
       if (!isCompatibleIslandFillGroup(run[0] as FillGroup, next)) break;
       run.push(next);
       i += 1;
     }
-    out.push(...optimizeIslandFillGroups(run));
+    out.push(...optimizeIslandFillGroups(run, settings));
   }
   return out;
 }
@@ -79,13 +118,13 @@ function optimizeGroups(groups: ReadonlyArray<Group>): Group[] {
 // semantically meaningful: row order, bidirectional scan offset, and overscan
 // all depend on sweep ordering. Island Fill is optimized only as whole groups;
 // Offset/Follow Shape is optimized as contour segments.
-function optimizeGroupAny(group: Group): Group {
-  if (group.kind === 'cut') return optimizeGroup(group);
-  if (isOffsetFillGroup(group)) return optimizeOffsetFillGroup(group);
+function optimizeGroupAny(group: Group, settings: PathOptimizationSettings): Group {
+  if (group.kind === 'cut') return optimizeGroup(group, settings);
+  if (isOffsetFillGroup(group)) return optimizeOffsetFillGroup(group, settings);
   return group;
 }
 
-function optimizeGroup(group: CutGroup): CutGroup {
+function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): CutGroup {
   if (group.segments.length === 0) return group;
   // Nearest-neighbor is O(n^2). Large traces can produce tens of
   // thousands of cut/hatch segments, and optimizing them synchronously
@@ -94,17 +133,20 @@ function optimizeGroup(group: CutGroup): CutGroup {
   if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
-  const ordered = insideFirstNearestNeighborOrder(group.segments);
+  const ordered = configuredSegmentOrder(group.segments, settings);
   return { ...group, segments: ordered };
 }
 
-function optimizeOffsetFillGroup(group: FillGroup): FillGroup {
+function optimizeOffsetFillGroup(group: FillGroup, settings: PathOptimizationSettings): FillGroup {
   if (group.segments.length === 0) return group;
   if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
-  return { ...group, segments: insideFirstNearestNeighborOrder(group.segments) };
+  return { ...group, segments: configuredSegmentOrder(group.segments, settings) };
 }
 
-function optimizeIslandFillGroups(groups: ReadonlyArray<FillGroup>): FillGroup[] {
+function optimizeIslandFillGroups(
+  groups: ReadonlyArray<FillGroup>,
+  settings: PathOptimizationSettings,
+): FillGroup[] {
   if (groups.length <= 1 || groups.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return [...groups];
   const endpoints = groups.map(islandGroupEndpoints);
   if (endpoints.some((entry) => entry === null)) return [...groups];
@@ -112,7 +154,10 @@ function optimizeIslandFillGroups(groups: ReadonlyArray<FillGroup>): FillGroup[]
   const remaining = new Set<number>();
   for (let i = 0; i < groups.length; i += 1) remaining.add(i);
   const out: FillGroup[] = [];
-  let cursor = ORIGIN;
+  let cursor = startCursorForSegments(
+    groups.flatMap((group) => group.segments),
+    settings.startPoint,
+  );
   while (remaining.size > 0) {
     const pick = pickBestIslandGroup(endpoints, remaining, cursor);
     if (pick === null) break;
@@ -126,14 +171,52 @@ function optimizeIslandFillGroups(groups: ReadonlyArray<FillGroup>): FillGroup[]
   return out.length === groups.length ? out : [...groups];
 }
 
-function insideFirstNearestNeighborOrder<T extends CutSegment>(segments: ReadonlyArray<T>): T[] {
+function configuredSegmentOrder<T extends CutSegment>(
+  segments: ReadonlyArray<T>,
+  settings: PathOptimizationSettings,
+): T[] {
+  const startCursor = startCursorForSegments(segments, settings.startPoint);
+  if (!settings.insideFirst) {
+    return nearestNeighborOrderFrom(
+      segments,
+      startCursor,
+      settings.pathDirection === 'allow-reverse',
+    ).segments;
+  }
+  return insideFirstNearestNeighborOrder(
+    segments,
+    startCursor,
+    settings.pathDirection === 'allow-reverse',
+  );
+}
+
+function startCursorForSegments(
+  segments: ReadonlyArray<CutSegment>,
+  policy: PathOptimizationSettings['startPoint'],
+): Vec2 {
+  if (policy === 'machine-origin') return ORIGIN;
+  const bounds = segments.map(segmentBounds).filter((entry) => entry !== null);
+  if (bounds.length === 0) return ORIGIN;
+  const minX = Math.min(...bounds.map((entry) => entry.minX));
+  const minY = Math.min(...bounds.map((entry) => entry.minY));
+  if (policy === 'job-lower-left') return { x: minX, y: minY };
+  const maxX = Math.max(...bounds.map((entry) => entry.maxX));
+  const maxY = Math.max(...bounds.map((entry) => entry.maxY));
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
+function insideFirstNearestNeighborOrder<T extends CutSegment>(
+  segments: ReadonlyArray<T>,
+  startCursor: Vec2,
+  allowReverse: boolean,
+): T[] {
   const depths = containmentDepths(segments);
   const maxDepth = depths.reduce((m, d) => Math.max(m, d), 0);
   const out: T[] = [];
-  let cursor = ORIGIN;
+  let cursor = startCursor;
   for (let depth = maxDepth; depth >= 0; depth -= 1) {
     const bucket = segments.filter((_, i) => depths[i] === depth);
-    const ordered = nearestNeighborOrderFrom(bucket, cursor);
+    const ordered = nearestNeighborOrderFrom(bucket, cursor, allowReverse);
     out.push(...ordered.segments);
     cursor = ordered.cursor;
   }
@@ -148,13 +231,14 @@ function insideFirstNearestNeighborOrder<T extends CutSegment>(segments: Readonl
 function nearestNeighborOrderFrom<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   startCursor: Vec2,
+  allowReverse: boolean,
 ): { readonly segments: T[]; readonly cursor: Vec2 } {
   const remaining = new Set<number>();
   for (let i = 0; i < segments.length; i += 1) remaining.add(i);
   const out: T[] = [];
   let cursor: Vec2 = startCursor;
   while (remaining.size > 0) {
-    const pick = pickBestNext(segments, remaining, cursor);
+    const pick = pickBestNext(segments, remaining, cursor, allowReverse);
     if (pick === null) break;
     remaining.delete(pick.index);
     const placed = pick.reverse ? reverseSegment(pick.segment) : pick.segment;
@@ -165,7 +249,7 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
   return { segments: out, cursor };
 }
 
-type Pick<T extends CutSegment> = {
+type SegmentPick<T extends CutSegment> = {
   readonly index: number;
   readonly reverse: boolean;
   readonly segment: T;
@@ -179,13 +263,14 @@ function pickBestNext<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   remaining: ReadonlySet<number>,
   cursor: Vec2,
-): Pick<T> | null {
-  let best: Pick<T> | null = null;
+  allowReverse: boolean,
+): SegmentPick<T> | null {
+  let best: SegmentPick<T> | null = null;
   let bestDistSq = Number.POSITIVE_INFINITY;
   for (const i of remaining) {
     const seg = segments[i];
     if (seg === undefined) continue;
-    const entries = segmentEntries(seg);
+    const entries = segmentEntries(seg, allowReverse);
     for (const entry of entries) {
       const d = distanceSquared(cursor, entry.point);
       if (d < bestDistSq) {
@@ -202,10 +287,11 @@ function pickBestNext<T extends CutSegment>(
 // so reverse is a no-op for travel).
 function segmentEntries(
   seg: CutSegment,
+  allowReverse: boolean,
 ): ReadonlyArray<{ readonly point: Vec2; readonly reverse: boolean }> {
   const start = seg.polyline[0];
   if (start === undefined) return [];
-  if (seg.closed) return [{ point: start, reverse: false }];
+  if (seg.closed || !allowReverse) return [{ point: start, reverse: false }];
   const end = seg.polyline[seg.polyline.length - 1];
   if (end === undefined) return [{ point: start, reverse: false }];
   return [

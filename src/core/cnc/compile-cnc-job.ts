@@ -40,6 +40,7 @@ import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
+import { orderInnerFirst } from './profile-ordering';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
@@ -250,7 +251,11 @@ function passesForLayer(
       depthPerPassMm: settings.depthPerPassMm,
     });
   }
-  const raw = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
+  // Finish allowance: roughing toolpaths stay `allowanceMm` proud of the wall
+  // (0 for every non-profile cut and for profile cuts without an allowance, so
+  // the offset — and therefore the output — is byte-identical to before).
+  const allowanceMm = profileFinishAllowanceMm(settings);
+  const raw = xyToolpathsForCutType(polylines, settings, tool.diameterMm, allowanceMm);
   // H.9 (opt-in): climb/conventional enforcement + mid-segment entry points.
   const toolpaths =
     settings.cutDirection === undefined
@@ -258,26 +263,77 @@ function passesForLayer(
       : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return [];
-  const passes =
+  const roughing =
     settings.cutType === 'pocket'
       ? depthMajorPasses(toolpaths, depths)
       : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm);
+  // One full-depth finishing pass at the true contour, appended after roughing.
+  const passes =
+    allowanceMm > 0
+      ? [...roughing, ...finishingProfilePasses(polylines, settings, tool.diameterMm)]
+      : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.
   return settings.rampEntryDeg === undefined
     ? passes
     : applyRampEntry(passes, settings.rampEntryDeg);
 }
 
+// The finish allowance in effect for this layer: the stock-to-leave value, but
+// only for the two side-offset profile cut types it applies to. Pocket,
+// profile-on-path, v-carve, drill, engrave, and relief are out of scope (0).
+function profileFinishAllowanceMm(settings: CncLayerSettings): number {
+  const applies = settings.cutType === 'profile-outside' || settings.cutType === 'profile-inside';
+  const allowance = settings.finishAllowanceMm ?? 0;
+  return applies && Number.isFinite(allowance) && allowance > 0 ? allowance : 0;
+}
+
+// The finishing pass: one loop along the TRUE contour (tool-radius offset, no
+// allowance) at full depth. When tabs are on it is tab-split through the SAME
+// splitPassForTabs the deepest roughing pass uses, so the finishing pass still
+// leaves the holding tabs and the part stays attached.
+function finishingProfilePasses(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  toolDiameterMm: number,
+): CncPass[] {
+  const side = settings.cutType === 'profile-inside' ? 'inside' : 'outside';
+  const raw = orderInnerFirst(profileToolpathPolylines(polylines, side, toolDiameterMm));
+  const toolpaths =
+    settings.cutDirection === undefined
+      ? raw
+      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
+  const zMm = -settings.depthMm;
+  const wantsTabs = settings.tabsEnabled;
+  const passes: CncPass[] = [];
+  for (const toolpath of toolpaths) {
+    if (
+      wantsTabs &&
+      toolpath.closed &&
+      passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm)
+    ) {
+      appendTabbedPasses(passes, toolpath, zMm, settings, toolDiameterMm);
+    } else {
+      passes.push(passFromPolyline(toolpath, zMm));
+    }
+  }
+  return passes;
+}
+
 function xyToolpathsForCutType(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
+  allowanceMm: number,
 ): ReadonlyArray<Polyline> {
   switch (settings.cutType) {
     case 'profile-outside':
-      return orderInnerFirst(profileToolpathPolylines(polylines, 'outside', toolDiameterMm));
+      return orderInnerFirst(
+        profileToolpathPolylines(polylines, 'outside', toolDiameterMm, allowanceMm),
+      );
     case 'profile-inside':
-      return orderInnerFirst(profileToolpathPolylines(polylines, 'inside', toolDiameterMm));
+      return orderInnerFirst(
+        profileToolpathPolylines(polylines, 'inside', toolDiameterMm, allowanceMm),
+      );
     case 'profile-on-path':
       return orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm));
     case 'pocket':
@@ -390,47 +446,6 @@ function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
   const alreadyClosed =
     Math.abs(first.x - last.x) <= COORD_EPS && Math.abs(first.y - last.y) <= COORD_EPS;
   return alreadyClosed ? points : [...points, first];
-}
-
-// Inner contours before outer ones: cutting a hole after freeing the part
-// that contains it machines a workpiece that can move.
-function orderInnerFirst(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
-  const closedPolylines = polylines.filter(
-    (polyline) => polyline.closed && polyline.points.length >= 3,
-  );
-  return polylines
-    .map((polyline, index) => ({
-      polyline,
-      index,
-      depth: containmentDepth(polyline, closedPolylines),
-    }))
-    .sort((a, b) => b.depth - a.depth || a.index - b.index)
-    .map((entry) => entry.polyline);
-}
-
-function containmentDepth(polyline: Polyline, closed: ReadonlyArray<Polyline>): number {
-  const probe = polyline.points[0];
-  if (probe === undefined) return 0;
-  let depth = 0;
-  for (const candidate of closed) {
-    if (candidate === polyline) continue;
-    if (pointInPolygon(probe, candidate.points)) depth += 1;
-  }
-  return depth;
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[i];
-    const b = polygon[j];
-    if (a === undefined || b === undefined) continue;
-    const crossesY = a.y > point.y !== b.y > point.y;
-    if (!crossesY) continue;
-    const xAtY = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-    if (point.x < xAtY) inside = !inside;
-  }
-  return inside;
 }
 
 function capFeed(feedMmPerMin: number, maxFeed: number): number {

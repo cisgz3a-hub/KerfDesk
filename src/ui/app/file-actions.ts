@@ -114,6 +114,7 @@ export type SaveGcodeCtx = {
   // null = never connected this session; a snapshot = run the $30/$32
   // comparison before saving (M11). Omitted = caller doesn't track it.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  readonly allowRotaryRaster?: boolean;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -213,6 +214,7 @@ function emitSaveGcode(
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    ...(ctx.allowRotaryRaster === true ? { allowRotaryRaster: true } : {}),
   });
 }
 

@@ -13,6 +13,8 @@ export type CommandShellCallbacks = {
   readonly requestScanOffsetTest: () => void;
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
+  readonly requestRotarySetup: () => void;
+  readonly requestLabsSettings: () => void;
   readonly requestProjectNotes: () => void;
   readonly requestUndoHistory: () => void;
   readonly requestCloseOpenFillContoursWithTolerance: () => void;
@@ -39,6 +41,8 @@ export type CommandDialogs = {
   readonly toggleLayersPanel: () => void;
   readonly machinePanelOpen: boolean;
   readonly toggleMachinePanel: () => void;
+  readonly rotaryFeatureEnabled: boolean;
+  readonly rotaryProfileSupported: boolean;
 };
 
 export type CommandSelection = {

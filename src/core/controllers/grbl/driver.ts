@@ -52,6 +52,7 @@ export const grblDriver: ControllerDriver = {
     firmwareSetupPanel: 'grbl-laser',
     probing: true,
     cncJobs: true,
+    lowPowerFire: true,
     overrides: true,
   },
   realtime: {

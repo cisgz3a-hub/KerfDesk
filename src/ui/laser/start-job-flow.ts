@@ -10,6 +10,7 @@
 // and a native dialog there would freeze the ack pump and Stop button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
+import { profileSupportsCapability } from '../../core/devices';
 import {
   createJobCheckpoint,
   fingerprintGcode,
@@ -24,6 +25,7 @@ import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { prepareStartJob } from './start-job-readiness';
 import { resumeConfirmation } from './resume-confirmation';
@@ -51,6 +53,8 @@ export async function runStartJobFlow(): Promise<void> {
     },
     jobPlacement,
     currentOutputScope(app),
+    undefined,
+    rotaryRasterAllowed(project),
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -157,6 +161,7 @@ function prepareResume(overrides?: {
     app.jobPlacement,
     outputScope,
     overrides?.jobOrigin,
+    rotaryRasterAllowed(project),
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -164,6 +169,13 @@ function prepareResume(overrides?: {
     return null;
   }
   return { project, gcode: prepared.gcode };
+}
+
+function rotaryRasterAllowed(project: Project): boolean {
+  return (
+    useExperimentalLaserFeatures.getState().features.rotaryRaster &&
+    profileSupportsCapability(project.device, 'rotary')
+  );
 }
 
 // Shared resume back half: build the re-entry program, confirm, suspend

@@ -230,6 +230,32 @@ describe('DeviceSettings in CNC mode (ADR-101 §6)', () => {
   });
 });
 
+describe('DeviceSettings low-power Fire', () => {
+  it('requires explicit profile enablement on an approved device', async () => {
+    useStore.getState().updateDeviceProfile({
+      capabilities: [...(useStore.getState().project.device.capabilities ?? []), 'low-power-fire'],
+    });
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const enabled = input(host, 'Enable low-power Fire for this machine');
+      expect(enabled.checked).toBe(false);
+
+      await act(async () => {
+        enabled.checked = true;
+        Simulate.change(enabled);
+      });
+
+      expect(useStore.getState().project.device.fireControl).toEqual({
+        enabled: true,
+        maxPowerPercent: 1,
+      });
+      expect(input(host, 'Maximum Fire power percent').max).toBe('5');
+    } finally {
+      await unmount();
+    }
+  });
+});
+
 describe('DeviceSettings scan offsets', () => {
   it('lets the operator edit calibrated scan-offset points on the device profile', async () => {
     const { host, unmount } = await renderDeviceSettings();

@@ -4,6 +4,7 @@
 
 import type { CameraAlignment, CameraCalibration } from '../camera';
 import type { RotarySetup } from './rotary';
+import type { LaserFireControl } from './fire-control';
 import type { ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
@@ -54,7 +55,9 @@ export type ProfileCapability =
   | 'scan-offsets'
   | 'verified-origin'
   | 'z-axis'
-  | 'camera';
+  | 'camera'
+  | 'rotary'
+  | 'low-power-fire';
 export const PROFILE_CAPABILITIES = [
   'grbl',
   'wcs',
@@ -64,6 +67,8 @@ export const PROFILE_CAPABILITIES = [
   'verified-origin',
   'z-axis',
   'camera',
+  'rotary',
+  'low-power-fire',
 ] as const satisfies ReadonlyArray<ProfileCapability>;
 export type ProfileEvidenceStatus =
   | 'default-starter'
@@ -171,6 +176,7 @@ export type DeviceProfile = {
   // Rotary attachment (ADR-127). Absent = no rotary configured; scaling
   // applies only while `rotary.enabled` — disabled output is byte-identical.
   readonly rotary?: RotarySetup;
+  readonly fireControl?: LaserFireControl;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. The firmware still enforces its
@@ -225,7 +231,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   model: 'GRBL 400x400',
   profileSource: 'built-in',
   catalogVersion: '2026-06-17',
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'KerfDesk default',
@@ -274,7 +280,16 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   gcodeDialect: { dialectId: 'neotronics-4040-safe' },
   framingFeedMmPerMin: 2000,
   noGoZones: [],
-  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: [
+    'grbl',
+    'wcs',
+    'air-assist',
+    'verified-origin',
+    'scan-offsets',
+    'no-go-zones',
+    'rotary',
+    'low-power-fire',
+  ],
   evidence: [
     {
       label: 'User-provided 4040 profile',

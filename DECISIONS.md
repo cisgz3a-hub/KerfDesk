@@ -26,6 +26,11 @@
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
+| ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
+| ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
+| ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
+| ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
+| ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 
 ---
 
@@ -6491,9 +6496,63 @@ must preserve work zero and pass all normal readiness checks. The behavior is
 unit/integration verified; real interruption and embedded-tool hardware tests
 remain unverified and must use the standing air-cut/scrap protocol first.
 
----
+## ADR-137 - Trace reliability: latest request wins and completed work is reusable (2026-07-11)
 
-## ADR-137 - Right workspace rails are independently collapsible, with machine controls fail-visible
+**Status:** accepted.
+
+> **Numbering note.** ADR-136 (CNC retract-first interruption recovery) was the last used; **ADR-137** is the next free.
+
+### Context
+
+The trace dialog debounces preview state, but the shared worker client still queues every request. A CPU-bound worker cannot receive a cancellation message until its current synchronous trace returns, so rapid preset changes can put obsolete jobs ahead of the only result the user wants. Every queued request also starts its own fixed timeout. Clicking Trace then decodes and traces the same source again even when the current preview already contains the matching geometry. On large or supersampled images, this duplicate and queued work is a more credible failure source than the tracing quality itself.
+
+### Decision
+
+Make the tracing pipeline explicitly single-flight and latest-wins. Starting a new worker trace retires the worker that owns an unfinished request, rejects that request with a typed superseded error, and runs the new request on a fresh worker. Supersession is control flow, not a preview error and not a reason to retry inline. The timeout applies only to the active request. A ready preview carries the identity of the file, options, boundary, and boundary mode; commit may reuse its paths and bounds only while all of those inputs still match. Bounded resize-at-decode, transferable worker buffers, and backend-specific working-pixel budgets preserve this one-live-job contract while limiting large-image memory and compute.
+
+### Consequences
+
+- Rapid option changes can pay worker startup again, but never wait behind stale CPU work; old worker memory becomes reclaimable as soon as it is terminated.
+- The preview and commit paths share one completed result when their inputs match, removing the most common duplicate full trace.
+- Large images are bounded before allocation-heavy tracing, and Region Enhance cannot stack an inner 4x supersampling pass on top of its own work scale.
+- This is in-process cancellation, not cooperative cancellation inside the tracing algorithms. A backend that monopolizes the main thread remains out of scope, and worker termination latency remains browser-controlled.
+- Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
+
+## ADR-138 - The primary toolbar is icon-first and never wraps
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The primary toolbar had fourteen text buttons and wrapped into a second row at
+compact desktop widths. That reduced canvas height, shifted the numeric toolbar
+and workspace during resize, and made the command surface visually dominant.
+Removing commands would improve density at the cost of discoverability.
+
+### Decision
+
+- Every toolbar command uses a pinned `lucide-static` icon. Familiar file,
+  import, export, Preview, and Shortcuts actions are icon-only at all widths.
+- Specialist commands retain icon-plus-label presentation above 1280 px and
+  switch to icon-only at 1280 px and below.
+- Icon-only buttons keep the complete command label as their accessible name
+  and retain the command registry's tooltip, shortcut, disabled reason, and
+  pressed state.
+- The toolbar is one non-wrapping row. Its command-group region may scroll
+  horizontally on unusually narrow windows; the brand and Shortcuts control
+  remain fixed outside that region, except the redundant brand wordmark hides
+  below 700 px to preserve every command before scrolling is needed.
+- Icons come from the already-approved `lucide-static` dependency. Imported SVG
+  strings are build assets, never project or user content.
+
+### Consequences
+
+The workspace no longer jumps between one-row and two-row chrome. Common
+desktop widths gain vertical space while specialist labels remain available
+where room permits. Operators on narrow windows may need to horizontally scroll
+the command group, but every command also remains available from the menus.
+
+## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
 
 **Status:** Accepted | **Date:** 2026-07-13
 
@@ -6532,3 +6591,36 @@ preference, so a panel that was collapsed before Start collapses again after the
 stream fully settles. Panel visibility remains session-only; persistence across
 launches can be added later if user testing shows that preference is valuable.
 At 700 px and below, the initial canvas no longer collapses to zero width.
+
+## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
+
+> **Numbering note.** ADR-137 through ADR-139 are accepted. **ADR-140** is allocated to this decision.
+
+Context. A profile cut removes the full wall across its depth passes, so the
+finished edge carries the roughing tool's deflection and chatter. Production CNC
+work leaves a small "stock to leave" allowance on roughing and removes it with a
+light finishing pass along the true contour for a cleaner wall.
+
+Decision. Optional per-layer `finishAllowanceMm` on CncLayerSettings, for
+profile-outside / profile-inside cuts only (0/absent = off, byte-identical).
+When > 0:
+- Roughing offsets the contour by tool-radius + allowance, staying that far
+  proud of the finished wall (profileToolpathPolylines gained an allowance arg).
+- One finishing pass at the true contour (tool-radius offset, allowance 0) at
+  full depth is appended after the roughing passes.
+- Holding tabs: the finishing pass runs through the SAME tab split the deepest
+  roughing pass uses, so tabs are preserved and the part stays attached.
+
+Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
+(which already has its own H.8 finishing skim) are out of scope, documented in
+code, and covered by a test showing those cut types are unaffected.
+
+Consequences.
+- Determinism (#5): allowance 0/absent is byte-identical (tested).
+- HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
+- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
+  same perimeter-fraction logic on concentric contours, so they align for
+  typical convex profiles; on complex/concave geometry clipper's offset can pick
+  a different start vertex and misalign them, which could sever the part. Verify
+  with a test cut before trusting tabs + finish allowance together on intricate
+  parts.

@@ -3,6 +3,7 @@ import {
   isGrblRxBufferBytes,
   isGrblStreamingMode,
   isKnownControllerKind,
+  normalizeLaserFireControl,
   type LaserAirAssistHardware,
   type LaserFocusMode,
   type LaserHeadMetadataConfidence,
@@ -13,7 +14,11 @@ import {
   type ProfileCapability,
   type ProfileEvidenceStatus,
 } from '../../core/devices';
-import { validateCameraProfileShape } from '../../core/camera';
+import {
+  normalizeCameraAlignment,
+  normalizeCameraCalibration,
+  validateCameraProfileShape,
+} from '../../core/camera';
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
@@ -48,7 +53,10 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateProfileCapabilities(value['capabilities']) ??
     validateProfileEvidence(value['evidence']) ??
     validateLaserSubProfile(value['laserSubProfile']) ??
-    validateCameraProfile(value['cameraProfile'])
+    validateCameraProfile(value['cameraProfile']) ??
+    validateCameraCalibration(value['cameraCalibration']) ??
+    validateCameraAlignment(value['cameraAlignment']) ??
+    validateLaserFireControl(value['fireControl'])
   );
 }
 
@@ -81,6 +89,12 @@ function validateProfileMachineFields(value: Record<string, unknown>): string | 
 
 function validateProfileStreamingFields(value: Record<string, unknown>): string | null {
   if (!isGcodeDialectSelection(value['gcodeDialect'])) return 'profile.gcodeDialect is invalid';
+  if (
+    value['baudRate'] !== undefined &&
+    (!Number.isInteger(value['baudRate']) || !isPositiveFinite(value['baudRate']))
+  ) {
+    return 'profile.baudRate must be a positive integer';
+  }
   if (value['streamingMode'] !== undefined && !isGrblStreamingMode(value['streamingMode'])) {
     return 'profile.streamingMode is invalid';
   }
@@ -178,6 +192,25 @@ function validateLaserSubProfile(value: unknown): string | null {
 function validateCameraProfile(value: unknown): string | null {
   if (value === undefined) return null;
   return validateCameraProfileShape(value, 'profile.cameraProfile');
+}
+
+function validateCameraCalibration(value: unknown): string | null {
+  if (value === undefined) return null;
+  return normalizeCameraCalibration(value) === undefined
+    ? 'profile.cameraCalibration is invalid'
+    : null;
+}
+
+function validateCameraAlignment(value: unknown): string | null {
+  if (value === undefined) return null;
+  return normalizeCameraAlignment(value) === undefined
+    ? 'profile.cameraAlignment is invalid'
+    : null;
+}
+
+function validateLaserFireControl(value: unknown): string | null {
+  if (value === undefined) return null;
+  return normalizeLaserFireControl(value) === undefined ? 'profile.fireControl is invalid' : null;
 }
 
 function validateLaserSubProfileIdentity(value: Record<string, unknown>): string | null {

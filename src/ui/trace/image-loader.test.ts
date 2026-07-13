@@ -139,6 +139,33 @@ describe('image-loader scaleToCap (ADR-037 decode resolution)', () => {
 });
 
 describe('image-loader header guards', () => {
+  it('asks ImageBitmap to resize a large source during decode', async () => {
+    const file = pngFileWithSize(4096, 2048);
+    const bitmap = {
+      width: 2048,
+      height: 1024,
+      close: vi.fn(),
+    } as unknown as ImageBitmap;
+    const createImageBitmap = vi.fn(async () => bitmap);
+    vi.stubGlobal('createImageBitmap', createImageBitmap);
+    const createObjectURL = vi.fn(() => 'blob:fallback');
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectURL,
+      configurable: true,
+    });
+
+    const image = await loadImageAsRawData(file);
+
+    expect(createImageBitmap).toHaveBeenCalledWith(file, {
+      resizeWidth: 2048,
+      resizeHeight: 1024,
+      resizeQuality: 'high',
+    });
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    expect(image).toMatchObject({ width: 2048, height: 1024 });
+  });
+
   it('reads PNG natural dimensions from the header without browser decode', async () => {
     const expectNoObjectUrlDecode = stubObjectUrlDecode(1, 1);
 

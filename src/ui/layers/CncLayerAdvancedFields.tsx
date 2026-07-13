@@ -9,6 +9,7 @@
 
 import { activeCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { CncFinishAllowanceField } from './CncFinishAllowanceField';
 import {
   FeedPresetRow,
   MotionPolishRows,
@@ -168,6 +169,7 @@ export function CutTypeSections(props: {
   const showPolish = isProfile || settings.cutType === 'pocket' || settings.cutType === 'engrave';
   return (
     <>
+      <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
       {props.hasReliefObjects ? (
         <ReliefLayerRows
           layer={layer}

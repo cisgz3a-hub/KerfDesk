@@ -18,7 +18,7 @@
 //   3. ColoredPath[] → SVG string via coloredPathsToSvg before the
 //      renderer sees it
 
-import { useEffect, useRef, useState } from 'react';
+import { type MutableRefObject, useEffect, useRef, useState } from 'react';
 import type { ColoredPath } from '../../core/scene';
 import {
   type RawImageData,
@@ -27,7 +27,9 @@ import {
   coloredPathsToSvg,
 } from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
+import type { PreparedTrace, TracePreparationRequest } from './prepared-trace';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
+import { isTraceRequestSuperseded } from './use-trace-worker-client';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -39,6 +41,7 @@ export type TracePreviewState =
       readonly width: number;
       readonly height: number;
       readonly paths: ReadonlyArray<ColoredPath>;
+      readonly preparedTrace?: PreparedTrace;
       readonly sourceHasTransparency?: boolean | undefined;
     }
   | { readonly kind: 'error'; readonly message: string };
@@ -66,12 +69,9 @@ export function useTracePreview(
   // closure — i.e. whatever value was current when the file-effect
   // FIRST fired. A user who picks a file before changing the preset
   // saw a trace at the original preset. R-H1 audit finding.
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
-  const boundaryRef = useRef<TraceBoundary | null>(boundary ?? null);
-  boundaryRef.current = boundary ?? null;
-  const boundaryModeRef = useRef<BoundaryMode>(boundaryMode);
-  boundaryModeRef.current = boundaryMode;
+  const optionsRef = useLatest(options);
+  const boundaryRef = useLatest<TraceBoundary | null>(boundary ?? null);
+  const boundaryModeRef = useLatest<BoundaryMode>(boundaryMode);
 
   useEffect(() => {
     if (file === null) {
@@ -92,11 +92,15 @@ export function useTracePreview(
         // Read options through the ref so the latest preset wins even
         // if the user changed it between picking the file and decode
         // completing (R-H1 fix).
-        void runTrace({
+        const currentOptions = optionsRef.current;
+        const currentBoundary = boundaryRef.current;
+        const currentBoundaryMode = boundaryModeRef.current;
+        startPreviewTrace({
           img,
-          options: optionsRef.current,
-          boundary: boundaryRef.current,
-          boundaryMode: boundaryModeRef.current,
+          file,
+          options: currentOptions,
+          boundary: currentBoundary,
+          boundaryMode: currentBoundaryMode,
           sourceHasTransparency,
           isCurrent: () => tokenRef.current === myToken,
           setState,
@@ -116,19 +120,20 @@ export function useTracePreview(
     // it as a dep — a preset switch is handled by the separate
     // effect below so a file with the same identity doesn't trigger
     // a full re-decode each time the user nudges a knob.
-  }, [file]);
+  }, [file, optionsRef, boundaryRef, boundaryModeRef]);
 
   useEffect(() => {
     const img = decodedRef.current;
-    if (img === null) return undefined;
+    if (img === null || file === null) return undefined;
     tokenRef.current += 1;
     const myToken = tokenRef.current;
     const sourceHasTransparency = rawImageHasTransparency(img);
     setState({ kind: 'tracing', sourceHasTransparency });
     const timer = window.setTimeout(() => {
       if (tokenRef.current !== myToken) return;
-      void runTrace({
+      startPreviewTrace({
         img,
+        file,
         options,
         boundary: boundary ?? null,
         boundaryMode,
@@ -140,9 +145,36 @@ export function useTracePreview(
     return () => {
       window.clearTimeout(timer);
     };
-  }, [options, boundary, boundaryMode]);
+  }, [file, options, boundary, boundaryMode]);
 
   return state;
+}
+
+function useLatest<T>(value: T): MutableRefObject<T> {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+function startPreviewTrace(args: {
+  readonly img: RawImageData;
+  readonly file: File;
+  readonly options: TraceOptions;
+  readonly boundary: TraceBoundary | null;
+  readonly boundaryMode: BoundaryMode;
+  readonly sourceHasTransparency: boolean;
+  readonly isCurrent: () => boolean;
+  readonly setState: (next: TracePreviewState) => void;
+}): void {
+  void runTrace({
+    ...args,
+    request: {
+      file: args.file,
+      options: args.options,
+      boundary: args.boundary,
+      boundaryMode: args.boundaryMode,
+    },
+  });
 }
 
 export function runTrace(args: {
@@ -151,6 +183,7 @@ export function runTrace(args: {
   readonly boundary?: TraceBoundary | null;
   readonly boundaryMode?: BoundaryMode;
   readonly sourceHasTransparency?: boolean | undefined;
+  readonly request?: TracePreparationRequest;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
 }): Promise<void> {
@@ -160,12 +193,13 @@ export function runTrace(args: {
   // preview's ready/error state (P2-A). Returns the promise so tests can await it.
   return (async () => {
     try {
-      const { paths } = await traceImageWithBoundaryMode(
+      const result = await traceImageWithBoundaryMode(
         args.img,
         args.options,
         args.boundary ?? null,
         args.boundaryMode ?? 'crop',
       );
+      const { paths } = result;
       if (!args.isCurrent()) return;
       const svg = coloredPathsToSvg(paths, args.img.width, args.img.height);
       args.setState({
@@ -174,9 +208,11 @@ export function runTrace(args: {
         width: args.img.width,
         height: args.img.height,
         paths,
+        ...(args.request === undefined ? {} : { preparedTrace: { request: args.request, result } }),
         sourceHasTransparency: args.sourceHasTransparency,
       });
     } catch (err) {
+      if (isTraceRequestSuperseded(err)) return;
       if (!args.isCurrent()) return;
       args.setState({
         kind: 'error',

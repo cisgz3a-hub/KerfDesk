@@ -7,6 +7,8 @@ import { placeBoardCommand } from './board-capture-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
 import { windowPanelCommands } from './window-panel-commands';
+import { rotarySetupCommand } from './rotary-command-family';
+import { labsCommand } from './labs-command-family';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -77,6 +79,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     registrationJigCommand(ctx),
     cameraCommand(ctx),
     placeBoardCommand(ctx),
+    rotarySetupCommand(ctx),
     ...calibrationToolCommands(ctx),
     enabled(
       'tools.optimization-settings',
@@ -85,6 +88,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Adjust output path optimization',
       ctx.optimizationSettings,
     ),
+    labsCommand(ctx),
     adjustImageCommand(ctx),
     imageMaskApplyCommand(ctx),
     imageMaskCropCommand(ctx),

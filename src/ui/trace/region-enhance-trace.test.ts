@@ -155,7 +155,13 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
     expect(traceImageWithFallback).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ width: 20, height: 20 }),
-      options,
+      expect.objectContaining({
+        ...options,
+        autoUpscaleSmallSources: false,
+        pixelScale: 2,
+        supersampleContour: false,
+        upscaleSmallSmoothSources: false,
+      }),
     );
 
     const polylines = result.paths.flatMap((p) => p.polylines);
