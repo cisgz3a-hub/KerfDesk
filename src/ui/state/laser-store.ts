@@ -447,7 +447,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
     (line, action) => safeWrite(set, get, line, action),
     () => refs.driver,
   ),
-  ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
+  ...originActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),
   pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
