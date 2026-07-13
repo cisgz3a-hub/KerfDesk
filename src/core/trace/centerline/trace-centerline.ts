@@ -6,6 +6,7 @@
 // of centerline mode — instead of imagetracer-style double outlines.
 
 import type { ColoredPath } from '../../scene';
+import { withCanonicalTraceCurves } from '../trace-curves';
 import { preprocessForTrace, type RawImageData, type TraceOptions } from '../trace-image';
 import { squaredDistanceField, type InkMask } from './distance-field';
 import { thinToMedialAxis } from './medial-thinning';
@@ -40,7 +41,9 @@ export function traceCenterlineStrokePaths(
   // Rings closed at a corner keep their endpoints a gap apart; make them
   // return to start so a stroked/engraved closed loop has no seam gap.
   const closed = closeRingEndpoints(polylines);
-  return closed.length === 0 ? [] : [{ color: CENTERLINE_COLOR, polylines: closed }];
+  return closed.length === 0
+    ? []
+    : withCanonicalTraceCurves([{ color: CENTERLINE_COLOR, polylines: closed }]);
 }
 
 // The shared preprocessing already binarized the image (threshold/Otsu);

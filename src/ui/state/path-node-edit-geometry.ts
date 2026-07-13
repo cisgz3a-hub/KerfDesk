@@ -1,4 +1,15 @@
-import type { Bounds, ColoredPath, Polyline, Vec2 } from '../../core/scene';
+import {
+  curveControlPoint,
+  curveNodePoint,
+  flattenCurveSubpath,
+  moveCurveAnchor,
+  moveCurveControl,
+  type Bounds,
+  type ColoredPath,
+  type CurveSubpath,
+  type Polyline,
+  type Vec2,
+} from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
 
 export function editPathsNodesByDelta(
@@ -8,21 +19,39 @@ export function editPathsNodesByDelta(
   dy: number,
 ): { readonly paths: ReadonlyArray<ColoredPath> } | null {
   let changed = false;
-  const refKeys = new Set(refs.map(pathNodeRefKey));
-  const nextPaths = paths.map((path, pathIndex) => ({
-    ...path,
-    polylines: path.polylines.map((polyline, polylineIndex) => ({
+  const curveRefs = refs.filter((ref) => ref.geometry === 'curve');
+  const legacyRefs = refs.filter((ref) => ref.geometry !== 'curve');
+  const nextPaths = paths.map((originalPath, pathIndex) => {
+    const curveEdit = editCurvePathByDelta(originalPath, pathIndex, curveRefs, dx, dy);
+    if (curveEdit !== null) {
+      changed = true;
+      return curveEdit;
+    }
+    const path = originalPath;
+    let pathChanged = false;
+    const polylines = path.polylines.map((polyline, polylineIndex) => ({
       ...polyline,
       points: polyline.points.map((point, pointIndex) => {
-        if (!refKeys.has(pathNodeRefKey({ objectId: '', pathIndex, polylineIndex, pointIndex }))) {
+        if (
+          !legacyRefs.some(
+            (ref) =>
+              ref.pathIndex === pathIndex &&
+              ref.polylineIndex === polylineIndex &&
+              ref.pointIndex === pointIndex,
+          )
+        ) {
           return point;
         }
         changed = true;
-        const nextPoint = { x: point.x + dx, y: point.y + dy };
-        return nextPoint;
+        pathChanged = true;
+        return { x: point.x + dx, y: point.y + dy };
       }),
-    })),
-  }));
+    }));
+    // The legacy node editor addresses compatibility-polyline indices. Until
+    // handle-aware curve editing lands, discard stale canonical geometry so
+    // preview and machine output use the points the user actually changed.
+    return pathChanged ? { color: path.color, polylines } : path;
+  });
   return changed ? { paths: nextPaths } : null;
 }
 
@@ -32,10 +61,12 @@ export function deletePathsNodes(
 ): { readonly paths: ReadonlyArray<ColoredPath> } | null {
   let changed = false;
   let invalid = false;
-  const refsByPolyline = groupPathNodeRefsByPolyline(refs);
-  const nextPaths = paths.map((path, pathIndex) => ({
-    ...path,
-    polylines: path.polylines.map((polyline, polylineIndex) => {
+  const refsByPolyline = groupPathNodeRefsByPolyline(
+    refs.filter((ref) => ref.geometry !== 'curve'),
+  );
+  const nextPaths = paths.map((path, pathIndex) => {
+    let pathChanged = false;
+    const polylines = path.polylines.map((polyline, polylineIndex) => {
       const polylineRefs = refsByPolyline.get(pathNodePolylineKey({ pathIndex, polylineIndex }));
       if (polylineRefs === undefined) return polyline;
       const edited = deletePolylineNodes(
@@ -48,9 +79,11 @@ export function deletePathsNodes(
       }
       if (edited === polyline) return polyline;
       changed = true;
+      pathChanged = true;
       return edited;
-    }),
-  }));
+    });
+    return pathChanged ? { color: path.color, polylines } : path;
+  });
   if (invalid || !changed) return null;
   return { paths: nextPaths };
 }
@@ -59,7 +92,60 @@ export function deletePathsNodes(
 // range. Used to turn an absolute drag target into the delta applied to the
 // whole selected-node set (audit C6).
 export function pathNodePoint(paths: ReadonlyArray<ColoredPath>, ref: PathNodeRef): Vec2 | null {
+  if (ref.geometry === 'curve') {
+    const curve = paths[ref.pathIndex]?.curves?.[ref.polylineIndex];
+    if (curve === undefined) return null;
+    return ref.handle === undefined
+      ? curveNodePoint(curve, ref.pointIndex)
+      : curveControlPoint(curve, ref.pointIndex, ref.handle);
+  }
   return paths[ref.pathIndex]?.polylines[ref.polylineIndex]?.points[ref.pointIndex] ?? null;
+}
+
+function editCurvePathByDelta(
+  path: ColoredPath,
+  pathIndex: number,
+  refs: ReadonlyArray<PathNodeRef>,
+  dx: number,
+  dy: number,
+): ColoredPath | null {
+  if (path.curves === undefined) return null;
+  const pathRefs = refs.filter((ref) => ref.pathIndex === pathIndex);
+  if (pathRefs.length === 0) return null;
+  const curves = [...path.curves];
+  let changed = false;
+  for (const ref of pathRefs) {
+    const curve = curves[ref.polylineIndex];
+    if (curve === undefined) continue;
+    const next = editCurveRef(curve, ref, dx, dy);
+    if (next === null) continue;
+    curves[ref.polylineIndex] = next;
+    changed = true;
+  }
+  if (!changed) return null;
+  const polylines: Polyline[] = [];
+  for (const curve of curves) {
+    const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
+    if (flattened.kind !== 'ok') return null;
+    polylines.push(flattened.polyline);
+  }
+  return { ...path, curves, polylines };
+}
+
+function editCurveRef(
+  curve: CurveSubpath,
+  ref: PathNodeRef,
+  dx: number,
+  dy: number,
+): CurveSubpath | null {
+  if (ref.handle === undefined) return moveCurveAnchor(curve, ref.pointIndex, { x: dx, y: dy });
+  const control = curveControlPoint(curve, ref.pointIndex, ref.handle);
+  return control === null
+    ? null
+    : moveCurveControl(curve, ref.pointIndex, ref.handle, {
+        x: control.x + dx,
+        y: control.y + dy,
+      });
 }
 
 export function materializedPolylineToSpecPoints(
@@ -141,10 +227,6 @@ function groupPathNodeRefsByPolyline(
     byPolyline.set(key, current);
   }
   return byPolyline;
-}
-
-function pathNodeRefKey(ref: Omit<PathNodeRef, 'objectId'> | PathNodeRef): string {
-  return `${ref.pathIndex}:${ref.polylineIndex}:${ref.pointIndex}`;
 }
 
 function pathNodePolylineKey(ref: Pick<PathNodeRef, 'pathIndex' | 'polylineIndex'>): string {

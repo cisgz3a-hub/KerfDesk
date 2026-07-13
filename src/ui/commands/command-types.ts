@@ -54,6 +54,7 @@ export type CommandId =
   | 'tools.focus-test'
   | 'tools.optimization-settings'
   | 'tools.rotary-setup'
+  | 'tools.print-and-cut'
   | 'tools.labs'
   | 'tools.adjust-image'
   | 'tools.apply-image-mask'
@@ -84,6 +85,8 @@ export type CommandId =
   | 'arrange.distribute-vertical-centers'
   | 'arrange.distribute-vertical-spacing'
   | 'arrange.break-apart'
+  | 'arrange.array'
+  | 'arrange.quick-nest'
   | 'arrange.flip-horizontal'
   | 'arrange.flip-vertical'
   | 'laser.connect'
@@ -190,6 +193,9 @@ export type AppCommandContext = {
   readonly rotaryFeatureEnabled: boolean;
   readonly rotaryProfileSupported: boolean;
   readonly rotarySetup: () => void;
+  readonly printAndCutFeatureEnabled: boolean;
+  readonly printAndCutProfileSupported: boolean;
+  readonly printAndCut: () => void;
   readonly labsSettings: () => void;
   readonly adjustImage: () => void;
   readonly saveProcessedBitmap: () => void;
@@ -215,6 +221,8 @@ export type AppCommandContext = {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly canBreakApartSelection: boolean;
   readonly breakApartSelection: () => void;
+  readonly createArray: () => void;
+  readonly quickNest: () => void;
   readonly flipHorizontal: () => void;
   readonly flipVertical: () => void;
   readonly connectLaser: () => void;

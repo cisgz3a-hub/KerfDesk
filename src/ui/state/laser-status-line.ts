@@ -43,6 +43,7 @@ export function handleStatusLine(
       fireActive: false,
       frameVerification: null,
       homingState: 'unknown',
+      trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
       pendingUntrackedAcks: 0,
       // A status-only Alarm (the ALARM:N line may have been consumed by a
       // pending command) must still terminate an active stream — a paused
@@ -65,6 +66,7 @@ export function handleStatusLine(
       fireActive: false,
       frameVerification: null,
       homingState: 'unknown',
+      trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
       pendingUntrackedAcks: 0,
     });
     cancelControllerLifecycleRefs(refs, 'Controller entered Sleep.');

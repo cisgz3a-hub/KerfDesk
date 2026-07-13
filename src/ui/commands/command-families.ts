@@ -9,6 +9,7 @@ import { vectorBooleanCommands } from './vector-boolean-commands';
 import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
+import { printAndCutCommand } from './print-cut-command-family';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -24,7 +25,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       },
       'Ctrl+N',
     ),
-    enabled('file.open', 'file', 'Open...', 'Open .lf2 project', ctx.openProject, 'Ctrl+O'),
+    enabled('file.open', 'file', 'Open...', 'Open project', ctx.openProject, 'Ctrl+O'),
     enabled('file.save', 'file', 'Save', 'Save project', ctx.saveProject, 'Ctrl+S'),
     enabled(
       'file.save-as',
@@ -80,6 +81,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     cameraCommand(ctx),
     placeBoardCommand(ctx),
     rotarySetupCommand(ctx),
+    printAndCutCommand(ctx),
     ...calibrationToolCommands(ctx),
     enabled(
       'tools.optimization-settings',

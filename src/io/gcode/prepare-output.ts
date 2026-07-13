@@ -68,12 +68,8 @@ export function prepareOutput(
   // Budget guard FIRST so an over-budget raster never reaches compileJob's large
   // allocations (P1-A). A failure flows out as the preflight result; every
   // consumer turns that into "can't" (empty g-code, empty preview, too-large).
-  // CNC compiles ignore raster objects entirely, so the raster budget guard
-  // does not apply to them.
-  if (outputProject.machine?.kind !== 'cnc') {
-    const preEmit = runPreEmitPreflight(outputProject);
-    if (!preEmit.ok) return { ok: false, preflight: preEmit };
-  }
+  const preEmit = runPreEmitPreflight(outputProject);
+  if (!preEmit.ok) return { ok: false, preflight: preEmit };
   const compiled = compileForMachine(outputProject);
   const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   const offset = options.jobOrigin

@@ -1,21 +1,23 @@
 // Direct tracedata -> ColoredPath conversion, bypassing parseSvg's
 // curve-flattening step. The quality lesson from LF1 was to use
 // imagetracerjs's structured `imagedataToTracedata` output instead of
-// routing through SVG strings. LF1 converted Q segments to cubic path
-// items; LaserForge 2.0 is a clean implementation that samples those Q
-// segments directly into the polyline scene model.
-//
-// Why flatten at all instead of carrying curves further? Our internal
-// data model is polyline-only: the compile + G-code emit stages produce
-// G1 moves over Polyline points. Carrying Beziers into the scene graph
-// would require a wider refactor (Polyline -> Path with curve segments).
-// Sampling at SAMPLES_PER_QUADRATIC density keeps the visual quality
-// indistinguishable from a true curve for typical engrave sizes.
+// routing through SVG strings. Quadratic segments are converted exactly
+// to canonical cubics. A deterministic sampled compatibility view remains
+// available for trace cleanup and subsystems still migrating to curves.
 //
 // Pure-core compliant: no clock, no random, no I/O. Same lazy tracer
 // load as trace-image.ts (cached promise — no re-download).
 
-import type { Bounds, ColoredPath, Polyline, Vec2 } from '../scene';
+import {
+  curveSubpathBounds,
+  polylineToCurveSubpath,
+  type Bounds,
+  type ColoredPath,
+  type CubicPathSegment,
+  type CurveSubpath,
+  type Polyline,
+  type Vec2,
+} from '../scene';
 import {
   type RawImageData,
   type TraceOptions,
@@ -33,6 +35,7 @@ import {
 import { traceCenterlineStrokePaths } from './centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
 import { traceImageToEdgePaths } from './edge-trace';
+import { withCanonicalTraceCurves } from './trace-curves';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 
 // Number of intermediate points to sample per quadratic Bezier
@@ -149,10 +152,12 @@ export async function traceImageToColoredPaths(
   const factor = upscaleFactorFor(image, options);
   if (factor > 1) {
     const scaledOptions: TraceOptions = { ...options, pixelScale: factor };
-    const upscaled = await dispatchTrace(upscaleBy(image, factor), scaledOptions);
+    const upscaled = withCanonicalTraceCurves(
+      await dispatchTrace(upscaleBy(image, factor), scaledOptions),
+    );
     return downscaleTracedPaths(upscaled, factor);
   }
-  return dispatchTrace(image, options);
+  return withCanonicalTraceCurves(await dispatchTrace(image, options));
 }
 
 // The supersample factor to apply, or 1 (no upscale). Two independent triggers,
@@ -232,15 +237,19 @@ export function tracedataToColoredPaths(td: TraceData): ColoredPath[] {
     const color = paletteToHex(palette);
     if (color === BACKGROUND_COLOR) continue;
     const polylines: Polyline[] = [];
+    const curves: CurveSubpath[] = [];
     for (const path of layer) {
-      const polyline = segmentsToPolyline(path.segments);
+      const geometry = segmentsToGeometry(path.segments);
       // imagetracerjs occasionally emits 0- or 1-point paths on
       // degenerate inputs; drop them to avoid downstream "polyline
       // with no edges" oddities. 2-point closed polylines (a single
       // edge) are still meaningful (degenerate dots) and pass through.
-      if (polyline.points.length >= 2) polylines.push(polyline);
+      if (geometry.polyline.points.length >= 2) {
+        polylines.push(geometry.polyline);
+        curves.push(geometry.curve);
+      }
     }
-    if (polylines.length > 0) result.push({ color, polylines });
+    if (polylines.length > 0) result.push({ color, polylines, curves });
   }
   return result;
 }
@@ -250,18 +259,62 @@ export function tracedataToColoredPaths(td: TraceData): ColoredPath[] {
 // (for L) or N quadratic samples (for Q). All paths from imagetracerjs
 // are closed by construction — the last segment's endpoint coincides
 // with the first segment's start.
-function segmentsToPolyline(segments: ReadonlyArray<TraceSegment>): Polyline {
+function segmentsToGeometry(segments: ReadonlyArray<TraceSegment>): {
+  readonly polyline: Polyline;
+  readonly curve: CurveSubpath;
+} {
   if (segments.length === 0) {
-    return { points: [], closed: true };
+    const polyline = { points: [], closed: true };
+    return { polyline, curve: polylineToCurveSubpath(polyline) };
   }
   const points: TracedPoint[] = [];
   const first = segments[0];
-  if (first === undefined) return { points: [], closed: true };
+  if (first === undefined) {
+    const polyline = { points: [], closed: true };
+    return { polyline, curve: polylineToCurveSubpath(polyline) };
+  }
   points.push({ point: { x: first.x1, y: first.y1 }, curveSample: false });
   for (const seg of segments) {
     appendSegmentSamples(points, seg);
   }
-  return { points: cleanTracedPoints(points), closed: true };
+  const cleaned = cleanTracedPoints(points);
+  const polyline: Polyline = { points: cleaned, closed: true };
+  return {
+    polyline,
+    curve:
+      cleaned.length === points.length
+        ? segmentsToCurveSubpath(segments)
+        : polylineToCurveSubpath(polyline),
+  };
+}
+
+function segmentsToCurveSubpath(segments: ReadonlyArray<TraceSegment>): CurveSubpath {
+  const first = segments[0];
+  if (first === undefined) return { start: { x: 0, y: 0 }, segments: [], closed: true };
+  return {
+    start: { x: first.x1, y: first.y1 },
+    segments: segments.map((segment) => {
+      if (segment.type === 'L')
+        return { kind: 'line' as const, to: { x: segment.x2, y: segment.y2 } };
+      return quadraticTraceSegmentAsCubic(segment);
+    }),
+    closed: true,
+  };
+}
+
+function quadraticTraceSegmentAsCubic(segment: TraceSegmentQ): CubicPathSegment {
+  return {
+    kind: 'cubic',
+    control1: {
+      x: segment.x1 + (2 / 3) * (segment.x2 - segment.x1),
+      y: segment.y1 + (2 / 3) * (segment.y2 - segment.y1),
+    },
+    control2: {
+      x: segment.x3 + (2 / 3) * (segment.x2 - segment.x3),
+      y: segment.y3 + (2 / 3) * (segment.y2 - segment.y3),
+    },
+    to: { x: segment.x3, y: segment.y3 },
+  };
 }
 
 // Push the samples of one segment onto the running point list. Skips
@@ -413,6 +466,16 @@ export function boundsFromColoredPaths(paths: ReadonlyArray<ColoredPath>): Bound
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
   for (const path of paths) {
+    if (path.curves !== undefined) {
+      for (const curve of path.curves) {
+        const bounds = curveSubpathBounds(curve);
+        minX = Math.min(minX, bounds.minX);
+        minY = Math.min(minY, bounds.minY);
+        maxX = Math.max(maxX, bounds.maxX);
+        maxY = Math.max(maxY, bounds.maxY);
+      }
+      continue;
+    }
     for (const pl of path.polylines) {
       for (const p of pl.points) {
         if (p.x < minX) minX = p.x;

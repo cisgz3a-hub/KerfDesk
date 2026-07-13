@@ -94,9 +94,14 @@ export function flattenArc(
   }
 }
 
-type Cubic = { readonly p0: Vec2; readonly p1: Vec2; readonly p2: Vec2; readonly p3: Vec2 };
+export type Cubic = {
+  readonly p0: Vec2;
+  readonly p1: Vec2;
+  readonly p2: Vec2;
+  readonly p3: Vec2;
+};
 
-function arcToCubics(
+export function arcToCubics(
   start: Vec2,
   end: Vec2,
   rxIn: number,

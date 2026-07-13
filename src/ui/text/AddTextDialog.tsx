@@ -12,34 +12,29 @@
 // lookup; we just split on '\n' for line breaks.
 
 import { useRef, useState } from 'react';
-import {
-  DEFAULT_FONT_KEY,
-  FONT_REGISTRY,
-  type KnownFontKey,
-  textToPolylines,
-} from '../../core/text';
-import {
-  DEFAULT_TEXT_ALIGNMENT,
-  DEFAULT_TEXT_COLOR,
-  DEFAULT_TEXT_LETTER_SPACING,
-  DEFAULT_TEXT_LINE_HEIGHT,
-  DEFAULT_TEXT_SIZE_MM,
-} from '../../core/text';
+import { bendTextRender, placeTextOnPath, textToPolylines } from '../../core/text';
+import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
+import { parseVariableTemplateSource } from '../../core/variables';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { loadFont } from './font-loader';
+import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
+import { PathTextFields } from './PathTextFields';
+import { VariableTextFields } from './VariableTextFields';
 import {
-  initialTextLetterSpacing,
-  initialTextLineHeight,
-  initialTextSizeMm,
   sanitizeTextDialogNumericValues,
   TextDialogNumericFields,
   type TextDialogNumericValues,
 } from './TextDialogNumericFields';
+import {
+  useTextDialogFields,
+  type DialogFields,
+  type DialogValues,
+} from './use-text-dialog-fields';
 
 export function AddTextDialog(): JSX.Element | null {
   const state = useUiStore((s) => s.textDialog);
@@ -58,8 +53,10 @@ function DialogForm(props: {
   const { state } = props;
   const close = useUiStore((s) => s.closeTextDialog);
   const upsert = useStore((s) => s.upsertTextObject);
+  const project = useStore((s) => s.project);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
   const pushToast = useToastStore((s) => s.pushToast);
-  const fields = useTextDialogFields(state);
+  const fields = useTextDialogFields(state, project, selectedObjectId);
   const [submitting, setSubmitting] = useState(false);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -73,60 +70,17 @@ function DialogForm(props: {
       <FormFields fields={fields} />
       <FormActions
         mode={state.mode}
-        canSubmit={fields.values.content.trim() !== '' && !submitting}
+        canSubmit={
+          fields.values.content.trim() !== '' &&
+          fields.fontAvailable &&
+          fields.pathAvailable &&
+          !submitting
+        }
         submitting={submitting}
         onCancel={close}
       />
     </Dialog>
   );
-}
-
-type DialogValues = TextDialogNumericValues & {
-  content: string;
-  fontKey: string;
-  alignment: TextAlignment;
-};
-
-type DialogFields = {
-  readonly values: DialogValues;
-  readonly setContent: (v: string) => void;
-  readonly setFontKey: (v: string) => void;
-  readonly setSizeMm: (v: number) => void;
-  readonly setAlignment: (v: TextAlignment) => void;
-  readonly setLineHeight: (v: number) => void;
-  readonly setLetterSpacing: (v: number) => void;
-};
-
-function useTextDialogFields(
-  state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']>,
-): DialogFields {
-  const [content, setContent] = useState(state.mode === 'edit' ? state.content : '');
-  const [fontKey, setFontKey] = useState<string>(
-    state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY,
-  );
-  const [sizeMm, setSizeMm] = useState(
-    initialTextSizeMm(state.mode === 'edit' ? state.sizeMm : DEFAULT_TEXT_SIZE_MM),
-  );
-  const [alignment, setAlignment] = useState<TextAlignment>(
-    state.mode === 'edit' ? state.alignment : DEFAULT_TEXT_ALIGNMENT,
-  );
-  const [lineHeight, setLineHeight] = useState(
-    initialTextLineHeight(state.mode === 'edit' ? state.lineHeight : DEFAULT_TEXT_LINE_HEIGHT),
-  );
-  const [letterSpacing, setLetterSpacing] = useState(
-    initialTextLetterSpacing(
-      state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
-    ),
-  );
-  return {
-    values: { content, fontKey, sizeMm, alignment, lineHeight, letterSpacing },
-    setContent,
-    setFontKey,
-    setSizeMm,
-    setAlignment,
-    setLineHeight,
-    setLetterSpacing,
-  };
 }
 
 async function commitText(
@@ -145,12 +99,15 @@ async function commitText(
     return;
   }
   const safeValues = sanitizeTextDialogNumericValues(v);
+  const variable = fieldsVariableTemplate(v);
+  if (!variable.ok) {
+    ctx.pushToast(variable.message, 'error');
+    return;
+  }
   ctx.setSubmitting(true);
   try {
-    const knownFontKey = asKnownFontKey(v.fontKey);
-    const substitutedFont = knownFontKey !== v.fontKey;
-    const buffer = await loadFont(knownFontKey);
-    const rendered = await textToPolylines({
+    const buffer = await loadFont(v.fontKey, v.embeddedFonts);
+    const rawRendered = await textToPolylines({
       fontBuffer: buffer,
       content: normalizedContent,
       sizeMm: safeValues.sizeMm,
@@ -159,27 +116,25 @@ async function commitText(
       letterSpacing: safeValues.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
     });
+    const placed = placeRenderedText(rawRendered, safeValues, v);
     const obj: TextObject = {
       kind: 'text',
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
       content: normalizedContent,
-      fontKey: knownFontKey,
+      fontKey: v.fontKey,
       sizeMm: safeValues.sizeMm,
       alignment: v.alignment,
       lineHeight: safeValues.lineHeight,
       letterSpacing: safeValues.letterSpacing,
+      bendDeg: v.pathText === undefined ? safeValues.bendDeg : 0,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
-      bounds: rendered.bounds,
-      transform: IDENTITY_TRANSFORM,
-      paths: rendered.paths,
+      ...(v.pathText === undefined ? {} : { pathText: v.pathText }),
+      ...(variable.template === undefined ? {} : { variableTemplate: variable.template }),
+      bounds: placed.rendered.bounds,
+      transform: placed.transform,
+      paths: placed.rendered.paths,
     };
-    ctx.upsert(obj);
-    if (substitutedFont) {
-      ctx.pushToast(
-        `Missing font "${v.fontKey}" was substituted with ${fontDisplayName(knownFontKey)}.`,
-        'warning',
-      );
-    }
+    ctx.upsert(obj, v.importedFont);
     ctx.close();
   } catch (err) {
     ctx.pushToast(
@@ -200,12 +155,23 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
     setAlignment,
     setLineHeight,
     setLetterSpacing,
+    setBendDeg,
   } = props.fields;
   return (
     <>
       <ContentField value={values.content} onChange={setContent} />
+      <VariableTextFields
+        enabled={props.fields.variableEnabled}
+        onEnabledChange={props.fields.setVariableEnabled}
+        onInsert={(source) => setContent(`${values.content}${source}`)}
+      />
       <Field label="Font">
-        <FontPicker value={values.fontKey} onChange={setFontKey} />
+        <FontPicker
+          value={values.fontKey}
+          embeddedFonts={values.embeddedFonts}
+          onChange={setFontKey}
+        />
+        <FontImportButton importFont={props.fields.importFont} />
       </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
@@ -215,9 +181,57 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
         setSizeMm={setSizeMm}
         setLineHeight={setLineHeight}
         setLetterSpacing={setLetterSpacing}
+        setBendDeg={setBendDeg}
+      />
+      <PathTextFields
+        enabled={props.fields.pathEnabled}
+        guides={props.fields.guides}
+        settings={
+          values.pathText ?? {
+            guideObjectId: props.fields.guides[0]?.id ?? '',
+            offsetMm: 0,
+            reverse: false,
+          }
+        }
+        setEnabled={props.fields.setPathEnabled}
+        setGuideId={props.fields.setPathGuideId}
+        setOffsetMm={props.fields.setPathOffsetMm}
+        setReverse={props.fields.setPathReverse}
       />
     </>
   );
+}
+
+function fieldsVariableTemplate(
+  values: DialogValues,
+):
+  | { readonly ok: true; readonly template?: NonNullable<TextObject['variableTemplate']> }
+  | { readonly ok: false; readonly message: string } {
+  if (values.variableTemplate === undefined) return { ok: true };
+  return parseVariableTemplateSource(values.content);
+}
+
+function placeRenderedText(
+  rendered: Awaited<ReturnType<typeof textToPolylines>>,
+  safeValues: TextDialogNumericValues,
+  values: DialogValues,
+): {
+  readonly rendered: Awaited<ReturnType<typeof textToPolylines>>;
+  readonly transform: typeof IDENTITY_TRANSFORM;
+} {
+  if (values.pathText === undefined) {
+    return {
+      rendered: bendTextRender(rendered, safeValues.bendDeg),
+      transform: IDENTITY_TRANSFORM,
+    };
+  }
+  if (values.pathGuide === undefined) throw new Error('Select a guide path for this text.');
+  const result = placeTextOnPath(rendered, values.pathGuide, values.pathText);
+  if (result.kind !== 'ok') throw new Error(result.message);
+  return {
+    rendered: result.rendered,
+    transform: { ...IDENTITY_TRANSFORM, x: result.origin.x, y: result.origin.y },
+  };
 }
 
 function ContentField(props: {
@@ -289,19 +303,6 @@ function FormActions(props: {
       </Button>
     </DialogActions>
   );
-}
-
-// Narrow a stored fontKey string back to KnownFontKey for the
-// loader. Unknown keys fall back to the default (so .lf2 files from
-// a future build that referenced an unbundled font still render in
-// something rather than crash).
-function asKnownFontKey(key: string): KnownFontKey {
-  if (FONT_REGISTRY.some((f) => f.key === key)) return key as KnownFontKey;
-  return DEFAULT_FONT_KEY;
-}
-
-function fontDisplayName(key: KnownFontKey): string {
-  return FONT_REGISTRY.find((f) => f.key === key)?.displayName ?? key;
 }
 
 function normalizeTextContent(text: string): string {

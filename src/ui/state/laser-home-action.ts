@@ -52,6 +52,7 @@ export async function runHomeAction(
   set((state) => ({
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     wcoCache: null,
     workOriginActive:
       state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',
@@ -102,9 +103,10 @@ export async function runHomeAction(
         ? {
             controllerOperation: null,
             homingState: 'confirmed',
+            alarmCode: null,
             log: pushLog(state, '[lf2] Homing confirmed after fresh Idle.'),
           }
-        : { homingState: 'confirmed' },
+        : { homingState: 'confirmed', alarmCode: null },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -15,6 +15,7 @@ describe('createPolyline', () => {
     expect(shape.bounds).toEqual({ minX: 2, minY: 3, maxX: 12, maxY: 9 });
     expect(shape.paths[0]?.color).toBe('#ff0000');
     expect(shape.paths[0]?.polylines[0]?.closed).toBe(false);
+    expect(shape.paths[0]?.curves?.[0]?.segments).toHaveLength(2);
   });
 
   it('carries the closed flag into the materialized path', () => {
@@ -41,5 +42,6 @@ describe('createPolyline', () => {
     });
     expect(shape.bounds).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
     expect(shape.paths[0]?.polylines).toEqual([]);
+    expect(shape.paths[0]?.curves).toEqual([]);
   });
 });

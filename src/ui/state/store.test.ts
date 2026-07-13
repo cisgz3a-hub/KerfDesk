@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createProject,
   IDENTITY_TRANSFORM,
+  PROJECT_SCHEMA_VERSION,
   type ImportedSvg,
   type RasterImage,
 } from '../../core/scene';
@@ -36,7 +37,7 @@ describe('useStore', () => {
 
   it('starts with a default-shaped Project and no selection', () => {
     const s = useStore.getState();
-    expect(s.project.schemaVersion).toBe(1);
+    expect(s.project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(s.project.scene.objects).toHaveLength(0);
     expect(s.project.scene.layers).toHaveLength(0);
     expect(s.selectedObjectId).toBeNull();

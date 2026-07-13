@@ -5,6 +5,42 @@ import { countPolylineSegments } from './draw-complexity';
 import { createDisplayPolylineCache } from './display-polylines';
 
 describe('display polyline cache', () => {
+  it('retessellates canonical curves as screen tolerance tightens and caches the zoom result', () => {
+    const cache = createDisplayPolylineCache();
+    const path = {
+      color: '#000000',
+      polylines: [
+        {
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+          ],
+          closed: false,
+        },
+      ],
+      curves: [
+        {
+          start: { x: 0, y: 0 },
+          segments: [
+            {
+              kind: 'cubic' as const,
+              control1: { x: 0, y: 100 },
+              control2: { x: 100, y: 100 },
+              to: { x: 100, y: 0 },
+            },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const coarse = cache.getPath(path, 1);
+    const fine = cache.getPath(path, 0.01);
+    const repeated = cache.getPath(path, 0.01);
+
+    expect(fine.segmentCount).toBeGreaterThan(coarse.segmentCount);
+    expect(repeated).toBe(fine);
+  });
+
   it('builds a bounded display copy without reading every source point', () => {
     const cache = createDisplayPolylineCache();
     const pointCount = 30_001;

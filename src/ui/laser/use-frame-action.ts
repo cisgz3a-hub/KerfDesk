@@ -11,11 +11,13 @@ import {
   offsetJobBounds,
   type JobBounds,
 } from '../../core/job';
-import { prepareOutput } from '../../io/gcode';
+import { prepareOutputSnapshot, type PreparedOutput } from '../../io/gcode';
 import { resolveJobPlacement, trustedMotionOffsetForPreflight } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { renderVariableText } from '../text/render-variable-text';
+import { currentPrintCutOutputRegistration } from './print-cut-output';
 
 export function useFrameAction(): () => void {
   const frame = useLaserStore((s) => s.frame);
@@ -24,54 +26,73 @@ export function useFrameAction(): () => void {
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
-    // Click-only consumer: read project/placement at call time instead of
-    // subscribing; a render-per-mousemove for a button handler would be noisy.
-    const app = useStore.getState();
-    const { project, jobPlacement } = app;
-    const outputScope = currentOutputScope(app);
-    const placement = resolveJobPlacement(jobPlacement, {
-      statusReport,
-      workOriginActive,
-      wcoCache,
-    });
-    if (!placement.ok) {
-      pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
-      return;
-    }
-    const frameScene = filterSceneForOutputScope(project.scene, outputScope);
-    const frameBounds = computeFrameBounds(
-      frameScene,
-      project.device,
-      placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
-    );
-    const prepared = prepareOutput(project, {
-      ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-      outputScope,
-    });
-    if (!prepared.ok) {
-      const fallbackBounds = rasterBudgetFallbackBounds(prepared.preflight, frameBounds);
-      if (fallbackBounds !== null) {
-        dispatchFrameIfSafe(frame, pushToast, fallbackBounds, fallbackBounds, placement, project);
-        return;
-      }
-      pushToast(
-        prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
-        'error',
-      );
-      return;
-    }
-    const bounds = computeJobBounds(prepared.job, project.device);
-    if (bounds === null) {
-      pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
-      return;
-    }
-    const motionBounds = computeJobMotionBounds(prepared.job, project.device) ?? bounds;
-    dispatchFrameIfSafe(frame, pushToast, bounds, motionBounds, placement, project);
+    void runFrameAction({ frame, statusReport, workOriginActive, wcoCache, pushToast });
   };
 }
 
+async function runFrameAction({
+  frame,
+  statusReport,
+  workOriginActive,
+  wcoCache,
+  pushToast,
+}: Pick<
+  ReturnType<typeof useLaserStore.getState>,
+  'frame' | 'statusReport' | 'workOriginActive' | 'wcoCache'
+> & {
+  readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
+}): Promise<void> {
+  // Click-only consumer: read project/placement at call time instead of
+  // subscribing; a render-per-mousemove for a button handler would be noisy.
+  const app = useStore.getState();
+  const { project, jobPlacement } = app;
+  const outputScope = currentOutputScope(app);
+  const placement = resolveJobPlacement(jobPlacement, {
+    statusReport,
+    workOriginActive,
+    wcoCache,
+  });
+  if (!placement.ok) {
+    pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
+    return;
+  }
+  const frameScene = filterSceneForOutputScope(project.scene, outputScope);
+  const frameBounds = computeFrameBounds(
+    frameScene,
+    project.device,
+    placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
+  );
+  const registration = currentPrintCutOutputRegistration(project);
+  const prepared = await prepareOutputSnapshot(project, {
+    clock: () => new Date(),
+    renderVariableText,
+    ...(registration === undefined ? {} : { registration }),
+    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+    outputScope,
+  });
+  if (!prepared.ok) {
+    const fallbackBounds = rasterBudgetFallbackBounds(prepared.preflight, frameBounds);
+    if (fallbackBounds !== null) {
+      dispatchFrameIfSafe(frame, pushToast, fallbackBounds, fallbackBounds, placement, project);
+      return;
+    }
+    pushToast(
+      prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
+      'error',
+    );
+    return;
+  }
+  const bounds = computeJobBounds(prepared.job, project.device);
+  if (bounds === null) {
+    pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
+    return;
+  }
+  const motionBounds = computeJobMotionBounds(prepared.job, project.device) ?? bounds;
+  dispatchFrameIfSafe(frame, pushToast, bounds, motionBounds, placement, project);
+}
+
 function rasterBudgetFallbackBounds(
-  preflight: Extract<ReturnType<typeof prepareOutput>, { readonly ok: false }>['preflight'],
+  preflight: Extract<PreparedOutput, { readonly ok: false }>['preflight'],
   frameBounds: JobBounds | null,
 ): JobBounds | null {
   const rasterOnly =

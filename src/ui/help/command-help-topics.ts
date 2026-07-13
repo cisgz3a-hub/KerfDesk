@@ -149,6 +149,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Configure and calibrate a roller or chuck rotary attachment.',
   },
+  'tools.print-and-cut': {
+    family: 'tools',
+    tooltip: 'Register printed artwork to two measured machine points before cutting.',
+  },
   'tools.labs': {
     family: 'tools',
     tooltip: 'Enable experimental machine workflows that are still being hardware-validated.',
@@ -269,6 +273,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'arrange.break-apart': {
     family: 'arrange',
     tooltip: 'Split selected imported SVG paths into separate selectable objects.',
+  },
+  'arrange.array': {
+    family: 'arrange',
+    tooltip: 'Create a bounded grid or circular array from the selected artwork.',
+  },
+  'arrange.quick-nest': {
+    family: 'arrange',
+    tooltip: 'Pack selected groups and objects deterministically without overlap.',
   },
   'arrange.flip-horizontal': {
     family: 'arrange',

@@ -60,7 +60,10 @@ describe('deserializeProject', () => {
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
+      expect(result.project.scene.objects[0]).toMatchObject({
+        paths: [{ curves: [{ segments: [{ kind: 'line' }] }] }],
+      });
     }
   });
 
@@ -77,7 +80,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -94,7 +97,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -107,7 +110,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -133,7 +136,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 

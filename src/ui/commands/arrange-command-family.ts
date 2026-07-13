@@ -24,10 +24,42 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
   return [
     ...align,
     ...distribute,
+    arrayCommand(ctx),
+    quickNestCommand(ctx),
     breakApartCommand(ctx),
     flipHorizontalCommand(ctx),
     flipVerticalCommand(ctx),
   ];
+}
+
+function quickNestCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasSelection
+    ? enabled(
+        'arrange.quick-nest',
+        'arrange',
+        'Quick Nest...',
+        'Pack selected artwork without overlap',
+        ctx.quickNest,
+      )
+    : disabled(
+        'arrange.quick-nest',
+        'arrange',
+        'Quick Nest...',
+        'Select artwork to nest.',
+        ctx.quickNest,
+      );
+}
+
+function arrayCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasSelection
+    ? enabled(
+        'arrange.array',
+        'arrange',
+        'Array...',
+        'Create a grid or circular array',
+        ctx.createArray,
+      )
+    : disabled('arrange.array', 'arrange', 'Array...', 'Select artwork to array.', ctx.createArray);
 }
 
 function breakApartCommand(ctx: AppCommandContext): AppCommand {

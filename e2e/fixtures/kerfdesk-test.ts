@@ -3,11 +3,21 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export type FixtureEvent = Readonly<Record<string, unknown>> & { readonly kind: string };
+export interface OpenFileFixture {
+  readonly name: string;
+  readonly text?: string;
+  readonly kind?: 'text' | 'png-fixture';
+  readonly width?: number;
+  readonly height?: number;
+}
 
 export interface KerfDeskFixture {
   readonly events: () => Promise<readonly FixtureEvent[]>;
   readonly savedFiles: () => Promise<Readonly<Record<string, string>>>;
   readonly emitSerialLine: (line: string) => Promise<void>;
+  readonly acknowledgeSerial: (count: number) => Promise<void>;
+  readonly setAutoAcknowledge: (enabled: boolean) => Promise<void>;
+  readonly setOpenFiles: (files: readonly OpenFileFixture[]) => Promise<void>;
 }
 
 const browserFixturePath = fileURLToPath(new URL('./browser-apis.js', import.meta.url));
@@ -61,6 +71,32 @@ function createFixtureControl(page: Page, pageErrors: readonly Error[]): KerfDes
           }
         ).__KERFDESK_E2E__.emitSerialLine(value);
       }, line),
+    acknowledgeSerial: (count) =>
+      page.evaluate((value) => {
+        (
+          window as typeof window & {
+            __KERFDESK_E2E__: { acknowledgeSerial: (count: number) => void };
+          }
+        ).__KERFDESK_E2E__.acknowledgeSerial(value);
+      }, count),
+    setAutoAcknowledge: (enabled) =>
+      page.evaluate((value) => {
+        (
+          window as typeof window & {
+            __KERFDESK_E2E__: { setAutoAcknowledge: (enabled: boolean) => void };
+          }
+        ).__KERFDESK_E2E__.setAutoAcknowledge(value);
+      }, enabled),
+    setOpenFiles: (files) =>
+      page.evaluate((value) => {
+        (
+          window as typeof window & {
+            __KERFDESK_E2E__: {
+              setOpenFiles: (files: readonly OpenFileFixture[]) => void;
+            };
+          }
+        ).__KERFDESK_E2E__.setOpenFiles(value);
+      }, files),
   };
 }
 

@@ -28,6 +28,7 @@ import {
 import { localContrastCrackField, localContrastInkBitmap } from './local-contrast-mask';
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
+import { withCanonicalTraceCurves } from './trace-curves';
 
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
@@ -95,7 +96,7 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
   );
   const minimumLength = Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX) * scale;
   const polylines = filterEdgePolylinesByLength(finished, minimumLength);
-  return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];
+  return polylines.length === 0 ? [] : withCanonicalTraceCurves([{ color: EDGE_COLOR, polylines }]);
 }
 
 export function filterEdgePolylinesByLength(

@@ -34,7 +34,18 @@
 // statically; the runtime arrives via `await loadOpentype()`.
 
 import type * as opentype from 'opentype.js';
-import type { Bounds, ColoredPath, Polyline, Vec2 } from '../scene';
+import {
+  curveSubpathBounds,
+  type Bounds,
+  type ColoredPath,
+  type CurveSubpath,
+  type Polyline,
+} from '../scene';
+import {
+  textOutlineGeometry,
+  translateTextOutline,
+  type TextOutlineGeometry,
+} from './text-outline-path';
 
 // Module surface we actually use. Lets the loader narrow the dynamic-
 // import result to something callable without a sprawling cast.
@@ -60,11 +71,8 @@ async function loadOpentype(): Promise<OpentypeModule> {
   return opentypePromise;
 }
 
-// Sampling resolution for curves. 12 segments per cubic / quad keeps
-// glyphs smooth at typical sizes (10-40 mm). Same default as the SVG
-// importer's flatten-curves module so the visual style is consistent.
-const CURVE_SAMPLES = 12;
-
+// The outline converter preserves native curves and also emits the legacy
+// sampled view used by subsystems that have not migrated to curve geometry.
 export type TextRenderInput = {
   readonly fontBuffer: ArrayBuffer;
   readonly content: string;
@@ -99,54 +107,58 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
   );
   const maxWidth = lineWidths.reduce((m, w) => (w > m ? w : m), 0);
   const raw: Polyline[] = [];
+  const rawCurves: CurveSubpath[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] ?? '';
     const lineWidth = lineWidths[i] ?? 0;
     const xOffset = alignOffset(input.alignment, lineWidth, maxWidth);
     const yBaseline = i * lineSpacingMm;
-    pushLinePolylines(font, line, input.sizeMm, xOffset, yBaseline, letterSpacing, raw);
+    const geometry = lineGeometry(font, line, input.sizeMm, xOffset, yBaseline, letterSpacing);
+    raw.push(...geometry.polylines);
+    rawCurves.push(...geometry.curves);
   }
   // Normalize: translate so the natural bounds are (0, 0)-rooted,
   // matching ImportedSvg's viewBox convention. fit-to-bed, hit-test,
   // and the workspace renderer all treat object-local bounds as
   // starting at top-left; text needs to behave the same.
-  const { polylines, bounds } = normalizeToOrigin(raw);
+  const { polylines, curves, bounds } = normalizeToOrigin(raw, rawCurves);
   return {
-    paths: [{ color: input.color, polylines }],
+    paths: [{ color: input.color, polylines, curves }],
     bounds,
   };
 }
 
-function normalizeToOrigin(polylines: ReadonlyArray<Polyline>): {
+function normalizeToOrigin(
+  polylines: ReadonlyArray<Polyline>,
+  curves: ReadonlyArray<CurveSubpath>,
+): {
   readonly polylines: ReadonlyArray<Polyline>;
+  readonly curves: ReadonlyArray<CurveSubpath>;
   readonly bounds: Bounds;
 } {
   if (polylines.length === 0) {
-    return { polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+    return { polylines: [], curves: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
   }
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const pl of polylines) {
-    for (const p of pl.points) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
+  for (const curve of curves) {
+    const curveBounds = curveSubpathBounds(curve);
+    minX = Math.min(minX, curveBounds.minX);
+    minY = Math.min(minY, curveBounds.minY);
+    maxX = Math.max(maxX, curveBounds.maxX);
+    maxY = Math.max(maxY, curveBounds.maxY);
   }
   if (!Number.isFinite(minX)) {
-    return { polylines: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+    return { polylines: [], curves: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
   }
   const dx = -minX;
   const dy = -minY;
-  const shifted: Polyline[] = polylines.map((pl) => ({
-    points: pl.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
-    closed: pl.closed,
-  }));
+  const shifted = translateTextOutline({ polylines, curves }, dx, dy);
   return {
-    polylines: shifted,
+    polylines: shifted.polylines,
+    curves: shifted.curves,
     bounds: { minX: 0, minY: 0, maxX: maxX - minX, maxY: maxY - minY },
   };
 }
@@ -172,15 +184,14 @@ function alignOffset(
   }
 }
 
-function pushLinePolylines(
+function lineGeometry(
   font: opentype.Font,
   line: string,
   sizeMm: number,
   xOffset: number,
   yBaseline: number,
   letterSpacing: number,
-  out: Polyline[],
-): void {
+): TextOutlineGeometry {
   // opentype's getPath returns SVG-like commands in mm-equivalent
   // units when we pass sizeMm directly. The baseline sits at y = 0
   // by convention; we translate to (xOffset, yBaseline). The
@@ -200,104 +211,5 @@ function pushLinePolylines(
     letterSpacing,
     features: { liga: true, rlig: true },
   });
-  flattenPath(path.commands, out);
-}
-
-// Flatten opentype path commands to polylines. Commands are M / L / C
-// (cubic) / Q (quadratic) / Z (close). One polyline per Move..Close
-// or per disjoint segment. De Casteljau sampling for curves — same
-// approach as src/io/svg/flatten-curves.ts (kept self-contained here
-// rather than reaching across module boundaries).
-//
-// **opentype.js v2 quirk:** the v2 PathCommand stream omits explicit `Z`
-// commands for closed glyph contours — closure is encoded as a final
-// `L` back to the contour's start point instead. Without compensating,
-// every text polyline came out closed=false, which made fillHatching
-// reject them all (it needs closed contours for the even-odd rule).
-// User-visible symptom: typing a letter "O", switching the layer to
-// Fill mode, and clicking Frame produced "Nothing to frame — enable
-// Output on at least one layer." We now detect closure geometrically
-// — if the last point of a subpath equals its start within float
-// epsilon, treat it as closed even when no Z arrived.
-const CLOSURE_EPS_MM = 1e-4;
-function flattenPath(commands: ReadonlyArray<opentype.PathCommand>, out: Polyline[]): void {
-  let current: Vec2[] = [];
-  let startPoint: Vec2 | null = null;
-  const finish = (closedByZ: boolean): void => {
-    if (current.length >= 2) {
-      const first = current[0];
-      const last = current[current.length - 1];
-      const isGeomClosed =
-        first !== undefined &&
-        last !== undefined &&
-        Math.abs(first.x - last.x) < CLOSURE_EPS_MM &&
-        Math.abs(first.y - last.y) < CLOSURE_EPS_MM;
-      out.push({ points: current, closed: closedByZ || isGeomClosed });
-    }
-    current = [];
-  };
-  for (const cmd of commands) {
-    switch (cmd.type) {
-      case 'M':
-        finish(false);
-        current = [{ x: cmd.x, y: cmd.y }];
-        startPoint = { x: cmd.x, y: cmd.y };
-        break;
-      case 'L':
-        current.push({ x: cmd.x, y: cmd.y });
-        break;
-      case 'C':
-        sampleCubic(current, cmd, CURVE_SAMPLES);
-        break;
-      case 'Q':
-        sampleQuadratic(current, cmd, CURVE_SAMPLES);
-        break;
-      case 'Z':
-        if (startPoint !== null) current.push({ x: startPoint.x, y: startPoint.y });
-        finish(true);
-        startPoint = null;
-        break;
-    }
-  }
-  finish(false);
-}
-
-function sampleCubic(
-  current: Vec2[],
-  cmd: { x1: number; y1: number; x2: number; y2: number; x: number; y: number },
-  steps: number,
-): void {
-  const start = current[current.length - 1];
-  if (start === undefined) return;
-  for (let i = 1; i <= steps; i += 1) {
-    const t = i / steps;
-    const x = bezierCubic(start.x, cmd.x1, cmd.x2, cmd.x, t);
-    const y = bezierCubic(start.y, cmd.y1, cmd.y2, cmd.y, t);
-    current.push({ x, y });
-  }
-}
-
-function sampleQuadratic(
-  current: Vec2[],
-  cmd: { x1: number; y1: number; x: number; y: number },
-  steps: number,
-): void {
-  const start = current[current.length - 1];
-  if (start === undefined) return;
-  for (let i = 1; i <= steps; i += 1) {
-    const t = i / steps;
-    const x = bezierQuadratic(start.x, cmd.x1, cmd.x, t);
-    const y = bezierQuadratic(start.y, cmd.y1, cmd.y, t);
-    current.push({ x, y });
-  }
-}
-
-function bezierCubic(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  const u = 1 - t;
-  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
-}
-
-function bezierQuadratic(p0: number, p1: number, p2: number, t: number): number {
-  const u = 1 - t;
-  return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+  return textOutlineGeometry(path.commands);
 }

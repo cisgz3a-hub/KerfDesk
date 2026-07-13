@@ -96,6 +96,46 @@ describe('transformedBBox', () => {
 });
 
 describe('hitTest', () => {
+  it('selects the canonical curve rather than its compatibility chord', () => {
+    const color = '#ff0000';
+    const curve: SceneObject = {
+      kind: 'imported-svg',
+      id: 'curve',
+      source: 'curve.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 7.5 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color,
+          polylines: [
+            {
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+              ],
+              closed: false,
+            },
+          ],
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              segments: [
+                {
+                  kind: 'cubic',
+                  control1: { x: 0, y: 10 },
+                  control2: { x: 10, y: 10 },
+                  to: { x: 10, y: 0 },
+                },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    expect(hitTest(withObjects(curve), { x: 5, y: 7.5 })).toBe('curve');
+  });
+
   it('returns null for an empty scene', () => {
     expect(hitTest(EMPTY_SCENE, { x: 5, y: 5 })).toBeNull();
   });

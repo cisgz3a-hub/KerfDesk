@@ -11,6 +11,7 @@
 // I/O.
 
 import { evaluateRasterBudget, pixelExtentForMm } from '../raster';
+import { scenePreparationTooComplex } from '../job/preparation-complexity';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
 import { outputOperationLayers, registrationOutputConflict } from '../scene';
@@ -18,6 +19,13 @@ import type { PreflightIssue, PreflightResult } from './preflight';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
   const issues: PreflightIssue[] = [];
+  if (scenePreparationTooComplex(project.scene)) {
+    issues.push({
+      code: 'vector-segment-budget-exceeded',
+      message:
+        'This design exceeds the safe curve or fill segment budget. Simplify the artwork or split it into smaller jobs.',
+    });
+  }
   if (registrationOutputConflict(project.scene)) {
     issues.push({
       code: 'registration-both-output',
@@ -25,7 +33,7 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
         'Registration jig: the box and your artwork are both set to burn. In the Registration Jig panel pick "Burn Box Only" or "Burn Artwork Only" so they do not burn in the same pass.',
     });
   }
-  for (const obj of project.scene.objects) {
+  for (const obj of project.machine?.kind === 'cnc' ? [] : project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
     const layers = project.scene.layers
       .flatMap((l) => outputOperationLayers(l))

@@ -5,7 +5,15 @@
 // an editable action.
 
 import { create } from 'zustand';
-import type { Bounds, RasterImage, SelectionAnchor, ShapeObject, Vec2 } from '../../core/scene';
+import type {
+  Bounds,
+  PathTextSettings,
+  RasterImage,
+  SelectionAnchor,
+  ShapeObject,
+  VariableTemplate,
+  Vec2,
+} from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 import type { MeasureDraft } from '../workspace/measure-tool';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
@@ -48,6 +56,9 @@ export type TextDialogState =
       readonly alignment: TextAlignment;
       readonly lineHeight: number;
       readonly letterSpacing: number;
+      readonly bendDeg?: number;
+      readonly pathText?: PathTextSettings;
+      readonly variableTemplate?: VariableTemplate;
       readonly color: string;
     };
 

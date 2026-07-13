@@ -116,6 +116,7 @@ export type LaserState = {
   // refill can overflow the real 128-byte buffer mid-burn.
   readonly pendingUntrackedAcks: number;
   readonly homingState: HomingState;
+  readonly trustedPositionEpoch?: number;
   readonly log: ReadonlyArray<string>;
   readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null

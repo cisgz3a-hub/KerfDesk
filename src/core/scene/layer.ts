@@ -43,6 +43,12 @@ export type LayerOperationSettings = {
   readonly dotWidthCorrectionMm: number;
 };
 
+export type LinkedMaterialBinding = {
+  readonly libraryId: string;
+  readonly presetId: string;
+  readonly lastResolved: LayerOperationSettings;
+};
+
 export type LayerSubLayer = {
   readonly id: string;
   readonly label: string;
@@ -56,6 +62,7 @@ export type Layer = LayerOperationSettings & {
   readonly visible: boolean;
   readonly output: boolean;
   readonly subLayers: ReadonlyArray<LayerSubLayer>;
+  readonly materialBinding?: LinkedMaterialBinding;
   // CNC operation for this layer, used only when the project machine is
   // 'cnc'. Laser fields above are ignored in CNC mode and vice versa, so a
   // project can switch machine kinds without losing either setup.

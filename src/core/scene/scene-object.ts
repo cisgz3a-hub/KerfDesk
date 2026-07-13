@@ -4,6 +4,8 @@
 // this module's switch arms. `assertNever` enforces exhaustiveness at compile
 // time so the missing arm is the only compile error when a new variant lands.
 
+import type { VariableTemplate } from './variable-template';
+
 export type Vec2 = { readonly x: number; readonly y: number };
 
 export type Polyline = {
@@ -11,10 +13,44 @@ export type Polyline = {
   readonly closed: boolean;
 };
 
+export type LinePathSegment = {
+  readonly kind: 'line';
+  readonly to: Vec2;
+};
+
+export type CubicPathSegment = {
+  readonly kind: 'cubic';
+  readonly control1: Vec2;
+  readonly control2: Vec2;
+  readonly to: Vec2;
+};
+
+export type EllipticalArcPathSegment = {
+  readonly kind: 'elliptical-arc';
+  readonly radiusX: number;
+  readonly radiusY: number;
+  readonly rotationDeg: number;
+  readonly largeArc: boolean;
+  readonly sweep: boolean;
+  readonly to: Vec2;
+};
+
+export type PathSegment = LinePathSegment | CubicPathSegment | EllipticalArcPathSegment;
+
+export type CurveSubpath = {
+  readonly start: Vec2;
+  readonly segments: ReadonlyArray<PathSegment>;
+  readonly closed: boolean;
+};
+
 export type ColoredPath = {
   // Lowercase 6-digit hex color, e.g. '#ff0000'. Layers are keyed by this value.
   readonly color: string;
   readonly polylines: ReadonlyArray<Polyline>;
+  // Schema-v2 canonical geometry. `polylines` remains a deterministic
+  // compatibility view while preview and compilation migrate subsystem by
+  // subsystem; serializers always materialize this field for saved projects.
+  readonly curves?: ReadonlyArray<CurveSubpath>;
 };
 
 export type Transform = {
@@ -103,10 +139,17 @@ export type TextAlignment = 'left' | 'center' | 'right';
 // fonts are bundled (so adding a font doesn't ripple here).
 export type FontKey = string;
 
+export type PathTextSettings = {
+  readonly guideObjectId: string;
+  readonly offsetMm: number;
+  readonly reverse: boolean;
+};
+
 export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
   readonly content: string;
+  readonly variableTemplate?: VariableTemplate;
   readonly fontKey: FontKey;
   readonly sizeMm: number;
   readonly alignment: TextAlignment;
@@ -115,6 +158,8 @@ export type TextObject = ObjectPowerScale & {
   // natural spacing. Positive = wider, negative = tighter. opentype.js
   // applies this as an extra advance after each glyph. Phase D.1 add.
   readonly letterSpacing: number;
+  readonly bendDeg?: number;
+  readonly pathText?: PathTextSettings;
   readonly color: string; // hex; default black
   readonly bounds: Bounds; // computed at edit time from `paths`
   readonly transform: Transform;

@@ -62,6 +62,57 @@ describe('drawScene path node handles', () => {
       fillRectStyles.filter((style) => style === canvasTheme.pathNodeHandleActiveFill),
     ).toHaveLength(2);
   });
+
+  it('draws canonical anchors and controls for a selected cubic node', () => {
+    const { ctx, fillRectStyles, strokeRectStyles } = recordingContext();
+    const project = vectorProject();
+    const object = project.scene.objects[0] as ImportedSvg;
+    const curved: ImportedSvg = {
+      ...object,
+      paths: [
+        {
+          ...object.paths[0]!,
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              segments: [
+                {
+                  kind: 'cubic',
+                  control1: { x: 5, y: 10 },
+                  control2: { x: 15, y: 10 },
+                  to: { x: 20, y: 0 },
+                },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    drawScene(
+      ctx,
+      800,
+      600,
+      { ...project, scene: { ...project.scene, objects: [curved] } },
+      {
+        selectedId: 'logo',
+        showPathNodeHandles: true,
+        selectedPathNode: {
+          objectId: 'logo',
+          pathIndex: 0,
+          polylineIndex: 0,
+          pointIndex: 0,
+          geometry: 'curve',
+        },
+        preview: false,
+        view: { zoomFactor: 1, panX: 0, panY: 0 },
+      },
+    );
+    expect(fillRectStyles).toContain(canvasTheme.pathNodeHandleActiveFill);
+    expect(
+      strokeRectStyles.filter((style) => style === canvasTheme.pathNodeHandleStroke).length,
+    ).toBeGreaterThanOrEqual(2);
+  });
 });
 
 function recordingContext(): {

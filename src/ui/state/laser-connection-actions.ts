@@ -51,16 +51,17 @@ export function connectionActions(
     connect: async (adapter, options = {}) => {
       refs.nextTranscriptId = 1;
       refs.driver = selectControllerDriver(options.controllerKind);
-      set({
+      set((state) => ({
         connection: { kind: 'connecting' },
         controllerOperation: null,
         log: [],
         transcript: [],
         homingState: 'unknown',
+        trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
         capabilities: refs.driver.capabilities,
         activeControllerKind: refs.driver.kind,
         detectedControllerKind: null,
-      });
+      }));
       try {
         // Inside the try: requestPort throws on browsers without Web Serial
         // (TypeError) and on Chromium policy/concurrency errors. Thrown
@@ -129,7 +130,7 @@ async function runDisconnect(
   }
   teardown(refs);
   if (conn !== null) await conn.close().catch(() => undefined);
-  set({
+  set((state) => ({
     connection: { kind: 'disconnected' },
     statusReport: null,
     controllerSettings: null,
@@ -146,9 +147,10 @@ async function runDisconnect(
     motionOperation: null,
     controllerOperation: null,
     homingState: 'unknown',
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     lastWriteError: null,
     pendingUntrackedAcks: 0,
-  });
+  }));
 }
 
 // Wait up to 2 s after connect for ANY controller line; when one arrives,

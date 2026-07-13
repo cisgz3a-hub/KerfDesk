@@ -6,9 +6,14 @@ import {
 } from '../../core/devices';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
+import { validateCurveSubpaths } from './project-curve-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
 import { validateOptimization } from './project-optimization-validator';
+import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
+import { validatePrintAndCutTargets } from './project-print-and-cut-validator';
+import { validatePathText } from './project-path-text-validator';
+import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import {
   firstError,
@@ -34,13 +39,8 @@ import {
   valueAtPath,
 } from './project-shape-primitives';
 
-// Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
-// deserialize. Distinct from the TARGET burn-grid budget (core/raster
-// MAX_RASTER_PIXELS): compile-job allocates the source luma buffer as
-// pixelWidth*pixelHeight (decodeBase64Luma / whiteLuma) BEFORE that budget runs,
-// so a hand-edited .lf2 with absurd dims (e.g. 2^30 x 1) could allocate
-// gigabytes here first. 256M px is far above any real import (2048-edge cap) or
-// Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
+// Bound source allocation before the target burn-grid budget runs. 256M pixels
+// remains far above real imports while blocking hand-edited allocation bombs.
 const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 
@@ -58,6 +58,9 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateDevice(device),
     validateWorkspace(workspace),
     validateOptimization(raw['optimization']),
+    validateProjectVariables(raw['variables']),
+    validatePrintAndCutTargets(raw['printAndCutTargets']),
+    validateEmbeddedFonts(raw['embeddedFonts']),
     optionalString(raw, 'notes'),
     validateScene(scene),
   ]);
@@ -70,7 +73,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     requirePositiveNumber(device, 'device.bedHeight'),
     requirePositiveNumber(device, 'device.maxFeed'),
     requirePositiveNumber(device, 'device.maxPowerS'),
-    requireOrigin(device, 'device.origin'),
+    requireLiteral(device, 'device.origin', ORIGINS),
     validateHoming(device['homing']),
     requireString(device, 'device.autofocusCommand'),
     optionalLiteral(device, 'device.airAssistCommand', ['none', 'M7', 'M8']),
@@ -99,7 +102,7 @@ function validateHoming(value: unknown): string | null {
   if (!isObject(value)) return 'missing or invalid `device.homing`';
   return firstError([
     requireBoolean(value, 'device.homing.enabled'),
-    requireOrigin(value, 'device.homing.direction'),
+    requireLiteral(value, 'device.homing.direction', ORIGINS),
   ]);
 }
 
@@ -232,6 +235,9 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     optionalNumber(obj, `${path}.letterSpacing`),
+    optionalNumber(obj, `${path}.bendDeg`),
+    validatePathText(obj['pathText'], `${path}.pathText`),
+    validateVariableTemplate(obj['variableTemplate'], `${path}.variableTemplate`),
     requireString(obj, `${path}.color`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
@@ -252,7 +258,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     requireString(obj, `${path}.color`),
-    requireDither(obj, `${path}.dither`),
+    requireLiteral(obj, `${path}.dither`, DITHER_ALGORITHMS),
     requirePositiveNumber(obj, `${path}.linesPerMm`),
     optionalNumber(obj, `${path}.brightness`),
     optionalNumber(obj, `${path}.contrast`),
@@ -388,6 +394,7 @@ function validateColoredPath(value: unknown, path: string): string | null {
   return firstError([
     requireString(value, `${path}.color`),
     validatePolylines(value['polylines'], `${path}.polylines`),
+    validateCurveSubpaths(value['curves'], `${path}.curves`),
   ]);
 }
 
@@ -431,12 +438,4 @@ function optionalGrblRxBufferBytes(obj: Record<string, unknown>, path: string): 
   return value === undefined || isGrblRxBufferBytes(value)
     ? null
     : `missing or invalid \`${path}\``;
-}
-
-function requireDither(obj: Record<string, unknown>, path: string): string | null {
-  return requireLiteral(obj, path, DITHER_ALGORITHMS);
-}
-
-function requireOrigin(obj: Record<string, unknown>, path: string): string | null {
-  return requireLiteral(obj, path, ORIGINS);
 }

@@ -97,6 +97,7 @@ describe('laser controller lifecycle operations', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({
+      alarmCode: 3,
       workOriginActive: true,
       wcoCache: { x: 12, y: 34, z: 0 },
       frameVerification: {
@@ -140,6 +141,7 @@ describe('laser controller lifecycle operations', () => {
 
     expect(controllerOperation()).toBeNull();
     expect(useLaserStore.getState().homingState).toBe('confirmed');
+    expect(useLaserStore.getState().alarmCode).toBeNull();
   });
 
   it('keeps a completed job locked until the internal settle marker and stable Idle finish', async () => {

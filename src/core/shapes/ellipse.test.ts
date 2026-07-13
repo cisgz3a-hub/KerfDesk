@@ -42,5 +42,9 @@ describe('createEllipse', () => {
     expect(shape.bounds).toEqual({ minX: 0, minY: 0, maxX: 80, maxY: 40 });
     expect(shape.paths[0]?.color).toBe('#00ff00');
     expect(shape.paths[0]?.polylines[0]?.closed).toBe(true);
+    expect(shape.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
+    expect(shape.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'cubic')).toBe(
+      true,
+    );
   });
 });

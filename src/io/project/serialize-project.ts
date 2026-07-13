@@ -5,8 +5,28 @@
 // constructors use consistent literal-shape orderings, so output is
 // byte-deterministic given a byte-deterministic Project.
 
-import type { Project } from '../../core/scene';
+import { polylineToCurveSubpath, type Project } from '../../core/scene';
 
 export function serializeProject(project: Project): string {
-  return `${JSON.stringify(project, null, 2)}\n`;
+  return `${JSON.stringify(withCurveGeometry(project), null, 2)}\n`;
+}
+
+function withCurveGeometry(project: Project): Project {
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      objects: project.scene.objects.map((object) =>
+        'paths' in object
+          ? {
+              ...object,
+              paths: object.paths.map((path) => ({
+                ...path,
+                curves: path.curves ?? path.polylines.map(polylineToCurveSubpath),
+              })),
+            }
+          : object,
+      ),
+    },
+  };
 }

@@ -24,6 +24,7 @@ import {
   type GcodeMetadata,
 } from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
+import type { PreparedOutput } from './prepare-output';
 
 export type EmitGcodeResult = {
   readonly gcode: string;
@@ -52,6 +53,13 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
     ...(options.jobOrigin ? { jobOrigin: options.jobOrigin } : {}),
     ...(options.outputScope ? { outputScope: options.outputScope } : {}),
   });
+  return emitPreparedGcode(prepared, options);
+}
+
+export function emitPreparedGcode(
+  prepared: PreparedOutput,
+  options: EmitGcodeOptions = {},
+): EmitGcodeResult {
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
   const machine = prepared.project.machine;
   // Scale Y at the last moment so design previews stay surface-true. Raster

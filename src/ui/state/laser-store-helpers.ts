@@ -240,6 +240,7 @@ export function initialLaserState(): Pick<
   | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
   | 'homingState'
+  | 'trustedPositionEpoch'
   | 'log'
   | 'transcript'
   | 'detectedSettings'
@@ -276,6 +277,7 @@ export function initialLaserState(): Pick<
     activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     homingState: 'unknown',
+    trustedPositionEpoch: 0,
     log: [],
     transcript: [],
     detectedSettings: null,
@@ -327,6 +329,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     airAssistOn: false,
     fireActive: false,
     homingState: 'unknown',
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     streamer: stream,
     // Replies owed by the dead controller will never arrive.
     pendingUntrackedAcks: 0,

@@ -2,6 +2,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useUiStore } from '../state/ui-store';
+import { useStore } from '../state/store';
+import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { ToolStrip } from './ToolStrip';
 
 (
@@ -24,6 +26,11 @@ async function render(node: JSX.Element): Promise<HTMLDivElement> {
 beforeEach(() => {
   useUiStore.getState().setToolMode({ kind: 'select' });
   useUiStore.getState().setPenDraft(null);
+  useStore.setState({
+    project: createProject(),
+    selectedPathNode: null,
+    selectedPathNodes: [],
+  });
 });
 
 afterEach(async () => {
@@ -90,6 +97,66 @@ describe('ToolStrip', () => {
 
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'measure' });
     expect(measure?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('shows curve-node actions and converts the selected segment', async () => {
+    const object: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'curve',
+      source: 'curve.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+              ],
+              closed: false,
+            },
+          ],
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              segments: [{ kind: 'line', to: { x: 10, y: 0 } }],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    useStore.setState({
+      project: {
+        ...createProject(),
+        scene: {
+          objects: [object],
+          layers: [createLayer({ id: '#000000', color: '#000000' })],
+          groups: [],
+        },
+      },
+      selectedObjectId: 'curve',
+      selectedPathNode: {
+        objectId: 'curve',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 0,
+        geometry: 'curve',
+      },
+      selectedPathNodes: [
+        { objectId: 'curve', pathIndex: 0, polylineIndex: 0, pointIndex: 0, geometry: 'curve' },
+      ],
+    });
+    useUiStore.getState().setToolMode({ kind: 'node' });
+    const h = await render(<ToolStrip />);
+    const curveButton = h.querySelector('button[aria-label="Curve"]');
+    expect(curveButton).not.toBeNull();
+    expect(curveButton?.hasAttribute('disabled')).toBe(false);
+    await act(async () => curveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const updated = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    expect(updated.paths[0]?.curves?.[0]?.segments[0]?.kind).toBe('cubic');
   });
 
   it('arms the Star tool from the tool strip', async () => {

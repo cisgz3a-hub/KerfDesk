@@ -3,7 +3,13 @@
 // extents; the pen places absolute scene-mm points, so callers pass
 // IDENTITY_TRANSFORM (the default) and local space equals scene space.
 
-import { IDENTITY_TRANSFORM, type ColoredPath, type ShapeObject, type Transform } from '../scene';
+import {
+  IDENTITY_TRANSFORM,
+  polylineToCurveSubpath,
+  type ColoredPath,
+  type ShapeObject,
+  type Transform,
+} from '../scene';
 import { polylineToPolylines, type PolylineSpec } from './polyline';
 import { boundsOfPolylines } from './polyline-bounds';
 
@@ -14,7 +20,9 @@ export function createPolyline(args: {
   readonly transform?: Transform;
 }): ShapeObject {
   const polylines = polylineToPolylines(args.spec);
-  const paths: ReadonlyArray<ColoredPath> = [{ color: args.color, polylines }];
+  const paths: ReadonlyArray<ColoredPath> = [
+    { color: args.color, polylines, curves: polylines.map(polylineToCurveSubpath) },
+  ];
   return {
     kind: 'shape',
     id: args.id,

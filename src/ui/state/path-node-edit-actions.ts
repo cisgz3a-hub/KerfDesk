@@ -22,6 +22,8 @@ export type PathNodeRef = {
   readonly pathIndex: number;
   readonly polylineIndex: number;
   readonly pointIndex: number;
+  readonly geometry?: 'curve';
+  readonly handle?: 'incoming' | 'outgoing';
 };
 
 export type PathNodeEditActions = {
@@ -306,6 +308,8 @@ export function pathNodeRefsEqual(a: PathNodeRef, b: PathNodeRef): boolean {
     a.objectId === b.objectId &&
     a.pathIndex === b.pathIndex &&
     a.polylineIndex === b.polylineIndex &&
-    a.pointIndex === b.pointIndex
+    a.pointIndex === b.pointIndex &&
+    a.geometry === b.geometry &&
+    a.handle === b.handle
   );
 }

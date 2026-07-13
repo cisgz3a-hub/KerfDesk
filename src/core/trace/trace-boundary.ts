@@ -1,5 +1,5 @@
 import { clamp } from '../math';
-import type { Bounds, ColoredPath } from '../scene';
+import { transformCurveSubpathUniform, type Bounds, type ColoredPath } from '../scene';
 import type { RawImageData } from './trace-image';
 
 export type TraceBoundary = {
@@ -64,6 +64,17 @@ export function offsetColoredPaths(
         y: point.y + offsetY,
       })),
     })),
+    ...(path.curves === undefined
+      ? {}
+      : {
+          curves: path.curves.map((curve) =>
+            transformCurveSubpathUniform(curve, {
+              scale: 1,
+              translateX: offsetX,
+              translateY: offsetY,
+            }),
+          ),
+        }),
   }));
 }
 

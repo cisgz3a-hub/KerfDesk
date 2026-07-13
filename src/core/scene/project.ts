@@ -4,8 +4,16 @@
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import type { MachineConfig } from './machine';
 import { EMPTY_SCENE, type Scene } from './scene';
+import type { ProjectVariableData } from './variable-template';
+import type { PrintAndCutDesignTargets } from './print-and-cut';
 
-export const PROJECT_SCHEMA_VERSION = 1 as const;
+export const PROJECT_SCHEMA_VERSION = 2 as const;
+
+export type EmbeddedFont = {
+  readonly key: string;
+  readonly fileName: string;
+  readonly dataBase64: string;
+};
 
 export type Workspace = {
   readonly width: number; // mm
@@ -37,6 +45,9 @@ export type Project = {
   readonly device: DeviceProfile;
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
+  readonly variables?: ProjectVariableData;
+  readonly printAndCutTargets?: PrintAndCutDesignTargets;
+  readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
   readonly notes: string;
   // Absent on laser projects saved before CNC support — treated as laser.
   readonly machine?: MachineConfig;

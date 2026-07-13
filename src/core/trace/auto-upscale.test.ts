@@ -186,6 +186,20 @@ describe('downscaleTracedPaths', () => {
           },
           { points: [{ x: 2, y: 6 }], closed: false },
         ],
+        curves: [
+          {
+            start: { x: 4, y: 8 },
+            segments: [
+              {
+                kind: 'cubic',
+                control1: { x: 6, y: 10 },
+                control2: { x: 8, y: 14 },
+                to: { x: 10, y: 20 },
+              },
+            ],
+            closed: true,
+          },
+        ],
       },
     ];
     const out = downscaleTracedPaths(paths, 2);
@@ -196,6 +210,16 @@ describe('downscaleTracedPaths', () => {
     ]);
     expect(out[0]?.polylines[0]?.closed).toBe(true);
     expect(out[0]?.polylines[1]?.closed).toBe(false);
+    expect(out[0]?.curves?.[0]).toMatchObject({
+      start: { x: 2, y: 4 },
+      segments: [
+        {
+          control1: { x: 3, y: 5 },
+          control2: { x: 4, y: 7 },
+          to: { x: 5, y: 10 },
+        },
+      ],
+    });
   });
 
   // Contract: factor must be a finite integer >= 1. An invalid factor would
@@ -262,6 +286,7 @@ describe('traceImageToColoredPaths auto-upscale wiring', () => {
     });
     // Coordinates must fall inside the source frame, not the 2x buffer.
     expect(maxCoord(withFlag)).toBeLessThanOrEqual(Math.max(image.width, image.height));
+    expect(withFlag.every((path) => path.curves?.length === path.polylines.length)).toBe(true);
   });
 
   it('does not lose geometry versus the un-upscaled run', async () => {

@@ -1,4 +1,4 @@
-/* global Blob, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, TextDecoder, TextEncoder, window, WritableStream */
+/* global Blob, document, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
 
 const BASIC_PROJECT = '__KERFDESK_E2E_PROJECT_FIXTURE__';
 
@@ -6,6 +6,7 @@ const state = {
   events: [],
   openFiles: [{ name: 'project-basic.lf2', text: BASIC_PROJECT }],
   savedFiles: {},
+  autoAcknowledge: true,
 };
 
 function record(kind, detail = {}) {
@@ -66,7 +67,13 @@ function installSerial() {
       },
     },
   });
-  return { emitLine };
+  return {
+    emitLine,
+    acknowledge(count) {
+      for (let index = 0; index < count; index += 1) emitLine('ok');
+      emitIdle();
+    },
+  };
 }
 
 function respondToSerialWrite(text, emitLine) {
@@ -80,8 +87,14 @@ function respondToSerialWrite(text, emitLine) {
     emitLine('$32=1');
   }
   const acknowledgements = [...text].filter((character) => character === '\n').length;
-  for (let index = 0; index < acknowledgements; index += 1) emitLine('ok');
-  emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  if (!state.autoAcknowledge && acknowledgements > 0) {
+    record('serial-acks-held', { count: acknowledgements });
+    return;
+  }
+  setTimeout(() => {
+    for (let index = 0; index < acknowledgements; index += 1) emitLine('ok');
+    emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  }, 0);
 }
 
 function installFilePickers() {
@@ -100,8 +113,38 @@ function fileHandle(file) {
   return {
     kind: 'file',
     name: file.name,
-    getFile: async () => new File([file.text], file.name, { type: 'application/json' }),
+    getFile: async () =>
+      file.kind === 'png-fixture'
+        ? generatedPngFile(file)
+        : new File([file.text ?? ''], file.name, { type: textFileType(file.name) }),
   };
+}
+
+async function generatedPngFile(file) {
+  const width = file.width ?? 64;
+  const height = file.height ?? 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = '#000000';
+  context.fillRect(width / 4, height / 4, width / 2, height / 2);
+  const blob = await new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (value) => (value === null ? reject(new Error('PNG encode failed')) : resolve(value)),
+      'image/png',
+    ),
+  );
+  return new File([blob], file.name, { type: 'image/png' });
+}
+
+function textFileType(name) {
+  if (/\.svg$/i.test(name)) return 'image/svg+xml';
+  if (/\.csv$/i.test(name)) return 'text/csv';
+  if (/\.(clb|lbrn2?)$/i.test(name)) return 'application/xml';
+  return 'application/json';
 }
 
 function saveHandle(name) {
@@ -149,6 +192,11 @@ window.__KERFDESK_E2E__ = {
   events: state.events,
   savedFiles: state.savedFiles,
   emitSerialLine: serial.emitLine,
+  acknowledgeSerial: serial.acknowledge,
+  setAutoAcknowledge: (enabled) => {
+    state.autoAcknowledge = enabled;
+    record('serial-auto-ack', { enabled });
+  },
   setOpenFiles: (files) => {
     state.openFiles = files;
   },
