@@ -95,6 +95,21 @@ describe('prepareConsoleCommand', () => {
     });
   });
 
+  it('accepts spindle-off and coolant-off together as one guarded block', () => {
+    expect(prepareConsoleCommand('M5 M9')).toEqual({
+      ok: true,
+      command: {
+        kind: 'gcode',
+        normalized: 'M5 M9',
+        wire: 'M5 M9\n',
+        requiresIdle: true,
+        requiresNoActiveOperation: true,
+        requiresConfirmation: false,
+        stateEffect: 'machine-state',
+      },
+    });
+  });
+
   it('classifies commands that can invalidate setup evidence', () => {
     const cases = [
       ['$H', 'reference'],

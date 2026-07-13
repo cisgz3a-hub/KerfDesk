@@ -22,6 +22,7 @@ import type { MachineKind } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
+import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
@@ -120,6 +121,10 @@ export type LaserState = {
   // fresh job stream frees RX budget GRBL has not freed, and the phantom
   // refill can overflow the real 128-byte buffer mid-burn.
   readonly pendingUntrackedAcks: number;
+  // Writes whose transport promise has not resolved yet. Reserved before
+  // awaiting conn.write so Start cannot install an ack-correlated fence while
+  // an earlier command is accepted by the controller but absent from the ack ledger.
+  readonly pendingTransportWrites?: number;
   readonly homingState: HomingState;
   readonly trustedPositionEpoch?: number;
   readonly workZReferenceEpoch: number;
@@ -146,6 +151,10 @@ export type LaserState = {
   // ADR-103 G3 - last-seen Ov: feed/rapid/spindle override percentages,
   // cached across frames exactly like wcoCache.
   readonly ovCache: OverrideValues | null;
+  // ADR-179 - last controller-commanded spindle/coolant state observed via
+  // GRBL A:. Optional only so older hand-built test states remain valid.
+  // null/undefined means unknown, not known off.
+  readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
   // Qualified evidence for the CNC stock-top contract. Separate from
@@ -289,6 +298,7 @@ const refs: LiveRefs = {
   stallProbe: null,
   controllerCommand: null,
   controllerIdleWait: null,
+  writeEpoch: 0,
   pendingResetCleanup: null,
 };
 
@@ -355,6 +365,11 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
         });
         throw new Error(message);
       }
+      // Clear before the serial write yields so a concurrent Start cannot
+      // trust the previous accessory observation after M7/M8/M9 was sent.
+      set((state) => ({
+        accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+      }));
       await safeWrite(set, get, `${command}\n`, 'air-assist', 'console');
       set({
         airAssistOn: enabled,

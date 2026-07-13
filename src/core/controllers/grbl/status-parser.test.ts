@@ -169,3 +169,59 @@ describe('parseStatusReport Ov overrides (ADR-103 G3)', () => {
     expect(r?.ov).toBeNull();
   });
 });
+
+describe('parseStatusReport A accessories (ADR-179)', () => {
+  it('decodes clockwise spindle, flood, and mist in any field-letter order', () => {
+    const r = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,8000|Ov:100,100,100|A:MFS>');
+    expect(r?.accessories).toEqual({
+      spindleCw: true,
+      spindleCcw: false,
+      flood: true,
+      mist: true,
+    });
+  });
+
+  it('decodes counter-clockwise spindle without inferring clockwise', () => {
+    const r = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,8000|Ov:100,100,100|A:C>');
+    expect(r?.accessories).toEqual({
+      spindleCw: false,
+      spindleCcw: true,
+      flood: false,
+      mist: false,
+    });
+  });
+
+  it('treats an Ov frame without A as a known all-off accessory observation', () => {
+    const r = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+    expect(r?.accessories).toEqual({
+      spindleCw: false,
+      spindleCcw: false,
+      flood: false,
+      mist: false,
+    });
+  });
+
+  it('keeps accessory state unknown when both A and intermittent Ov are absent', () => {
+    const r = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(r?.accessories).toBeNull();
+  });
+
+  it('detects grblHAL secondary-spindle telemetry outside the primary A field', () => {
+    const r = parseStatusReport(
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|SP1:12000,,S,100|Ov:100,100,100>',
+    );
+    expect(r?.accessories).toMatchObject({
+      spindleCw: false,
+      spindleCcw: false,
+      secondarySpindlePresent: true,
+    });
+  });
+
+  it('decodes grblHAL spindle-encoder faults and pending tool changes', () => {
+    const r = parseStatusReport('<Tool|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100|A:ET>');
+    expect(r?.accessories).toMatchObject({
+      spindleEncoderFault: true,
+      toolChangePending: true,
+    });
+  });
+});

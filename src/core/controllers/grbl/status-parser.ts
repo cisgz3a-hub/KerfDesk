@@ -17,7 +17,11 @@
 // those frames — it appears only while a limit / probe / door is active.
 // Ov (feed/rapid/spindle override percentages) is reported on the same
 // intermittent cadence as WCO, so consumers cache it (`ovCache`) exactly
-// like `wcoCache`. Other fields (Bf, Ln) are still not parsed.
+// like `wcoCache`. A (active spindle/coolant accessories) is emitted only
+// alongside Ov and only while at least one accessory is active. Therefore an
+// Ov frame without A is a positive all-off observation; a frame with neither
+// field carries no new accessory evidence. Other fields (Bf, Ln) are still
+// not parsed.
 
 export type GrblState =
   | 'Idle'
@@ -73,6 +77,31 @@ export type StatusReport = {
    */
   readonly ov?: OverrideValues | null;
   /**
+   * Controller-commanded spindle/coolant state from `A:`. GRBL omits `A:`
+   * when every accessory is off, but emits it only alongside `Ov:`. Thus an
+   * `Ov:` frame without `A:` produces an all-false value, while a frame with
+   * neither field produces null (no new observation). This is controller
+   * state, not tachometer/current/flow-sensor proof of the physical machine.
+   */
+  readonly accessories?: {
+    readonly spindleCw: boolean;
+    readonly spindleCcw: boolean;
+    readonly flood: boolean;
+    readonly mist: boolean;
+    // grblHAL adds E when spindle encoder feedback reports a fault. This is
+    // not an ordinary on/off accessory state and must fail closed for CNC.
+    readonly spindleEncoderFault?: boolean;
+    // grblHAL adds T while a firmware-managed tool change is pending.
+    readonly toolChangePending?: boolean;
+    // grblHAL reports additional system spindles as SP1:, SP2:, etc. Their
+    // selection/stop semantics are machine-specific and unsupported here.
+    readonly secondarySpindlePresent?: boolean;
+  } | null;
+  /** True only when this wire frame contained an explicit `A:` field. Used
+   * to distinguish a grblHAL fault-clear report from an ordinary Ov-only
+   * frame, which cannot prove exceptional A:E/A:T flags cleared. */
+  readonly accessoryReportPresent?: boolean;
+  /**
    * Work Coordinate Offset — the machine-to-work translation that
    * GRBL is currently applying. WPos = MPos - WCO. Reported on a
    * cadence (every Nth status), so it's null on most frames. **UI
@@ -106,6 +135,8 @@ export function parseStatusReport(line: string): StatusReport | null {
   if (first === undefined || first === '') return null;
   const stateParsed = parseState(first);
   if (stateParsed === null) return null;
+  const ov = pickOverrides(fields);
+  const accessoryReportPresent = fields.some((field) => field.startsWith('A:'));
   return {
     state: stateParsed.state,
     subState: stateParsed.subState,
@@ -115,7 +146,37 @@ export function parseStatusReport(line: string): StatusReport | null {
     spindle: pickFsValue(fields, 1),
     wco: pickAxisField(fields, 'WCO'),
     pins: pickPins(fields),
-    ov: pickOverrides(fields),
+    ov,
+    accessories: pickAccessories(fields, ov),
+    accessoryReportPresent,
+  };
+}
+
+function pickAccessories(
+  fields: ReadonlyArray<string>,
+  ov: OverrideValues | null,
+): NonNullable<StatusReport['accessories']> | null {
+  const secondarySpindlePresent = fields.some((field) => /^SP[1-9]\d*:/.test(field));
+  for (const field of fields) {
+    if (!field.startsWith('A:')) continue;
+    const body = field.slice('A:'.length);
+    return {
+      spindleCw: body.includes('S'),
+      spindleCcw: body.includes('C'),
+      flood: body.includes('F'),
+      mist: body.includes('M'),
+      ...(body.includes('E') ? { spindleEncoderFault: true } : {}),
+      ...(body.includes('T') ? { toolChangePending: true } : {}),
+      ...(secondarySpindlePresent ? { secondarySpindlePresent: true } : {}),
+    };
+  }
+  if (ov === null && !secondarySpindlePresent) return null;
+  return {
+    spindleCw: false,
+    spindleCcw: false,
+    flood: false,
+    mist: false,
+    ...(secondarySpindlePresent ? { secondarySpindlePresent: true } : {}),
   };
 }
 

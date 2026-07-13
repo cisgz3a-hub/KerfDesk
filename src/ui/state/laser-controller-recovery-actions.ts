@@ -38,6 +38,7 @@ export function controllerRecoveryActions(
           alarmCode: null,
           lastError: null,
           wcoCache: null,
+          accessoryCache: null,
           workOriginActive:
             state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',
           workOriginSource:

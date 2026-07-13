@@ -118,7 +118,11 @@ function ProbePlateRemovalConfirmation(): JSX.Element | null {
     <div role="alert" style={plateRemovalStyle}>
       <strong>Probe complete — spindle start is still blocked.</strong>
       <span>Remove the touch plate and probe lead from the stock and cutter.</span>
-      <button type="button" onClick={confirm} title="Confirm the touch plate and probe lead are clear of the stock and cutter before the spindle starts.">
+      <button
+        type="button"
+        onClick={confirm}
+        title="Confirm the touch plate and probe lead are clear of the stock and cutter before the spindle starts."
+      >
         Confirm plate removed
       </button>
     </div>

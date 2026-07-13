@@ -33,10 +33,12 @@ export function handleStatusLine(
   const operation = state.motionOperation;
   const streamer = state.streamer;
   if (report.state === 'Alarm') {
+    advanceWriteEpoch(refs);
     set({
       statusReport: report,
       wcoCache: null,
       ovCache: null,
+      accessoryCache: null,
       ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
@@ -45,6 +47,7 @@ export function handleStatusLine(
       homingState: 'unknown',
       trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
       pendingUntrackedAcks: 0,
+      pendingTransportWrites: 0,
       // A status-only Alarm (the ALARM:N line may have been consumed by a
       // pending command) must still terminate an active stream — a paused
       // stream would otherwise keep Resume mounted against a locked
@@ -55,11 +58,13 @@ export function handleStatusLine(
     return;
   }
   if (report.state === 'Sleep') {
+    advanceWriteEpoch(refs);
     set({
       statusReport: report,
       alarmCode: null,
       wcoCache: null,
       ovCache: null,
+      accessoryCache: null,
       ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
@@ -68,6 +73,7 @@ export function handleStatusLine(
       homingState: 'unknown',
       trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
       pendingUntrackedAcks: 0,
+      pendingTransportWrites: 0,
     });
     cancelControllerLifecycleRefs(refs, 'Controller entered Sleep.');
     return;
@@ -91,7 +97,7 @@ export function handleStatusLine(
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
 
   set({
-    ...statusPositionPatch(report, state.workOriginSource),
+    ...statusPositionPatch(report, state.workOriginSource, state.accessoryCache),
     ...operationPatch,
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
@@ -99,6 +105,10 @@ export function handleStatusLine(
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+function advanceWriteEpoch(refs: ControllerLifecycleRefs): void {
+  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
 }
 
 // A fresh Idle observed while holding at a tool change, with the pre-M0 tail
@@ -165,19 +175,51 @@ function shouldReleaseStreamerAtIdle(
 function statusPositionPatch(
   report: StatusReport,
   originSource: LaserState['workOriginSource'],
+  previousAccessories: LaserState['accessoryCache'],
 ): Pick<LaserState, 'statusReport'> &
-  Partial<Pick<LaserState, 'wcoCache' | 'ovCache' | 'workOriginActive' | 'workOriginSource'>> {
+  Partial<
+    Pick<
+      LaserState,
+      'wcoCache' | 'ovCache' | 'accessoryCache' | 'workOriginActive' | 'workOriginSource'
+    >
+  > {
   // Ov: is reported on the same intermittent cadence as WCO — cache the
   // last-seen values so the overrides readout doesn't flicker (ADR-103 G3).
   const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
-  if (report.wco === null) return { statusReport: report, ...ovPatch };
+  // A: is intermittent with Ov:. Preserve the last state on frames carrying
+  // neither field; the parser turns Ov-without-A into a known all-off value.
+  const accessoryPatch =
+    report.accessories === null || report.accessories === undefined
+      ? {}
+      : {
+          accessoryCache: {
+            ...report.accessories,
+            ...(previousAccessories?.secondarySpindlePresent === true
+              ? { secondarySpindlePresent: true }
+              : {}),
+            ...exceptionalAccessoryLatch(previousAccessories, report.accessoryReportPresent),
+          },
+        };
+  if (report.wco === null) return { statusReport: report, ...ovPatch, ...accessoryPatch };
   const active = hasCustomXyOrigin(report.wco);
   return {
     statusReport: report,
     ...ovPatch,
+    ...accessoryPatch,
     wcoCache: report.wco,
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(originSource) : 'none',
+  };
+}
+
+function exceptionalAccessoryLatch(
+  previous: LaserState['accessoryCache'],
+  explicitAccessoryReport: boolean | undefined,
+): Partial<NonNullable<LaserState['accessoryCache']>> {
+  if (explicitAccessoryReport === true) return {};
+  return {
+    ...(previous?.spindleEncoderFault === true ? { spindleEncoderFault: true } : {}),
+    ...(previous?.toolChangePending === true ? { toolChangePending: true } : {}),
   };
 }
 

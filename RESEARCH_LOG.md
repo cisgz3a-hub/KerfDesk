@@ -830,4 +830,31 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   effective combined offset. A mutation `ok` proves acceptance, not the value of every untouched axis.
 - **KerfDesk consequence:** XY-only commands may derive X/Y but must preserve known Z or wait for
   readback. Any G92.1 path invalidates unqualified Z evidence until a new touch-off or richer readback
-  proof exists.
+proof exists.
+
+---
+
+## CNC live accessory and Start ownership semantics (2026-07-13, ADR-179)
+
+- **GRBL v1.1 interface source:**
+  https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface at repository HEAD
+  `bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e` (archived upstream).
+  `A:SCFM` describes controller-commanded primary spindle/coolant state;
+  `Ov:` without `A:` is the ordinary all-off observation. Realtime commands
+  can be ignored when repeated before the prior request is serviced.
+- **grblHAL implementation source:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/report.c
+  lines 1452-1485. Current code emits `A:E` for spindle encoder error and
+  `A:T` for a pending firmware tool change, and reports secondary spindles in
+  separate `SPn:` fields. The source also supports automatic status reporting.
+- **Decision impact:** CNC Start uses an app-wide arming reservation, an
+  acknowledged queued dwell as the command/inbound fence, then a live
+  `Idle`/`Ov:`/`A:` observation and a synchronous final state/ack/setup-epoch
+  gate. Exceptional grblHAL flags and secondary-spindle evidence fail closed.
+- **Boundary:** this proves ordering only for KerfDesk-owned writes. GRBL has no
+  transaction that atomically binds a status frame to later program bytes, so
+  pendants, WebUIs, PLCs, macros, and second senders require exclusive-command
+  ownership or an external/machine-specific interlock.
+- **Use:** read-only protocol research; no upstream code copied.
+- **Confidence:** high for the cited wire/source behavior; physical controller
+  campaigns remain required before production safety claims.

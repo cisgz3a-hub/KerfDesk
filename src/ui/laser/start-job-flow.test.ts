@@ -89,6 +89,13 @@ function configureReadyCncStart(): void {
   }));
   useLaserStore.setState({
     controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
+    ovCache: { feed: 100, rapid: 100, spindle: 100 },
+    accessoryCache: {
+      spindleCw: false,
+      spindleCcw: false,
+      flood: false,
+      mist: false,
+    },
     workZReferenceEpoch: 7,
     workZZeroEvidence: {
       source: 'manual-zero',

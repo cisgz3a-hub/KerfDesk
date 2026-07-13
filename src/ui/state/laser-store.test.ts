@@ -78,7 +78,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   // startJob waits for owed untracked acks to drain.
   await flush();
   connection.emitLine('ok');
-  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
   await flush();
 }
 
@@ -210,12 +210,21 @@ describe('laser-store serial write failures', () => {
     });
     const connection = makeConnection(write);
     await connectWith(connection);
+    useLaserStore.setState({
+      accessoryCache: {
+        spindleCw: false,
+        spindleCcw: false,
+        flood: false,
+        mist: false,
+      },
+    });
 
     await expect(useLaserStore.getState().startJob('G21\nG90\nM3 S0\nM5\n')).rejects.toThrow(
       'port lost',
     );
 
     expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().accessoryCache).toBeNull();
     expect(useLaserStore.getState().log.join('\n')).toContain('Serial write failed: port lost');
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'write-failed',

@@ -52,6 +52,7 @@
 | ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
+| ADR-179 | 2026-07-13 | Accepted | Block controller-reported active spindle/coolant before CNC Start |
 
 ---
 
@@ -7274,3 +7275,67 @@ could unlock Continue. Comment labels improved operator guidance but were not st
 Changing the selected cutter or compiling a different first section can no longer reuse unrelated
 Z evidence. The host proves consistency between operator-selected tool identity, Z evidence, and
 the compiled plan; it still cannot physically sense the cutter, clamp, touch plate, or spindle.
+
+---
+
+## ADR-179 - Block controller-reported active spindle/coolant before CNC Start
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL `Idle` means motion is idle; it does not mean spindle and coolant are off. A manual command or
+interrupted workflow can leave `M3`, `M4`, `M7`, or `M8` active before KerfDesk's controlled CNC
+preamble. GRBL reports controller-commanded accessories in `A:`: `S` is clockwise spindle, `C` is
+counter-clockwise spindle, `F` is flood, and `M` is mist. The field appears alongside the
+intermittent `Ov:` report only while an accessory is active, so `Ov:` without `A:` is the protocol's
+all-off observation. A frame with neither field carries no new evidence.
+
+This status is controller state, not physical sensor feedback. It cannot prove spindle RPM, coolant
+flow, relay position, or that external hardware followed the command.
+
+### Decision
+
+- Parse `A:` and cache its last observation across sparse status frames. Preserve an active cache
+  until an `Ov:` frame without `A:` observes all accessories off. Clear the cache when connection or
+  controller-reset evidence is lost.
+- Block CNC Start and CNC resume whenever the live cache reports any spindle direction or coolant
+  channel active. Name every active channel in the blocker.
+- While CNC controls are otherwise idle, show a recovery action for active accessories. It sends one
+  guarded, acknowledged `M5 M9` block only after the operator confirms the cutter is clear and
+  stopping is safe; Start stays blocked until a fresh status report confirms the all-off state.
+- Arming any job stream invalidates the prior accessory observation. A partial initial or refill
+  write may already have executed accessory commands even when transport reports failure.
+- After the final CNC setup confirmation, discard the pre-modal cache and actively request status
+  until a fresh `Ov:`/`A:` observation arrives. Before that request, reserve an app-wide
+  `start-arming` controller operation, drain earlier app acknowledgements, and send an acknowledged
+  queued dwell marker. Its `ok` is the inbound/command fence: earlier app commands and buffered
+  serial output have been consumed before the live observation. Recheck the zero-ack ledger and
+  every live gate synchronously before arming.
+- Reserve transport writes before awaiting the port, then atomically transfer successful writes to
+  the ack ledger. Reset/reconnect advances a write epoch: late completions from the old epoch reject
+  and cannot decrement current counters or reassert origin/work-Z evidence. The queued Start marker
+  must receive a correlated positive `ok`; `error`, `ALARM`, timeout, or reboot cancels arming.
+- CNC Start fails closed while `A:`/`Ov:` evidence is missing. Any app command that can change
+  spindle or coolant state invalidates the prior observation until a fresh accessory report arrives.
+  Laser Start is unchanged. Firmware that omits these fields cannot run CNC jobs with this gate.
+- grblHAL `SP1:`/`SPn:` secondary-spindle telemetry is a hard blocker. KerfDesk does not yet model
+  machine-specific spindle selection and recovery, so it must not collapse those spindles into `A:`
+  or offer the primary-spindle `M5 M9` recovery action.
+- grblHAL `A:E` (spindle encoder fault) and `A:T` (firmware tool change pending) are hard blockers.
+  Exceptional flags latch across ordinary `Ov:`-without-`A:` frames and clear only on reset/reconnect
+  or an explicit `A:` report that omits them.
+- A reboot banner cancels `start-arming`, invalidates volatile origin/work-Z/position evidence, and
+  advances setup epochs. The final arm boundary must still own the reservation and the same epochs.
+
+### Consequences
+
+KerfDesk no longer treats motion-idle as an accessory-neutral CNC handoff. A stale commanded spindle
+or coolant state is stopped and observed before the job-owned retract/spin-up sequence begins. The
+single-block recovery avoids issuing `M5`, invalidating cached Idle, and then incorrectly attempting
+a separately guarded `M9`. Physical at-speed and output feedback remain future hardware/profile work.
+The safety claim requires KerfDesk to be the controller's only command owner. A pendant, WebUI,
+second serial/network sender, PLC, or firmware macro can mutate state after any observation; GRBL has
+no transaction that atomically couples a status report to the following job bytes. Those concurrent
+external mutations remain outside KerfDesk's single-sender contract and require a controller/VFD
+interlock or machine-specific supervisory protocol.

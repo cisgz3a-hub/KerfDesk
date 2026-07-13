@@ -38,6 +38,7 @@ function makeLaserState(): LaserState {
     lastSettingsReadAt: null,
     wcoCache: null,
     ovCache: null,
+    accessoryCache: null,
     workOriginActive: false,
     workZZeroEvidence: null,
     workZReferenceEpoch: 0,
@@ -141,5 +142,114 @@ describe('handleLine Ov override caching (ADR-103 G3)', () => {
     expect(get().ovCache).not.toBeNull();
     handleLine(set, get, refs, async () => undefined, '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
     expect(get().ovCache).toBeNull();
+  });
+
+  it('latches secondary-spindle presence across later sparse grblHAL reports', () => {
+    const { refs, set, get } = makeHarness();
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|SP1:12000,,S,100|Ov:100,100,100>',
+    );
+    expect(get().accessoryCache?.secondarySpindlePresent).toBe(true);
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+    );
+    expect(get().accessoryCache?.secondarySpindlePresent).toBe(true);
+  });
+
+  it('latches grblHAL exceptional A flags until an explicit A report clears them', () => {
+    const { refs, set, get } = makeHarness();
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100|A:ET>',
+    );
+    expect(get().accessoryCache).toMatchObject({
+      spindleEncoderFault: true,
+      toolChangePending: true,
+    });
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+    );
+    expect(get().accessoryCache).toMatchObject({
+      spindleEncoderFault: true,
+      toolChangePending: true,
+    });
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100|A:>',
+    );
+    expect(get().accessoryCache?.spindleEncoderFault).toBeUndefined();
+    expect(get().accessoryCache?.toolChangePending).toBeUndefined();
+  });
+});
+
+describe('handleLine A accessory caching (ADR-179)', () => {
+  it('preserves an active observation across sparse frames, then clears it on Ov without A', () => {
+    const { refs, set, get } = makeHarness();
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,8000|Ov:100,100,100|A:SF>',
+    );
+    expect(get().accessoryCache).toEqual({
+      spindleCw: true,
+      spindleCcw: false,
+      flood: true,
+      mist: false,
+    });
+
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(get().accessoryCache?.spindleCw).toBe(true);
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+    );
+    expect(get().accessoryCache).toEqual({
+      spindleCw: false,
+      spindleCcw: false,
+      flood: false,
+      mist: false,
+    });
+  });
+
+  it('clears the cache when the controller enters Alarm', () => {
+    const { refs, set, get } = makeHarness();
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,0.000|FS:0,8000|Ov:100,100,100|A:S>',
+    );
+    expect(get().accessoryCache).not.toBeNull();
+    handleLine(set, get, refs, async () => undefined, '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(get().accessoryCache).toBeNull();
   });
 });

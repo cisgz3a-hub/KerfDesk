@@ -100,6 +100,7 @@ export function connectionActions(
           probeBusy: false,
           homingState: 'unknown',
           pendingUntrackedAcks: 0,
+          pendingTransportWrites: 0,
         });
         void runHandshake(set, get, refs, safeWrite).catch(() => undefined);
       } catch (err) {
@@ -144,6 +145,7 @@ async function runDisconnect(
     airAssistOn: false,
     fireActive: false,
     wcoCache: null,
+    accessoryCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,
@@ -156,6 +158,7 @@ async function runDisconnect(
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     lastWriteError: null,
     pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
   }));
 }
 
@@ -209,6 +212,7 @@ async function runHandshake(
 }
 
 function teardown(refs: LiveRefs): void {
+  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   cancelControllerLifecycleRefs(refs);
   cancelResetCleanup(refs);
   refs.unsubscribeLine?.();

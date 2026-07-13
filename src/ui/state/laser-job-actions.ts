@@ -23,6 +23,9 @@ import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
   cncSetupAttestationMatches,
 } from './cnc-setup-attestation';
+import { assertCncLiveStartReady, refreshCncLiveStartState } from './cnc-live-start-readiness';
+import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
+import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -39,6 +42,10 @@ type SetFn = (
 type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type DriverFn = () => ControllerDriver;
+type StartSetupEpoch = {
+  readonly trustedPosition: number;
+  readonly workZReference: number;
+};
 
 const PAUSE_REQUIRES_LASER_MODE_MESSAGE =
   'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.';
@@ -52,8 +59,8 @@ const PAUSE_UNSUPPORTED_MESSAGE =
 const UNTRACKED_ACK_DRAIN_TIMEOUT_MS = 1_500;
 const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
 const START_PENDING_ACK_MESSAGE =
-  'The controller has not acknowledged a previous command yet. Start was blocked so the stale ' +
-  'acknowledgement cannot corrupt the job stream — check the connection and try again.';
+  'A previous controller write is still in transport or awaiting acknowledgement. Start was ' +
+  'blocked so its terminal response cannot corrupt the job stream — check the connection and try again.';
 
 export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
   'The compiled tool plan does not match the CNC program pauses. Start was blocked so tool identity cannot drift at a change boundary.';
@@ -61,7 +68,7 @@ export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
 export function jobActions(
   set: SetFn,
   get: GetFn,
-  refs: ResetCleanupRefs,
+  refs: ResetCleanupRefs & ControllerLifecycleRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
@@ -69,102 +76,115 @@ export function jobActions(
     continueToolChange: () => runContinueToolChange(set, get, safeWrite),
     startJob: async (gcode, options = {}) => {
       assertStartAllowed(set, get);
-      if (get().pendingUntrackedAcks > 0) {
-        await waitForUntrackedAckDrain(get);
-        // The wait yielded the task queue — anything could have changed
-        // (another Start, an alarm, a disconnect). Re-assert every guard so
-        // the synchronous double-start protection below still holds.
-        assertStartAllowed(set, get);
-      }
-      assertCncSetupAttested(gcode, options);
-      // M13: a line longer than the RX buffer can never send — step() would
-      // break silently, leaving a phantom idle job and a frozen progress bar.
-      const streamOptions = normalizeStartJobOptions(options);
-      const oversized = findOversizedLine(gcode, streamOptions.rxBufferBytes);
-      if (oversized !== null) {
-        throw new Error(
-          `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
-            `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
-        );
-      }
-      // A lone M0 in a CNC job is a tool-change boundary: swallow it and hold
-      // at Idle so the operator can jog/probe/Zero-Z the new bit (CNC-01..03).
-      // Laser jobs and imported-in-laser-mode programs keep sending M0 as an
-      // ordinary program stop.
-      const initial = createStreamer(gcode, {
-        ...streamOptions,
-        toolChangePause: options.machineKind === 'cnc',
-      });
-      const stepped = step(initial);
-      const { labels, toolIds } = toolChangeManifest(gcode, options);
-      // A job whose pre-M0 lines all fit the RX buffer reaches the FIRST hold in
-      // this synchronous step (no ack); later holds enter via advanceStream.
-      const entersHoldNow = stepped.state.status === 'tool-change';
-      set((state) => ({
-        streamer: stepped.state,
-        activeJobMachineKind: options.machineKind ?? 'laser',
-        toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
-        toolChangeToolIds: entersHoldNow ? toolIds.slice(1) : toolIds,
-        pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
-        pendingToolId: entersHoldNow ? (toolIds[0] ?? null) : null,
-        ...toolChangeEntryPatch(state, entersHoldNow),
-      }));
-      if (stepped.toSend.length === 0) return;
+      const setupEpoch = captureStartSetupEpoch(get());
+      set({ controllerOperation: { kind: 'start-arming', phase: 'queue-fence' } });
       try {
-        await safeWrite(stepped.toSend, 'start');
-      } catch (err) {
-        set({ streamer: null });
-        throw err;
+        if (hasPendingControllerWrite(get())) {
+          await waitForUntrackedAckDrain(get);
+          assertStartAllowed(set, get, true);
+        }
+        assertCncSetupAttested(gcode, options);
+        const machineKind = options.machineKind ?? 'laser';
+        if (machineKind === 'cnc') {
+          await startControllerCommand(refs, safeWrite, {
+            kind: 'start-arming',
+            label: 'CNC Start queue fence',
+            command: `${driver().commands.settleDwell}\n`,
+            timeoutMs: UNTRACKED_ACK_DRAIN_TIMEOUT_MS,
+          });
+        }
+        assertStartReservation(get, setupEpoch);
+        await refreshCncLiveStartState(set, get, safeWrite, driver, machineKind);
+        assertStartAllowed(set, get, true);
+        assertCncLiveStartReady(set, get, machineKind);
+        assertStartReservation(get, setupEpoch);
+        if (hasPendingControllerWrite(get())) throw new Error(START_PENDING_ACK_MESSAGE);
+        assertGcodeFitsController(gcode, options);
+        const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
+        const entersHoldNow = stepped.state.status === 'tool-change';
+        set((state) => ({
+          streamer: stepped.state,
+          accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+          activeJobMachineKind: options.machineKind ?? 'laser',
+          toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
+          toolChangeToolIds: entersHoldNow ? toolIds.slice(1) : toolIds,
+          pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
+          pendingToolId: entersHoldNow ? (toolIds[0] ?? null) : null,
+          ...toolChangeEntryPatch(state, entersHoldNow),
+        }));
+        if (stepped.toSend.length === 0) return;
+        try {
+          await safeWrite(stepped.toSend, 'start');
+        } catch (err) {
+          set({ streamer: null });
+          throw err;
+        }
+      } finally {
+        set((state) => ({
+          controllerOperation:
+            state.controllerOperation?.kind === 'start-arming' ? null : state.controllerOperation,
+        }));
       }
     },
     pauseJob: () => runPauseJob(set, get, safeWrite, driver),
     resumeJob: () => runResumeJob(set, safeWrite, driver),
-    stopJob: async () => {
-      const softReset = driver().realtime.softReset;
-      if (softReset !== null) await safeWrite(softReset, 'stop');
-      if (softReset === null) {
-        // Stream-side stop (Marlin): no reset, no reboot — the beam-off
-        // lines go out immediately and their acks queue behind the
-        // in-flight job lines in receive order.
-        try {
-          for (const line of driver().commands.stopLaserLines) {
-            await safeWrite(`${line}\n`, 'stop');
-          }
-        } catch {
-          // Coolant cleanup is best effort and may fail if the serial link
-          // is already gone.
-        }
-      }
-      // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
-      // cached WCO so the readout doesn't lie about "custom origin"
-      // until the next WCO frame arrives. Same race window as
-      // resumeJob — use functional set.
-      // A sent soft reset also wiped the firmware's RX buffer: the
-      // in-flight lines will never be acked, so drop them from the
-      // accounting or the beam-off cleanup acks get claimed by the dead
-      // stream (audit F1). Stream-side stops (Marlin) keep in-flight —
-      // the firmware still acks those lines.
-      set((s) => ({
-        wcoCache: null,
-        airAssistOn: false,
-        ...originPatchAfterSoftReset(s),
-        streamer:
-          s.streamer === null
-            ? s.streamer
-            : softReset !== null
-              ? wipeInFlight(cancelStreamer(s.streamer))
-              : cancelStreamer(s.streamer),
-      }));
-      // After a sent reset, the beam-off cleanup is deferred until the boot
-      // banner arrives (audit F2): written now it races the reboot — either
-      // swallowed mid-init (its ack never comes, the counter jams) or acked
-      // after the banner reset the untracked ledger (an orphaned ok). The
-      // soft reset itself already de-energized laser and coolant.
-      if (softReset !== null) {
-        armResetCleanup(refs, safeWrite, driver().commands.stopLaserLines);
-      }
-    },
+    stopJob: () => runStopJob(set, refs, safeWrite, driver),
   };
+}
+
+async function runStopJob(
+  set: SetFn,
+  refs: ResetCleanupRefs & ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+  driver: DriverFn,
+): Promise<void> {
+  const softReset = driver().realtime.softReset;
+  if (softReset !== null) await safeWrite(softReset, 'stop');
+  if (softReset === null) {
+    try {
+      for (const line of driver().commands.stopLaserLines) await safeWrite(`${line}\n`, 'stop');
+    } catch {
+      // Best effort if the transport is already gone.
+    }
+  }
+  set((state) => ({
+    wcoCache: null,
+    accessoryCache: null,
+    airAssistOn: false,
+    ...originPatchAfterSoftReset(state),
+    streamer:
+      state.streamer === null
+        ? state.streamer
+        : softReset !== null
+          ? wipeInFlight(cancelStreamer(state.streamer))
+          : cancelStreamer(state.streamer),
+  }));
+  if (softReset !== null) armResetCleanup(refs, safeWrite, driver().commands.stopLaserLines);
+}
+
+function assertGcodeFitsController(gcode: string, options: StartJobOptions): void {
+  const streamOptions = normalizeStartJobOptions(options);
+  const oversized = findOversizedLine(gcode, streamOptions.rxBufferBytes);
+  if (oversized === null) return;
+  throw new Error(
+    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
+      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
+  );
+}
+
+function prepareInitialStream(
+  gcode: string,
+  options: StartJobOptions,
+): {
+  readonly stepped: ReturnType<typeof step>;
+  readonly labels: ReadonlyArray<string>;
+  readonly toolIds: ReadonlyArray<string | null>;
+} {
+  const streamOptions = normalizeStartJobOptions(options);
+  const stepped = step(
+    createStreamer(gcode, { ...streamOptions, toolChangePause: options.machineKind === 'cnc' }),
+  );
+  return { stepped, ...toolChangeManifest(gcode, options) };
 }
 
 function assertCncSetupAttested(gcode: string, options: StartJobOptions): void {
@@ -212,23 +232,52 @@ function toolChangeEntryPatch(state: LaserState, entersHoldNow: boolean): Partia
     : {};
 }
 
-function assertStartAllowed(set: SetFn, get: GetFn): void {
-  assertAutofocusIdle(get());
-  const blockedMessage = setupCommandBlockMessage(get());
-  if (blockedMessage === null) return;
-  set({
-    lastWriteError: blockedMessage,
-    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
-  });
-  throw new Error(blockedMessage);
+function assertStartAllowed(set: SetFn, get: GetFn, allowStartArming = false): void {
+  const state = get();
+  assertAutofocusIdle(state);
+  const gateState =
+    allowStartArming && state.controllerOperation?.kind === 'start-arming'
+      ? { ...state, controllerOperation: null }
+      : state;
+  const blockedMessage = setupCommandBlockMessage(gateState);
+  if (blockedMessage !== null) {
+    set({
+      lastWriteError: blockedMessage,
+      log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+    });
+    throw new Error(blockedMessage);
+  }
+}
+
+function captureStartSetupEpoch(state: LaserState): StartSetupEpoch {
+  return {
+    trustedPosition: state.trustedPositionEpoch ?? 0,
+    workZReference: state.workZReferenceEpoch,
+  };
+}
+
+function assertStartReservation(get: GetFn, expected: StartSetupEpoch): void {
+  const state = get();
+  const unchanged =
+    state.controllerOperation?.kind === 'start-arming' &&
+    (state.trustedPositionEpoch ?? 0) === expected.trustedPosition &&
+    state.workZReferenceEpoch === expected.workZReference;
+  if (unchanged) return;
+  throw new Error(
+    'CNC Start lost its exclusive controller/setup reservation before streaming. Re-check setup and try again.',
+  );
 }
 
 async function waitForUntrackedAckDrain(get: GetFn): Promise<void> {
   const deadline = Date.now() + UNTRACKED_ACK_DRAIN_TIMEOUT_MS;
-  while (get().pendingUntrackedAcks > 0) {
+  while (hasPendingControllerWrite(get())) {
     if (Date.now() > deadline) throw new Error(START_PENDING_ACK_MESSAGE);
     await sleep(UNTRACKED_ACK_DRAIN_POLL_MS);
   }
+}
+
+function hasPendingControllerWrite(state: LaserState): boolean {
+  return state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0;
 }
 
 function sleep(ms: number): Promise<void> {

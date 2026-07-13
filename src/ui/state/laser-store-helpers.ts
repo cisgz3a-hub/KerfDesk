@@ -256,7 +256,7 @@ function streamPositionUnchanged(
   );
 }
 
-export function initialLaserState(): Pick<
+type InitialLaserState = Pick<
   LaserState,
   | 'capabilities'
   | 'activeControllerKind'
@@ -276,6 +276,7 @@ export function initialLaserState(): Pick<
   | 'streamer'
   | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
+  | 'pendingTransportWrites'
   | 'homingState'
   | 'trustedPositionEpoch'
   | 'workZReferenceEpoch'
@@ -287,6 +288,7 @@ export function initialLaserState(): Pick<
   | 'lastSettingsReadAt'
   | 'wcoCache'
   | 'ovCache'
+  | 'accessoryCache'
   | 'workOriginActive'
   | 'workOriginSource'
   | 'workZZeroEvidence'
@@ -296,7 +298,9 @@ export function initialLaserState(): Pick<
   | 'pendingToolLabel'
   | 'pendingToolId'
   | 'frameVerification'
-> {
+>;
+
+export function initialLaserState(): InitialLaserState {
   return {
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,
@@ -316,6 +320,7 @@ export function initialLaserState(): Pick<
     streamer: null,
     activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
     homingState: 'unknown',
     trustedPositionEpoch: 0,
     workZReferenceEpoch: 0,
@@ -327,6 +332,7 @@ export function initialLaserState(): Pick<
     lastSettingsReadAt: null,
     wcoCache: null,
     ovCache: null,
+    accessoryCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,
@@ -359,6 +365,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // fresh status frame arrives.
     wcoCache: null,
     ovCache: null,
+    accessoryCache: null,
     workOriginActive: state.workOriginSource === 'g54-persistent',
     workOriginSource: state.workOriginSource === 'g54-persistent' ? 'unknown' : 'none',
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
