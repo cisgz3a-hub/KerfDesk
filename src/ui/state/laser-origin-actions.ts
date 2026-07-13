@@ -140,7 +140,6 @@ async function zeroZHere(
     'Zero work Z',
     (write) => zeroZHereAction(write, usesPrimaryWcs(get())),
     () => ({
-      workZZeroKnown: true,
       workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', get().workZReferenceEpoch),
     }),
   );
@@ -242,7 +241,6 @@ function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
     workOriginSource: 'g54-persistent',
     // G92.1 clears every transient axis. The boolean does not encode whether
     // Z came from G92 or persistent G54, so conservatively require a new touch-off.
-    workZZeroKnown: false,
     // Any Z-reference loss also voids work-Z evidence (fail-closed for CNC start).
     workZZeroEvidence: null,
     // G10 L20 P1 writes X/Y only. Z cannot be reconstructed from MPos after
@@ -257,7 +255,6 @@ function clearedOriginPatch(): Partial<LaserState> {
     workOriginActive: false,
     workOriginSource: 'none',
     // clearOrigin (G92.1) drops ALL G92 offsets, Z included, so work Z0 is void.
-    workZZeroKnown: false,
     workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,
