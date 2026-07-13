@@ -433,6 +433,28 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await expect(page.getByRole('button', { name: 'Start job' })).toBeEnabled();
 });
 
+test('preserves an interrupted laser checkpoint after a cable disconnect', async ({
+  page,
+  kerfdesk,
+}) => {
+  await connectAndHome(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  page.on('dialog', (dialog) => void dialog.accept());
+
+  await page.getByRole('button', { name: 'Start job' }).click();
+  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect.poll(async () => serialWriteLineCount(await kerfdesk.events())).toBeGreaterThan(0);
+  await kerfdesk.acknowledgeSerial(1);
+  await kerfdesk.disconnectSerial();
+
+  await expect(page.getByText(/Interrupted laser job/)).toBeVisible();
+  await expect(page.locator('p').filter({ hasText: 'Recorded cause:' })).toContainText(
+    /connection|disconnect|USB/i,
+  );
+  await expect(page.getByRole('button', { name: 'Review safe recovery' })).toBeVisible();
+  await expect(page.getByTitle('Discard the interrupted-job record.')).toBeVisible();
+});
+
 test('shares jog speed across buttons, keyboard movement, and return to work zero', async ({
   page,
   kerfdesk,
@@ -502,6 +524,13 @@ function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): str
     .filter((event) => event['kind'] === 'serial-write')
     .map((event) => String(event['text']))
     .join('');
+}
+
+function serialWriteLineCount(events: readonly Readonly<Record<string, unknown>>[]): number {
+  return events
+    .filter((event) => event['kind'] === 'serial-write')
+    .map((event) => String(event['text']))
+    .reduce((count, text) => count + [...text].filter((character) => character === '\n').length, 0);
 }
 
 function frameWriteCount(events: readonly Readonly<Record<string, unknown>>[]): number {
