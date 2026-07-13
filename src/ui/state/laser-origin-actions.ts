@@ -112,10 +112,17 @@ async function setOriginHere(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   assertOriginActionReady(set, get, refs);
-  await runOriginTransaction(set, refs, safeWrite, 'Set work origin', setOriginHereAction, () => {
-    const { statusReport, wcoCache } = get();
-    return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
-  });
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Set work origin',
+    (write) => setOriginHereAction(write, usesPrimaryWcs(get())),
+    () => {
+      const { statusReport, wcoCache } = get();
+      return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
+    },
+  );
 }
 
 async function zeroZHere(
@@ -125,9 +132,14 @@ async function zeroZHere(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   assertOriginActionReady(set, get, refs);
-  await runOriginTransaction(set, refs, safeWrite, 'Zero work Z', zeroZHereAction, () => ({
-    workZZeroKnown: true,
-  }));
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Zero work Z',
+    (write) => zeroZHereAction(write, usesPrimaryWcs(get())),
+    () => ({ workZZeroKnown: true }),
+  );
 }
 
 async function resetOrigin(
@@ -142,7 +154,7 @@ async function resetOrigin(
     refs,
     safeWrite,
     'Reset transient origin',
-    resetOriginAction,
+    (write) => resetOriginAction(write, usesPrimaryWcs(get())),
     () =>
       get().workOriginSource === 'g54-persistent'
         ? persistentOriginAfterTransientClearPatch()
@@ -162,7 +174,7 @@ async function setPersistentOriginHere(
     refs,
     safeWrite,
     'Set persistent origin',
-    setPersistentOriginHereAction,
+    (write) => setPersistentOriginHereAction(write, usesPrimaryWcs(get())),
     persistentOriginAfterTransientClearPatch,
   );
 }
@@ -179,7 +191,7 @@ async function clearPersistentOrigin(
     refs,
     safeWrite,
     'Clear persistent origin',
-    clearPersistentOriginAction,
+    (write) => clearPersistentOriginAction(write, usesPrimaryWcs(get())),
     clearedOriginPatch,
   );
 }
@@ -194,6 +206,10 @@ async function releaseMotors(
   await runOriginTransaction(set, refs, safeWrite, 'Release motors', releaseMotorsAction, () =>
     get().workOriginSource === 'g54-persistent' ? unknownOriginPatch() : clearedOriginPatch(),
   );
+}
+
+function usesPrimaryWcs(state: LaserState): boolean {
+  return state.capabilities.wcs === 'g92-and-g10';
 }
 
 function transientXyOriginPatch(

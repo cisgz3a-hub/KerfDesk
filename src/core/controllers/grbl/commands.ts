@@ -53,6 +53,11 @@ export const CMD_COOLANT_OFF = 'M9';
 // G10 L20/L2 against G54 when the operator explicitly wants the origin
 // to survive reconnects.
 
+/** KerfDesk's canonical work coordinate system. Every app-controlled origin,
+ * probe, and CNC program explicitly selects G54 so a prior G55-G59 modal
+ * state or controller startup block cannot redirect coordinates. */
+export const CMD_SELECT_PRIMARY_WCS = 'G54';
+
 /** Set work origin to the current head position (transient, cleared on
  *  alarm/soft-reset). Maps to G92 X0 Y0 — declares the current MPos as the
  *  (0, 0) of the work coordinate system. The next G-code job runs relative

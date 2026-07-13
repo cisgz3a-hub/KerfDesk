@@ -14,6 +14,7 @@
 import {
   addVec3,
   formatVec3,
+  hasGWord,
   leadingGWord,
   parseMotionWords,
   resolveTarget,
@@ -324,9 +325,11 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
 function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
   if (state.locked) return { state, effects: [emit('error:9', opts)] };
   const g = leadingGWord(line);
-  if (g === 92.1) return { state: { ...state, g92: null }, effects: [emit('ok', opts)] };
-  if (g === 92) return { state: applyG92(state, line), effects: [emit('ok', opts)] };
-  if (g === 10) return { state: applyG10(state, line), effects: [emit('ok', opts)] };
+  if (hasGWord(line, 92.1)) {
+    return { state: { ...state, g92: null }, effects: [emit('ok', opts)] };
+  }
+  if (hasGWord(line, 92)) return { state: applyG92(state, line), effects: [emit('ok', opts)] };
+  if (hasGWord(line, 10)) return { state: applyG10(state, line), effects: [emit('ok', opts)] };
   const words = parseMotionWords(line);
   const isAbsolute = words.setsAbsolute ?? state.isAbsolute;
   let next: GrblSimState = {

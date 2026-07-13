@@ -3,8 +3,8 @@
 // Two workflows, both two-stage (fast seek, back off, slow re-touch — the
 // gSender/Carbide-Motion convention that removes seek-speed overshoot from
 // the recorded position):
-//   - Z: probe down onto the plate, set work Z so Z0 = plate underside
-//     (= stock top) via `G10 L20 P0 Z<thickness>`.
+//   - Z: select G54, probe down onto the plate, set work Z so Z0 = plate
+//     underside (= stock top) via `G10 L20 P0 Z<thickness>`.
 //   - XYZ corner: Z first, then probe each side face of the plate. At side
 //     contact the bit CENTER sits one bit-radius outside the stock face, so
 //     the work zero is `G10 L20 P0 <axis><-dir·radius>`.
@@ -73,6 +73,7 @@ function fmt(value: number): string {
 /** Z-only touch-plate cycle. Ends `retractMm` above the plate top, G90. */
 export function buildZProbeLines(params: ZProbeParams): ReadonlyArray<string> {
   return [
+    'G54',
     'G21',
     // G93 is modal and reinterprets F as inverse time. Always restore the
     // mm/min contract before any seek, probe, or retract motion.
