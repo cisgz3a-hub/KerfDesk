@@ -27,6 +27,7 @@
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
+| ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 
 ---
@@ -6493,9 +6494,31 @@ must preserve work zero and pass all normal readiness checks. The behavior is
 unit/integration verified; real interruption and embedded-tool hardware tests
 remain unverified and must use the standing air-cut/scrap protocol first.
 
+## ADR-137 - Trace reliability: latest request wins and completed work is reusable (2026-07-11)
+
+**Status:** accepted.
+
+> **Numbering note.** ADR-136 (CNC retract-first interruption recovery) was the last used; **ADR-137** is the next free.
+
+### Context
+
+The trace dialog debounces preview state, but the shared worker client still queues every request. A CPU-bound worker cannot receive a cancellation message until its current synchronous trace returns, so rapid preset changes can put obsolete jobs ahead of the only result the user wants. Every queued request also starts its own fixed timeout. Clicking Trace then decodes and traces the same source again even when the current preview already contains the matching geometry. On large or supersampled images, this duplicate and queued work is a more credible failure source than the tracing quality itself.
+
+### Decision
+
+Make the tracing pipeline explicitly single-flight and latest-wins. Starting a new worker trace retires the worker that owns an unfinished request, rejects that request with a typed superseded error, and runs the new request on a fresh worker. Supersession is control flow, not a preview error and not a reason to retry inline. The timeout applies only to the active request. A ready preview carries the identity of the file, options, boundary, and boundary mode; commit may reuse its paths and bounds only while all of those inputs still match. Bounded resize-at-decode, transferable worker buffers, and backend-specific working-pixel budgets preserve this one-live-job contract while limiting large-image memory and compute.
+
+### Consequences
+
+- Rapid option changes can pay worker startup again, but never wait behind stale CPU work; old worker memory becomes reclaimable as soon as it is terminated.
+- The preview and commit paths share one completed result when their inputs match, removing the most common duplicate full trace.
+- Large images are bounded before allocation-heavy tracing, and Region Enhance cannot stack an inner 4x supersampling pass on top of its own work scale.
+- This is in-process cancellation, not cooperative cancellation inside the tracing algorithms. A backend that monopolizes the main thread remains out of scope, and worker termination latency remains browser-controlled.
+- Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
+
 ## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
 
-> **Numbering note.** ADR-137 through ADR-139 are reserved by open PRs #53 and #56; **ADR-140** is the next unallocated decision number.
+> **Numbering note.** ADR-137 is accepted; ADR-138 and ADR-139 remain reserved by open PRs. **ADR-140** is allocated to this decision.
 
 Context. A profile cut removes the full wall across its depth passes, so the
 finished edge carries the roughing tool's deflection and chatter. Production CNC

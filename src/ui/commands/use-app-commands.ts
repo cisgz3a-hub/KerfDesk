@@ -16,6 +16,7 @@ import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -57,6 +58,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toggleBoardCapturePanel = useUiStore((s) => s.toggleBoardCapturePanel);
   const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
   const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
+  const rotaryFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.rotary);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -69,6 +71,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       toggleBoardCapturePanel,
       cameraPanelOpen,
       toggleCameraPanel,
+      rotaryFeatureEnabled,
+      rotaryProfileSupported: profileSupportsCapability(app.project.device, 'rotary'),
     }),
   );
 }
@@ -149,6 +153,8 @@ function appCommandContext(
     focusTestAvailable:
       profileSupportsCapability(app.project.device, 'z-axis') &&
       app.project.device.zTravelConfirmed === true,
+    rotaryFeatureEnabled: dialogs.rotaryFeatureEnabled,
+    rotaryProfileSupported: dialogs.rotaryProfileSupported,
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
   };
@@ -308,6 +314,9 @@ function saveGcodeAction(
         wcoCache: laser.wcoCache,
       },
       controllerSettings: laser.controllerSettings,
+      allowRotaryRaster:
+        useExperimentalLaserFeatures.getState().features.rotaryRaster &&
+        profileSupportsCapability(app.project.device, 'rotary'),
       pushToast,
     });
 }

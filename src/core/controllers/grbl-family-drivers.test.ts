@@ -73,4 +73,13 @@ describe('GRBL-family variant drivers', () => {
     expect(smoothiewareDriver.capabilities.overrides).toBe(false);
     expect(ruidaDriver.capabilities.overrides).toBe(false);
   });
+
+  it('exposes low-power Fire only on the GRBL-family protocol', () => {
+    expect(grblDriver.capabilities.lowPowerFire).toBe(true);
+    expect(grblHalDriver.capabilities.lowPowerFire).toBe(true);
+    expect(fluidncDriver.capabilities.lowPowerFire).toBe(true);
+    expect(marlinDriver.capabilities.lowPowerFire).toBe(false);
+    expect(smoothiewareDriver.capabilities.lowPowerFire).toBe(false);
+    expect(ruidaDriver.capabilities.lowPowerFire).toBe(false);
+  });
 });

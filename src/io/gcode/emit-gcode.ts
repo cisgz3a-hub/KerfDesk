@@ -34,6 +34,7 @@ export type EmitGcodeOptions = {
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
+  readonly allowRotaryRaster?: boolean;
   // When set, a provenance comment header (build/commit/emitter) is prepended to
   // the returned G-code. Preflight runs on the motion body only, so the header
   // never affects the verdict, and callers that need deterministic, header-free
@@ -53,9 +54,13 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   });
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
   const machine = prepared.project.machine;
-  // Rotary (ADR-127): scale Y at the last moment so previews stay
-  // surface-true; refuse raster jobs (v1 is vectors-only) before any emit.
-  const rotaryStage = applyRotaryStage(prepared.project, prepared.job);
+  // Scale Y at the last moment so design previews stay surface-true. Raster
+  // remains fail-closed unless the caller proves the Labs gate.
+  const rotaryStage = applyRotaryStage(
+    prepared.project,
+    prepared.job,
+    options.allowRotaryRaster === true,
+  );
   if (rotaryStage.kind === 'refused') return { gcode: '', preflight: rotaryStage.preflight };
   const job = rotaryStage.job;
   // CNC router projects always emit through the Z-aware GRBL strategy; laser
@@ -105,14 +110,11 @@ type RotaryStage =
   | { readonly kind: 'refused'; readonly preflight: PreflightResult }
   | { readonly kind: 'ok'; readonly job: Job; readonly boundsHeightOverrideMm?: number };
 
-// ADR-127: with the rotary active on a laser project, refuse raster jobs
-// (v1 is vectors-only), then delegate the Y scale/rebase + wrap limit to the
-// shared machineSpaceJob helper so framing, the estimate, placement, and
-// .rd export all agree with the emitted motion (review R3). CNC and disabled
-// rotary pass through untouched.
-function applyRotaryStage(project: Project, job: Job): RotaryStage {
+// Delegate Y scale/rebase + wrap limit to the shared machine-space helper.
+// CNC and disabled rotary pass through untouched.
+function applyRotaryStage(project: Project, job: Job, allowRotaryRaster: boolean): RotaryStage {
   if (!rotaryAppliesTo(project.device, project.machine)) return { kind: 'ok', job };
-  if (job.groups.some((group) => group.kind === 'raster')) {
+  if (!allowRotaryRaster && job.groups.some((group) => group.kind === 'raster')) {
     return {
       kind: 'refused',
       preflight: {
@@ -121,8 +123,8 @@ function applyRotaryStage(project: Project, job: Job): RotaryStage {
           {
             code: 'rotary-raster-unsupported',
             message:
-              'Image engraves are not supported with the rotary enabled (v1 is vectors-only). ' +
-              'Disable the rotary in Tools → Rotary Setup, or remove the image layer.',
+              'Rotary image engraving is experimental and disabled. ' +
+              'Enable it in Tools > Labs, disable the rotary, or remove the image layer.',
           },
         ],
       },

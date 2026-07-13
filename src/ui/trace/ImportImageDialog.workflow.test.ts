@@ -167,6 +167,17 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
+  it('does not show contour-only Smoothness and Optimize controls for Centerline', async () => {
+    await withTraceDialog(async (host) => {
+      await changePreset(presetSelect(host), 'Centerline');
+      const text = host.textContent ?? '';
+      expect(text).toContain('Threshold');
+      expect(text).toContain('Ignore Less Than');
+      expect(text).not.toContain('Smoothness');
+      expect(text).not.toContain('Optimize');
+    });
+  });
+
   it('reveals the boundary-mode toggle only after a region is boxed', async () => {
     await withTraceDialog(async (host) => {
       // No boundary yet → the crop/enhance toggle is hidden.

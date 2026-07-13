@@ -86,7 +86,7 @@ export function prepareOutput(
   return {
     ok: true,
     project: outputProject,
-    job: project.optimization.reduceTravelMoves ? optimizePaths(placed) : placed,
+    job: optimizePaths(placed, project.optimization),
     jobOriginOffset: offset,
   };
 }

@@ -91,6 +91,46 @@ describe('traceImage (worker client with inline fallback)', () => {
     expect(Number.isFinite(result.bounds.maxY)).toBe(true);
   });
 
+  it('transfers a copied pixel buffer while preserving the cached source pixels', async () => {
+    vi.resetModules();
+    let sentRequest: TraceWorkerRequest | undefined;
+    let sentTransfer: ReadonlyArray<Transferable> | undefined;
+    class TransferWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      postMessage(request: TraceWorkerRequest, transfer: ReadonlyArray<Transferable>): void {
+        sentRequest = request;
+        sentTransfer = transfer;
+        const response: TraceWorkerResponse = {
+          id: request.id,
+          kind: 'ok',
+          paths: [],
+          bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+        };
+        queueMicrotask(() => {
+          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
+        });
+      }
+
+      terminate(): void {
+        /* healthy worker is reused */
+      }
+    }
+    vi.stubGlobal('Worker', TransferWorker);
+    const client = await import('./use-trace-worker-client');
+    const source = tinyImage();
+    source.data[0] = 37;
+
+    await client.traceImage(source, traceOptions);
+
+    expect(sentRequest?.image.data).not.toBe(source.data);
+    expect(sentRequest?.image.data[0]).toBe(37);
+    expect(sentTransfer).toHaveLength(1);
+    expect(sentTransfer?.[0]).toBe(sentRequest?.image.data.buffer);
+    expect(source.data.byteLength).toBe(source.width * source.height * 4);
+  });
+
   it('keeps the worker alive after one request returns a trace error', async () => {
     vi.resetModules();
     const workers: FakeTraceWorker[] = [];

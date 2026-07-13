@@ -64,6 +64,9 @@ export type ControllerCapabilities = {
   // a 3 s spin-up dwell would become 3 ms and the bit plunges before the
   // spindle is at speed.
   readonly cncJobs: boolean;
+  // Momentary low-power M3/S positioning beam. This is a protocol capability;
+  // the active machine profile and explicit operator opt-in must also allow it.
+  readonly lowPowerFire: boolean;
   // GRBL 1.1 extended realtime override bytes (0x90–0x9D: feed/rapid/spindle).
   // false ⇒ the firmware has no realtime overrides, so such a byte would land
   // in its line buffer and corrupt the stream mid-job — the UI must not mount

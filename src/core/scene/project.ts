@@ -14,11 +14,22 @@ export type Workspace = {
 };
 
 export type ProjectOptimizationSettings = {
+  /** Legacy compatibility field, kept synchronized with travelPolicy. */
   readonly reduceTravelMoves: boolean;
+  readonly travelPolicy: 'nearest-neighbor' | 'source-order';
+  readonly insideFirst: boolean;
+  readonly layerPriority: 'project-order' | 'reverse-project-order';
+  readonly pathDirection: 'allow-reverse' | 'preserve';
+  readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
 };
 
 export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   reduceTravelMoves: true,
+  travelPolicy: 'nearest-neighbor',
+  insideFirst: true,
+  layerPriority: 'project-order',
+  pathDirection: 'allow-reverse',
+  startPoint: 'machine-origin',
 };
 
 export type Project = {

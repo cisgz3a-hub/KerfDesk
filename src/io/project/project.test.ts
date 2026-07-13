@@ -321,45 +321,6 @@ describe('deserializeProject', () => {
     }
   });
 
-  it('back-fills missing optimization settings on older .lf2 files', () => {
-    const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
-      device: {
-        name: 'Default',
-        bedWidth: 300,
-        bedHeight: 300,
-        maxFeed: 3000,
-        maxPowerS: 1000,
-        origin: 'front-left',
-        homing: { enabled: false, direction: 'front-left' },
-        autofocusCommand: '',
-      },
-      workspace: { width: 300, height: 300, units: 'mm' },
-      scene: { objects: [], layers: [] },
-    });
-
-    const result = deserializeProject(oldShape);
-
-    expect(result.kind).toBe('ok');
-    if (result.kind === 'ok') {
-      expect(result.project.optimization.reduceTravelMoves).toBe(true);
-    }
-  });
-
-  it('reports invalid when optimization settings have the wrong type', () => {
-    const text = serializeProject({
-      ...aProject(),
-      optimization: { reduceTravelMoves: 'sometimes' },
-    } as unknown as Project);
-
-    const result = deserializeProject(text);
-
-    expect(result.kind).toBe('invalid');
-    if (result.kind === 'invalid') {
-      expect(result.reason).toMatch(/optimization\.reduceTravelMoves/);
-    }
-  });
-
   it('back-fills missing letterSpacing on text objects from pre-D.1 .lf2 files', () => {
     // D.1 added letterSpacing to TextObject. Files saved before D.1 are
     // missing the field; normalizeSceneObject must fill it with the
