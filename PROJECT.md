@@ -143,6 +143,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.15 | Two-tool pocket rest machining with bounded 2D remaining-stock geometry and guarded manual tool change (ADR-153) | Built; hardware CLAIMED |
 | H.16 | Verified constant-load adaptive clearing for bounded island-free pockets (ADR-154) | Built; hardware CLAIMED |
 | H.17 | Linked straight-sided inlay pocket and insert pairs with radius-matched geometry (ADR-155) | Built; hardware CLAIMED |
+| H.18 | Persisted drag-placeable holding-tab anchors for closed CNC profiles (ADR-156) | Built; hardware CLAIMED |
 
 
 ### Phase I — v0.9 "Multi-controller" [Merged to main; awaiting remaining hardware passes]

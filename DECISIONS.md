@@ -6945,3 +6945,37 @@ The two halves cannot drift in tool radius, allowance, ordering, or persisted se
 creates a ready-to-cut pair but increases required stock width, which preview and bed checks must
 still validate. Software verification covers geometry, compilation, ordering, persistence, and
 preflight; hardware remains CLAIMED until the standing CNC air-cut and scrap protocol passes.
+
+---
+
+## ADR-156 - Manual CNC tabs use persisted normalized contour anchors
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Automatic tab spacing can place bridges on corners, visible faces, or difficult cleanup locations.
+Direct manipulation is useful only if the displayed handles, saved project, compensated toolpath,
+and emitted gaps all describe the same physical positions after ordinary object transforms.
+
+### Decision
+
+- A selected closed profile object may replace its automatic distribution with object-level anchors
+  identified by layer color, path index, polyline index, and normalized contour arc length.
+- Dragging projects the handle back onto an eligible source contour. Move, rotate, mirror, scale,
+  duplicate, save, and reload preserve the normalized anchors with the object.
+- Compilation projects each source anchor onto the matching compensated roughing and finishing
+  contours before splitting tab gaps. Objects without manual anchors continue using automatic tabs,
+  including other objects on the same layer.
+- Reset removes the manual anchors for that layer and restores automatic distribution. One drag is
+  one undoable interaction, and Escape restores the pre-drag project.
+- Manual positions apply to ordinary closed profile cuts. Generated inlay inserts, click-to-add or
+  delete, and triangular 3D tabs remain outside this decision.
+
+### Consequences
+
+Operators can move bridges away from weak or visible locations without losing them across project
+round trips or object transforms. Anchors depend on the referenced path topology; a future topology-
+changing editor must deliberately remap or invalidate them rather than guessing. Software tests
+cover persistence, mixed automatic/manual layers, compensated roughing and finishing paths, and
+interaction undo; hardware remains CLAIMED pending the standing CNC cut protocol.

@@ -40,7 +40,7 @@ import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
-import { collectLayerContours, collectLayerPolylines } from './collect-cnc-contours';
+import { collectLayerContours } from './collect-cnc-contours';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
