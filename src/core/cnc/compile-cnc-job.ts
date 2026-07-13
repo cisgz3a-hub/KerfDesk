@@ -41,15 +41,13 @@ import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
-import { drillPeckPasses } from './drill-peck';
 import { planHelicalPocketPasses } from './helical-entry';
 import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { orderInnerFirst } from './profile-ordering';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
-import { vcarvePasses } from './vcarve-ladder';
-import { adaptivePocketPassesForSettings } from './adaptive-pocket-operation';
+import { specializedPassesForLayer } from './compile-cnc-special-passes';
 
 const COORD_EPS = 1e-9;
 
@@ -249,34 +247,12 @@ function passesForLayer(
   tool: CncTool,
   config: CncMachineConfig,
 ): ReadonlyArray<CncPass> {
-  // V-carve computes per-ring depths itself (H.3) — it does not fit the
-  // "XY toolpaths × uniform depth ladder" shape of the other cut types.
-  if (settings.cutType === 'v-carve') {
-    return vcarvePasses(polylines, {
-      tool,
-      maxDepthMm: settings.depthMm,
-      depthPerPassMm: settings.depthPerPassMm,
-      resolutionMm: settings.vResolutionMm,
-    });
-  }
-  // Drill encodes its own peck Z cycle (H.7) — no XY toolpath × depth grid.
-  if (settings.cutType === 'drill') {
-    return drillPeckPasses(polylines, {
-      depthMm: settings.depthMm,
-      depthPerPassMm: settings.depthPerPassMm,
-    });
-  }
+  const specialized = specializedPassesForLayer(polylines, settings, tool);
+  if (specialized !== null) return specialized;
   // Finish allowance: roughing toolpaths stay `allowanceMm` proud of the wall
   // (0 for every non-profile cut and for profile cuts without an allowance, so
   // the offset — and therefore the output — is byte-identical to before).
   const allowanceMm = profileFinishAllowanceMm(settings);
-  const adaptive = adaptivePocketPassesForSettings(
-    polylines,
-    settings,
-    tool,
-    zPassDepths(settings.depthMm, settings.depthPerPassMm),
-  );
-  if (adaptive !== null) return adaptive;
   const restOperation = resolveRestPocketOperation(polylines, settings, config);
   if (restOperation.kind === 'error') return [];
   const raw =
