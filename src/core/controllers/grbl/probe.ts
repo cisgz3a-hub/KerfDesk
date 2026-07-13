@@ -149,6 +149,7 @@ export function buildCornerProbeLines(params: CornerProbeParams): ReadonlyArray<
   const xAfterCentering = sx * PLATE_CENTER_MM;
   const yAfterRetreat = -sy * (radius + SIDE_RETREAT_MM);
   return [
+    'G54',
     ...zContactLines(params),
     `G0 Z${fmt(PLATE_TOP_CLEAR_MM)}`,
     ...sideLegLines('X', sx, params, zTop),
