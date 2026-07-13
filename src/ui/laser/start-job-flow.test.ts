@@ -17,6 +17,7 @@ import {
   fingerprintsEqual,
 } from '../../core/recovery';
 import { useStore } from '../state';
+import { resetStore } from '../state/test-helpers';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -79,6 +80,8 @@ function runnableProject() {
 
 describe('runStartJobFlow', () => {
   beforeEach(() => {
+    localStorage.clear();
+    resetStore();
     useStore.setState({
       project: runnableProject(),
       selectedObjectId: null,
@@ -99,6 +102,7 @@ describe('runStartJobFlow', () => {
   });
 
   afterEach(() => {
+    localStorage.clear();
     useLaserStore.setState({
       ...initialLaserState(),
       startJob: originalStartJob,
@@ -130,6 +134,10 @@ describe('runStartJobFlow', () => {
         },
       },
     }));
+    useLaserStore.setState({
+      activeControllerKind: 'marlin',
+      detectedControllerKind: 'marlin',
+    });
 
     await runStartJobFlow();
 
@@ -144,6 +152,7 @@ describe('runStartJobFlow', () => {
 describe('job checkpoint integration (ADR-118)', () => {
   beforeEach(() => {
     localStorage.clear();
+    resetStore();
     useStore.setState({
       project: runnableProject(),
       selectedObjectId: null,
