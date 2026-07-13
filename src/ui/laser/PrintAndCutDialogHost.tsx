@@ -1,9 +1,6 @@
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import {
-  resolvePrintCutRegistration,
-  usePrintCutSessionStore,
-} from '../state/print-cut-session-store';
+import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
 import { PrintAndCutDialog } from './PrintAndCutDialog';
 
@@ -14,7 +11,6 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
   const session = usePrintCutSessionStore();
   const pushToast = useToastStore((state) => state.pushToast);
   const epoch = laser.trustedPositionEpoch ?? 0;
-  const registration = resolvePrintCutRegistration(project, epoch, session);
   const captureEnabled =
     laser.connection.kind === 'connected' &&
     laser.homingState === 'confirmed' &&
@@ -36,7 +32,6 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       firstMachinePoint={session.first?.epoch === epoch ? session.first.point : null}
       secondMachinePoint={session.second?.epoch === epoch ? session.second.point : null}
       captureEnabled={captureEnabled}
-      invalidReason={registration.kind === 'invalid' ? registration.reason : null}
       onCapture={capture}
       onCancel={props.onClose}
       onApply={(targets) => {

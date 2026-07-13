@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { solveTwoPointRegistration } from '../../core/registration';
 import type { PrintAndCutDesignTargets, Vec2 } from '../../core/scene';
 import { Button, Dialog, DialogActions, NumberInput } from '../kit';
 
@@ -7,13 +8,17 @@ export function PrintAndCutDialog(props: {
   readonly firstMachinePoint: Vec2 | null;
   readonly secondMachinePoint: Vec2 | null;
   readonly captureEnabled: boolean;
-  readonly invalidReason: string | null;
   readonly onCapture: (which: 'first' | 'second') => void;
   readonly onCancel: () => void;
   readonly onApply: (targets: PrintAndCutDesignTargets) => void;
   readonly onDisable: () => void;
 }): JSX.Element {
   const [targets, setTargets] = useState(props.initialTargets);
+  const invalidReason = registrationDraftError(
+    targets,
+    props.firstMachinePoint,
+    props.secondMachinePoint,
+  );
   const setCoordinate = (which: 'first' | 'second', axis: 'x' | 'y', value: string): void => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
@@ -27,6 +32,7 @@ export function PrintAndCutDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
+        if (invalidReason !== null) return;
         props.onApply(targets);
       }}
     >
@@ -48,16 +54,31 @@ export function PrintAndCutDialog(props: {
           onCapture={() => props.onCapture('second')}
         />
       </div>
-      {props.invalidReason !== null ? <p style={warningStyle}>{props.invalidReason}</p> : null}
+      {invalidReason !== null ? <p style={warningStyle}>{invalidReason}</p> : null}
       <DialogActions>
         <Button onClick={props.onDisable}>Disable</Button>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" disabled={invalidReason !== null}>
           Apply registration
         </Button>
       </DialogActions>
     </Dialog>
   );
+}
+
+export function registrationDraftError(
+  targets: PrintAndCutDesignTargets,
+  firstMachinePoint: Vec2 | null,
+  secondMachinePoint: Vec2 | null,
+): string | null {
+  if (firstMachinePoint === null || secondMachinePoint === null) {
+    return 'Capture both machine registration points.';
+  }
+  const solved = solveTwoPointRegistration({
+    design: [targets.first, targets.second],
+    machine: [firstMachinePoint, secondMachinePoint],
+  });
+  return solved.ok ? null : solved.reason;
 }
 
 function TargetRow(props: {

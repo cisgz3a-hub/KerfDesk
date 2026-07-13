@@ -130,7 +130,48 @@ test('configures chuck rotary and generates its calibration pattern', async ({
   });
 });
 
-test('captures two machine points and persists print-and-cut design targets', async ({
+test('exports rotary raster through the opted-in machine-space transform', async ({
+  page,
+  kerfdesk,
+}) => {
+  await enableLab(page, 'Rotary image engraving');
+  await runMenuCommand(page, 'Tools', 'Rotary Setup...');
+  await page.getByLabel('Enable rotary for this machine profile').check();
+  await page.getByRole('button', { name: 'Chuck' }).click();
+  await page.getByLabel('Rotary object diameter').fill('80');
+  await page.getByLabel('Rotary millimetres per rotation').fill('360');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+
+  await kerfdesk.setOpenFiles([
+    { name: 'rotary-raster.png', kind: 'png-fixture', width: 16, height: 16 },
+  ]);
+  await page.getByRole('button', { name: 'Import Image...' }).click();
+  await runMenuCommand(page, 'File', 'Save G-code...');
+
+  const gcode = await savedText(kerfdesk, '.gcode');
+  const yValues = [...gcode.matchAll(/Y(-?\d+(?:\.\d+)?)/g)].map((match) => Number(match[1]));
+  expect(gcode).toContain('G21');
+  expect(yValues.length).toBeGreaterThan(2);
+  expect(Math.min(...yValues)).toBeGreaterThanOrEqual(0);
+  expect(Math.max(...yValues)).toBeGreaterThan(30);
+});
+
+test('gates camera bed alignment behind Labs and homing capability', async ({ page }) => {
+  await page.getByRole('button', { name: 'Camera' }).click();
+  const align = page.getByRole('button', { name: 'Align to bed…' });
+  await expect(align).toBeDisabled();
+  await expect(align).toHaveAttribute('title', /Tools > Labs/);
+
+  await enableLab(page, 'Camera alignment v2');
+  await expect(align).toBeEnabled();
+  await page.getByRole('button', { name: 'Start USB camera' }).click();
+  await align.click();
+  await expect(page.getByText('Align camera to bed', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Markers already burned' }).click();
+  await expect(page.getByRole('button', { name: 'Detect markers' })).toBeEnabled();
+});
+
+test('uses one print-and-cut transform for export and invalidates it on trust loss', async ({
   page,
   kerfdesk,
 }) => {
@@ -162,6 +203,25 @@ test('captures two machine points and persists print-and-cut design targets', as
   await kerfdesk.emitSerialLine('<Idle|MPos:120.000,30.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await captureButtons.nth(1).click();
   await page.getByRole('button', { name: 'Apply registration' }).click();
+
+  await runMenuCommand(page, 'File', 'Save G-code...');
+  const gcode = await savedText(kerfdesk, '.gcode');
+  expect(gcode).toContain('X30.000');
+  // Design Y=10 is registered to machine Y=40; front-left output then maps
+  // that bed coordinate to controller Y=300-40=260.
+  expect(gcode).toContain('Y260.000');
+
+  await page.getByRole('button', { name: /^Disconnect/ }).click();
+  const savedBefore = fileSavedCount(await kerfdesk.events());
+  let blockedMessage = '';
+  page.once('dialog', (dialog) => {
+    blockedMessage = dialog.message();
+    void dialog.dismiss();
+  });
+  await runMenuCommand(page, 'File', 'Save G-code...');
+  await expect.poll(() => blockedMessage).toContain('registration is not valid');
+  expect(fileSavedCount(await kerfdesk.events())).toBe(savedBefore);
+
   await page.getByRole('button', { name: 'Save As...' }).click();
 
   const saved = await savedProject(kerfdesk);
@@ -494,10 +554,26 @@ function exactSerialWriteCount(
 async function savedProject(kerfdesk: {
   savedFiles: () => Promise<Readonly<Record<string, string>>>;
 }): Promise<SavedProject> {
-  await expect.poll(async () => Object.keys(await kerfdesk.savedFiles()).length).toBeGreaterThan(0);
-  const text = Object.values(await kerfdesk.savedFiles())[0];
-  expect(text).toBeDefined();
-  return JSON.parse(text ?? '{}') as SavedProject;
+  return JSON.parse(await savedText(kerfdesk, '.lf2')) as SavedProject;
+}
+
+async function savedText(
+  kerfdesk: { savedFiles: () => Promise<Readonly<Record<string, string>>> },
+  extension: string,
+): Promise<string> {
+  await expect
+    .poll(async () =>
+      Object.keys(await kerfdesk.savedFiles()).some((name) => name.endsWith(extension)),
+    )
+    .toBe(true);
+  const files = await kerfdesk.savedFiles();
+  const entry = Object.entries(files).find(([name]) => name.endsWith(extension));
+  if (entry === undefined) throw new Error(`Saved ${extension} file missing`);
+  return entry[1];
+}
+
+function fileSavedCount(events: readonly Readonly<Record<string, unknown>>[]): number {
+  return events.filter((event) => event['kind'] === 'file-saved').length;
 }
 
 interface SavedProject {
