@@ -257,6 +257,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
 
     const priorCommand = useLaserStore.getState().sendConsoleCommand('$G');
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     const starting = useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
       cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),

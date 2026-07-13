@@ -7468,3 +7468,48 @@ that a grblHAL pendant/MPG owns input. The operator must return control and wait
 for `MPG:0`. This is one protocol-visible competing-owner signal, not a general
 ownership lease; unexpected-ack contamination is intentionally a separate
 decision because attribution false positives require a broader ledger audit.
+
+---
+
+## ADR-183 - Unexpected GRBL terminal responses invalidate controller ownership
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL-family `ok` and `error` replies do not identify their sender or command.
+KerfDesk can attribute them only while one of its own ledgers owns a response:
+an in-flight stream line, a reserved non-stream line, or the shared interactive
+command arbiter. The existing autofocus path bypassed those ledgers with a
+second line subscription, while the transport ledger reserved an owed ack only
+after `write()` resolved. Both created false attribution windows. Conversely, a
+bare terminal response with no owner is evidence that a second sender, macro,
+or controller-side path may be mutating the same session.
+
+### Decision
+
+- GRBL, grblHAL, and FluidNC classify every terminal response against the
+  pre-consumption ownership snapshot. Marlin, Smoothieware, Ruida, and
+  nonterminal lines are not included in this first policy.
+- Non-stream writes reserve their owed terminal responses synchronously before
+  awaiting the transport. Failed writes release the reservation; a reply that
+  arrives inside the transport Promise window is therefore still attributable.
+- Autofocus uses the single shared command arbiter and write/ack ledger. Its
+  composite completion requires a terminal `ok` plus a qualified later Idle or
+  an observed active-to-Idle cycle, without installing a private line reader.
+- A terminal response with no KerfDesk owner is intercepted before it can
+  advance a stream or enter ordinary error routing. The first response is
+  latched for the serial session, invalidates trusted-position, work-Z, and
+  Verified Frame evidence once, and raises a safety notice.
+- Notice dismissal, alarm, and controller banner/reset do not erase the latch.
+  Disconnect or a new connection clears it. CNC Start checks the latch before
+  its queue fence and again at final live readiness.
+
+### Consequences
+
+KerfDesk detects command-channel contamination that legacy GRBL cannot identify
+directly, and it no longer lets autofocus double-consume shared replies. The
+detector is intentionally conservative: a reply observed while KerfDesk owns a
+different valid command can still be misattributed because the firmware has no
+client identity. This is anomaly detection, not an exclusive lease; production
+multi-sender machines still require a sole gateway or machine interlock.

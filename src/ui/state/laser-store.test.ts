@@ -387,7 +387,7 @@ describe('laser-store autofocus lifecycle', () => {
     await connectWith(connection);
 
     const first = useLaserStore.getState().autofocus('$HZ1');
-    await Promise.resolve();
+    await flush();
     const second = useLaserStore.getState().autofocus('$HZ1');
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
@@ -405,7 +405,7 @@ describe('laser-store autofocus lifecycle', () => {
     await connectWith(connection);
 
     const autofocus = useLaserStore.getState().autofocus('$HZ1');
-    await Promise.resolve();
+    await flush();
 
     await expect(useLaserStore.getState().jog({ dx: 1, feed: 1000 })).rejects.toThrow(
       /auto-focus is running/i,

@@ -1,38 +1,49 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SerialConnection } from '../../platform/types';
-import type { StatusReport } from '../../core/controllers/grbl';
-import { describeAutofocusResult, runAutofocus } from './autofocus-action';
+import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
+import { describeAutofocusResult, runAutofocus, type RunAutofocusArgs } from './autofocus-action';
+import {
+  cancelControllerLifecycleRefs,
+  consumeControllerCommandResponse,
+  type ControllerLifecycleRefs,
+} from './laser-interactive-command';
 
-type MockConn = SerialConnection & {
-  readonly received: string[];
-  emit: (line: string) => void;
+type AutofocusHarness = {
+  readonly refs: ControllerLifecycleRefs;
+  readonly written: string[];
+  readonly emit: (line: string) => void;
+  readonly args: (overrides?: Partial<RunAutofocusArgs>) => RunAutofocusArgs;
 };
 
-function mockConnection(): MockConn {
-  const received: string[] = [];
-  const lineHandlers = new Set<(line: string) => void>();
-  const closeHandlers = new Set<() => void>();
-  const conn: MockConn = {
-    received,
-    write: async (data: string) => {
-      received.push(data);
-    },
-    onLine: (handler) => {
-      lineHandlers.add(handler);
-      return () => lineHandlers.delete(handler);
-    },
-    onClose: (handler) => {
-      closeHandlers.add(handler);
-      return () => closeHandlers.delete(handler);
-    },
-    close: async () => {
-      /* test stub — no-op */
-    },
-    emit: (line: string) => {
-      for (const h of lineHandlers) h(line);
-    },
+function makeHarness(write?: (line: string) => Promise<void>): AutofocusHarness {
+  const refs: ControllerLifecycleRefs = {
+    controllerCommand: null,
+    controllerIdleWait: null,
+    writeEpoch: 0,
   };
-  return conn;
+  const written: string[] = [];
+  const sharedWrite = async (line: string): Promise<void> => {
+    written.push(line);
+    await write?.(line);
+  };
+  return {
+    refs,
+    written,
+    emit: (line) => {
+      const response = classifyResponse(line);
+      consumeControllerCommandResponse(refs, response, line);
+      if (response.kind === 'status' && response.report.state === 'Alarm') {
+        cancelControllerLifecycleRefs(refs, 'Controller entered Alarm.');
+      }
+    },
+    args: (overrides = {}) => ({
+      connected: true,
+      statusReport: idleStatus(),
+      command: '$HZ1',
+      refs,
+      write: sharedWrite,
+      ...overrides,
+    }),
+  };
 }
 
 function idleStatus(): StatusReport {
@@ -49,174 +60,205 @@ function idleStatus(): StatusReport {
 
 describe('runAutofocus — preflight', () => {
   it('rejects when not connected', async () => {
-    const r = await runAutofocus({
-      connection: null,
-      statusReport: idleStatus(),
-      command: '$HZ1',
-    });
-    expect(r.kind).toBe('preflight-failed');
-    if (r.kind === 'preflight-failed') expect(r.reason).toMatch(/not connected/i);
+    const harness = makeHarness();
+    const result = await runAutofocus(harness.args({ connected: false }));
+    expect(result.kind).toBe('preflight-failed');
+    if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/not connected/i);
   });
 
   it('rejects when command is empty', async () => {
-    const r = await runAutofocus({
-      connection: mockConnection(),
-      statusReport: idleStatus(),
-      command: '   ',
-    });
-    expect(r.kind).toBe('preflight-failed');
+    const harness = makeHarness();
+    expect((await runAutofocus(harness.args({ command: '   ' }))).kind).toBe('preflight-failed');
   });
 
-  it('rejects multi-line commands ($HZ1 must be single-line)', async () => {
-    const r = await runAutofocus({
-      connection: mockConnection(),
-      statusReport: idleStatus(),
-      command: '$HZ1\nG1 Z0',
-    });
-    expect(r.kind).toBe('preflight-failed');
-    if (r.kind === 'preflight-failed') expect(r.reason).toMatch(/single line/i);
+  it('rejects multi-line commands', async () => {
+    const harness = makeHarness();
+    const result = await runAutofocus(harness.args({ command: '$HZ1\nG1 Z0' }));
+    expect(result.kind).toBe('preflight-failed');
+    if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/single line/i);
   });
 
-  it('rejects when controller is not idle', async () => {
-    const r = await runAutofocus({
-      connection: mockConnection(),
-      statusReport: { ...idleStatus(), state: 'Run' },
-      command: '$HZ1',
-    });
-    expect(r.kind).toBe('preflight-failed');
-    if (r.kind === 'preflight-failed') expect(r.reason).toMatch(/Idle/i);
+  it('rejects when controller is not Idle', async () => {
+    const harness = makeHarness();
+    const result = await runAutofocus(
+      harness.args({ statusReport: { ...idleStatus(), state: 'Run' } }),
+    );
+    expect(result.kind).toBe('preflight-failed');
+    if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/Idle/i);
   });
 });
 
-describe('runAutofocus — wire protocol', () => {
+describe('runAutofocus — shared response ownership', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('sends the command + a status query', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    // Let the write microtask drain.
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(conn.received[0]).toBe('$HZ1\n');
-    expect(conn.received[1]).toBe('?');
-    // Cycle to completion so the test cleans up.
-    conn.emit('ok');
-    conn.emit('<Run|MPos:0.000,0.000,0.000|FS:0,0>');
-    conn.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
-    const r = await p;
-    expect(r.kind).toBe('ok');
+  it('sends the command through the shared write function', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    expect(harness.written).toEqual(['$HZ1\n']);
+    harness.emit('ok');
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    expect((await pending).kind).toBe('ok');
   });
 
-  it('resolves ok after Idle → Run → Idle cycle', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    await Promise.resolve();
-    conn.emit('ok');
-    conn.emit('<Run|MPos:0.000,0.000,0.000|FS:0,0>');
-    conn.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
-    expect((await p).kind).toBe('ok');
+  it('resolves when ok and Idle arrive synchronously in one pump turn', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    harness.emit('ok');
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    expect((await pending).kind).toBe('ok');
   });
 
-  it('treats unknown status tokens (Falcon Focus) as active', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    await Promise.resolve();
-    conn.emit('ok');
-    conn.emit('<Focus|MPos:0.000,0.000,-2.000|FS:0,0>');
-    conn.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
-    expect((await p).kind).toBe('ok');
+  it('retains ok and Idle delivered before the shared write promise resolves', async () => {
+    let releaseWrite: () => void = () => undefined;
+    const harness = makeHarness(
+      async () =>
+        await new Promise<void>((resolve) => {
+          releaseWrite = resolve;
+        }),
+    );
+    const pending = runAutofocus(harness.args());
+    await flush();
+
+    harness.emit('ok');
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    releaseWrite();
+    await flush();
+
+    expect((await pending).kind).toBe('ok');
   });
 
-  it('resolves ok on Falcon firmwares that ack + skip straight to Idle', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    await Promise.resolve();
-    conn.emit('ok');
-    // No Run/Home/Focus phase — just Idle after ack.
-    conn.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
-    expect((await p).kind).toBe('ok');
+  it('accepts an active-to-Idle cycle that completes before the terminal ok', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    harness.emit('<Run|MPos:0.000,0.000,-2.000|FS:0,0>');
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    harness.emit('ok');
+    expect((await pending).kind).toBe('ok');
   });
 
-  it('rejects on error: response with the error code', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    await Promise.resolve();
-    conn.emit('error:20');
-    const r = await p;
-    expect(r.kind).toBe('rejected');
-    if (r.kind === 'rejected') {
-      expect(r.errorCode).toBe(20);
-      expect(r.raw).toBe('error:20');
-    }
-  });
-
-  it('rejects on unrecognized error responses without assigning a GRBL code', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    await Promise.resolve();
-    conn.emit('error:7002009');
-    const r = await p;
-    expect(r.kind).toBe('rejected');
-    if (r.kind === 'rejected') {
-      expect(r.errorCode).toBeNull();
-      expect(r.raw).toBe('error:7002009');
-    }
-  });
-
-  it('rejects on Alarm status', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
-    await Promise.resolve();
-    conn.emit('ok');
-    conn.emit('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
-    expect((await p).kind).toBe('alarm');
-  });
-
-  it('times out when no response after timeoutMs', async () => {
-    const conn = mockConnection();
-    const p = runAutofocus({
-      connection: conn,
-      statusReport: idleStatus(),
-      command: '$HZ1',
-      timeoutMs: 1000,
+  it('ignores a stale pre-ack Idle until a fresh post-ack Idle arrives', async () => {
+    const harness = makeHarness();
+    let settled = false;
+    const pending = runAutofocus(harness.args()).then((result) => {
+      settled = true;
+      return result;
     });
-    await Promise.resolve();
-    vi.advanceTimersByTime(1500);
-    expect((await p).kind).toBe('timeout');
-  });
-});
-
-describe('describeAutofocusResult', () => {
-  it('maps error:20 to a helpful firmware hint', () => {
-    const t = describeAutofocusResult({ kind: 'rejected', errorCode: 20, raw: 'error:20' });
-    expect(t.variant).toBe('error');
-    expect(t.message).toMatch(/firmware/i);
+    await flush();
+    harness.emit('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    harness.emit('ok');
+    await flush();
+    expect(settled).toBe(false);
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    expect((await pending).kind).toBe('ok');
   });
 
-  it('maps error:9 to the no-probe-pin hint', () => {
-    const t = describeAutofocusResult({ kind: 'rejected', errorCode: 9, raw: 'error:9' });
-    expect(t.message).toMatch(/probe pin/i);
+  it('rejects on error response with the error code', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    harness.emit('error:20');
+    expect(await pending).toEqual({ kind: 'rejected', errorCode: 20, raw: 'error:20' });
   });
 
-  it('maps unrecognized error responses to the raw controller reply', () => {
-    const t = describeAutofocusResult({
+  it('preserves unrecognized error responses without assigning a GRBL code', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    harness.emit('error:7002009');
+    expect(await pending).toEqual({
       kind: 'rejected',
       errorCode: null,
       raw: 'error:7002009',
     });
-    expect(t.message).toContain('error:7002009');
+  });
+
+  it('rejects on Alarm status', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    harness.emit('ok');
+    harness.emit('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect((await pending).kind).toBe('alarm');
+  });
+
+  it('rejects on a terminal ALARM with its code', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    harness.emit('ALARM:3');
+    expect(await pending).toEqual({ kind: 'alarm', alarmCode: 3 });
+  });
+
+  it('times out and releases the semantic owner', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ timeoutMs: 1000 }));
+    await flush();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect((await pending).kind).toBe('timeout');
+    expect(harness.refs.controllerCommand).toBeNull();
+  });
+
+  it('is cancelled promptly through the shared lifecycle', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args());
+    await flush();
+    cancelControllerLifecycleRefs(harness.refs, 'Controller disconnected.');
+    expect(await pending).toEqual({
+      kind: 'preflight-failed',
+      reason: 'Controller disconnected.',
+    });
+  });
+
+  it('reports shared write failures and releases the semantic owner', async () => {
+    const harness = makeHarness(async () => {
+      throw new Error('USB write failed');
+    });
+    expect(await runAutofocus(harness.args())).toEqual({
+      kind: 'preflight-failed',
+      reason: 'USB write failed',
+    });
+    expect(harness.refs.controllerCommand).toBeNull();
+  });
+});
+
+async function flush(): Promise<void> {
+  for (let i = 0; i < 4; i += 1) await Promise.resolve();
+}
+
+describe('describeAutofocusResult', () => {
+  it('maps error:20 to a helpful firmware hint', () => {
+    const result = describeAutofocusResult({ kind: 'rejected', errorCode: 20, raw: 'error:20' });
+    expect(result.variant).toBe('error');
+    expect(result.message).toMatch(/firmware/i);
+  });
+
+  it('maps error:9 to the no-probe-pin hint', () => {
+    const result = describeAutofocusResult({ kind: 'rejected', errorCode: 9, raw: 'error:9' });
+    expect(result.message).toMatch(/probe pin/i);
+  });
+
+  it('maps unrecognized error responses to the raw controller reply', () => {
+    const result = describeAutofocusResult({
+      kind: 'rejected',
+      errorCode: null,
+      raw: 'error:7002009',
+    });
+    expect(result.message).toContain('error:7002009');
   });
 
   it('maps timeout to a warning', () => {
-    const t = describeAutofocusResult({ kind: 'timeout' });
-    expect(t.variant).toBe('warning');
-    expect(t.message).toMatch(/may still be moving/i);
-    expect(t.message).toMatch(/physical/i);
+    const result = describeAutofocusResult({ kind: 'timeout' });
+    expect(result.variant).toBe('warning');
+    expect(result.message).toMatch(/may still be moving/i);
+    expect(result.message).toMatch(/physical/i);
   });
 
   it('maps ok to a success toast', () => {
-    const t = describeAutofocusResult({ kind: 'ok' });
-    expect(t.variant).toBe('success');
+    const result = describeAutofocusResult({ kind: 'ok' });
+    expect(result.variant).toBe('success');
   });
 });

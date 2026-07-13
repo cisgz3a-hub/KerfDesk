@@ -68,7 +68,21 @@ export type LaserSafetyNotice =
   | {
       readonly kind: 'frame-limit';
       readonly message: string;
+    }
+  | {
+      readonly kind: 'controller-ownership';
+      readonly message: string;
     };
+
+export const CONTROLLER_OWNERSHIP_LOST_MESSAGE =
+  'KerfDesk received an ok/error reply that no KerfDesk command owns. Another sender, pendant, ' +
+  'or controller-side macro may be sharing the command channel, so queued-command accounting and ' +
+  'machine position can no longer be trusted. Stop other senders, disconnect and reconnect, then ' +
+  'repeat CNC setup before starting.';
+
+export function controllerOwnershipLostNotice(): LaserSafetyNotice {
+  return { kind: 'controller-ownership', message: CONTROLLER_OWNERSHIP_LOST_MESSAGE };
+}
 
 // M13 (AUDIT-2026-06-10): the streamer is ack-driven — if GRBL stops
 // answering (wedged firmware, half-dead USB, EMI) the job sat at a frozen

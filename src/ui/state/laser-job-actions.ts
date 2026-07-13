@@ -27,6 +27,7 @@ import {
 } from './cnc-setup-attestation';
 import { cncResumeBlockMessage } from './cnc-pause-resume-policy';
 import {
+  assertCncControllerOwnershipClean,
   assertCncLiveStartReady,
   assertCncMpgInactive,
   refreshCncLiveStartState,
@@ -89,6 +90,7 @@ export function jobActions(
         }
         assertCncSetupAttested(gcode, options, setupEpoch);
         const machineKind = options.machineKind ?? 'laser';
+        assertCncControllerOwnershipClean(set, get, machineKind);
         assertCncMpgInactive(set, get, machineKind);
         if (machineKind === 'cnc') {
           await startControllerCommand(refs, safeWrite, {
