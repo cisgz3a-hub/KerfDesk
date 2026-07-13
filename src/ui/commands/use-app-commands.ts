@@ -58,6 +58,9 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toggleBoardCapturePanel = useUiStore((s) => s.toggleBoardCapturePanel);
   const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
   const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
+  const layersPanelOpen = useUiStore((s) => s.railPanelVisibility.layers);
+  const machinePanelOpen = useUiStore((s) => s.railPanelVisibility.machine);
+  const toggleRailPanel = useUiStore((s) => s.toggleRailPanel);
   const rotaryFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.rotary);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
@@ -71,6 +74,10 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       toggleBoardCapturePanel,
       cameraPanelOpen,
       toggleCameraPanel,
+      layersPanelOpen,
+      toggleLayersPanel: () => toggleRailPanel('layers'),
+      machinePanelOpen,
+      toggleMachinePanel: () => toggleRailPanel('machine'),
       rotaryFeatureEnabled,
       rotaryProfileSupported: profileSupportsCapability(app.project.device, 'rotary'),
     }),
@@ -123,6 +130,7 @@ function appCommandContext(
     toggleBoardCapturePanel: dialogs.toggleBoardCapturePanel,
     cameraPanelOpen: dialogs.cameraPanelOpen,
     toggleCameraPanel: dialogs.toggleCameraPanel,
+    ...railPanelCommandContext(dialogs, activeStreamer),
     hasRasterSelection: selected?.kind === 'raster-image',
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
@@ -157,6 +165,22 @@ function appCommandContext(
     rotaryProfileSupported: dialogs.rotaryProfileSupported,
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
+  };
+}
+
+function railPanelCommandContext(
+  dialogs: CommandDialogs,
+  jobActive: boolean,
+): Pick<
+  AppCommandContext,
+  'jobActive' | 'layersPanelOpen' | 'toggleLayersPanel' | 'machinePanelOpen' | 'toggleMachinePanel'
+> {
+  return {
+    jobActive,
+    layersPanelOpen: dialogs.layersPanelOpen,
+    toggleLayersPanel: dialogs.toggleLayersPanel,
+    machinePanelOpen: dialogs.machinePanelOpen,
+    toggleMachinePanel: dialogs.toggleMachinePanel,
   };
 }
 

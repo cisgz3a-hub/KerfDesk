@@ -90,6 +90,8 @@ export type CommandId =
   | 'laser.disconnect'
   | 'laser.home'
   | 'window.toggle-preview'
+  | 'window.toggle-layers-panel'
+  | 'window.toggle-machine-panel'
   | 'window.fit-view'
   | 'window.project-notes'
   | 'window.undo-history'
@@ -120,6 +122,7 @@ export type AppCommandContext = {
   readonly serialSupported: boolean;
   readonly connected: boolean;
   readonly machineBusy: boolean;
+  readonly jobActive: boolean;
   readonly homingEnabled: boolean;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
@@ -220,6 +223,10 @@ export type AppCommandContext = {
   readonly togglePreview: () => void;
   readonly previewActive: boolean;
   readonly hasPreviewableContent: boolean;
+  readonly layersPanelOpen: boolean;
+  readonly toggleLayersPanel: () => void;
+  readonly machinePanelOpen: boolean;
+  readonly toggleMachinePanel: () => void;
   readonly resetView: () => void;
   readonly projectNotes: () => void;
   readonly undoHistory: () => void;

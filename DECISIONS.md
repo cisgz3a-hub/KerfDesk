@@ -29,6 +29,7 @@
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
+| ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 
 ---
@@ -6551,9 +6552,49 @@ desktop widths gain vertical space while specialist labels remain available
 where room permits. Operators on narrow windows may need to horizontally scroll
 the command group, but every command also remains available from the menus.
 
+## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The fixed 320 px Cuts/Layers rail and 300 px machine rail consume most of a
+1024 px workspace before the drawing tool strip. The canvas remains technically
+responsive but becomes too narrow for practical layout work. Neither rail had a
+visibility command, so operators could not trade inspector space for canvas
+space without resizing the whole application.
+
+The machine rail also owns the visible Stop control. Treating it like an
+ordinary hideable inspector during a stream would remove the primary pointer
+target for an emergency stop, even though the global keyboard shortcut remains.
+
+### Decision
+
+- Ephemeral UI state tracks Cuts/Layers and machine-panel visibility
+  independently. It is not project data and is not included in undo or `.lf2`.
+- Each expanded rail has a header collapse button. A collapsed rail remains as
+  a narrow named strip with an expand button, preserving location and
+  discoverability.
+- Checked commands in the Window menu mirror both visibility states.
+- Entering a viewport 700 px wide or narrower collapses both rails once. Users
+  may expand either rail while remaining compact; the default reapplies only on
+  the next transition into compact mode.
+- An active job makes the machine panel fail-visible regardless of its stored
+  preference. Its collapse button and Window command are disabled until the job
+  is no longer active, so the visible Stop control remains reachable.
+
+### Consequences
+
+Compact windows can recover 280 px per collapsed rail without hiding how to
+restore the panels. Ending a job restores the operator's prior machine-panel
+preference, so a panel that was collapsed before Start collapses again after the
+stream fully settles. Panel visibility remains session-only; persistence across
+launches can be added later if user testing shows that preference is valuable.
+At 700 px and below, the initial canvas no longer collapses to zero width.
+
 ## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
 
-> **Numbering note.** ADR-137 and ADR-138 are accepted; ADR-139 remains reserved by an open PR. **ADR-140** is allocated to this decision.
+> **Numbering note.** ADR-137 through ADR-139 are accepted. **ADR-140** is allocated to this decision.
 
 Context. A profile cut removes the full wall across its depth passes, so the
 finished edge carries the roughing tool's deflection and chatter. Production CNC

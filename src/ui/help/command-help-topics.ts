@@ -296,6 +296,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'window',
     tooltip: 'Preview the exact toolpath that will be sent to the machine.',
   },
+  'window.toggle-layers-panel': {
+    family: 'window',
+    tooltip: 'Show or hide the Cuts / Layers panel to control the workspace width.',
+  },
+  'window.toggle-machine-panel': {
+    family: 'window',
+    tooltip: 'Show or hide the machine controls panel when no job is active.',
+  },
   'window.fit-view': {
     family: 'window',
     tooltip: 'Fit the full machine bed into the workspace view.',

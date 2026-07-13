@@ -11,9 +11,11 @@
 // fields as field rows below.
 
 import { machineKindOf } from '../../core/scene';
+import { CollapsedRail, RailPanelHeading } from '../common';
 import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { AddLayerControls } from './AddLayerControls';
 import { CncAdvancedToggle } from './CncAdvancedToggle';
 import { LayerRow } from './LayerRow';
@@ -24,6 +26,8 @@ import { SelectedObjectProperties } from './SelectedObjectProperties';
 import { SelectedReliefProperties } from './SelectedReliefProperties';
 
 export function CutsLayersPanel(): JSX.Element {
+  const panelVisible = useUiStore((s) => s.railPanelVisibility.layers);
+  const togglePanel = useUiStore((s) => s.toggleRailPanel);
   const layers = useStore((s) => s.project.scene.layers);
   const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const selectedObjectId = useStore((s) => s.selectedObjectId);
@@ -32,11 +36,18 @@ export function CutsLayersPanel(): JSX.Element {
   // The Material Library stores laser presets (power/speed); it hides in CNC
   // mode where those numbers have no meaning.
   const showMaterialLibrary = machineKind === 'laser';
+  if (!panelVisible) {
+    return (
+      <CollapsedRail
+        title="Cuts / Layers"
+        ariaLabel="Cuts / Layers panel collapsed"
+        onExpand={() => togglePanel('layers')}
+      />
+    );
+  }
   return (
     <aside aria-label="Cuts / Layers panel" className="lf-rail" style={panelStyle}>
-      <h2 className="lf-heading" style={headingStyle}>
-        Cuts / Layers
-      </h2>
+      <RailPanelHeading title="Cuts / Layers" onCollapse={() => togglePanel('layers')} />
       <MachineModeToggle />
       <CncSetupPanel />
       <AddLayerControls />
@@ -126,7 +137,6 @@ const panelStyle: React.CSSProperties = {
 // selections would need useUiStore — an optional follow-up, LAY-02.)
 const LAYERS_SECTION_DEFAULT_OPEN = true;
 
-const headingStyle: React.CSSProperties = { margin: '0 0 10px 0' };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyle: 'italic' };
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
 const collapsedPanelStyle: React.CSSProperties = {

@@ -95,8 +95,13 @@ export type FloatingPanelPosition = {
 };
 
 export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
+export type RailPanelId = 'layers' | 'machine';
+export type RailPanelVisibility = Readonly<Record<RailPanelId, boolean>>;
 
 export type UiState = {
+  readonly railPanelVisibility: RailPanelVisibility;
+  readonly setRailPanelVisible: (panel: RailPanelId, visible: boolean) => void;
+  readonly toggleRailPanel: (panel: RailPanelId) => void;
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
   readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
@@ -218,7 +223,7 @@ export type UiState = {
 // disclosure). Grouped into a slice so the store factory stays under the
 // function-size cap; each action only needs `set`, and setShowCncAdvanced also
 // writes localStorage so the Basic/Advanced choice survives reloads (ADR-111).
-type UiStateSetter = (partial: Partial<UiState>) => void;
+type UiStateSetter = (partial: Partial<UiState> | ((state: UiState) => Partial<UiState>)) => void;
 function uiToggleSlice(
   set: UiStateSetter,
 ): Pick<
@@ -272,7 +277,27 @@ function uiDialogSlice(
   };
 }
 
+function uiRailPanelSlice(
+  set: UiStateSetter,
+): Pick<UiState, 'railPanelVisibility' | 'setRailPanelVisible' | 'toggleRailPanel'> {
+  return {
+    railPanelVisibility: { layers: true, machine: true },
+    setRailPanelVisible: (panel, visible) =>
+      set((state) => ({
+        railPanelVisibility: { ...state.railPanelVisibility, [panel]: visible },
+      })),
+    toggleRailPanel: (panel) =>
+      set((state) => ({
+        railPanelVisibility: {
+          ...state.railPanelVisibility,
+          [panel]: !state.railPanelVisibility[panel],
+        },
+      })),
+  };
+}
+
 export const useUiStore = create<UiState>((set) => ({
+  ...uiRailPanelSlice(set),
   dragOverlay: false,
   setDragOverlay: (next) => set({ dragOverlay: next }),
   scrubberT: 1,
