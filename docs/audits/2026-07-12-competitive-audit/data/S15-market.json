@@ -1,0 +1,357 @@
+{
+  "sector": 15,
+  "categories": [
+    {
+      "id": "15.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Grid Array (rows/cols, center-to-center or padding spacing, mirror, randomize), Radial/circular array, Virtual Array of synced clones, and Copy-Along-Path. The roster's most complete design-time array toolset.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/GridArray/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CopyAlongPath/" },
+            { "tag": "COMM", "cite": "https://support.salasers.com/optimizing-designs-grid-array-tool" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Inherits LightBurn's layout suite: Grid Array (rows/cols) and Circular/radial Array; auto-increment offsets pair with Variable Text for serialized copies.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/CircularArray/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No built-in array/replication. LaserGRBL loads a single image or G-code file; users must build grids in Inkscape or other design tools before import.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Array tool duplicates an element in grid or circular layout with configurable counts and spacing (xTool Creative Space / continues in xTool Studio).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1303" },
+            { "tag": "COMM", "cite": "https://support.xtool.com/community-support/detail/1709" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "No native array dialog; grid replication comes from the community 'Replicator' app plus manual copy/paste. Functional but not a first-class production array tool.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/new-replicator-app/13052" },
+            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/duplicate-carves/49908" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Array Copy (rows/cols, gap or offset), Copy-Along-Vectors, and linked Array-Copy-Toolpath with a 'minimize tool changes' option. Strong production-grade replication.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/Array%20Copy/index.html" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Copy%20Along%20Vectors/index.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "15.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Quick Nest auto-packs parts' bounding boxes into a rectangular container (adjustable padding, optional rotation) to maximize sheet usage; made available to Core in 2.1.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/QuickNest/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Quick Nest bounding-box auto-packing into a rectangular container with padding and optional rotation; same engine as LightBurn.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/QuickNest/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No auto-fit or fill-the-board; single-file sender with no multi-part layout engine.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No auto-fit or nesting; the Array tool is manual grid/circular duplication only. Batch mode swaps variable content but does not auto-pack to maximize stock.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1869" },
+            { "tag": "INF", "cite": "https://support.xtool.com/article/1303" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No auto-fit/nesting engine. 'Tiling' only splits an oversized job across the bed; it does not pack parts to maximize stock usage.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://easel.com/features/tiling" },
+            { "tag": "INF", "cite": "https://forum.easel.com/t/new-replicator-app/13052" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "True Shape Nesting (Pro) auto-arranges vectors into the material or user-defined area for optimal usage; VCarve Desktop has no nesting.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" },
+            { "tag": "COMM", "cite": "https://www.learnyourcnc.com/blog/easily-make-toolpaths-after-nesting-objects" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "15.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Native Quick Nest is bounding-box only; true-shape nesting is via the built-in 'Nest Selected' SVGnest.com round-trip. Native true-shape nesting is slated for 2.2 Pro (unreleased).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/QuickNest/" },
+            { "tag": "COMM", "cite": "https://softsolder.com/2023/07/26/lightburn-nesting-shapes/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "True Nest arranges by actual contours with four optimization levels, stoppable mid-calc. Only in 0.9 early-access Pro (not yet on sale); stable 0.8 has bounding-box Quick Nest only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/millmage-0-9-00-early-access-pro-features-are-here/191036" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No nesting of any kind.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No true-shape nesting and no nesting engine at all.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1869" },
+            { "tag": "INF", "cite": "https://support.xtool.com/article/1303" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No nesting; no irregular-shape packing capability.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://easel.com/features/tiling" },
+            { "tag": "INF", "cite": "https://easel.inventables.com/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "True Shape Nesting (Pro) packs by actual contours into sheets, the roster's reference-quality nesting for irregular parts. Absent from VCarve Desktop.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Nest%20Parts/Nest%20Parts.html" },
+            { "tag": "COMM", "cite": "https://www.learnyourcnc.com/blog/easily-make-toolpaths-after-nesting-objects" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "15.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Rectangular bed/workspace only; the Quick Nest container is documented as 'rectangle only'. No circular/custom-outline stock or offcut management.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/QuickNest/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Rectangular workspace and rectangle-only nesting container; 0.9 adds Multi-Page projects. No circular/custom stock outlines or offcut handling found.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/QuickNest/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Only a rectangular working-area preview; no stock/material model, no custom shapes or offcuts. Token-level support.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Rectangular work area / baseplate defined per machine; flat-material workflow. No custom/circular stock outlines or offcut nesting.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1673" },
+            { "tag": "INF", "cite": "https://support.xtool.com/article/1303" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Rectangular material dimensions only (Workpieces splits a project into parts). No circular/custom stock outlines or offcut support.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/new-feature-workpieces/37092" },
+            { "tag": "INF", "cite": "https://easel.inventables.com/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Material Setup defines a rectangular block; nesting targets the material size or a user-definable area across multiple sheets. Rectangular sheets; no circular/offcut stock modeling. Desktop capped at 24x24in.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Nest%20Parts/Nest%20Parts.html" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "15.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Variable Text with Serial Number, Date/Time, Merge/CSV, and Cut-Setting modes; auto-advance; CSV column %n syntax; plus QR-code and Barcode generators that accept variable data. Roster-leading batch personalization.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/VariableText/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/Tools/BarCode.html" },
+            { "tag": "COMM", "cite": "https://support.salasers.com/using-variable-text-in-lightburn" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Variable Text with Serial Number, Date/Time, and Merge/CSV modes plus auto-advance, substituted on Preview/Start/Export; inherits LightBurn's batch engine.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/VariableText/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No variable text, serialization, or CSV merge; not a design environment.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/raster-image-import/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Batch Processing mode assigns per-copy variables for text, images (PNG/JPG/BMP/WEBP), and vectors (SVG/DXF) via a downloadable template or manual rows. Strong batch personalization for a consumer tool.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1869" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No documented variable-text, serialization, or CSV-merge feature; the text tool is static. Batch personalization requires manual duplication/editing or project copies.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/6138903275667-Easel-Features-Text-and-Fonts" },
+            { "tag": "INF", "cite": "https://discuss.inventables.com/t/templates-in-easel/142246" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Plate Production drives batch badges/nameplates from a text-file list using !!variable!! placeholders with consecutive numbering; gadgets extend automation. Solid for serialized engraving.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Plate%20Production/Plate%20Production.html" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/gadgets/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "15.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Reusable .lbrn2 project files, Material Library presets, and Variable Text auto-advance that persists serial state across runs. No dedicated saved-job/template queue.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/VariableText/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Reusable .mage project files and 0.9 Multi-Page projects for multi-sheet jobs; Variable Text auto-advance persists serials. No formal saved-job template system.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/VariableText/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Recent-files list, reload-and-rerun the loaded G-code, and user-defined custom-button macros. No job templates or saved-job manager. Token-level.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Cloud/local project files, recent projects, and Batch Processing templates for repeat runs; re-run last job. No dedicated production job-queue.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1303" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1869" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Cloud-saved projects, a copy-a-project-to-customize workflow, and shareable/community templates. Convenient for hobby reuse but no formal job-template or serial-run system.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/templates-in-easel/142246" },
+            { "tag": "OFF", "cite": "https://easel.inventables.com/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Production-grade: Toolpath Templates apply saved settings across nested sheets, Job Setup Sheets document runs, and Gadgets automate task sequences (all Pro). The roster's strongest repeat-job tooling.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/gadgets/" }
+          ]
+        }
+      ]
+    }
+  ]
+}
