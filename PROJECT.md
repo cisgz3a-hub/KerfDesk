@@ -74,6 +74,10 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 Job time estimates, settings panel, SVG re-import with diff, path optimization (nearest-neighbor, inner-shapes-first), keyboard shortcuts pass, autosave + recovery, local-only crash reporter.
 
+Layout extension (ADR-151): Quick Nest can compact small/medium jobs against real closed outlines,
+with deterministic item/point/candidate budgets and immediate rectangular fallback for dense,
+invalid, or oversized inputs.
+
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 
 **MVP is complete at end of Phase C.**

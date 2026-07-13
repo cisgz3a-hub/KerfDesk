@@ -36,6 +36,7 @@
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 | ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
+| ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
 
 ---
 
@@ -6778,3 +6779,34 @@ validators, deterministic tests, and explicit operator controls.
 Variable production is now intentional product scope rather than an undocumented accretion.
 Projects remain offline and self-contained, and long runs have deterministic bounds and wrap
 semantics. The schema surface grows, so load validation and round-trip tests remain release gates.
+
+---
+
+## ADR-151 - Quick Nest uses bounded outline compaction with rectangular fallback
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Rectangle-only nesting wastes material around concave and irregular art. Exact outline compaction
+can reduce that waste, but its candidate search and polygon intersections run synchronously on the
+UI thread. An item-count limit alone does not bound dense outlines, and a large concave corpus can
+freeze the application before the operator can cancel.
+
+### Decision
+
+- Quick Nest may compact placements using sanitized closed object outlines after a conservative
+  rectangular nest establishes a valid seed.
+- Outline mode is limited to 32 items and a deterministic point-weighted work budget of 250,000
+  (`itemCount² × totalOutlinePoints`). Candidate count is independently capped.
+- Inputs outside either budget use the existing rectangular algorithm immediately. Invalid
+  polygons, Clipper failures, or a non-improving search also fall back to the rectangular result.
+- Every accepted outline placement is revalidated against the bed, padding, obstacles, and peer
+  geometry before it can update the scene.
+
+### Consequences
+
+Small and medium irregular jobs can save stock without changing the safe default for dense or large
+jobs. The synchronous algorithm now has an enforceable upper bound, while rectangular fallback
+preserves responsiveness and deterministic placement. Moving outline search to a worker remains a
+future optimization, not a prerequisite for safe use.
