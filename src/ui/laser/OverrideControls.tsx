@@ -1,7 +1,8 @@
 // OverrideControls — real-time feed/spindle/rapid overrides while a job
 // runs (ADR-103 G3, F-CNC21). GRBL applies these instantly mid-stream; the
 // live percentages come back in `Ov:` and are cached in ovCache. Rendered
-// by JobControls only while a job is streaming or paused.
+// while a job is streaming/paused, and while Idle when a non-default value
+// must be reset before deterministic CNC Start.
 
 import {
   RT_FEED_OV_MINUS_10,
