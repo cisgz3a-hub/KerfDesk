@@ -7207,8 +7207,9 @@ coordinates, and actual motion refer to different frames.
   `G54 G92.1` before their explicit P1 write.
 - Probe transactions select G54 before any motion and before their P0 commit. A failed transaction
   still produces no setup evidence.
-- Every emitted CNC program selects G54 in its preamble before the first safe-Z motion. This is a
-  final defense against startup/console modal drift and intentionally changes CNC G-code bytes.
+- Every emitted CNC program, including the standalone surfacing wizard, selects G54 in its preamble
+  before the first safe-Z motion. This is a final defense against startup/console modal drift and
+  intentionally changes CNC G-code bytes.
 - G92-only controllers retain their existing commands; KerfDesk CNC execution remains GRBL-family
   only.
 

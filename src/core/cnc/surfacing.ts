@@ -88,6 +88,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     '; zero X/Y at the front-left corner of the area, Z0 on the surface to face',
     'G21',
     'G90',
+    'G54',
     `M3 S${Math.round(params.spindleRpm)}`,
     `G4 P${params.spindleSpinupSec.toFixed(3)}`,
     `G0 Z${fmt(params.safeZMm)}`,

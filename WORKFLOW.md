@@ -2553,9 +2553,9 @@ F-CNC19 tiling.
    G54 before writing P1.
 2. Z and corner probe transactions select G54 before their first motion and
    commit P0 only after every required contact succeeds.
-3. Every CNC program emits `G54` after units/absolute mode and before its first
-   safe-Z lift, so a prior G55-G59 console command or startup block cannot
-   redirect the job.
+3. Every CNC program, including standalone surfacing output, emits `G54` after
+   units/absolute mode and before its first safe-Z lift, so a prior G55-G59
+   console command or startup block cannot redirect the job.
 
 #### Error — stale alternate WCS
 1. A controller left in G55-G59 is normalized before app-controlled setup and
