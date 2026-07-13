@@ -2692,6 +2692,32 @@ F-CNC19 tiling.
    realtime-status arbiter that proves stable `Hold:0` continuity before `~`.
    This flow does not silently opt any current profile into that contract.
 
+### F-CNC42. Attest exclusive controller access at CNC Start - Phase H.11
+
+#### Success - one fresh Start confirmation
+1. After compile/readiness succeeds, the CNC confirmation names physical
+   workholding/clearance and every common competing command path: pendant/MPG,
+   WebUI/network, another sender app, PLC motion or spindle commands, controller
+   macros, and SD/file jobs.
+2. The operator confirms KerfDesk is the sole command owner while emergency-
+   stop, safety-door, and feed-hold circuits remain enabled.
+3. The resulting evidence is bound to the exact program fingerprint plus the
+   current trusted-position and work-Z-reference epochs.
+
+#### Error - missing, incomplete, or stale evidence
+1. The store rejects direct or stale callers before the queue fence, realtime
+   query, or job bytes are written.
+2. A reconnect, controller banner/reset, alarm/sleep, homing, origin/probe
+   change, tool change, or other setup-trust invalidation requires a new
+   confirmation.
+
+#### Edge - declaration is not protocol ownership
+1. GRBL cannot identify a sender or grant an exclusive lease. The confirmation
+   is an operational contract, not proof that another path is inactive.
+2. Machines with multiple intentional senders require a sole gateway/firmware
+   lease and machine-level selector/interlock design before CNC Start can claim
+   enforced ownership.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

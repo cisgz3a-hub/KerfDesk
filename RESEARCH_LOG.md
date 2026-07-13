@@ -886,3 +886,31 @@ proof exists.
 - **Use:** read-only protocol/manual research; no upstream code copied.
 - **Confidence:** high for the generic refusal. Any future opt-in still requires
   machine-specific hardware and fault-injection validation.
+
+---
+
+## CNC controller ownership and Start attestation (2026-07-13, ADR-181)
+
+- **Stock GRBL attribution limit:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c
+  and
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c
+  implement a shared input order with bare terminal responses; no client ID,
+  nonce, command ID, or lease is returned.
+- **Realtime mutation:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md
+  documents realtime reset/hold/resume/override handling outside the normal
+  line buffer. These mutations generally have no attributable terminal ack.
+- **grblHAL competing-owner evidence:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/report.c#L1494-L1503
+  reports `MPG:1`/`MPG:0`, which can expose MPG ownership but is not a general
+  lease across network, serial, PLC, macro, or physical inputs.
+- **Browser boundary:** https://wicg.github.io/serial/#dom-serialport-open
+  defines opening the browser's serial port; it cannot prove that other
+  controller-side transports or command sources are inactive.
+- **Decision impact:** require a fresh, exact-program exclusive-access operator
+  attestation for each CNC Start, bind it to the existing controller/setup
+  epochs, and reject stale evidence before any fence or job byte.
+- **Use:** read-only protocol/specification research; no upstream code copied.
+- **Confidence:** high that legacy GRBL cannot prove ownership. The attestation
+  reduces operational ambiguity but does not replace a gateway or interlock.

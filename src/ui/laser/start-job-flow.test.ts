@@ -25,6 +25,7 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
+  cncControllerEpochOf,
   cncSetupAttestationMatches,
 } from '../state/cnc-setup-attestation';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
@@ -164,7 +165,8 @@ describe('runStartJobFlow', () => {
     const options = startJob.mock.calls[0]?.[1];
     if (typeof gcode !== 'string') throw new Error('CNC Start did not compile G-code');
     expect(options?.machineKind).toBe('cnc');
-    expect(cncSetupAttestationMatches(options?.cncSetupAttestation, gcode)).toBe(true);
+    const epoch = cncControllerEpochOf(useLaserStore.getState());
+    expect(cncSetupAttestationMatches(options?.cncSetupAttestation, gcode, epoch)).toBe(true);
   });
 
   it('does not stream a CNC program when physical setup confirmation is declined', async () => {
