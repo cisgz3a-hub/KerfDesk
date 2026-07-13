@@ -56,6 +56,7 @@ export type PreflightCode =
   | 'cnc-settings-invalid'
   | 'cnc-helix-entry-invalid'
   | 'cnc-rest-machining-invalid'
+  | 'cnc-adaptive-clearing-invalid'
   | 'cnc-layer-empty'
   | 'cnc-depth-exceeds-stock'
   | 'cnc-overdeep-cut'

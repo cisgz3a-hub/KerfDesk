@@ -67,6 +67,30 @@ function onlyGroup(scene: Scene): CncGroup {
 }
 
 describe('compileCncJob', () => {
+  it('compiles verified adaptive roughing with native helix and cleanup contours', () => {
+    const scene = sceneWith(
+      [
+        cncLayer('L1', '#ff0000', {
+          cutType: 'pocket',
+          pocketStrategy: 'adaptive',
+          adaptiveOptimalLoadMm: 0.4,
+          depthMm: 2,
+          depthPerPassMm: 2,
+        }),
+      ],
+      [squareObject('O1', '#ff0000', 20)],
+    );
+    const job = compileCncJob(scene, dev, config);
+    expect(job.groups).toHaveLength(1);
+    const group = job.groups[0];
+    if (group?.kind !== 'cnc') throw new Error('expected a CNC group');
+    expect(group.passes[0]?.kind).toBe('helical-contour');
+    expect(group.passes.some((pass) => pass.kind === 'contour')).toBe(true);
+    const gcode = cncGrblStrategy.emit(job, dev);
+    expect(gcode).toMatch(/^G3 .*I-.*J0\.000/m);
+    expect(gcode).toBe(cncGrblStrategy.emit(compileCncJob(scene, dev, config), dev));
+  });
+
   it('runs a larger pocket rougher before a smaller rest-machining bit', () => {
     const scene = sceneWith(
       [

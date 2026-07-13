@@ -8,6 +8,7 @@ type PocketStrategy = NonNullable<CncLayerSettings['pocketStrategy']>;
 
 const OPTIONS: ReadonlyArray<{ readonly value: PocketStrategy; readonly label: string }> = [
   { value: 'offset', label: 'Offset rings' },
+  { value: 'adaptive', label: 'Adaptive clearing' },
   { value: 'raster-x', label: 'Raster — X sweeps' },
   { value: 'raster-y', label: 'Raster — Y sweeps' },
 ];
@@ -24,7 +25,7 @@ export function PocketFillRow(props: {
       <span style={labelStyle}>Fill method</span>
       <select
         aria-label="Pocket fill method"
-        title="How the pocket interior is cleared: contour-parallel offset rings, or serpentine raster sweeps along one axis. The finishing wall pass runs last either way."
+        title="How the pocket interior is cleared: verified constant-load adaptive roughing, contour-parallel rings, or raster sweeps. A finishing wall pass runs last."
         value={value}
         onChange={(e) => {
           const next = OPTIONS.find((option) => option.value === e.target.value);

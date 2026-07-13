@@ -14,7 +14,12 @@
 //   8. No emitted Z below -(stock + through-cut allowance) — proves the depth
 //      invariant on the final text, not just the settings (findOverdeepCutIssues).
 
-import { findCncHelicalEntryIssues, findCncRestPocketIssues, findDroppedCncLayers } from '../cnc';
+import {
+  findCncAdaptivePocketIssues,
+  findCncHelicalEntryIssues,
+  findCncRestPocketIssues,
+  findDroppedCncLayers,
+} from '../cnc';
 import { machineBoundsForDevice } from '../devices';
 import {
   DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
@@ -80,6 +85,12 @@ export function runCncPreflight(
     issues.push({
       code: 'cnc-rest-machining-invalid',
       message: `Layer ${issue.layerId}: ${issue.reason} Adjust Rough first or disable it.`,
+    });
+  }
+  for (const issue of findCncAdaptivePocketIssues(project.scene, project.device, config)) {
+    issues.push({
+      code: 'cnc-adaptive-clearing-invalid',
+      message: `Layer ${issue.layerId}: ${issue.reason} Adjust Optimal load or choose another fill method.`,
     });
   }
   appendBoundsIssues(project, gcode, options, issues);

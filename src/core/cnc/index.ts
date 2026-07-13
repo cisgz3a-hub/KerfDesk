@@ -5,6 +5,20 @@ export { findDroppedCncLayers } from './compile-cnc-diagnostics';
 export { findCncHelicalEntryIssues, type CncHelicalEntryIssue } from './cnc-helical-issues';
 export { planHelicalPocketPasses, type HelicalEntryPlan } from './helical-entry';
 export { planRestPocketToolpaths, type RestPocketPlan } from './rest-pocket';
+export {
+  planAdaptivePocket,
+  type AdaptivePocketPlan,
+  type AdaptivePocketSequence,
+} from './adaptive-pocket';
+export { verifyAdaptivePocket, type AdaptivePocketVerification } from './adaptive-pocket-verifier';
+export {
+  adaptiveOptimalLoadMm,
+  adaptivePocketPasses,
+  adaptivePocketPassesForSettings,
+  resolveAdaptivePocketOperation,
+  type AdaptivePocketOperation,
+} from './adaptive-pocket-operation';
+export { findCncAdaptivePocketIssues, type CncAdaptivePocketIssue } from './cnc-adaptive-issues';
 export { findCncRestPocketIssues, type CncRestPocketIssue } from './cnc-rest-issues';
 export { zPassDepths } from './depth-passes';
 export { profileToolpathPolylines, type ProfileSide } from './profile-paths';

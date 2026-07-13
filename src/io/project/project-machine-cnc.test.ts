@@ -29,6 +29,23 @@ function deserializeOk(text: string): Project {
 }
 
 describe('.lf2 machine / cnc round-trip', () => {
+  it('round-trips adaptive strategy and optimal load while dropping malformed load', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    const scene = raw['scene'] as { layers: Array<{ cnc: Record<string, unknown> }> };
+    scene.layers[0]!.cnc['pocketStrategy'] = 'adaptive';
+    scene.layers[0]!.cnc['adaptiveOptimalLoadMm'] = 0.4;
+    const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
+    expect(loaded.scene.layers[0]?.cnc).toMatchObject({
+      pocketStrategy: 'adaptive',
+      adaptiveOptimalLoadMm: 0.4,
+    });
+
+    scene.layers[0]!.cnc['adaptiveOptimalLoadMm'] = -1;
+    expect(
+      deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc?.adaptiveOptimalLoadMm,
+    ).toBeUndefined();
+  });
+
   it('round-trips the selected pocket roughing bit', () => {
     const project = cncProject();
     const layer = project.scene.layers[0];

@@ -24,7 +24,7 @@ export function findCncHelicalEntryIssues(
   for (const layer of scene.layers) {
     if (!layer.output) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    if (settings.cutType !== 'pocket' || settings.helixEntry === undefined) continue;
+    if (!usesManualHelicalEntry(settings)) continue;
     if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
       issues.push({
         layerId: layer.id,
@@ -42,4 +42,14 @@ export function findCncHelicalEntryIssues(
     if (!plan.ok) issues.push({ layerId: layer.id, reason: plan.reason });
   }
   return issues;
+}
+
+function usesManualHelicalEntry(
+  settings: typeof DEFAULT_CNC_LAYER_SETTINGS,
+): settings is typeof settings & { readonly helixEntry: NonNullable<typeof settings.helixEntry> } {
+  return (
+    settings.cutType === 'pocket' &&
+    settings.helixEntry !== undefined &&
+    settings.pocketStrategy !== 'adaptive'
+  );
 }

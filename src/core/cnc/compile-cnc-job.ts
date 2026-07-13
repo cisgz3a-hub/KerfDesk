@@ -48,6 +48,7 @@ import { orderInnerFirst } from './profile-ordering';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
+import { adaptivePocketPassesForSettings } from './adaptive-pocket-operation';
 
 const COORD_EPS = 1e-9;
 
@@ -268,6 +269,13 @@ function passesForLayer(
   // (0 for every non-profile cut and for profile cuts without an allowance, so
   // the offset — and therefore the output — is byte-identical to before).
   const allowanceMm = profileFinishAllowanceMm(settings);
+  const adaptive = adaptivePocketPassesForSettings(
+    polylines,
+    settings,
+    tool,
+    zPassDepths(settings.depthMm, settings.depthPerPassMm),
+  );
+  if (adaptive !== null) return adaptive;
   const restOperation = resolveRestPocketOperation(polylines, settings, config);
   if (restOperation.kind === 'error') return [];
   const raw =
