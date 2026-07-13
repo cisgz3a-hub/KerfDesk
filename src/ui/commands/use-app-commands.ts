@@ -11,6 +11,7 @@ import {
 } from '../app/file-actions';
 import { handleOpenGcodePreview } from '../app/gcode-open-action';
 import { connectOptionsForDevice } from './connect-options';
+import { railPanelCommandContext } from './command-context-helpers';
 import { currentOutputScope, useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -169,16 +170,7 @@ function connectionCommandContext(
   laser: ReturnType<typeof useLaserStore.getState>,
   platform: ReturnType<typeof usePlatform>,
   activeStreamer: boolean,
-): Pick<
-  AppCommandContext,
-  | 'machineKind'
-  | 'dirty'
-  | 'savedName'
-  | 'serialSupported'
-  | 'connected'
-  | 'machineBusy'
-  | 'homingEnabled'
-> {
+) {
   return {
     machineKind: machineKindOf(app.project.machine),
     dirty: app.dirty,
@@ -191,22 +183,6 @@ function connectionCommandContext(
       laser.controllerOperation !== null ||
       activeStreamer,
     homingEnabled: app.project.device.homing.enabled,
-  };
-}
-
-function railPanelCommandContext(
-  dialogs: CommandDialogs,
-  jobActive: boolean,
-): Pick<
-  AppCommandContext,
-  'jobActive' | 'layersPanelOpen' | 'toggleLayersPanel' | 'machinePanelOpen' | 'toggleMachinePanel'
-> {
-  return {
-    jobActive,
-    layersPanelOpen: dialogs.layersPanelOpen,
-    toggleLayersPanel: dialogs.toggleLayersPanel,
-    machinePanelOpen: dialogs.machinePanelOpen,
-    toggleMachinePanel: dialogs.toggleMachinePanel,
   };
 }
 
