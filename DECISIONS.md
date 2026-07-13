@@ -33,6 +33,7 @@
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 | ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
+| ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 
 ---
 
@@ -6677,3 +6678,45 @@ publication. Manual dispatch remains an unsigned, non-publishing dry run.
 A Windows code-signing certificate is required for the next tagged release.
 Missing or invalid signing material fails closed. ADR-135's automatic-update
 trust constant remains a separate, deliberate release switch.
+
+---
+
+## ADR-143 - Disable executable CNC checkpoint and start-from-line recovery
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+ADR-136 improved one failure mode by rewinding CNC recovery to a retract-first
+boundary, but the app still could not prove that retract was safe. A GRBL `ok`
+means a line was accepted into controller/planner processing; it does not prove
+that the physical cut completed, that position survived the interruption, or
+that the cutter is clear. Automatically moving Z can therefore pull a stopped
+or broken tool through stock, clamps, or a shifted workpiece. No generic G-code
+preamble can infer tool engagement, retained work coordinates, workholding
+integrity, or the correct extraction direction.
+
+### Decision
+
+- Automatic CNC restart from both checkpoints and arbitrary G-code lines is
+  disabled. The core resume builder returns a stable policy error for every CNC
+  request before it parses or emits any motion.
+- The UI removes the executable CNC recovery controls and replaces them with a
+  supervised recovery message: inspect engagement, establish clearance with a
+  machine-specific procedure, re-home if position may be lost, verify WCS/Z
+  zero/tool/workholding, and start a newly reviewed recovery job.
+- CNC checkpoints remain visible as diagnostic evidence, including accepted-line
+  counts and the recorded interruption cause, until the operator dismisses them.
+  Their counts are labelled as controller acknowledgements, not completed motion.
+- Laser start-from-line and checkpoint recovery remain available with their
+  beam-off positioning rules. Ordinary live Feed Hold/Resume is unchanged; it
+  resumes the same controller session and is not crash/start-from-line recovery.
+
+### Consequences
+
+KerfDesk no longer offers one-click continuation for an interrupted router job.
+Operators may lose machining time and must create a deliberate recovery job,
+but the application will not guess physical cutter state from transport-level
+acknowledgements. A future CNC recovery feature requires machine-specific,
+hardware-validated state acquisition and a supervised recovery state machine;
+re-enabling the old retract-first preamble is not an acceptable shortcut.
