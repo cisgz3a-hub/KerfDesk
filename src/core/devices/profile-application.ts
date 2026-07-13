@@ -1,4 +1,5 @@
 import type { DeviceProfile } from './device-profile';
+import { streamingModeForController } from './controller-streaming-mode';
 
 export type ProfileControllerFactMergeInput = {
   readonly profile: DeviceProfile;
@@ -22,9 +23,11 @@ export function profileWithControllerFacts(args: ProfileControllerFactMergeInput
   };
   const controllerKind =
     args.detectedControllerKind ?? (controllerRead ? args.current.controllerKind : undefined);
+  const streamingMode = streamingModeForController(controllerKind, args.profile.streamingMode);
   return {
     ...args.profile,
     ...machinePatch,
+    streamingMode,
     ...(controllerRead ? { framingFeedMmPerMin } : {}),
     ...(controllerKind === undefined ? {} : { controllerKind }),
   };

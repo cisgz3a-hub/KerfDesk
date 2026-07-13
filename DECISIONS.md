@@ -31,6 +31,9 @@
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
+| ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
+| ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
+| ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 
 ---
 
@@ -6624,3 +6627,96 @@ Consequences.
   a different start vertex and misalign them, which could sever the part. Verify
   with a test cut before trusting tabs + finish allowance together on intricate
   parts.
+
+---
+
+## ADR-141 - The network-camera bridge is desktop and local-development only
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-140 records the CNC finish allowance; **ADR-141** is the next allocated decision number.
+
+### Context
+
+An exact hosted-origin allowlist still lets same-origin XSS drive the operator's
+loopback bridge and reach private-network cameras. A token delivered to browser
+JavaScript would not close that threat because the same XSS could reuse it.
+
+### Decision
+
+The bridge accepts browser requests only from `app://app` and HTTP loopback
+origins used by local development. Hosted origins are rejected before any
+discovery, probe, proxy, or ffmpeg work. Hosted builds retain USB cameras;
+network cameras require Desktop or local development.
+
+### Consequences
+
+A compromised hosted page can no longer use KerfDesk's bridge as a private
+network camera oracle. Desktop is the supported network-camera workflow.
+
+---
+
+## ADR-142 - Production desktop tags require a valid Windows signature
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-141 records the network-camera bridge restriction; **ADR-142** is the next allocated decision number.
+
+### Context
+
+The release workflow could publish an unsigned Windows installer when signing
+secrets were absent.
+
+### Decision
+
+Tag builds fail before packaging unless `CSC_LINK` and `CSC_KEY_PASSWORD`
+exist. After packaging, `Get-AuthenticodeSignature` must report `Valid` before
+publication. Manual dispatch remains an unsigned, non-publishing dry run.
+
+### Consequences
+
+A Windows code-signing certificate is required for the next tagged release.
+Missing or invalid signing material fails closed. ADR-135's automatic-update
+trust constant remains a separate, deliberate release switch.
+
+---
+
+## ADR-143 - Disable executable CNC checkpoint and start-from-line recovery
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+ADR-136 improved one failure mode by rewinding CNC recovery to a retract-first
+boundary, but the app still could not prove that retract was safe. A GRBL `ok`
+means a line was accepted into controller/planner processing; it does not prove
+that the physical cut completed, that position survived the interruption, or
+that the cutter is clear. Automatically moving Z can therefore pull a stopped
+or broken tool through stock, clamps, or a shifted workpiece. No generic G-code
+preamble can infer tool engagement, retained work coordinates, workholding
+integrity, or the correct extraction direction.
+
+### Decision
+
+- Automatic CNC restart from both checkpoints and arbitrary G-code lines is
+  disabled. The core resume builder returns a stable policy error for every CNC
+  request before it parses or emits any motion.
+- The UI removes the executable CNC recovery controls and replaces them with a
+  supervised recovery message: inspect engagement, establish clearance with a
+  machine-specific procedure, re-home if position may be lost, verify WCS/Z
+  zero/tool/workholding, and start a newly reviewed recovery job.
+- CNC checkpoints remain visible as diagnostic evidence, including accepted-line
+  counts and the recorded interruption cause, until the operator dismisses them.
+  Their counts are labelled as controller acknowledgements, not completed motion.
+- Laser start-from-line and checkpoint recovery remain available with their
+  beam-off positioning rules. Ordinary live Feed Hold/Resume is unchanged; it
+  resumes the same controller session and is not crash/start-from-line recovery.
+
+### Consequences
+
+KerfDesk no longer offers one-click continuation for an interrupted router job.
+Operators may lose machining time and must create a deliberate recovery job,
+but the application will not guess physical cutter state from transport-level
+acknowledgements. A future CNC recovery feature requires machine-specific,
+hardware-validated state acquisition and a supervised recovery state machine;
+re-enabling the old retract-first preamble is not an acceptable shortcut.

@@ -10,6 +10,12 @@ const h = vi.hoisted(() => ({
   setNeedRefresh: vi.fn(),
   updateServiceWorker: vi.fn(),
   streamer: { status: null as string | null },
+  machine: {
+    safetyNotice: null as object | null,
+    motionOperation: null as object | null,
+    controllerOperation: null as object | null,
+    checkpointPending: false,
+  },
   pushToast: vi.fn(),
   registration: { addEventListener: vi.fn() },
 }));
@@ -29,8 +35,16 @@ vi.mock('virtual:pwa-register/react', () => ({
   },
 }));
 vi.mock('../state/laser-store', () => ({
-  useLaserStore: (sel: (s: { streamer: { status: string } | null }) => unknown) =>
-    sel({ streamer: h.streamer.status === null ? null : { status: h.streamer.status } }),
+  useLaserStore: (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({
+      streamer: h.streamer.status === null ? null : { status: h.streamer.status },
+      safetyNotice: h.machine.safetyNotice,
+      motionOperation: h.machine.motionOperation,
+      controllerOperation: h.machine.controllerOperation,
+    }),
+}));
+vi.mock('../state/job-checkpoint-storage', () => ({
+  readJobCheckpoint: () => (h.machine.checkpointPending ? { schema: 3 } : null),
 }));
 vi.mock('../state/toast-store', () => ({
   useToastStore: (sel: (s: { pushToast: typeof h.pushToast }) => unknown) =>
@@ -62,6 +76,10 @@ beforeEach(() => {
   h.swState.offlineReady = false;
   h.swState.needRefresh = false;
   h.streamer.status = null;
+  h.machine.safetyNotice = null;
+  h.machine.motionOperation = null;
+  h.machine.controllerOperation = null;
+  h.machine.checkpointPending = false;
   localStorage.clear();
   vi.clearAllMocks();
 });
@@ -106,6 +124,24 @@ describe('PwaUpdatePrompt', () => {
   it('suppresses the banner while an errored job still needs operator handling', async () => {
     h.swState.needRefresh = true;
     h.streamer.status = 'errored';
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it.each([
+    ['a terminal safety notice', 'safetyNotice'],
+    ['a motion operation', 'motionOperation'],
+    ['a controller operation', 'controllerOperation'],
+  ] as const)('suppresses Reload during %s', async (_label, field) => {
+    h.swState.needRefresh = true;
+    h.machine[field] = {};
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it('suppresses Reload while an interrupted-job checkpoint is unresolved', async () => {
+    h.swState.needRefresh = true;
+    h.machine.checkpointPending = true;
     const { host } = await render();
     expect(host.querySelector(BANNER)).toBeNull();
   });

@@ -12,6 +12,7 @@ import {
   normalizeGrblRxBufferBytes,
   normalizeGrblStreamingMode,
   normalizeScanOffsetTable,
+  streamingModeForController,
 } from '../../core/devices';
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
@@ -214,6 +215,9 @@ function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
 }
 
 function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> {
+  const controllerKind = isKnownControllerKind(dev['controllerKind'])
+    ? dev['controllerKind']
+    : undefined;
   return {
     ...dev,
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
@@ -228,7 +232,10 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     ),
     airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
-    streamingMode: normalizeGrblStreamingMode(dev['streamingMode']),
+    streamingMode: streamingModeForController(
+      controllerKind,
+      normalizeGrblStreamingMode(dev['streamingMode']),
+    ),
     rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
     scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { resumeConfirmation } from './resume-confirmation';
 
 describe('resumeConfirmation', () => {
-  it('names the CNC rewind boundary and retract-before-spindle sequence', () => {
+  it('never describes an executable CNC recovery sequence', () => {
     const message = resumeConfirmation('cnc', 144, 137);
-    expect(message).toContain('safe retract boundary line 137');
-    expect(message).toContain('extracts Z');
-    expect(message).toContain('before any spindle-start command');
+    expect(message).toContain('CNC recovery is disabled');
+    expect(message).toContain('acknowledgements do not prove');
+    expect(message).not.toContain('extracts Z');
   });
 
   it('keeps the beam-off positioning contract for laser recovery', () => {

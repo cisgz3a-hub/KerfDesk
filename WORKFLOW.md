@@ -814,25 +814,26 @@ run that finishes cleanly clears it.
 1. App/tab/PC died mid-job. Operator relaunches; autosave recovery
    restores the project (F-C3).
 2. The Laser window shows the banner: "Interrupted laser job from
-   <time>: N of M motion lines confirmed."
+   <time>: N of M G-code lines acknowledged by the controller."
 3. Operator connects, homes, and confirms the work zero is unchanged
    (same contract as manual Start-from-line).
-4. **Review safe recovery** re-compiles the project and verifies the
-   fingerprint. Laser resumes map the acked count to the first unconfirmed
-   raw line. Router resumes rewind from that point to the previous pure
-   safe-Z retract boundary, extract Z at the recovered plunge feed before
-   issuing a spindle-start command, spin up at clearance, then replay the
-   complete cutting segment.
-5. The checkpoint records the terminal safety reason when one is available
+4. For laser jobs, **Review safe recovery** re-compiles the project, verifies
+   the fingerprint, and maps the acknowledged count to the first unconfirmed
+   raw line.
+5. For router jobs, no executable recovery action is offered. The checkpoint
+   remains diagnostic evidence and the banner directs the operator through a
+   supervised, machine-specific clearance/re-home/WCS/Z-zero/tool/workholding
+   review before creating a new recovery job.
+6. The checkpoint records the terminal safety reason when one is available
    (disconnect, controller error/rejected line, reboot, write failure, or
    cancellation) and shows it after reload/reconnect.
-6. The checkpoint clears only after the controller reports connected,
+7. The checkpoint clears only after the controller reports connected,
    physical Idle; the final GRBL `ok` alone is not physical completion.
 
 #### Error — project changed since the run
 1. Fingerprint mismatch → alert explains the project no longer produces
-   the interrupted program; nothing is streamed. The manual
-   Start-from-line control remains the escape hatch.
+   the interrupted program; nothing is streamed. Manual Start-from-line remains
+   available for laser jobs only.
 2. A checkpoint resume re-compiles with the output scope and the RESOLVED job
    origin the ORIGINAL run used (both stored in the checkpoint, schema v3), so a
    crash no longer trips this error on its own — including a Current Position
@@ -841,9 +842,9 @@ run that finishes cleanly clears it.
    placement as the possible causes when the bytes genuinely differ (PST-02, R1).
 
 #### Edge — controller lost power too
-1. Acked lines may include a buffer's worth GRBL never executed; the
-   banner says so. Backing up re-burns a short stretch; skipping forward
-   leaves gaps — when in doubt, resume earlier via the manual control.
+1. Acknowledged lines may include a buffer's worth GRBL never executed; the
+   banner says so. Laser recovery can replay from an earlier line. CNC recovery
+   never converts that transport-level count into automatic machine motion.
 
 #### Edge — deliberate Stop
 1. Stop keeps the checkpoint (a stopped job is still resumable);
@@ -1971,13 +1972,16 @@ F-CNC19 tiling.
 1. Every M0 change block carries "; re-zero Z on the stock top, then
    cycle-start to resume". The operator swaps the bit, jogs Z to touch
    the stock top, zeros Z (or probes), and resumes.
-2. The spindle restarts (M3 + spin-up dwell) after the pause, before
-   any motion.
+2. **Continue remains disabled** until the pre-change retract/park has drained
+   to a fresh controller Idle and the new tool's Z zero has been established.
+3. Continue first emits `G0 Z<safe>` with the spindle off. Only after that
+   clearance move does it emit M3 + spin-up dwell and resume cutting.
 
 #### Error — resumed without re-zeroing
-1. Not detectable in software: the wrong Z persists until the next
-   change. The comment sequence is the guard; this flow documents the
-   risk (manual GRBL tool changes are inherently operator-owned).
+1. Continue remains blocked with "establish its Z zero" until Zero Z or a
+   successful probe records fresh work-Z evidence for the replacement bit.
+2. Tool identity, clamping, touch-plate removal, and actual spindle-at-speed
+   remain operator/machine responsibilities; this host gate does not prove them.
 
 #### Empty
 1. Single-bit jobs never pause.
@@ -2277,26 +2281,26 @@ F-CNC19 tiling.
 1. Reflex (inside-L) corners and hole rings (islands of remaining
    material) are never relieved.
 
-### F-CNC27. Resume a job from a line — Phase H.11 (ADR-103 G7)
+### F-CNC27. Supervised CNC interruption recovery — Phase H.11 (ADR-141)
 
 #### Success
-1. Job controls → "Start from line…": enter the 1-based line of the
-   exported job and Resume. Laser jobs replay modal state and position
-   with the beam off before arming. CNC jobs treat the requested line as
-   the interruption vicinity, rewind to the previous pure safe-Z retract,
-   extract Z at the recovered plunge feed before any spindle-start command,
-   spin up at safe height, then replay that entire cutting segment.
-2. A confirm spells out the contract: the work zero must be UNCHANGED
-   since the original run.
+1. CNC Job controls show an always-visible "Automatic CNC recovery disabled"
+   notice instead of a G-code line input or Resume button.
+2. The notice directs the operator to inspect cutter engagement, establish
+   clearance with the machine-specific procedure, re-home if position may be
+   lost, verify WCS/Z zero/tool/workholding, and start a newly reviewed job.
+3. Laser jobs retain Start from line: modal state is reconstructed and the head
+   positions with the beam off before arming.
 
 #### Error — impossible resumes
-1. Out-of-range lines, programs using G91 before the resume point, empty
-   tails, and CNC programs with no previous safe retract boundary are
-   refused with the reason (nothing streams).
+1. Every CNC call into the core resume builder is refused before parsing or
+   emitting motion, even if a hidden/stale UI or future caller bypasses the
+   visible control. Laser recovery still refuses out-of-range lines, programs
+   using G91 before the resume point, and empty tails.
 
 #### Empty
-1. The control is disabled while disconnected or any job/motion is
-   active (same readiness gate as Start).
+1. The CNC information panel has no executable control. Laser Start from line
+   is disabled while disconnected or any job/motion is active.
 
 #### Edge — laser jobs
 1. Programs with no Z words never receive Z commands in the preamble —
@@ -2886,8 +2890,10 @@ F-CNC19 tiling.
   camera source; calibration, auto-align, overlay updates, trace-from-camera,
   and snapshots use the same pixel-readable capture path as USB cameras.
 - **Error / bridge unavailable.** If the bridge is not running, discovery and
-  machine-camera capture show an actionable message. Browser users are pointed
-  to the bridge command; the desktop app starts it automatically.
+  machine-camera capture show an actionable message. Local-development users
+  are pointed to the bridge command; the desktop app starts it automatically.
+  Hosted web builds cannot call the loopback network-camera bridge and support
+  USB cameras only (ADR-136).
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera

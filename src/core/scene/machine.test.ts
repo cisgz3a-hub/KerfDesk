@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TOOLS, type CncToolKind } from './machine';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  DEFAULT_CNC_STOCK,
+  DEFAULT_CNC_TOOLS,
+  type CncToolKind,
+} from './machine';
 
 const STABLE_DEFAULT_TOOL_IDS = [
   'em-3175',
@@ -54,5 +60,13 @@ describe('DEFAULT_CNC_TOOLS', () => {
         expect(tool.tipAngleDeg).toBeUndefined();
       }
     }
+  });
+});
+
+describe('DEFAULT_CNC_LAYER_SETTINGS', () => {
+  it('starts with a shallow pass instead of releasing the part', () => {
+    expect(DEFAULT_CNC_LAYER_SETTINGS.depthMm).toBeGreaterThan(0);
+    expect(DEFAULT_CNC_LAYER_SETTINGS.depthMm).toBeLessThan(DEFAULT_CNC_STOCK.thicknessMm);
+    expect(DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled).toBe(false);
   });
 });

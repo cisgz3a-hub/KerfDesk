@@ -12,7 +12,7 @@
 // running); XY follow the same machine coordinates as the laser pipeline.
 // S maps to spindle RPM — GRBL $30 should equal the machine's max RPM.
 //
-// Preamble:  G21, G90, G94, M3 S<rpm>, G4 P<spinup>, G0 Z<safe>, [M7/M8].
+// Preamble:  G21, G90, G94, G0 Z<safe>, M3 S<rpm>, G4 P<spinup>, [M7/M8].
 // Postamble: G0 Z<safe>, M5, [M9], G0 X0 Y0 (park, still at safe Z).
 // The M7/M8/M9 coolant lines appear only when the machine's coolant is on.
 //
@@ -85,8 +85,13 @@ function emitJob(job: Job, _device: DeviceProfile): string {
   // Lift to safe height BEFORE the spindle spins up: after Z touch-off the
   // bit is resting on the stock top, and starting the spindle there burns
   // the stock and can grab (Easel's post lifts first, then M3).
-  appendRetract(lines, head, firstGroup.safeZMm);
-  appendSpindleStart(lines, firstGroup.spindleRpm, firstGroup.spindleSpinupSec);
+  appendSpindleStart(
+    lines,
+    head,
+    firstGroup.safeZMm,
+    firstGroup.spindleRpm,
+    firstGroup.spindleSpinupSec,
+  );
   // Coolant is machine-wide for the job: turn it on right after the spindle
   // spins up (never while the bit is still resting on the stock during
   // touch-off), and off at job end after M5. 'off'/absent emits nothing, so
@@ -179,8 +184,7 @@ function appendGroupTransition(
     return;
   }
   if (group.spindleRpm !== state.currentRpm) {
-    appendRetract(lines, head, group.safeZMm);
-    appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
+    appendSpindleStart(lines, head, group.safeZMm, group.spindleRpm, group.spindleSpinupSec);
     state.currentRpm = group.spindleRpm;
   }
 }
@@ -188,7 +192,8 @@ function appendGroupTransition(
 // The manual GRBL tool-change flow (F-CNC14/15): retract, spindle off,
 // park at the front for bit access, M0 pause. The operator swaps the bit,
 // re-zeros Z on the stock top (the new bit's length differs), and
-// cycle-starts/resumes; the spindle then spins back up before any motion.
+// continues. Touch-off leaves the new bit at Z0 on the stock, so the first
+// resumed command lifts to safe Z with the spindle off; only then may M3 run.
 function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm: number): void {
   appendRetract(lines, head, safeZMm);
   lines.push('M5');
@@ -198,15 +203,23 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm:
   lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${group.toolName ?? 'next tool'}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
-  appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
   // The operator physically moved Z during the pause (touch-off leaves the
   // new bit at the stock top), so the tracked height is no longer real.
-  // Forgetting it forces the next appendRetract to emit G0 Z<safe> before
-  // any XY rapid — the same resume discipline every commercial post uses.
   head.z = null;
+  appendSpindleStart(lines, head, safeZMm, group.spindleRpm, group.spindleSpinupSec);
 }
 
-function appendSpindleStart(lines: string[], rpm: number, spinupSec: number): void {
+// Central spindle-start invariant: every native CNC M3 is preceded by a known
+// safe-Z retract. This is especially important after a manual tool touch-off,
+// where the new cutter is resting on the stock when Continue is pressed.
+function appendSpindleStart(
+  lines: string[],
+  head: Head,
+  safeZMm: number,
+  rpm: number,
+  spinupSec: number,
+): void {
+  appendRetract(lines, head, safeZMm);
   lines.push(`M3 S${Math.max(0, Math.round(rpm))}`);
   if (spinupSec > 0) lines.push(`G4 P${fmt(spinupSec)}`);
 }

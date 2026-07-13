@@ -15,6 +15,7 @@ coverage/
 # Playwright browser artifacts
 test-results/
 playwright-report/
+blob-report/
 
 # Cloudflare wrangler (pages dev) — cache + temp worker shims
 .wrangler/

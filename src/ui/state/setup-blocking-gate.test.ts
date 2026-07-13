@@ -8,10 +8,12 @@ import type { LaserState } from './laser-store';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
   TOOL_CHANGE_NOT_IDLE_MESSAGE,
+  TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE,
   activeJobCommandBlockMessage,
   jogFrameCommandBlockMessage,
   setupBlockingJobCommandBlockMessage,
   setupCommandBlockMessage,
+  toolChangeContinueBlockMessage,
 } from './laser-store-helpers';
 
 const MULTI_TOOL = ['G1 X10 Y10 F800', 'G0 Z5', 'M5', 'G0 X0 Y0', 'M0', 'M3 S12000'].join('\n');
@@ -103,5 +105,25 @@ describe('setupBlockingJobCommandBlockMessage (CNC-03)', () => {
     const s = gateState({ streamer: drainedToolChangeStreamer(), toolChangeIdleSeen: true });
     expect(activeJobCommandBlockMessage(s)).toBe(ACTIVE_JOB_COMMAND_MESSAGE);
     expect(setupCommandBlockMessage(s)).toBe(ACTIVE_JOB_COMMAND_MESSAGE);
+  });
+});
+
+describe('toolChangeContinueBlockMessage', () => {
+  it('requires both a fresh drained Idle and fresh work-Z evidence', () => {
+    const notSettled = gateState({
+      streamer: toolChangeStreamer(),
+      toolChangeIdleSeen: false,
+      workZZeroKnown: false,
+    });
+    expect(toolChangeContinueBlockMessage(notSettled)).toBe(TOOL_CHANGE_NOT_IDLE_MESSAGE);
+
+    const needsZZero = gateState({
+      streamer: drainedToolChangeStreamer(),
+      toolChangeIdleSeen: true,
+      workZZeroKnown: false,
+    });
+    expect(toolChangeContinueBlockMessage(needsZZero)).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
+
+    expect(toolChangeContinueBlockMessage({ ...needsZZero, workZZeroKnown: true })).toBeNull();
   });
 });
