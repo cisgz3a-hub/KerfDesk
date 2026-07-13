@@ -75,8 +75,23 @@ describe('prepareMarlinConsoleCommand', () => {
     expect(
       estop.ok && !estop.command.requiresIdle && !estop.command.requiresNoActiveOperation,
     ).toBe(true);
+    expect(estop.ok && estop.command.stateEffect).toBe('reference');
     const gcode = prepareMarlinConsoleCommand('G0 X10');
     expect(gcode.ok && gcode.command.requiresIdle).toBe(true);
+    expect(gcode.ok && gcode.command.stateEffect).toBe('machine-state');
+  });
+
+  it('classifies Marlin setup mutations', () => {
+    for (const [input, stateEffect] of [
+      ['G28', 'reference'],
+      ['M92 X80', 'configuration'],
+      ['M206 Z1', 'configuration'],
+      ['M851 Z-1.5', 'tool'],
+      ['G92 Z0', 'coordinates-z'],
+    ] as const) {
+      const result = prepareMarlinConsoleCommand(input);
+      expect(result.ok && result.command.stateEffect).toBe(stateEffect);
+    }
   });
 });
 

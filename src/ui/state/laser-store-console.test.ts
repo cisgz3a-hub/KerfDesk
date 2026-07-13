@@ -71,6 +71,11 @@ afterEach(async () => {
     controllerSettings: null,
     wcoCache: null,
     workOriginActive: false,
+    workOriginSource: 'none',
+    workZZeroKnown: false,
+    frameVerification: null,
+    homingState: 'unknown',
+    trustedPositionEpoch: 0,
   });
   vi.restoreAllMocks();
 });
@@ -122,6 +127,116 @@ describe('laser-store console commands', () => {
     });
   });
 
+  it('preserves setup evidence for read-only console queries', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      trustedPositionEpoch: 7,
+    });
+
+    await useLaserStore.getState().sendConsoleCommand('$#');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      trustedPositionEpoch: 7,
+      statusReport: { state: 'Idle' },
+    });
+  });
+
+  it('requires fresh position after console motion without discarding work-zero authority', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      frameVerification: {
+        boundsSignature: '0,0,10,10',
+        wco: { x: 12, y: 34, z: 5 },
+        workOriginActive: true,
+      },
+      homingState: 'confirmed',
+      trustedPositionEpoch: 7,
+    });
+
+    await useLaserStore.getState().sendConsoleCommand('G0 X10');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      frameVerification: null,
+      homingState: 'confirmed',
+      statusReport: null,
+      trustedPositionEpoch: 8,
+    });
+  });
+
+  it('invalidates only XY setup truth for an XY-only console origin command', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      frameVerification: {
+        boundsSignature: '0,0,10,10',
+        wco: { x: 12, y: 34, z: 5 },
+        workOriginActive: true,
+      },
+      trustedPositionEpoch: 7,
+    });
+
+    await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: false,
+      workOriginSource: 'none',
+      workZZeroKnown: true,
+      wcoCache: null,
+      frameVerification: null,
+      statusReport: null,
+      trustedPositionEpoch: 8,
+    });
+  });
+
+  it('invalidates Z truth but preserves XY authority for a console tool-length change', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      trustedPositionEpoch: 7,
+    });
+
+    await useLaserStore.getState().sendConsoleCommand('G43.1 Z-12.5');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: false,
+      wcoCache: null,
+      statusReport: null,
+      trustedPositionEpoch: 8,
+    });
+  });
+
   it('blocks console commands during an active job except realtime status query', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
@@ -159,9 +274,45 @@ describe('laser-store console commands', () => {
     ).rejects.toThrow(/Idle status report/i);
 
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    useLaserStore.setState({
+      controllerSettings: { laserModeEnabled: true },
+      detectedSettings: { laserModeEnabled: true },
+      grblSettingsRows: [
+        {
+          id: 32,
+          code: '$32',
+          rawValue: '1',
+          numericValue: 1,
+          name: 'Laser mode',
+          unit: null,
+          description: 'Laser mode enable',
+          category: 'laser',
+          known: true,
+          writeRisk: 'common',
+        },
+      ],
+      lastSettingsReadAt: 123,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroKnown: true,
+      wcoCache: { x: 1, y: 2, z: 3 },
+      homingState: 'confirmed',
+    });
     await useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true });
 
     expect(writes.at(-1)).toBe('$32=1\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerSettings: null,
+      detectedSettings: null,
+      grblSettingsRows: [],
+      lastSettingsReadAt: null,
+      workOriginActive: false,
+      workOriginSource: 'none',
+      workZZeroKnown: false,
+      wcoCache: null,
+      homingState: 'unknown',
+      statusReport: null,
+    });
   });
 });
 
