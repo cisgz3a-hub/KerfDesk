@@ -6979,3 +6979,36 @@ round trips or object transforms. Anchors depend on the referenced path topology
 changing editor must deliberately remap or invalidate them rather than guessing. Software tests
 cover persistence, mixed automatic/manual layers, compensated roughing and finishing paths, and
 interaction undo; hardware remains CLAIMED pending the standing CNC cut protocol.
+
+---
+
+## ADR-157 - Detected controller identity gates profile transport and output
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Machine profiles previously carried controller family, streaming mode, receive-window size, and
+G-code dialect as independently selectable fields. After firmware detection, those fields could
+describe different controller families, leaving a seemingly valid profile able to stream with a
+stale driver or emit an incompatible dialect.
+
+### Decision
+
+- One pure compatibility policy reconciles configured and detected controller family, streaming
+  mode, bounded receive window, and output dialect while reporting every correction.
+- Marlin and Smoothieware use one-line acknowledged streaming. Crossing back to a GRBL-family
+  controller restores character-counted streaming; compatible explicit GRBL choices remain intact.
+- A completed settings read may overlay controller-reported machine limits onto catalog defaults.
+  Before such a read, selecting a profile does not borrow stale limits from the current connection.
+- Once firmware is detected, profiles for another controller family remain visible but cannot be
+  applied. Start and Resume refuse if configured, active, and detected controller identities differ.
+- Simulator evidence does not upgrade a controller family to hardware-verified status. Existing
+  catalog confidence labels and the physical fault matrix remain authoritative.
+
+### Consequences
+
+Profile selection, connection diagnostics, persisted transport fields, output strategy, and Start
+readiness now share one controller contract. Operators may need to reconnect after changing profile
+families, and unsafe cross-family combinations fail visibly rather than being corrected only at
+stream time. The policy expands safety coverage without claiming a broader hardware ecosystem.

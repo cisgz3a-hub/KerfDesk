@@ -172,6 +172,11 @@ Verified end-to-end against scripted firmware simulators
 - **I.5 — Ruida** (ADR-097): EXPERIMENTAL `.rd` export (encode→decode round-trip
   proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
   link; pure UDP session state machine as groundwork.
+- **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
+  streaming mode, receive window, output dialect, active driver, and Start
+  readiness are reconciled by one fail-closed policy. Cross-family profile
+  selection is refused after detection; simulator-verified families remain
+  hardware CLAIMED.
 
 **Hardware truth table:** GRBL v1.1 + grblHAL = **hardware-verified on the Falcon
 A1 Pro (GrblHAL 1.1f), maintainer, 2026-07-02** — this also proves the S1/H.1
