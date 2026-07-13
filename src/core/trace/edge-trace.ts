@@ -96,9 +96,7 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
   );
   const minimumLength = Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX) * scale;
   const polylines = filterEdgePolylinesByLength(finished, minimumLength);
-  return polylines.length === 0
-    ? []
-    : withCanonicalTraceCurves([{ color: EDGE_COLOR, polylines }]);
+  return polylines.length === 0 ? [] : withCanonicalTraceCurves([{ color: EDGE_COLOR, polylines }]);
 }
 
 export function filterEdgePolylinesByLength(

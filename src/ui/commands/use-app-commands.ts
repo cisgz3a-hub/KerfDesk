@@ -171,7 +171,13 @@ function connectionCommandContext(
   activeStreamer: boolean,
 ): Pick<
   AppCommandContext,
-  'machineKind' | 'dirty' | 'savedName' | 'serialSupported' | 'connected' | 'machineBusy' | 'homingEnabled'
+  | 'machineKind'
+  | 'dirty'
+  | 'savedName'
+  | 'serialSupported'
+  | 'connected'
+  | 'machineBusy'
+  | 'homingEnabled'
 > {
   return {
     machineKind: machineKindOf(app.project.machine),
