@@ -2238,13 +2238,19 @@ F-CNC19 tiling.
 #### Success
 1. Material & Bit → "Surface spoilboard": width/height (prefilled from
    the stock), stepover % of the active bit, total depth. Save writes a
-   standalone .nc: serpentine rows per 0.5 mm depth step, spindle
-   spin-up first, park at the origin after M5.
+   provenance-stamped standalone .nc: serpentine rows per 0.5 mm depth
+   step, spindle-off safe-Z lift before M3/spin-up, park at the origin
+   after M5. Fixed feeds are capped to the device-profile maximum.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
+3. Before the picker opens, emitted-text preflight checks the work-origin
+   bed envelope, enabled no-go-zone uncertainty, feed/RPM ceilings,
+   finite coordinates, safe travel/depth, and spindle-start clearance.
+   Connected-controller $30/$32 mismatches use the normal export confirm.
 
 #### Error — save fails
-1. A failed dialog/write toasts the reason; nothing else changes.
+1. A preflight failure or failed dialog/write toasts the reason; nothing
+   is written.
 
 #### Empty
 1. Cancelling the save dialog writes nothing.

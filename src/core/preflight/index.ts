@@ -18,3 +18,4 @@ export { runPreEmitPreflight } from './pre-emit';
 export { firstZoneCrossedBySegment } from './no-go-zones';
 export type { CncPreflightOptions } from './cnc-preflight';
 export { runCncPreflight } from './cnc-preflight';
+export { runStandaloneCncPreflight } from './standalone-cnc-preflight';
