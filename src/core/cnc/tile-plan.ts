@@ -135,6 +135,10 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
       for (const piece of clipPointsToRect([...pass.points], tile.rect, pass.closed)) {
         passes.push({ kind: 'path3d', closed: false, points: piece });
       }
+    } else if (pass.kind === 'helical-contour') {
+      for (const piece of clipPointsToRect(helicalXyzPoints(pass), tile.rect, false)) {
+        passes.push({ kind: 'path3d', closed: false, points: piece });
+      }
     } else {
       const xyz = cncPassXyPoints(pass).map((point) => ({ x: point.x, y: point.y, z: pass.zMm }));
       for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {
@@ -149,6 +153,26 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
   }
   if (passes.length === 0) return null;
   return { ...group, passes: passes.map((pass) => translatePass(pass, tile)) };
+}
+
+function helicalXyzPoints(pass: Extract<CncPass, { readonly kind: 'helical-contour' }>): Xyz[] {
+  const circle = cncPassXyPoints(pass).slice(0, -pass.polyline.length);
+  const revolutions = Math.max(1, Math.floor(pass.revolutions));
+  const points: Xyz[] = [];
+  for (let revolution = 0; revolution < revolutions; revolution += 1) {
+    for (let index = 0; index < circle.length; index += 1) {
+      const point = circle[index];
+      if (point === undefined || (revolution > 0 && index === 0)) continue;
+      const progress = (revolution + index / Math.max(1, circle.length - 1)) / revolutions;
+      points.push({
+        x: point.x,
+        y: point.y,
+        z: pass.startZMm + (pass.zMm - pass.startZMm) * progress,
+      });
+    }
+  }
+  points.push(...pass.polyline.map((point) => ({ ...point, z: pass.zMm })));
+  return points;
 }
 
 type Xyz = { readonly x: number; readonly y: number; readonly z: number };
@@ -246,6 +270,17 @@ function translatePass(pass: CncPass, tile: CncTile): CncPass {
       start: { x: pass.start.x - tile.rect.minX, y: pass.start.y - tile.rect.minY },
       end: { x: pass.end.x - tile.rect.minX, y: pass.end.y - tile.rect.minY },
       center: { x: pass.center.x - tile.rect.minX, y: pass.center.y - tile.rect.minY },
+    };
+  }
+  if (pass.kind === 'helical-contour') {
+    return {
+      ...pass,
+      start: { x: pass.start.x - tile.rect.minX, y: pass.start.y - tile.rect.minY },
+      center: { x: pass.center.x - tile.rect.minX, y: pass.center.y - tile.rect.minY },
+      polyline: pass.polyline.map((point) => ({
+        x: point.x - tile.rect.minX,
+        y: point.y - tile.rect.minY,
+      })),
     };
   }
   return {

@@ -14,7 +14,7 @@
 //   8. No emitted Z below -(stock + through-cut allowance) — proves the depth
 //      invariant on the final text, not just the settings (findOverdeepCutIssues).
 
-import { findDroppedCncLayers } from '../cnc';
+import { findCncHelicalEntryIssues, findDroppedCncLayers } from '../cnc';
 import { machineBoundsForDevice } from '../devices';
 import {
   DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
@@ -68,6 +68,12 @@ export function runCncPreflight(
         `Layer ${layerId}: its shapes produced no toolpaths — usually the bit is too wide to ` +
         'fit them (pockets and inside profiles need the bit to fit inside), or a profile/pocket ' +
         'shape is not closed. Fix the layer or disable its Output.',
+    });
+  }
+  for (const issue of findCncHelicalEntryIssues(project.scene, project.device, config)) {
+    issues.push({
+      code: 'cnc-helix-entry-invalid',
+      message: `Layer ${issue.layerId}: ${issue.reason} Adjust Helical entry or disable it.`,
     });
   }
   appendBoundsIssues(project, gcode, options, issues);

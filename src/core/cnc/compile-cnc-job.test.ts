@@ -66,6 +66,39 @@ function onlyGroup(scene: Scene): CncGroup {
 }
 
 describe('compileCncJob', () => {
+  it('compiles an opted-in offset pocket with native helical contour passes', () => {
+    const scene = sceneWith(
+      [
+        cncLayer('L1', '#ff0000', {
+          cutType: 'pocket',
+          depthMm: 4,
+          depthPerPassMm: 2,
+          helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+        }),
+      ],
+      [squareObject('O1', '#ff0000', 20)],
+    );
+    const group = onlyGroup(scene);
+    expect(group.passes.length).toBeGreaterThan(0);
+    expect(group.passes.every((pass) => pass.kind === 'helical-contour')).toBe(true);
+    expect(group.passes[0]).toMatchObject({ startZMm: 0, zMm: -2 });
+    expect(group.passes.at(-1)).toMatchObject({ startZMm: -2, zMm: -4 });
+    const firstDepthPasses = group.passes.filter(
+      (pass) => pass.kind === 'helical-contour' && pass.zMm === -2,
+    );
+    expect(firstDepthPasses.length).toBeGreaterThan(1);
+    expect(
+      new Set(
+        firstDepthPasses.map((pass) =>
+          pass.kind === 'helical-contour' ? `${pass.center.x},${pass.center.y}` : '',
+        ),
+      ).size,
+    ).toBeGreaterThan(1);
+    for (const pass of firstDepthPasses) {
+      if (pass.kind === 'helical-contour') expect(pass.polyline[0]).toEqual(pass.start);
+    }
+  });
+
   it('expands depth passes shallow to deep with an exact floor', () => {
     const scene = sceneWith(
       [cncLayer('L1', '#ff0000', { cutType: 'profile-on-path', depthMm: 3, depthPerPassMm: 1.5 })],

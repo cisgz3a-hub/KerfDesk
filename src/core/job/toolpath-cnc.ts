@@ -143,6 +143,23 @@ function cutStepForPass(
         groupId: group.layerId,
         passIndex,
       };
+    case 'helical-contour': {
+      const radius = Math.hypot(pass.start.x - pass.center.x, pass.start.y - pass.center.y);
+      const helixLength = Math.hypot(
+        Math.PI * 2 * radius * Math.max(1, Math.floor(pass.revolutions)),
+        pass.zMm - pass.startZMm,
+      );
+      const first = pass.polyline[0] ?? pass.start;
+      return {
+        kind: 'cut',
+        color: group.color,
+        polyline: xy,
+        length: helixLength + dist(pass.start, first) + polylineLength(pass.polyline),
+        z: { from: pass.startZMm, to: pass.zMm },
+        groupId: group.layerId,
+        passIndex,
+      };
+    }
     default:
       return assertNever(pass, 'CncPass');
   }
@@ -155,6 +172,8 @@ function passExitZMm(pass: CncPass): number {
     case 'path3d':
       return pass.points[pass.points.length - 1]?.z ?? 0;
     case 'arc':
+      return pass.zMm;
+    case 'helical-contour':
       return pass.zMm;
     default:
       return assertNever(pass, 'CncPass');

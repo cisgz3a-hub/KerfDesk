@@ -2,6 +2,7 @@ export type {
   CncArcPass,
   CncContourPass,
   CncGroup,
+  CncHelicalContourPass,
   CncPass,
   CncPath3dPass,
   CutGroup,

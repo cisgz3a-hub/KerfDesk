@@ -115,6 +115,29 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     expect(cut.length).toBeCloseTo((Math.PI * 10) / 2, 9);
     expect(cut.z).toEqual({ from: -1.25, to: -1.25 });
   });
+
+  it('measures a helical contour in 3D and reports its descending Z span', () => {
+    const helix: CncPass = {
+      kind: 'helical-contour',
+      start: { x: 5, y: 0 },
+      center: { x: 0, y: 0 },
+      clockwise: false,
+      startZMm: 0,
+      zMm: -2,
+      revolutions: 2,
+      polyline: [
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+      ],
+      closed: false,
+    };
+    const toolpath = buildToolpath({ groups: [group([helix])] });
+    const cut = toolpath.steps.find((step) => step.kind === 'cut');
+    if (cut?.kind !== 'cut') throw new Error('expected cut');
+    const helicalLength = Math.hypot(4 * Math.PI * 5, 2);
+    expect(cut.length).toBeCloseTo(helicalLength + 5 + 10, 9);
+    expect(cut.z).toEqual({ from: 0, to: -2 });
+  });
 });
 
 // ── Emitter agreement property ──────────────────────────────────────────────

@@ -36,10 +36,12 @@ import {
 import type { CncGroup, CncPass, Job } from '../job';
 import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
 import { coolantFields } from './coolant-fields';
+import { capFeed, capSpindle } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
+import { planHelicalPocketPasses } from './helical-entry';
 import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
@@ -49,7 +51,6 @@ import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
 
 const COORD_EPS = 1e-9;
-const MIN_FEED_MM_PER_MIN = 1;
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
   const clearingGroups: CncGroup[] = [];
@@ -81,35 +82,14 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
 }
 
-// Output layers whose vector shapes exist but compile to zero toolpaths —
-// usually a bit too wide for the geometry (pockets and inside profiles need
-// the bit to fit), or open shapes on a closed-only cut type. Preflight
-// surfaces these so a job never silently omits a layer the user drew.
-export function findDroppedCncLayers(
-  scene: Scene,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): ReadonlyArray<string> {
-  const dropped: string[] = [];
-  for (const layer of scene.layers) {
-    if (!layer.output) continue;
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    const polylines = collectLayerPolylines(scene.objects, layer, device);
-    if (polylines.length === 0) continue;
-    const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
-    const group = cncGroupForLayer(layer, settings, polylines, device, config);
-    if (clearance === null && group === null) dropped.push(layer.id);
-  }
-  return dropped;
-}
-
+// Side-offset profiles are the only cut types eligible for holding tabs.
 export function isProfileCutType(cutType: CncCutType): boolean {
   return (
     cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'
   );
 }
 
-function collectLayerPolylines(
+export function collectLayerPolylines(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
@@ -161,7 +141,7 @@ function appendObjectPolylines(
   }
 }
 
-function cncGroupForLayer(
+export function cncGroupForLayer(
   layer: Layer,
   settings: CncLayerSettings,
   polylines: ReadonlyArray<Polyline>,
@@ -199,7 +179,7 @@ function cncGroupForLayer(
 
 // The two-stage v-carve's clearing group (H.7): pocket the flat floors
 // with the layer's clearing bit before the v-bit ladder runs.
-function vcarveClearanceGroupForLayer(
+export function vcarveClearanceGroupForLayer(
   layer: Layer,
   settings: CncLayerSettings,
   polylines: ReadonlyArray<Polyline>,
@@ -271,6 +251,8 @@ function passesForLayer(
       : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return [];
+  const helicalPasses = helicalPocketPasses(settings, toolpaths, depths);
+  if (helicalPasses !== null) return helicalPasses;
   const roughing =
     settings.cutType === 'pocket'
       ? depthMajorPasses(toolpaths, depths)
@@ -286,7 +268,18 @@ function passesForLayer(
     : applyRampEntry(passes, settings.rampEntryDeg);
 }
 
-function xyToolpathsForCutType(
+function helicalPocketPasses(
+  settings: CncLayerSettings,
+  toolpaths: ReadonlyArray<Polyline>,
+  depths: ReadonlyArray<number>,
+): ReadonlyArray<CncPass> | null {
+  if (settings.cutType !== 'pocket' || settings.helixEntry === undefined) return null;
+  if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') return [];
+  const plan = planHelicalPocketPasses(toolpaths, depths, settings.helixEntry);
+  return plan.ok ? plan.passes : [];
+}
+
+export function xyToolpathsForCutType(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
@@ -413,16 +406,6 @@ function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
   const alreadyClosed =
     Math.abs(first.x - last.x) <= COORD_EPS && Math.abs(first.y - last.y) <= COORD_EPS;
   return alreadyClosed ? points : [...points, first];
-}
-
-function capFeed(feedMmPerMin: number, maxFeed: number): number {
-  if (!Number.isFinite(feedMmPerMin) || feedMmPerMin <= 0) return MIN_FEED_MM_PER_MIN;
-  return Math.min(feedMmPerMin, maxFeed);
-}
-
-function capSpindle(spindleRpm: number, spindleMaxRpm: number): number {
-  if (!Number.isFinite(spindleRpm) || spindleRpm <= 0) return 0;
-  return Math.min(spindleRpm, spindleMaxRpm);
 }
 
 // Pocket clearing strategy dispatch (ADR-105 G10): offset rings unless the

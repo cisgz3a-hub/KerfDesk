@@ -178,6 +178,37 @@ describe('tileJobs clipping', () => {
     }
   });
 
+  it('clips helical passes into tile-safe XYZ motion with interpolated depth', () => {
+    const helix: CncGroup['passes'] = [
+      {
+        kind: 'helical-contour',
+        start: { x: 95, y: 50 },
+        center: { x: 90, y: 50 },
+        clockwise: false,
+        startZMm: 0,
+        zMm: -2,
+        revolutions: 2,
+        polyline: [
+          { x: 95, y: 50 },
+          { x: 250, y: 50 },
+        ],
+        closed: false,
+      },
+    ];
+    const tiled = tileJobs({ groups: [groupOf(helix)] }, TILING);
+    expect(tiled.length).toBeGreaterThan(1);
+    const points = tiled.flatMap(({ job }) =>
+      job.groups.flatMap((group) =>
+        group.kind === 'cnc'
+          ? group.passes.flatMap((pass) => (pass.kind === 'path3d' ? pass.points : []))
+          : [],
+      ),
+    );
+    expect(points.length).toBeGreaterThan(4);
+    expect(points.some((point) => point.z < 0 && point.z > -2)).toBe(true);
+    expect(points.some((point) => point.z === -2)).toBe(true);
+  });
+
   it('drops tiles with no motion', () => {
     // Line only in the left half of a 2-column grid.
     const tiled = tileJobs(lineJob(0, 95, 150, -1), {

@@ -207,6 +207,7 @@ export type {
   CncCoolantMode,
   CncCutDirection,
   CncCutType,
+  CncHelixEntrySettings,
   CncLayerSettings,
   CncMachineConfig,
   CncMachineParams,

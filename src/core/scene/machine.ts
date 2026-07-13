@@ -54,6 +54,12 @@ export type CncStock = {
 // spindle, climb keeps material on the LEFT of travel (see motion-polish).
 export type CncCutDirection = 'climb' | 'conventional';
 
+export type CncHelixEntrySettings = {
+  readonly maxDiameterMm: number;
+  readonly minDiameterMm: number;
+  readonly angleDeg: number;
+};
+
 export type CncCutType =
   | 'profile-outside'
   | 'profile-inside'
@@ -94,6 +100,9 @@ export type CncLayerSettings = {
   // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
   // descend into cuts along the path at this angle instead of plunging.
   readonly rampEntryDeg?: number;
+  // Pocket-only native G2/G3 descent. Diameter values describe the tool-center
+  // circle; the pocket toolpath is already inset by the cutter radius.
+  readonly helixEntry?: CncHelixEntrySettings;
   // Enforce climb or conventional cutting on profile/pocket toolpaths.
   readonly cutDirection?: CncCutDirection;
   // Total cut depth below stock top (positive). For v-carve this is the MAX

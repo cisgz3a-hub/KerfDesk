@@ -12,6 +12,7 @@ import { useStore } from '../state';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
 import {
   FeedPresetRow,
+  HelicalEntryRows,
   MotionPolishRows,
   ReliefLayerRows,
   VClearToolSelect,
@@ -180,6 +181,14 @@ export function CutTypeSections(props: {
       ) : null}
       {settings.cutType === 'v-carve' ? (
         <VCarveSection
+          layer={layer}
+          settings={settings}
+          onCommit={onCommit}
+          onCommitSettings={onCommitSettings}
+        />
+      ) : null}
+      {settings.cutType === 'pocket' ? (
+        <HelicalEntryRows
           layer={layer}
           settings={settings}
           onCommit={onCommit}
