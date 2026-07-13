@@ -6,20 +6,13 @@ import {
   rasterBoundsInMachineCoords,
 } from '../../core/job';
 import { pixelExtentForMm } from '../../core/raster';
-import {
-  LAYER_DEFAULTS,
-  type Layer,
-  type LayerMode,
-  type Project,
-  type RasterImage,
-} from '../../core/scene';
+import { type Layer, type LayerMode, type Project, type RasterImage } from '../../core/scene';
+import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
-  const warnings: string[] = [];
-  for (const layer of project.scene.layers) {
-    if (usesUncalibratedDefaults(layer)) warnings.push(uncalibratedLayerWarning(layer.id));
-  }
-  appendFillHeatWarnings(project, warnings);
+  const job = compileJob(project.scene, project.device);
+  const warnings = [...detectUncalibratedJobWarnings(job)];
+  appendFillHeatWarnings(job, warnings);
 
   const outputLayersByColor = new Map(
     project.scene.layers.filter((layer) => layer.output).map((layer) => [layer.color, layer]),
@@ -46,8 +39,7 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   return warnings;
 }
 
-function appendFillHeatWarnings(project: Project, warnings: string[]): void {
-  const job = compileJob(project.scene, project.device);
+function appendFillHeatWarnings(job: ReturnType<typeof compileJob>, warnings: string[]): void {
   const heat = analyzeFillHeatRisk(job);
   if (job.groups.some(isSensitiveIslandFillGroup) && heat.sensitiveIslandShortSweepCount > 0) {
     warnings.push(
@@ -118,19 +110,6 @@ function describeRasterUpsample(obj: RasterImage, layer: Layer, project: Project
     `${burnWidth} × ${burnHeight} px at ${layer.linesPerMm} lines/mm — the engrave will be softer than ` +
     'the canvas preview. Lower lines/mm, shrink the image, or re-import a higher-resolution file.'
   );
-}
-
-function usesUncalibratedDefaults(layer: Layer): boolean {
-  return (
-    layer.output &&
-    layer.power === LAYER_DEFAULTS.power &&
-    layer.speed === LAYER_DEFAULTS.speed &&
-    layer.passes === LAYER_DEFAULTS.passes
-  );
-}
-
-function uncalibratedLayerWarning(layerId: string): string {
-  return `Layer ${layerId} is still using uncalibrated defaults: ${LAYER_DEFAULTS.power}% power, ${LAYER_DEFAULTS.speed} mm/min, ${LAYER_DEFAULTS.passes} pass. Run a material test on scrap before burning final material.`;
 }
 
 function traceVectorWarning(
