@@ -2490,6 +2490,28 @@ F-CNC19 tiling.
    set their material on the layer card, or re-pick the project material to
    apply to all.
 
+### F-CNC37. Keep CNC setup and execution in one explicit WCS — Phase H.11
+
+#### Success
+1. KerfDesk treats G54 as the canonical GRBL-family work coordinate system.
+   Set Origin, Zero Z, and Reset Origin select G54 in the same parsed block as
+   their G92 mutation; persistent-origin actions clear transient offsets under
+   G54 before writing P1.
+2. Z and corner probe transactions select G54 before their first motion and
+   commit P0 only after the required contact succeeds.
+3. Every CNC program, including surfacing, emits `G54` before its first motion,
+   so a prior G55-G59 console command or startup block cannot redirect the job.
+
+#### Error — stale alternate WCS
+1. A controller left in G55-G59 is normalized before app-controlled setup and
+   again by the stream preamble. Missing work-Z evidence remains a separate
+   Start blocker.
+
+#### Edge — other controller families and multi-WCS workflows
+1. G92-only controllers retain their original origin commands and do not
+   receive G54. KerfDesk's current project model has no multi-WCS workflow;
+   jobs intentionally use G54, and CNC execution remains GRBL-family only.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

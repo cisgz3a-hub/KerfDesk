@@ -3,6 +3,7 @@
 exports[`emitGcode production composition — cnc > multi-tool pocket + tabbed profile — byte-pinned 1`] = `
 "G21
 G90
+G54
 G94
 ; tool: 3.175 mm (1/8") end mill (load before starting)
 G0 Z3.810

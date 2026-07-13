@@ -41,7 +41,7 @@ describe('cncGrblStrategy', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
     // The safe-Z lift comes BEFORE M3: after touch-off the bit rests on the
     // stock top, and the spindle must not spin up there.
-    expect(gcode.startsWith('G21\nG90\nG94\nG0 Z3.810\nM3 S12000\nG4 P3.000\n')).toBe(true);
+    expect(gcode.startsWith('G21\nG90\nG54\nG94\nG0 Z3.810\nM3 S12000\nG4 P3.000\n')).toBe(true);
   });
 
   it('retracts before XY travel and plunges at the plunge feed', () => {

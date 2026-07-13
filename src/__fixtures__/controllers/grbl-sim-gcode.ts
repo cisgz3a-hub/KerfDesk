@@ -88,3 +88,10 @@ export function leadingGWord(body: string): number | null {
   const value = Number.parseFloat(match[1] ?? '');
   return Number.isFinite(value) ? value : null;
 }
+
+/** True when a line contains the exact G word, even if another modal G word
+ * precedes it (for example the atomic `G54 G92 Z0` setup block). */
+export function hasGWord(body: string, value: number): boolean {
+  const target = String(value).replace('.', '\\.');
+  return new RegExp(`(?:^|\\s)[Gg]${target}(?:\\s|$)`).test(body);
+}

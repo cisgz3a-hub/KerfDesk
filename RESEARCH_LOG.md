@@ -820,3 +820,14 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
     no copyleft). Added to the `scripts/check-licenses.mjs` allow-list on
     adoption (maintainer-approved 2026-07-04), consistent with the existing
     permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).
+
+## GRBL work-coordinate identity review (2026-07-13)
+
+- **Primary source:** [GRBL v1.1 commands](https://github.com/gnea/grbl/blob/master/doc/markdown/commands.md)
+- `$G` reports the active modal state and documents G54-G59 as the coordinate-system selection group.
+- `$#` reports the stored G54-G59, G92, tool-length, and probe parameters; G10 L2/L20 writes the
+  selected P-indexed work coordinate.
+- **KerfDesk consequence:** an acknowledged setup write is insufficient if a prior startup block or
+  console command left G55-G59 active. App-controlled setup, probing, surfacing, and normal CNC output
+  therefore select G54 explicitly. Modal readback remains a later hardening step, not a prerequisite
+  for this deterministic normalization.

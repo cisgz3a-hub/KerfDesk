@@ -223,7 +223,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
     const setOrigin = useLaserStore.getState().setOriginHere();
     await pump(100);
     await setOrigin;
-    expect(sim.outbound().some((w) => w.startsWith('G92 X0 Y0'))).toBe(true);
+    expect(sim.outbound().some((w) => w.startsWith('G54 G92 X0 Y0'))).toBe(true);
     await pump(1200);
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 0, z: 0 });
     expect(useLaserStore.getState().workOriginActive).toBe(true);

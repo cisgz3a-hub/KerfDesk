@@ -165,12 +165,12 @@ describe('grbl-simulator', () => {
     await pump(5);
     await conn.write('$J=G91 G21 X12.000 F1000\n');
     await pump(10);
-    await conn.write('G92 X0 Y0\n');
+    await conn.write('G54 G92 X0 Y0\n');
     await pump(5);
     await conn.write('?');
     await pump(2);
     expect(lines.at(-1)).toContain('|WCO:12.000,0.000,0.000');
-    await conn.write('G92.1\n');
+    await conn.write('G54 G92.1\n');
     await pump(5);
     await conn.write('?');
     await pump(2);
