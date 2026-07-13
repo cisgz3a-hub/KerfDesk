@@ -7,8 +7,12 @@
 // The skip length adds one tool diameter so the PHYSICAL bridge is the
 // requested width after the bit (radius on each side) eats into the gap.
 
-import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
-import type { Polyline } from '../scene';
+import {
+  applyAutomaticTabsToPolylines,
+  automaticTabAnchorPoints,
+  splitClosedPolylineForTabsAtAnchors,
+} from '../geometry/tabs-bridges';
+import type { Polyline, Vec2 } from '../scene';
 
 export type CncTabSettings = {
   readonly tabWidthMm: number;
@@ -42,4 +46,70 @@ export function splitPassForTabs(
     // dangerous as a freed part.
     tabSkipInnerShapes: false,
   });
+}
+
+export function splitPassForTabsAlignedToReference(
+  polyline: Polyline,
+  references: ReadonlyArray<Polyline>,
+  settings: CncTabSettings,
+): ReadonlyArray<Polyline> {
+  const reference = closestClosedReference(polyline, references);
+  if (reference === null) return splitPassForTabs(polyline, settings);
+  const anchors = automaticTabAnchorPoints(reference, settings.tabsPerShape);
+  return splitClosedPolylineForTabsAtAnchors(
+    polyline,
+    anchors,
+    Math.max(0, settings.tabWidthMm) + Math.max(0, settings.toolDiameterMm),
+  );
+}
+
+function closestClosedReference(
+  target: Polyline,
+  references: ReadonlyArray<Polyline>,
+): Polyline | null {
+  let best: Polyline | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const reference of references) {
+    if (!reference.closed || reference.points.length < 3) continue;
+    const distance = averageDistanceToPolyline(target.points, reference.points);
+    if (distance < bestDistance - TAB_EPS) {
+      best = reference;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function averageDistanceToPolyline(
+  points: ReadonlyArray<Vec2>,
+  polyline: ReadonlyArray<Vec2>,
+): number {
+  if (points.length === 0) return Number.POSITIVE_INFINITY;
+  let total = 0;
+  for (const point of points) {
+    let nearest = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < polyline.length; index += 1) {
+      const start = polyline[index];
+      const end = polyline[(index + 1) % polyline.length];
+      if (start !== undefined && end !== undefined) {
+        nearest = Math.min(nearest, pointToSegmentDistance(point, start, end));
+      }
+    }
+    total += nearest;
+  }
+  return total / points.length;
+}
+
+function pointToSegmentDistance(point: Vec2, start: Vec2, end: Vec2): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const t =
+    lengthSquared <= TAB_EPS
+      ? 0
+      : Math.max(
+          0,
+          Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
+        );
+  return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
 }

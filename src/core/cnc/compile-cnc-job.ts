@@ -40,6 +40,7 @@ import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
+import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
 import { orderInnerFirst } from './profile-ordering';
@@ -277,53 +278,12 @@ function passesForLayer(
   // One full-depth finishing pass at the true contour, appended after roughing.
   const passes =
     allowanceMm > 0
-      ? [...roughing, ...finishingProfilePasses(polylines, settings, tool.diameterMm)]
+      ? [...roughing, ...finishingProfilePasses(polylines, settings, tool.diameterMm, toolpaths)]
       : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.
   return settings.rampEntryDeg === undefined
     ? passes
     : applyRampEntry(passes, settings.rampEntryDeg);
-}
-
-// The finish allowance in effect for this layer: the stock-to-leave value, but
-// only for the two side-offset profile cut types it applies to. Pocket,
-// profile-on-path, v-carve, drill, engrave, and relief are out of scope (0).
-function profileFinishAllowanceMm(settings: CncLayerSettings): number {
-  const applies = settings.cutType === 'profile-outside' || settings.cutType === 'profile-inside';
-  const allowance = settings.finishAllowanceMm ?? 0;
-  return applies && Number.isFinite(allowance) && allowance > 0 ? allowance : 0;
-}
-
-// The finishing pass: one loop along the TRUE contour (tool-radius offset, no
-// allowance) at full depth. When tabs are on it is tab-split through the SAME
-// splitPassForTabs the deepest roughing pass uses, so the finishing pass still
-// leaves the holding tabs and the part stays attached.
-function finishingProfilePasses(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-): CncPass[] {
-  const side = settings.cutType === 'profile-inside' ? 'inside' : 'outside';
-  const raw = orderInnerFirst(profileToolpathPolylines(polylines, side, toolDiameterMm));
-  const toolpaths =
-    settings.cutDirection === undefined
-      ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
-  const zMm = -settings.depthMm;
-  const wantsTabs = settings.tabsEnabled;
-  const passes: CncPass[] = [];
-  for (const toolpath of toolpaths) {
-    if (
-      wantsTabs &&
-      toolpath.closed &&
-      passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm)
-    ) {
-      appendTabbedPasses(passes, toolpath, zMm, settings, toolDiameterMm);
-    } else {
-      passes.push(passFromPolyline(toolpath, zMm));
-    }
-  }
-  return passes;
 }
 
 function xyToolpathsForCutType(

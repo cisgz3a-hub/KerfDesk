@@ -255,7 +255,10 @@ const focusHintStyle: React.CSSProperties = {
 };
 const jogRowStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(116px, 1fr) 104px',
+  // The Fire/air-assist column shrinks (minmax floor 0) rather than overflowing
+  // the fixed-width rail when the panel is dragged toward its minimum width; the
+  // arrow pad keeps its 116px min so the jog buttons never clip.
+  gridTemplateColumns: 'minmax(116px, 1fr) minmax(0, 104px)',
   gridTemplateAreas: '"arrows air" "warning warning"',
   alignItems: 'stretch',
   gap: 8,
