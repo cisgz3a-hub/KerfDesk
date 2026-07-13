@@ -6880,3 +6880,35 @@ Large pockets can clear faster while retaining small-feature reach and island pr
 result depends on a deliberate manual tool change and correct Z touch-off. Software tests cover
 geometry, ordering, persistence, preview, and preflight; hardware remains CLAIMED until the standing
 two-tool air-cut and scrap protocol passes.
+
+---
+
+## ADR-154 - Adaptive pockets require verified constant-load ring sequences
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Ordinary pocket offsets can spend long segments at high cutter engagement and do not establish that
+the requested stock was actually cleared. Calling them adaptive without a bounded planner and an
+independent coverage check would overstate both performance and safety. A first implementation can
+support common closed pockets without claiming island-aware or full stock-simulation behavior.
+
+### Decision
+
+- End-mill pockets may opt into deterministic constant-load roughing sequences using an explicit
+  optimal load, defaulted to 10% and capped at 50% of tool diameter.
+- Planning is limited to sanitized closed, island-free regions. Open contours, islands, invalid
+  parameters, and geometry failures block preflight instead of falling back silently.
+- Each sequence uses a native locally fitted helical entry and conventional cleanup contours.
+- An independent bounded stock-removal verifier must confirm engagement and at least 98.5% coverage.
+  Jobs exceeding its 1,000,000-cell budget are refused rather than checked at reduced resolution.
+- This is bounded 2D adaptive clearing, not a medial-axis trochoidal planner or full in-process stock
+  simulation. Hardware status remains CLAIMED until the standing CNC air-cut and scrap test passes.
+
+### Consequences
+
+Supported pockets receive deterministic, software-verified roughing paths with explicit failure
+boundaries. Large pockets and island geometry can be rejected even when an ordinary pocket strategy
+would compile; that fail-closed behavior is intentional until a scalable, island-aware verifier is
+adopted. The planner, verifier, persistence, preflight, preview, and emitted arcs remain release-gated.
