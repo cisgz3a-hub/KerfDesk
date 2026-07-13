@@ -8,9 +8,9 @@ function repoFile(path: string): string {
 
 // Structural gate for the desktop release pipeline (ADR-024). Green CI can't
 // prove the installer runs, but it CAN pin the invariants that keep the release
-// correct: tag-gated, verified before packaging, version-pinned, unsigned until
-// a cert exists, and publishing to the exact origin electron-updater reads from.
-describe('Desktop release workflow gate (ADR-024/135)', () => {
+// correct: tag-gated, verified before packaging, version-pinned, signed before
+// publishing, and targeting the exact origin electron-updater reads from.
+describe('Desktop release workflow gate (ADR-024/152)', () => {
   const workflow = repoFile('.github/workflows/release-desktop.yml');
 
   it('builds only on version tags, on a Windows runner', () => {
@@ -31,28 +31,33 @@ describe('Desktop release workflow gate (ADR-024/135)', () => {
   });
 
   it('pins the installer version to the tag and emits the update feed locally', () => {
-    expect(workflow).toContain('-c.extraMetadata.version=');
+    expect(workflow).toContain('--config.extraMetadata.version=');
     expect(workflow).toContain('--publish never');
   });
 
-  it('requires and verifies signing for production tags (ADR-137)', () => {
-    expect(workflow).toContain('CSC_LINK: ${{ secrets.CSC_LINK }}');
-    expect(workflow).toContain('CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}');
-    expect(workflow).toContain('Production desktop tags require');
-    expect(workflow).toContain('Get-AuthenticodeSignature');
+  it('fails tag releases closed unless signing credentials and a valid signature exist', () => {
+    expect(workflow).toContain('Require tag-release signing credentials');
+    expect(workflow).toContain('WIN_CSC_LINK: ${{ secrets.CSC_LINK }}');
+    expect(workflow).toContain('--config.forceCodeSigning="${force_signing}"');
+    expect(workflow).toContain('Verify signed tag installer');
     expect(workflow).toContain("$signature.Status -ne 'Valid'");
-    expect(workflow).toContain('CSC_IDENTITY_AUTO_DISCOVERY');
   });
 
-  it('keeps automatic updates disabled while releases may be unsigned', () => {
+  it('embeds update trust only in signed tag builds and reads it fail-closed at runtime', () => {
+    expect(workflow).toContain('if [ "${GITHUB_REF_TYPE}" = "tag" ]');
+    expect(workflow).toContain('--config.extraMetadata.kerfdeskUpdateChannelTrusted="${trust}"');
     expect(repoFile('electron/main.ts')).toContain(
-      'const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = false',
+      'readDesktopUpdateChannelTrust(app.getAppPath())',
     );
+    expect(repoFile('electron-builder.yml')).toContain('verifyUpdateCodeSignature: true');
   });
 
   it('publishes to R2 only for tag pushes, never a manual dry run', () => {
     expect(workflow).toContain("if: github.ref_type == 'tag'");
     expect(workflow).toContain('wrangler r2 object put');
+    expect(workflow.indexOf('Verify signed tag installer')).toBeLessThan(
+      workflow.indexOf('Publish installer + update feed to Cloudflare R2'),
+    );
   });
 
   it('uploads the feed to the same origin electron-updater reads from', () => {
