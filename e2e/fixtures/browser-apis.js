@@ -15,6 +15,7 @@ function record(kind, detail = {}) {
 
 function installSerial() {
   let readController = null;
+  let currentStatus = '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>';
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const port = new EventTarget();
@@ -34,7 +35,7 @@ function installSerial() {
       write(chunk) {
         const text = decoder.decode(chunk);
         record('serial-write', { text });
-        respondToSerialWrite(text, emitLine);
+        respondToSerialWrite(text, emitLine, () => currentStatus);
       },
     });
     queueMicrotask(() => {
@@ -51,10 +52,11 @@ function installSerial() {
   port.forget = async () => record('serial-forget');
 
   function emitLine(line) {
+    if (/^<[^>]+>$/.test(line)) currentStatus = line;
     readController?.enqueue(encoder.encode(`${line}\n`));
   }
   function emitIdle() {
-    emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    emitLine(currentStatus);
   }
 
   Object.defineProperty(navigator, 'serial', {
@@ -80,9 +82,9 @@ function installSerial() {
   };
 }
 
-function respondToSerialWrite(text, emitLine) {
+function respondToSerialWrite(text, emitLine, currentStatus) {
   if (text === '?') {
-    emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    emitLine(currentStatus());
     return;
   }
   if (text.includes('$$')) {
@@ -97,7 +99,7 @@ function respondToSerialWrite(text, emitLine) {
   }
   setTimeout(() => {
     for (let index = 0; index < acknowledgements; index += 1) emitLine('ok');
-    emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    emitLine(currentStatus());
   }, 0);
 }
 
