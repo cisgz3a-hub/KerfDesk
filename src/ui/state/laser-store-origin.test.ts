@@ -142,6 +142,44 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
+  it('does not finish Set Origin until the machine location is captured (post-Release/Wake)', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    // Post-$SLP-wake state: Idle (so the Idle-gate passes) but WPos-only with no
+    // cached WCO, so the machine location cannot be inferred yet — the exact state
+    // where the origin would otherwise record active-but-location-unknown (wcoCache
+    // null → Start refuses it until a jog forces a fresh frame; the reported bug).
+    connection.emitLine('<Idle|WPos:5.000,6.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+
+    let settled = false;
+    const action = useLaserStore
+      .getState()
+      .setOriginHere()
+      .then(() => {
+        settled = true;
+      });
+    await flush();
+    connection.emitLine('ok'); // G92 acknowledged
+    await flush();
+
+    // The G92 is acknowledged, but the location is still unknown (no MPos/WCO frame
+    // yet). Set Origin must NOT finish having recorded an unusable origin — it waits.
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+    expect(settled).toBe(false);
+
+    // GRBL reports the new WCO after the G92 (a G92 does not move the head, so this
+    // is the head's true location):
+    connection.emitLine('<Idle|MPos:5.000,6.000,0.000|WCO:5.000,6.000,0.000|FS:0,0>');
+    await action;
+
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().workOriginSource).toBe('g92');
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 5, y: 6, z: 0 });
+  });
+
   it('Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)', async () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);

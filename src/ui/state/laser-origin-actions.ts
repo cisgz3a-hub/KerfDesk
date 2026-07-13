@@ -81,6 +81,30 @@ function blockOriginAction(set: SetFn, get: GetFn, message: string): never {
   throw new Error(message);
 }
 
+// Bounded so a silent controller cannot hang Set Origin; the connection's status
+// poll delivers fresh position/WCO frames and a G92 forces a WCO report, so a
+// usable position normally lands within a poll cycle. On timeout it returns the
+// last (possibly null) reading — no worse than recording immediately.
+const ORIGIN_POSITION_WAIT_TIMEOUT_MS = 3_000;
+const ORIGIN_POSITION_POLL_MS = 50;
+
+async function waitForInferredMachinePosition(get: GetFn): Promise<LaserState['wcoCache']> {
+  const deadline = Date.now() + ORIGIN_POSITION_WAIT_TIMEOUT_MS;
+  let inferred = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+  while (inferred === null) {
+    if (Date.now() > deadline) return null;
+    await sleep(ORIGIN_POSITION_POLL_MS);
+    inferred = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+  }
+  return inferred;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 export function originActions(
   set: SetFn,
   get: GetFn,
@@ -112,10 +136,20 @@ async function setOriginHere(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   assertOriginActionReady(set, get, refs);
-  await runOriginTransaction(set, refs, safeWrite, 'Set work origin', setOriginHereAction, () => {
-    const { statusReport, wcoCache } = get();
-    return activeOriginPatch('g92', inferCurrentMachinePosition(statusReport, wcoCache));
-  });
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Set work origin',
+    setOriginHereAction,
+    // Wait for the post-G92 position before recording. Right after Release motors
+    // ($SLP) + Wake, an Idle frame can be WPos-only with no cached WCO, so the
+    // location is briefly unknowable and the origin would otherwise record as
+    // active-but-location-unknown — Start then refuses it until a jog forces a
+    // fresh frame (reported bug). A G92 does not move the head, so the captured
+    // position is the head's true location.
+    async () => activeOriginPatch('g92', await waitForInferredMachinePosition(get)),
+  );
 }
 
 async function zeroZHere(
