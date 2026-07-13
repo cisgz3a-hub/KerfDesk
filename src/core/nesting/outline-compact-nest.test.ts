@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { compactOutlineNest, outlineNest, type OutlineNestItem } from './outline-compact-nest';
+import {
+  compactOutlineNest,
+  isOutlineNestWithinWorkBudget,
+  outlineNest,
+  type OutlineNestItem,
+} from './outline-compact-nest';
 import type { NestPlacement, NestRect } from './quick-nest';
 
 const bin: NestRect = { minX: 0, minY: 0, maxX: 100, maxY: 60 };
@@ -174,7 +179,7 @@ describe('compactOutlineNest', () => {
   });
 
   it('falls back without expensive outline work above the bounded corpus size', () => {
-    const items = Array.from({ length: 151 }, (_, index) =>
+    const items = Array.from({ length: 33 }, (_, index) =>
       item(
         String(index),
         [
@@ -195,10 +200,33 @@ describe('compactOutlineNest', () => {
     expect(compactOutlineNest({ ...bin, maxX: 200 }, items, placements, { padding: 0 })).toBe(
       placements,
     );
+    const result = outlineNest({ ...bin, maxX: 200 }, items, { padding: 0 });
+    expect(result).toMatchObject({ ok: true, usedOutline: false });
   });
 
-  it('packs a deterministic forty-part production corpus within its budget', () => {
-    const items = Array.from({ length: 40 }, (_, index) =>
+  it('rejects outline corpora whose point-weighted work exceeds the interactive budget', () => {
+    const triangle = item('triangle', [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ]);
+    const simple = Array.from({ length: 32 }, (_, index) => ({
+      ...triangle,
+      id: String(index),
+    }));
+    const detailed = simple.map((entry) => ({
+      ...entry,
+      outline: [
+        points(Array.from({ length: 8 }, (_, pointIndex) => [pointIndex, pointIndex % 2] as const)),
+      ],
+    }));
+
+    expect(isOutlineNestWithinWorkBudget(simple)).toBe(true);
+    expect(isOutlineNestWithinWorkBudget(detailed)).toBe(false);
+  });
+
+  it('packs a deterministic thirty-two-part production corpus within its budget', () => {
+    const items = Array.from({ length: 32 }, (_, index) =>
       item(
         String(index).padStart(2, '0'),
         [

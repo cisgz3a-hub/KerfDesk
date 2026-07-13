@@ -26,7 +26,8 @@ export type OutlineNestResult =
     }
   | Extract<QuickNestResult, { readonly ok: false }>;
 
-export const OUTLINE_NEST_ITEM_LIMIT = 150;
+export const OUTLINE_NEST_ITEM_LIMIT = 32;
+const OUTLINE_NEST_WORK_LIMIT = 250_000;
 const MAX_CANDIDATES_PER_ITEM = 4_000;
 const AREA_EPSILON = 1e-7;
 
@@ -35,7 +36,7 @@ export function outlineNest(
   items: ReadonlyArray<OutlineNestItem>,
   options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
 ): OutlineNestResult {
-  if (items.length === 0 || items.length > OUTLINE_NEST_ITEM_LIMIT) {
+  if (!isOutlineNestWithinWorkBudget(items)) {
     const result = quickNest(bin, items, options);
     return result.ok ? { ...result, usedOutline: false } : result;
   }
@@ -77,12 +78,24 @@ export function compactOutlineNest(
   placements: ReadonlyArray<NestPlacement>,
   options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
 ): ReadonlyArray<NestPlacement> {
-  if (items.length === 0 || items.length > OUTLINE_NEST_ITEM_LIMIT) return placements;
+  if (!isOutlineNestWithinWorkBudget(items)) return placements;
   try {
     return compactOutlineNestUnsafe(bin, items, placements, options);
   } catch {
     return placements;
   }
+}
+
+export function isOutlineNestWithinWorkBudget(items: ReadonlyArray<OutlineNestItem>): boolean {
+  if (items.length === 0 || items.length > OUTLINE_NEST_ITEM_LIMIT) return false;
+  const itemPairCount = items.length * items.length;
+  let outlinePoints = 0;
+  for (const item of items) {
+    if (item.outline === undefined || item.outline.length === 0) outlinePoints += 4;
+    else for (const path of item.outline) outlinePoints += path.length;
+    if (itemPairCount * outlinePoints > OUTLINE_NEST_WORK_LIMIT) return false;
+  }
+  return true;
 }
 
 function compactOutlineNestUnsafe(
