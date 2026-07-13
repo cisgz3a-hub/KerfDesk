@@ -10,7 +10,7 @@
 // and a native dialog there would freeze the ack pump and Stop button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
-import { profileSupportsCapability } from '../../core/devices';
+import { profileSupportsCapability, streamingModeForController } from '../../core/devices';
 import {
   createJobCheckpoint,
   fingerprintGcode,
@@ -75,7 +75,10 @@ export async function runStartJobFlow(): Promise<void> {
   }
   try {
     await laser.startJob(prepared.gcode, {
-      streamingMode: project.device.streamingMode,
+      streamingMode: streamingModeForController(
+        project.device.controllerKind,
+        project.device.streamingMode,
+      ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });
@@ -216,7 +219,10 @@ async function streamResumeFromRawLine(
   }
   try {
     await useLaserStore.getState().startJob(resume.lines.join('\n'), {
-      streamingMode: project.device.streamingMode,
+      streamingMode: streamingModeForController(
+        project.device.controllerKind,
+        project.device.streamingMode,
+      ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });

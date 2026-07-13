@@ -43,6 +43,17 @@ export function consoleActions(
     sendConsoleCommand: async (input, options = {}) => {
       const prepared = refs.driver.prepareConsoleCommand(input);
       if (!prepared.ok) return block(set, get, refs, prepared.reason);
+      if (
+        prepared.command.kind === 'setting-write' &&
+        refs.driver.capabilities.settings !== 'grbl-dollar'
+      ) {
+        return block(
+          set,
+          get,
+          refs,
+          `${refs.driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`,
+        );
+      }
       const blocked = consoleCommandBlockReason(get(), prepared.command, false);
       if (blocked !== null) return block(set, get, refs, blocked);
       if (prepared.command.requiresConfirmation && options.confirmed !== true) {

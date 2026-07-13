@@ -31,6 +31,8 @@
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
+| ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
+| ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 
 ---
 
@@ -6624,3 +6626,54 @@ Consequences.
   a different start vertex and misalign them, which could sever the part. Verify
   with a test cut before trusting tabs + finish allowance together on intricate
   parts.
+
+---
+
+## ADR-141 - The network-camera bridge is desktop and local-development only
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-140 records the CNC finish allowance; **ADR-141** is the next allocated decision number.
+
+### Context
+
+An exact hosted-origin allowlist still lets same-origin XSS drive the operator's
+loopback bridge and reach private-network cameras. A token delivered to browser
+JavaScript would not close that threat because the same XSS could reuse it.
+
+### Decision
+
+The bridge accepts browser requests only from `app://app` and HTTP loopback
+origins used by local development. Hosted origins are rejected before any
+discovery, probe, proxy, or ffmpeg work. Hosted builds retain USB cameras;
+network cameras require Desktop or local development.
+
+### Consequences
+
+A compromised hosted page can no longer use KerfDesk's bridge as a private
+network camera oracle. Desktop is the supported network-camera workflow.
+
+---
+
+## ADR-142 - Production desktop tags require a valid Windows signature
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-141 records the network-camera bridge restriction; **ADR-142** is the next allocated decision number.
+
+### Context
+
+The release workflow could publish an unsigned Windows installer when signing
+secrets were absent.
+
+### Decision
+
+Tag builds fail before packaging unless `CSC_LINK` and `CSC_KEY_PASSWORD`
+exist. After packaging, `Get-AuthenticodeSignature` must report `Valid` before
+publication. Manual dispatch remains an unsigned, non-publishing dry run.
+
+### Consequences
+
+A Windows code-signing certificate is required for the next tagged release.
+Missing or invalid signing material fails closed. ADR-135's automatic-update
+trust constant remains a separate, deliberate release switch.

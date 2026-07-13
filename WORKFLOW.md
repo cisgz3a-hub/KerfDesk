@@ -2880,8 +2880,10 @@ F-CNC19 tiling.
   camera source; calibration, auto-align, overlay updates, trace-from-camera,
   and snapshots use the same pixel-readable capture path as USB cameras.
 - **Error / bridge unavailable.** If the bridge is not running, discovery and
-  machine-camera capture show an actionable message. Browser users are pointed
-  to the bridge command; the desktop app starts it automatically.
+  machine-camera capture show an actionable message. Local-development users
+  are pointed to the bridge command; the desktop app starts it automatically.
+  Hosted web builds cannot call the loopback network-camera bridge and support
+  USB cameras only (ADR-136).
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera

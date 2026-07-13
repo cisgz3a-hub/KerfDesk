@@ -12,6 +12,7 @@ import { isGrblRxBufferBytes, isGrblStreamingMode } from '../grbl-streaming';
 import { validateCameraProfileShape } from '../camera';
 import { isGcodeDialectSelection } from './gcode-dialects';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
+import { isStreamingModeCompatible } from './controller-streaming-mode';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -293,6 +294,8 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   }
   if (!isGrblStreamingMode(profile.streamingMode)) {
     errors.push('streamingMode must be char-counted or ping-pong');
+  } else if (!isStreamingModeCompatible(profile.controllerKind, profile.streamingMode)) {
+    errors.push(`${profile.controllerKind} requires ping-pong streaming`);
   }
   if (!isGrblRxBufferBytes(profile.rxBufferBytes)) {
     errors.push('rxBufferBytes must be a positive integer not greater than 4096');

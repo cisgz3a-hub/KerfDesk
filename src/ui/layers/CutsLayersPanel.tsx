@@ -128,8 +128,9 @@ const panelStyle: React.CSSProperties = {
   // Card layout means we don't need 500 px of horizontal room any more.
   // 320 px holds a clean two-column field-row layout (label + control)
   // and leaves plenty of width for the Laser panel on 1280-class monitors.
-  width: 320,
-  flexShrink: 0,
+  width: '100%',
+  height: '100%',
+  boxSizing: 'border-box',
 };
 // LightBurn keeps the Cuts/Layers list always visible, so default the Layers
 // disclosure open — selecting an object never hides the layer rows. Material

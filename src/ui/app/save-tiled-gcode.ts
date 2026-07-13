@@ -8,12 +8,13 @@
 import { tileFileName, tileJobs } from '../../core/cnc';
 import { runCncPreflight, type ControllerSettingsSnapshot } from '../../core/preflight';
 import { cncGrblStrategy } from '../../core/output';
-import { prepareOutput } from '../../io/gcode';
+import { gcodeMetadataHeader, prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 import { confirmControllerReadiness } from './confirm-controller-readiness';
+import { buildGcodeMetadata } from './build-info';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
@@ -78,8 +79,8 @@ function emitTileFiles(
 ): TileFile[] | null {
   const emitted: TileFile[] = [];
   for (const { tile, job } of tiles) {
-    const gcode = cncGrblStrategy.emit(job, ctx.project.device);
-    const preflight = runCncPreflight(ctx.project, machine, gcode);
+    const body = cncGrblStrategy.emit(job, ctx.project.device);
+    const preflight = runCncPreflight(ctx.project, machine, body);
     if (!preflight.ok) {
       const lines = preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
       jobAwareAlert(
@@ -88,7 +89,14 @@ function emitTileFiles(
       );
       return null;
     }
-    emitted.push({ name: tileFileName(baseName(ctx.savedName), tile), gcode });
+    const header = gcodeMetadataHeader(buildGcodeMetadata(), {
+      kind: 'cnc',
+      spindleMaxRpm: machine.params.spindleMaxRpm,
+    });
+    emitted.push({
+      name: tileFileName(baseName(ctx.savedName), tile),
+      gcode: `${header}; tile: row ${tile.row + 1}, column ${tile.col + 1}\n${body}`,
+    });
   }
   return emitted;
 }
