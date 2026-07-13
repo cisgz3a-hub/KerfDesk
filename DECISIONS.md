@@ -28,6 +28,7 @@
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
+| ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 
 ---
@@ -6516,9 +6517,43 @@ Make the tracing pipeline explicitly single-flight and latest-wins. Starting a n
 - This is in-process cancellation, not cooperative cancellation inside the tracing algorithms. A backend that monopolizes the main thread remains out of scope, and worker termination latency remains browser-controlled.
 - Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
 
+## ADR-138 - The primary toolbar is icon-first and never wraps
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The primary toolbar had fourteen text buttons and wrapped into a second row at
+compact desktop widths. That reduced canvas height, shifted the numeric toolbar
+and workspace during resize, and made the command surface visually dominant.
+Removing commands would improve density at the cost of discoverability.
+
+### Decision
+
+- Every toolbar command uses a pinned `lucide-static` icon. Familiar file,
+  import, export, Preview, and Shortcuts actions are icon-only at all widths.
+- Specialist commands retain icon-plus-label presentation above 1280 px and
+  switch to icon-only at 1280 px and below.
+- Icon-only buttons keep the complete command label as their accessible name
+  and retain the command registry's tooltip, shortcut, disabled reason, and
+  pressed state.
+- The toolbar is one non-wrapping row. Its command-group region may scroll
+  horizontally on unusually narrow windows; the brand and Shortcuts control
+  remain fixed outside that region, except the redundant brand wordmark hides
+  below 700 px to preserve every command before scrolling is needed.
+- Icons come from the already-approved `lucide-static` dependency. Imported SVG
+  strings are build assets, never project or user content.
+
+### Consequences
+
+The workspace no longer jumps between one-row and two-row chrome. Common
+desktop widths gain vertical space while specialist labels remain available
+where room permits. Operators on narrow windows may need to horizontally scroll
+the command group, but every command also remains available from the menus.
+
 ## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
 
-> **Numbering note.** ADR-137 is accepted; ADR-138 and ADR-139 remain reserved by open PRs. **ADR-140** is allocated to this decision.
+> **Numbering note.** ADR-137 and ADR-138 are accepted; ADR-139 remains reserved by an open PR. **ADR-140** is allocated to this decision.
 
 Context. A profile cut removes the full wall across its depth passes, so the
 finished edge carries the roughing tool's deflection and chatter. Production CNC
