@@ -2564,6 +2564,26 @@ F-CNC19 tiling.
    when a persistent G54 Z may still exist; later `$#` readback may prove and
    preserve that distinction.
 
+### F-CNC38. Retract and wait before every CNC cutting start — Phase H.11
+
+#### Success
+1. A native CNC job, a post-tool-change restart, and a standalone surfacing
+   program all retract to configured safe Z before `M3`.
+2. Each spindle start then emits a positive, machine-configured `G4` dwell
+   before the first plunge or other cutting motion.
+
+#### Error — missing spin-up time
+1. Spindle spin-up durations below 0.5 seconds, including zero and negative
+   values, plus non-finite values, fail CNC preflight. No Start or export path
+   may write the invalid program to a machine or file.
+2. Standalone surfacing generation rejects the same invalid duration instead
+   of producing `G4 P0` or starting the spindle against the work surface.
+
+#### Edge — physical at-speed feedback
+1. The delay is a time-based operator setting, not sensor proof. GRBL `FS`
+   feedback must not be used as proof of measured physical RPM; machines that
+   need more than the 0.5-second input floor must use a longer delay.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

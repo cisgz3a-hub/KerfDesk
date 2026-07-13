@@ -188,10 +188,10 @@ function CncMachineParamsFields(props: { readonly machine: CncMachineConfig }): 
         label="Spin-up delay"
         unit="s"
         value={machine.params.spindleSpinupSec}
-        min={0}
+        min={0.5}
         max={30}
         step={0.5}
-        title="Dwell after starting the spindle before the first plunge."
+        title="Time-based dwell after M3 and before the first plunge. Set enough time for this spindle to reach cutting speed; GRBL does not prove physical RPM."
         onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
       />
       <Row label="Coolant">

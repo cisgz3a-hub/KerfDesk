@@ -234,6 +234,9 @@ function appendSpindleStart(
 ): void {
   appendRetract(lines, head, safeZMm);
   lines.push(`M3 S${Math.max(0, Math.round(rpm))}`);
+  // This is deliberately time-based. Stock GRBL's FS value reflects its
+  // commanded/limited spindle output, not tachometer-backed physical RPM.
+  // CNC preflight rejects non-positive durations before output can be written.
   if (spinupSec > 0) lines.push(`G4 P${fmt(spinupSec)}`);
 }
 
