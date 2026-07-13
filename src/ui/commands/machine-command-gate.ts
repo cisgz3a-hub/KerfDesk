@@ -13,8 +13,10 @@ import type { AppCommand, CommandId } from './command-types';
 
 // Laser-only commands, per ADR-101 §2: calibration generators, Fill-mode
 // tools, raster/Image-mode processing (CNC compile never consumes rasters),
-// the Trace family, the Registration Jig, and laser path optimization
-// (optimizePaths passes kind:'cnc' groups through untouched).
+// the Registration Jig, and laser path optimization (optimizePaths passes
+// kind:'cnc' groups through untouched). The Trace family was reclassified
+// machine-agnostic by the 2026-07-13 ADR-101 amendment (traced vectors flow
+// into the CNC cut pipeline), so it is deliberately NOT in this set.
 export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>([
   'tools.material-test',
   'tools.interval-test',
@@ -24,9 +26,6 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
   'tools.close-open-fill-contours',
   'tools.close-fill-contours-with-tolerance',
   'tools.convert-to-bitmap',
-  'tools.trace-image',
-  'tools.retrace-original',
-  'tools.multi-file-trace',
   'tools.adjust-image',
   'tools.apply-image-mask',
   'tools.crop-image',

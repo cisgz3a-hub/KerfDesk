@@ -142,6 +142,20 @@ export function PresetHint(): JSX.Element {
   );
 }
 
+// CNC-only advisory: outline presets trace both sides of a thin stroke, so on a
+// profile cut a thin line becomes two cuts bracketing it — point operators at
+// the Centerline preset for a single pass. Cutting out filled shapes/logos (the
+// common CNC case) is unaffected. Shown only when the project machine is CNC.
+export function CncTraceHint(): JSX.Element {
+  return (
+    <p style={cncHintStyle}>
+      Cutting on CNC: the outline presets (Line Art, Smooth, Sharp) trace shape edges — ideal for
+      cutting a filled shape or logo out, but a thin line becomes two cuts bracketing it. For a
+      single pass down thin strokes, pick the <strong>Centerline</strong> preset.
+    </p>
+  );
+}
+
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
     <label className="lf-field">
@@ -183,4 +197,10 @@ const hintStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   margin: '4px 0 0 0',
   fontStyle: 'italic',
+};
+const cncHintStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+  margin: '0 0 6px 0',
+  lineHeight: 1.3,
 };
