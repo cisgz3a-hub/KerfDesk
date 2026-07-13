@@ -80,7 +80,7 @@ describe('CheckpointResumeBanner', () => {
     render();
 
     expect(host?.textContent).toContain('Interrupted laser job');
-    expect(host?.textContent).toContain('2 of 4 motion lines confirmed');
+    expect(host?.textContent).toContain('2 of 4 G-code lines acknowledged by the controller');
     expect(host?.querySelector('button')?.textContent).toBe('Review safe recovery');
   });
 
@@ -96,13 +96,16 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.textContent).toBe('');
   });
 
-  it('explains retract-first safe-boundary recovery for a CNC interruption', () => {
+  it('retains CNC checkpoint evidence without offering executable recovery', () => {
     storedCheckpoint(2, 'cnc');
     render();
 
-    expect(host?.textContent).toContain('previous safe retract boundary');
-    expect(host?.textContent).toContain('extracts Z before starting the spindle');
-    expect(host?.textContent).not.toContain('first unconfirmed line');
+    expect(host?.textContent).toContain('Automatic CNC restart');
+    expect(host?.textContent).toContain('acknowledgements do not prove');
+    expect(host?.textContent).toContain('retained as diagnostic evidence');
+    expect([...(host?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
+      'Dismiss',
+    ]);
   });
 
   it('shows the persisted interruption cause after reconnect or reload', () => {

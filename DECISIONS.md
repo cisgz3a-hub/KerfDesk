@@ -26,11 +26,12 @@
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
-| ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
+| ADR-136 | 2026-07-12 | Superseded | CNC interruption recovery rewinds to a retract-first safe boundary (see ADR-141) |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
+| ADR-141 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 
 ---
 
@@ -6417,7 +6418,7 @@ Calibrated overlays now register correctly on the still. A visible UX change: fo
 
 ## ADR-135 - Gate desktop auto-update on a trusted, code-signed channel
 
-**Status:** Accepted | **Date:** 2026-07-12
+**Status:** Superseded by ADR-141 | **Date:** 2026-07-12
 
 ### Context
 
@@ -6624,3 +6625,43 @@ Consequences.
   a different start vertex and misalign them, which could sever the part. Verify
   with a test cut before trusting tabs + finish allowance together on intricate
   parts.
+
+## ADR-141 - Disable executable CNC checkpoint and start-from-line recovery
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+ADR-136 improved one failure mode by rewinding CNC recovery to a retract-first
+boundary, but the app still could not prove that retract was safe. A GRBL `ok`
+means a line was accepted into controller/planner processing; it does not prove
+that the physical cut completed, that position survived the interruption, or
+that the cutter is clear. Automatically moving Z can therefore pull a stopped
+or broken tool through stock, clamps, or a shifted workpiece. No generic G-code
+preamble can infer tool engagement, retained work coordinates, workholding
+integrity, or the correct extraction direction.
+
+### Decision
+
+- Automatic CNC restart from both checkpoints and arbitrary G-code lines is
+  disabled. The core resume builder returns a stable policy error for every CNC
+  request before it parses or emits any motion.
+- The UI removes the executable CNC recovery controls and replaces them with a
+  supervised recovery message: inspect engagement, establish clearance with a
+  machine-specific procedure, re-home if position may be lost, verify WCS/Z
+  zero/tool/workholding, and start a newly reviewed recovery job.
+- CNC checkpoints remain visible as diagnostic evidence, including accepted-line
+  counts and the recorded interruption cause, until the operator dismisses them.
+  Their counts are labelled as controller acknowledgements, not completed motion.
+- Laser start-from-line and checkpoint recovery remain available with their
+  beam-off positioning rules. Ordinary live Feed Hold/Resume is unchanged; it
+  resumes the same controller session and is not crash/start-from-line recovery.
+
+### Consequences
+
+KerfDesk no longer offers one-click continuation for an interrupted router job.
+Operators may lose machining time and must create a deliberate recovery job,
+but the application will not guess physical cutter state from transport-level
+acknowledgements. A future CNC recovery feature requires machine-specific,
+hardware-validated state acquisition and a supervised recovery state machine;
+re-enabling the old retract-first preamble is not an acceptable shortcut.

@@ -68,7 +68,12 @@ export {
 } from './streamer';
 
 export type { CornerProbeParams, ProbeCorner, ZProbeParams } from './probe';
-export { buildResumeProgram, type ResumeOptions, type ResumeProgramResult } from './resume-program';
+export {
+  buildResumeProgram,
+  CNC_AUTOMATIC_RECOVERY_DISABLED_REASON,
+  type ResumeOptions,
+  type ResumeProgramResult,
+} from './resume-program';
 export {
   buildCornerProbeLines,
   buildZProbeLines,

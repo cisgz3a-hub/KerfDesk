@@ -9,7 +9,10 @@
 // startJob-failed alert in the catch arm can fire after streaming began,
 // and a native dialog there would freeze the ack pump and Stop button.
 
-import { buildResumeProgram } from '../../core/controllers/grbl';
+import {
+  buildResumeProgram,
+  CNC_AUTOMATIC_RECOVERY_DISABLED_REASON,
+} from '../../core/controllers/grbl';
 import { profileSupportsCapability } from '../../core/devices';
 import {
   createJobCheckpoint,
@@ -101,9 +104,14 @@ export async function runStartJobFlow(): Promise<void> {
   }
 }
 
-// Resume a stopped/errored job from a chosen 1-based RAW line (ADR-103 G7,
-// F-CNC27) — the manual, ungated path: the operator vouches for the line.
+// Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC
+// recovery is intentionally blocked before compile and again in the core
+// builder because acknowledgement position is not physical machine state.
 export async function runStartFromLineFlow(fromLine: number): Promise<void> {
+  if (machineKindOf(useStore.getState().project.machine) === 'cnc') {
+    jobAwareAlert(`Cannot resume CNC job:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`);
+    return;
+  }
   const prepared = prepareResume();
   if (prepared === null) return;
   await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine);
@@ -114,6 +122,10 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
 // edited project silently renumbers every line), then map the acked-sendable
 // count back to the raw line the stream died at.
 export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promise<void> {
+  if (checkpoint.machineKind === 'cnc') {
+    jobAwareAlert(`Cannot resume CNC job:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`);
+    return;
+  }
   // Recompile with the run's OWN scope + resolved origin (PST-02, R1): a crash
   // resets the live output scope and re-resolves current-position against the
   // post-crash head, both of which would renumber every line and trip the

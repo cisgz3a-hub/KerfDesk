@@ -1,8 +1,8 @@
-// StartFromLineControl — resume a stopped/errored job from a chosen G-code
-// line (ADR-103 G7, F-CNC27). The heavy lifting (readiness gate, modal-state
-// replay, confirm, stream) lives in runStartFromLineFlow.
+// StartFromLineControl — laser start-from-line recovery plus the visible CNC
+// policy block (ADR-103 G7, ADR-141).
 
 import { useState } from 'react';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl';
 import { runStartFromLineFlow } from './start-job-flow';
 
 const MIN_LINE = 1;
@@ -11,9 +11,18 @@ const MAX_LINE = 1_000_000;
 export function StartFromLineControl(props: {
   readonly disabled: boolean;
   readonly busy: boolean;
+  readonly machineKind: 'laser' | 'cnc';
 }): JSX.Element {
   const [line, setLine] = useState(MIN_LINE);
   const blocked = props.disabled || props.busy;
+  if (props.machineKind === 'cnc') {
+    return (
+      <div style={cncBlockedStyle} role="status" aria-label="Automatic CNC recovery disabled">
+        <strong>Automatic CNC recovery disabled</strong>
+        <p style={hintStyle}>{CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}</p>
+      </div>
+    );
+  }
   return (
     <details style={boxStyle}>
       <summary
@@ -47,8 +56,8 @@ export function StartFromLineControl(props: {
         </button>
       </div>
       <p style={hintStyle}>
-        Requires the same work zero as the original run. The spindle restarts, moves to the recorded
-        position at safe height, feeds back to depth, then continues.
+        Requires the same work zero as the original run. The head moves to the recorded position
+        with the beam off, then the remaining laser program is replayed.
       </p>
     </details>
   );
@@ -58,6 +67,11 @@ const boxStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 4,
   padding: '4px 6px',
+};
+const cncBlockedStyle: React.CSSProperties = {
+  ...boxStyle,
+  borderLeft: '3px solid var(--lf-warning)',
+  fontSize: 12,
 };
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6, margin: '6px 0' };
