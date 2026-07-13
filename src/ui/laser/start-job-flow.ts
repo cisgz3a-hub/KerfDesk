@@ -9,10 +9,8 @@
 // startJob-failed alert in the catch arm can fire after streaming began,
 // and a native dialog there would freeze the ack pump and Stop button.
 
-import {
-  buildResumeProgram,
-  CNC_AUTOMATIC_RECOVERY_DISABLED_REASON,
-} from '../../core/controllers/grbl';
+import { buildResumeProgram } from '../../core/controllers/grbl';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import { profileSupportsCapability, streamingModeForController } from '../../core/devices';
 import {
   createJobCheckpoint,

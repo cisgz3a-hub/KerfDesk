@@ -1,4 +1,4 @@
-import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import type { MachineKind } from '../../core/scene';
 
 export function resumeConfirmation(

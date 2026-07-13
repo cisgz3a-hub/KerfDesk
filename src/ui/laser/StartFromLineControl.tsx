@@ -2,7 +2,7 @@
 // policy block (ADR-103 G7, ADR-141).
 
 import { useState } from 'react';
-import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import { runStartFromLineFlow } from './start-job-flow';
 
 const MIN_LINE = 1;

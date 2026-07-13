@@ -8,10 +8,8 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
-import {
-  CNC_AUTOMATIC_RECOVERY_DISABLED_REASON,
-  type StatusReport,
-} from '../../core/controllers/grbl';
+import type { StatusReport } from '../../core/controllers/grbl';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import {
   advanceJobCheckpoint,
   createJobCheckpoint,

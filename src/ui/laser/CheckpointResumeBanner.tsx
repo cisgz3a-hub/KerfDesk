@@ -2,7 +2,7 @@
 // interrupted laser jobs and diagnostic evidence only for CNC checkpoints.
 
 import { useEffect, useState } from 'react';
-import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl';
+import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import type { JobCheckpoint } from '../../core/recovery';
 import { clearJobCheckpoint, readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
