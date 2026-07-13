@@ -1120,6 +1120,11 @@ status frames). It must never read the raw `statusReport.wco` — GRBL
 only emits WCO every Nth frame, so the raw field is null on ~29
 frames out of 30 and would flicker the readout.
 
+The readout and Reset action treat any nonzero WCO axis as meaningful,
+but job placement is axis-specific: only a nonzero X or Y offset proves
+an XY custom origin. A Z-only touch-off remains visible and may establish
+work-Z evidence, but it cannot enable User Origin or Verified Origin.
+
 **The four states.**
 
 1. **Success.** Connected, idle, head jogged to a workpiece corner.

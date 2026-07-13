@@ -26,6 +26,20 @@ describe('resolveJobPlacement', () => {
     }
   });
 
+  it('does not accept a Z-only WCO as proof of an XY user origin', () => {
+    const resolved = resolveJobPlacement(
+      { startFrom: 'user-origin', anchor: 'front-left' },
+      {
+        statusReport: idleAtMachinePosition(10, 20),
+        workOriginActive: false,
+        wcoCache: { x: 0, y: 0, z: 5 },
+      },
+    );
+
+    expect(resolved.ok).toBe(false);
+    if (!resolved.ok) expect(resolved.messages.join('\n')).toMatch(/set origin/i);
+  });
+
   it('resolves user-origin output to zero-based job coordinates plus WCO bounds offset', () => {
     const resolved = resolveJobPlacement(
       { startFrom: 'user-origin', anchor: 'center' },
