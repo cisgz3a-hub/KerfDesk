@@ -31,6 +31,7 @@ describe('JobControls progress display', () => {
         status: 'done',
         streamingMode: 'char-counted',
         queued: [],
+        queueIndex: 0,
         inFlight: [],
         inFlightBytes: 0,
         completed: 5,

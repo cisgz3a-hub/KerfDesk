@@ -57,8 +57,11 @@ export type StreamerStatus =
 export type StreamerState = {
   readonly status: StreamerStatus;
   readonly streamingMode: StreamingMode;
-  // Lines remaining to send, each already terminated with '\n'.
+  // Immutable lines for the complete stream, each already terminated with '\n'.
+  // queueIndex identifies the next unsent line. Keeping one backing array makes
+  // every dequeue O(1) instead of copying the entire remaining job.
   readonly queued: ReadonlyArray<string>;
+  readonly queueIndex: number;
   // Lines sent but not yet ack'd, head-first.
   readonly inFlight: ReadonlyArray<{ readonly line: string; readonly bytes: number }>;
   // Total bytes currently in-flight (sum of inFlight[].bytes).
@@ -104,6 +107,7 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
     status: lines.length === 0 ? 'done' : 'idle',
     streamingMode: opts.streamingMode ?? 'char-counted',
     queued: lines,
+    queueIndex: 0,
     inFlight: [],
     inFlightBytes: 0,
     completed: 0,
@@ -180,7 +184,7 @@ function isTerminal(status: StreamerStatus): boolean {
 }
 
 type FillResult = {
-  readonly queued: ReadonlyArray<string>;
+  readonly queueIndex: number;
   readonly inFlight: ReadonlyArray<{ readonly line: string; readonly bytes: number }>;
   readonly inFlightBytes: number;
   readonly sent: ReadonlyArray<string>;
@@ -192,28 +196,28 @@ type FillResult = {
 // Greedily batch queued lines that fit the remaining RX buffer. Stops early at
 // a tool-change M0 (leaving it queued) or when the next line won't fit.
 function fillBuffer(state: StreamerState): FillResult {
-  let queued = state.queued;
+  let queueIndex = state.queueIndex;
   let inFlight = state.inFlight;
   let inFlightBytes = state.inFlightBytes;
   const sent: string[] = [];
-  while (queued.length > 0) {
+  while (queueIndex < state.queued.length) {
     if (state.streamingMode === 'ping-pong' && sent.length > 0) break;
-    const next = queued[0];
+    const next = state.queued[queueIndex];
     if (next === undefined) break;
     // The M0 must NOT be sent: detected inside the loop, not at the top, because
     // in char-counted mode the retract/M5/park/M0 are all tiny and would batch
     // into one chunk with the M0.
     if (state.toolChangePause && isToolChangeLine(next)) {
-      return { queued, inFlight, inFlightBytes, sent, hitToolChange: true };
+      return { queueIndex, inFlight, inFlightBytes, sent, hitToolChange: true };
     }
     const bytes = next.length;
     if (inFlightBytes + bytes > state.rxBufferBytes) break;
     sent.push(next);
     inFlight = [...inFlight, { line: next, bytes }];
     inFlightBytes += bytes;
-    queued = queued.slice(1);
+    queueIndex += 1;
   }
-  return { queued, inFlight, inFlightBytes, sent, hitToolChange: false };
+  return { queueIndex, inFlight, inFlightBytes, sent, hitToolChange: false };
 }
 
 // Try to send as many queued lines as fit in the remaining buffer. Always
@@ -225,17 +229,20 @@ export function step(state: StreamerState): StepResult {
   if (state.streamingMode === 'ping-pong' && state.inFlight.length > 0) {
     return { state, toSend: '' };
   }
-  const { queued, inFlight, inFlightBytes, sent, hitToolChange } = fillBuffer(state);
+  const { queueIndex, inFlight, inFlightBytes, sent, hitToolChange } = fillBuffer(state);
   const toSend = sent.join('');
   // Return the tool-change transition explicitly even when nothing was sent
   // (the M0 was first this call) — otherwise the empty-send guard below would
   // drop the transition and re-return the un-held original state.
   if (hitToolChange) {
-    return { state: { ...state, status: 'tool-change', queued, inFlight, inFlightBytes }, toSend };
+    return {
+      state: { ...state, status: 'tool-change', queueIndex, inFlight, inFlightBytes },
+      toSend,
+    };
   }
   if (sent.length === 0) return { state, toSend: '' };
   return {
-    state: { ...state, status: 'streaming', queued, inFlight, inFlightBytes },
+    state: { ...state, status: 'streaming', queueIndex, inFlight, inFlightBytes },
     toSend,
   };
 }
@@ -249,7 +256,7 @@ export function continueToolChange(state: StreamerState): StreamerState {
   return {
     ...state,
     status: 'streaming',
-    queued: state.queued.slice(1),
+    queueIndex: state.queueIndex + 1,
     completed: state.completed + 1,
   };
 }
@@ -292,7 +299,7 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
         : state.status !== 'paused' &&
             state.status !== 'tool-change' &&
             nextInFlight.length === 0 &&
-            state.queued.length === 0
+            queuedLineCount(state) === 0
           ? 'done'
           : state.status;
   return {
@@ -323,14 +330,14 @@ export function resume(state: StreamerState): StreamerState {
   // has nothing left to send, so the stream completes here. The job lock
   // still holds until the machine reports Idle (the caller's release path),
   // because the resumed planner motion is still executing.
-  if (state.inFlight.length === 0 && state.queued.length === 0) {
+  if (state.inFlight.length === 0 && queuedLineCount(state) === 0) {
     return { ...state, status: 'done' };
   }
   return { ...state, status: 'streaming' };
 }
 
 export function cancel(state: StreamerState): StreamerState {
-  return { ...state, status: 'cancelled', queued: [] };
+  return { ...state, status: 'cancelled', queued: [], queueIndex: 0 };
 }
 
 // Mark the streamer disconnected — used when the serial port drops
@@ -339,7 +346,7 @@ export function cancel(state: StreamerState): StreamerState {
 // involuntary loss from user-initiated stop so the UI can word the
 // notification correctly. MIT-T1 audit finding (CNCjs parity).
 export function disconnect(state: StreamerState): StreamerState {
-  return { ...state, status: 'disconnected', queued: [] };
+  return { ...state, status: 'disconnected', queued: [], queueIndex: 0 };
 }
 
 // Mark the streamer errored without consuming an ack — used when a
@@ -349,7 +356,19 @@ export function disconnect(state: StreamerState): StreamerState {
 // still be executing its buffered lines (AUDIT-VERIFICATION-2026-06-10,
 // HD1-adjacent finding).
 export function markErrored(state: StreamerState): StreamerState {
-  return { ...state, status: 'errored', queued: [] };
+  return { ...state, status: 'errored', queued: [], queueIndex: 0 };
+}
+
+export function queuedLineCount(state: StreamerState): number {
+  return Math.max(0, state.queued.length - state.queueIndex);
+}
+
+export function nextQueuedLine(state: StreamerState): string | undefined {
+  return state.queued[state.queueIndex];
+}
+
+export function remainingQueuedLines(state: StreamerState): ReadonlyArray<string> {
+  return state.queued.slice(state.queueIndex);
 }
 
 // Clear in-flight accounting after the firmware provably wiped its receive

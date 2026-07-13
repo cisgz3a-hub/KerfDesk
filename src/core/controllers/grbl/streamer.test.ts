@@ -5,9 +5,12 @@ import {
   DEFAULT_RX_BUFFER_BYTES,
   disconnect,
   markErrored,
+  nextQueuedLine,
   onAck,
   pause,
   progress,
+  queuedLineCount,
+  remainingQueuedLines,
   resume,
   step,
   wipeInFlight,
@@ -18,6 +21,7 @@ describe('createStreamer', () => {
     const s = createStreamer('G21\n; comment\n\nG90\nM5\n');
     expect(s.total).toBe(3);
     expect(s.queued).toEqual(['G21\n', 'G90\n', 'M5\n']);
+    expect(s.queueIndex).toBe(0);
   });
 
   it('returns done state for empty input', () => {
@@ -43,7 +47,7 @@ describe('step — buffer filling', () => {
     const r = step(s);
     expect(r.toSend).toBe('G21\nG90\nM5\n');
     expect(r.state.inFlight.map((f) => f.line)).toEqual(['G21\n', 'G90\n', 'M5\n']);
-    expect(r.state.queued).toHaveLength(0);
+    expect(queuedLineCount(r.state)).toBe(0);
     expect(r.state.status).toBe('streaming');
   });
 
@@ -55,21 +59,21 @@ describe('step — buffer filling', () => {
     });
     const r = step(s);
     expect(r.state.inFlight).toHaveLength(2);
-    expect(r.state.queued).toHaveLength(1);
+    expect(queuedLineCount(r.state)).toBe(1);
   });
 
   it('sends exactly one queued line per step in ping-pong mode', () => {
     const first = step(createStreamer('G21\nG90\nM5', { streamingMode: 'ping-pong' }));
     expect(first.toSend).toBe('G21\n');
     expect(first.state.inFlight.map((item) => item.line)).toEqual(['G21\n']);
-    expect(first.state.queued).toEqual(['G90\n', 'M5\n']);
+    expect(remainingQueuedLines(first.state)).toEqual(['G90\n', 'M5\n']);
 
     const acked = onAck(first.state, 'ok').state;
     const second = step(acked);
 
     expect(second.toSend).toBe('G90\n');
     expect(second.state.inFlight.map((item) => item.line)).toEqual(['G90\n']);
-    expect(second.state.queued).toEqual(['M5\n']);
+    expect(remainingQueuedLines(second.state)).toEqual(['M5\n']);
   });
 
   it('returns toSend="" when paused', () => {
@@ -106,7 +110,7 @@ describe('onAck — consuming acks', () => {
     // Tiny buffer so lines stay queued after the first send. This is the exact
     // path that sent M3 S255 right after a rejected G21 before the fix.
     const s = step(createStreamer('G21\nG90\nM3 S255\nG1 X10', { rxBufferBytes: 12 })).state;
-    expect(s.queued.length).toBeGreaterThan(0);
+    expect(queuedLineCount(s)).toBeGreaterThan(0);
     const r = onAck(s, 'error');
     expect(r.state.status).toBe('errored');
     expect(step(r.state).toSend).toBe('');
@@ -136,7 +140,7 @@ describe('onAck — consuming acks', () => {
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.inFlight).toEqual([]);
-    expect(state.queued.length).toBeGreaterThan(0);
+    expect(queuedLineCount(state)).toBeGreaterThan(0);
     expect(state.status).toBe('paused');
 
     const alarmed = onAck(state, 'alarm');
@@ -178,7 +182,7 @@ describe('onAck — consuming acks', () => {
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.inFlight).toEqual([]);
-    expect(state.queued).toEqual([]);
+    expect(queuedLineCount(state)).toBe(0);
     expect(state.status).toBe('paused');
   });
 
@@ -203,7 +207,7 @@ describe('onAck — consuming acks', () => {
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.inFlight).toHaveLength(0);
-    expect(state.queued).toHaveLength(0);
+    expect(queuedLineCount(state)).toBe(0);
     expect(state.status).toBe('errored');
   });
 
@@ -246,6 +250,24 @@ describe('onAck — consuming acks', () => {
     expect(r.status).toBe('errored');
     expect(r.queued).toHaveLength(0);
     expect(step(r).toSend).toBe('');
+  });
+
+  it('advances through a long queue without copying its backing array', () => {
+    let state = createStreamer(
+      Array.from({ length: 2_000 }, (_unused, index) => `G1 X${index}`).join('\n'),
+      { streamingMode: 'ping-pong' },
+    );
+    const backingQueue = state.queued;
+
+    for (let index = 0; index < 1_000; index += 1) {
+      state = step(state).state;
+      expect(nextQueuedLine(state)).toBe(`G1 X${index + 1}\n`);
+      expect(state.queued).toBe(backingQueue);
+      state = onAck(state, 'ok').state;
+    }
+
+    expect(state.queueIndex).toBe(1_000);
+    expect(queuedLineCount(state)).toBe(1_000);
   });
 });
 

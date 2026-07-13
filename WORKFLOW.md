@@ -300,8 +300,7 @@ Identical to F-A3 except:
 3. Scrubber disappears.
 
 #### Live updates
-- Changes to any Layer's power/speed/passes/visible/output cause preview to re-render within 100 ms.
-- Changes to transform also re-render.
+- Changes to any Layer's power/speed/passes/visible/output or object transform schedule a preview rebuild outside render. Stale scheduled or asynchronous builds are cancelled; the previous route stays painted until its replacement is ready.
 
 #### Empty — preview with no output layers
 - Preview shows empty workspace (no paths visible).
@@ -312,12 +311,12 @@ Identical to F-A3 except:
 - Preflight summary at top of viewport: `Preview: 1 layer extends 12 mm beyond bed`.
 
 #### Edge — preview of very large scene
-- > 10,000 path segments: warning shown above viewport: `Large scene - display simplified for performance`; the canvas renders a bounded display sample instead of walking every source point on each redraw.
+- > 120,000 path segments: warning shown above viewport: `Large scene - display simplified for performance`; the canvas renders a bounded display sample instead of walking every source point on each redraw.
 - Generated G-code and saved project geometry are unaffected — simplification is visual only.
 
 #### Raster engrave preview (image-mode layers) — ADR-028
 - **Success:** each `raster-image` on an output-enabled image-mode layer renders a burn simulation at the image's placement, registered with the bitmap including rotation/mirror. Threshold/Floyd-Steinberg render as crisp black/white dots; grayscale as a smooth ramp. The simulation uses the exact dither + power scaling the G-code will emit (WYSIWYG, like the Fill hatch preview).
-- **Live updates:** changing the layer's power or dither algorithm re-renders the simulation within the same 100 ms budget.
+- **Live updates:** changing the layer's power or dither algorithm schedules the same cancellable preview rebuild; over-budget raster work is refused before allocation.
 - **Empty:** an image-mode layer with Output off shows no simulation — same rule as any non-output layer (preview shows what *burns*, not what's merely visible on the design canvas).
 - **Edge — missing luma:** a legacy `.lf2` raster with no embedded luma buffer renders white / laser-off, not full-burn. If that leaves the job with no G1 burn moves, preflight reports empty output.
 - **Edge — scrubber:** the route scrubber follows raster output row-by-row through the same toolpath as emitted G-code. The burn simulation may still render as the full image backdrop, but the animated route/head reveal raster rows, passes, and bidirectional travel in order.
