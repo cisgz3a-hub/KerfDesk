@@ -49,7 +49,11 @@ export function handleLine(
   recordInboundLine(set, refs, state, cls, line);
   publishDetectedSettings(set, refs, cls);
   const ackOwner = settleUntrackedAck(set, state, cls.kind);
-  if (consumeControllerCommandResponse(refs, cls, line)) return;
+  const commandConsumed = consumeControllerCommandResponse(refs, cls, line);
+  // An arbiter-owned ALARM still has global machine meaning: invalidate
+  // origins, cancel a held stream, and surface the lock. The command promise
+  // already rejected above; continue into the shared alarm handler as well.
+  if (commandConsumed && cls.kind !== 'alarm') return;
   if (cls.kind === 'status') {
     handleStatusLine(set, get, refs, safeWrite, cls.report);
     return;

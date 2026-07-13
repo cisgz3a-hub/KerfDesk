@@ -54,6 +54,7 @@ export function connectionActions(
       set((state) => ({
         connection: { kind: 'connecting' },
         controllerOperation: null,
+        probeBusy: false,
         log: [],
         transcript: [],
         homingState: 'unknown',
@@ -94,6 +95,7 @@ export function connectionActions(
           airAssistOn: false,
           fireActive: false,
           controllerOperation: null,
+          probeBusy: false,
           homingState: 'unknown',
           pendingUntrackedAcks: 0,
         });
@@ -146,6 +148,7 @@ async function runDisconnect(
     frameVerification: null,
     motionOperation: null,
     controllerOperation: null,
+    probeBusy: false,
     homingState: 'unknown',
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     lastWriteError: null,

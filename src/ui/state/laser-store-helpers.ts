@@ -128,7 +128,7 @@ export function disconnectStopCommands(
   driver: ControllerDriver,
 ): ReadonlyArray<string> {
   const fireOff = state.fireActive ? ['M5\n'] : [];
-  if (isActiveJob(state.streamer)) {
+  if (isActiveJob(state.streamer) || state.controllerOperation?.kind === 'probe') {
     const softReset = driver.realtime.softReset;
     return [
       ...(softReset === null ? [] : [softReset]),
@@ -337,6 +337,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     frameVerification: null,
     motionOperation: null,
     controllerOperation: null,
+    probeBusy: false,
     airAssistOn: false,
     fireActive: false,
     homingState: 'unknown',
