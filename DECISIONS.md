@@ -41,6 +41,7 @@
 | ADR-153 | 2026-07-13 | Accepted | Two-tool pocket rest machining uses bounded 2D stock subtraction |
 | ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
+| ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
 
 ---
 
@@ -7087,3 +7088,33 @@ An operator must explicitly establish stock-top Z0 before every fresh CNC Start
 after a reference-invalidating event. This adds setup friction but removes a
 direct path to cutting at the wrong physical depth. It still does not prove
 tool identity, clamping, plate removal, or spindle-at-speed feedback.
+
+---
+
+## ADR-173 - Bind work-Z evidence to the compiled CNC tool plan
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Epoch-bound evidence proved that Z0 was freshly established, but not which cutter was in the
+spindle. Z0 for a 3.175 mm end mill could therefore unlock a job whose first compiled section uses a
+different bit. The same ambiguity existed after M0: a freshly zeroed but wrong replacement cutter
+could unlock Continue. Comment labels improved operator guidance but were not stable identity.
+
+### Decision
+
+- Manual Zero Z and probe transactions snapshot the stable ID of the Active bit when the physical
+  reference operation begins. A project edit while probing cannot relabel the completed evidence.
+- The prepared CNC Job produces structured tool-plan metadata from its exact contiguous section
+  order. The metadata travels beside the stream; emitted G-code remains byte-identical.
+- CNC Start requires current Z evidence whose tool ID matches the first compiled section. Each M0
+  hold carries the next section's ID and Continue requires newly established evidence for that ID.
+- Legacy/imported streams without structured IDs retain their existing label-only behavior; native
+  KerfDesk CNC compilation always supplies the structured plan.
+
+### Consequences
+
+Changing the selected cutter or compiling a different first section can no longer reuse unrelated
+Z evidence. The host proves consistency between operator-selected tool identity, Z evidence, and
+the compiled plan; it still cannot physically sense the cutter, clamp, touch plate, or spindle.

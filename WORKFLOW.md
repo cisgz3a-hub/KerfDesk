@@ -1986,15 +1986,20 @@ F-CNC19 tiling.
 1. CNC Start is blocked until manual Zero Z or a settled probe records
    work-Z evidence for the current reference epoch. The gate cannot be
    overridden because KerfDesk's CNC emitter defines Z0 as the stock top.
-2. Set Origin establishes XY only and does not satisfy this gate. Laser Start
+2. The evidence also records the Active bit selected when Zero Z/probing begins.
+   Start compares it with the first bit in the exact compiled tool-section plan;
+   missing or mismatched identity blocks until the planned bit is loaded,
+   selected, and referenced again.
+3. Set Origin establishes XY only and does not satisfy this gate. Laser Start
    is unaffected.
 
 #### Success
 1. Every M0 change block carries "; re-zero Z on the stock top, then
-   cycle-start to resume". The operator swaps the bit, jogs Z to touch
-   the stock top, zeros Z (or probes), and resumes.
+   cycle-start to resume". The operator swaps the bit, selects that exact bit
+   as Active, jogs Z to touch the stock top, zeros Z (or probes), and resumes.
 2. **Continue remains disabled** until the pre-change retract/park has drained
-   to a fresh controller Idle and the new tool's Z zero has been established.
+   to a fresh controller Idle and the new tool's Z zero has been established
+   with the stable tool ID expected by the compiled section plan.
 3. Continue first emits `G0 Z<safe>` with the spindle off. Only after that
    clearance move does it emit M3 + spin-up dwell and resume cutting.
 
@@ -2003,8 +2008,10 @@ F-CNC19 tiling.
    successful probe records fresh work-Z evidence for the replacement bit.
    That evidence records whether it came from manual Zero Z or a settled probe
    and must match the current work-Z reference epoch.
-2. Tool identity, clamping, touch-plate removal, and actual spindle-at-speed
-   remain operator/machine responsibilities; this host gate does not prove them.
+2. KerfDesk proves agreement between the selected Active-bit ID, the Z evidence,
+   and the compiled plan. It cannot sense the physical cutter; truthful tool
+   selection, clamping, touch-plate removal, and actual spindle-at-speed remain
+   operator/machine responsibilities.
 
 #### Empty
 1. Single-bit jobs never pause.

@@ -27,7 +27,7 @@ import {
   setupCommandBlockMessage,
   toolChangeContinueBlockMessage,
 } from './laser-store-helpers';
-import type { LaserState } from './laser-store';
+import type { LaserState, StartJobOptions } from './laser-store';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -50,6 +50,9 @@ const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
 const START_PENDING_ACK_MESSAGE =
   'The controller has not acknowledged a previous command yet. Start was blocked so the stale ' +
   'acknowledgement cannot corrupt the job stream — check the connection and try again.';
+
+export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
+  'The compiled tool plan does not match the CNC program pauses. Start was blocked so tool identity cannot drift at a change boundary.';
 
 export function jobActions(
   set: SetFn,
@@ -88,9 +91,7 @@ export function jobActions(
         toolChangePause: options.machineKind === 'cnc',
       });
       const stepped = step(initial);
-      // Name the bit at each M0 hold: the labels the CNC emitter wrote as
-      // comments (the streamer strips them), consumed head-first at entry (R5).
-      const labels = options.machineKind === 'cnc' ? extractToolChangeLabels(gcode) : [];
+      const { labels, toolIds } = toolChangeManifest(gcode, options);
       // A job whose pre-M0 lines all fit the RX buffer reaches the FIRST hold in
       // this synchronous step (no ack); later holds enter via advanceStream.
       const entersHoldNow = stepped.state.status === 'tool-change';
@@ -98,7 +99,9 @@ export function jobActions(
         streamer: stepped.state,
         activeJobMachineKind: options.machineKind ?? 'laser',
         toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
+        toolChangeToolIds: entersHoldNow ? toolIds.slice(1) : toolIds,
         pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
+        pendingToolId: entersHoldNow ? (toolIds[0] ?? null) : null,
         ...toolChangeEntryPatch(state, entersHoldNow),
       }));
       if (stepped.toSend.length === 0) return;
@@ -157,6 +160,33 @@ export function jobActions(
       }
     },
   };
+}
+
+function toolChangeManifest(
+  gcode: string,
+  options: StartJobOptions,
+): {
+  readonly labels: ReadonlyArray<string>;
+  readonly toolIds: ReadonlyArray<string | null>;
+} {
+  if (options.machineKind !== 'cnc') return { labels: [], toolIds: [] };
+  // Structured compile metadata carries stable IDs without changing G-code
+  // bytes. Direct/imported callers retain the legacy comment-label fallback.
+  const plannedChanges = options.cncToolPlan?.slice(1);
+  if (plannedChanges !== undefined && plannedChanges.length !== countM0Boundaries(gcode)) {
+    throw new Error(TOOL_CHANGE_PLAN_MISMATCH_MESSAGE);
+  }
+  const labels =
+    plannedChanges?.map((tool) => tool.name ?? tool.id ?? 'next tool') ??
+    extractToolChangeLabels(gcode);
+  return {
+    labels,
+    toolIds: plannedChanges?.map((tool) => tool.id) ?? labels.map(() => null),
+  };
+}
+
+function countM0Boundaries(gcode: string): number {
+  return gcode.split('\n').filter((line) => line.trim().toUpperCase() === 'M0').length;
 }
 
 function toolChangeEntryPatch(state: LaserState, entersHoldNow: boolean): Partial<LaserState> {

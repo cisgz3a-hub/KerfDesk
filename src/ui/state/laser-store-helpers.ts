@@ -16,6 +16,13 @@ import type { LaserState } from './laser-store';
 import { isWorkZZeroEvidenceCurrent } from './work-z-zero-evidence';
 
 const LOG_MAX = 200;
+const TOOL_CHANGE_STATE_DEFAULTS = {
+  toolChangeIdleSeen: false,
+  toolChangeLabels: [] as ReadonlyArray<string>,
+  toolChangeToolIds: [] as ReadonlyArray<string | null>,
+  pendingToolLabel: null,
+  pendingToolId: null,
+};
 const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
@@ -29,7 +36,7 @@ export const FIRE_ACTIVE_COMMAND_MESSAGE =
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
-  'Load the new bit and establish its Z zero on the stock top before continuing.';
+  'Load the new bit, select it as the Active bit, and establish its Z zero on the stock top before continuing.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -82,9 +89,17 @@ export function toolChangeReady(state: LaserState): boolean {
 // trusted to target the configured safe height.
 export function toolChangeContinueBlockMessage(state: LaserState): string | null {
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
-  return isWorkZZeroEvidenceCurrent(state.workZZeroEvidence, state.workZReferenceEpoch)
-    ? null
-    : TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
+  if (!isWorkZZeroEvidenceCurrent(state.workZZeroEvidence, state.workZReferenceEpoch)) {
+    return TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
+  }
+  if (state.pendingToolId !== null && state.workZZeroEvidence?.toolId !== state.pendingToolId) {
+    const expected = state.pendingToolLabel ?? state.pendingToolId;
+    return (
+      `Work Z belongs to a different bit. Load ${expected}, select it as the Active bit, ` +
+      'then Zero Z or probe again before continuing.'
+    );
+  }
+  return null;
 }
 
 // True while stream acks are still outstanding — sending or paused, or any
@@ -269,7 +284,9 @@ export function initialLaserState(): Pick<
   | 'workZZeroEvidence'
   | 'toolChangeIdleSeen'
   | 'toolChangeLabels'
+  | 'toolChangeToolIds'
   | 'pendingToolLabel'
+  | 'pendingToolId'
   | 'frameVerification'
 > {
   return {
@@ -305,9 +322,7 @@ export function initialLaserState(): Pick<
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,
-    toolChangeIdleSeen: false,
-    toolChangeLabels: [],
-    pendingToolLabel: null,
+    ...TOOL_CHANGE_STATE_DEFAULTS,
     frameVerification: null,
   };
 }

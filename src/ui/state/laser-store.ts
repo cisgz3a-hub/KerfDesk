@@ -43,6 +43,7 @@ import type { OverrideValues, RealtimeOverrideByte } from '../../core/controller
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
+import type { CncToolPlanEntry } from './cnc-tool-plan';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
@@ -79,6 +80,7 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 // safety can distinguish laser ($32 proof required) from router (must not).
 export type StartJobOptions = CreateStreamerOptions & {
   readonly machineKind?: MachineKind;
+  readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
 };
 
 export type LaserState = {
@@ -160,10 +162,14 @@ export type LaserState = {
   // Set at Start from the compiled program's tool-change comments; the head is
   // consumed into pendingToolLabel each time a tool-change hold is entered.
   readonly toolChangeLabels: ReadonlyArray<string>;
+  // Stable IDs parallel to toolChangeLabels. null preserves the legacy/imported
+  // fallback where only a comment label is available.
+  readonly toolChangeToolIds: ReadonlyArray<string | null>;
   // The bit to load at the CURRENT tool-change hold, or null when it is unknown
   // (single-tool job, imported .nc, resume tail) — the UI names the bit when set
   // and falls back to a generic prompt when null (R5).
   readonly pendingToolLabel: string | null;
+  readonly pendingToolId: string | null;
   /**
    * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
    * the current origin. Set when a frame is dispatched in 'verified-origin'

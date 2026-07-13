@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -65,6 +67,7 @@ afterEach(async () => {
     workOriginSource: 'none',
     frameVerification: null,
   });
+  useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
 
@@ -109,11 +112,15 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
 
     // Zero Z (G92 Z0) is what establishes the stock-top contract.
+    useStore.setState({
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+    });
     await useLaserStore.getState().zeroZHere();
     expect(write).toHaveBeenCalledWith('G92 Z0\n');
     expect(useLaserStore.getState().workZZeroEvidence).toEqual({
       source: 'manual-zero',
       referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      toolId: 'em-3175',
     });
   });
 

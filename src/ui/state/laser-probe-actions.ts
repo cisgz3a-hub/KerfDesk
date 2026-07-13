@@ -22,7 +22,8 @@ import {
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
-import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
+import { useStore } from './store';
+import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -50,6 +51,7 @@ export function probeActions(
     probe: async (lines): Promise<ProbeResult> => {
       const preflight = probePreflight(get(), refs, lines);
       if (preflight !== null) return preflight;
+      const toolId = selectedCncToolId(useStore.getState().project);
       set(probeStartedPatch);
       let pendingLine = lines[0] ?? '';
       try {
@@ -86,7 +88,7 @@ export function probeActions(
           controllerOperation:
             state.controllerOperation?.kind === 'probe' ? null : state.controllerOperation,
           probeBusy: false,
-          workZZeroEvidence: captureWorkZZeroEvidence('probe', state.workZReferenceEpoch),
+          workZZeroEvidence: captureWorkZZeroEvidence('probe', state.workZReferenceEpoch, toolId),
           alarmCode: null,
           lastWriteError: null,
           log: pushLog(state, '[lf2] Probe transaction settled at fresh Idle.'),

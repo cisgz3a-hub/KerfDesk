@@ -9,16 +9,14 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
-import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
+import { runControllerReadiness } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
   machineKindOf,
-  validateOutputScope,
   type OutputScope,
   type Project,
 } from '../../core/scene';
 import {
-  emitGcode,
   emitPreparedGcode,
   prepareOutput,
   prepareOutputSnapshot,
@@ -27,6 +25,7 @@ import {
 } from '../../io/gcode';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
+import { cncToolPlan, type CncToolPlanEntry } from '../state/cnc-tool-plan';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import {
   DEFAULT_JOB_PLACEMENT,
@@ -36,7 +35,7 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import { detectMachineJobWarnings } from './machine-job-warnings';
-import { cncWorkZeroStartIssue } from './cnc-start-advisories';
+import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -52,6 +51,7 @@ export type StartJobPreparation =
       readonly ok: true;
       readonly gcode: string;
       readonly warnings: ReadonlyArray<string>;
+      readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
       // The RESOLVED origin this compile used (undefined = Absolute). The
       // checkpoint stores it so resume reproduces identical bytes (R1).
       readonly jobOrigin?: JobOriginPlacement;
@@ -132,14 +132,19 @@ export function prepareStartJob(
   const placement = resolveStartPlacement(jobPlacement, machine, resolvedJobOrigin);
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
-  const preEmitIssues = findScopedPreEmitIssues(project, outputScope);
-  if (preEmitIssues.length > 0) return { ok: false, messages: preEmitIssues };
-  const originBoundsIssue = findPlacementBoundsIssue(project, placement, outputScope, motionOffset);
-  if (originBoundsIssue !== null) {
-    return { ok: false, messages: [originBoundsIssue] };
-  }
+  const inspected = inspectPreparedStart(
+    prepareOutput(project, {
+      ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+      outputScope,
+    }),
+    placement,
+    motionOffset,
+    machine,
+  );
+  if (!inspected.ok) return inspected;
+  const { prepared, toolPlan } = inspected;
 
-  const { gcode, preflight } = emitGcode(project, {
+  const { gcode, preflight } = emitPreparedGcode(prepared, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
@@ -149,10 +154,8 @@ export function prepareStartJob(
     return { ok: false, messages: preflight.issues.map((i) => i.message) };
   }
 
-  const verifiedFrameIssue = findVerifiedFrameGateIssue(project, placement, outputScope, machine);
-  if (verifiedFrameIssue !== null) {
-    return { ok: false, messages: [verifiedFrameIssue] };
-  }
+  const verifiedFrameIssue = verifiedFrameIssueFromPrepared(prepared, placement, machine);
+  if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
   if (!controller.ok) {
@@ -164,7 +167,7 @@ export function prepareStartJob(
     controllerSettings,
     controller.warnings.map((i) => i.message),
   );
-  return okPreparation(gcode, warnings, placement.jobOrigin);
+  return okPreparation(gcode, warnings, placement.jobOrigin, toolPlan);
 }
 
 export async function prepareStartJobSnapshot(
@@ -186,21 +189,21 @@ export async function prepareStartJobSnapshot(
   const placement = resolveStartPlacement(jobPlacement, machine, undefined);
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
-  const preEmitIssues = findScopedPreEmitIssues(project, outputScope);
-  if (preEmitIssues.length > 0) return { ok: false, messages: preEmitIssues };
 
-  const prepared = await prepareOutputSnapshot(project, {
-    clock: options.clock,
-    renderVariableText: options.renderVariableText,
-    ...registrationOption(options.registration),
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    outputScope,
-  });
-  if (!prepared.ok) {
-    return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
-  }
-  const originBoundsIssue = placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
-  if (originBoundsIssue !== null) return { ok: false, messages: [originBoundsIssue] };
+  const inspected = inspectPreparedStart(
+    await prepareOutputSnapshot(project, {
+      clock: options.clock,
+      renderVariableText: options.renderVariableText,
+      ...registrationOption(options.registration),
+      ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+      outputScope,
+    }),
+    placement,
+    motionOffset,
+    machine,
+  );
+  if (!inspected.ok) return inspected;
+  const { prepared, toolPlan } = inspected;
 
   const { gcode, preflight } = emitPreparedGcode(prepared, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
@@ -223,7 +226,7 @@ export async function prepareStartJobSnapshot(
     controllerSettings,
     controller.warnings.map((issue) => issue.message),
   );
-  return okPreparation(gcode, warnings, placement.jobOrigin);
+  return okPreparation(gcode, warnings, placement.jobOrigin, toolPlan);
 }
 
 function registrationOption(registration: SimilarityTransform | null | undefined): {
@@ -236,8 +239,15 @@ function okPreparation(
   gcode: string,
   warnings: ReadonlyArray<string>,
   jobOrigin: JobOriginPlacement | undefined,
+  toolPlan: ReadonlyArray<CncToolPlanEntry>,
 ): StartJobPreparation {
-  return { ok: true, gcode, warnings, ...(jobOrigin === undefined ? {} : { jobOrigin }) };
+  return {
+    ok: true,
+    gcode,
+    warnings,
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+    ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
+  };
 }
 
 // Resolve the origin for a Start or a resume. A fresh Start resolves the
@@ -280,30 +290,34 @@ function readinessMode(machine: MachineStartSnapshot): ReadinessSettingsCapabili
   return machine.settingsCapability ?? 'grbl-dollar';
 }
 
-function findScopedPreEmitIssues(
-  project: Project,
-  outputScope: OutputScope,
-): ReadonlyArray<string> {
-  const scoped = validateOutputScope(project.scene, outputScope);
-  if (!scoped.ok) return scoped.messages;
-  const outputProject =
-    scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
-  const preEmit = runPreEmitPreflight(outputProject);
-  return preEmit.ok ? [] : preEmit.issues.map((issue) => issue.message);
-}
+type PreparedStartInspection =
+  | {
+      readonly ok: true;
+      readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
+      readonly toolPlan: ReadonlyArray<CncToolPlanEntry>;
+    }
+  | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
-function findPlacementBoundsIssue(
-  project: Project,
-  placement: Extract<ResolvedJobPlacement, { ok: true }>,
-  outputScope: OutputScope,
+function inspectPreparedStart(
+  prepared: PreparedOutput,
+  placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
   motionOffset: { readonly x: number; readonly y: number } | undefined,
-): string | null {
-  if (placement.jobOrigin === undefined || motionOffset === undefined) {
-    return null;
+  machine: MachineStartSnapshot,
+): PreparedStartInspection {
+  if (!prepared.ok) {
+    return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
-  const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
-  if (!prepared.ok) return null;
-  return placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
+  const originIssue = placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
+  if (originIssue !== null) return { ok: false, messages: [originIssue] };
+  const toolPlan = cncToolPlan(prepared.job);
+  const toolIssue = cncWorkZeroToolStartIssue(
+    prepared.project,
+    machine.workZZeroEvidence,
+    toolPlan[0],
+  );
+  return toolIssue === null
+    ? { ok: true, prepared, toolPlan }
+    : { ok: false, messages: [toolIssue] };
 }
 
 function placementBoundsIssueFromPrepared(
@@ -334,18 +348,6 @@ function placementBoundsIssueFromPrepared(
 // mismatch (no frame yet, or the job moved/resized or the origin changed since)
 // means the frame's guarantee no longer holds, so re-frame. Other start modes
 // are unaffected.
-function findVerifiedFrameGateIssue(
-  project: Project,
-  placement: Extract<ResolvedJobPlacement, { ok: true }>,
-  outputScope: OutputScope,
-  machine: MachineStartSnapshot,
-): string | null {
-  if (placement.jobOrigin?.startFrom !== 'verified-origin') return null;
-  const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
-  if (!prepared.ok) return null;
-  return verifiedFrameIssueFromPrepared(prepared, placement, machine);
-}
-
 function verifiedFrameIssueFromPrepared(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,

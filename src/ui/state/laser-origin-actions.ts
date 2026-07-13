@@ -23,7 +23,8 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
-import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
+import { useStore } from './store';
+import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -76,12 +77,17 @@ export function originActions(
     },
     zeroZHere: async () => {
       assertOriginActionReady(set, get);
+      const toolId = selectedCncToolId(useStore.getState().project);
       await zeroZHereAction((out) => safeWrite(out, 'origin'));
       // Z-only offset: XY origin state is untouched, and the WCO cache
       // refreshes from the next WCO-bearing status frame. This is what
       // establishes work Z0 (the CNC stock-top contract) for the Start advisory.
       set((state) => ({
-        workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', state.workZReferenceEpoch),
+        workZZeroEvidence: captureWorkZZeroEvidence(
+          'manual-zero',
+          state.workZReferenceEpoch,
+          toolId,
+        ),
         log: pushLog(get(), '[lf2] Work Z zeroed at current bit height (G92 Z0).'),
       }));
     },

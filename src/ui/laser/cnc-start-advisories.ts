@@ -3,11 +3,15 @@
 // with the Save-G-code path and has no machine snapshot).
 
 import { machineKindOf, type Project } from '../../core/scene';
+import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { isWorkZZeroEvidenceCurrent, type WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 
 export const CNC_NO_WORK_ZERO_START_MESSAGE =
   'No work zero is set — the CNC toolpath assumes Z0 is the stock top. Jog to the ' +
   'stock surface and Zero Z (or probe) before running, or the cut depth will be wrong.';
+export const CNC_UNKNOWN_INITIAL_TOOL_START_MESSAGE =
+  'The compiled CNC job does not identify its first bit, so KerfDesk cannot prove that work Z ' +
+  'belongs to the cutter that will move. Recompile the job with a valid tool assignment.';
 
 // A CNC job's emitter treats Z0 as the stock top (cnc-grbl-strategy assumes it),
 // but Start does not otherwise confirm work Z0 was ever established. This keys on
@@ -23,4 +27,25 @@ export function cncWorkZeroStartIssue(
   if (machineKindOf(project.machine) !== 'cnc') return null;
   if (isWorkZZeroEvidenceCurrent(evidence, referenceEpoch)) return null;
   return CNC_NO_WORK_ZERO_START_MESSAGE;
+}
+
+export function cncWorkZeroToolStartIssue(
+  project: Project,
+  evidence: WorkZZeroEvidence | null | undefined,
+  firstTool: CncToolPlanEntry | undefined,
+): string | null {
+  const machine = project.machine;
+  if (machine?.kind !== 'cnc' || firstTool === undefined) return null;
+  if (firstTool.id === null) return CNC_UNKNOWN_INITIAL_TOOL_START_MESSAGE;
+  if (evidence?.toolId === firstTool.id) return null;
+
+  const expectedName = firstTool.name ?? firstTool.id;
+  const evidenceName =
+    evidence?.toolId === undefined
+      ? 'an unrecorded bit'
+      : (machine.tools.find((tool) => tool.id === evidence.toolId)?.name ?? evidence.toolId);
+  return (
+    `This job starts with ${expectedName}, but work Z was established for ${evidenceName}. ` +
+    `Load ${expectedName}, select it as the Active bit, then Zero Z or probe again.`
+  );
 }

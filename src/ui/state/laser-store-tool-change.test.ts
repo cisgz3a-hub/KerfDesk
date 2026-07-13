@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { createProject } from '../../core/scene';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
+import { TOOL_CHANGE_PLAN_MISMATCH_MESSAGE } from './laser-job-actions';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 import { TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE } from './laser-store-helpers';
@@ -69,6 +70,11 @@ const CNC_MULTI_TOOL = [
   'G1 X2 Y2',
 ].join('\n');
 
+const CNC_TOOL_PLAN = [
+  { id: 'em-3175', name: '3.175 mm end mill' },
+  { id: 'em-6350', name: '6.35 mm end mill' },
+];
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -85,6 +91,19 @@ afterEach(async () => {
 });
 
 describe('CNC tool-change activation (CNC-01..03)', () => {
+  it('refuses a structured tool plan that cannot align with every M0 boundary', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncToolPlan: CNC_TOOL_PLAN.slice(0, 1),
+      }),
+    ).rejects.toThrow(TOOL_CHANGE_PLAN_MISMATCH_MESSAGE);
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
   it('holds a CNC job at the M0 without sending it, then continueToolChange resumes', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
@@ -97,9 +116,13 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
       workZZeroEvidence: {
         source: 'manual-zero',
         referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+        toolId: 'em-3175',
       },
     });
-    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, { machineKind: 'cnc' });
+    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncToolPlan: CNC_TOOL_PLAN,
+    });
 
     // The pre-M0 lines went out; the M0 did NOT, and the stream is held.
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
@@ -131,12 +154,27 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     expect(writes.join('')).toBe('');
     expect(useLaserStore.getState().lastWriteError).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
 
-    // Simulate a successful Zero Z/probe action, then Continue. The first
-    // resumed command is the spindle-off safe-Z lift; M3 follows it.
+    // A current Z0 for the old cutter still fails closed: the evidence must be
+    // bound to the exact planned replacement tool.
     useLaserStore.setState({
       workZZeroEvidence: {
         source: 'manual-zero',
         referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+        toolId: 'em-3175',
+      },
+    });
+    await useLaserStore.getState().continueToolChange();
+    expect(writes.join('')).toBe('');
+    expect(useLaserStore.getState().lastWriteError).toContain('different bit');
+    expect(useLaserStore.getState().lastWriteError).toContain('6.35 mm end mill');
+
+    // Simulate selecting/loading the planned cutter and then a successful Zero
+    // Z/probe. The first resumed command is the spindle-off safe-Z lift; M3 follows it.
+    useLaserStore.setState({
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+        toolId: 'em-6350',
       },
     });
     await useLaserStore.getState().continueToolChange();
@@ -150,11 +188,15 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
   it('names the bit at the tool-change hold from the compiled label (R5)', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes));
-    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, { machineKind: 'cnc' });
+    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncToolPlan: CNC_TOOL_PLAN,
+    });
 
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
     // The generic "the next bit" prompt is replaced by the real bit identity.
     expect(useLaserStore.getState().pendingToolLabel).toBe('6.35 mm end mill');
+    expect(useLaserStore.getState().pendingToolId).toBe('em-6350');
   });
 
   it('leaves the tool label null for a laser job M0 (no CNC tool change) (R5)', async () => {
