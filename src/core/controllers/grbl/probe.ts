@@ -3,8 +3,8 @@
 // Two workflows, both two-stage (fast seek, back off, slow re-touch — the
 // gSender/Carbide-Motion convention that removes seek-speed overshoot from
 // the recorded position):
-//   - Z: probe down onto the plate, set work Z so Z0 = plate underside
-//     (= stock top) via `G10 L20 P0 Z<thickness>`.
+//   - Z: select G54, probe down onto the plate, set work Z so Z0 = plate
+//     underside (= stock top) via `G10 L20 P0 Z<thickness>`.
 //   - XYZ corner: Z first, then probe each side face of the plate. The cycle
 //     stays in relative motion until every contact succeeds, then commits X,
 //     Y, and Z together with one G10 L20. A failed contact therefore cannot
@@ -83,6 +83,7 @@ export function buildZProbeLines(params: ZProbeParams): ReadonlyArray<string> {
 
 function zContactLines(params: ZProbeParams): ReadonlyArray<string> {
   return [
+    'G54',
     'G21',
     'G91',
     `G38.2 Z${fmt(-params.maxTravelMm)} F${fmt(params.seekFeedMmPerMin)}`,

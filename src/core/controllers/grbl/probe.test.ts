@@ -23,6 +23,7 @@ const CORNER: CornerProbeParams = {
 describe('buildZProbeLines', () => {
   it('emits the two-stage cycle with thickness-compensated zero', () => {
     expect(buildZProbeLines(DEFAULT_Z_PROBE_PARAMS)).toEqual([
+      'G54',
       'G21',
       'G91',
       'G38.2 Z-25.000 F150.000',
@@ -45,6 +46,10 @@ describe('buildZProbeLines', () => {
 });
 
 describe('buildCornerProbeLines', () => {
+  it('selects the canonical G54 WCS before any probe motion or coordinate commit', () => {
+    expect(buildCornerProbeLines(CORNER)[0]).toBe('G54');
+  });
+
   it('commits XYZ once after every probe contact succeeds', () => {
     const lines = buildCornerProbeLines(CORNER);
     const commits = lines.filter((line) => line.startsWith('G10 L20'));

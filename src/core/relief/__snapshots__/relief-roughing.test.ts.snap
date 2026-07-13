@@ -3,6 +3,7 @@
 exports[`relief roughing — compile pipeline > emits deterministic G-code (snapshot) 1`] = `
 "G21
 G90
+G54
 G94
 G0 Z3.810
 M3 S12000

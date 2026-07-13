@@ -12,13 +12,20 @@ import {
   resetOrigin,
   setOriginHere,
   setPersistentOriginHere,
+  zeroZHere,
 } from './origin-actions';
 
 describe('setOriginHere', () => {
-  it('writes exactly G92 X0 Y0 with a trailing newline', async () => {
+  it('atomically selects G54 and sets transient XY zero', async () => {
+    const safeWrite = vi.fn(async () => undefined);
+    await setOriginHere(safeWrite, true);
+    expect(safeWrite).toHaveBeenCalledTimes(1);
+    expect(safeWrite).toHaveBeenCalledWith('G54 G92 X0 Y0\n');
+  });
+
+  it('keeps the bare G92 command for G92-only controller families', async () => {
     const safeWrite = vi.fn(async () => undefined);
     await setOriginHere(safeWrite);
-    expect(safeWrite).toHaveBeenCalledTimes(1);
     expect(safeWrite).toHaveBeenCalledWith('G92 X0 Y0\n');
   });
 
@@ -31,7 +38,7 @@ describe('setOriginHere', () => {
       box.resolve = r;
     });
     const safeWrite = vi.fn(() => pending);
-    const action = setOriginHere(safeWrite);
+    const action = setOriginHere(safeWrite, true);
     // Hasn't resolved yet.
     let resolved = false;
     void action.then(() => {
@@ -46,21 +53,30 @@ describe('setOriginHere', () => {
   });
 });
 
-describe('resetOrigin', () => {
-  it('writes exactly G92.1 with a trailing newline', async () => {
+describe('zeroZHere', () => {
+  it('atomically selects G54 and sets transient stock-top Z zero', async () => {
     const safeWrite = vi.fn(async () => undefined);
-    await resetOrigin(safeWrite);
+    await zeroZHere(safeWrite, true);
     expect(safeWrite).toHaveBeenCalledTimes(1);
-    expect(safeWrite).toHaveBeenCalledWith('G92.1\n');
+    expect(safeWrite).toHaveBeenCalledWith('G54 G92 Z0\n');
+  });
+});
+
+describe('resetOrigin', () => {
+  it('atomically selects G54 and clears G92', async () => {
+    const safeWrite = vi.fn(async () => undefined);
+    await resetOrigin(safeWrite, true);
+    expect(safeWrite).toHaveBeenCalledTimes(1);
+    expect(safeWrite).toHaveBeenCalledWith('G54 G92.1\n');
   });
 });
 
 describe('setPersistentOriginHere', () => {
   it('clears transient G92 before setting the persistent G54 origin', async () => {
     const safeWrite = vi.fn(async () => undefined);
-    await setPersistentOriginHere(safeWrite);
+    await setPersistentOriginHere(safeWrite, undefined, true);
     expect(safeWrite).toHaveBeenCalledTimes(2);
-    expect(safeWrite).toHaveBeenNthCalledWith(1, 'G92.1\n');
+    expect(safeWrite).toHaveBeenNthCalledWith(1, 'G54 G92.1\n');
     expect(safeWrite).toHaveBeenNthCalledWith(2, 'G10 L20 P1 X0 Y0\n');
   });
 });
@@ -68,9 +84,9 @@ describe('setPersistentOriginHere', () => {
 describe('clearPersistentOrigin', () => {
   it('clears transient G92 before clearing the persistent G54 origin', async () => {
     const safeWrite = vi.fn(async () => undefined);
-    await clearPersistentOrigin(safeWrite);
+    await clearPersistentOrigin(safeWrite, undefined, true);
     expect(safeWrite).toHaveBeenCalledTimes(2);
-    expect(safeWrite).toHaveBeenNthCalledWith(1, 'G92.1\n');
+    expect(safeWrite).toHaveBeenNthCalledWith(1, 'G54 G92.1\n');
     expect(safeWrite).toHaveBeenNthCalledWith(2, 'G10 L2 P1 X0 Y0\n');
   });
 });

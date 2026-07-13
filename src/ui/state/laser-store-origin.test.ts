@@ -93,7 +93,7 @@ describe('laser-store origin actions', () => {
 
     await useLaserStore.getState().setOriginHere();
 
-    expect(write).toHaveBeenCalledWith('G92 X0 Y0\n');
+    expect(write).toHaveBeenCalledWith('G54 G92 X0 Y0\n');
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g92');
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
@@ -105,18 +105,18 @@ describe('laser-store origin actions', () => {
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
 
-    // G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
+    // G54 G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
     // advisory (which keys on qualified work-Z evidence) must stay live.
     await useLaserStore.getState().setOriginHere();
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
 
-    // Zero Z (G92 Z0) is what establishes the stock-top contract.
+    // Zero Z (G54 G92 Z0) is what establishes the stock-top contract.
     useStore.setState({
       project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
     });
     await useLaserStore.getState().zeroZHere();
-    expect(write).toHaveBeenCalledWith('G92 Z0\n');
+    expect(write).toHaveBeenCalledWith('G54 G92 Z0\n');
     expect(useLaserStore.getState().workZZeroEvidence).toEqual({
       source: 'manual-zero',
       referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
@@ -143,7 +143,7 @@ describe('laser-store origin actions', () => {
 
     await useLaserStore.getState().setPersistentOriginHere();
 
-    expect(write).toHaveBeenCalledWith('G92.1\n');
+    expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(write).toHaveBeenCalledWith('G10 L20 P1 X0 Y0\n');
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
@@ -187,7 +187,7 @@ describe('laser-store origin actions', () => {
       'persistent origin rejected',
     );
 
-    expect(write).toHaveBeenCalledWith('G92.1\n');
+    expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(useLaserStore.getState()).toMatchObject({
       workOriginActive: false,
       workOriginSource: 'none',
@@ -209,7 +209,7 @@ describe('laser-store origin actions', () => {
 
     await useLaserStore.getState().resetOrigin();
 
-    expect(write).toHaveBeenCalledWith('G92.1\n');
+    expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().workOriginSource).toBe('none');
     expect(useLaserStore.getState().wcoCache).toBeNull();
@@ -231,7 +231,7 @@ describe('laser-store origin actions', () => {
 
     await useLaserStore.getState().resetOrigin();
 
-    expect(write).toHaveBeenCalledWith('G92.1\n');
+    expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
@@ -255,7 +255,7 @@ describe('laser-store origin actions', () => {
 
     await useLaserStore.getState().clearPersistentOrigin();
 
-    expect(write).toHaveBeenCalledWith('G92.1\n');
+    expect(write).toHaveBeenCalledWith('G54 G92.1\n');
     expect(write).toHaveBeenCalledWith('G10 L2 P1 X0 Y0\n');
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().workOriginSource).toBe('none');

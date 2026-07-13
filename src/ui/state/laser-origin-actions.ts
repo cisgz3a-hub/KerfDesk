@@ -67,10 +67,11 @@ export function originActions(
   | 'clearPersistentOrigin'
   | 'releaseMotors'
 > {
+  const writeOrigin = (out: string): Promise<void> => safeWrite(out, 'origin');
   return {
     setOriginHere: async () => {
       assertOriginActionReady(set, get);
-      await setOriginHereAction((out) => safeWrite(out, 'origin'));
+      await setOriginHereAction(writeOrigin, usesPrimaryWcs(get()));
       const { statusReport, wcoCache } = get();
       const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
       set(activeOriginPatch('g92', inferredWco));
@@ -78,7 +79,7 @@ export function originActions(
     zeroZHere: async () => {
       assertOriginActionReady(set, get);
       const toolId = selectedCncToolId(useStore.getState().project);
-      await zeroZHereAction((out) => safeWrite(out, 'origin'));
+      await zeroZHereAction(writeOrigin, usesPrimaryWcs(get()));
       // Z-only offset: XY origin state is untouched, and the WCO cache
       // refreshes from the next WCO-bearing status frame. This is what
       // establishes work Z0 (the CNC stock-top contract) for the Start advisory.
@@ -93,7 +94,7 @@ export function originActions(
     },
     resetOrigin: async () => {
       assertOriginActionReady(set, get);
-      await resetOriginAction((out) => safeWrite(out, 'origin'));
+      await resetOriginAction(writeOrigin, usesPrimaryWcs(get()));
       if (get().workOriginSource === 'g54-persistent') {
         set((state) => ({
           frameVerification: null,
@@ -107,8 +108,9 @@ export function originActions(
     setPersistentOriginHere: async () => {
       assertPersistentOriginReady(set, get);
       await setPersistentOriginHereAction(
-        (out) => safeWrite(out, 'origin'),
+        writeOrigin,
         () => set(transientOriginClearedPatch),
+        usesPrimaryWcs(get()),
       );
       const { statusReport, wcoCache } = get();
       const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
@@ -117,8 +119,9 @@ export function originActions(
     clearPersistentOrigin: async () => {
       assertPersistentOriginReady(set, get);
       await clearPersistentOriginAction(
-        (out) => safeWrite(out, 'origin'),
+        writeOrigin,
         () => set(transientOriginClearedPatch),
+        usesPrimaryWcs(get()),
       );
       set(clearedOriginAfterTransientClearPatch());
     },
@@ -135,6 +138,10 @@ export function originActions(
       set(clearedOriginPatch);
     },
   };
+}
+
+function usesPrimaryWcs(state: LaserState): boolean {
+  return state.capabilities.wcs === 'g92-and-g10';
 }
 
 function activeOriginPatch(

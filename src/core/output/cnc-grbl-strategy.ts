@@ -12,7 +12,7 @@
 // running); XY follow the same machine coordinates as the laser pipeline.
 // S maps to spindle RPM — GRBL $30 should equal the machine's max RPM.
 //
-// Preamble:  G21, G90, G94, G0 Z<safe>, M3 S<rpm>, G4 P<spinup>, [M7/M8].
+// Preamble:  G21, G90, G54, G94, G0 Z<safe>, M3 S<rpm>, G4 P<spinup>, [M7/M8].
 // Postamble: G0 Z<safe>, M5, [M9], G0 X0 Y0 (park, still at safe Z).
 // The M7/M8/M9 coolant lines appear only when the machine's coolant is on.
 //
@@ -87,6 +87,10 @@ function emitJob(job: Job, _device: DeviceProfile): string {
   const head: Head = { x: null, y: null, z: null };
   lines.push('G21');
   lines.push('G90');
+  // G54 is KerfDesk's canonical WCS. GRBL's active G54-G59 selection is
+  // modal and may be changed by a console command or startup block, so never
+  // let a stale G55-G59 redirect an otherwise valid program.
+  lines.push('G54');
   lines.push('G94');
   if (isMultiTool && firstGroup.toolName !== undefined) {
     lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);

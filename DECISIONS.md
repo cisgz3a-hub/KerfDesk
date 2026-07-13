@@ -44,6 +44,7 @@
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-174 | 2026-07-13 | Accepted | Probe-derived Z evidence requires plate-removal acknowledgement |
 | ADR-175 | 2026-07-13 | Accepted | Bind CNC physical-setup acknowledgement to exact streamed bytes |
+| ADR-176 | 2026-07-13 | Accepted | Normalize KerfDesk CNC setup and programs to G54 |
 
 ---
 
@@ -7183,3 +7184,37 @@ Every fresh CNC program requires a deliberate last-step setup review, including 
 the future. Evidence cannot be silently reused after recompilation or byte changes. The gate adds
 friction and cannot detect dishonest or mistaken confirmation; cameras, fixture probing, and
 machine-integrated workholding sensors remain future higher-assurance options.
+
+---
+
+## ADR-176 - Normalize KerfDesk CNC setup and programs to G54
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL makes G54-G59 a modal coordinate-system group. `$G` exposes the active member, and controller
+startup blocks or console commands may select a non-default WCS. KerfDesk's persistent-origin UI
+writes `G10 ... P1` (G54), while probe commits used `P0` (the currently active WCS) and CNC programs
+did not select any WCS. A stale G55-G59 could therefore make origin, Z/tool evidence, preflight
+coordinates, and actual motion refer to different frames.
+
+### Decision
+
+- G54 is KerfDesk's canonical GRBL-family work coordinate system.
+- On controllers whose WCS capability is `g92-and-g10`, Set Origin, Zero Z, and Reset Origin combine
+  G54 selection and the G92 mutation in one parsed block. Persistent-origin flows similarly combine
+  `G54 G92.1` before their explicit P1 write.
+- Probe transactions select G54 before any motion and before their P0 commit. A failed transaction
+  still produces no setup evidence.
+- Every emitted CNC program selects G54 in its preamble before the first safe-Z motion. This is a
+  final defense against startup/console modal drift and intentionally changes CNC G-code bytes.
+- G92-only controllers retain their existing commands; KerfDesk CNC execution remains GRBL-family
+  only.
+
+### Consequences
+
+App-controlled CNC setup and execution now share an explicit coordinate frame. Projects relying on
+G55-G59 must be converted to G54 before use; multi-WCS workflows are not represented by KerfDesk's
+current project model. The host still does not independently read back `$G` before every operation,
+so external tools changing the WCS concurrently remain outside the single-sender safety contract.
