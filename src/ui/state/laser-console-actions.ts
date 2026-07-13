@@ -1,5 +1,6 @@
 import { startCollecting, type SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
+import type { ConsoleStateEffect } from '../../core/controllers/console-state-effect';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -71,6 +72,10 @@ export function consoleActions(
         });
       }
       await write(prepared.command.wire, actionForConsoleCommand(prepared.command.kind), 'console');
+      const stateEffect = prepared.command.stateEffect;
+      if (stateEffect !== 'read-only') {
+        set((state) => consoleStateEffectPatch(state, stateEffect, prepared.command.normalized));
+      }
     },
     clearTranscript: () => set({ transcript: [] }),
   };
@@ -105,6 +110,81 @@ function consoleCommandBlockReason(
 
 function actionForConsoleCommand(kind: string): LaserSafetyAction {
   return kind === 'unlock' ? 'unlock' : 'console';
+}
+
+function consoleStateEffectPatch(
+  state: LaserState,
+  effect: Exclude<ConsoleStateEffect, 'read-only'>,
+  command: string,
+): Partial<LaserState> {
+  const base: Partial<LaserState> = {
+    // A serial write is not proof that buffered motion or modal mutation has
+    // physically completed. Require a fresh controller report before another
+    // setup/job action can trust Idle or position.
+    statusReport: null,
+    frameVerification: null,
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    log: pushLog(
+      state,
+      `[lf2] Console ${stateEffectLabel(effect)} invalidated cached machine/setup evidence: ${command}`,
+    ),
+  };
+  switch (effect) {
+    case 'machine-state':
+      return base;
+    case 'coordinates-xy':
+      return {
+        ...base,
+        workOriginActive: false,
+        workOriginSource: 'none',
+        wcoCache: null,
+      };
+    case 'coordinates-z':
+    case 'tool':
+      return { ...base, workZZeroKnown: false, wcoCache: null };
+    case 'coordinates-all':
+      return { ...base, ...unknownCoordinatePatch() };
+    case 'reference':
+      return { ...base, ...unknownCoordinatePatch(), homingState: 'unknown' };
+    case 'configuration':
+      return {
+        ...base,
+        ...unknownCoordinatePatch(),
+        homingState: 'unknown',
+        detectedSettings: null,
+        controllerSettings: null,
+        grblSettingsRows: [],
+        lastSettingsReadAt: null,
+      };
+  }
+}
+
+function unknownCoordinatePatch(): Partial<LaserState> {
+  return {
+    workOriginActive: false,
+    workOriginSource: 'none',
+    workZZeroKnown: false,
+    wcoCache: null,
+  };
+}
+
+function stateEffectLabel(effect: Exclude<ConsoleStateEffect, 'read-only'>): string {
+  switch (effect) {
+    case 'machine-state':
+      return 'machine-state command';
+    case 'coordinates-xy':
+      return 'XY-coordinate command';
+    case 'coordinates-z':
+      return 'Z-coordinate command';
+    case 'coordinates-all':
+      return 'coordinate-system command';
+    case 'tool':
+      return 'tool-state command';
+    case 'reference':
+      return 'reference-state command';
+    case 'configuration':
+      return 'configuration command';
+  }
 }
 
 function block(set: SetFn, get: GetFn, refs: ConsoleActionRefs, reason: string): never {

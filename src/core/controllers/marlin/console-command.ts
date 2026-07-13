@@ -5,6 +5,7 @@
 // any time — it is the point of an E-stop.
 
 import type { ConsoleCommandResult } from '../grbl/console-command';
+import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
 import {
   MARLIN_CMD_EMERGENCY_STOP,
   MARLIN_CMD_FIRMWARE_INFO,
@@ -37,12 +38,12 @@ export function prepareMarlinConsoleCommand(input: string): ConsoleCommandResult
   }
   if (upper === MARLIN_CMD_EMERGENCY_STOP) {
     // E-stop: never gated on idle or active operations.
-    return command('gcode', normalized, false, false);
+    return command('gcode', normalized, false, false, 'reference');
   }
   if (QUERY_COMMANDS.has(upper)) {
-    return command('gcode', normalized, false, true);
+    return command('gcode', normalized, false, true, 'read-only');
   }
-  return command('gcode', normalized, true, true);
+  return command('gcode', normalized, true, true, marlinStateEffect(normalized));
 }
 
 function command(
@@ -50,6 +51,7 @@ function command(
   normalized: string,
   requiresIdle: boolean,
   requiresNoActiveOperation: boolean,
+  stateEffect: ConsoleStateEffect,
 ): ConsoleCommandResult {
   return {
     ok: true,
@@ -60,6 +62,15 @@ function command(
       requiresIdle,
       requiresNoActiveOperation,
       requiresConfirmation: false,
+      stateEffect,
     },
   };
+}
+
+function marlinStateEffect(input: string): ConsoleStateEffect {
+  const upper = input.toUpperCase();
+  if (/G28(?=$|[^0-9.])/.test(upper)) return 'reference';
+  if (/M(?:92|206|428)(?=$|[^0-9.])/.test(upper)) return 'configuration';
+  if (/M851(?=$|[^0-9.])/.test(upper)) return 'tool';
+  return commonConsoleStateEffect(input);
 }

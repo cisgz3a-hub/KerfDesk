@@ -722,6 +722,8 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 1. User clicks `$I`, `$$`, `$#`, `$G`, or `?`.
 2. App sends the command through the same guarded serial write path as all other controller writes.
 3. `$$` starts the existing settings collector so detected controller settings refresh when the dump completes.
+4. Read-only queries preserve the current work-origin, Z-zero, homing,
+   position, and frame-verification evidence.
 
 #### Success — unlock alarm
 1. When the controller is in `Alarm`, user can send `$X` from the console or the alarm banner after confirming the head is safe.
@@ -743,6 +745,15 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
 2. Multiline input is rejected; persistent macros are deferred to a later lane.
+3. Every accepted command carries a controller-specific state-effect tag.
+   Ordinary motion/modal commands clear cached Idle/position and frame
+   evidence until a fresh status report arrives. XY-only coordinate commands
+   clear XY authority but preserve established work Z; Z/tool commands clear
+   work-Z evidence but preserve XY authority; full WCS, homing/reset, and
+   configuration commands clear the complete setup evidence they can affect.
+4. A successful serial write is the invalidation boundary. It is not treated
+   as physical completion or controller acknowledgement. If the write fails,
+   the existing write-failure safety notice applies and no mutation is assumed.
 
 ### F-B14. Machine Settings read-only backup
 

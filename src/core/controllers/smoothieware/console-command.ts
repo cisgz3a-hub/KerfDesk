@@ -4,6 +4,7 @@
 // stuck — it is the recovery command.
 
 import type { ConsoleCommandResult } from '../grbl/console-command';
+import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
 import {
   SMOOTHIE_CMD_FIRMWARE_INFO,
   SMOOTHIE_CMD_POSITION,
@@ -33,16 +34,19 @@ export function prepareSmoothieConsoleCommand(input: string): ConsoleCommandResu
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };
   }
   if (normalized === '?') {
-    return command('gcode', normalized, '?', false, false);
+    return command('gcode', normalized, '?', false, false, 'read-only');
   }
   if (upper === SMOOTHIE_CMD_UNLOCK) {
     // Halt recovery must stay available while an operation is wedged.
-    return command('gcode', normalized, `${normalized}\n`, false, false);
+    return command('gcode', normalized, `${normalized}\n`, false, false, 'reference');
   }
   if (QUERY_COMMANDS.has(upper)) {
-    return command('gcode', normalized, `${normalized}\n`, false, true);
+    return command('gcode', normalized, `${normalized}\n`, false, true, 'read-only');
   }
-  return command('gcode', normalized, `${normalized}\n`, true, true);
+  const stateEffect = /G28(?=$|[^0-9.])/i.test(normalized)
+    ? 'reference'
+    : commonConsoleStateEffect(normalized);
+  return command('gcode', normalized, `${normalized}\n`, true, true, stateEffect);
 }
 
 function command(
@@ -51,6 +55,7 @@ function command(
   wire: string,
   requiresIdle: boolean,
   requiresNoActiveOperation: boolean,
+  stateEffect: ConsoleStateEffect,
 ): ConsoleCommandResult {
   return {
     ok: true,
@@ -61,6 +66,7 @@ function command(
       requiresIdle,
       requiresNoActiveOperation,
       requiresConfirmation: false,
+      stateEffect,
     },
   };
 }
