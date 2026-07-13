@@ -130,6 +130,10 @@ describe('runStartJobFlow', () => {
         },
       },
     }));
+    useLaserStore.setState({
+      activeControllerKind: 'marlin',
+      detectedControllerKind: 'marlin',
+    });
 
     await runStartJobFlow();
 

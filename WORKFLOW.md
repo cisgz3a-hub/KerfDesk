@@ -1982,6 +1982,13 @@ F-CNC19 tiling.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
+#### Start gate — establish stock-top Z0
+1. CNC Start is blocked until manual Zero Z or a settled probe records
+   work-Z evidence for the current reference epoch. The gate cannot be
+   overridden because KerfDesk's CNC emitter defines Z0 as the stock top.
+2. Set Origin establishes XY only and does not satisfy this gate. Laser Start
+   is unaffected.
+
 #### Success
 1. Every M0 change block carries "; re-zero Z on the stock top, then
    cycle-start to resume". The operator swaps the bit, jogs Z to touch

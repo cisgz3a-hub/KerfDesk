@@ -40,6 +40,7 @@
 | ADR-152 | 2026-07-13 | Accepted | Offset pockets may use locally tangent native helical entries |
 | ADR-153 | 2026-07-13 | Accepted | Two-tool pocket rest machining uses bounded 2D stock subtraction |
 | ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
+| ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 
 ---
 
@@ -7055,3 +7056,34 @@ Known motion no longer causes unnecessary re-zeroing, while reference-changing o
 reuse an earlier bit-to-stock claim. The record still does not prove active tool identity, physical
 touch-plate removal, WCS number, clamp state, or spindle-at-speed; those require additional modeled
 evidence and hardware qualification.
+
+---
+
+## ADR-172 - Missing qualified work Z blocks CNC Start
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+KerfDesk's generated CNC programs define Z0 as the stock top, but Start treated
+missing work-Z evidence as an overridable warning. Continuing could therefore
+apply every programmed depth from an unknown datum. ADR-171 made the evidence
+source-qualified and reference-epoch-bound, so the host can now distinguish
+current setup evidence from missing or stale state without relying on XY origin.
+
+### Decision
+
+- Missing, stale, or absent work-Z evidence is an early CNC Start blocker.
+- Manual Zero Z and a fully settled probe are accepted only when their evidence
+  epoch matches the current work-Z reference epoch.
+- Set Origin remains XY-only and cannot satisfy the Z gate. Laser jobs retain
+  their existing Start behavior because they have no stock-top depth contract.
+- Other machine/project advisories remain warnings; this policy change is
+  limited to the datum required by the emitted CNC coordinates.
+
+### Consequences
+
+An operator must explicitly establish stock-top Z0 before every fresh CNC Start
+after a reference-invalidating event. This adds setup friction but removes a
+direct path to cutting at the wrong physical depth. It still does not prove
+tool identity, clamping, plate removal, or spindle-at-speed feedback.
