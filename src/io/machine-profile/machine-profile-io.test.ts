@@ -29,6 +29,8 @@ function profileWithCalibration(): DeviceProfile {
       alignedAt: 1_788_000_100_000,
     },
     fireControl: { enabled: true, maxPowerPercent: 1.5 },
+    estimateCutTimeScale: 1.18,
+    estimateTravelTimeScale: 1.07,
     scanningOffsets: [
       { speedMmPerMin: 6000, offsetMm: 0.18 },
       { speedMmPerMin: 3000, offsetMm: 0.09 },
@@ -98,6 +100,8 @@ describe('LaserForge machine profile documents', () => {
           basis: 'rectified',
         },
         fireControl: { enabled: true, maxPowerPercent: 1.5 },
+        estimateCutTimeScale: 1.18,
+        estimateTravelTimeScale: 1.07,
         scanningOffsets: [
           { speedMmPerMin: 3000, offsetMm: 0.09 },
           { speedMmPerMin: 6000, offsetMm: 0.18 },
@@ -137,6 +141,8 @@ describe('LaserForge machine profile documents', () => {
       profileWithCalibration().cameraAlignment,
     );
     expect(result.document.profile.fireControl).toEqual({ enabled: true, maxPowerPercent: 1.5 });
+    expect(result.document.profile.estimateCutTimeScale).toBe(1.18);
+    expect(result.document.profile.estimateTravelTimeScale).toBe(1.07);
     expect(result.document.profile.noGoZones).toHaveLength(1);
   });
 
@@ -205,6 +211,14 @@ describe('LaserForge machine profile documents', () => {
     expect(deserializeProfilePatch({ baudRate: 115200.5 })).toEqual({
       kind: 'invalid',
       reason: 'profile.baudRate must be a positive integer',
+    });
+    expect(deserializeProfilePatch({ estimateCutTimeScale: 0 })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.estimateCutTimeScale must be between 0.1 and 5',
+    });
+    expect(deserializeProfilePatch({ estimateTravelTimeScale: 'fast' })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.estimateTravelTimeScale must be between 0.1 and 5',
     });
   });
 

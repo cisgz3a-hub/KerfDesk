@@ -38,6 +38,13 @@ const toolpath: Toolpath = {
   ],
 };
 
+const estimate = {
+  kind: 'estimated' as const,
+  label: '47s',
+  totalSeconds: 47,
+  breakdown: { cutSeconds: 35, travelSeconds: 12 },
+};
+
 let cleanup: (() => Promise<void>) | null = null;
 
 afterEach(async () => {
@@ -52,10 +59,14 @@ afterEach(async () => {
 
 describe('PreviewStatsPanel', () => {
   it('shows the total estimated time when the live estimate is available', async () => {
-    const host = await renderPanel({ kind: 'estimated', label: '47s' });
+    const host = await renderPanel(estimate);
 
     expect(host.textContent).toContain('Time');
     expect(host.textContent).toContain('47s');
+    expect(host.textContent).toContain('Cut time');
+    expect(host.textContent).toContain('35s');
+    expect(host.textContent).toContain('Travel time');
+    expect(host.textContent).toContain('12s');
   });
 
   it('shows a clear large-job state when live estimation is paused', async () => {
@@ -66,7 +77,7 @@ describe('PreviewStatsPanel', () => {
   });
 
   it('labels whether route preview is for the whole project or selected output', async () => {
-    const host = await renderPanel({ kind: 'estimated', label: '47s' }, 'Selected output');
+    const host = await renderPanel(estimate, 'Selected output');
 
     expect(host.textContent).toContain('Route');
     expect(host.textContent).toContain('Selected output');
@@ -203,7 +214,7 @@ async function renderCombinedPanel(): Promise<HTMLDivElement> {
     root.render(
       <PreviewControlsPanel
         toolpath={toolpath}
-        estimate={{ kind: 'estimated', label: '47s' }}
+        estimate={estimate}
         routeLabel="Whole project"
         disabled={false}
       />,

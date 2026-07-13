@@ -27,7 +27,15 @@ export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = PREPARATION_COMPILED_SEGMEN
 
 export type LiveJobEstimate =
   | { readonly kind: 'empty' }
-  | { readonly kind: 'estimated'; readonly label: string }
+  | {
+      readonly kind: 'estimated';
+      readonly label: string;
+      readonly totalSeconds: number;
+      readonly breakdown: {
+        readonly cutSeconds: number;
+        readonly travelSeconds: number;
+      };
+    }
   | { readonly kind: 'too-large' };
 
 export function estimateLiveJob(
@@ -88,7 +96,12 @@ function estimatePrepared(prepared: PreparedOutput): LiveJobEstimate {
 
   const result = estimateJobDuration(prepared.job, prepared.project.device);
   return result.totalSeconds > 0
-    ? { kind: 'estimated', label: formatDuration(result.totalSeconds) }
+    ? {
+        kind: 'estimated',
+        label: formatDuration(result.totalSeconds),
+        totalSeconds: result.totalSeconds,
+        breakdown: result.breakdown,
+      }
     : { kind: 'empty' };
 }
 

@@ -45,8 +45,11 @@ export type {
 } from './device-profile';
 export {
   DEFAULT_DEVICE_PROFILE,
+  isEstimateTimeScale,
   isKnownControllerKind,
   KNOWN_CONTROLLER_KINDS,
+  MAX_ESTIMATE_TIME_SCALE,
+  MIN_ESTIMATE_TIME_SCALE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   PROFILE_CAPABILITIES,
 } from './device-profile';

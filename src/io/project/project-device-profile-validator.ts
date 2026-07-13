@@ -1,6 +1,7 @@
 import { validateCameraProfileShape } from '../../core/camera';
 import {
   HARD_MAX_FIRE_POWER_PERCENT,
+  isEstimateTimeScale,
   PROFILE_CAPABILITIES,
   type ProfileCapability,
 } from '../../core/devices';
@@ -65,6 +66,20 @@ export function optionalLaserSubProfile(obj: Record<string, unknown>, path: stri
 export function optionalCameraProfile(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined ? null : validateCameraProfileShape(value, path);
+}
+
+export function optionalEstimateTimeScales(
+  obj: Record<string, unknown>,
+  path: string,
+): string | null {
+  for (const field of ['estimateCutTimeScale', 'estimateTravelTimeScale'] as const) {
+    const fieldPath = `${path}.${field}`;
+    const value = valueAtPath(obj, fieldPath);
+    if (value !== undefined && !isEstimateTimeScale(value)) {
+      return `missing or invalid \`${fieldPath}\``;
+    }
+  }
+  return null;
 }
 
 export function optionalRotarySetup(obj: Record<string, unknown>, path: string): string | null {

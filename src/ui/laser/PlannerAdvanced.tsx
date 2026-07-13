@@ -9,6 +9,7 @@
 // collapse with no React state.
 
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { MAX_ESTIMATE_TIME_SCALE, MIN_ESTIMATE_TIME_SCALE } from '../../core/devices';
 import { inlineCodeStyle, numInputStyle, Row, unitStyle } from './device-settings-shared';
 
 const MAX_ACCEL = 100000;
@@ -17,8 +18,12 @@ const MAX_JD_MM = 100;
 export function PlannerAdvanced(props: {
   readonly accel: number;
   readonly jd: number;
+  readonly cutTimeScale: number;
+  readonly travelTimeScale: number;
   readonly onAccelChange: (next: number) => void;
   readonly onJdChange: (next: number) => void;
+  readonly onCutTimeScaleChange: (next: number) => void;
+  readonly onTravelTimeScaleChange: (next: number) => void;
 }): JSX.Element {
   return (
     <details style={advancedDetailsStyle}>
@@ -55,10 +60,36 @@ export function PlannerAdvanced(props: {
           />
           <span style={unitStyle}>mm</span>
         </Row>
+        <Row label="Cut time scale">
+          <ClearableNumberField
+            min={MIN_ESTIMATE_TIME_SCALE}
+            max={MAX_ESTIMATE_TIME_SCALE}
+            step={0.01}
+            value={props.cutTimeScale}
+            onCommit={props.onCutTimeScaleChange}
+            style={numInputStyle}
+            ariaLabel="Estimated cut time scale"
+            title="Multiply estimated cutting, engraving, and plunge time. Use measured time divided by estimated time. This never changes machine feeds."
+          />
+          <span style={unitStyle}>x</span>
+        </Row>
+        <Row label="Travel time scale">
+          <ClearableNumberField
+            min={MIN_ESTIMATE_TIME_SCALE}
+            max={MAX_ESTIMATE_TIME_SCALE}
+            step={0.01}
+            value={props.travelTimeScale}
+            onCommit={props.onTravelTimeScaleChange}
+            style={numInputStyle}
+            ariaLabel="Estimated travel time scale"
+            title="Multiply estimated rapid and laser-off travel time. Use measured time divided by estimated time. This never changes machine feeds."
+          />
+          <span style={unitStyle}>x</span>
+        </Row>
         <p style={advancedHintStyle}>
-          Tune these to match your machine&apos;s <code style={inlineCodeStyle}>$$</code> output
-          when burn times consistently differ from the estimate. Defaults match the GRBL shipping
-          standard.
+          Match acceleration and junction deviation to the machine&apos;s{' '}
+          <code style={inlineCodeStyle}>$$</code> output first. Then calibrate each time scale from
+          a measured job. A value of 1.00 leaves the planner estimate unchanged.
         </p>
       </div>
     </details>
