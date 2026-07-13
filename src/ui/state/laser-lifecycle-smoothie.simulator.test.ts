@@ -160,9 +160,13 @@ describe('Smoothieware lifecycle against the simulator', () => {
     const sim = await connectSmoothieIdle();
     await useLaserStore.getState().jog({ dx: 12, feed: 1000 });
     await pump(800);
-    await useLaserStore.getState().setOriginHere();
+    const setOrigin = useLaserStore.getState().setOriginHere();
+    await pump(100);
+    await setOrigin;
     expect(sim.outbound().some((w) => w.startsWith('G92 X0 Y0'))).toBe(true);
-    await useLaserStore.getState().resetOrigin();
+    const resetOrigin = useLaserStore.getState().resetOrigin();
+    await pump(100);
+    await resetOrigin;
     expect(sim.outbound().some((w) => w.startsWith('G92.1'))).toBe(true);
   });
 

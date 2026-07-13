@@ -6607,8 +6607,10 @@ When > 0:
   proud of the finished wall (profileToolpathPolylines gained an allowance arg).
 - One finishing pass at the true contour (tool-radius offset, allowance 0) at
   full depth is appended after the roughing passes.
-- Holding tabs: the finishing pass runs through the SAME tab split the deepest
-  roughing pass uses, so tabs are preserved and the part stays attached.
+- Holding tabs: the finishing pass projects the deepest roughing path's
+  physical tab-center anchors onto the true contour before splitting it. This
+  preserves tab locations even when offset contours choose different start
+  vertices or distribute perimeter length differently.
 
 Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
 (which already has its own H.8 finishing skim) are out of scope, documented in
@@ -6617,12 +6619,10 @@ code, and covered by a test showing those cut types are unaffected.
 Consequences.
 - Determinism (#5): allowance 0/absent is byte-identical (tested).
 - HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
-- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
-  same perimeter-fraction logic on concentric contours, so they align for
-  typical convex profiles; on complex/concave geometry clipper's offset can pick
-  a different start vertex and misalign them, which could sever the part. Verify
-  with a test cut before trusting tabs + finish allowance together on intricate
-  parts.
+- Tab alignment is start-vertex invariant: finishing gaps are centered by
+  nearest-point projection from the matching roughing contour's physical tab
+  anchors. Automated tests cover contours with deliberately different start
+  vertices. Hardware verification remains required before production use.
 
 ---
 
@@ -6747,3 +6747,121 @@ Parametric objects remain editable instead of becoming effectively baked after c
 save, laser compilation, and CNC compilation continue to consume the same materialized paths, so
 no downstream shape-specific branch is added. Width and radius values remain object-local geometry;
 the existing selection transform controls continue to own whole-object scale, rotation, and mirror.
+
+---
+
+## ADR-159 - Schema v2 curves are canonical and compatibility polylines are invalidated
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Project schema v2 stores line, cubic, and elliptical-arc curve subpaths. When `curves` are present,
+they are the editable source of truth and machine consumers flatten them with explicit tolerance and
+segment budgets. Curve edits regenerate compatibility polylines; a legacy polyline-only edit deletes
+the stale curve field. Serialization promotes remaining polyline-only paths to line curves, and the
+v1→v2 migrator performs the same one-way promotion for old projects.
+
+### Consequences
+
+Preview, hit testing, save, laser compile, and CNC compile cannot silently choose conflicting copies
+of geometry. Topology-changing code must update curves and rematerialize polylines, or deliberately
+invalidate curves. Budget exhaustion refuses the operation instead of emitting partial geometry.
+
+---
+
+## ADR-160 - Rotary raster is an explicit experimental amendment to ADR-127
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+ADR-127's vectors-only refusal remains the default. Raster rows may use the same rotary machine-space
+Y transform only when both rotary and rotary-raster Labs gates are enabled and the output caller
+passes the explicit permission. Otherwise preflight returns `rotary-raster-unsupported`. Surface
+row spacing is scaled; pixel power data and non-rotary output remain unchanged.
+
+### Consequences
+
+The experimental path is testable without weakening saved-project or encoder defaults. It remains
+hardware CLAIMED and must not be presented as verified cylindrical photo engraving.
+
+---
+
+## ADR-161 - Labs gates experimental laser features locally and fail closed
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Tools → Labs owns explicit gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera
+alignment v2. Gates default false, tolerate unavailable/corrupt local storage by reverting false,
+and encode dependencies (`rotaryRaster` implies `rotary`; disabling rotary disables its raster gate).
+They are workstation consent, not portable project authorization; output paths must receive explicit
+permission rather than reading UI storage from core code.
+
+### Consequences
+
+Opening a project on another machine cannot silently arm experimental behavior. Each feature still
+requires its own profile, capability, preflight, and hardware-confidence checks.
+
+---
+
+## ADR-162 - Low-power Fire is profile-opted, hard-capped, and momentary
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Fire appears only for laser projects when the Labs gate, controller capability, profile capability,
+and profile `fireControl.enabled` all agree. Power is capped by the configured limit and an absolute
+5% ceiling. The control requires a known idle position with no alarm, job, motion, probe, autofocus,
+controller operation, or pending untracked acknowledgement. Pointer/key release, leave, cancel,
+window blur, visibility loss, unmount, and error all request laser-off; release emits `M5`.
+
+### Consequences
+
+Fire is a supervised positioning aid, not a persistent power toggle. Profiles without an explicit
+safe contract expose no control, and simulator coverage does not replace a physical safety pass.
+
+---
+
+## ADR-163 - Cut Planner exposes five persisted deterministic policies
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+The former `reduceTravelMoves` switch is retained only as a compatibility mirror. The persisted Cut
+Planner owns travel policy, inside-first ordering, layer priority, path-direction reversal, and the
+planning start reference. Nearest-neighbor ordering is deterministic, preserves semantically ordered
+raster/scanline work, and falls back to source order above its 2,000-segment synchronous budget.
+This is a bounded greedy planner, not a claim of full 2-opt optimality.
+
+### Consequences
+
+Operator intent round-trips and output remains deterministic. Adding another policy requires schema
+validation, legacy defaults, output tests, and a new complexity bound.
+
+---
+
+## ADR-164 - Adopt bounded offline editing and interoperability already shipped
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+- Adopt bounded node and Bezier-handle editing for imported/materialized paths under ADR-159's
+  geometry invalidation rule; general weld/boolean/offset kernel work remains deferred.
+- Adopt defensive LightBurn `.clb` import into native libraries and refreshable native preset-to-layer
+  bindings. `.clb` export, manufacturer packs, and LightBurn `LinkPath` synchronization remain deferred.
+- Adopt explicit `.ttf`/`.otf` import with project embedding under count and byte budgets. Automatic
+  host system-font enumeration remains out of scope.
+- Adopt bounded offline variable text from embedded CSV, serial, date/time, and cut-setting fields.
+  Network/database sources, barcode/QR generation, and automatic imposition remain out of scope.
+
+### Consequences
+
+These tested capabilities are intentional product scope rather than undocumented exceptions. Their
+offline, bounded persistence contracts remain release gates; this decision does not authorize the
+larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.

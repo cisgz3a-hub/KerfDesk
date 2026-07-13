@@ -352,6 +352,24 @@ describe('handleLine alarm terminates paused streams', () => {
   });
 });
 
+describe('handleLine axis-specific work-origin evidence', () => {
+  it('caches a Z-only WCO without promoting it to an XY custom origin', () => {
+    const { refs, set, get } = makeHarness();
+
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Idle|MPos:0.000,0.000,5.000|WCO:0.000,0.000,5.000|FS:0,0>',
+    );
+
+    expect(get().wcoCache).toEqual({ x: 0, y: 0, z: 5 });
+    expect(get().workOriginActive).toBe(false);
+    expect(get().workOriginSource).toBe('none');
+  });
+});
+
 describe('handleLine status-only Alarm recovery state', () => {
   it('clears motion and custom-origin state when GRBL reports Alarm without ALARM:N', () => {
     const { refs, set, get } = makeHarness();

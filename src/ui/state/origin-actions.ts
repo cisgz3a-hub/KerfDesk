@@ -117,3 +117,13 @@ export function hasCustomOrigin(wco: WorkCoordinateOffset | null): boolean {
     Math.abs(wco.z) > ORIGIN_EPSILON_MM
   );
 }
+
+/**
+ * True only when the cached WCO proves an XY placement offset. A Z-only
+ * touch-off is valid work-Z evidence, but it must never activate User Origin
+ * placement for an XY job.
+ */
+export function hasCustomXyOrigin(wco: WorkCoordinateOffset | null): boolean {
+  if (wco === null) return false;
+  return Math.abs(wco.x) > ORIGIN_EPSILON_MM || Math.abs(wco.y) > ORIGIN_EPSILON_MM;
+}

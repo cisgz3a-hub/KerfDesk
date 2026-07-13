@@ -72,7 +72,7 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 ### Phase C — v0.3 "Polish" [MVP completes here]
 
-Job time estimates, settings panel, SVG re-import with diff, path optimization (nearest-neighbor, inner-shapes-first), keyboard shortcuts pass, autosave + recovery, local-only crash reporter.
+Job time estimates, settings panel, SVG re-import with diff, and a persisted deterministic Cut Planner (travel policy, inside-first, layer priority, path direction, and planning start), plus keyboard shortcuts, autosave + recovery, and a local-only crash reporter. The planner remains bounded nearest-neighbor rather than full 2-opt (ADR-163).
 
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 
@@ -85,6 +85,8 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 - Bundled MIT-compatible fonts only (Apache-2.0 + OFL-1.1; see THIRD_PARTY_NOTICES.md).
 - Text-to-path via `opentype.js` (MIT).
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
+- Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
+- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields; live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
@@ -101,7 +103,8 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 - **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
 - **F.4 — Convert to Bitmap** [A1–A4 shipped (Fill All / Outlines / Use Cut Settings + DPI control); A5 placement/brightness polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
 
-- **F.5 - Material calibration workflow** [Approved; staged]. Minimal LightBurn-style Material Test and Interval Test generators are now in scope so operators can calibrate speed, power, passes, and image line interval on scrap before burning final work. Start with pure Scene generators that flow through the existing preview/save/start pipeline; UI and hardware verification follow. The native Material Library recipe foundation and deterministic `.lfml.json` IO are now scoped as support infrastructure for those calibrated settings; the in-app multi-library UI — create/edit wizard, Saved Libraries browser, and auto-save persistence — is scoped by ADR-093, while LightBurn `.clb` compatibility, manufacturer profiles, and linked presets ("Link") remain deferred. ADR-044, ADR-045, ADR-093.
+- **F.5 - Material calibration workflow** [Shipped; hardware calibration pending]. Minimal LightBurn-style Material Test and Interval Test generators, native `.lfml.json` libraries, multi-library UI, bounded LightBurn `.clb` import, and refreshable native preset-to-layer bindings are in scope. Manufacturer profile packs, `.clb` export, and LightBurn `LinkPath` synchronization remain deferred. ADR-044, ADR-045, ADR-093, ADR-164.
+- **F.6 - Experimental laser safety surface** [Shipped; hardware features remain CLAIMED]. Tools → Labs stores fail-closed, local feature gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera alignment v2. Low-power Fire additionally requires controller capability and an opted-in profile, is hard-capped at 5%, and is hold-to-run with redundant release paths (ADR-161, ADR-162).
 
 ### Phase G — v0.7 "Drawing tools" [Built (B1–B7); P2 follow-ups pending]
 
@@ -109,8 +112,8 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 
 - New pure `src/core/shapes/` (shape→polylines) + a `kind:'shape'` SceneObject variant (Rectangle / Ellipse / Polygon / Polyline parametric blocks + materialized `paths`, the ADR-014 / TextObject precedent) so compile/preview/emit/save are untouched.
 - A tool-mode discriminated union + vertical tool strip (Esc returns to Select); `Workspace` mousedown draws on the current drawing layer color with a live mm readout.
-- Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
-- OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
+- Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Parametric property editing and bounded node/Bezier editing have since shipped (ADR-159, ADR-164).
+- The broader geometry kernel — weld, general boolean operations, and arbitrary offset editing — remains out of scope and still requires an explicit phase and dependency evaluation.
 
 ### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 
@@ -448,23 +451,21 @@ an assumption that every folder must have an `index.ts`.
 Reject any of these mid-development without a `PROJECT.md` revision and a `DECISIONS.md` entry. **MIT availability does not change this list.**
 
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
-- Non-GRBL controllers (Marlin, Smoothie, Ruida, Trocen, TopWisdom).
+- ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
+  simulator/evidence labels; Trocen and TopWisdom remain out of scope.
 - macOS / Linux desktop builds.
-- Node editing of imported paths.
+- ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.
 - ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —
   staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
   print-and-cut → v4 capture-to-trace) — no longer out of scope.
-- Rotary attachment.
+- ~~Rotary attachment.~~ **Scoped and shipped software-side by ADR-127/160**; hardware remains CLAIMED. Raster rotary output is default-refused unless its dependent Labs gates are explicit.
 - Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
   Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
   safe-Z retracts) — ADR-098.
-- Manufacturer setting profiles, LightBurn `.clb` compatibility, and linked
-  material presets ("Link"). Minimal Material Test / Interval Test generators
-  are scoped by Phase F.5 and ADR-044; the native Material Library recipe +
-  `.lfml.json` IO foundation by ADR-045; and the in-app multi-library UI
-  (create/edit wizard, Saved Libraries browser, auto-save persistence) by
-  ADR-093.
+- Manufacturer setting profile packs, LightBurn `.clb` export, and LightBurn
+  `LinkPath` synchronization. Bounded `.clb` import and refreshable native
+  preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync.
 - ~~DXF~~, AI, PDF import. **DXF moved in-scope by Phase H.6 (clean-room
@@ -484,8 +485,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   and advanced fill-pattern systems, node/graph-based operation editors, and plugin
   operation pipelines remain out of scope.
 - Macros, scripting, command palette, plugins, extensions.
-- Variable text (CSV / counter / date).
-- System fonts.
+- ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**;
+  live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
+- Host system-font enumeration. Explicitly imported user fonts are embedded in
+  the project under fixed budgets and no longer depend on the host after save (ADR-164).
 
 ---
 

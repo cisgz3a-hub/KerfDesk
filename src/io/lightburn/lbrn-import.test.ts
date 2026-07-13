@@ -35,6 +35,27 @@ describe('importLightBurnProject', () => {
     });
   });
 
+  it('reads cut settings from LightBurn child elements', () => {
+    const xml = `<LightBurnProject FormatVersion="1">
+      <CutSetting type="Scan">
+        <index Value="1"/>
+        <maxPower Value="50"/>
+        <speed Value="15"/>
+        <numPasses Value="3"/>
+      </CutSetting>
+      <Shape Type="Rect" CutIndex="1" W="10" H="6"><XForm>1 0 0 1 5 5</XForm></Shape>
+    </LightBurnProject>`;
+    const result = importLightBurnProject(xml, 'child-elements.lbrn2');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.scene.layers.find((layer) => layer.color === '#0000ff')).toMatchObject({
+      mode: 'fill',
+      speed: 900,
+      power: 50,
+      passes: 3,
+    });
+  });
+
   it('uses a text BackupPath and reports unsupported shapes', () => {
     const xml = `<LightBurnProject><Shape Type="Text" Str="Hi"><BackupPath Type="Path" CutIndex="0"><XForm>1 0 0 1 5 5</XForm><VertList>V0 0c0x1c1x1V5 0c0x1c1x1</VertList><PrimList>L0 1</PrimList></BackupPath></Shape><Shape Type="Image" /></LightBurnProject>`;
     const result = importLightBurnProject(xml, 'text.lbrn2');
