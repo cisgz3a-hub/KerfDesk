@@ -23,6 +23,7 @@ import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
   cncSetupAttestationMatches,
 } from './cnc-setup-attestation';
+import { cncResumeBlockMessage } from './cnc-pause-resume-policy';
 import { assertCncLiveStartReady, refreshCncLiveStartState } from './cnc-live-start-readiness';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
@@ -127,7 +128,7 @@ export function jobActions(
       }
     },
     pauseJob: () => runPauseJob(set, get, safeWrite, driver),
-    resumeJob: () => runResumeJob(set, safeWrite, driver),
+    resumeJob: () => runResumeJob(set, get, safeWrite, driver),
     stopJob: () => runStopJob(set, refs, safeWrite, driver),
   };
 }
@@ -318,7 +319,20 @@ async function runPauseJob(
   }
 }
 
-async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn): Promise<void> {
+async function runResumeJob(
+  set: SetFn,
+  get: GetFn,
+  safeWrite: SafeWriteFn,
+  driver: DriverFn,
+): Promise<void> {
+  const cncBlockMessage = cncResumeBlockMessage(get().activeJobMachineKind);
+  if (cncBlockMessage !== null) {
+    set({
+      lastWriteError: cncBlockMessage,
+      log: pushLog(get(), `[lf2] CNC Resume blocked: ${cncBlockMessage}`),
+    });
+    throw new Error(cncBlockMessage);
+  }
   const resumeByte = driver().realtime.resume;
   if (resumeByte !== null) await safeWrite(resumeByte, 'resume');
   // Functional set so the snapshot is taken AT WRITE TIME — during

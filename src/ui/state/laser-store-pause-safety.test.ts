@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RT_HOLD } from '../../core/controllers/grbl';
+import { RT_HOLD, RT_RESUME } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
@@ -132,6 +132,44 @@ describe('laser-store pause safety', () => {
     await useLaserStore.getState().pauseJob();
 
     expect(writes).toContain(RT_HOLD);
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+  });
+
+  it('refuses CNC Resume without writing cycle-start or refilling the stream', async () => {
+    const writes: string[] = [];
+    let liveConnection: FakeConnection | null = null;
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === 'G4 P0.01\n') setTimeout(() => liveConnection?.emitLine('ok'), 0);
+      if (data === '?') {
+        setTimeout(() => {
+          liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+        }, 0);
+      }
+    });
+    liveConnection = connection;
+    await connectWith(connection);
+    useLaserStore.setState({
+      controllerSettings: { laserModeEnabled: false },
+      accessoryCache: {
+        spindleCw: false,
+        spindleCcw: false,
+        flood: false,
+        mist: false,
+      },
+    });
+    const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
+    await useLaserStore.getState().startJob(gcode, {
+      machineKind: 'cnc',
+      cncSetupAttestation: createCncSetupAttestation(gcode),
+    });
+    await useLaserStore.getState().pauseJob();
+    writes.length = 0;
+
+    await expect(useLaserStore.getState().resumeJob()).rejects.toThrow(/cannot prove.*spindle/i);
+
+    expect(writes).not.toContain(RT_RESUME);
+    expect(writes).toEqual([]);
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 

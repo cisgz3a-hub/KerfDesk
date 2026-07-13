@@ -858,3 +858,31 @@ proof exists.
 - **Use:** read-only protocol research; no upstream code copied.
 - **Confidence:** high for the cited wire/source behavior; physical controller
   campaigns remain required before production safety claims.
+
+---
+
+## Same-session CNC hold/resume continuity (2026-07-13, ADR-180)
+
+- **GRBL behavior:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/commands.md
+  documents realtime feed hold/cycle start, spindle-stop override, and safety-door
+  restoration. These operate on the current planner session; they are not a
+  durable execution ledger or proof of physical spindle RPM.
+- **Physical feedback comparison:**
+  https://linuxcnc.org/docs/stable/html/config/core-components.html models
+  spindle at-speed as a hardware/encoder-backed input before feed proceeds.
+  Legacy GRBL `A:`/`FS:` instead report controller command/output state.
+- **Machine-specific recovery comparison:**
+  https://www.haascnc.com/service/online-operator-s-manuals/mill-operator-s-manual/mill---operation.html
+  keeps the spindle running in Run-Stop-Jog-Continue and uses an ordered return;
+  the controller warns that tools, offsets, and return path must remain valid.
+- **Decision impact:** generic CNC Resume now fails closed before `~` or stream
+  refill. Pause remains available, but continuation routes to Stop and supervised
+  recovery until a profile can prove exclusive control plus spindle continuity.
+- **Future architecture:** do not inject a queued dwell into a paused stream.
+  A safe opt-in needs an ack-neutral realtime-status arbiter, stable `Hold:0`
+  observations, unchanged session/setup epochs, and controller-visible spindle
+  fault/at-speed evidence.
+- **Use:** read-only protocol/manual research; no upstream code copied.
+- **Confidence:** high for the generic refusal. Any future opt-in still requires
+  machine-specific hardware and fault-injection validation.
