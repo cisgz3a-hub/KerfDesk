@@ -14,6 +14,11 @@ export { createPolygon } from './create-polygon';
 export { starToPolylines } from './star';
 export type { StarSpec } from './star';
 export { createStar } from './create-star';
+export {
+  rematerializeParametricShape,
+  sanitizeParametricShapeSpec,
+  type ParametricShapeSpec,
+} from './rematerialize-shape';
 export { polylineToPolylines } from './polyline';
 export type { PolylineSpec } from './polyline';
 export { createPolyline } from './create-polyline';
