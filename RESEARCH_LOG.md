@@ -969,3 +969,28 @@ proof exists.
   upstream code copied.
 - **Confidence:** high for the response-attribution limitation and local ledger
   behavior; physical multi-transport fault injection remains required.
+
+## GRBL probe ownership and settlement — 2026-07-13 (ADR-184)
+
+- **Sources:** GRBL's official `interface.md`, `commands.md`, `gcode.c`, and
+  local source audit at upstream commit `bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e`.
+- GRBL terminal `ok` means the line was accepted by the parser, not that queued
+  physical motion has finished. A successful probe transaction therefore needs
+  a FIFO planner fence followed by fresh stable Idle reports.
+- `G38.2` failure is alarmed; `G10 L20` mutates the selected coordinate system.
+  A later failure can therefore leave partial motion or coordinate changes even
+  though the overall multi-line cycle failed.
+- Status `FS:` exposes commanded feed and spindle speed. KerfDesk can refuse a
+  probe when spindle-off evidence is absent, while `M5`/`M9` provide an explicit
+  commanded-off boundary before motion. This does not prove mechanical coast-down.
+- Serial adapters are allowed to deliver a reply before their write Promise
+  resolves. Response ownership and the untracked-ack ledger must be reserved
+  synchronously before the first await.
+- Serial write resolution proves only OS/adapter queueing, not that GRBL has
+  processed Ctrl-X. Recovery therefore requires the observed GRBL reboot banner
+  before any later Idle report can qualify settlement. Every banner, alarm,
+  sleep, disconnect, or explicit ledger reset advances the write-session epoch
+  so late Promises cannot mutate a newer acknowledgement owner.
+- No new dependency was adopted. Hardware confirmation remains outstanding for
+  probe wiring, plate geometry, spindle coast-down, controller variants, and
+  real-machine reset/recovery behavior.

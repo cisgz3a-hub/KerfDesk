@@ -40,6 +40,7 @@ import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import { overrideActions } from './override-actions';
 import { probeActions } from './laser-probe-actions';
 import type { ProbeResult } from './probe-actions';
+import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { OverrideValues, RealtimeOverrideByte } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
@@ -220,7 +221,7 @@ export type LaserState = {
   readonly home: () => Promise<void>;
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   // ADR-103 G2 - run a prepared touch-plate probing sequence.
-  readonly probe: (lines: ReadonlyArray<string>) => Promise<ProbeResult>;
+  readonly probe: (request: ProbeRequest) => Promise<ProbeResult>;
   readonly confirmProbePlateRemoved: () => void;
   // ADR-103 G3 - send a real-time override byte (legal mid-job by design).
   readonly sendRealtimeOverride: (byte: RealtimeOverrideByte) => Promise<void>;
@@ -308,6 +309,7 @@ const refs: LiveRefs = {
   stallProbe: null,
   controllerCommand: null,
   controllerIdleWait: null,
+  controllerResetWait: null,
   writeEpoch: 0,
   pendingResetCleanup: null,
 };
@@ -483,6 +485,10 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...overrideActions(
     (line) => safeWrite(set, get, line),
     () => get().capabilities.overrides,
+    () =>
+      get().controllerOperation?.kind === 'probe'
+        ? 'Realtime overrides are locked during a probe transaction.'
+        : null,
   ),
   ...jobActions(
     set,

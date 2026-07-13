@@ -25,9 +25,17 @@ export type ControllerCommandKind =
 export type ControllerLifecycleRefs = {
   controllerCommand: ControllerCommandRequest | null;
   controllerIdleWait: ControllerIdleWaitRequest | null;
+  controllerResetWait?: ControllerResetWaitRequest | null;
   // Serial-session/reset generation. Late transport promises from an older
   // epoch must not mutate the current write/ack ledgers.
   writeEpoch?: number;
+};
+
+type ControllerResetWaitRequest = {
+  readonly expectedEpoch: number;
+  readonly resolve: () => void;
+  readonly reject: (err: Error) => void;
+  readonly timer: ReturnType<typeof setTimeout>;
 };
 
 type ControllerCommandRequest = {
@@ -218,6 +226,34 @@ export function waitForFreshIdle(
   });
 }
 
+export function waitForControllerResetBoundary(
+  refs: ControllerLifecycleRefs,
+  expectedEpoch: number,
+  timeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
+): Promise<void> {
+  if (refs.controllerResetWait != null) {
+    return Promise.reject(new Error('A controller reset-boundary wait is already active.'));
+  }
+  return new Promise((resolve, reject) => {
+    const request: ControllerResetWaitRequest = {
+      expectedEpoch,
+      resolve,
+      reject,
+      timer: setTimeout(() => {
+        finishResetWait(refs, request, 'reject', 'Timed out waiting for controller reboot banner.');
+      }, timeoutMs),
+    };
+    refs.controllerResetWait = request;
+  });
+}
+
+export function observeControllerResetBoundary(refs: ControllerLifecycleRefs): void {
+  const request = refs.controllerResetWait;
+  if (request == null) return;
+  if ((refs.writeEpoch ?? 0) <= request.expectedEpoch) return;
+  finishResetWait(refs, request, 'resolve');
+}
+
 export function observeControllerIdleWait(
   set: SetFn,
   refs: ControllerLifecycleRefs,
@@ -252,6 +288,8 @@ export function cancelControllerLifecycleRefs(
   if (command !== null) finishControllerCommand(refs, command, 'reject', message);
   const idleWait = refs.controllerIdleWait;
   if (idleWait !== null) finishIdleWait(refs, idleWait, 'reject', message);
+  const resetWait = refs.controllerResetWait;
+  if (resetWait != null) finishResetWait(refs, resetWait, 'reject', message);
 }
 
 function finishControllerCommand(
@@ -291,6 +329,19 @@ function finishIdleWait(
   clearTimeout(request.timer);
   if (mode === 'resolve') request.resolve();
   else request.reject(new Error(message ?? 'Controller did not report Idle.'));
+}
+
+function finishResetWait(
+  refs: ControllerLifecycleRefs,
+  request: ControllerResetWaitRequest,
+  mode: 'resolve' | 'reject',
+  message?: string,
+): void {
+  if (refs.controllerResetWait !== request) return;
+  refs.controllerResetWait = null;
+  clearTimeout(request.timer);
+  if (mode === 'resolve') request.resolve();
+  else request.reject(new Error(message ?? 'Controller reboot boundary was not observed.'));
 }
 
 function updateOperationIdleReports(

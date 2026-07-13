@@ -40,6 +40,15 @@ export type CornerProbeParams = ZProbeParams & {
   readonly sideClearanceMm: number;
 };
 
+/**
+ * A typed probe request, not caller-authored G-code. The live store expands
+ * this request with the audited builders below so only a real touch-plate
+ * cycle can establish work-coordinate evidence.
+ */
+export type ProbeRequest =
+  | { readonly kind: 'z'; readonly params: ZProbeParams }
+  | { readonly kind: 'corner'; readonly params: CornerProbeParams };
+
 export const DEFAULT_Z_PROBE_PARAMS: ZProbeParams = {
   plateThicknessMm: 15,
   seekFeedMmPerMin: 150,

@@ -5,8 +5,6 @@
 
 import { useState } from 'react';
 import {
-  buildCornerProbeLines,
-  buildZProbeLines,
   DEFAULT_SIDE_CLEARANCE_MM,
   DEFAULT_SIDE_DROP_MM,
   DEFAULT_Z_PROBE_PARAMS,
@@ -59,17 +57,20 @@ export function ProbeControls(): JSX.Element | null {
   const ready = connection.kind === 'connected' && statusReport?.state === 'Idle' && !probeBusy;
 
   const run = (): void => {
-    const lines =
+    const request =
       mode === 'z'
-        ? buildZProbeLines(zParams)
-        : buildCornerProbeLines({
-            ...zParams,
-            bitDiameterMm: effectiveBitDiameter,
-            corner,
-            sideDropMm: DEFAULT_SIDE_DROP_MM,
-            sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
-          });
-    void probe(lines).then((result) => {
+        ? ({ kind: 'z', params: zParams } as const)
+        : ({
+            kind: 'corner',
+            params: {
+              ...zParams,
+              bitDiameterMm: effectiveBitDiameter,
+              corner,
+              sideDropMm: DEFAULT_SIDE_DROP_MM,
+              sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
+            },
+          } as const);
+    void probe(request).then((result) => {
       const described = describeProbeResult(result);
       pushToast(described.message, described.variant);
     });
