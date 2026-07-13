@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   clearPersistentOrigin,
   hasCustomOrigin,
+  hasCustomXyOrigin,
   releaseMotors,
   resetOrigin,
   setOriginHere,
@@ -107,5 +108,17 @@ describe('hasCustomOrigin', () => {
 
   it('treats negative offsets symmetrically', () => {
     expect(hasCustomOrigin({ x: -10, y: -20, z: 0 })).toBe(true);
+  });
+});
+
+describe('hasCustomXyOrigin', () => {
+  it('does not treat a Z-only touch-off as an XY job origin', () => {
+    expect(hasCustomXyOrigin({ x: 0, y: 0, z: 5 })).toBe(false);
+  });
+
+  it('recognizes either non-trivial XY offset and ignores float noise', () => {
+    expect(hasCustomXyOrigin({ x: 10, y: 0, z: 5 })).toBe(true);
+    expect(hasCustomXyOrigin({ x: 0, y: -20, z: 5 })).toBe(true);
+    expect(hasCustomXyOrigin({ x: 0.0005, y: -0.0005, z: 5 })).toBe(false);
   });
 });

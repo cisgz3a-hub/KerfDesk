@@ -20,7 +20,7 @@ import {
 } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import type { SafeWriteFn, SetFn } from './laser-line-shared';
-import { hasCustomOrigin } from './origin-actions';
+import { hasCustomXyOrigin } from './origin-actions';
 
 export function handleStatusLine(
   set: SetFn,
@@ -158,7 +158,7 @@ function statusPositionPatch(
   // last-seen values so the overrides readout doesn't flicker (ADR-103 G3).
   const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
   if (report.wco === null) return { statusReport: report, ...ovPatch };
-  const active = hasCustomOrigin(report.wco);
+  const active = hasCustomXyOrigin(report.wco);
   return {
     statusReport: report,
     ...ovPatch,

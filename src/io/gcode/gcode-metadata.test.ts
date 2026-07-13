@@ -10,8 +10,8 @@ const META: GcodeMetadata = {
 };
 
 describe('gcodeMetadataHeader', () => {
-  it('tracks the ADR-039 raster gap-rapid emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-039-raster-gap-rapid-v1');
+  it('tracks the latest safety-relevant emitter revision', () => {
+    expect(EMITTER_REVISION).toBe('adr-103-surfacing-safe-start-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

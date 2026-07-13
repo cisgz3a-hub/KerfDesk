@@ -55,14 +55,18 @@ describe('surfacingRowYs', () => {
 });
 
 describe('buildSurfacingProgram', () => {
-  it('brackets motion with spin-up and M5, ends parked at the origin', () => {
+  it('clears the touched surface before spin-up, brackets cutting with M5, and parks', () => {
     const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const lines = program.lines;
     expect(lines).toContain('M3 S12000');
     expect(lines).toContain('G4 P3.000');
     expect(lines.at(-2)).toBe('M5');
     expect(lines.at(-1)).toBe('G0 X0.000 Y0.000');
-    // Spindle starts before any motion below safe Z.
+    // Z0 touch-off leaves the cutter on the surface. The first motion must lift
+    // it with the spindle off; only then may M3 and its dwell run.
+    const firstMotion = lines.findIndex((line) => /^G[01]\b/.test(line));
+    expect(lines[firstMotion]).toBe('G0 Z5.000');
+    expect(firstMotion).toBeLessThan(lines.indexOf('M3 S12000'));
     expect(lines.indexOf('M3 S12000')).toBeLessThan(
       lines.findIndex((line) => line.startsWith('G1 Z-')),
     );

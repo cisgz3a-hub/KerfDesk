@@ -4,7 +4,12 @@ import {
   rankMaterialRecipeCandidates,
   type MaterialRecipe,
 } from '../../core/material-library';
-import { updateLayer, type Layer, type Project } from '../../core/scene';
+import {
+  captureLayerOperationSettings,
+  updateLayer,
+  type Layer,
+  type Project,
+} from '../../core/scene';
 import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -111,7 +116,7 @@ function applyLinkedPreset(
       materialBinding: {
         libraryId: state.materialLibrary.libraryId,
         presetId: preset.id,
-        lastResolved: { ...target, ...recipe },
+        lastResolved: { ...captureLayerOperationSettings(target), ...recipe },
       },
     };
     applied = true;

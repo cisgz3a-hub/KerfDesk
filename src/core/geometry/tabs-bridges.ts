@@ -43,6 +43,49 @@ export function applyAutomaticTabsToPolylines(
   return out;
 }
 
+export function automaticTabAnchorPoints(
+  polyline: Polyline,
+  tabsPerShape: number,
+): ReadonlyArray<Vec2> {
+  if (!polyline.closed) return [];
+  const context = splitContext(polyline, 0);
+  if (context === null) return [];
+  const count = Math.max(1, Math.floor(tabsPerShape));
+  const anchors: Vec2[] = [];
+  for (let index = 0; index < count; index += 1) {
+    anchors.push(
+      pointAtDistance(
+        context.points,
+        context.cumulative,
+        context.perimeter,
+        ((index + 0.5) * context.perimeter) / count,
+      ),
+    );
+  }
+  return anchors;
+}
+
+export function splitClosedPolylineForTabsAtAnchors(
+  polyline: Polyline,
+  anchors: ReadonlyArray<Vec2>,
+  sizeMm: number,
+): ReadonlyArray<Polyline> {
+  if (!polyline.closed || anchors.length === 0) return [polyline];
+  const normalizedSize = Number.isFinite(sizeMm) ? Math.max(0, sizeMm) : 0;
+  if (normalizedSize <= 0) return [polyline];
+  const context = splitContext(polyline, normalizedSize);
+  if (context === null) return [polyline];
+  const half = normalizedSize / 2;
+  const skips = mergeIntervals(
+    anchors.flatMap((anchor) => {
+      const center = nearestDistanceOnClosedPolyline(context, anchor);
+      return splitModuloInterval(center - half, center + half, context.perimeter);
+    }),
+  );
+  const segments = burnSegmentsBetweenTabs(context, skips);
+  return segments.length > 0 ? segments : [polyline];
+}
+
 function isTabEligible(
   polyline: Polyline,
   polylines: ReadonlyArray<Polyline>,
@@ -220,6 +263,36 @@ function pointAtDistance(
     return { x: cleanCoord(a.x + (b.x - a.x) * t), y: cleanCoord(a.y + (b.y - a.y) * t) };
   }
   return points[0] as Vec2;
+}
+
+function nearestDistanceOnClosedPolyline(context: SplitContext, anchor: Vec2): number {
+  let bestDistanceSquared = Number.POSITIVE_INFINITY;
+  let bestPathDistance = 0;
+  for (let index = 0; index < context.points.length; index += 1) {
+    const start = context.points[index];
+    const end = context.points[(index + 1) % context.points.length];
+    if (start === undefined || end === undefined) continue;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+    const t =
+      lengthSquared <= EPS
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1, ((anchor.x - start.x) * dx + (anchor.y - start.y) * dy) / lengthSquared),
+          );
+    const projectedX = start.x + dx * t;
+    const projectedY = start.y + dy * t;
+    const distanceSquared = (anchor.x - projectedX) ** 2 + (anchor.y - projectedY) ** 2;
+    if (distanceSquared < bestDistanceSquared - EPS) {
+      bestDistanceSquared = distanceSquared;
+      const edgeStart = context.cumulative[index] ?? 0;
+      const edgeEnd = context.cumulative[index + 1] ?? edgeStart;
+      bestPathDistance = edgeStart + (edgeEnd - edgeStart) * t;
+    }
+  }
+  return bestPathDistance;
 }
 
 function dedupeConsecutive(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
