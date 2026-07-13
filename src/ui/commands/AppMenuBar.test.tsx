@@ -351,6 +351,7 @@ describe('AppMenuBar', () => {
         label: 'Measure',
         title: 'Measure',
         enabled: true,
+        active: false,
         invoke: runMeasure,
       },
       {

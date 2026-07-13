@@ -22,7 +22,10 @@ export function handleMenuKeyDown(
   if (family === undefined) return;
   if (target.closest('[data-menu-family-summary]') !== null) {
     handleSummaryKey(event, context, family);
-  } else if (target.getAttribute('role') === 'menuitem') {
+  } else if (
+    target.getAttribute('role') === 'menuitem' ||
+    target.getAttribute('role') === 'menuitemcheckbox'
+  ) {
     handleItemKey(event, context, family, target as HTMLButtonElement);
   }
 }
@@ -90,7 +93,11 @@ function handleItemListKey(
 export function menuItems(menu: Element | null | undefined): HTMLButtonElement[] {
   return menu === null || menu === undefined
     ? []
-    : [...menu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)')];
+    : [
+        ...menu.querySelectorAll<HTMLButtonElement>(
+          'button[role="menuitem"]:not(:disabled), button[role="menuitemcheckbox"]:not(:disabled)',
+        ),
+      ];
 }
 
 export function familySummary(root: HTMLElement, family: CommandFamily): HTMLElement | undefined {

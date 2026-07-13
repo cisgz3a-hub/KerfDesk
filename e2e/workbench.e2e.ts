@@ -21,7 +21,7 @@ test('assembled workbench is keyboard navigable and canvas-first at 1024px', asy
   await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
   await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
   await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();
-  await expect(page.getByLabel('Cuts / Layers panel')).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Cuts / Layers panel' })).toBeVisible();
   await expect(page.getByLabel('Laser controls')).toHaveCount(0);
 
   const file = page.getByRole('menuitem', { name: 'File' });
@@ -34,7 +34,7 @@ test('assembled workbench is keyboard navigable and canvas-first at 1024px', asy
   await expect(tools).toBeFocused();
   await tools.press('ArrowDown');
   await expect(page.getByRole('group', { name: 'Create & measure' })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Measure' })).toBeFocused();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Measure' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(tools).toBeFocused();
 });
