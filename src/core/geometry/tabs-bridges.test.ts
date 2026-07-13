@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
-import { applyAutomaticTabsToPolylines } from './tabs-bridges';
+import {
+  applyAutomaticTabsToPolylines,
+  automaticTabAnchorPoints,
+  splitClosedPolylineForTabsAtAnchors,
+} from './tabs-bridges';
 
 const SETTINGS = {
   tabsEnabled: true,
@@ -55,6 +59,34 @@ describe('automatic tabs / bridges geometry', () => {
     expect(result.filter((segment) => !segment.closed)).toHaveLength(4);
     expect(result.filter((segment) => segment.closed)).toEqual([
       { closed: true, points: squarePoints(5, 5, 5) },
+    ]);
+  });
+
+  it('projects physical tab anchors onto a contour with a different start vertex', () => {
+    const roughing: Polyline = { closed: true, points: squarePoints(0, 0, 20) };
+    const finishing: Polyline = {
+      closed: true,
+      points: [
+        { x: 18, y: 2 },
+        { x: 18, y: 18 },
+        { x: 2, y: 18 },
+        { x: 2, y: 2 },
+      ],
+    };
+    const anchors = automaticTabAnchorPoints(roughing, 4);
+    const segments = splitClosedPolylineForTabsAtAnchors(finishing, anchors, 2);
+    const gapCenters = segments.map((segment, index) => {
+      const end = segment.points.at(-1) as { x: number; y: number };
+      const next = segments[(index + 1) % segments.length]?.points[0] as { x: number; y: number };
+      return { x: (end.x + next.x) / 2, y: (end.y + next.y) / 2 };
+    });
+
+    gapCenters.sort((a, b) => a.x - b.x || a.y - b.y);
+    expect(gapCenters).toEqual([
+      { x: 2, y: 10 },
+      { x: 10, y: 2 },
+      { x: 10, y: 18 },
+      { x: 18, y: 10 },
     ]);
   });
 });
