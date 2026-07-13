@@ -7,7 +7,7 @@
 // a later bit.
 
 import type { CncGroup } from '../job';
-import { isProfileCutType } from './compile-cnc-job';
+import { isProfileCutType } from './compile-cnc-helpers';
 
 // Groups without a toolId (pre-H.7 fixtures) share one implicit section.
 const IMPLICIT_TOOL_KEY = '';

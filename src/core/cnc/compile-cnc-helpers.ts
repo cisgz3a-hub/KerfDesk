@@ -1,6 +1,18 @@
-import type { Polyline, Vec2 } from '../scene';
+import type { CncPass } from '../job';
+import type { CncCutType, Polyline, Vec2 } from '../scene';
 
 const MIN_FEED_MM_PER_MIN = 1;
+const COORD_EPS = 1e-9;
+
+export function contourPassFromPolyline(polyline: Polyline, zMm: number): CncPass {
+  return { kind: 'contour', zMm, polyline: ensureRingClosure(polyline), closed: polyline.closed };
+}
+
+export function isProfileCutType(cutType: CncCutType): boolean {
+  return (
+    cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'
+  );
+}
 
 export function orderInnerFirst(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {
   const closedPolylines = polylines.filter(
@@ -46,4 +58,13 @@ function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
     if (point.x < xAtY) inside = !inside;
   }
   return inside;
+}
+
+function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
+  const first = polyline.points[0];
+  const last = polyline.points[polyline.points.length - 1];
+  if (!polyline.closed || first === undefined || last === undefined) return polyline.points;
+  const alreadyClosed =
+    Math.abs(first.x - last.x) <= COORD_EPS && Math.abs(first.y - last.y) <= COORD_EPS;
+  return alreadyClosed ? polyline.points : [...polyline.points, first];
 }

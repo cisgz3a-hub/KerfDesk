@@ -10,6 +10,21 @@ export function offsetClosedPolylinesForKerf(
   polylines: ReadonlyArray<Polyline>,
   kerfOffsetMm: number,
 ): ReadonlyArray<Polyline> {
+  return offsetClosedPolylines(polylines, kerfOffsetMm, JoinType.Miter);
+}
+
+export function offsetClosedPolylinesWithRoundJoins(
+  polylines: ReadonlyArray<Polyline>,
+  offsetMm: number,
+): ReadonlyArray<Polyline> {
+  return offsetClosedPolylines(polylines, offsetMm, JoinType.Round);
+}
+
+function offsetClosedPolylines(
+  polylines: ReadonlyArray<Polyline>,
+  kerfOffsetMm: number,
+  joinType: JoinType,
+): ReadonlyArray<Polyline> {
   if (!Number.isFinite(kerfOffsetMm) || kerfOffsetMm === 0) return polylines;
   const paths = polylines.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
   if (paths.length === 0) return [];
@@ -22,7 +37,7 @@ export function offsetClosedPolylinesForKerf(
     inflatePathsD(
       [...oriented],
       kerfOffsetMm,
-      JoinType.Miter,
+      joinType,
       EndType.Polygon,
       2,
       OFFSET_PRECISION_DECIMALS,

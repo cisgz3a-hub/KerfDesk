@@ -1,7 +1,8 @@
 // core/cnc — CNC (router/mill) toolpath compilation. Public API.
 
-export { compileCncJob, isProfileCutType } from './compile-cnc-job';
+export { compileCncJob } from './compile-cnc-job';
 export { findDroppedCncLayers } from './compile-cnc-diagnostics';
+export { isProfileCutType } from './compile-cnc-helpers';
 export { findCncHelicalEntryIssues, type CncHelicalEntryIssue } from './cnc-helical-issues';
 export { planHelicalPocketPasses, type HelicalEntryPlan } from './helical-entry';
 export { planRestPocketToolpaths, type RestPocketPlan } from './rest-pocket';
@@ -19,6 +20,14 @@ export {
   type AdaptivePocketOperation,
 } from './adaptive-pocket-operation';
 export { findCncAdaptivePocketIssues, type CncAdaptivePocketIssue } from './cnc-adaptive-issues';
+export { findCncInlayIssues, type CncInlayIssue } from './cnc-inlay-issues';
+export {
+  planStraightInlayPair,
+  planStraightInlayPairForSettings,
+  straightInlayPocketDepthMm,
+  type StraightInlayPairOptions,
+  type StraightInlayPairPlan,
+} from './inlay-pair';
 export { findCncRestPocketIssues, type CncRestPocketIssue } from './cnc-rest-issues';
 export { zPassDepths } from './depth-passes';
 export { profileToolpathPolylines, type ProfileSide } from './profile-paths';

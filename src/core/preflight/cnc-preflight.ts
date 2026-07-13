@@ -17,6 +17,7 @@
 import {
   findCncAdaptivePocketIssues,
   findCncHelicalEntryIssues,
+  findCncInlayIssues,
   findCncRestPocketIssues,
   findDroppedCncLayers,
 } from '../cnc';
@@ -91,6 +92,12 @@ export function runCncPreflight(
     issues.push({
       code: 'cnc-adaptive-clearing-invalid',
       message: `Layer ${issue.layerId}: ${issue.reason} Adjust Optimal load or choose another fill method.`,
+    });
+  }
+  for (const issue of findCncInlayIssues(project.scene, project.device, config)) {
+    issues.push({
+      code: 'cnc-inlay-invalid',
+      message: `Layer ${issue.layerId}: ${issue.reason} Adjust the inlay settings or choose another bit.`,
     });
   }
   appendBoundsIssues(project, gcode, options, issues);

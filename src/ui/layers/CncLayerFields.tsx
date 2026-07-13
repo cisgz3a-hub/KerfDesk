@@ -37,7 +37,7 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   const isCnc = machine?.kind === 'cnc';
   const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;
   const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
-  const isProfile = settings.cutType.startsWith('profile');
+  const isProfile = settings.cutType.startsWith('profile') || settings.cutType === 'inlay-pair';
   const commit = (patch: Partial<CncLayerSettings>): void =>
     setLayerParam(layer.id, { cnc: { ...settings, ...patch } });
   const commitSettings = (next: CncLayerSettings): void => setLayerParam(layer.id, { cnc: next });
@@ -110,13 +110,17 @@ function CutDepthField(props: {
     <>
       <NumberField
         layer={props.layer}
-        label="Cut depth"
+        label={props.settings.cutType === 'inlay-pair' ? 'Insert depth' : 'Cut depth'}
         unit="mm"
         value={props.settings.depthMm}
         min={0.05}
         max={200}
         step={0.5}
-        title="Total depth below the stock top. Equal to stock thickness for a through cut."
+        title={
+          props.settings.cutType === 'inlay-pair'
+            ? 'Male insert profile depth. Equal to stock thickness to free the insert.'
+            : 'Total depth below the stock top. Equal to stock thickness for a through cut.'
+        }
         onCommit={(depthMm) => props.onCommit({ depthMm })}
       />
       {props.stockThicknessMm > 0 ? (
