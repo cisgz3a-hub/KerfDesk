@@ -85,6 +85,9 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 - Bundled MIT-compatible fonts only (Apache-2.0 + OFL-1.1; see THIRD_PARTY_NOTICES.md).
 - Text-to-path via `opentype.js` (MIT).
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
+- Production extension (ADR-150): offline serial/date/time/CSV/cut-setting fields with embedded data,
+  bounded sequence ranges, explicit next/previous/reset controls, and advancement only after
+  successful output. Barcode/QR, live databases, and label imposition remain out of scope.
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 

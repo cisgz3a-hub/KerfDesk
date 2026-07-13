@@ -35,6 +35,7 @@
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
+| ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
 
 ---
 
@@ -6747,3 +6748,33 @@ Parametric objects remain editable instead of becoming effectively baked after c
 save, laser compilation, and CNC compilation continue to consume the same materialized paths, so
 no downstream shape-specific branch is added. Width and radius values remain object-local geometry;
 the existing selection transform controls continue to own whole-object scale, rotation, and mirror.
+
+---
+
+## ADR-150 - Adopt bounded variable-data production as a Phase D extension
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Phase D originally scoped ordinary text in bundled fonts. The production workflow now also has
+typed serial, date/time, CSV, and cut-setting fields, while this branch adds bounded record and
+serial ranges, configurable step size, forward/reverse wrap, and reset. Leaving that capability
+outside PROJECT.md would make persistence and output behavior look accidental despite its bounded
+validators, deterministic tests, and explicit operator controls.
+
+### Decision
+
+- Adopt variable text and bounded sequence controls as a Phase D production extension.
+- Keep imported CSV normalized and embedded in the project; no network or database source is
+  introduced.
+- Advance values only after explicit operator action, successful export, or completed streaming.
+  Failed or stale output must not advance production state.
+- Clamp persisted ranges to the embedded dataset and require safe integers for serial arithmetic.
+- Barcode/QR fields, live databases, and automatic label imposition remain out of scope.
+
+### Consequences
+
+Variable production is now intentional product scope rather than an undocumented accretion.
+Projects remain offline and self-contained, and long runs have deterministic bounds and wrap
+semantics. The schema surface grows, so load validation and round-trip tests remain release gates.
