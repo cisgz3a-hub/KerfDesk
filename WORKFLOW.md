@@ -2121,9 +2121,11 @@ F-CNC19 tiling.
    fence plus two fresh Idle reports complete before the toast confirms
    "work zero is set and motion is settled".
 3. XYZ corner cycle: Z first over the plate center, then each side face
-   (two-stage, flank contact below the plate top), zeroing X and Y one
-   bit-radius outside the stock faces, ending parked just outside the
-   zeroed corner. Corner choice mirrors all directions and signs.
+   (two-stage, flank contact below the plate top). The cycle keeps all
+   positioning relative and leaves the previous WCS untouched until all
+   six contacts succeed. One acknowledged `G10 L20 P0 X... Y... Z...`
+   then commits the complete corner frame before the bit parks just
+   outside it. Corner choice mirrors all directions and signs.
 
 #### Error — probe never fires / fires early
 1. ALARM:5 (no contact within travel): named toast — check the clip
@@ -2131,6 +2133,10 @@ F-CNC19 tiling.
 2. ALARM:4 (already triggered): named toast — check for a short /
    already-touching bit, `$X`, retry.
 3. Any error:N stops the sequence immediately; nothing further is sent.
+   In XYZ mode, an error before the combined G10 leaves the previous WCS
+   unchanged. A timeout or disconnect while that one commit is awaiting
+   acknowledgement makes the coordinate state unknown, so setup evidence
+   remains invalid until the operator re-establishes the work frame.
 4. No `ok` within 45 s, or failure to settle at fresh Idle: timeout toast
    names the pending boundary, invalidates work-Z/status evidence, and
    warns that motion state is unknown (physical stop if unsafe).
