@@ -107,6 +107,7 @@ export type TraceOptions = {
   readonly edgeBlurSigma?: number;
   readonly edgeLowThresholdRatio?: number;
   readonly edgeHighThresholdRatio?: number;
+  // Minimum finished edge-path length in source-image pixels.
   readonly edgeMinLengthPx?: number;
   readonly edgeJoinGapPx?: number;
   readonly edgeMedianFilter?: boolean;

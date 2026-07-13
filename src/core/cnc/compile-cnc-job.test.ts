@@ -225,6 +225,125 @@ describe('compileCncJob', () => {
     expect(compileCncJob(scene, dev, config)).toEqual(compileCncJob(scene, dev, config));
   });
 
+  it('is byte-identical with finishAllowanceMm 0 or absent (determinism #5)', () => {
+    const base = sceneWith(
+      [cncLayer('L1', '#ff0000', { cutType: 'profile-outside', depthMm: 4, depthPerPassMm: 2 })],
+      [squareObject('O1', '#ff0000', 40)],
+    );
+    const zero = sceneWith(
+      [
+        cncLayer('L1', '#ff0000', {
+          cutType: 'profile-outside',
+          depthMm: 4,
+          depthPerPassMm: 2,
+          finishAllowanceMm: 0,
+        }),
+      ],
+      [squareObject('O1', '#ff0000', 40)],
+    );
+    expect(compileCncJob(zero, dev, config)).toEqual(compileCncJob(base, dev, config));
+  });
+
+  it('does not add a finishing pass for out-of-scope cut types (pocket, on-path)', () => {
+    for (const cutType of ['pocket', 'profile-on-path'] as const) {
+      const withAllowance = sceneWith(
+        [
+          cncLayer('L1', '#ff0000', {
+            cutType,
+            depthMm: 4,
+            depthPerPassMm: 2,
+            finishAllowanceMm: 2,
+          }),
+        ],
+        [squareObject('O1', '#ff0000', 40)],
+      );
+      const without = sceneWith(
+        [cncLayer('L1', '#ff0000', { cutType, depthMm: 4, depthPerPassMm: 2 })],
+        [squareObject('O1', '#ff0000', 40)],
+      );
+      expect(compileCncJob(withAllowance, dev, config)).toEqual(
+        compileCncJob(without, dev, config),
+      );
+    }
+  });
+
+  it('leaves stock on roughing and appends one full-depth finishing pass at the true contour', () => {
+    const size = 40;
+    const layerSettings = (extra: Partial<CncLayerSettings>) => ({
+      cutType: 'profile-outside' as const,
+      depthMm: 4,
+      depthPerPassMm: 2,
+      ...extra,
+    });
+    const noAllowance = onlyGroup(
+      sceneWith(
+        [cncLayer('L1', '#ff0000', layerSettings({}))],
+        [squareObject('O1', '#ff0000', size)],
+      ),
+    );
+    const withAllowance = onlyGroup(
+      sceneWith(
+        [cncLayer('L1', '#ff0000', layerSettings({ finishAllowanceMm: 2 }))],
+        [squareObject('O1', '#ff0000', size)],
+      ),
+    );
+    const spanX = (pass: CncPass) => {
+      const xs = contourPass(pass).polyline.map((p) => p.x);
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    // Exactly one extra pass: the appended finishing loop.
+    expect(withAllowance.passes).toHaveLength(noAllowance.passes.length + 1);
+    // Roughing contour sits ~2 mm further out per side (span grows by ~2*allowance).
+    const noSpan = Math.max(...noAllowance.passes.map(spanX));
+    const roughSpan = Math.max(...withAllowance.passes.map(spanX));
+    expect(roughSpan).toBeGreaterThan(noSpan + 3.9);
+    // One finishing pass at FULL depth on the TRUE contour (span == no-allowance span).
+    const finishing = withAllowance.passes.filter(
+      (pass) => Math.abs(contourPass(pass).zMm + 4) < 1e-9 && Math.abs(spanX(pass) - noSpan) < 1e-6,
+    );
+    expect(finishing).toHaveLength(1);
+    expect(finishing[0]?.closed).toBe(true);
+  });
+
+  it('keeps holding tabs on the finishing pass so the part is not fully severed', () => {
+    const allowanceMm = 2;
+    const group = onlyGroup(
+      sceneWith(
+        [
+          cncLayer('L1', '#ff0000', {
+            cutType: 'profile-outside',
+            depthMm: 6,
+            depthPerPassMm: 2,
+            finishAllowanceMm: allowanceMm,
+            tabsEnabled: true,
+            tabHeightMm: 2,
+            tabWidthMm: 6,
+            tabsPerShape: 4,
+          }),
+        ],
+        [squareObject('O1', '#ff0000', 40)],
+      ),
+    );
+    // Passes are in machine coordinates, so derive the shape center from the
+    // overall bounding box (the inflated roughing extent). Every roughing pass
+    // reaches that extent; every true-contour finishing pass reaches one
+    // allowance short of it — a clean offset/scale-invariant classifier.
+    const pts = group.passes.flatMap((pass) => contourPass(pass).polyline);
+    const cx = (Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2;
+    const cy = (Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2;
+    const reach = (pass: CncPass) =>
+      Math.max(
+        ...contourPass(pass).polyline.map((p) => Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy))),
+      );
+    const roughReach = Math.max(...group.passes.map(reach));
+    const finishing = group.passes.filter((pass) => reach(pass) <= roughReach - allowanceMm / 2);
+    // The true-contour finishing loop is split into multiple OPEN segments —
+    // the tab gaps that keep the part attached — all at full depth.
+    expect(finishing.length).toBeGreaterThan(1);
+    expect(finishing.every((pass) => !pass.closed)).toBe(true);
+    expect(finishing.every((pass) => Math.abs(contourPass(pass).zMm + 6) < 1e-9)).toBe(true);
+  });
+
   it('drops engrave polylines with non-finite points instead of compiling NaN passes', () => {
     // Engrave is the one cut type that takes source polylines verbatim, so it
     // must apply the same hasFinitePoints guard as profile/pocket/v-carve/drill

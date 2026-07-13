@@ -76,6 +76,15 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.thresholdLuma).toBe(160);
   });
 
+  it('makes a manual Line Art threshold authoritative over automatic sketch routing', () => {
+    expect(LINE_ART.autoSketchTrace).toBe(true);
+
+    const merged = mergeLightBurnTraceSettings(LINE_ART, { thresholdLuma: 144 });
+
+    expect(merged.autoSketchTrace).toBe(false);
+    expect(merged.thresholdLuma).toBe(144);
+  });
+
   it('keeps Otsu enabled when non-threshold trace controls change', () => {
     expect(SMOOTH.useOtsuThreshold).toBe(true);
 

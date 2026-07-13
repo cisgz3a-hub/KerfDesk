@@ -12,6 +12,8 @@ export type IconName =
   | 'arrow-right'
   | 'chevron-up'
   | 'chevron-down'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'plus'
   | 'minus'
   | 'close'
@@ -46,6 +48,8 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   'arrow-right': <path d="M3 8h10M9 4l4 4-4 4" />,
   'chevron-up': <path d="M4 10l4-4 4 4" />,
   'chevron-down': <path d="M4 6l4 4 4-4" />,
+  'chevron-left': <path d="M10 4 6 8l4 4" />,
+  'chevron-right': <path d="m6 4 4 4-4 4" />,
   plus: <path d="M8 3v10M3 8h10" />,
   minus: <path d="M3 8h10" />,
   close: <path d="M4 4l8 8M12 4l-8 8" />,

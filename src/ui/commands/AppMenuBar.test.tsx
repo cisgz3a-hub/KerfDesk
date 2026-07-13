@@ -54,6 +54,32 @@ afterEach(() => {
 });
 
 describe('AppMenuBar', () => {
+  it('renders toggle commands as checked menu items', async () => {
+    const toggle: AppCommand = {
+      id: 'window.toggle-layers-panel',
+      family: 'window',
+      label: 'Cuts / Layers Panel',
+      title: 'Show or hide the panel',
+      enabled: true,
+      active: false,
+      invoke: vi.fn(),
+    };
+    const { host, root } = await renderMenu([toggle]);
+    try {
+      const windowMenu = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'Window',
+      );
+      if (!(windowMenu instanceof HTMLElement)) throw new Error('Window menu missing');
+      await act(async () => windowMenu.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+      const item = host.querySelector('[role="menuitemcheckbox"]');
+      expect(item?.getAttribute('aria-checked')).toBe('false');
+      expect(item?.textContent).toBe('Cuts / Layers Panel');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('renders command families and runs enabled commands', async () => {
     const onNew = vi.fn();
     const { host, root } = await renderMenu(commands(onNew));

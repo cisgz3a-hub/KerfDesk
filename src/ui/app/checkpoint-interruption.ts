@@ -18,6 +18,8 @@ export function checkpointInterruption(
 }
 
 function noticeKind(notice: LaserSafetyNotice): JobInterruption['kind'] {
+  // A fire-time link drop is a disconnect just like a job-time one: GRBL may
+  // still be executing its buffer, so recovery treats both as 'disconnect'.
   if (notice.kind === 'disconnect-during-job' || notice.kind === 'disconnect-during-fire') {
     return 'disconnect';
   }

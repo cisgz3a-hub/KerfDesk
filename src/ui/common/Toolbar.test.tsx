@@ -218,9 +218,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
-      const hint = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Shortcuts',
-      );
+      const hint = host.querySelector('button[aria-label="Keyboard Shortcuts"]');
       const title = hint?.getAttribute('title') ?? '';
       // Shipped shortcuts the hint used to omit:
       expect(title).toContain('Ctrl+D'); // duplicate (shortcuts.ts)
@@ -247,9 +245,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
-      const hint = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Shortcuts',
-      );
+      const hint = host.querySelector('button[aria-label="Keyboard Shortcuts"]');
       if (!(hint instanceof HTMLButtonElement)) throw new Error('Shortcuts button missing');
       await act(async () => {
         hint.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -283,9 +279,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="cnc" />);
       });
 
-      const hint = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Shortcuts',
-      );
+      const hint = host.querySelector('button[aria-label="Keyboard Shortcuts"]');
       const title = hint?.getAttribute('title') ?? '';
       expect(title).toContain('Router: Ctrl+Enter');
       expect(title).not.toContain('Laser:');
@@ -377,9 +371,7 @@ describe('Toolbar command buttons', () => {
         root.render(<Toolbar commands={commands} machineKind="laser" />);
       });
 
-      const button = [...host.querySelectorAll('button')].find((item) =>
-        item.textContent?.startsWith('New'),
-      );
+      const button = host.querySelector('button[aria-label="New"]');
       if (!(button instanceof HTMLButtonElement)) throw new Error('New button missing');
       await act(async () => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true }));

@@ -25,7 +25,6 @@ import {
   preprocessForTrace,
 } from './trace-image';
 import {
-  MAX_UPSCALE_SOURCE_PIXELS,
   THIN_STROKE_UPSCALE_FACTOR,
   computeUpscaleFactor,
   downscaleTracedPaths,
@@ -37,6 +36,7 @@ import { traceCenterlineStrokePaths } from './centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
 import { traceImageToEdgePaths } from './edge-trace';
 import { withCanonicalTraceCurves } from './trace-curves';
+import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -200,10 +200,13 @@ function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
   // shared finisher), so its opt-in rides the same flag.
   const contourQuality =
     options.supersampleContour === true &&
-    (isBinaryContourPreset(options) || options.traceMode === 'edge') &&
-    image.width * image.height <= MAX_UPSCALE_SOURCE_PIXELS;
+    (isBinaryContourPreset(options) || options.traceMode === 'edge');
   const contourFactor = contourQuality ? THIN_STROKE_UPSCALE_FACTOR : 1;
-  return Math.max(thinFactor, smallFactor, contourFactor);
+  let factor = Math.max(thinFactor, smallFactor, contourFactor);
+  while (factor > 1 && !fitsTraceWorkingPixelBudget(image, factor, options)) {
+    factor -= 1;
+  }
+  return factor;
 }
 
 // The backend selection shared by both the direct and the upscaled paths.

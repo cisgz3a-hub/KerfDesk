@@ -72,8 +72,9 @@ describe('CommandShell file boundaries', () => {
 });
 
 async function clickButton(host: HTMLElement, text: string): Promise<void> {
-  const button = [...host.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent?.includes(text),
+  const button = [...host.querySelectorAll('button')].find(
+    (candidate) =>
+      candidate.getAttribute('aria-label') === text || candidate.textContent?.includes(text),
   );
   if (!(button instanceof HTMLButtonElement)) throw new Error(`${text} button missing`);
   await act(async () => {

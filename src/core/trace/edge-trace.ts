@@ -19,8 +19,12 @@
 // parameters from them (see the derivation constants below).
 
 import { clamp } from '../math';
-import type { ColoredPath } from '../scene';
-import { contourPolylinesFromMask, flattenStrengthFromSmoothness } from './contour-trace';
+import type { ColoredPath, Polyline } from '../scene';
+import {
+  contourPolylinesFromMask,
+  flattenStrengthFromSmoothness,
+  optimizationToleranceScaleFromOptimize,
+} from './contour-trace';
 import { localContrastCrackField, localContrastInkBitmap } from './local-contrast-mask';
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
@@ -28,6 +32,7 @@ import { withCanonicalTraceCurves } from './trace-curves';
 
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
+const MIN_EDGE_AREA_PX = 2;
 // Same base simplification epsilon as the contour lane (see contour-trace).
 const EDGE_SIMPLIFY_EPSILON_PX = 0.45;
 
@@ -70,25 +75,53 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
   // field gives sub-pixel vertex positions, which in turn lets the wobble
   // stages stand down and the fairing-by-fitting tail engage per loop.
   const crackField = localContrastCrackField(source, maskOptions);
-  const polylines = contourPolylinesFromMask(
+  const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
+  const finished = contourPolylinesFromMask(
     { width: bitmap.width, height: bitmap.height, ink: bitmap.data },
     {
-      // The Edge preset's "minimum line" knob maps onto the finisher's
-      // speckle gate: loops below this area (px²) are dropped — the same
-      // numeric mapping the previous geometry stage used for its
-      // area-based suppression.
-      minAreaPx:
-        Math.max(2, Math.round(options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX)) *
+      // A tiny area floor prevents degenerate loops; the operator's Minimum
+      // line value is applied to finished source-pixel path length below.
+      minAreaPx: MIN_EDGE_AREA_PX * scale * scale,
+      epsilonPx:
+        EDGE_SIMPLIFY_EPSILON_PX *
+        Math.max(0.1, options.lineTolerance ?? 1) *
         scale *
-        scale,
-      epsilonPx: EDGE_SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale,
+        toleranceScale,
+      fitToleranceScale: toleranceScale,
       // Same Smoothness → flatten-strength ramp as the contour lane.
       flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
       pixelScale: scale,
       crackField,
     },
   );
-  return polylines.length === 0 ? [] : withCanonicalTraceCurves([{ color: EDGE_COLOR, polylines }]);
+  const minimumLength = Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX) * scale;
+  const polylines = filterEdgePolylinesByLength(finished, minimumLength);
+  return polylines.length === 0
+    ? []
+    : withCanonicalTraceCurves([{ color: EDGE_COLOR, polylines }]);
+}
+
+export function filterEdgePolylinesByLength(
+  polylines: ReadonlyArray<Polyline>,
+  minimumLengthPx: number,
+): Polyline[] {
+  if (!Number.isFinite(minimumLengthPx) || minimumLengthPx <= 0) return [...polylines];
+  return polylines.filter((polyline) => polylineLength(polyline) >= minimumLengthPx);
+}
+
+function polylineLength(polyline: Polyline): number {
+  let length = 0;
+  for (let i = 1; i < polyline.points.length; i += 1) {
+    const a = polyline.points[i - 1];
+    const b = polyline.points[i];
+    if (a !== undefined && b !== undefined) length += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  const first = polyline.points[0];
+  const last = polyline.points[polyline.points.length - 1];
+  if (polyline.closed && first !== undefined && last !== undefined) {
+    length += Math.hypot(first.x - last.x, first.y - last.y);
+  }
+  return length;
 }
 
 function maskDelta(options: TraceOptions): number {

@@ -149,7 +149,6 @@ function SettingsDialogHost(props: {
   if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;
   return null;
 }
-
 const FOCUS_TEST_UNAVAILABLE_MESSAGE =
   'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.';
 
