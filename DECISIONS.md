@@ -3650,6 +3650,12 @@ Marlin, Smoothieware, and Ruida. The store layer hardcoded GRBL bytes ($J=, $X,
 5. `.lf2`/.lfmachine round-trip `controllerKind` + optional `baudRate`; unknown
    values are dropped to the GRBL default at the deserialize boundary
    (`isKnownControllerKind` is the single source of truth).
+6. **Console commands declare their state effect at the driver seam.** Read-only
+   queries preserve evidence; machine/modal commands require a fresh status;
+   XY, Z/tool, full-coordinate, reference, and configuration mutations
+   invalidate only the setup authority they can make stale. The invalidation
+   happens after a successful serial write, never from the operator's text
+   alone, and a write is not promoted to physical-completion evidence.
 
 **Consequences.** grblHAL/FluidNC land as capability deltas on the GRBL driver
 (FluidNC: settings read-only, no $-writes). One family per sub-phase (keeps

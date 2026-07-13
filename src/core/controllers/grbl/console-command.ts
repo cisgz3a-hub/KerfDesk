@@ -1,4 +1,5 @@
 import { CMD_BUILD_INFO, CMD_SETTINGS, CMD_UNLOCK, RT_STATUS } from './commands';
+import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
 
 export const CMD_OFFSETS = '$#';
 export const CMD_MODAL_STATE = '$G';
@@ -20,6 +21,7 @@ export type PreparedConsoleCommand = {
   readonly requiresIdle: boolean;
   readonly requiresNoActiveOperation: boolean;
   readonly requiresConfirmation: boolean;
+  readonly stateEffect: ConsoleStateEffect;
 };
 
 export type ConsoleCommandResult =
@@ -55,11 +57,16 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   if (upper === CMD_MODAL_STATE) {
     return ok('modal-state-query', CMD_MODAL_STATE, `${CMD_MODAL_STATE}\n`);
   }
-  if (upper === CMD_UNLOCK) return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`);
-  if (SETTING_WRITE_RE.test(normalized)) {
-    return ok('setting-write', normalized, `${normalized}\n`, true, true, true);
+  if (upper === CMD_UNLOCK) {
+    return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
   }
-  return ok('gcode', normalized, `${normalized}\n`, true, true, false);
+  if (SETTING_WRITE_RE.test(normalized)) {
+    return ok('setting-write', normalized, `${normalized}\n`, true, true, true, 'configuration');
+  }
+  const stateEffect = /^\$H(?:[XYZABC])?$/i.test(normalized)
+    ? 'reference'
+    : commonConsoleStateEffect(normalized);
+  return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
 }
 
 function ok(
@@ -69,6 +76,7 @@ function ok(
   requiresIdle = false,
   requiresNoActiveOperation = true,
   requiresConfirmation = false,
+  stateEffect: ConsoleStateEffect = 'read-only',
 ): ConsoleCommandResult {
   return {
     ok: true,
@@ -79,6 +87,7 @@ function ok(
       requiresIdle,
       requiresNoActiveOperation,
       requiresConfirmation,
+      stateEffect,
     },
   };
 }

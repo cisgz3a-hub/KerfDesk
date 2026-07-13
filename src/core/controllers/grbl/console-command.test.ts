@@ -23,6 +23,7 @@ describe('prepareConsoleCommand', () => {
         requiresIdle: false,
         requiresNoActiveOperation: false,
         requiresConfirmation: false,
+        stateEffect: 'read-only',
       },
     });
   });
@@ -37,6 +38,7 @@ describe('prepareConsoleCommand', () => {
         requiresIdle: false,
         requiresNoActiveOperation: true,
         requiresConfirmation: false,
+        stateEffect: 'read-only',
       },
     });
     expect(prepareConsoleCommand('$#')).toMatchObject({
@@ -63,6 +65,7 @@ describe('prepareConsoleCommand', () => {
         requiresIdle: true,
         requiresNoActiveOperation: true,
         requiresConfirmation: true,
+        stateEffect: 'configuration',
       },
     });
   });
@@ -87,7 +90,26 @@ describe('prepareConsoleCommand', () => {
         requiresIdle: true,
         requiresNoActiveOperation: true,
         requiresConfirmation: false,
+        stateEffect: 'machine-state',
       },
     });
+  });
+
+  it('classifies commands that can invalidate setup evidence', () => {
+    const cases = [
+      ['$H', 'reference'],
+      ['G92 X0 Y0', 'coordinates-xy'],
+      ['G92 Z0', 'coordinates-z'],
+      ['G92.1', 'coordinates-all'],
+      ['G10 L20 P1 X0 Z15', 'coordinates-all'],
+      ['G43.1 Z-12.5', 'tool'],
+      ['T2 M6', 'tool'],
+    ] as const;
+    for (const [input, stateEffect] of cases) {
+      expect(prepareConsoleCommand(input)).toMatchObject({
+        ok: true,
+        command: { stateEffect },
+      });
+    }
   });
 });

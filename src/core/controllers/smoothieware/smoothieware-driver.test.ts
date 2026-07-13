@@ -61,10 +61,23 @@ describe('prepareSmoothieConsoleCommand', () => {
     expect(
       unlock.ok && !unlock.command.requiresIdle && !unlock.command.requiresNoActiveOperation,
     ).toBe(true);
+    expect(unlock.ok && unlock.command.stateEffect).toBe('reference');
     const status = prepareSmoothieConsoleCommand('?');
     expect(status.ok && status.command.wire === '?').toBe(true);
     const gcode = prepareSmoothieConsoleCommand('G0 X10');
     expect(gcode.ok && gcode.command.requiresIdle).toBe(true);
+    expect(gcode.ok && gcode.command.stateEffect).toBe('machine-state');
+  });
+
+  it('classifies Smoothieware setup mutations', () => {
+    for (const [input, stateEffect] of [
+      ['G28', 'reference'],
+      ['G92 X0 Y0', 'coordinates-xy'],
+      ['G43.1 Z-3', 'tool'],
+    ] as const) {
+      const result = prepareSmoothieConsoleCommand(input);
+      expect(result.ok && result.command.stateEffect).toBe(stateEffect);
+    }
   });
 });
 
