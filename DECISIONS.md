@@ -28,6 +28,7 @@
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
+| ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 
 ---
 
@@ -6514,3 +6515,36 @@ Make the tracing pipeline explicitly single-flight and latest-wins. Starting a n
 - Large images are bounded before allocation-heavy tracing, and Region Enhance cannot stack an inner 4x supersampling pass on top of its own work scale.
 - This is in-process cancellation, not cooperative cancellation inside the tracing algorithms. A backend that monopolizes the main thread remains out of scope, and worker termination latency remains browser-controlled.
 - Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
+
+## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
+
+> **Numbering note.** ADR-137 is accepted; ADR-138 and ADR-139 remain reserved by open PRs. **ADR-140** is allocated to this decision.
+
+Context. A profile cut removes the full wall across its depth passes, so the
+finished edge carries the roughing tool's deflection and chatter. Production CNC
+work leaves a small "stock to leave" allowance on roughing and removes it with a
+light finishing pass along the true contour for a cleaner wall.
+
+Decision. Optional per-layer `finishAllowanceMm` on CncLayerSettings, for
+profile-outside / profile-inside cuts only (0/absent = off, byte-identical).
+When > 0:
+- Roughing offsets the contour by tool-radius + allowance, staying that far
+  proud of the finished wall (profileToolpathPolylines gained an allowance arg).
+- One finishing pass at the true contour (tool-radius offset, allowance 0) at
+  full depth is appended after the roughing passes.
+- Holding tabs: the finishing pass runs through the SAME tab split the deepest
+  roughing pass uses, so tabs are preserved and the part stays attached.
+
+Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
+(which already has its own H.8 finishing skim) are out of scope, documented in
+code, and covered by a test showing those cut types are unaffected.
+
+Consequences.
+- Determinism (#5): allowance 0/absent is byte-identical (tested).
+- HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
+- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
+  same perimeter-fraction logic on concentric contours, so they align for
+  typical convex profiles; on complex/concave geometry clipper's offset can pick
+  a different start vertex and misalign them, which could sever the part. Verify
+  with a test cut before trusting tabs + finish allowance together on intricate
+  parts.
