@@ -164,7 +164,12 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
   it('enables pocket helical entry and removes a conflicting along-path ramp', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
-      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket', rampEntryDeg: 5 },
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket',
+        rampEntryDeg: 5,
+        pocketRoughToolId: 'em-6350',
+      },
     };
     installProject(layer, false);
     const { host, root } = await render(layer);
@@ -174,11 +179,42 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
       await act(async () => checkbox.click());
       const settings = useStore.getState().project.scene.layers[0]?.cnc;
       expect(settings?.rampEntryDeg).toBeUndefined();
+      expect(settings?.pocketRoughToolId).toBeUndefined();
       expect(settings?.helixEntry).toEqual({
         minDiameterMm: 2,
         maxDiameterMm: 8,
         angleDeg: 3,
       });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('selects a larger roughing bit and removes a conflicting helix', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket',
+        toolId: 'em-1588',
+        helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+      },
+    };
+    installProject(layer, false);
+    const { host, root } = await render(layer);
+    try {
+      const select = host.querySelector(
+        `select[aria-label="Pocket roughing bit for ${layer.color}"]`,
+      );
+      if (!(select instanceof HTMLSelectElement)) throw new Error('Roughing bit selector missing');
+      await act(async () => {
+        select.value = 'em-6350';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      const settings = useStore.getState().project.scene.layers[0]?.cnc;
+      expect(settings?.pocketRoughToolId).toBe('em-6350');
+      expect(settings?.helixEntry).toBeUndefined();
     } finally {
       await act(async () => root.unmount());
       host.remove();

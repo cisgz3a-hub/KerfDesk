@@ -103,6 +103,9 @@ export type CncLayerSettings = {
   // Pocket-only native G2/G3 descent. Diameter values describe the tool-center
   // circle; the pocket toolpath is already inset by the cutter radius.
   readonly helixEntry?: CncHelixEntrySettings;
+  // Pocket-only two-bit rest machining. This larger end mill clears the bulk
+  // first; the layer's selected bit then cuts only geometrically remaining stock.
+  readonly pocketRoughToolId?: string;
   // Enforce climb or conventional cutting on profile/pocket toolpaths.
   readonly cutDirection?: CncCutDirection;
   // Total cut depth below stock top (positive). For v-carve this is the MAX

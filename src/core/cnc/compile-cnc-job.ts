@@ -39,12 +39,12 @@ import { coolantFields } from './coolant-fields';
 import { capFeed, capSpindle } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
+import { pocketToolpathsForSettings, resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
 import { planHelicalPocketPasses } from './helical-entry';
 import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
-import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
 import { orderInnerFirst } from './profile-ordering';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
@@ -69,6 +69,8 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
     // the v-bit ladder, with its own bit.
     const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
     if (clearance !== null) clearingGroups.push(clearance);
+    const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
+    if (roughing !== null) clearingGroups.push(roughing);
     const group = cncGroupForLayer(layer, settings, polylines, device, config);
     if (group === null) continue;
     if (isProfileCutType(settings.cutType)) {
@@ -149,11 +151,34 @@ export function cncGroupForLayer(
   config: CncMachineConfig,
 ): CncGroup | null {
   const tool = layerCncTool(config, settings);
-  const passes = passesForLayer(polylines, settings, tool);
+  const passes = passesForLayer(polylines, settings, tool, config);
+  return cncGroupForPasses(layer, settings, tool, passes, device, config);
+}
+
+function restPocketRoughingGroupForLayer(
+  layer: Layer,
+  settings: CncLayerSettings,
+  polylines: ReadonlyArray<Polyline>,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): CncGroup | null {
+  const operation = resolveRestPocketOperation(polylines, settings, config);
+  if (operation.kind !== 'ok') return null;
+  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
+  let passes: ReadonlyArray<CncPass> = depthMajorPasses(operation.roughToolpaths, depths);
+  if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);
+  return cncGroupForPasses(layer, settings, operation.roughTool, passes, device, config);
+}
+
+function cncGroupForPasses(
+  layer: Layer,
+  settings: CncLayerSettings,
+  tool: CncTool,
+  passes: ReadonlyArray<CncPass>,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): CncGroup | null {
   if (passes.length === 0) return null;
-  // Drill holes run the whole peck cycle at the plunge feed: re-entry is
-  // air until the previous floor, and fresh material only ever meets the
-  // bit at plunge speed.
   const cutFeed =
     settings.cutType === 'drill'
       ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin)
@@ -221,6 +246,7 @@ function passesForLayer(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   tool: CncTool,
+  config: CncMachineConfig,
 ): ReadonlyArray<CncPass> {
   // V-carve computes per-ring depths itself (H.3) — it does not fit the
   // "XY toolpaths × uniform depth ladder" shape of the other cut types.
@@ -243,7 +269,12 @@ function passesForLayer(
   // (0 for every non-profile cut and for profile cuts without an allowance, so
   // the offset — and therefore the output — is byte-identical to before).
   const allowanceMm = profileFinishAllowanceMm(settings);
-  const raw = xyToolpathsForCutType(polylines, settings, tool.diameterMm, allowanceMm);
+  const restOperation = resolveRestPocketOperation(polylines, settings, config);
+  if (restOperation.kind === 'error') return [];
+  const raw =
+    restOperation.kind === 'ok'
+      ? restOperation.restToolpaths
+      : xyToolpathsForCutType(polylines, settings, tool.diameterMm, allowanceMm);
   // H.9 (opt-in): climb/conventional enforcement + mid-segment entry points.
   const toolpaths =
     settings.cutDirection === undefined
@@ -297,7 +328,7 @@ export function xyToolpathsForCutType(
     case 'profile-on-path':
       return orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm));
     case 'pocket':
-      return pocketToolpaths(polylines, settings, toolDiameterMm);
+      return pocketToolpathsForSettings(polylines, settings, toolDiameterMm);
     case 'engrave':
       // Same non-finite guard as every other cut type: a NaN vertex would
       // otherwise survive to the emitter as a literal "G1 XNaN" that the
@@ -406,22 +437,4 @@ function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
   const alreadyClosed =
     Math.abs(first.x - last.x) <= COORD_EPS && Math.abs(first.y - last.y) <= COORD_EPS;
   return alreadyClosed ? points : [...points, first];
-}
-
-// Pocket clearing strategy dispatch (ADR-105 G10): offset rings unless the
-// layer opted into raster sweeps.
-function pocketToolpaths(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  toolDiameterMm: number,
-): ReadonlyArray<Polyline> {
-  if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
-    return pocketToolpathRaster(
-      polylines,
-      toolDiameterMm,
-      settings.stepoverPercent,
-      settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
-    );
-  }
-  return pocketToolpathRings(polylines, toolDiameterMm, settings.stepoverPercent);
 }

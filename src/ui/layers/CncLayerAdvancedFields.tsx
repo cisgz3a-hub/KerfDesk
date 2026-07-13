@@ -17,6 +17,7 @@ import {
   ReliefLayerRows,
   VClearToolSelect,
 } from './CncLayerToolFields';
+import { RestPocketToolSelect } from './CncRestPocketFields';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
@@ -188,12 +189,19 @@ export function CutTypeSections(props: {
         />
       ) : null}
       {settings.cutType === 'pocket' ? (
-        <HelicalEntryRows
-          layer={layer}
-          settings={settings}
-          onCommit={onCommit}
-          onCommitSettings={onCommitSettings}
-        />
+        <>
+          <RestPocketToolSelect
+            layer={layer}
+            settings={settings}
+            onCommitSettings={onCommitSettings}
+          />
+          <HelicalEntryRows
+            layer={layer}
+            settings={settings}
+            onCommit={onCommit}
+            onCommitSettings={onCommitSettings}
+          />
+        </>
       ) : null}
       {showPolish ? (
         <MotionPolishRows

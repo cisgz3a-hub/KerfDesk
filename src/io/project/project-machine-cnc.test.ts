@@ -29,6 +29,27 @@ function deserializeOk(text: string): Project {
 }
 
 describe('.lf2 machine / cnc round-trip', () => {
+  it('round-trips the selected pocket roughing bit', () => {
+    const project = cncProject();
+    const layer = project.scene.layers[0];
+    if (layer?.cnc === undefined) throw new Error('CNC layer missing');
+    const withRougher: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...layer,
+            cnc: { ...layer.cnc, toolId: 'em-1588', pocketRoughToolId: 'em-6350' },
+          },
+        ],
+      },
+    };
+    expect(
+      deserializeOk(serializeProject(withRougher)).scene.layers[0]?.cnc?.pocketRoughToolId,
+    ).toBe('em-6350');
+  });
+
   it('round-trips valid helical-entry settings and drops malformed values', () => {
     const project = cncProject();
     const layer = project.scene.layers[0];
