@@ -4310,6 +4310,35 @@ sources consumed by both compilers.
 - The laser-only set grows past ~25 entries → the shared-shell decision
   itself is under strain; re-open ADR-098's shared-UI clause.
 
+### Amendment 2026-07-13 — Trace family reclassified machine-agnostic
+
+**Trigger:** the first "Reversal triggers" bullet above — the maintainer needs
+Trace available in CNC for cut-a-logo workflows (trace a raster to vectors, then
+cut those vectors on the router).
+
+**Change:** `tools.trace-image`, `tools.retrace-original`, and
+`tools.multi-file-trace` move out of `LASER_ONLY_COMMAND_IDS` and become
+machine-agnostic (visible in both laser and CNC). The other raster tools
+(`tools.adjust-image`, `tools.crop-image`, `tools.apply-image-mask`,
+`tools.remove-image-mask`, `tools.save-processed-bitmap`) stay laser-only — they
+prep a raster *engrave*, which CNC has no mode for.
+
+**Why it is safe:** a `traced-image` object already flows through the CNC cut
+pipeline unchanged (`compile-cnc-job.ts` `collectLayerPolylines` handles it like
+imported SVG/text/shape, and the kept trace-source raster is already excluded
+from the CNC "raster will be skipped" advisory via `role !== 'trace-source'`).
+No compile-pipeline change is needed.
+
+**Fidelity caveat (recorded for operators):** the tracer is outline-based, so a
+single thin stroke traces as two parallel contours. On a laser that is cosmetic;
+on a CNC *profile* cut it becomes two cuts bracketing the stroke rather than one
+centerline pass. Cutting out a filled shape/logo — the common CNC case — is
+unaffected. The Trace dialog shows a CNC note to this effect.
+
+**Verification:** `machine-command-gate.test.ts` moves the three Trace IDs into
+`CNC_SURVIVORS`, locking the new behavior; the data-driven "hidden set equals
+the laser-only set" assertion updates from the source of truth automatically.
+
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
 **Status:** Accepted

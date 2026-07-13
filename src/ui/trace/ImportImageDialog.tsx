@@ -47,6 +47,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { Dialog } from '../kit';
 import {
+  CncTraceHint,
   DialogActions,
   DeleteImageAfterTraceToggle,
   PresetHint,
@@ -83,6 +84,7 @@ function DialogBody(props: {
   const { seed } = props;
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
   const [preset, setPreset] = useState<string>('Line Art');
@@ -115,11 +117,7 @@ function DialogBody(props: {
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    if (file === null) {
-      pushToast('Image still loading — try again in a moment.', 'warning');
-      return;
-    }
-    const traceArgs = {
+    submitTraceDialog({
       file,
       options,
       seed,
@@ -127,15 +125,12 @@ function DialogBody(props: {
       deleteSourceAfterTrace,
       boundary,
       boundaryMode,
-      ...preparedTraceEntry(preview),
-      ...(props.replaceTraceId === undefined ? {} : { replaceTraceId: props.replaceTraceId }),
-    };
-    void commit(traceArgs, {
+      preview,
+      replaceTraceId: props.replaceTraceId,
       traceExistingImage,
       pushToast,
       close,
       setBusy,
-      getCurrentObject: (id) => useStore.getState().project.scene.objects.find((o) => o.id === id),
     });
   };
 
@@ -144,6 +139,7 @@ function DialogBody(props: {
     <Dialog onClose={close} ariaLabel="Trace image" as="form" onSubmit={onSubmit} size="md">
       <h2 className="lf-dialog-title">Trace Image</h2>
       <SourceLabel name={seed.source} />
+      {machineKind === 'cnc' ? <CncTraceHint /> : null}
       <PresetPicker value={preset} onChange={setPreset} />
       {supportsTraceFillStyle ? (
         <TraceFillStylePicker value={traceFillStyle} onChange={setTraceFillStyle} />
@@ -238,6 +234,48 @@ function TracePreviewPanel(props: {
       ) : null}
     </>
   );
+}
+
+// Assemble the trace args from the dialog's live state and hand them to commit.
+// Extracted from DialogBody so that render function stays inside the 80-line
+// function cap (ADR-015) after the CNC-hint conditional was added.
+function submitTraceDialog(deps: {
+  readonly file: File | null;
+  readonly options: TraceOptions;
+  readonly seed: RasterImage;
+  readonly traceFillStyle: TraceFillStyle;
+  readonly deleteSourceAfterTrace: boolean;
+  readonly boundary: TraceBoundary | null;
+  readonly boundaryMode: BoundaryMode;
+  readonly preview: ReturnType<typeof useTracePreview>;
+  readonly replaceTraceId: string | undefined;
+  readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
+  readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
+  readonly close: () => void;
+  readonly setBusy: (v: boolean) => void;
+}): void {
+  if (deps.file === null) {
+    deps.pushToast('Image still loading — try again in a moment.', 'warning');
+    return;
+  }
+  const traceArgs = {
+    file: deps.file,
+    options: deps.options,
+    seed: deps.seed,
+    traceFillStyle: deps.traceFillStyle,
+    deleteSourceAfterTrace: deps.deleteSourceAfterTrace,
+    boundary: deps.boundary,
+    boundaryMode: deps.boundaryMode,
+    ...preparedTraceEntry(deps.preview),
+    ...(deps.replaceTraceId === undefined ? {} : { replaceTraceId: deps.replaceTraceId }),
+  };
+  void commit(traceArgs, {
+    traceExistingImage: deps.traceExistingImage,
+    pushToast: deps.pushToast,
+    close: deps.close,
+    setBusy: deps.setBusy,
+    getCurrentObject: (id) => useStore.getState().project.scene.objects.find((o) => o.id === id),
+  });
 }
 
 // Exported for testing the source-revalidation guard (P2-A).
