@@ -4402,7 +4402,9 @@ lands here before code.
   thickness compensated) and **XYZ corner** (plate edge offsets + bit
   diameter). Two-stage G38.2 (fast seek, retract, slow re-probe),
   `G10 L20` work-offset zeroing, ALARM:4/5 decoded, Idle-only
-  preflight, 30 s watchdog. PROVISIONAL defaults: seek 150 mm/min,
+  preflight, 30 s watchdog. The XYZ cycle performs all contact motion
+  before one combined X/Y/Z offset commit, so a failed leg cannot leave a
+  partially rewritten WCS. PROVISIONAL defaults: seek 150 mm/min,
   re-probe 25 mm/min, retract 2 mm, max travel 25 mm.
 - **G3. Real-time overrides.** GRBL 1.1 realtime bytes: feed
   0x90–0x94, rapid 0x95–0x97, spindle 0x99–0x9D, surfaced as

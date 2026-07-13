@@ -45,23 +45,27 @@ describe('buildZProbeLines', () => {
 });
 
 describe('buildCornerProbeLines', () => {
-  it('zeros X and Y one bit-radius outside the stock faces (front-left)', () => {
+  it('commits XYZ once after every probe contact succeeds', () => {
     const lines = buildCornerProbeLines(CORNER);
-    expect(lines).toContain('G10 L20 P0 X-3.175');
-    expect(lines).toContain('G10 L20 P0 Y-3.175');
-    expect(lines).toContain('G10 L20 P0 Z15.000');
+    const commits = lines.filter((line) => line.startsWith('G10 L20'));
+    expect(commits).toEqual(['G10 L20 P0 X15.000 Y-7.175 Z20.000']);
+
+    const commitIndex = lines.indexOf(commits[0] ?? '');
+    const lastProbeIndex = lines.findLastIndex((line) => line.startsWith('G38.2'));
+    expect(commitIndex).toBeGreaterThan(lastProbeIndex);
   });
 
   it('side probes descend to plate-flank height, not below the stock', () => {
     const lines = buildCornerProbeLines(CORNER);
-    // thickness 15 − drop 6 = flank at work Z9, well above stock top (Z0).
-    expect(lines.filter((line) => line === 'G0 Z9.000')).toHaveLength(2);
+    // The bit starts each side leg at work Z20 and drops 11 mm to flank Z9,
+    // which remains above the stock top without relying on a partial Z zero.
+    expect(lines.filter((line) => line === 'G0 Z-11.000')).toHaveLength(2);
+    expect(lines.filter((line) => line === 'G0 Z11.000')).toHaveLength(2);
   });
 
-  it('mirrors probe directions per corner and flips the zero signs', () => {
+  it('mirrors probe directions and the atomic commit per corner', () => {
     const backRight = buildCornerProbeLines({ ...CORNER, corner: 'back-right' });
-    expect(backRight).toContain('G10 L20 P0 X3.175');
-    expect(backRight).toContain('G10 L20 P0 Y3.175');
+    expect(backRight).toContain('G10 L20 P0 X-15.000 Y7.175 Z20.000');
     // Probes travel in −X / −Y toward the faces.
     expect(backRight.some((line) => line.startsWith('G38.2 X-40.000'))).toBe(true);
     expect(backRight.some((line) => line.startsWith('G38.2 Y-40.000'))).toBe(true);

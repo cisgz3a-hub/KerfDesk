@@ -5,9 +5,10 @@
 // the recorded position):
 //   - Z: probe down onto the plate, set work Z so Z0 = plate underside
 //     (= stock top) via `G10 L20 P0 Z<thickness>`.
-//   - XYZ corner: Z first, then probe each side face of the plate. At side
-//     contact the bit CENTER sits one bit-radius outside the stock face, so
-//     the work zero is `G10 L20 P0 <axis><-dir·radius>`.
+//   - XYZ corner: Z first, then probe each side face of the plate. The cycle
+//     stays in relative motion until every contact succeeds, then commits X,
+//     Y, and Z together with one G10 L20. A failed contact therefore cannot
+//     leave only part of the work coordinate system changed.
 //
 // Geometry model (PROVISIONAL, ADR-103): a rectangular corner plate whose
 // outer faces sit flush with the stock faces, wide enough that the plate
@@ -73,14 +74,20 @@ function fmt(value: number): string {
 /** Z-only touch-plate cycle. Ends `retractMm` above the plate top, G90. */
 export function buildZProbeLines(params: ZProbeParams): ReadonlyArray<string> {
   return [
+    ...zContactLines(params),
+    `G10 L20 P0 Z${fmt(params.plateThicknessMm)}`,
+    `G0 Z${fmt(params.retractMm)}`,
+    'G90',
+  ];
+}
+
+function zContactLines(params: ZProbeParams): ReadonlyArray<string> {
+  return [
     'G21',
     'G91',
     `G38.2 Z${fmt(-params.maxTravelMm)} F${fmt(params.seekFeedMmPerMin)}`,
     `G0 Z${fmt(BACKOFF_MM)}`,
     `G38.2 Z${fmt(-SLOW_RETOUCH_BUDGET_MM)} F${fmt(params.probeFeedMmPerMin)}`,
-    `G10 L20 P0 Z${fmt(params.plateThicknessMm)}`,
-    `G0 Z${fmt(params.retractMm)}`,
-    'G90',
   ];
 }
 
@@ -101,31 +108,27 @@ function cornerSigns(corner: ProbeCorner): CornerSigns {
   }
 }
 
-// One side face: clear the face laterally, drop to flank height (absolute —
-// Z is already zeroed), two-stage probe back into the face, zero the axis,
-// retreat, and lift back above the plate.
+// One side face: clear the face laterally, drop from the known plate-top
+// clearance to flank height, two-stage probe back into the face, retreat,
+// and lift. The cycle deliberately does not mutate the WCS here.
 function sideLegLines(
   axis: 'X' | 'Y',
   dir: 1 | -1,
   params: CornerProbeParams,
   zTopMm: number,
 ): ReadonlyArray<string> {
-  const radius = params.bitDiameterMm / 2;
   const flankZ = Math.max(MIN_FLANK_HEIGHT_MM, params.plateThicknessMm - params.sideDropMm);
+  const flankDrop = zTopMm - flankZ;
   const travel = params.sideClearanceMm + SIDE_TRAVEL_MARGIN_MM;
   return [
     'G91',
     `G0 ${axis}${fmt(-dir * params.sideClearanceMm)}`,
-    'G90',
-    `G0 Z${fmt(flankZ)}`,
-    'G91',
+    `G0 Z${fmt(-flankDrop)}`,
     `G38.2 ${axis}${fmt(dir * travel)} F${fmt(params.seekFeedMmPerMin)}`,
     `G0 ${axis}${fmt(-dir * BACKOFF_MM)}`,
     `G38.2 ${axis}${fmt(dir * SLOW_RETOUCH_BUDGET_MM)} F${fmt(params.probeFeedMmPerMin)}`,
-    `G10 L20 P0 ${axis}${fmt(-dir * radius)}`,
     `G0 ${axis}${fmt(-dir * SIDE_RETREAT_MM)}`,
-    'G90',
-    `G0 Z${fmt(zTopMm)}`,
+    `G0 Z${fmt(flankDrop)}`,
   ];
 }
 
@@ -135,14 +138,23 @@ function sideLegLines(
  */
 export function buildCornerProbeLines(params: CornerProbeParams): ReadonlyArray<string> {
   const { sx, sy } = cornerSigns(params.corner);
+  const radius = params.bitDiameterMm / 2;
   const zTop = params.plateThicknessMm + PLATE_TOP_CLEAR_MM;
+  const xAfterCentering = sx * PLATE_CENTER_MM;
+  const yAfterRetreat = -sy * (radius + SIDE_RETREAT_MM);
   return [
-    ...buildZProbeLines({ ...params, retractMm: PLATE_TOP_CLEAR_MM }),
+    ...zContactLines(params),
+    `G0 Z${fmt(PLATE_TOP_CLEAR_MM)}`,
     ...sideLegLines('X', sx, params, zTop),
-    // Re-center over the plate (X is zeroed now, so absolute is exact)
-    // before probing the front/back face.
-    `G0 X${fmt(sx * PLATE_CENTER_MM)}`,
+    // X is still uncommitted. From the known contact + retreat position,
+    // this relative move places the bit over the plate center.
+    `G0 X${fmt(sx * (PLATE_CENTER_MM + radius + SIDE_RETREAT_MM))}`,
     ...sideLegLines('Y', sy, params, zTop),
+    'G90',
+    // This is the only coordinate mutation in the corner cycle. At this
+    // point all six probe contacts have succeeded and the current XYZ values
+    // are derivable from their deterministic relative retreats/lifts.
+    `G10 L20 P0 X${fmt(xAfterCentering)} Y${fmt(yAfterRetreat)} Z${fmt(zTop)}`,
     `G0 X${fmt(-sx * FINAL_PARK_MM)} Y${fmt(-sy * FINAL_PARK_MM)}`,
   ];
 }

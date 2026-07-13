@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildCornerProbeLines,
+  DEFAULT_SIDE_CLEARANCE_MM,
+  DEFAULT_SIDE_DROP_MM,
+  DEFAULT_Z_PROBE_PARAMS,
+} from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -172,6 +178,42 @@ describe('probe controller transaction lifecycle', () => {
     expect(useLaserStore.getState().alarmCode).toBe(5);
     expect(useLaserStore.getState().statusReport).toBeNull();
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
+  });
+
+  it('does not write a partial corner WCS when the final side contact fails', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const lines = buildCornerProbeLines({
+      ...DEFAULT_Z_PROBE_PARAMS,
+      bitDiameterMm: 6.35,
+      corner: 'front-left',
+      sideDropMm: DEFAULT_SIDE_DROP_MM,
+      sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
+    });
+    const lastProbeLine = lines.filter((line) => line.startsWith('G38.2')).at(-1);
+    if (lastProbeLine === undefined) throw new Error('corner probe line missing');
+
+    const probe = useLaserStore.getState().probe(lines);
+    await flush();
+    for (const line of lines) {
+      expect(writes.at(-1)).toBe(`${line}\n`);
+      if (line === lastProbeLine) {
+        connection.emitLine('ALARM:5');
+        break;
+      }
+      connection.emitLine('ok');
+      await flush();
+    }
+
+    await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
+    expect(writes.some((line) => line.startsWith('G10 L20'))).toBe(false);
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().statusReport).toBeNull();
   });
 
   it('aborts on a status-only Alarm even when no numbered ALARM line arrives', async () => {
