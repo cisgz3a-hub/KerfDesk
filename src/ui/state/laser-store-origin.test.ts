@@ -103,15 +103,18 @@ describe('laser-store origin actions', () => {
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
 
     // G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
-    // advisory (which keys on workZZeroKnown) must stay live.
+    // advisory (which keys on qualified work-Z evidence) must stay live.
     await useLaserStore.getState().setOriginHere();
     expect(useLaserStore.getState().workOriginActive).toBe(true);
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
 
     // Zero Z (G92 Z0) is what establishes the stock-top contract.
     await useLaserStore.getState().zeroZHere();
     expect(write).toHaveBeenCalledWith('G92 Z0\n');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(true);
+    expect(useLaserStore.getState().workZZeroEvidence).toEqual({
+      source: 'manual-zero',
+      referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+    });
   });
 
   it('marks the work origin persistent after advanced Set Persistent Origin succeeds', async () => {
@@ -120,6 +123,10 @@ describe('laser-store origin actions', () => {
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
     useLaserStore.setState({
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      },
       frameVerification: {
         boundsSignature: 'old',
         wco: { x: 12, y: 34, z: 0 },
@@ -135,6 +142,7 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
     expect(useLaserStore.getState().frameVerification).toBeNull();
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
   });
 
   it('requires an Idle status before advanced persistent origin writes', async () => {
@@ -148,6 +156,38 @@ describe('laser-store origin actions', () => {
     );
 
     expect(write).not.toHaveBeenCalledWith('G10 L20 P1 X0 Y0\n');
+  });
+
+  it('invalidates transient Z evidence when G92.1 succeeds but the persistent write fails', async () => {
+    let rejectPersistentWrite = false;
+    const write = vi.fn<(data: string) => Promise<void>>(async (data) => {
+      if (rejectPersistentWrite && data === 'G10 L20 P1 X0 Y0\n') {
+        throw new Error('persistent origin rejected');
+      }
+    });
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    const epoch = useLaserStore.getState().workZReferenceEpoch;
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 12, y: 34, z: 5 },
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: epoch },
+    });
+    rejectPersistentWrite = true;
+
+    await expect(useLaserStore.getState().setPersistentOriginHere()).rejects.toThrow(
+      'persistent origin rejected',
+    );
+
+    expect(write).toHaveBeenCalledWith('G92.1\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: false,
+      workOriginSource: 'none',
+      workZZeroEvidence: null,
+      workZReferenceEpoch: epoch + 1,
+      wcoCache: null,
+    });
   });
 
   it('clears the active work-origin flag when Reset Origin succeeds', async () => {
@@ -176,6 +216,10 @@ describe('laser-store origin actions', () => {
       workOriginActive: true,
       workOriginSource: 'g54-persistent',
       wcoCache: { x: 12, y: 34, z: 0 },
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      },
     });
 
     await useLaserStore.getState().resetOrigin();
@@ -184,6 +228,7 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g54-persistent');
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
   });
 
   it('clears persistent G54 origin through the advanced clear action', async () => {

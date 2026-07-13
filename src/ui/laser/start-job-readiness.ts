@@ -27,6 +27,7 @@ import {
 } from '../../io/gcode';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
+import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveJobPlacement,
@@ -68,7 +69,8 @@ export type MachineStartSnapshot = {
   readonly controllerOperationActive?: boolean;
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
-  readonly workZZeroKnown?: boolean;
+  readonly workZZeroEvidence?: WorkZZeroEvidence | null;
+  readonly workZReferenceEpoch?: number;
   readonly wcoCache?: WorkCoordinateOffset | null;
   // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
   readonly frameVerification?: FrameVerification | null;
@@ -270,7 +272,11 @@ function collectStartWarnings(
   controllerWarnings: ReadonlyArray<string>,
   machine: MachineStartSnapshot,
 ): string[] {
-  const workZeroAdvisory = cncWorkZeroAdvisory(project, machine.workZZeroKnown);
+  const workZeroAdvisory = cncWorkZeroAdvisory(
+    project,
+    machine.workZZeroEvidence,
+    machine.workZReferenceEpoch,
+  );
   return [
     ...controllerWarnings,
     ...detectMachineJobWarnings(project, controllerSettings),

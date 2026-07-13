@@ -94,16 +94,13 @@ export function jobActions(
       // A job whose pre-M0 lines all fit the RX buffer reaches the FIRST hold in
       // this synchronous step (no ack); later holds enter via advanceStream.
       const entersHoldNow = stepped.state.status === 'tool-change';
-      set({
+      set((state) => ({
         streamer: stepped.state,
         activeJobMachineKind: options.machineKind ?? 'laser',
         toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
         pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
-        // A short first tool section can reach M0 in this synchronous initial
-        // step, before advanceStream sees an ack transition. Invalidate the old
-        // tool's Z evidence here too so Continue never inherits it.
-        ...(entersHoldNow ? { workZZeroKnown: false, toolChangeIdleSeen: false } : {}),
-      });
+        ...toolChangeEntryPatch(state, entersHoldNow),
+      }));
       if (stepped.toSend.length === 0) return;
       try {
         await safeWrite(stepped.toSend, 'start');
@@ -160,6 +157,18 @@ export function jobActions(
       }
     },
   };
+}
+
+function toolChangeEntryPatch(state: LaserState, entersHoldNow: boolean): Partial<LaserState> {
+  // A short first tool section can reach M0 synchronously, before the ack path
+  // sees a transition. Invalidate the old tool's Z evidence here too.
+  return entersHoldNow
+    ? {
+        workZZeroEvidence: null,
+        workZReferenceEpoch: state.workZReferenceEpoch + 1,
+        toolChangeIdleSeen: false,
+      }
+    : {};
 }
 
 function assertStartAllowed(set: SetFn, get: GetFn): void {
@@ -297,12 +306,25 @@ async function runContinueToolChange(
 
 function originPatchAfterSoftReset(
   state: LaserState,
-): Pick<LaserState, 'workOriginActive' | 'workOriginSource' | 'workZZeroKnown'> {
+): Pick<
+  LaserState,
+  'workOriginActive' | 'workOriginSource' | 'workZZeroEvidence' | 'workZReferenceEpoch'
+> {
   // A soft reset voids the bit-to-stock Z relationship (Codex audit P1).
   if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return { workOriginActive: true, workOriginSource: 'unknown', workZZeroKnown: false };
+    return {
+      workOriginActive: true,
+      workOriginSource: 'unknown',
+      workZZeroEvidence: null,
+      workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    };
   }
-  return { workOriginActive: false, workOriginSource: 'none', workZZeroKnown: false };
+  return {
+    workOriginActive: false,
+    workOriginSource: 'none',
+    workZZeroEvidence: null,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+  };
 }
 
 function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

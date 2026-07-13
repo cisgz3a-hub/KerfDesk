@@ -39,6 +39,7 @@
 | ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
 | ADR-152 | 2026-07-13 | Accepted | Offset pockets may use locally tangent native helical entries |
 | ADR-153 | 2026-07-13 | Accepted | Two-tool pocket rest machining uses bounded 2D stock subtraction |
+| ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
 
 ---
 
@@ -7020,3 +7021,37 @@ Profile selection, connection diagnostics, persisted transport fields, output st
 readiness now share one controller contract. Operators may need to reconnect after changing profile
 families, and unsafe cross-family combinations fail visibly rather than being corrected only at
 stream time. The policy expands safety coverage without claiming a broader hardware ecosystem.
+
+---
+
+## ADR-171 - Work-Z readiness uses source-qualified, epoch-bound evidence
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The CNC stock-top contract was represented by one session Boolean. It recorded neither how Z0 was
+established nor which reference state it belonged to. A future invalidation omission could
+therefore let stale truth suppress the Start warning or unlock tool-change Continue. Persistent
+origin paths also emit `G92.1`, which clears a prior `G92 Z0` even when persistent XY authority
+remains valid.
+
+### Decision
+
+- Replace the Boolean with `WorkZZeroEvidence { source, referenceEpoch }`, where source distinguishes
+  a manual Zero Z from a fully settled probe transaction.
+- Maintain a dedicated `workZReferenceEpoch`. Normal motion and XY-only origin changes preserve it.
+  Reconnect, reset, alarm, home, tool changes, probe attempts, Z/tool/full-WCS console mutations,
+  motor release, and configuration changes advance it and clear the evidence.
+- Start advisories and tool-change Continue accept evidence only when its epoch equals the current
+  work-Z reference epoch.
+- Reset Origin and Set Persistent Origin invalidate Z evidence because their command sequences emit
+  `G92.1`. Multi-write actions apply that invalidation after the successful `G92.1` write, so a later
+  `G10` failure cannot leave stale evidence behind.
+
+### Consequences
+
+Known motion no longer causes unnecessary re-zeroing, while reference-changing operations cannot
+reuse an earlier bit-to-stock claim. The record still does not prove active tool identity, physical
+touch-plate removal, WCS number, clamp state, or spindle-at-speed; those require additional modeled
+evidence and hardware qualification.

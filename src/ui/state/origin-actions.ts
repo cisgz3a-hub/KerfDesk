@@ -74,8 +74,10 @@ export async function resetOrigin(safeWrite: (line: string) => Promise<void>): P
  */
 export async function setPersistentOriginHere(
   safeWrite: (line: string) => Promise<void>,
+  onTransientOriginCleared?: () => void,
 ): Promise<void> {
   await safeWrite(`${CMD_CLEAR_ORIGIN}\n`);
+  onTransientOriginCleared?.();
   await safeWrite(`${CMD_SET_PERSISTENT_ORIGIN_HERE}\n`);
 }
 
@@ -85,8 +87,10 @@ export async function setPersistentOriginHere(
  */
 export async function clearPersistentOrigin(
   safeWrite: (line: string) => Promise<void>,
+  onTransientOriginCleared?: () => void,
 ): Promise<void> {
   await safeWrite(`${CMD_CLEAR_ORIGIN}\n`);
+  onTransientOriginCleared?.();
   await safeWrite(`${CMD_CLEAR_PERSISTENT_ORIGIN}\n`);
 }
 

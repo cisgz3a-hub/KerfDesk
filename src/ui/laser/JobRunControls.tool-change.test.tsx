@@ -7,6 +7,13 @@ import { createStreamer, onAck, step } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
 import { RunningControls } from './JobRunControls';
 
+function currentWorkZEvidence() {
+  return {
+    source: 'manual-zero' as const,
+    referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+  };
+}
+
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -45,7 +52,7 @@ afterEach(async () => {
     pendingToolLabel: null,
     streamer: null,
     toolChangeIdleSeen: false,
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
   });
 });
 
@@ -54,7 +61,7 @@ describe('RunningControls tool-change (CNC-04)', () => {
     useLaserStore.setState({
       streamer: readyToolChangeStreamer(),
       toolChangeIdleSeen: true,
-      workZZeroKnown: false,
+      workZZeroEvidence: null,
     });
     const { host, root } = await renderRunningControls({
       isStreaming: false,
@@ -83,7 +90,7 @@ describe('RunningControls tool-change (CNC-04)', () => {
     useLaserStore.setState({
       streamer: readyToolChangeStreamer(),
       toolChangeIdleSeen: true,
-      workZZeroKnown: true,
+      workZZeroEvidence: currentWorkZEvidence(),
     });
     const { host, root } = await renderRunningControls({
       isStreaming: false,

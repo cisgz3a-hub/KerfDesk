@@ -49,7 +49,8 @@ export function advanceStream(
     // any Idle currently in statusReport predates reaching the boundary. Also
     // consume the next tool label so the pause UI can name the bit (R5).
     set((state) => ({
-      workZZeroKnown: false,
+      workZZeroEvidence: null,
+      workZReferenceEpoch: state.workZReferenceEpoch + 1,
       toolChangeIdleSeen: false,
       pendingToolLabel: state.toolChangeLabels[0] ?? null,
       toolChangeLabels: state.toolChangeLabels.slice(1),

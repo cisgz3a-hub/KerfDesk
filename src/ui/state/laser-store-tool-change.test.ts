@@ -93,12 +93,17 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     writes.length = 0;
     // Simulate valid Z evidence for the first tool. Entering even a synchronous
     // first hold must invalidate it for the replacement tool.
-    useLaserStore.setState({ workZZeroKnown: true });
+    useLaserStore.setState({
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      },
+    });
     await useLaserStore.getState().startJob(CNC_MULTI_TOOL, { machineKind: 'cnc' });
 
     // The pre-M0 lines went out; the M0 did NOT, and the stream is held.
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     expect(writes.join('')).toContain('G0 X0 Y0');
     expect(writes.join('')).not.toContain('M0');
 
@@ -120,7 +125,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
 
     // Fresh Idle unlocks setup, but Continue still refuses until the new tool
     // has been zeroed. Tool-change entry invalidated the old tool's Z evidence.
-    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     writes.length = 0;
     await useLaserStore.getState().continueToolChange();
     expect(writes.join('')).toBe('');
@@ -128,7 +133,12 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
 
     // Simulate a successful Zero Z/probe action, then Continue. The first
     // resumed command is the spindle-off safe-Z lift; M3 follows it.
-    useLaserStore.setState({ workZZeroKnown: true });
+    useLaserStore.setState({
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      },
+    });
     await useLaserStore.getState().continueToolChange();
     const resumed = writes.join('');
     expect(resumed).toContain('G0 Z5');

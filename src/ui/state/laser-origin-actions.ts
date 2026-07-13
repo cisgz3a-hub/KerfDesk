@@ -23,6 +23,7 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -79,31 +80,41 @@ export function originActions(
       // Z-only offset: XY origin state is untouched, and the WCO cache
       // refreshes from the next WCO-bearing status frame. This is what
       // establishes work Z0 (the CNC stock-top contract) for the Start advisory.
-      set({
-        workZZeroKnown: true,
+      set((state) => ({
+        workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', state.workZReferenceEpoch),
         log: pushLog(get(), '[lf2] Work Z zeroed at current bit height (G92 Z0).'),
-      });
+      }));
     },
     resetOrigin: async () => {
       assertOriginActionReady(set, get);
       await resetOriginAction((out) => safeWrite(out, 'origin'));
       if (get().workOriginSource === 'g54-persistent') {
-        set({ frameVerification: null });
+        set((state) => ({
+          frameVerification: null,
+          workZZeroEvidence: null,
+          workZReferenceEpoch: state.workZReferenceEpoch + 1,
+        }));
         return;
       }
-      set(clearedOriginPatch());
+      set(clearedOriginPatch);
     },
     setPersistentOriginHere: async () => {
       assertPersistentOriginReady(set, get);
-      await setPersistentOriginHereAction((out) => safeWrite(out, 'origin'));
+      await setPersistentOriginHereAction(
+        (out) => safeWrite(out, 'origin'),
+        () => set(transientOriginClearedPatch),
+      );
       const { statusReport, wcoCache } = get();
       const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
       set(activeOriginPatch('g54-persistent', inferredWco));
     },
     clearPersistentOrigin: async () => {
       assertPersistentOriginReady(set, get);
-      await clearPersistentOriginAction((out) => safeWrite(out, 'origin'));
-      set(clearedOriginPatch());
+      await clearPersistentOriginAction(
+        (out) => safeWrite(out, 'origin'),
+        () => set(transientOriginClearedPatch),
+      );
+      set(clearedOriginAfterTransientClearPatch());
     },
     releaseMotors: async () => {
       assertOriginActionReady(set, get);
@@ -112,10 +123,10 @@ export function originActions(
       // so transient origin and any Verified Frame are void (ADR-053 P4). G54
       // can survive, but the cached WCO is no longer trustworthy after hand move.
       if (get().workOriginSource === 'g54-persistent') {
-        set(unknownOriginPatch());
+        set(unknownOriginPatch);
         return;
       }
-      set(clearedOriginPatch());
+      set(clearedOriginPatch);
     },
   };
 }
@@ -132,23 +143,47 @@ function activeOriginPatch(
   };
 }
 
-function clearedOriginPatch(): Partial<LaserState> {
+function transientOriginClearedPatch(state: LaserState): Partial<LaserState> {
+  const transientXyWasActive = state.workOriginSource === 'g92';
+  return {
+    workZZeroEvidence: null,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    frameVerification: null,
+    ...(transientXyWasActive
+      ? { workOriginActive: false, workOriginSource: 'none' as const, wcoCache: null }
+      : {}),
+  };
+}
+
+function clearedOriginAfterTransientClearPatch(): Partial<LaserState> {
   return {
     workOriginActive: false,
     workOriginSource: 'none',
-    // clearOrigin (G92.1) drops ALL G92 offsets, Z included, so work Z0 is void.
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,
   };
 }
 
-function unknownOriginPatch(): Partial<LaserState> {
+function clearedOriginPatch(state: LaserState): Partial<LaserState> {
+  return {
+    workOriginActive: false,
+    workOriginSource: 'none',
+    // clearOrigin (G92.1) drops ALL G92 offsets, Z included, so work Z0 is void.
+    workZZeroEvidence: null,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    wcoCache: null,
+    frameVerification: null,
+  };
+}
+
+function unknownOriginPatch(state: LaserState): Partial<LaserState> {
   return {
     workOriginActive: true,
     workOriginSource: 'unknown',
     // Motors released / hand-moved: the bit-to-stock Z relationship is void.
-    workZZeroKnown: false,
+    workZZeroEvidence: null,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
     wcoCache: null,
     frameVerification: null,
   };

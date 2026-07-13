@@ -750,6 +750,9 @@ Progress bar shows `completed / total` lines as a percentage with the count over
    clear XY authority but preserve established work Z; Z/tool commands clear
    work-Z evidence but preserve XY authority; full WCS, homing/reset, and
    configuration commands clear the complete setup evidence they can affect.
+   Preserved work-Z evidence remains bound to its own reference epoch, so
+   ordinary motion does not discard a valid stock-top datum while Z/tool,
+   reset, homing, reconnect, and configuration changes make old evidence stale.
 4. A successful serial write is the invalidation boundary. It is not treated
    as physical completion or controller acknowledgement. If the write fails,
    the existing write-failure safety notice applies and no mutation is assumed.
@@ -1991,6 +1994,8 @@ F-CNC19 tiling.
 #### Error — resumed without re-zeroing
 1. Continue remains blocked with "establish its Z zero" until Zero Z or a
    successful probe records fresh work-Z evidence for the replacement bit.
+   That evidence records whether it came from manual Zero Z or a settled probe
+   and must match the current work-Z reference epoch.
 2. Tool identity, clamping, touch-plate removal, and actual spindle-at-speed
    remain operator/machine responsibilities; this host gate does not prove them.
 
