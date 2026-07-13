@@ -316,6 +316,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'window',
     tooltip: 'Show or hide the machine controls panel when no job is active.',
   },
+  'window.toggle-side-panels': {
+    family: 'window',
+    tooltip: 'Show or hide both workspace side panels with F12 when no job is active.',
+  },
+  'window.reset-layout': {
+    family: 'window',
+    tooltip: 'Restore both workspace side panels to their standard visible layout.',
+  },
   'window.fit-view': {
     family: 'window',
     tooltip: 'Fit the full machine bed into the workspace view.',

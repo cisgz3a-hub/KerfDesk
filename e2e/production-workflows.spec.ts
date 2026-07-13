@@ -335,7 +335,8 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   page,
   kerfdesk,
 }) => {
-  await page.getByRole('button', { name: 'Set up device' }).click();
+  await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+  await page.getByRole('button', { name: 'Run guided setup', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Device Setup' })).toContainText('Step 1 of 7');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();

@@ -127,6 +127,8 @@ function baseCtxActions(): Partial<AppCommandContext> {
     togglePreview: vi.fn(),
     toggleLayersPanel: vi.fn(),
     toggleMachinePanel: vi.fn(),
+    toggleSidePanels: vi.fn(),
+    resetWorkspaceLayout: vi.fn(),
     resetView: vi.fn(),
     projectNotes: vi.fn(),
     undoHistory: vi.fn(),

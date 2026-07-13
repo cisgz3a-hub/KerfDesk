@@ -95,6 +95,8 @@ export type CommandId =
   | 'window.toggle-preview'
   | 'window.toggle-layers-panel'
   | 'window.toggle-machine-panel'
+  | 'window.toggle-side-panels'
+  | 'window.reset-layout'
   | 'window.fit-view'
   | 'window.project-notes'
   | 'window.undo-history'
@@ -237,6 +239,8 @@ export type AppCommandContext = {
   readonly toggleLayersPanel: () => void;
   readonly machinePanelOpen: boolean;
   readonly toggleMachinePanel: () => void;
+  readonly toggleSidePanels: () => void;
+  readonly resetWorkspaceLayout: () => void;
   readonly resetView: () => void;
   readonly projectNotes: () => void;
   readonly undoHistory: () => void;

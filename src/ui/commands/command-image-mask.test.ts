@@ -20,6 +20,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     toggleLayersPanel: vi.fn(),
     machinePanelOpen: true,
     toggleMachinePanel: vi.fn(),
+    toggleSidePanels: vi.fn(),
+    resetWorkspaceLayout: vi.fn(),
     canUndo: false,
     canRedo: false,
     hasSelection: false,

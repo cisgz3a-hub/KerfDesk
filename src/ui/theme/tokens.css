@@ -89,6 +89,18 @@
   --lf-z-toast: 1100;
 }
 
+html,
+body,
+#app-root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
 /* Keyboard-only focus ring, everywhere. */
 :focus-visible {
   outline: 2px solid var(--lf-focus);

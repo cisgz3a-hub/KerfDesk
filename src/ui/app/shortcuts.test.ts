@@ -263,6 +263,7 @@ describe('handleViewShortcut — Shift+F fit-to-selection', () => {
       resetView: vi.fn(),
       zoomBy: vi.fn(),
       fitToSelection,
+      toggleSidePanels: vi.fn(),
     });
     expect(handled).toBe(true);
     expect(fitToSelection).toHaveBeenCalled();
@@ -278,6 +279,7 @@ describe('handleViewShortcut — Shift+F fit-to-selection', () => {
       resetView: vi.fn(),
       zoomBy: vi.fn(),
       fitToSelection,
+      toggleSidePanels: vi.fn(),
     });
     expect(fitToSelection).not.toHaveBeenCalled();
     input.remove();
@@ -292,6 +294,7 @@ describe('handleViewShortcut — Shift+F fit-to-selection', () => {
       resetView,
       zoomBy: vi.fn(),
       fitToSelection: vi.fn(),
+      toggleSidePanels: vi.fn(),
     });
     expect(resetView).toHaveBeenCalled();
     div.remove();
@@ -308,6 +311,7 @@ describe('handleViewShortcut — input-focus guard (regression check)', () => {
       resetView: vi.fn(),
       zoomBy,
       fitToSelection: vi.fn(),
+      toggleSidePanels: vi.fn(),
     });
     expect(zoomBy).not.toHaveBeenCalled();
     input.remove();
