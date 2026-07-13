@@ -17,6 +17,7 @@ const ESC_CANCELABLE_DRAG_KINDS: ReadonlySet<DragState['kind']> = new Set([
   'selection-scale',
   'rotate',
   'path-node',
+  'cnc-tab',
   'marquee',
 ]);
 

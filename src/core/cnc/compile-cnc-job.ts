@@ -8,23 +8,17 @@
 //
 // Pure and deterministic: no clock, random input, or I/O.
 
-import { type DeviceProfile, toMachineCoords } from '../devices';
+import { type DeviceProfile } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  applyTransform,
   assertNever,
-  flattenColoredPathCurves,
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
   type CncTool,
-  type ColoredPath,
   type Layer,
   type Polyline,
   type Scene,
-  type SceneObject,
-  type Transform,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
 import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
@@ -47,6 +41,8 @@ import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
+import { collectLayerContours, collectLayerPolylines } from './collect-cnc-contours';
+import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
   const clearingGroups: CncGroup[] = [];
@@ -59,7 +55,8 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
     clearingGroups.push(
       ...compileReliefGroupsForLayer(scene.objects, layer, settings, device, config),
     );
-    const polylines = collectLayerPolylines(scene.objects, layer, device);
+    const contours = collectLayerContours(scene.objects, layer, device);
+    const polylines = contours.map((contour) => contour.polyline);
     if (polylines.length === 0) continue;
     const inlayGroups = compileStraightInlayGroups(
       polylines,
@@ -78,7 +75,7 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
     if (clearance !== null) clearingGroups.push(clearance);
     const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
     if (roughing !== null) clearingGroups.push(roughing);
-    const group = cncGroupForLayer(layer, settings, polylines, device, config);
+    const group = cncGroupForLayer(layer, settings, polylines, device, config, contours);
     if (group === null) continue;
     if (isProfileCutType(settings.cutType)) {
       profileGroups.push(group);
@@ -91,57 +88,7 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
 }
 
-export function collectLayerPolylines(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): Polyline[] {
-  const out: Polyline[] = [];
-  for (const obj of objects) {
-    switch (obj.kind) {
-      case 'imported-svg':
-      case 'text':
-      case 'traced-image':
-      case 'shape':
-        appendObjectPolylines(obj.paths, obj.transform, layer.color, device, out);
-        break;
-      case 'raster-image':
-        // A router has no raster mode; bitmaps are ignored in CNC compile.
-        break;
-      case 'relief':
-        // Relief heightmap toolpaths arrive with H.5 roughing — ignored by
-        // the polyline collector by design.
-        break;
-      default:
-        assertNever(obj, 'SceneObject');
-    }
-  }
-  return out;
-}
-
-function appendObjectPolylines(
-  paths: ReadonlyArray<ColoredPath>,
-  transform: Transform,
-  layerColor: string,
-  device: DeviceProfile,
-  out: Polyline[],
-): void {
-  for (const path of paths) {
-    if (path.color !== layerColor) continue;
-    const flattened = flattenColoredPathCurves(path, {
-      toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-      segmentBudget: 100_000,
-    });
-    const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
-    for (const polyline of polylines) {
-      if (polyline.points.length < 2) continue;
-      out.push({
-        points: polyline.points.map((p) => toMachineCoords(applyTransform(p, transform), device)),
-        closed: polyline.closed,
-      });
-    }
-  }
-}
+export { collectLayerPolylines } from './collect-cnc-contours';
 
 export function cncGroupForLayer(
   layer: Layer,
@@ -149,9 +96,10 @@ export function cncGroupForLayer(
   polylines: ReadonlyArray<Polyline>,
   device: DeviceProfile,
   config: CncMachineConfig,
+  tabSources?: ReadonlyArray<CollectedCncContour>,
 ): CncGroup | null {
   const tool = layerCncTool(config, settings);
-  const passes = passesForLayer(polylines, settings, tool, config);
+  const passes = passesForLayer(polylines, settings, tool, config, tabSources);
   return cncGroupForPasses(layer, settings, tool, passes, device, config);
 }
 
@@ -247,6 +195,7 @@ function passesForLayer(
   settings: CncLayerSettings,
   tool: CncTool,
   config: CncMachineConfig,
+  tabSources: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const specialized = specializedPassesForLayer(polylines, settings, tool);
   if (specialized !== null) return specialized;
@@ -272,11 +221,26 @@ function passesForLayer(
   const roughing =
     settings.cutType === 'pocket'
       ? depthMajorPasses(toolpaths, depths)
-      : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm);
+      : contourMajorPasses(
+          toolpaths,
+          depths,
+          settings,
+          tool.diameterMm,
+          manualTabCentersForToolpaths(toolpaths, tabSources),
+        );
   // One full-depth finishing pass at the true contour, appended after roughing.
   const passes =
     allowanceMm > 0
-      ? [...roughing, ...finishingProfilePasses(polylines, settings, tool.diameterMm, toolpaths)]
+      ? [
+          ...roughing,
+          ...finishingProfilePasses(
+            polylines,
+            settings,
+            tool.diameterMm,
+            toolpaths,
+            tabSources,
+          ),
+        ]
       : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.
   return settings.rampEntryDeg === undefined
@@ -344,6 +308,7 @@ function contourMajorPasses(
   depths: ReadonlyArray<number>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
+  manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>> = new Map(),
 ): CncPass[] {
   const wantsTabs = settings.tabsEnabled && isProfileCutType(settings.cutType);
   // Tabbed loops need a full-loop pass at EXACTLY the tab top: otherwise tab
@@ -357,7 +322,14 @@ function contourMajorPasses(
       const needsTabs =
         wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
       if (needsTabs) {
-        appendTabbedPasses(passes, toolpath, zMm, settings, toolDiameterMm);
+        appendTabbedPasses(
+          passes,
+          toolpath,
+          zMm,
+          settings,
+          toolDiameterMm,
+          manualTabCenters.get(toolpath),
+        );
       } else {
         passes.push(contourPassFromPolyline(toolpath, zMm));
       }
@@ -383,12 +355,17 @@ function appendTabbedPasses(
   zMm: number,
   settings: CncLayerSettings,
   toolDiameterMm: number,
+  manualCenters?: ReadonlyArray<number>,
 ): void {
-  for (const piece of splitPassForTabs(toolpath, {
-    tabWidthMm: settings.tabWidthMm,
-    tabsPerShape: settings.tabsPerShape,
-    toolDiameterMm,
-  })) {
+  for (const piece of splitPassForTabs(
+    toolpath,
+    {
+      tabWidthMm: settings.tabWidthMm,
+      tabsPerShape: settings.tabsPerShape,
+      toolDiameterMm,
+    },
+    manualCenters,
+  )) {
     if (piece.points.length >= 2) passes.push(contourPassFromPolyline(piece, zMm));
   }
 }

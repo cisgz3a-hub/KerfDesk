@@ -1,6 +1,10 @@
 import type { CncPass } from '../job';
 import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
-import { passNeedsTabs, splitPassForTabsAlignedToReference } from './cnc-tabs';
+import { passNeedsTabs, splitPassForTabs, splitPassForTabsAlignedToReference } from './cnc-tabs';
+import {
+  manualTabCentersForToolpaths,
+  type CollectedCncContour,
+} from './cnc-manual-tab-mapping';
 import { enforceCutDirection } from './motion-polish';
 import { orderInnerFirst } from './profile-ordering';
 import { profileToolpathPolylines } from './profile-paths';
@@ -23,6 +27,7 @@ export function finishingProfilePasses(
   settings: CncLayerSettings,
   toolDiameterMm: number,
   roughingToolpaths: ReadonlyArray<Polyline>,
+  tabSources: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const side = settings.cutType === 'profile-inside' ? 'inside' : 'outside';
   const raw = orderInnerFirst(profileToolpathPolylines(polylines, side, toolDiameterMm));
@@ -31,19 +36,24 @@ export function finishingProfilePasses(
       ? raw
       : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
   const zMm = -settings.depthMm;
+  const manualTabCenters = manualTabCentersForToolpaths(toolpaths, tabSources);
   const passes: CncPass[] = [];
   for (const toolpath of toolpaths) {
     const needsTabs =
       settings.tabsEnabled &&
       toolpath.closed &&
       passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
-    const pieces = needsTabs
-      ? splitPassForTabsAlignedToReference(toolpath, roughingToolpaths, {
-          tabWidthMm: settings.tabWidthMm,
-          tabsPerShape: settings.tabsPerShape,
-          toolDiameterMm,
-        })
-      : [toolpath];
+    const tabSettings = {
+      tabWidthMm: settings.tabWidthMm,
+      tabsPerShape: settings.tabsPerShape,
+      toolDiameterMm,
+    };
+    const manualCenters = manualTabCenters.get(toolpath);
+    const pieces = !needsTabs
+      ? [toolpath]
+      : manualCenters !== undefined
+        ? splitPassForTabs(toolpath, tabSettings, manualCenters)
+        : splitPassForTabsAlignedToReference(toolpath, roughingToolpaths, tabSettings);
     for (const piece of pieces) {
       if (piece.points.length >= 2) passes.push(passFromPolyline(piece, zMm));
     }

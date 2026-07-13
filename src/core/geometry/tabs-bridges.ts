@@ -122,6 +122,25 @@ function splitClosedPolylineForTabs(
   return segments.length > 0 ? segments : [polyline];
 }
 
+export function applyManualTabsToPolyline(
+  polyline: Polyline,
+  centers: ReadonlyArray<number>,
+  sizeMm: number,
+): ReadonlyArray<Polyline> {
+  const context = splitContext(polyline, sizeMm);
+  if (context === null) return [polyline];
+  const half = sizeMm / 2;
+  const intervals = centers.flatMap((center) => {
+    const normalized = Number.isFinite(center) ? Math.max(0, Math.min(1, center)) : 0;
+    const distance = normalized * context.perimeter;
+    return splitModuloInterval(distance - half, distance + half, context.perimeter);
+  });
+  const skips = mergeIntervals(intervals);
+  if (skips.length === 0) return [polyline];
+  const segments = burnSegmentsBetweenTabs(context, skips);
+  return segments.length > 0 ? segments : [polyline];
+}
+
 function splitContext(polyline: Polyline, sizeMm: number): SplitContext | null {
   const points = normalizeClosedPoints(polyline.points);
   if (points.length < MIN_CLOSED_POINTS) return null;

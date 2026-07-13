@@ -5,7 +5,6 @@ import {
   type RefObject,
 } from 'react';
 import {
-  hitTest,
   type Project,
   type SelectionAnchor,
   type ShapeObject,
@@ -15,17 +14,19 @@ import {
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { computeMouseDownDrag, type DragState } from './drag-state';
-import { isStationaryRightPanClick, panOffsetForDrag } from './pan-drag';
+import { panOffsetForDrag } from './pan-drag';
 import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
 import { dispatchPositionLaser } from './position-laser-click';
+import { hitCncTabAnchor } from './cnc-tab-editor';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
+import { openContextBarForRightClick } from './workspace-context-menu';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
 import {
   handleNonTransformDragUpdate,
@@ -159,6 +160,7 @@ function runWorkspaceDragMove(args: {
     setMeasureDraft: deps.setMeasureDraft,
     setSelectionMarquee: deps.setSelectionMarquee,
     setSelectedPathNodePositionDuringInteraction: deps.setSelectedPathNodePositionDuringInteraction,
+    setSelectedCncTabAnchorDuringInteraction: deps.setSelectedCncTabAnchorDuringInteraction,
     selectionAnchor: deps.selectionAnchor,
     snapSettings: deps.snapSettings,
     setObjectTransform: deps.setObjectTransform,
@@ -216,6 +218,7 @@ function beginToolDrag(args: {
   readonly project: Project;
   readonly viewState: WorkspaceViewState;
   readonly toolMode: ReturnType<typeof useUiStore.getState>['toolMode'];
+  readonly selectedObjectId: string | null;
   readonly selectPathNode: ReturnType<typeof useStore.getState>['selectPathNode'];
   readonly drawShape: (shape: ShapeObject) => void;
 }):
@@ -236,6 +239,20 @@ function beginToolDrag(args: {
     return {
       kind: 'handled',
       drag: point === null ? null : { kind: 'measure', startScenePoint: point },
+    };
+  }
+  if (args.toolMode.kind === 'cnc-tabs') {
+    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    const object = args.project.scene.objects.find((item) => item.id === args.selectedObjectId);
+    if (point === null || object === undefined) return { kind: 'handled', drag: null };
+    return {
+      kind: 'handled',
+      drag: hitCncTabAnchor(
+        object,
+        args.toolMode.layerColor,
+        point,
+        pxToMmForCanvas(args.ref.current, args.project, args.viewState),
+      ),
     };
   }
   if (args.toolMode.kind === 'position-laser') {
@@ -283,6 +300,11 @@ function updateWorkspaceDrag(args: {
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
   readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
+  readonly setSelectedCncTabAnchorDuringInteraction: (
+    anchorIndex: number,
+    layerColor: string,
+    scenePoint: Vec2,
+  ) => void;
   readonly selectionAnchor: SelectionAnchor;
   readonly snapSettings: SnapSettings;
   readonly setObjectTransform: (id: string, transform: Transform) => void;
@@ -351,29 +373,6 @@ function finishWorkspaceDrag(args: {
     return;
   }
   args.endInteraction();
-}
-
-function openContextBarForRightClick(args: {
-  readonly drag: Extract<DragState, { kind: 'pan' }>;
-  readonly e: CanvasMouseEvent;
-  readonly ref: CanvasRef;
-  readonly project: Project;
-  readonly viewState: WorkspaceViewState;
-  readonly selectObject: (id: string | null) => void;
-}): void {
-  if (args.e.type !== 'mouseup') return;
-  if (!isStationaryRightPanClick(args.drag, args.e)) return;
-  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-  const hitId = point === null ? null : hitTest(args.project.scene, point);
-  if (hitId !== null) args.selectObject(hitId);
-  const current = useStore.getState();
-  const hasSelection =
-    hitId !== null || current.selectedObjectId !== null || current.additionalSelectedIds.size > 0;
-  useUiStore.getState().openWorkspaceContextBar({
-    x: args.e.clientX,
-    y: args.e.clientY,
-    context: hasSelection ? 'workspace-selection' : 'workspace-empty',
-  });
 }
 
 function commitSelectionMarquee(args: {
