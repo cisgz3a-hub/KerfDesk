@@ -26,8 +26,16 @@ export function findDroppedCncLayers(
     if (polylines.length === 0) continue;
     const usesExplicitPocketPlanner =
       settings.cutType === 'pocket' &&
-      (settings.helixEntry !== undefined || settings.pocketRoughToolId !== undefined);
+      (settings.helixEntry !== undefined ||
+        settings.pocketRoughToolId !== undefined ||
+        settings.pocketStrategy === 'adaptive');
     if (usesExplicitPocketPlanner) {
+      if (
+        settings.pocketStrategy === 'adaptive' &&
+        polylines.some((polyline) => polyline.closed && polyline.points.length >= 3)
+      ) {
+        continue;
+      }
       const tool = layerCncTool(config, settings);
       if (xyToolpathsForCutType(polylines, settings, tool.diameterMm, 0).length > 0) continue;
     }

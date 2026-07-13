@@ -27,6 +27,7 @@ export function resolveRestPocketOperation(
   if (settings.cutType !== 'pocket' || settings.pocketRoughToolId === undefined) {
     return { kind: 'not-requested' };
   }
+  if (settings.pocketStrategy === 'adaptive') return { kind: 'not-requested' };
   if (settings.helixEntry !== undefined) {
     return { kind: 'error', reason: 'Rest machining and helical entry cannot be combined yet.' };
   }
@@ -68,5 +69,6 @@ export function pocketToolpathsForSettings(
       settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
     );
   }
+  if (settings.pocketStrategy === 'adaptive') return [];
   return pocketToolpathRings(polylines, toolDiameterMm, settings.stepoverPercent);
 }

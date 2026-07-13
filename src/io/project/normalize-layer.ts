@@ -8,7 +8,7 @@ import {
   type LayerOperationSettings,
 } from '../../core/scene';
 
-const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y']);
+const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'adaptive']);
 
 // Keep a raw string field only when it is one of a known set of values —
 // used for the closed-union optional CNC layer keys.
@@ -72,6 +72,9 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
   return {
     ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
     ...enumPassthrough('pocketStrategy', raw['pocketStrategy'], POCKET_STRATEGIES),
+    ...(isPositiveNumber(raw['adaptiveOptimalLoadMm'])
+      ? { adaptiveOptimalLoadMm: raw['adaptiveOptimalLoadMm'] }
+      : {}),
     ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['pocketRoughToolId'] === 'string'
