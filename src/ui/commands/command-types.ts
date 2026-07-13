@@ -100,7 +100,9 @@ export type CommandId =
   | 'window.undo-history'
   | 'help.about'
   | 'help.connection'
-  | 'help.safety';
+  | 'help.safety'
+  | 'help.report-bug'
+  | 'help.discussions';
 
 export type AppCommand = {
   readonly id: CommandId;
