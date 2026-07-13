@@ -7,7 +7,7 @@
 // The skip length adds one tool diameter so the PHYSICAL bridge is the
 // requested width after the bit (radius on each side) eats into the gap.
 
-import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
+import { applyAutomaticTabsToPolylines, applyManualTabsToPolyline } from '../geometry/tabs-bridges';
 import type { Polyline } from '../scene';
 
 export type CncTabSettings = {
@@ -32,11 +32,16 @@ export function passNeedsTabs(zMm: number, depthMm: number, tabHeightMm: number)
 export function splitPassForTabs(
   polyline: Polyline,
   settings: CncTabSettings,
+  manualCenters?: ReadonlyArray<number>,
 ): ReadonlyArray<Polyline> {
   if (!polyline.closed) return [polyline];
+  const tabSizeMm = Math.max(0, settings.tabWidthMm) + Math.max(0, settings.toolDiameterMm);
+  if (manualCenters !== undefined) {
+    return applyManualTabsToPolyline(polyline, manualCenters, tabSizeMm);
+  }
   return applyAutomaticTabsToPolylines([polyline], {
     tabsEnabled: true,
-    tabSizeMm: Math.max(0, settings.tabWidthMm) + Math.max(0, settings.toolDiameterMm),
+    tabSizeMm,
     tabsPerShape: settings.tabsPerShape,
     // CNC tabs go on every through-cut contour — a freed hole slug is as
     // dangerous as a freed part.

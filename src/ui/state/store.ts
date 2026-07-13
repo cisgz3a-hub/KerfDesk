@@ -11,7 +11,6 @@ import {
   type BoardShape,
   type Layer,
   type LayerMoveDirection,
-  type OutputScope,
   type Project,
   type RasterImage,
   type Scene,
@@ -124,6 +123,8 @@ import { variableDataActions, type VariableDataActions } from './variable-data-a
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
 import { printCutProjectActions, type PrintCutProjectActions } from './print-cut-project-actions';
+import { cncTabActions, type CncTabActions } from './cnc-tab-actions';
+export { currentOutputScope } from './output-scope-state';
 
 export type { ImportOutcome } from './scene-mutations';
 
@@ -138,6 +139,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 };
 
 export type AppState = ObjectPropertiesActions &
+  CncTabActions &
   ArrayActions &
   NestActions &
   PrintCutProjectActions &
@@ -428,17 +430,6 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
   };
 }
 
-export function currentOutputScope(state: AppState): OutputScope {
-  return {
-    cutSelectedGraphics: state.outputScopeSettings.cutSelectedGraphics,
-    useSelectionOrigin: state.outputScopeSettings.useSelectionOrigin,
-    selectedObjectIds: [
-      ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
-      ...state.additionalSelectedIds,
-    ],
-  };
-}
-
 export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
   ...projectActions(set),
@@ -460,6 +451,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...savedLibrariesActions(set, get),
   ...materialPresetActions(set),
   ...objectPropertiesActions(set),
+  ...cncTabActions(set),
   ...imageMaskActions(set),
   ...sceneClipboardActions(set),
   ...sceneGroupActions(set),

@@ -34,6 +34,12 @@ export { profileToolpathPolylines, type ProfileSide } from './profile-paths';
 export { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
 export { passNeedsTabs, splitPassForTabs, tabTopZMm, type CncTabSettings } from './cnc-tabs';
 export {
+  cncTabAnchorPosition,
+  projectCncTabAnchor,
+  projectPointToPolyline,
+  seedCncTabAnchors,
+} from './cnc-tab-anchors';
+export {
   planTiles,
   REGISTRATION_HOLE_DEPTH_MM,
   tileFileName,

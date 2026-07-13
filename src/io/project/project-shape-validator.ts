@@ -15,6 +15,7 @@ import { validatePrintAndCutTargets } from './project-print-and-cut-validator';
 import { validatePathText } from './project-path-text-validator';
 import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
+import { validateCncTabAnchors } from './project-cnc-tab-validator';
 import {
   firstError,
   isObject,
@@ -156,6 +157,8 @@ function validateSceneGroupObjectId(value: unknown, path: string): string | null
 
 function validateSceneObject(obj: unknown, path: string): string | null {
   if (!isObject(obj)) return `missing or invalid \`${path}\``;
+  const tabAnchorError = validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`);
+  if (tabAnchorError !== null) return tabAnchorError;
   const kind = obj['kind'];
   if (kind === 'imported-svg') return validateVectorObject(obj, path);
   if (kind === 'text') return validateTextObject(obj, path);

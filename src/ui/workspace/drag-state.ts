@@ -18,6 +18,7 @@ import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
 import { hitAabbHandle } from './selection-handles';
 import type { PathNodeDragState } from './path-node-drag';
+import type { CncTabDragState } from './cnc-tab-editor';
 import {
   hitRotateHandle,
   hitSelectionRotateHandle,
@@ -88,7 +89,8 @@ export type DragState =
       readonly kind: 'measure';
       readonly startScenePoint: Vec2;
     }
-  | PathNodeDragState;
+  | PathNodeDragState
+  | CncTabDragState;
 
 // Decide what kind of drag a mouse-down on `point` initiates, based on the
 // selected object's handle layout. Returns null if the click missed all

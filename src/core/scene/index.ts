@@ -39,6 +39,7 @@ export type { RegistrationRunState } from './registration-layer';
 export type {
   Bounds,
   ColoredPath,
+  CncTabAnchor,
   CubicPathSegment,
   CurveSubpath,
   DitherAlgorithm,

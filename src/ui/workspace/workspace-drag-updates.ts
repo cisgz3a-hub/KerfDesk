@@ -8,7 +8,7 @@ import { updatePenCursor } from './pen-tool';
 
 type CanvasMouseEvent = React.MouseEvent<HTMLCanvasElement>;
 
-export function handleNonTransformDragUpdate(args: {
+type NonTransformDragUpdateArgs = {
   readonly e: CanvasMouseEvent;
   readonly drag: DragState | null;
   readonly point: Vec2 | null;
@@ -20,7 +20,14 @@ export function handleNonTransformDragUpdate(args: {
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
   readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
-}): boolean {
+  readonly setSelectedCncTabAnchorDuringInteraction: (
+    anchorIndex: number,
+    layerColor: string,
+    scenePoint: Vec2,
+  ) => void;
+};
+
+export function handleNonTransformDragUpdate(args: NonTransformDragUpdateArgs): boolean {
   if (args.drag?.kind === 'marquee') {
     updateSelectionMarquee({
       drag: args.drag,
@@ -47,15 +54,28 @@ export function handleNonTransformDragUpdate(args: {
     });
     return true;
   }
-  if (args.toolMode.kind === 'draw' && args.toolMode.shape === 'polyline') {
-    updatePenCursor(args.point, args.e.shiftKey);
-    return true;
-  }
+  if (handleLiveToolUpdate(args)) return true;
   if (args.drag?.kind === 'draw') {
     updateDrawDraft({ ...args, drag: args.drag });
     return true;
   }
   return false;
+}
+
+function handleLiveToolUpdate(args: NonTransformDragUpdateArgs): boolean {
+  if (args.drag?.kind === 'cnc-tab') {
+    if (args.point !== null) {
+      args.setSelectedCncTabAnchorDuringInteraction(
+        args.drag.anchorIndex,
+        args.drag.layerColor,
+        args.point,
+      );
+    }
+    return true;
+  }
+  if (args.toolMode.kind !== 'draw' || args.toolMode.shape !== 'polyline') return false;
+  updatePenCursor(args.point, args.e.shiftKey);
+  return true;
 }
 
 export function updateMeasureDraft(args: {
