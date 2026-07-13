@@ -33,7 +33,9 @@ export type IconName =
   | 'star'
   | 'ruler'
   | 'pen'
-  | 'crosshair';
+  | 'crosshair'
+  | 'panel-left'
+  | 'panel-right';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   crosshair: (
@@ -96,6 +98,20 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
     </>
   ),
   pen: <path d="M3 13l1-3 6-6 2 2-6 6-3 1Z" />,
+  // Side-panel toggles: an app-window rectangle with a divider marking the left
+  // (Layers) or right (Machine) rail — the standard "toggle this sidebar" glyph.
+  'panel-left': (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M6 3v10" />
+    </>
+  ),
+  'panel-right': (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M10 3v10" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 16 }: { readonly name: IconName; readonly size?: number }) {
