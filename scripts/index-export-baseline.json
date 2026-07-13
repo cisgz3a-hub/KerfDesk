@@ -1,6 +1,6 @@
 {
   "src/core/scene/index.ts": 207,
-  "src/core/controllers/grbl/index.ts": 102,
+  "src/core/controllers/grbl/index.ts": 105,
   "src/core/camera/index.ts": 90,
   "src/core/job/index.ts": 88,
   "src/core/devices/index.ts": 86,
