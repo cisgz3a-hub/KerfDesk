@@ -116,17 +116,7 @@ function appCommandContext(
     ...arrangeCommandContext(app, callbacks),
     ...laserCommandContext(platform, laser),
     ...windowHelpCommandContext(callbacks, app),
-    machineKind: machineKindOf(app.project.machine),
-    dirty: app.dirty,
-    savedName: app.savedName,
-    serialSupported: platform.serial.isSupported(),
-    connected: laser.connection.kind === 'connected',
-    machineBusy:
-      laser.autofocusBusy ||
-      laser.motionOperation !== null ||
-      laser.controllerOperation !== null ||
-      activeStreamer,
-    homingEnabled: app.project.device.homing.enabled,
+    ...connectionCommandContext(app, laser, platform, activeStreamer),
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
     toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
@@ -171,6 +161,30 @@ function appCommandContext(
     printAndCutProfileSupported: dialogs.printAndCutProfileSupported,
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
+  };
+}
+
+function connectionCommandContext(
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  platform: ReturnType<typeof usePlatform>,
+  activeStreamer: boolean,
+): Pick<
+  AppCommandContext,
+  'machineKind' | 'dirty' | 'savedName' | 'serialSupported' | 'connected' | 'machineBusy' | 'homingEnabled'
+> {
+  return {
+    machineKind: machineKindOf(app.project.machine),
+    dirty: app.dirty,
+    savedName: app.savedName,
+    serialSupported: platform.serial.isSupported(),
+    connected: laser.connection.kind === 'connected',
+    machineBusy:
+      laser.autofocusBusy ||
+      laser.motionOperation !== null ||
+      laser.controllerOperation !== null ||
+      activeStreamer,
+    homingEnabled: app.project.device.homing.enabled,
   };
 }
 
