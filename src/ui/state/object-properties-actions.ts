@@ -3,7 +3,9 @@ import {
   type ObjectOperationOverride,
   type Project,
   type SceneObject,
+  type ShapeObject,
 } from '../../core/scene';
+import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const MIN_POWER_SCALE_PERCENT = 0;
@@ -27,6 +29,7 @@ type ObjectPropertiesSet = (fn: (state: ObjectPropertiesState) => ObjectProperti
 
 export type ObjectPropertiesActions = {
   readonly setSelectedObjectsPowerScale: (powerScale: number) => void;
+  readonly setSelectedShapeSpec: (spec: ParametricShapeSpec) => void;
   readonly setSelectedObjectsOperationOverride: (patch: ObjectOperationOverride) => void;
   readonly setSelectedObjectsOperationOverrideForLayer: (
     layerColor: string,
@@ -52,6 +55,30 @@ export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropert
         if (!changed) return {};
         return {
           project: { ...state.project, scene: { ...state.project.scene, objects } },
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
+    setSelectedShapeSpec: (spec) =>
+      set((state) => {
+        if (state.selectedObjectId === null || state.additionalSelectedIds.size > 0) return {};
+        const selected = state.project.scene.objects.find(
+          (object) => object.id === state.selectedObjectId,
+        );
+        if (!isEditableParametricShape(selected)) return {};
+        const replacement = rematerializeParametricShape(selected, spec);
+        if (replacement === null || shapeSpecEqual(replacement, selected)) return {};
+        return {
+          project: {
+            ...state.project,
+            scene: {
+              ...state.project.scene,
+              objects: state.project.scene.objects.map((object) =>
+                object.id === selected.id ? replacement : object,
+              ),
+            },
+          },
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],
           dirty: true,
@@ -83,6 +110,14 @@ export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropert
         };
       }),
   };
+}
+
+function isEditableParametricShape(object: SceneObject | undefined): object is ShapeObject {
+  return object?.kind === 'shape' && object.spec.kind !== 'polyline';
+}
+
+function shapeSpecEqual(left: ShapeObject, right: ShapeObject): boolean {
+  return JSON.stringify(left.spec) === JSON.stringify(right.spec);
 }
 
 function setSelectedObjectsOperationOverrideMatching(

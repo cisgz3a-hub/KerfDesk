@@ -34,7 +34,7 @@
 | ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
-| ADR-177 | 2026-07-13 | Accepted | Keep origin evidence honest per axis after G92 mutations |
+| ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 
 ---
 
@@ -4310,6 +4310,35 @@ sources consumed by both compilers.
 - The laser-only set grows past ~25 entries → the shared-shell decision
   itself is under strain; re-open ADR-098's shared-UI clause.
 
+### Amendment 2026-07-13 — Trace family reclassified machine-agnostic
+
+**Trigger:** the first "Reversal triggers" bullet above — the maintainer needs
+Trace available in CNC for cut-a-logo workflows (trace a raster to vectors, then
+cut those vectors on the router).
+
+**Change:** `tools.trace-image`, `tools.retrace-original`, and
+`tools.multi-file-trace` move out of `LASER_ONLY_COMMAND_IDS` and become
+machine-agnostic (visible in both laser and CNC). The other raster tools
+(`tools.adjust-image`, `tools.crop-image`, `tools.apply-image-mask`,
+`tools.remove-image-mask`, `tools.save-processed-bitmap`) stay laser-only — they
+prep a raster *engrave*, which CNC has no mode for.
+
+**Why it is safe:** a `traced-image` object already flows through the CNC cut
+pipeline unchanged (`compile-cnc-job.ts` `collectLayerPolylines` handles it like
+imported SVG/text/shape, and the kept trace-source raster is already excluded
+from the CNC "raster will be skipped" advisory via `role !== 'trace-source'`).
+No compile-pipeline change is needed.
+
+**Fidelity caveat (recorded for operators):** the tracer is outline-based, so a
+single thin stroke traces as two parallel contours. On a laser that is cosmetic;
+on a CNC *profile* cut it becomes two cuts bracketing the stroke rather than one
+centerline pass. Cutting out a filled shape/logo — the common CNC case — is
+unaffected. The Trace dialog shows a CNC note to this effect.
+
+**Verification:** `machine-command-gate.test.ts` moves the three Trace IDs into
+`CNC_SURVIVORS`, locking the new behavior; the data-driven "hidden set equals
+the laser-only set" assertion updates from the source of truth automatically.
+
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
 **Status:** Accepted
@@ -6523,11 +6552,6 @@ Make the tracing pipeline explicitly single-flight and latest-wins. Starting a n
 - Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
 
 ## ADR-138 - The primary toolbar is icon-first and never wraps
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Context
-
 The primary toolbar had fourteen text buttons and wrapped into a second row at
 compact desktop widths. That reduced canvas height, shifted the numeric toolbar
 and workspace during resize, and made the command surface visually dominant.
@@ -6724,6 +6748,37 @@ re-enabling the old retract-first preamble is not an acceptable shortcut.
 
 ---
 
+## ADR-144 - Parametric shape edits rematerialize canonical geometry
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Rectangle, ellipse, polygon, and star objects retain their generating parameters, but those
+parameters were immutable after the initial canvas drag. The selected-object panel exposed only
+laser output overrides, despite calling itself Shape Properties, and disappeared entirely in CNC
+mode. Resizing could change the overall transform but could not change a rectangle corner radius,
+polygon side count, or star inset.
+
+### Decision
+
+- A single selected parametric shape exposes validated geometry fields in Shape Properties for
+  both laser and CNC projects. Multi-selection and polyline node editing keep their existing tools.
+- Each edit sanitizes the complete discriminated shape spec, then regenerates bounds,
+  compatibility polylines, and schema-v2 canonical curves through the established shape factories.
+- Rematerialization preserves object ID, transform, color, power scale, operation override,
+  provenance, stacking order, and group ownership.
+- One committed field edit creates one undo frame. Invalid or unchanged input creates none.
+
+### Consequences
+
+Parametric objects remain editable instead of becoming effectively baked after creation. Preview,
+save, laser compilation, and CNC compilation continue to consume the same materialized paths, so
+no downstream shape-specific branch is added. Width and radius values remain object-local geometry;
+the existing selection transform controls continue to own whole-object scale, rotation, and mirror.
+
+---
+
 ## ADR-159 - Schema v2 curves are canonical and compatibility polylines are invalidated
 
 **Status:** Accepted | **Date:** 2026-07-13
@@ -6839,31 +6894,3 @@ validation, legacy defaults, output tests, and a new complexity bound.
 These tested capabilities are intentional product scope rather than undocumented exceptions. Their
 offline, bounded persistence contracts remain release gates; this decision does not authorize the
 larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.
-
----
-
-## ADR-177 - Keep origin evidence honest per axis after G92 mutations
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Context
-
-GRBL computes work position from machine position minus WCS, G92, and tool-length offsets. `G92`
-updates only the named axes, while `G92.1` clears the complete transient G92 offset. KerfDesk was
-synthesizing a full XYZ WCO from MPos after XY-only origin commands, and successful persistent/reset
-flows could retain `workZZeroKnown` after sending `G92.1`.
-
-### Decision
-
-- XY-only Set Origin derives new X/Y offsets but preserves Z only when a prior Z WCO is known.
-  Otherwise the WCO cache stays null until a fresh WCO-bearing status arrives.
-- Every acknowledged origin flow containing `G92.1` invalidates work-Z evidence and the WCO cache.
-- A persistent G54 XY origin may remain active after transient reset, but that does not prove stock-top
-  Z. The operator must establish Z again before relying on CNC setup evidence.
-
-### Consequences
-
-The host no longer fabricates an untouched axis or retains evidence for an offset the controller may
-have cleared. This is deliberately conservative when Z came from persistent probing because the
-current boolean does not encode provenance; a richer axis/source evidence model can later preserve
-only what readback proves.

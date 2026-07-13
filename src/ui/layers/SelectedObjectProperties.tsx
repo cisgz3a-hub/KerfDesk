@@ -3,6 +3,10 @@ import type { SceneObject } from '../../core/scene';
 import { useStore } from '../state';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedObjectOperationSettings } from './SelectedObjectOperationSettings';
+import {
+  isParametricShapeObject,
+  SelectedShapeGeometryFields,
+} from './SelectedShapeGeometryFields';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const DEFAULT_POWER_SCALE_PERCENT = 100;
@@ -19,19 +23,27 @@ export function SelectedObjectProperties(): JSX.Element | null {
     [objects, selectedObjectId, additionalSelectedIds],
   );
   if (selectedObjects.length === 0) return null;
-  // ADR-101 §3: every editor in this section (power scale, operation
-  // override, image adjustments) exists only in the laser output pipeline —
-  // the CNC compiler reads none of them. CNC object editors (relief
-  // parameters) mount their own panel.
-  if (isCncMachine) return null;
+  // CAM overrides are laser-only; parametric geometry is shared by laser and CNC.
+  const parametricShape = singleParametricShape(selectedObjects);
+  if (isCncMachine && parametricShape === null) return null;
   return (
     <section aria-label="Selected object properties" style={sectionStyle}>
       <h3 style={headingStyle}>Shape Properties</h3>
-      <PowerScaleInput objects={selectedObjects} />
-      <SelectedObjectOperationSettings objects={selectedObjects} />
-      <SelectedImageAdjustments />
+      {parametricShape === null ? null : <SelectedShapeGeometryFields object={parametricShape} />}
+      {isCncMachine ? null : (
+        <>
+          <PowerScaleInput objects={selectedObjects} />
+          <SelectedObjectOperationSettings objects={selectedObjects} />
+          <SelectedImageAdjustments />
+        </>
+      )}
     </section>
   );
+}
+
+function singleParametricShape(objects: ReadonlyArray<SceneObject>) {
+  const object = objects.length === 1 ? objects[0] : undefined;
+  return object?.kind === 'shape' && isParametricShapeObject(object) ? object : null;
 }
 
 function PowerScaleInput(props: { readonly objects: ReadonlyArray<SceneObject> }): JSX.Element {
