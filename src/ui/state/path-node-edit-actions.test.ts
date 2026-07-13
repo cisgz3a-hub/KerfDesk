@@ -3,6 +3,7 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  polylineToCurveSubpath,
   type ColoredPath,
   type ImportedSvg,
   type RasterImage,
@@ -15,7 +16,9 @@ describe('path node edit actions', () => {
   beforeEach(() => resetStore());
 
   it('selects and nudges an imported SVG node with undoable bounds updates', () => {
-    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    loadObjects([
+      importedSvg('logo', [pathWithCanonicalPolyline('#000000', false, squarePoints())]),
+    ]);
     useStore.setState({ dirty: false });
 
     useStore.getState().selectPathNode({
@@ -37,6 +40,7 @@ describe('path node edit actions', () => {
       pointIndex: 2,
     });
     expect(point).toEqual({ x: 13, y: 8 });
+    expect(object?.paths[0]?.curves).toBeUndefined();
     expect(object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 13, maxY: 10 });
     expect(state.undoStack).toHaveLength(1);
     expect(state.dirty).toBe(true);
@@ -45,6 +49,7 @@ describe('path node edit actions', () => {
 
     const restored = useStore.getState().project.scene.objects[0] as ImportedSvg | undefined;
     expect(restored?.paths[0]?.polylines[0]?.points[2]).toEqual({ x: 10, y: 10 });
+    expect(restored?.paths[0]?.curves).toHaveLength(1);
   });
 
   it('keeps a polyline shape spec in sync with the edited path point', () => {
@@ -80,7 +85,9 @@ describe('path node edit actions', () => {
   });
 
   it('sets a selected node position as one undoable interaction for mouse drag', () => {
-    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    loadObjects([
+      importedSvg('logo', [pathWithCanonicalPolyline('#000000', false, squarePoints())]),
+    ]);
     useStore.getState().selectPathNode({
       objectId: 'logo',
       pathIndex: 0,
@@ -95,6 +102,7 @@ describe('path node edit actions', () => {
     const during = useStore.getState();
     const duringObject = during.project.scene.objects[0] as ImportedSvg | undefined;
     expect(duringObject?.paths[0]?.polylines[0]?.points[1]).toEqual({ x: 14, y: 6 });
+    expect(duringObject?.paths[0]?.curves).toBeUndefined();
     expect(duringObject?.bounds).toEqual({ minX: 0, minY: 0, maxX: 14, maxY: 10 });
     expect(during.undoStack).toHaveLength(0);
     expect(during.dirty).toBe(true);
@@ -215,7 +223,9 @@ describe('path node edit actions', () => {
   });
 
   it('deletes selected open polyline nodes without deleting the object', () => {
-    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    loadObjects([
+      importedSvg('logo', [pathWithCanonicalPolyline('#000000', false, squarePoints())]),
+    ]);
     useStore.setState({ dirty: false });
     useStore.getState().selectPathNode({
       objectId: 'logo',
@@ -243,6 +253,7 @@ describe('path node edit actions', () => {
       { x: 0, y: 10 },
     ]);
     expect(object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 10, maxY: 10 });
+    expect(object?.paths[0]?.curves).toBeUndefined();
     expect(state.selectedObjectId).toBe('logo');
     expect(state.selectedPathNode).toBeNull();
     expect(state.selectedPathNodes).toEqual([]);
@@ -252,6 +263,7 @@ describe('path node edit actions', () => {
     useStore.getState().undo();
     const restored = useStore.getState().project.scene.objects[0] as ImportedSvg | undefined;
     expect(restored?.paths[0]?.polylines[0]?.points).toEqual(squarePoints());
+    expect(restored?.paths[0]?.curves).toHaveLength(1);
   });
 
   it('keeps polyline shape specs in sync when deleting selected nodes', () => {
@@ -398,6 +410,15 @@ function pathWithPolyline(
   points: ReadonlyArray<{ readonly x: number; readonly y: number }>,
 ): ColoredPath {
   return { color, polylines: [{ closed, points }] };
+}
+
+function pathWithCanonicalPolyline(
+  color: string,
+  closed: boolean,
+  points: ReadonlyArray<{ readonly x: number; readonly y: number }>,
+): ColoredPath {
+  const path = pathWithPolyline(color, closed, points);
+  return { ...path, curves: path.polylines.map(polylineToCurveSubpath) };
 }
 
 function squarePoints(): ReadonlyArray<{ readonly x: number; readonly y: number }> {

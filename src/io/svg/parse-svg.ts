@@ -11,11 +11,14 @@
 
 import {
   type ColoredPath,
+  type CurveSubpath,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Polyline,
+  polylineToCurveSubpath,
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
+import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
 import { elementToSubPaths } from './shape-to-polylines';
 import { linearScaleMagnitude } from './transform-scale';
 import {
@@ -98,14 +101,7 @@ function normalizeColor(input: string | null): string {
   return tryParseRgb(s) ?? COLOR_FALLBACK;
 }
 
-type Matrix = {
-  readonly a: number;
-  readonly b: number;
-  readonly c: number;
-  readonly d: number;
-  readonly e: number;
-  readonly f: number;
-};
+type Matrix = SvgMatrix;
 
 type PresentationState = {
   readonly stroke: string | null;
@@ -131,9 +127,11 @@ const INITIAL_PRESENTATION_STATE: PresentationState = {
   visibility: null,
 };
 
+type PathBucket = { readonly polylines: Polyline[]; readonly curves: CurveSubpath[] };
+
 function walkGeometry(
   svgEl: Element,
-  byColor: Map<string, Polyline[]>,
+  byColor: Map<string, PathBucket>,
   counts: { text: number; image: number },
   unitScale: { readonly scaleX: number; readonly scaleY: number },
   budget: SvgImportBudget,
@@ -158,7 +156,7 @@ const MAX_WALK_DEPTH = 256;
 function walkElement(
   el: Element,
   parent: PresentationState,
-  byColor: Map<string, Polyline[]>,
+  byColor: Map<string, PathBucket>,
   counts: { text: number; image: number },
   budget: SvgImportBudget,
   depth: number,
@@ -186,7 +184,7 @@ function walkElement(
 function appendUseGeometry(
   el: Element,
   state: PresentationState,
-  byColor: Map<string, Polyline[]>,
+  byColor: Map<string, PathBucket>,
   counts: { text: number; image: number },
   budget: SvgImportBudget,
   depth: number,
@@ -210,7 +208,7 @@ function appendUseGeometry(
 function appendElementGeometry(
   el: Element,
   state: PresentationState,
-  byColor: Map<string, Polyline[]>,
+  byColor: Map<string, PathBucket>,
   budget: SvgImportBudget,
 ): void {
   // Flatten curves/arcs to a scene-mm tolerance, not user-units, by dividing
@@ -222,17 +220,23 @@ function appendElementGeometry(
   const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill) : '';
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
-  const arr = byColor.get(color) ?? [];
+  const bucket = byColor.get(color) ?? { polylines: [], curves: [] };
   for (const sub of subs) {
     reserveSvgPolyline(color, sub.points.length, budget);
-    const points = sub.points.map((p) => applyMatrix(state.transform, p));
+    const points = sub.points.map((p) => applySvgMatrix(state.transform, p));
     assertSvgImportPoints(points);
-    arr.push({
+    const polyline = {
       points,
       closed: sub.closed,
-    });
+    };
+    bucket.polylines.push(polyline);
+    bucket.curves.push(
+      sub.curve === undefined
+        ? polylineToCurveSubpath(polyline)
+        : transformSvgCurveSubpath(sub.curve, state.transform),
+    );
   }
-  byColor.set(color, arr);
+  byColor.set(color, bucket);
 }
 
 function isDefinitionContainer(el: Element): boolean {
@@ -243,7 +247,7 @@ function isDefinitionContainer(el: Element): boolean {
 function walkReferencedDefinition(
   el: Element,
   parent: PresentationState,
-  byColor: Map<string, Polyline[]>,
+  byColor: Map<string, PathBucket>,
   counts: { text: number; image: number },
   budget: SvgImportBudget,
   depth: number,
@@ -401,16 +405,6 @@ function multiplyMatrix(left: Matrix, right: Matrix): Matrix {
   };
 }
 
-function applyMatrix(
-  matrix: Matrix,
-  point: { readonly x: number; readonly y: number },
-): { readonly x: number; readonly y: number } {
-  return {
-    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
-    y: matrix.b * point.x + matrix.d * point.y + matrix.f,
-  };
-}
-
 export function parseSvg(args: { svgText: string; id: string; source: string }): ParseSvgResult {
   const { clean, stripped } = sanitizeSvg(args.svgText);
 
@@ -432,14 +426,15 @@ export function parseSvg(args: { svgText: string; id: string; source: string }):
     { x: bounds.minX, y: bounds.minY },
     { x: bounds.maxX, y: bounds.maxY },
   ]);
-  const byColor = new Map<string, Polyline[]>();
+  const byColor = new Map<string, PathBucket>();
   const counts = { text: 0, image: 0 };
   const budget = createSvgImportBudget();
   walkGeometry(svgEl, byColor, counts, unitScale, budget);
 
-  const paths: ColoredPath[] = [...byColor.entries()].map(([color, polylines]) => ({
+  const paths: ColoredPath[] = [...byColor.entries()].map(([color, bucket]) => ({
     color,
-    polylines,
+    polylines: bucket.polylines,
+    curves: bucket.curves,
   }));
 
   const notes: string[] = [];

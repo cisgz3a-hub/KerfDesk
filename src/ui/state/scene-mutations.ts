@@ -495,8 +495,13 @@ export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult
   const hadLayer = s.project.scene.layers.some((layer) => layer.color === text.color);
   let scene: Scene;
   if (existing !== undefined) {
-    const preserved: TextObject = { ...text, transform: existing.transform };
+    const preserved: TextObject = {
+      ...text,
+      transform: text.pathText === undefined ? existing.transform : text.transform,
+    };
     scene = replaceObject(s.project.scene, text.id, preserved);
+  } else if (text.pathText !== undefined) {
+    scene = addObject(s.project.scene, text);
   } else {
     const fitted = fitObjectToBed(text, s.project.device.bedWidth, s.project.device.bedHeight);
     scene = addObject(s.project.scene, fitted);

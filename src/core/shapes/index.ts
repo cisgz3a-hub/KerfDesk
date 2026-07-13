@@ -1,12 +1,11 @@
 // core/shapes — pure geometry for the on-canvas drawing primitives (ADR-051,
-// Phase G). Each shape converts a parametric spec into polylines that the
-// kind:'shape' SceneObject variant materializes into paths; compile/preview/emit
-// stay untouched.
+// Phase G). Shape factories preserve canonical curves and retain deterministic
+// compatibility polylines for subsystems still migrating to schema-v2 geometry.
 
-export { rectangleToPolylines } from './rectangle';
+export { rectangleToCurve, rectangleToPolylines } from './rectangle';
 export type { RectangleSpec } from './rectangle';
 export { createRectangle } from './create-rectangle';
-export { ellipseSegmentCount, ellipseToPolylines } from './ellipse';
+export { ellipseSegmentCount, ellipseToCurve, ellipseToPolylines } from './ellipse';
 export type { EllipseSpec } from './ellipse';
 export { createEllipse } from './create-ellipse';
 export { polygonToPolylines } from './polygon';

@@ -83,6 +83,7 @@ describe('grblDriver', () => {
       firmwareSetupPanel: 'grbl-laser',
       probing: true,
       cncJobs: true,
+      lowPowerFire: true,
       overrides: true,
     });
   });

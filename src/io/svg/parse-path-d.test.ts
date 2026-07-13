@@ -103,6 +103,44 @@ describe('parsePathD — non-finite coordinate rejection (S04-001)', () => {
 });
 
 describe('parsePathD — curve flattening (De Casteljau subdivision)', () => {
+  it('retains native cubic geometry while exposing the compatibility polyline', () => {
+    const subpath = parsePathD('M 0 0 C 10 0 20 10 30 10')[0];
+    expect(subpath?.curve).toEqual({
+      start: { x: 0, y: 0 },
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 10, y: 0 },
+          control2: { x: 20, y: 10 },
+          to: { x: 30, y: 10 },
+        },
+      ],
+      closed: false,
+    });
+    expect(subpath?.points.length).toBeGreaterThan(2);
+  });
+
+  it('converts quadratic input to an equivalent cubic segment', () => {
+    expect(parsePathD('M0 0 Q 3 6 9 0')[0]?.curve?.segments[0]).toEqual({
+      kind: 'cubic',
+      control1: { x: 2, y: 4 },
+      control2: { x: 5, y: 4 },
+      to: { x: 9, y: 0 },
+    });
+  });
+
+  it('retains SVG elliptical-arc parameters', () => {
+    expect(parsePathD('M10 0 A 10 5 30 0 1 0 10')[0]?.curve?.segments[0]).toEqual({
+      kind: 'elliptical-arc',
+      radiusX: 10,
+      radiusY: 5,
+      rotationDeg: 30,
+      largeArc: false,
+      sweep: true,
+      to: { x: 0, y: 10 },
+    });
+  });
+
   it('flattens a C command into many intermediate points ending at the segment endpoint', () => {
     const subs = parsePathD('M 0 0 C 10 0 20 10 30 10');
     const pts = subs[0]?.points ?? [];

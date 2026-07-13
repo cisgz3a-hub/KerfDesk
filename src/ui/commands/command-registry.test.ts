@@ -256,6 +256,28 @@ describe('buildAppCommands', () => {
     expect(optimizationSettings).toHaveBeenCalled();
   });
 
+  it('keeps Rotary Setup disabled until its Labs gate is enabled', () => {
+    const rotarySetup = vi.fn();
+    const disabledCommands = buildAppCommands(baseCtx({ rotarySetup }));
+    const disabledCommand = commandById(disabledCommands, 'tools.rotary-setup');
+
+    expect(disabledCommand.enabled).toBe(false);
+    expect(disabledCommand.disabledReason).toContain('Tools > Labs');
+    expect(runCommand(disabledCommand)).toBe(false);
+
+    const unsupported = commandById(
+      buildAppCommands(baseCtx({ rotaryFeatureEnabled: true, rotarySetup })),
+      'tools.rotary-setup',
+    );
+    expect(unsupported.disabledReason).toContain('does not support a rotary axis');
+
+    const enabledCommands = buildAppCommands(
+      baseCtx({ rotaryFeatureEnabled: true, rotaryProfileSupported: true, rotarySetup }),
+    );
+    expect(runCommand(commandById(enabledCommands, 'tools.rotary-setup'))).toBe(true);
+    expect(rotarySetup).toHaveBeenCalledTimes(1);
+  });
+
   it('runs Project Notes from the Window menu without the destructive dirty-project guard', () => {
     const confirmDiscard = vi.fn(async () => true);
     const projectNotes = vi.fn();
@@ -406,5 +428,28 @@ describe('window.toggle-preview command (M27)', () => {
     expect(command.enabled).toBe(true);
     expect(runCommand(command)).toBe(true);
     expect(togglePreview).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('right-rail visibility commands', () => {
+  it('exposes independent checked commands for both right rails', () => {
+    const commands = buildAppCommands(baseCtx({ layersPanelOpen: false, machinePanelOpen: true }));
+
+    expect(commandById(commands, 'window.toggle-layers-panel').active).toBe(false);
+    expect(commandById(commands, 'window.toggle-machine-panel').active).toBe(true);
+  });
+
+  it('keeps machine controls visible and non-collapsible during an active job', () => {
+    const toggleMachinePanel = vi.fn();
+    const command = commandById(
+      buildAppCommands(baseCtx({ jobActive: true, machinePanelOpen: false, toggleMachinePanel })),
+      'window.toggle-machine-panel',
+    );
+
+    expect(command.active).toBe(true);
+    expect(command.enabled).toBe(false);
+    expect(command.disabledReason).toContain('Stop remains reachable');
+    expect(runCommand(command)).toBe(false);
+    expect(toggleMachinePanel).not.toHaveBeenCalled();
   });
 });

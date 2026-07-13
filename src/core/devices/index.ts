@@ -9,6 +9,13 @@ export type {
   MarlinPowerMode,
 } from './gcode-dialects';
 export {
+  cappedFirePowerS,
+  DEFAULT_FIRE_POWER_PERCENT,
+  HARD_MAX_FIRE_POWER_PERCENT,
+  normalizeLaserFireControl,
+  type LaserFireControl,
+} from './fire-control';
+export {
   GRBL_GCODE_DIALECTS,
   MARLIN_GCODE_DIALECTS,
   isGcodeDialectId,

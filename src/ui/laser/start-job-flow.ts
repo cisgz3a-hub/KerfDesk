@@ -10,7 +10,7 @@
 // and a native dialog there would freeze the ack pump and Stop button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
-import { streamingModeForController } from '../../core/devices';
+import { profileSupportsCapability, streamingModeForController } from '../../core/devices';
 import {
   createJobCheckpoint,
   fingerprintGcode,
@@ -25,15 +25,20 @@ import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { isActiveJob } from '../state/laser-store-helpers';
-import { prepareStartJob } from './start-job-readiness';
+import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
+import { renderVariableText } from '../text/render-variable-text';
+import { armVariableStreamAdvancement } from './variable-stream-advancement';
+import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { resumeConfirmation } from './resume-confirmation';
 
 export async function runStartJobFlow(): Promise<void> {
   const app = useStore.getState();
   const { project, jobPlacement } = app;
   const laser = useLaserStore.getState();
-  const prepared = prepareStartJob(
+  const registration = currentPrintCutOutputRegistration(project);
+  const prepared = await prepareStartJobSnapshot(
     project,
     laser.controllerSettings,
     {
@@ -52,6 +57,12 @@ export async function runStartJobFlow(): Promise<void> {
     },
     jobPlacement,
     currentOutputScope(app),
+    rotaryRasterAllowed(project),
+    {
+      clock: () => new Date(),
+      renderVariableText,
+      ...(registration === undefined ? {} : { registration }),
+    },
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -71,6 +82,7 @@ export async function runStartJobFlow(): Promise<void> {
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });
+    armVariableStreamAdvancement(project);
     // Checkpoint the run only once the stream is actually under way
     // (ADR-118); a refused start must not overwrite an older recovery
     // record. useJobCheckpoint advances it from streamer acks.
@@ -161,6 +173,7 @@ function prepareResume(overrides?: {
     app.jobPlacement,
     outputScope,
     overrides?.jobOrigin,
+    rotaryRasterAllowed(project),
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -168,6 +181,13 @@ function prepareResume(overrides?: {
     return null;
   }
   return { project, gcode: prepared.gcode };
+}
+
+function rotaryRasterAllowed(project: Project): boolean {
+  return (
+    useExperimentalLaserFeatures.getState().features.rotaryRaster &&
+    profileSupportsCapability(project.device, 'rotary')
+  );
 }
 
 // Shared resume back half: build the re-entry program, confirm, suspend

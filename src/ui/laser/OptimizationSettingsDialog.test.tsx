@@ -34,19 +34,19 @@ afterEach(() => {
 });
 
 describe('OptimizationSettingsDialog', () => {
-  it('renders reduce-travel and submits the checkbox state', async () => {
+  it('submits all cut-planner policies and synchronizes the legacy flag', async () => {
     const { host, root, onApply } = await renderDialog();
     try {
-      expect(host.textContent).toContain('Optimization Settings');
-      const reduceTravel = host.querySelector('input[name="reduceTravelMoves"]');
-      if (!(reduceTravel instanceof HTMLInputElement)) {
-        throw new Error('reduce travel checkbox missing');
+      expect(host.textContent).toContain('Cut Planner');
+      const travelPolicy = host.querySelector('select[name="travelPolicy"]');
+      if (!(travelPolicy instanceof HTMLSelectElement)) {
+        throw new Error('travel policy missing');
       }
-      expect(reduceTravel.checked).toBe(true);
+      expect(travelPolicy.value).toBe('nearest-neighbor');
 
       await act(async () => {
-        reduceTravel.checked = false;
-        Simulate.change(reduceTravel);
+        travelPolicy.value = 'source-order';
+        Simulate.change(travelPolicy);
       });
       await act(async () => {
         const form = host.querySelector('form');
@@ -54,7 +54,11 @@ describe('OptimizationSettingsDialog', () => {
         Simulate.submit(form);
       });
 
-      expect(onApply).toHaveBeenCalledWith({ reduceTravelMoves: false });
+      expect(onApply).toHaveBeenCalledWith({
+        ...DEFAULT_PROJECT_OPTIMIZATION,
+        reduceTravelMoves: false,
+        travelPolicy: 'source-order',
+      });
     } finally {
       await act(async () => root.unmount());
     }

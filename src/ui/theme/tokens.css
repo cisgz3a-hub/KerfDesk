@@ -184,6 +184,62 @@
   height: 36px;
 }
 
+/* ---------- Responsive command toolbar ---------- */
+
+.lf-toolbar-command-groups {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.lf-toolbar-command-groups::-webkit-scrollbar {
+  display: none;
+}
+.lf-toolbar-separator {
+  display: inline-block;
+}
+.lf-toolbar-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.lf-toolbar-command--icon-only {
+  width: 30px;
+  padding: 0;
+}
+.lf-toolbar-icon,
+.lf-toolbar-icon > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1280px) {
+  .lf-toolbar-build,
+  .lf-toolbar-command-label {
+    display: none;
+  }
+  .lf-toolbar-command {
+    width: 30px;
+    padding: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .lf-toolbar-brand,
+  .lf-toolbar-identity-separator {
+    display: none;
+  }
+}
+
 /* ---------- Inputs ---------- */
 
 .lf-input,

@@ -27,6 +27,21 @@ describe('createRectangle', () => {
       { x: 0, y: 50 },
       { x: 0, y: 0 },
     ]);
+    expect(shape.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
+    expect(shape.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'line')).toBe(
+      true,
+    );
+  });
+
+  it('preserves rounded corners as native cubics', () => {
+    const shape = createRectangle({
+      id: 'rounded',
+      color: '#ff0000',
+      spec: { widthMm: 80, heightMm: 50, cornerRadiusMm: 10 },
+    });
+    const segments = shape.paths[0]?.curves?.[0]?.segments ?? [];
+    expect(segments.filter((segment) => segment.kind === 'cubic')).toHaveLength(4);
+    expect(segments.filter((segment) => segment.kind === 'line')).toHaveLength(4);
   });
 
   it('compiles to a non-empty job through the existing pipeline (line layer)', () => {

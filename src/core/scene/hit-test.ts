@@ -9,6 +9,7 @@ import type { Layer, LayerMode } from './layer';
 import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
+import { flattenColoredPathCurves } from './curve-path';
 import { sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
@@ -66,7 +67,7 @@ function hitVectorObject(
     const layer = layerByColor.get(path.color);
     if (layer?.visible === false) continue;
     const mode = effectiveLayerMode(obj, layer);
-    for (const polyline of path.polylines) {
+    for (const polyline of hitTestPolylines(path)) {
       if (polyline.points.length === 0) continue;
       hasPolyline = true;
       const hit = hitPolyline(obj, mode, polyline, point);
@@ -79,6 +80,14 @@ function hitVectorObject(
   }
   if (!hasPolyline && pointInObjectBBox(point, obj)) return { kind: 'primary' };
   return lineInteriorArea === null ? NO_HIT : { kind: 'line-interior', area: lineInteriorArea };
+}
+
+function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
+  const flattened = flattenColoredPathCurves(path, {
+    toleranceMm: VECTOR_STROKE_HIT_TOLERANCE_MM / 8,
+    segmentBudget: 100_000,
+  });
+  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
 }
 
 function hitPolyline(

@@ -9,7 +9,8 @@
 // session. opentype.js parses ~5ms per typical TTF; the cache makes
 // repeated text edits feel instant.
 
-import type { KnownFontKey } from '../../core/text';
+import { embeddedFontBuffer, findFontEntry, type KnownFontKey } from '../../core/text';
+import type { EmbeddedFont } from '../../core/scene';
 import robotoUrl from './fonts/Roboto-Regular.ttf?url';
 import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
@@ -22,12 +23,24 @@ const URL_BY_KEY: Readonly<Record<KnownFontKey, string>> = {
   'dancing-script-regular': dancingScriptUrl,
 };
 
-const cache = new Map<KnownFontKey, ArrayBuffer>();
+const cache = new Map<string, ArrayBuffer>();
 
-export async function loadFont(key: KnownFontKey): Promise<ArrayBuffer> {
+export async function loadFont(
+  key: string,
+  embeddedFonts?: ReadonlyArray<EmbeddedFont>,
+): Promise<ArrayBuffer> {
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
-  const url = URL_BY_KEY[key];
+  const known = findFontEntry(key);
+  if (known === null) {
+    const embedded = embeddedFonts?.find((font) => font.key === key);
+    if (embedded === undefined)
+      throw new Error(`Font "${key}" is not available. Relink it to edit.`);
+    const buffer = embeddedFontBuffer(embedded);
+    cache.set(key, buffer);
+    return buffer;
+  }
+  const url = URL_BY_KEY[known.key];
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch font ${key}: ${res.status}`);
   const buf = await res.arrayBuffer();
@@ -39,7 +52,7 @@ export async function loadFont(key: KnownFontKey): Promise<ArrayBuffer> {
 // synchronous code (canvas draw) get the font without awaiting; the
 // caller falls back to a placeholder or no-op until the async load
 // completes and a redraw is triggered.
-export function getCachedFont(key: KnownFontKey): ArrayBuffer | null {
+export function getCachedFont(key: string): ArrayBuffer | null {
   return cache.get(key) ?? null;
 }
 

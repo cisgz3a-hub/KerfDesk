@@ -67,6 +67,7 @@ function useFileEditShortcuts(): void {
   const lastSaveTarget = useStore((s) => s.lastSaveTarget);
   const markSaved = useStore((s) => s.markSaved);
   const markLoaded = useStore((s) => s.markLoaded);
+  const advanceVariablesAfter = useStore((s) => s.advanceVariablesAfter);
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
@@ -76,7 +77,7 @@ function useFileEditShortcuts(): void {
   const confirmDiscard = (action: string): Promise<boolean> =>
     confirmDiscardAsync(platform, action);
   // prettier-ignore
-  const fileCtx: FileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
+  const fileCtx: FileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, advanceVariablesAfter, pushToast, confirmDiscard };
   // prettier-ignore
   const editCtx: EditCtx = { undo, redo, selectedObjectId, selectedPathNode, additionalSelectedIds, removeSceneObjects, deleteSelectedPathNodes, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, groupSelection, ungroupSelection, duplicateSelection, resetToolMode };
   useFileEditShortcutEffect(fileCtx, editCtx, { setToolMode, openConvertToBitmap });

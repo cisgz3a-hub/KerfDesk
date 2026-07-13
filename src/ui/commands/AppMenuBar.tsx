@@ -125,7 +125,8 @@ function MenuItem(props: {
   return (
     <button
       type="button"
-      role="menuitem"
+      role={command.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      {...(command.active === undefined ? {} : { 'aria-checked': command.active })}
       className="lf-menu-item"
       disabled={!command.enabled}
       title={controlHelp(commandHelp, command.disabledReason)}
@@ -135,7 +136,10 @@ function MenuItem(props: {
         if (runCommand(command)) props.onCommandRun();
       }}
     >
-      <span>{command.label}</span>
+      <span style={checkmarkStyle} aria-hidden="true">
+        {command.active === true ? '✓' : ''}
+      </span>
+      <span style={menuLabelStyle}>{command.label}</span>
       {command.shortcut !== undefined ? (
         <span style={shortcutStyle}>{command.shortcut}</span>
       ) : null}
@@ -158,6 +162,8 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.registration-jig',
         'tools.camera',
         'tools.place-board',
+        'tools.rotary-setup',
+        'tools.print-and-cut',
         'tools.box-generator',
       ],
     },
@@ -170,7 +176,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.focus-test',
       ],
     },
-    { label: 'Settings', ids: ['tools.optimization-settings'] },
+    { label: 'Settings', ids: ['tools.optimization-settings', 'tools.labs'] },
     {
       label: 'Image',
       ids: [
@@ -302,6 +308,12 @@ const menuItemStyle: React.CSSProperties = {
   justifyContent: 'space-between',
   gap: 16,
 };
+const checkmarkStyle: React.CSSProperties = {
+  width: 12,
+  flexShrink: 0,
+  textAlign: 'center',
+};
+const menuLabelStyle: React.CSSProperties = { flex: 1 };
 const shortcutStyle: React.CSSProperties = {
   color: 'var(--lf-text-faint)',
   fontSize: 12,

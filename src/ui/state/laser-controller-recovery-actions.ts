@@ -48,6 +48,7 @@ export function controllerRecoveryActions(
           motionOperation: null,
           controllerOperation: { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 },
           homingState: 'unknown',
+          trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
           lastWriteError: null,
           // The soft reset wiped the firmware's RX buffer — in-flight lines
           // will never be acked (audit F1).

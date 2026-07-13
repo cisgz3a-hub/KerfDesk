@@ -104,22 +104,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
         value={traceValue(props.preset, props.overrides, 'ignoreLessThanPixels')}
         onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
       />
-      <NumberRow
-        label="Smoothness"
-        min={0}
-        max={1.33}
-        step={0.01}
-        value={traceValue(props.preset, props.overrides, 'smoothness')}
-        onChange={(smoothness) => set({ smoothness })}
-      />
-      <NumberRow
-        label="Optimize"
-        min={0}
-        max={2}
-        step={0.01}
-        value={traceValue(props.preset, props.overrides, 'optimize')}
-        onChange={(optimize) => set({ optimize })}
-      />
+      {props.preset.traceMode !== 'centerline' ? <ContourGeometryControls {...props} /> : null}
       <CheckboxRow
         label="Trace alpha mask"
         checked={
@@ -143,6 +128,32 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
       )}
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
     </fieldset>
+  );
+}
+
+function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element {
+  const set = (patch: LightBurnTraceSettingOverrides): void => {
+    props.onChange({ ...props.overrides, ...patch });
+  };
+  return (
+    <>
+      <NumberRow
+        label="Smoothness"
+        min={0}
+        max={1.33}
+        step={0.01}
+        value={traceValue(props.preset, props.overrides, 'smoothness')}
+        onChange={(smoothness) => set({ smoothness })}
+      />
+      <NumberRow
+        label="Optimize"
+        min={0}
+        max={2}
+        step={0.01}
+        value={traceValue(props.preset, props.overrides, 'optimize')}
+        onChange={(optimize) => set({ optimize })}
+      />
+    </>
   );
 }
 

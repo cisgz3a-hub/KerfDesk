@@ -46,8 +46,12 @@
 - **Origin marker**: small cross at the device-profile origin.
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
-- **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers."
+- **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
+- **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers." A header chevron collapses it to a narrow named strip; the same strip expands it.
+- **Machine controls panel**: docked at the far right. It uses the same collapse/expand pattern, except it cannot be collapsed while a job is active because the visible Stop control must remain reachable.
+- **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering compact mode again reapplies the collapsed default.
 - **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
+- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. The machine-panel command is disabled and checked while a job is active.
 
 #### Disabled controls
 - `File → Save Project`
@@ -892,12 +896,34 @@ The guided alternative to hunting through the Device Profile panel and the seven
 
 ---
 
-## Phase E flows — STUB
+## Phase E flows
 
-- F-E1. Import raster image
-- F-E2. Open trace dialog
-- F-E3. Adjust trace parameters with live preview
-- F-E4. Apply trace → produces Scene object
+### F-E1. Import and trace a raster image
+
+**Success**:
+1. Choose a raster image and open the trace dialog. The image is decoded at the
+   preview budget and the selected preset starts tracing in a worker.
+2. Adjust a preset, threshold, or boundary control. Changes are debounced; the
+   newest request supersedes and cancels any older trace still running.
+3. The preview displays only the newest completed result. A late response from
+   a retired worker is ignored and cannot replace the current preview.
+4. Click **Trace** after the preview is ready. When the file, options, and
+   boundary still match, the ready preview geometry is reused instead of traced
+   a second time. The result is imported as a Scene object.
+
+**Error — worker stalls or crashes**:
+- A worker request has a bounded execution timeout. The failed worker is
+  retired, the current request reports a recoverable error, and the next trace
+  starts with a fresh worker. Small images may use the bounded inline fallback.
+
+**Edge — rapid preset changes**:
+- At most one trace job is live. Starting the newest job rejects the older job
+  as superseded; supersession is not shown as a user-facing error.
+
+**Edge — source changes before commit**:
+- Reuse is allowed only when file identity, options, boundary, and boundary mode
+  match the ready preview. Otherwise commit decodes and traces the current
+  source normally. Existing source-revalidation checks still apply.
 
 ---
 

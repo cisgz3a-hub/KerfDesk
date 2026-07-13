@@ -5,19 +5,21 @@
 // via De Casteljau subdivision (cubic + quadratic) and W3C arc-to-cubic
 // conversion. Default flatness 0.25 mm — see flatten-curves.ts.
 
-import type { Vec2 } from '../../core/scene';
+import type { CurveSubpath, PathSegment, Vec2 } from '../../core/scene';
 import { DEFAULT_FLATNESS_MM, flattenArc, flattenCubic, flattenQuadratic } from './flatten-curves';
 import { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 export type SubPath = {
   readonly points: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  readonly curve?: CurveSubpath;
 };
 
 type MutableSubPath = {
   points: Vec2[];
   closed: boolean;
   start: Vec2;
+  segments: PathSegment[];
 };
 
 type State = {
@@ -91,7 +93,11 @@ export function parsePathD(
     pointCount: 0,
   };
   for (const tok of tokens) dispatch(state, tok);
-  return state.subpaths.map((sp) => ({ points: sp.points, closed: sp.closed }));
+  return state.subpaths.map((sp) => ({
+    points: sp.points,
+    closed: sp.closed,
+    curve: { start: sp.start, segments: sp.segments, closed: sp.closed },
+  }));
 }
 
 function tokenize(d: string): ReadonlyArray<Token> {
@@ -200,12 +206,13 @@ function startSubpath(state: State, at: Vec2): void {
 
 function createSubpath(state: State, at: Vec2): MutableSubPath {
   reservePathPoints(state, 1);
-  return { points: [at], closed: false, start: at };
+  return { points: [at], closed: false, start: at, segments: [] };
 }
 
 function appendPoint(state: State, sub: MutableSubPath, point: Vec2): void {
   reservePathPoints(state, 1);
   sub.points.push(point);
+  sub.segments.push({ kind: 'line', to: point });
 }
 
 function appendPoints(state: State, sub: MutableSubPath, points: ReadonlyArray<Vec2>): void {
@@ -281,7 +288,9 @@ function handleCubic(state: State, args: ReadonlyArray<number>, rel: boolean): v
     const end = offset(args[k + 4] ?? 0, args[k + 5] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenCubic(state.cursor, c1, c2, end, state.flatness, out);
-    appendPoints(state, ensureSub(state), out);
+    const sub = ensureSub(state);
+    appendPoints(state, sub, out);
+    sub.segments.push({ kind: 'cubic', control1: c1, control2: c2, to: end });
     state.cursor = end;
     state.lastCubicCtrl = c2;
     state.lastQuadraticCtrl = null;
@@ -296,7 +305,9 @@ function handleSmoothCubic(state: State, args: ReadonlyArray<number>, rel: boole
     const end = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenCubic(state.cursor, c1, c2, end, state.flatness, out);
-    appendPoints(state, ensureSub(state), out);
+    const sub = ensureSub(state);
+    appendPoints(state, sub, out);
+    sub.segments.push({ kind: 'cubic', control1: c1, control2: c2, to: end });
     state.cursor = end;
     state.lastCubicCtrl = c2;
     state.lastQuadraticCtrl = null;
@@ -309,7 +320,9 @@ function handleQuadratic(state: State, args: ReadonlyArray<number>, rel: boolean
     const end = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenQuadratic(state.cursor, c1, end, state.flatness, out);
-    appendPoints(state, ensureSub(state), out);
+    const sub = ensureSub(state);
+    appendPoints(state, sub, out);
+    sub.segments.push(quadraticAsCubic(state.cursor, c1, end));
     state.cursor = end;
     state.lastQuadraticCtrl = c1;
     state.lastCubicCtrl = null;
@@ -325,7 +338,9 @@ function handleSmoothQuadratic(state: State, args: ReadonlyArray<number>, rel: b
     const end = offset(args[k] ?? 0, args[k + 1] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenQuadratic(state.cursor, c1, end, state.flatness, out);
-    appendPoints(state, ensureSub(state), out);
+    const sub = ensureSub(state);
+    appendPoints(state, sub, out);
+    sub.segments.push(quadraticAsCubic(state.cursor, c1, end));
     state.cursor = end;
     state.lastQuadraticCtrl = c1;
     state.lastCubicCtrl = null;
@@ -348,10 +363,39 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
       state.flatness,
       out,
     );
-    appendPoints(state, ensureSub(state), out);
+    const sub = ensureSub(state);
+    appendPoints(state, sub, out);
+    sub.segments.push(
+      rx === 0 || ry === 0
+        ? { kind: 'line', to: end }
+        : {
+            kind: 'elliptical-arc',
+            radiusX: Math.abs(rx),
+            radiusY: Math.abs(ry),
+            rotationDeg: xAxisRotationDeg,
+            largeArc,
+            sweep,
+            to: end,
+          },
+    );
     state.cursor = end;
   }
   resetSmoothControls(state);
+}
+
+function quadraticAsCubic(from: Vec2, control: Vec2, to: Vec2): PathSegment {
+  return {
+    kind: 'cubic',
+    control1: {
+      x: from.x + (2 / 3) * (control.x - from.x),
+      y: from.y + (2 / 3) * (control.y - from.y),
+    },
+    control2: {
+      x: to.x + (2 / 3) * (control.x - to.x),
+      y: to.y + (2 / 3) * (control.y - to.y),
+    },
+    to,
+  };
 }
 
 function handleClose(state: State): void {

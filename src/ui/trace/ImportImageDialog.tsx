@@ -55,13 +55,15 @@ import {
   TraceFillStylePicker,
   type TraceFillStyle,
 } from './dialog-parts';
-import { dataUrlToFile, loadImageAsRawData } from './image-loader';
+import { dataUrlToFile } from './image-loader';
+import type { PreparedTrace } from './prepared-trace';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceSettingsControls } from './TraceSettingsControls';
-import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
+import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
+import { resolveTraceCommitResult } from './trace-commit-result';
 import { useTracePreview } from './use-trace-preview';
 
 export function ImportImageDialog(): JSX.Element | null {
@@ -125,6 +127,7 @@ function DialogBody(props: {
       deleteSourceAfterTrace,
       boundary,
       boundaryMode,
+      ...preparedTraceEntry(preview),
       ...(props.replaceTraceId === undefined ? {} : { replaceTraceId: props.replaceTraceId }),
     };
     void commit(traceArgs, {
@@ -168,6 +171,14 @@ function DialogBody(props: {
       <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
     </Dialog>
   );
+}
+
+function preparedTraceEntry(preview: ReturnType<typeof useTracePreview>): {
+  readonly preparedTrace?: PreparedTrace;
+} {
+  return preview.kind === 'ready' && preview.preparedTrace !== undefined
+    ? { preparedTrace: preview.preparedTrace }
+    : {};
 }
 
 function isFilledContourTraceOptions(options: TraceOptions): boolean {
@@ -240,6 +251,7 @@ export async function commit(
     readonly replaceTraceId?: string;
     readonly boundary?: TraceBoundary | null;
     readonly boundaryMode?: BoundaryMode;
+    readonly preparedTrace?: PreparedTrace;
   },
   ctx: {
     readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
@@ -251,7 +263,6 @@ export async function commit(
 ): Promise<void> {
   ctx.setBusy(true);
   try {
-    const image = await loadImageAsRawData(args.file);
     // Direct tracedata path: ColoredPath[] directly, skipping the
     // SVG-string + parseSvg detour that flattened Béziers at coarse
     // tolerance. Curves stay at imagetracerjs's analytic fidelity
@@ -263,12 +274,7 @@ export async function commit(
     // re-traces the region supersampled and patches it into the full trace
     // (ADR-113). Either way geometry returns in source-image coordinates so
     // preview, commit, and overlay registration stay on the same pixels.
-    const { paths, bounds } = await traceImageWithBoundaryMode(
-      image,
-      args.options,
-      args.boundary ?? null,
-      args.boundaryMode ?? 'crop',
-    );
+    const { paths, bounds } = await resolveTraceCommitResult(args);
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,

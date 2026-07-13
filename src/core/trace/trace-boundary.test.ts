@@ -55,6 +55,20 @@ describe('trace boundary helpers', () => {
             ],
           },
         ],
+        curves: [
+          {
+            start: { x: 0, y: 1 },
+            segments: [
+              {
+                kind: 'cubic',
+                control1: { x: 1, y: 2 },
+                control2: { x: 2, y: 3 },
+                to: { x: 3, y: 4 },
+              },
+            ],
+            closed: false,
+          },
+        ],
       },
     ];
 
@@ -68,6 +82,20 @@ describe('trace boundary helpers', () => {
               { x: 10, y: 21 },
               { x: 13, y: 24 },
             ],
+          },
+        ],
+        curves: [
+          {
+            start: { x: 10, y: 21 },
+            segments: [
+              {
+                kind: 'cubic',
+                control1: { x: 11, y: 22 },
+                control2: { x: 12, y: 23 },
+                to: { x: 13, y: 24 },
+              },
+            ],
+            closed: false,
           },
         ],
       },

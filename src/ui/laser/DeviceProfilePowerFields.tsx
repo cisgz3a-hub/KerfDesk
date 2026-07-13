@@ -5,7 +5,12 @@
 // report) on its "placement & safety" step. The inline Device Profile panel
 // renders both directly and hides them in CNC mode (ADR-101 §6).
 
-import type { DeviceProfile } from '../../core/devices';
+import {
+  DEFAULT_FIRE_POWER_PERCENT,
+  HARD_MAX_FIRE_POWER_PERCENT,
+  profileSupportsCapability,
+  type DeviceProfile,
+} from '../../core/devices';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { numInputStyle, Row } from './device-settings-shared';
 
@@ -86,10 +91,63 @@ export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
   );
 }
 
+export function FireControlRow({ device, update }: DeviceRowsProps): JSX.Element | null {
+  if (!profileSupportsCapability(device, 'low-power-fire')) return null;
+  const control = device.fireControl ?? {
+    enabled: false,
+    maxPowerPercent: DEFAULT_FIRE_POWER_PERCENT,
+  };
+  return (
+    <Row label="Low-power Fire">
+      <span style={fireControlStyle}>
+        <label
+          style={inlineLabelStyle}
+          title="Explicitly allow the momentary Fire positioning beam for this machine profile."
+        >
+          <input
+            type="checkbox"
+            checked={control.enabled}
+            onChange={(event) =>
+              update({ fireControl: { ...control, enabled: event.target.checked } })
+            }
+            aria-label="Enable low-power Fire for this machine"
+            title="Enable the capped momentary Fire positioning beam for this machine profile."
+          />
+          <span>Enabled</span>
+        </label>
+        <ClearableNumberField
+          min={0.1}
+          max={HARD_MAX_FIRE_POWER_PERCENT}
+          step={0.1}
+          value={control.maxPowerPercent}
+          onCommit={(maxPowerPercent) => update({ fireControl: { ...control, maxPowerPercent } })}
+          style={firePowerInputStyle}
+          ariaLabel="Maximum Fire power percent"
+          title={`Maximum momentary Fire power. KerfDesk never allows more than ${HARD_MAX_FIRE_POWER_PERCENT}%.`}
+        />
+        <span>% max</span>
+      </span>
+    </Row>
+  );
+}
+
 const inlineLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 4,
   fontSize: 12,
   cursor: 'pointer',
+};
+
+const fireControlStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+  fontSize: 12,
+};
+
+const firePowerInputStyle: React.CSSProperties = {
+  ...numInputStyle,
+  width: 64,
 };

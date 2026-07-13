@@ -122,6 +122,15 @@ describe('tracedataToColoredPaths', () => {
     // Last point is the end of the Q (t = 1).
     expect(points[16]?.x).toBeCloseTo(10, 6);
     expect(points[16]?.y).toBeCloseTo(0, 6);
+    const segment = result[0]?.curves?.[0]?.segments[0];
+    expect(segment?.kind).toBe('cubic');
+    if (segment?.kind === 'cubic') {
+      expect(segment.control1.x).toBeCloseTo(10 / 3, 12);
+      expect(segment.control1.y).toBeCloseTo(20 / 3, 12);
+      expect(segment.control2.x).toBeCloseTo(20 / 3, 12);
+      expect(segment.control2.y).toBeCloseTo(20 / 3, 12);
+      expect(segment.to).toEqual({ x: 10, y: 0 });
+    }
   });
 
   it('Q midpoint sample matches the analytic Bezier formula', () => {

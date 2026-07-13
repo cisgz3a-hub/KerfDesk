@@ -14,6 +14,7 @@ import {
   type MaterialPreset,
 } from '../../io/material-library';
 import {
+  handleImportClbMaterialLibrary,
   handleOpenMaterialLibrary,
   handleSaveMaterialLibrary,
 } from './material-library-file-actions';
@@ -109,6 +110,28 @@ afterEach(() => {
 });
 
 describe('material library file actions', () => {
+  it('imports CLB through the platform picker and reports unsupported fields', async () => {
+    const setMaterialLibrary = vi.fn();
+    const pushToast = vi.fn();
+    await handleImportClbMaterialLibrary({
+      platform: mockPlatform({
+        open: async () => [
+          file(
+            'birch.clb',
+            '<Library><Material Name="Birch"><Entry Thickness="3" Desc="Cut"><CutSetting Speed="8" MaxPower="75" UnknownPulse="10" /></Entry></Material></Library>',
+          ),
+        ],
+      }),
+      setMaterialLibrary,
+      pushToast,
+    });
+    expect(setMaterialLibrary).toHaveBeenCalledOnce();
+    expect(pushToast).toHaveBeenCalledWith('Imported 1 CLB preset(s).', 'success');
+    expect(pushToast).toHaveBeenCalledWith(
+      '1 unsupported CLB field or entry warning(s) were reported.',
+      'warning',
+    );
+  });
   it('opens a valid native material library file', async () => {
     const doc = library();
     const setMaterialLibrary = vi.fn();

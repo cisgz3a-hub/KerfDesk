@@ -5,7 +5,7 @@ import { createProject, PROJECT_SCHEMA_VERSION } from './project';
 describe('createProject', () => {
   it('starts at schemaVersion 1 (Phase A)', () => {
     expect(createProject().schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(PROJECT_SCHEMA_VERSION).toBe(1);
+    expect(PROJECT_SCHEMA_VERSION).toBe(2);
   });
 
   it('uses the default device profile when none is passed', () => {

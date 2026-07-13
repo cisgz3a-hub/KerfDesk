@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { usePlatform } from '../../app';
 import { loadRtspCameraUrl, saveRtspCameraUrl } from '../../state/camera-preference-storage';
 import { useCameraStore } from '../../state/camera-store';
+import { CameraSourceView } from '../CameraSourceView';
 import { noteStyle, rowStyle, sectionStyle } from './panel-styles';
 
 export function RtspSourceControls(): JSX.Element {
@@ -53,6 +54,9 @@ export function RtspSourceControls(): JSX.Element {
           {rtspActive ? 'Connected' : 'Connect'}
         </button>
       </div>
+      {rtspActive && sourceState.kind === 'live' ? (
+        <CameraSourceView source={sourceState.source} />
+      ) : null}
     </details>
   );
 }

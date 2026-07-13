@@ -3,8 +3,11 @@
 
 import { describeAlarm } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
+import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
+import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { machineControlsLabel, machineDisplayName, machineNoun } from '../machine/machine-labels';
@@ -21,6 +24,7 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
+  const machinePanel = useMachinePanelVisibility();
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -57,15 +61,20 @@ export function LaserWindow(): JSX.Element {
   const supportsSerial = platform.serial.isSupported();
   // File-only profiles (Ruida .rd export) have no live link to open — the
   // Connect button and machine controls stay dark and a hint explains why.
-  const isFileOnlyProfile =
-    selectControllerDriver(controllerKind).capabilities.transport === 'file-only';
+  const isFileOnlyProfile = isFileOnlyController(controllerKind);
+
+  if (!machinePanel.requestedVisible && !jobActive) {
+    return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
+  }
 
   return (
     <aside aria-label={machineControlsLabel(machineKind)} className="lf-rail" style={panelStyle}>
       <DetectedSettingsToast />
-      <h2 className="lf-heading" style={headingStyle}>
-        {machineDisplayName(machineKind)}
-      </h2>
+      <MachineRailHeading
+        machineKind={machineKind}
+        jobActive={jobActive}
+        onCollapse={machinePanel.toggle}
+      />
       <SafetyNoticeBanner />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <DeviceSetupControls />
@@ -99,6 +108,49 @@ export function LaserWindow(): JSX.Element {
       />
       <ConsolePanel />
     </aside>
+  );
+}
+
+function useMachinePanelVisibility(): {
+  readonly requestedVisible: boolean;
+  readonly toggle: () => void;
+} {
+  const requestedVisible = useUiStore((s) => s.railPanelVisibility.machine);
+  const togglePanel = useUiStore((s) => s.toggleRailPanel);
+  return { requestedVisible, toggle: () => togglePanel('machine') };
+}
+
+function isFileOnlyController(
+  controllerKind: Parameters<typeof selectControllerDriver>[0],
+): boolean {
+  return selectControllerDriver(controllerKind).capabilities.transport === 'file-only';
+}
+
+function CollapsedMachineRail(props: {
+  readonly machineKind: MachineKind;
+  readonly onExpand: () => void;
+}): JSX.Element {
+  return (
+    <CollapsedRail
+      title={machineDisplayName(props.machineKind)}
+      ariaLabel={`${machineControlsLabel(props.machineKind)} collapsed`}
+      onExpand={props.onExpand}
+    />
+  );
+}
+
+function MachineRailHeading(props: {
+  readonly machineKind: MachineKind;
+  readonly jobActive: boolean;
+  readonly onCollapse: () => void;
+}): JSX.Element {
+  return (
+    <RailPanelHeading
+      title={machineDisplayName(props.machineKind)}
+      onCollapse={props.onCollapse}
+      collapseDisabled={props.jobActive}
+      collapseDisabledReason="Machine controls stay visible while a job is active so Stop remains reachable."
+    />
   );
 }
 
@@ -255,7 +307,6 @@ const panelStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 10,
 };
-const headingStyle: React.CSSProperties = { margin: '0 0 4px 0' };
 const hintStyle: React.CSSProperties = {
   color: 'var(--lf-danger-fg)',
   fontStyle: 'italic',

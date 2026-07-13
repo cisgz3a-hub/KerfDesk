@@ -6,6 +6,7 @@
 
 import {
   findRegistrationBoxes,
+  type EmbeddedFont,
   type Layer,
   type Project,
   type SceneObject,
@@ -71,8 +72,8 @@ export function objectInsertActions(
       fitAllObjects(get);
       return outcome;
     },
-    upsertTextObject: (text: TextObject) => {
-      set((s) => applyUpsertText(s, text));
+    upsertTextObject: (text: TextObject, embeddedFont?: EmbeddedFont) => {
+      set((s) => applyTextAndEmbeddedFont(s, text, embeddedFont));
     },
     drawShape: (shape: ShapeObject) => {
       set((s) => applyDrawShape(s, shape));
@@ -120,6 +121,14 @@ export function objectInsertActions(
       set((s) => applySetRegistrationBoxLocked(s, locked) ?? s);
     },
   };
+}
+
+function applyTextAndEmbeddedFont(state: AppState, text: TextObject, embeddedFont?: EmbeddedFont) {
+  const next = applyUpsertText(state, text);
+  if (embeddedFont === undefined) return next;
+  const existing = next.project.embeddedFonts ?? [];
+  const embeddedFonts = [...existing.filter((font) => font.key !== embeddedFont.key), embeddedFont];
+  return { ...next, project: { ...next.project, embeddedFonts } };
 }
 
 function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(

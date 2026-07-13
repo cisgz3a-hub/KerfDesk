@@ -56,9 +56,20 @@ describe('textToPolylines', () => {
     expect(r.paths[0]?.polylines.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('preserves native cubic glyph outlines alongside compatibility polylines', async () => {
+    const r = await render('S');
+    const path = r.paths[0];
+    expect(path?.curves).toHaveLength(path?.polylines.length ?? 0);
+    expect(
+      path?.curves?.some((curve) => curve.segments.some((segment) => segment.kind === 'cubic')),
+    ).toBe(true);
+    expect(path?.curves?.every((curve) => curve.closed)).toBe(true);
+  });
+
   it('empty content produces no polylines and zero-area bounds', async () => {
     const r = await render('');
     expect(r.paths[0]?.polylines.length).toBe(0);
+    expect(r.paths[0]?.curves).toEqual([]);
     expect(r.bounds).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
   });
 

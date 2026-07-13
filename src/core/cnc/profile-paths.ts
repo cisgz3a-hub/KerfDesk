@@ -27,10 +27,16 @@ function isFinitePoint(point: Vec2): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
+// allowanceMm is the finish allowance ("stock to leave"): the roughing pass is
+// offset by tool radius + allowance so it stays that far PROUD of the finished
+// wall; the finishing pass calls this with allowance 0 for the true contour.
+// Only widens the offset for side-offset (outside/inside) cuts — on-path is
+// always centered. Default 0 keeps pre-allowance callers byte-identical.
 export function profileToolpathPolylines(
   polylines: ReadonlyArray<Polyline>,
   side: ProfileSide,
   toolDiameterMm: number,
+  allowanceMm = 0,
 ): ReadonlyArray<Polyline> {
   const closed: Polyline[] = [];
   const open: Polyline[] = [];
@@ -43,7 +49,8 @@ export function profileToolpathPolylines(
     }
   }
   const radius = Math.max(0, toolDiameterMm) / 2;
-  const delta = side === 'outside' ? radius : side === 'inside' ? -radius : 0;
+  const magnitude = radius + Math.max(0, allowanceMm);
+  const delta = side === 'outside' ? magnitude : side === 'inside' ? -magnitude : 0;
   const offsetClosed = delta === 0 ? closed : offsetClosedPolylinesForKerf(closed, delta);
   return [...offsetClosed, ...open];
 }

@@ -1,5 +1,13 @@
-import { applyTransform, type SceneObject, type Vec2 } from '../../core/scene';
-import type { PathNodeRef } from '../state/path-node-edit-actions';
+import {
+  applyTransform,
+  curveControlPoint,
+  curveNodeCount,
+  curveNodePoint,
+  type ColoredPath,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
+import { pathNodeRefsEqual, type PathNodeRef } from '../state/path-node-edit-actions';
 import { canvasTheme } from '../theme/canvas-theme';
 import type { ViewTransform } from './view-transform';
 
@@ -17,6 +25,10 @@ export function drawPathNodeHandles(
   for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
     const path = object.paths[pathIndex];
     if (path === undefined) continue;
+    if (path.curves !== undefined) {
+      drawCurvePathHandles(ctx, object, path, pathIndex, view, selectedNodes);
+      continue;
+    }
     for (let polylineIndex = 0; polylineIndex < path.polylines.length; polylineIndex += 1) {
       const polyline = path.polylines[polylineIndex];
       if (polyline === undefined) continue;
@@ -31,6 +43,75 @@ export function drawPathNodeHandles(
       }
     }
   }
+}
+
+function drawCurvePathHandles(
+  ctx: CanvasRenderingContext2D,
+  object: SceneObject,
+  path: ColoredPath,
+  pathIndex: number,
+  view: ViewTransform,
+  selectedNodes: ReadonlyArray<PathNodeRef>,
+): void {
+  for (let curveIndex = 0; curveIndex < (path.curves?.length ?? 0); curveIndex += 1) {
+    const curve = path.curves?.[curveIndex];
+    if (curve === undefined) continue;
+    for (let nodeIndex = 0; nodeIndex < curveNodeCount(curve); nodeIndex += 1) {
+      const anchor = curveNodePoint(curve, nodeIndex);
+      if (anchor === null) continue;
+      const ref: PathNodeRef = {
+        objectId: object.id,
+        pathIndex,
+        polylineIndex: curveIndex,
+        pointIndex: nodeIndex,
+        geometry: 'curve',
+      };
+      const selected = selectedNodes.some(
+        (candidate) =>
+          pathNodeRefsEqual(candidate, ref) ||
+          (candidate.geometry === 'curve' &&
+            candidate.objectId === ref.objectId &&
+            candidate.pathIndex === ref.pathIndex &&
+            candidate.polylineIndex === ref.polylineIndex &&
+            candidate.pointIndex === ref.pointIndex),
+      );
+      drawNodeHandle(ctx, screenPoint(anchor, object, view), selected);
+      if (selected) drawCurveControls(ctx, object, curve, ref, view);
+    }
+  }
+}
+
+function drawCurveControls(
+  ctx: CanvasRenderingContext2D,
+  object: SceneObject,
+  curve: NonNullable<ColoredPath['curves']>[number],
+  anchorRef: PathNodeRef,
+  view: ViewTransform,
+): void {
+  const anchor = curveNodePoint(curve, anchorRef.pointIndex);
+  if (anchor === null) return;
+  const anchorScreen = screenPoint(anchor, object, view);
+  for (const side of ['incoming', 'outgoing'] as const) {
+    const control = curveControlPoint(curve, anchorRef.pointIndex, side);
+    if (control === null) continue;
+    const controlScreen = screenPoint(control, object, view);
+    ctx.strokeStyle = canvasTheme.pathNodeHandleStroke;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(anchorScreen.x, anchorScreen.y);
+    ctx.lineTo(controlScreen.x, controlScreen.y);
+    ctx.stroke();
+    drawControlHandle(ctx, controlScreen);
+  }
+}
+
+function drawControlHandle(ctx: CanvasRenderingContext2D, point: Vec2): void {
+  const size = 5;
+  const half = size / 2;
+  ctx.fillStyle = canvasTheme.pathNodeHandleFill;
+  ctx.strokeStyle = canvasTheme.pathNodeHandleStroke;
+  ctx.fillRect(point.x - half, point.y - half, size, size);
+  ctx.strokeRect(point.x - half, point.y - half, size, size);
 }
 
 function isNodeEditableVector(

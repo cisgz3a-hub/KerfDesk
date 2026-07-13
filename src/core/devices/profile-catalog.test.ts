@@ -88,6 +88,13 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     expect(entry === undefined ? false : profileSupportsCapability(entry.profile, 'grbl')).toBe(
       true,
     );
+    expect(entry === undefined ? false : profileSupportsCapability(entry.profile, 'rotary')).toBe(
+      true,
+    );
+    const marlin = profileCatalogEntryById('generic-marlin-laser');
+    expect(marlin === undefined ? true : profileSupportsCapability(marlin.profile, 'rotary')).toBe(
+      false,
+    );
   });
 
   it('duplicates a built-in profile as a custom editable profile', () => {

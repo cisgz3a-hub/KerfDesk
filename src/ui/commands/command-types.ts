@@ -53,6 +53,9 @@ export type CommandId =
   | 'tools.scan-offset-test'
   | 'tools.focus-test'
   | 'tools.optimization-settings'
+  | 'tools.rotary-setup'
+  | 'tools.print-and-cut'
+  | 'tools.labs'
   | 'tools.adjust-image'
   | 'tools.apply-image-mask'
   | 'tools.crop-image'
@@ -82,12 +85,16 @@ export type CommandId =
   | 'arrange.distribute-vertical-centers'
   | 'arrange.distribute-vertical-spacing'
   | 'arrange.break-apart'
+  | 'arrange.array'
+  | 'arrange.quick-nest'
   | 'arrange.flip-horizontal'
   | 'arrange.flip-vertical'
   | 'laser.connect'
   | 'laser.disconnect'
   | 'laser.home'
   | 'window.toggle-preview'
+  | 'window.toggle-layers-panel'
+  | 'window.toggle-machine-panel'
   | 'window.fit-view'
   | 'window.project-notes'
   | 'window.undo-history'
@@ -118,6 +125,7 @@ export type AppCommandContext = {
   readonly serialSupported: boolean;
   readonly connected: boolean;
   readonly machineBusy: boolean;
+  readonly jobActive: boolean;
   readonly homingEnabled: boolean;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
@@ -182,6 +190,13 @@ export type AppCommandContext = {
   readonly focusTestAvailable: boolean;
   readonly focusTest: () => void;
   readonly optimizationSettings: () => void;
+  readonly rotaryFeatureEnabled: boolean;
+  readonly rotaryProfileSupported: boolean;
+  readonly rotarySetup: () => void;
+  readonly printAndCutFeatureEnabled: boolean;
+  readonly printAndCutProfileSupported: boolean;
+  readonly printAndCut: () => void;
+  readonly labsSettings: () => void;
   readonly adjustImage: () => void;
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;
@@ -206,6 +221,8 @@ export type AppCommandContext = {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly canBreakApartSelection: boolean;
   readonly breakApartSelection: () => void;
+  readonly createArray: () => void;
+  readonly quickNest: () => void;
   readonly flipHorizontal: () => void;
   readonly flipVertical: () => void;
   readonly connectLaser: () => void;
@@ -214,6 +231,10 @@ export type AppCommandContext = {
   readonly togglePreview: () => void;
   readonly previewActive: boolean;
   readonly hasPreviewableContent: boolean;
+  readonly layersPanelOpen: boolean;
+  readonly toggleLayersPanel: () => void;
+  readonly machinePanelOpen: boolean;
+  readonly toggleMachinePanel: () => void;
   readonly resetView: () => void;
   readonly projectNotes: () => void;
   readonly undoHistory: () => void;

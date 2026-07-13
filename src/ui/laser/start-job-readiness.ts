@@ -1,4 +1,5 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { SimilarityTransform } from '../../core/registration';
 import {
   computeJobBounds,
   describeFramePreflightFailure,
@@ -15,7 +16,14 @@ import {
   type OutputScope,
   type Project,
 } from '../../core/scene';
-import { emitGcode, prepareOutput } from '../../io/gcode';
+import {
+  emitGcode,
+  emitPreparedGcode,
+  prepareOutput,
+  prepareOutputSnapshot,
+  type PreparedOutput,
+  type VariableTextRenderer,
+} from '../../io/gcode';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
 import {
@@ -91,6 +99,7 @@ export function prepareStartJob(
   // head XY and its checkpoint fingerprint) while the live machine is still
   // re-validated through the origin's mode (R1).
   resolvedJobOrigin?: JobOriginPlacement,
+  allowRotaryRaster?: boolean,
 ): StartJobPreparation {
   const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
@@ -109,6 +118,7 @@ export function prepareStartJob(
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    allowRotaryRaster: allowRotaryRaster === true,
   });
   if (!preflight.ok) {
     return { ok: false, messages: preflight.issues.map((i) => i.message) };
@@ -131,6 +141,72 @@ export function prepareStartJob(
     machine,
   );
   return okPreparation(gcode, warnings, placement.jobOrigin);
+}
+
+export async function prepareStartJobSnapshot(
+  project: Project,
+  controllerSettings: ControllerSettingsSnapshot | null,
+  machine: MachineStartSnapshot,
+  jobPlacement: JobPlacementSettings,
+  outputScope: OutputScope,
+  allowRotaryRaster: boolean,
+  options: {
+    readonly clock: () => Date;
+    readonly renderVariableText: VariableTextRenderer;
+    readonly registration?: SimilarityTransform | null;
+  },
+): Promise<StartJobPreparation> {
+  const machineIssues = findEarlyStartIssues(project, machine);
+  if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
+
+  const placement = resolveStartPlacement(jobPlacement, machine, undefined);
+  if (!placement.ok) return { ok: false, messages: placement.messages };
+  const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
+  const preEmitIssues = findScopedPreEmitIssues(project, outputScope);
+  if (preEmitIssues.length > 0) return { ok: false, messages: preEmitIssues };
+
+  const prepared = await prepareOutputSnapshot(project, {
+    clock: options.clock,
+    renderVariableText: options.renderVariableText,
+    ...registrationOption(options.registration),
+    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+    outputScope,
+  });
+  if (!prepared.ok) {
+    return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
+  }
+  const originBoundsIssue = placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
+  if (originBoundsIssue !== null) return { ok: false, messages: [originBoundsIssue] };
+
+  const { gcode, preflight } = emitPreparedGcode(prepared, {
+    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+    outputScope,
+    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    allowRotaryRaster,
+  });
+  if (!preflight.ok) {
+    return { ok: false, messages: preflight.issues.map((issue) => issue.message) };
+  }
+  const verifiedFrameIssue = verifiedFrameIssueFromPrepared(prepared, placement, machine);
+  if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
+
+  const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
+  if (!controller.ok) {
+    return { ok: false, messages: controller.errors.map((issue) => issue.message) };
+  }
+  const warnings = collectStartWarnings(
+    project,
+    controllerSettings,
+    controller.warnings.map((issue) => issue.message),
+    machine,
+  );
+  return okPreparation(gcode, warnings, placement.jobOrigin);
+}
+
+function registrationOption(registration: SimilarityTransform | null | undefined): {
+  readonly registration?: SimilarityTransform | null;
+} {
+  return registration === undefined ? {} : { registration };
 }
 
 function okPreparation(
@@ -212,7 +288,16 @@ function findPlacementBoundsIssue(
   }
   const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
   if (!prepared.ok) return null;
-  const bounds = computeJobBounds(prepared.job, project.device);
+  return placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
+}
+
+function placementBoundsIssueFromPrepared(
+  prepared: Extract<PreparedOutput, { readonly ok: true }>,
+  placement: Extract<ResolvedJobPlacement, { ok: true }>,
+  motionOffset: { readonly x: number; readonly y: number } | undefined,
+): string | null {
+  if (placement.jobOrigin === undefined || motionOffset === undefined) return null;
+  const bounds = computeJobBounds(prepared.job, prepared.project.device);
   if (bounds === null) return null;
   const physicalBounds = {
     minX: bounds.minX + motionOffset.x,
@@ -220,7 +305,7 @@ function findPlacementBoundsIssue(
     maxX: bounds.maxX + motionOffset.x,
     maxY: bounds.maxY + motionOffset.y,
   };
-  const preflight = framePreflight(physicalBounds, project.device);
+  const preflight = framePreflight(physicalBounds, prepared.project.device);
   if (preflight.kind === 'ok') return null;
   if (preflight.kind === 'no-go-zone') {
     return `Selected job origin would place this job through no-go zone "${preflight.zoneName}".`;
@@ -243,7 +328,16 @@ function findVerifiedFrameGateIssue(
   if (placement.jobOrigin?.startFrom !== 'verified-origin') return null;
   const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
   if (!prepared.ok) return null;
-  const bounds = computeJobBounds(prepared.job, project.device);
+  return verifiedFrameIssueFromPrepared(prepared, placement, machine);
+}
+
+function verifiedFrameIssueFromPrepared(
+  prepared: Extract<PreparedOutput, { readonly ok: true }>,
+  placement: Extract<ResolvedJobPlacement, { ok: true }>,
+  machine: MachineStartSnapshot,
+): string | null {
+  if (placement.jobOrigin?.startFrom !== 'verified-origin') return null;
+  const bounds = computeJobBounds(prepared.job, prepared.project.device);
   if (bounds === null) return null;
   const valid = isVerifiedFrameValid(machine.frameVerification ?? null, {
     boundsSignature: frameBoundsSignature(bounds),

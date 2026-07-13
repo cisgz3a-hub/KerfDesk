@@ -4,6 +4,7 @@ import { controllerOperationCommandBlockMessage } from './laser-controller-opera
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
+  FIRE_ACTIVE_COMMAND_MESSAGE,
   MOTION_OPERATION_ACTIVE_MESSAGE,
   UNKNOWN_IDLE_STATUS_MESSAGE,
   isActiveJob,
@@ -82,6 +83,7 @@ function consoleCommandBlockReason(
 ): string | null {
   if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
   if (command.requiresNoActiveOperation) {
+    if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
     if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
     if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
     const controllerOperationMessage = controllerOperationCommandBlockMessage(

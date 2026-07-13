@@ -145,6 +145,18 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Adjust path ordering and travel optimization for output.',
   },
+  'tools.rotary-setup': {
+    family: 'tools',
+    tooltip: 'Configure and calibrate a roller or chuck rotary attachment.',
+  },
+  'tools.print-and-cut': {
+    family: 'tools',
+    tooltip: 'Register printed artwork to two measured machine points before cutting.',
+  },
+  'tools.labs': {
+    family: 'tools',
+    tooltip: 'Enable experimental machine workflows that are still being hardware-validated.',
+  },
   'tools.adjust-image': {
     family: 'tools',
     tooltip: 'Tune brightness, contrast, gamma, and dithering for the selected image.',
@@ -262,6 +274,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'arrange',
     tooltip: 'Split selected imported SVG paths into separate selectable objects.',
   },
+  'arrange.array': {
+    family: 'arrange',
+    tooltip: 'Create a bounded grid or circular array from the selected artwork.',
+  },
+  'arrange.quick-nest': {
+    family: 'arrange',
+    tooltip: 'Pack selected groups and objects deterministically without overlap.',
+  },
   'arrange.flip-horizontal': {
     family: 'arrange',
     tooltip: 'Mirror the selected artwork horizontally around its center.',
@@ -287,6 +307,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'window.toggle-preview': {
     family: 'window',
     tooltip: 'Preview the exact toolpath that will be sent to the machine.',
+  },
+  'window.toggle-layers-panel': {
+    family: 'window',
+    tooltip: 'Show or hide the Cuts / Layers panel to control the workspace width.',
+  },
+  'window.toggle-machine-panel': {
+    family: 'window',
+    tooltip: 'Show or hide the machine controls panel when no job is active.',
   },
   'window.fit-view': {
     family: 'window',

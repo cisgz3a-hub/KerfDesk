@@ -281,6 +281,37 @@ describe('file actions contextual failure handling', () => {
     ).toBe(true);
   });
 
+  it('advances variables only after the export write succeeds', async () => {
+    const project = projectWithLine();
+    const advanceVariablesAfter = vi.fn();
+    const toast = toasts();
+    await handleSaveGcode({
+      platform: mockPlatform({
+        save: async () => ({ displayName: 'out.gcode', write: async () => undefined }),
+      }),
+      project,
+      savedName: null,
+      advanceVariablesAfter,
+      pushToast: toast.pushToast,
+    });
+    expect(advanceVariablesAfter).toHaveBeenCalledWith(project, 'successful-export');
+
+    advanceVariablesAfter.mockClear();
+    await handleSaveGcode({
+      platform: mockPlatform({
+        save: async () => ({
+          displayName: 'failed.gcode',
+          write: async () => Promise.reject(new Error('disk full')),
+        }),
+      }),
+      project,
+      savedName: null,
+      advanceVariablesAfter,
+      pushToast: toast.pushToast,
+    });
+    expect(advanceVariablesAfter).not.toHaveBeenCalled();
+  });
+
   it('saves only selected artwork when Cut Selected Graphics is enabled', async () => {
     const written: string[] = [];
     const target: SaveTarget = {

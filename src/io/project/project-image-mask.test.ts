@@ -47,7 +47,9 @@ describe('project image mask persistence', () => {
     const result = deserializeProject(serializeProject(original));
 
     expect(result.kind).toBe('ok');
-    if (result.kind === 'ok') expect(result.project).toEqual(original);
+    if (result.kind === 'ok') {
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
+    }
   });
 
   it('rejects a malformed image mask reference', () => {

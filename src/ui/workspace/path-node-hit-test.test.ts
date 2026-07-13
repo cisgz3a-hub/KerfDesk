@@ -55,6 +55,7 @@ describe('hitPathNode', () => {
       pathIndex: 0,
       polylineIndex: 0,
       pointIndex: 0,
+      geometry: 'curve',
     });
   });
 
@@ -62,6 +63,57 @@ describe('hitPathNode', () => {
     const scene = withObjects(importedSvg('logo', [path([{ x: 0, y: 0 }])]));
 
     expect(hitPathNode(scene, { x: 20, y: 20 }, 0.25)).toBeNull();
+  });
+
+  it('hits canonical anchors and selected cubic controls instead of sampled points', () => {
+    const curved: ColoredPath = {
+      color: '#000000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 0, y: 0 },
+            { x: 5, y: 4 },
+            { x: 10, y: 0 },
+          ],
+        },
+      ],
+      curves: [
+        {
+          start: { x: 0, y: 0 },
+          segments: [
+            {
+              kind: 'cubic',
+              control1: { x: 2, y: 5 },
+              control2: { x: 8, y: 5 },
+              to: { x: 10, y: 0 },
+            },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const scene = withObjects(importedSvg('curve', [curved]));
+    expect(hitPathNode(scene, { x: 15, y: 3 }, 0.2)).toEqual({
+      objectId: 'curve',
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex: 1,
+      geometry: 'curve',
+    });
+    const selected = [
+      {
+        objectId: 'curve',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 0,
+        geometry: 'curve' as const,
+      },
+    ];
+    expect(hitPathNode(scene, { x: 7, y: 8 }, 0.2, selected)).toEqual({
+      ...selected[0],
+      handle: 'outgoing',
+    });
   });
 
   it('ignores editable nodes on hidden layers', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { inkDisc, paper, toRawImage } from '../../__fixtures__/perceptual/procedural-ink';
 import { filledStarImage, starOuterTips } from '../../__fixtures__/perceptual/star-fixture';
-import { traceImageToEdgePaths } from './edge-trace';
+import { filterEdgePolylinesByLength, traceImageToEdgePaths } from './edge-trace';
 import { TRACE_PRESETS } from './trace-presets';
 import type { RawImageData } from './trace-image';
 
@@ -229,6 +229,31 @@ function samplePathAtUnitSteps(polyline: TestPolyline): Array<{ x: number; y: nu
 }
 
 describe('traceImageToEdgePaths', () => {
+  it('defines Minimum line as polyline length rather than enclosed area', () => {
+    const short = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+        { x: 2, y: 2 },
+        { x: 0, y: 2 },
+        { x: 0, y: 0 },
+      ],
+    };
+    const longThin = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 1 },
+        { x: 0, y: 1 },
+        { x: 0, y: 0 },
+      ],
+    };
+
+    expect(filterEdgePolylinesByLength([short, longThin], 10)).toEqual([longThin]);
+  });
+
   it("traces a filled square's edges as polylines spanning its boundary", () => {
     const paths = traceImageToEdgePaths(filledSquare(64, 18, 46), EDGE_OPTIONS);
     expect(paths.length).toBeGreaterThan(0);

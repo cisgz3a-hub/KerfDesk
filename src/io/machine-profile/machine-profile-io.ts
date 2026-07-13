@@ -4,6 +4,7 @@ import {
   normalizeGrblRxBufferBytes,
   normalizeGrblStreamingMode,
   streamingModeForController,
+  normalizeLaserFireControl,
   normalizeScanOffsetTable,
   validateMachineProfile,
   type DeviceProfile,
@@ -252,6 +253,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...canonicalMachineMetadata(profile),
     ...canonicalCameraGeometry(profile),
     gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
+    ...(profile.baudRate !== undefined ? { baudRate: profile.baudRate } : {}),
     streamingMode: streamingModeForController(
       profile.controllerKind,
       normalizeGrblStreamingMode(profile.streamingMode),
@@ -266,7 +268,10 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     airAssistCommand: profile.airAssistCommand,
     scanningOffsets: normalizeScanOffsetTable(profile.scanningOffsets),
     noGoZones: profile.noGoZones.map((zone) => ({ ...zone })),
+    ...canonicalCameraCalibration(profile),
+    ...canonicalCameraAlignment(profile),
     ...(profile.rotary !== undefined ? { rotary: { ...profile.rotary } } : {}),
+    ...canonicalFireControl(profile),
     origin: profile.origin,
     homing: { ...profile.homing },
     autofocusCommand: profile.autofocusCommand,
@@ -275,6 +280,21 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     junctionDeviationMm: profile.junctionDeviationMm,
     ...canonicalZMetadata(profile),
   };
+}
+
+function canonicalCameraCalibration(profile: DeviceProfile): Partial<DeviceProfile> {
+  const calibration = normalizeCameraCalibration(profile.cameraCalibration);
+  return calibration === undefined ? {} : { cameraCalibration: calibration };
+}
+
+function canonicalCameraAlignment(profile: DeviceProfile): Partial<DeviceProfile> {
+  const alignment = normalizeCameraAlignment(profile.cameraAlignment);
+  return alignment === undefined ? {} : { cameraAlignment: alignment };
+}
+
+function canonicalFireControl(profile: DeviceProfile): Partial<DeviceProfile> {
+  const fireControl = normalizeLaserFireControl(profile.fireControl);
+  return fireControl === undefined ? {} : { fireControl };
 }
 
 function canonicalIdentityMetadata(profile: DeviceProfile): Partial<DeviceProfile> {

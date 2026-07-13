@@ -12,6 +12,23 @@ function profileWithCalibration(): DeviceProfile {
   return {
     ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
     profileSource: 'custom',
+    baudRate: 250000,
+    cameraCalibration: {
+      intrinsics: { fx: 900, fy: 905, cx: 640, cy: 360 },
+      distortion: [0.1, -0.02, 0.003, -0.0004],
+      imageWidth: 1280,
+      imageHeight: 720,
+      rmsPx: 0.42,
+      calibratedAt: 1_788_000_000_000,
+    },
+    cameraAlignment: {
+      homography: [1, 0, 2, 0, 1, 3, 0, 0, 1],
+      frameWidth: 1280,
+      frameHeight: 720,
+      basis: 'rectified',
+      alignedAt: 1_788_000_100_000,
+    },
+    fireControl: { enabled: true, maxPowerPercent: 1.5 },
     scanningOffsets: [
       { speedMmPerMin: 6000, offsetMm: 0.18 },
       { speedMmPerMin: 3000, offsetMm: 0.09 },
@@ -70,6 +87,17 @@ describe('LaserForge machine profile documents', () => {
         gcodeDialect: { dialectId: 'neotronics-4040-safe' },
         streamingMode: 'char-counted',
         rxBufferBytes: 120,
+        baudRate: 250000,
+        cameraCalibration: {
+          intrinsics: { fx: 900, fy: 905, cx: 640, cy: 360 },
+          distortion: [0.1, -0.02, 0.003, -0.0004],
+          rmsPx: 0.42,
+        },
+        cameraAlignment: {
+          homography: [1, 0, 2, 0, 1, 3, 0, 0, 1],
+          basis: 'rectified',
+        },
+        fireControl: { enabled: true, maxPowerPercent: 1.5 },
         scanningOffsets: [
           { speedMmPerMin: 3000, offsetMm: 0.09 },
           { speedMmPerMin: 6000, offsetMm: 0.18 },
@@ -81,7 +109,7 @@ describe('LaserForge machine profile documents', () => {
     });
   });
 
-  it('roundtrips calibrated scan offsets and no-go zones', () => {
+  it('roundtrips transport, camera calibration, alignment, scan offsets, and no-go zones', () => {
     const original = serializeMachineProfileDocument({
       format: MACHINE_PROFILE_FORMAT,
       schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
@@ -101,6 +129,14 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.gcodeDialect.dialectId).toBe('neotronics-4040-safe');
     expect(result.document.profile.streamingMode).toBe('char-counted');
     expect(result.document.profile.rxBufferBytes).toBe(120);
+    expect(result.document.profile.baudRate).toBe(250000);
+    expect(result.document.profile.cameraCalibration).toEqual(
+      profileWithCalibration().cameraCalibration,
+    );
+    expect(result.document.profile.cameraAlignment).toEqual(
+      profileWithCalibration().cameraAlignment,
+    );
+    expect(result.document.profile.fireControl).toEqual({ enabled: true, maxPowerPercent: 1.5 });
     expect(result.document.profile.noGoZones).toHaveLength(1);
   });
 
@@ -166,6 +202,10 @@ describe('LaserForge machine profile documents', () => {
       kind: 'invalid',
       reason: 'profile.rxBufferBytes is invalid',
     });
+    expect(deserializeProfilePatch({ baudRate: 115200.5 })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.baudRate must be a positive integer',
+    });
   });
 
   it('rejects malformed nested machine profile fields before canonicalizing', () => {
@@ -192,6 +232,27 @@ describe('LaserForge machine profile documents', () => {
     ).toEqual({
       kind: 'invalid',
       reason: 'profile.laserSubProfile is invalid',
+    });
+    expect(deserializeProfilePatch({ cameraCalibration: { imageWidth: 1280 } })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.cameraCalibration is invalid',
+    });
+    expect(
+      deserializeProfilePatch({
+        cameraAlignment: {
+          ...profileWithCalibration().cameraAlignment,
+          homography: [1, 0, 0],
+        },
+      }),
+    ).toEqual({
+      kind: 'invalid',
+      reason: 'profile.cameraAlignment is invalid',
+    });
+    expect(
+      deserializeProfilePatch({ fireControl: { enabled: true, maxPowerPercent: 50 } }),
+    ).toEqual({
+      kind: 'invalid',
+      reason: 'profile.fireControl is invalid',
     });
   });
 

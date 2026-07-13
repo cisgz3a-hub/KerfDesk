@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightBurnLibrary DisplayName="main material library">
+    <Material name="ABS Black">
+        <Entry Thickness="1.5000" Desc="cut">
+            <CutSetting type="Cut">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="ABS Black/1.5000/cut"/>
+                <minPower Value="10"/>
+                <maxPower Value="90"/>
+                <maxPower2 Value="20"/>
+                <speed Value="18.3333"/>
+                <numPasses Value="3"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+        <Entry Thickness="1.5000" Desc="engrave">
+            <CutSetting type="Scan">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="ABS Black/1.5000/engrave"/>
+                <minPower Value="10"/>
+                <maxPower Value="25"/>
+                <maxPower2 Value="20"/>
+                <speed Value="33.3333"/>
+                <overscan Value="0"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+    </Material>
+    <Material name="Basswood">
+        <Entry Thickness="2.0000" Desc="cut">
+            <CutSetting type="Cut">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="Basswood/2.0000/cut"/>
+                <maxPower Value="80"/>
+                <maxPower2 Value="20"/>
+                <speed Value="18.3333"/>
+                <numPasses Value="3"/>
+                <priority Value="0"/>
+            </CutSetting>
+        </Entry>
+        <Entry Thickness="2.0000" Desc="engrave">
+            <CutSetting type="Scan">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="Basswood/2.0000/engrave"/>
+                <maxPower Value="30"/>
+                <maxPower2 Value="20"/>
+                <speed Value="56.6667"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+    </Material>
+    <Material name="EVA Foam Black">
+        <Entry Thickness="2.0000" Desc="cut">
+            <CutSetting type="Cut">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="EVA Foam Black/2.0000/cut"/>
+                <maxPower Value="90"/>
+                <maxPower2 Value="20"/>
+                <speed Value="133.333"/>
+                <numPasses Value="2"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+        <Entry Thickness="2.0000" Desc="engrave">
+            <CutSetting type="Scan">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="EVA Foam Black/2.0000/engrave"/>
+                <maxPower Value="20"/>
+                <maxPower2 Value="20"/>
+                <speed Value="133.333"/>
+                <numPasses Value="2"/>
+                <overscan Value="0"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+    </Material>
+    <Material name="EVA Foam White">
+        <Entry Thickness="8.0000" Desc="cut 16pass">
+            <CutSetting type="Cut">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="EVA Foam White/8.0000/cut 16pass"/>
+                <minPower Value="10"/>
+                <maxPower Value="90"/>
+                <maxPower2 Value="20"/>
+                <speed Value="46.6667"/>
+                <numPasses Value="16"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+        <Entry Thickness="8.0000" Desc="engrave">
+            <CutSetting type="Scan">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="EVA Foam White/8.0000/engrave"/>
+                <minPower Value="10"/>
+                <maxPower Value="25"/>
+                <maxPower2 Value="20"/>
+                <speed Value="33.3333"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+    </Material>
+    <Material name="Kraft cardstock">
+        <Entry Thickness="0.0000" Desc="cut">
+            <CutSetting type="Cut">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="Kraft cardstock/0.0000/cut"/>
+                <maxPower Value="30"/>
+                <maxPower2 Value="20"/>
+                <speed Value="13.3333"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+        <Entry Thickness="0.0000" Desc="engrave_light">
+            <CutSetting type="Scan">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="Kraft cardstock/0.0000/engrave_light"/>
+                <minPower Value="10"/>
+                <maxPower Value="10"/>
+                <maxPower2 Value="20"/>
+                <speed Value="33.3333"/>
+                <overscan Value="0"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+        <Entry Thickness="0.0000" Desc="engrave_dark">
+            <CutSetting type="Scan">
+                <index Value="0"/>
+                <name Value=""/>
+                <LinkPath Value="Kraft cardstock/0.0000/engrave_dark"/>
+                <minPower Value="10"/>
+                <maxPower Value="10"/>
+                <maxPower2 Value="20"/>
+                <speed Value="26.6667"/>
+                <overscan Value="0"/>
+                <priority Value="0"/>
+                <tabCount Value="1"/>
+                <tabCountMax Value="1"/>
+            </CutSetting>
+        </Entry>
+    </Material>
+</LightBurnLibrary>

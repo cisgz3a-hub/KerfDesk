@@ -84,6 +84,11 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
       ? { cutDirection: raw['cutDirection'] }
       : {}),
+    // Finish allowance: non-negative (0 = off), so a hand-edited negative value
+    // is dropped rather than inflating the roughing offset the wrong way.
+    ...(isNonNegativeNumber(raw['finishAllowanceMm'])
+      ? { finishAllowanceMm: raw['finishAllowanceMm'] }
+      : {}),
   };
 }
 

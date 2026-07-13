@@ -13,6 +13,7 @@ export function MaterialLibraryRecipeControls(props: {
   readonly activePresetId: string;
   readonly activePresetOption: MaterialLibraryPresetOption | null;
   readonly onAssign: () => boolean;
+  readonly onLink: () => boolean;
   readonly onDelete: () => boolean;
   readonly onStatus: (message: string) => void;
 }): JSX.Element {
@@ -41,6 +42,16 @@ export function MaterialLibraryRecipeControls(props: {
           }}
         >
           Apply to layer
+        </Button>
+        <Button
+          aria-label="Link selected material preset to layer"
+          title="Link this layer to the preset while keeping a last-known settings snapshot."
+          disabled={applyDisabled}
+          onClick={() =>
+            props.onStatus(props.onLink() ? 'Linked preset to layer.' : 'Preset was not linked.')
+          }
+        >
+          Link to layer
         </Button>
         <Button
           aria-label="Delete selected material preset"

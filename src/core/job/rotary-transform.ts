@@ -4,10 +4,10 @@
 // cylinder currently is — the design's position on the flat-bed canvas is
 // meaningless on a rotary, only its extent matters. Runs at the LAST moment
 // (inside emitGcode, after prepareOutput), so previews/estimates keep
-// showing surface-true geometry. Vector groups only: raster groups are
-// refused upstream (rotary-raster-unsupported); CNC never reaches this.
+// showing surface-true geometry. Raster groups map their bounds through the
+// same transform; reverse mode also reverses pixel rows so artwork mirrors.
 
-import type { CutSegment, FillSegment, Job } from './job';
+import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
 
 // reverse (ADR-127): the rotary can spin the opposite way (chuck mounted
 // backwards, or roller/gearing that inverts direction), which mirrors the
@@ -26,6 +26,9 @@ export function applyRotaryYScale(job: Job, yScale: number, reverse = false): Jo
       if (group.kind === 'fill') {
         return { ...group, segments: group.segments.map((s) => map(s) as FillSegment) };
       }
+      if (group.kind === 'raster') {
+        return mapRasterGroup(group, yScale, range.min, extent, reverse);
+      }
       return group;
     }),
   };
@@ -35,6 +38,11 @@ function jobYRange(job: Job): { readonly min: number; readonly max: number } | n
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   for (const group of job.groups) {
+    if (group.kind === 'raster') {
+      min = Math.min(min, group.bounds.minY);
+      max = Math.max(max, group.bounds.maxY);
+      continue;
+    }
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
     for (const segment of group.segments) {
       for (const p of segment.polyline) {
@@ -44,6 +52,36 @@ function jobYRange(job: Job): { readonly min: number; readonly max: number } | n
     }
   }
   return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
+}
+
+function mapRasterGroup(
+  group: RasterGroup,
+  yScale: number,
+  baseY: number,
+  extent: number,
+  reverse: boolean,
+): RasterGroup {
+  const forwardMin = (group.bounds.minY - baseY) * yScale;
+  const forwardMax = (group.bounds.maxY - baseY) * yScale;
+  return {
+    ...group,
+    bounds: {
+      ...group.bounds,
+      minY: reverse ? extent - forwardMax : forwardMin,
+      maxY: reverse ? extent - forwardMin : forwardMax,
+    },
+    sValues: reverse ? reverseRasterRows(group) : group.sValues,
+  };
+}
+
+function reverseRasterRows(group: RasterGroup): Uint16Array {
+  const reversed = new Uint16Array(group.sValues.length);
+  for (let row = 0; row < group.pixelHeight; row += 1) {
+    const sourceStart = row * group.pixelWidth;
+    const targetStart = (group.pixelHeight - 1 - row) * group.pixelWidth;
+    reversed.set(group.sValues.subarray(sourceStart, sourceStart + group.pixelWidth), targetStart);
+  }
+  return reversed;
 }
 
 function mapSegment<T extends CutSegment>(

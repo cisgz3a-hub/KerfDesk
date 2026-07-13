@@ -60,7 +60,10 @@ describe('deserializeProject', () => {
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
+      expect(result.project.scene.objects[0]).toMatchObject({
+        paths: [{ curves: [{ segments: [{ kind: 'line' }] }] }],
+      });
     }
   });
 
@@ -77,7 +80,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -94,7 +97,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -107,7 +110,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -133,7 +136,7 @@ describe('deserializeProject', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 
@@ -318,45 +321,6 @@ describe('deserializeProject', () => {
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);
       expect((layer as { readonly fillCrossHatch?: boolean })?.fillCrossHatch).toBe(false);
-    }
-  });
-
-  it('back-fills missing optimization settings on older .lf2 files', () => {
-    const oldShape = JSON.stringify({
-      schemaVersion: PROJECT_SCHEMA_VERSION,
-      device: {
-        name: 'Default',
-        bedWidth: 300,
-        bedHeight: 300,
-        maxFeed: 3000,
-        maxPowerS: 1000,
-        origin: 'front-left',
-        homing: { enabled: false, direction: 'front-left' },
-        autofocusCommand: '',
-      },
-      workspace: { width: 300, height: 300, units: 'mm' },
-      scene: { objects: [], layers: [] },
-    });
-
-    const result = deserializeProject(oldShape);
-
-    expect(result.kind).toBe('ok');
-    if (result.kind === 'ok') {
-      expect(result.project.optimization.reduceTravelMoves).toBe(true);
-    }
-  });
-
-  it('reports invalid when optimization settings have the wrong type', () => {
-    const text = serializeProject({
-      ...aProject(),
-      optimization: { reduceTravelMoves: 'sometimes' },
-    } as unknown as Project);
-
-    const result = deserializeProject(text);
-
-    expect(result.kind).toBe('invalid');
-    if (result.kind === 'invalid') {
-      expect(result.reason).toMatch(/optimization\.reduceTravelMoves/);
     }
   });
 

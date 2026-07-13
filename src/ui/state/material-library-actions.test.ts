@@ -182,6 +182,26 @@ describe('material library store actions', () => {
     });
   });
 
+  it('links a layer with a last-resolved snapshot and refreshes from the active library', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setMaterialLibrary(library([preset()]));
+    useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
+
+    expect(useStore.getState().linkMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
+      true,
+    );
+    expect(targetLayer().materialBinding).toMatchObject({
+      libraryId: 'shop-library',
+      presetId: 'birch-3mm-clean-cut',
+      lastResolved: { power: 44 },
+    });
+
+    useStore.getState().setMaterialLibrary(null);
+    expect(targetLayer().power).toBe(44);
+    expect(targetLayer().materialBinding?.lastResolved.power).toBe(44);
+    expect(useStore.getState().refreshLinkedMaterialLayer('#ff0000')).toBe(false);
+  });
+
   // (The old "blocks recipes for incompatible device profiles" test was removed:
   // ADR-045 says device mismatch is warn-not-block, now asserted by the
   // device-mismatch apply test above. The 'unsupported' safety block below stays.)

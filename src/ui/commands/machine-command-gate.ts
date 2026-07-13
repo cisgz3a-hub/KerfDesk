@@ -33,7 +33,10 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
   'tools.remove-image-mask',
   'tools.save-processed-bitmap',
   'tools.registration-jig',
+  'tools.print-and-cut',
+  'tools.rotary-setup',
   'tools.optimization-settings',
+  'tools.labs',
 ]);
 
 // CNC-only commands (hidden in laser mode): the .nc program simulator —

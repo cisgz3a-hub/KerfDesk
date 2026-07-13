@@ -11,7 +11,7 @@ import {
   type ShapeObject,
   type Transform,
 } from '../scene';
-import { rectangleToPolylines, type RectangleSpec } from './rectangle';
+import { rectangleToCurve, rectangleToPolylines, type RectangleSpec } from './rectangle';
 
 export function createRectangle(args: {
   readonly id: string;
@@ -20,7 +20,9 @@ export function createRectangle(args: {
   readonly transform?: Transform;
 }): ShapeObject {
   const polylines = rectangleToPolylines(args.spec);
-  const paths: ReadonlyArray<ColoredPath> = [{ color: args.color, polylines }];
+  const paths: ReadonlyArray<ColoredPath> = [
+    { color: args.color, polylines, curves: [rectangleToCurve(args.spec)] },
+  ];
   return {
     kind: 'shape',
     id: args.id,

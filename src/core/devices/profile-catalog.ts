@@ -47,7 +47,7 @@ const XTOOL_D1_PRO_PROFILE: DeviceProfile = {
   controllerKind: 'grbl-v1.1',
   bedWidth: 430,
   bedHeight: 390,
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'xTool D1 Pro public specs',
@@ -67,7 +67,7 @@ const SCULPFUN_S30_PROFILE: DeviceProfile = {
   controllerKind: 'grbl-v1.1',
   bedWidth: 410,
   bedHeight: 400,
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'Sculpfun S30 public specs',
@@ -87,7 +87,7 @@ const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
   controllerKind: 'grbl-v1.1',
   bedWidth: 400,
   bedHeight: 400,
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'Ortur Laser Master 3 public specs',
@@ -107,7 +107,7 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
   name: 'Generic grblHAL 400×400',
   machineFamily: 'generic-grblhal',
   controllerKind: 'grblhal',
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'grblHAL protocol compatibility',
@@ -125,7 +125,7 @@ const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
   name: 'Generic FluidNC 400×400',
   machineFamily: 'generic-fluidnc',
   controllerKind: 'fluidnc',
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'no-go-zones'],
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'FluidNC GRBL-compatible reporting',

@@ -34,5 +34,9 @@ describe('createPolygon', () => {
     // A 4-gon (radius 10, first vertex up) has vertices (10,0)(20,10)(10,20)(0,10).
     expect(shape.bounds).toEqual({ minX: 0, minY: 0, maxX: 20, maxY: 20 });
     expect(shape.paths[0]?.color).toBe('#0000ff');
+    expect(shape.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
+    expect(shape.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'line')).toBe(
+      true,
+    );
   });
 });

@@ -137,7 +137,7 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     uninstall();
   });
 
-  it('Ctrl+Enter claims the event when connected and idle', () => {
+  it('Ctrl+Enter claims the event when connected and idle', async () => {
     const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     patchLaserStore({ streamer: null, connection: { kind: 'connected' } });
     const uninstall = installJobShortcuts(window);
@@ -153,7 +153,7 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     // The flow runs and (with an empty scene / unknown status) surfaces the
     // readiness alert — proving the shortcut reached runStartJobFlow.
     expect(event.defaultPrevented).toBe(true);
-    expect(alert).toHaveBeenCalled();
+    await vi.waitFor(() => expect(alert).toHaveBeenCalled());
     uninstall();
   });
 

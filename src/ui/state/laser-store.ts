@@ -45,6 +45,7 @@ import type { FrameVerification } from './frame-verification';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
+import { fireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
   activeJobCommandBlockMessage,
@@ -89,6 +90,9 @@ export type LaserState = {
   // Jobs may still emit their own M7/M8/M9 sequence; Stop/Disconnect force this
   // false after sending the driver's coolant-off cleanup.
   readonly airAssistOn: boolean;
+  // True while a guarded momentary Fire request is active, including its
+  // in-flight serial write. Every exit path clears this before the final M5.
+  readonly fireActive: boolean;
   // P0-B: operator-facing safety alert raised when the store cannot guarantee
   // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
   // drop mid-job. null = nothing to warn about. Cleared on the next successful
@@ -112,6 +116,7 @@ export type LaserState = {
   // refill can overflow the real 128-byte buffer mid-burn.
   readonly pendingUntrackedAcks: number;
   readonly homingState: HomingState;
+  readonly trustedPositionEpoch?: number;
   readonly log: ReadonlyArray<string>;
   readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null
@@ -204,6 +209,7 @@ export type LaserState = {
   // machine position so it reuses `jog`'s guards and works for the (0,0) corner.
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
+  readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
   readonly frame: (
     bounds: {
@@ -415,6 +421,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
     safeWrite(set, get, line, action, source),
   ),
   ...airAssistActions(set, get),
+  ...fireActions(set, get, (line, action, source) => safeWrite(set, get, line, action, source)),
   ...probeActions(set, get, refs),
   ...overrideActions(
     (line) => safeWrite(set, get, line),

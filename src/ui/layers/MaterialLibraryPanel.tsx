@@ -73,6 +73,7 @@ function LoadedMaterialLibraryPanel(props: {
   const project = useStore((state) => state.project);
   const layers = useStore((state) => state.project.scene.layers);
   const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
+  const linkMaterialPresetToLayer = useStore((state) => state.linkMaterialPresetToLayer);
   const deleteMaterialPreset = useStore((state) => state.deleteMaterialPreset);
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
@@ -88,6 +89,8 @@ function LoadedMaterialLibraryPanel(props: {
   );
   const activePresetOption =
     presetOptions.find((option) => option.preset.id === activePresetId) ?? null;
+  const activeLayer = layers.find((layer) => layer.id === activeLayerId) ?? null;
+  const linkStatus = materialLinkStatus(activeLayer, props.library);
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
@@ -109,12 +112,26 @@ function LoadedMaterialLibraryPanel(props: {
         activePresetId={activePresetId}
         activePresetOption={activePresetOption}
         onAssign={() => assignMaterialPresetToLayer(activeLayerId, activePresetId)}
+        onLink={() => linkMaterialPresetToLayer(activeLayerId, activePresetId)}
         onDelete={() => deleteMaterialPreset(activePresetId)}
         onStatus={setStatus}
       />
       {status !== '' ? <p style={statusStyle}>{status}</p> : null}
+      {linkStatus !== null ? <p style={statusStyle}>{linkStatus}</p> : null}
     </section>
   );
+}
+
+function materialLinkStatus(layer: Layer | null, library: MaterialLibraryDocument): string | null {
+  const binding = layer?.materialBinding;
+  if (binding === undefined) return null;
+  if (binding.libraryId !== library.libraryId) {
+    return 'Linked material library is unavailable. Using the last-resolved settings snapshot.';
+  }
+  if (!library.entries.some((entry) => entry.id === binding.presetId)) {
+    return 'Linked material preset is missing. Using the last-resolved settings snapshot.';
+  }
+  return 'Layer is linked to the selected material library.';
 }
 
 function MaterialLibrarySelectors(props: {

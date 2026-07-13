@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`external LightBurn project migration corpus > imports acwright-backplane-top.lbrn2 deterministically with an explicit report 1`] = `
+{
+  "appVersion": "2.0.05",
+  "formatVersion": "1",
+  "importedLayers": 1,
+  "importedObjects": 11,
+  "sourceName": "acwright-backplane-top.lbrn2",
+  "unsupportedShapeTypes": [],
+  "warnings": [],
+}
+`;
+
+exports[`external LightBurn project migration corpus > imports acwright-db25-helper-top.lbrn2 deterministically with an explicit report 1`] = `
+{
+  "appVersion": "2.0.05",
+  "formatVersion": "1",
+  "importedLayers": 1,
+  "importedObjects": 5,
+  "sourceName": "acwright-db25-helper-top.lbrn2",
+  "unsupportedShapeTypes": [],
+  "warnings": [],
+}
+`;
+
+exports[`external LightBurn project migration corpus > imports acwright-joystick-helper-top.lbrn2 deterministically with an explicit report 1`] = `
+{
+  "appVersion": "2.0.05",
+  "formatVersion": "1",
+  "importedLayers": 1,
+  "importedObjects": 5,
+  "sourceName": "acwright-joystick-helper-top.lbrn2",
+  "unsupportedShapeTypes": [],
+  "warnings": [],
+}
+`;
+
+exports[`external LightBurn project migration corpus > imports acwright-keypad-helper-top.lbrn2 deterministically with an explicit report 1`] = `
+{
+  "appVersion": "2.0.05",
+  "formatVersion": "1",
+  "importedLayers": 1,
+  "importedObjects": 7,
+  "sourceName": "acwright-keypad-helper-top.lbrn2",
+  "unsupportedShapeTypes": [],
+  "warnings": [],
+}
+`;
+
+exports[`external LightBurn project migration corpus > imports acwright-plate.lbrn2 deterministically with an explicit report 1`] = `
+{
+  "appVersion": "2.0.05",
+  "formatVersion": "1",
+  "importedLayers": 1,
+  "importedObjects": 25,
+  "sourceName": "acwright-plate.lbrn2",
+  "unsupportedShapeTypes": [],
+  "warnings": [],
+}
+`;

@@ -11,11 +11,13 @@ import {
 } from '../app/file-actions';
 import { handleOpenGcodePreview } from '../app/gcode-open-action';
 import { connectOptionsForDevice } from './connect-options';
+import { railPanelCommandContext } from './command-context-helpers';
 import { currentOutputScope, useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -57,6 +59,11 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toggleBoardCapturePanel = useUiStore((s) => s.toggleBoardCapturePanel);
   const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
   const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
+  const layersPanelOpen = useUiStore((s) => s.railPanelVisibility.layers);
+  const machinePanelOpen = useUiStore((s) => s.railPanelVisibility.machine);
+  const toggleRailPanel = useUiStore((s) => s.toggleRailPanel);
+  const rotaryFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.rotary);
+  const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -69,6 +76,15 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       toggleBoardCapturePanel,
       cameraPanelOpen,
       toggleCameraPanel,
+      layersPanelOpen,
+      toggleLayersPanel: () => toggleRailPanel('layers'),
+      machinePanelOpen,
+      toggleMachinePanel: () => toggleRailPanel('machine'),
+      rotaryFeatureEnabled,
+      rotaryProfileSupported: profileSupportsCapability(app.project.device, 'rotary'),
+      printAndCutFeatureEnabled,
+      printAndCutProfileSupported: app.project.device.homing.enabled,
+      printAndCut: callbacks.requestPrintAndCut,
     }),
   );
 }
@@ -98,20 +114,10 @@ function appCommandContext(
     ...fileCommandContext(callbacks, platform, app, laser, pushToast),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
-    ...arrangeCommandContext(app),
+    ...arrangeCommandContext(app, callbacks),
     ...laserCommandContext(platform, laser),
     ...windowHelpCommandContext(callbacks, app),
-    machineKind: machineKindOf(app.project.machine),
-    dirty: app.dirty,
-    savedName: app.savedName,
-    serialSupported: platform.serial.isSupported(),
-    connected: laser.connection.kind === 'connected',
-    machineBusy:
-      laser.autofocusBusy ||
-      laser.motionOperation !== null ||
-      laser.controllerOperation !== null ||
-      activeStreamer,
-    homingEnabled: app.project.device.homing.enabled,
+    ...connectionCommandContext(app, laser, platform, activeStreamer),
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
     toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
@@ -119,6 +125,7 @@ function appCommandContext(
     toggleBoardCapturePanel: dialogs.toggleBoardCapturePanel,
     cameraPanelOpen: dialogs.cameraPanelOpen,
     toggleCameraPanel: dialogs.toggleCameraPanel,
+    ...railPanelCommandContext(dialogs, activeStreamer),
     hasRasterSelection: selected?.kind === 'raster-image',
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
@@ -149,8 +156,33 @@ function appCommandContext(
     focusTestAvailable:
       profileSupportsCapability(app.project.device, 'z-axis') &&
       app.project.device.zTravelConfirmed === true,
+    rotaryFeatureEnabled: dialogs.rotaryFeatureEnabled,
+    rotaryProfileSupported: dialogs.rotaryProfileSupported,
+    printAndCutFeatureEnabled: dialogs.printAndCutFeatureEnabled,
+    printAndCutProfileSupported: dialogs.printAndCutProfileSupported,
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
+  };
+}
+
+function connectionCommandContext(
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  platform: ReturnType<typeof usePlatform>,
+  activeStreamer: boolean,
+) {
+  return {
+    machineKind: machineKindOf(app.project.machine),
+    dirty: app.dirty,
+    savedName: app.savedName,
+    serialSupported: platform.serial.isSupported(),
+    connected: laser.connection.kind === 'connected',
+    machineBusy:
+      laser.autofocusBusy ||
+      laser.motionOperation !== null ||
+      laser.controllerOperation !== null ||
+      activeStreamer,
+    homingEnabled: app.project.device.homing.enabled,
   };
 }
 
@@ -211,6 +243,7 @@ function editCommandContext(
   | 'measureTool'
   | 'measureActive'
   | 'addText'
+  | 'printAndCut'
 > {
   return {
     canUndo: app.undoStack.length > 0,
@@ -231,11 +264,13 @@ function editCommandContext(
     measureTool: dialogs.measureTool,
     measureActive: dialogs.measureActive,
     addText: () => dialogs.openTextDialog({ mode: 'add' }),
+    printAndCut: dialogs.printAndCut,
   };
 }
 
 function arrangeCommandContext(
   app: ReturnType<typeof useStore.getState>,
+  callbacks: CommandShellCallbacks,
 ): Pick<
   AppCommandContext,
   | 'alignSelection'
@@ -243,6 +278,8 @@ function arrangeCommandContext(
   | 'breakApartSelection'
   | 'flipHorizontal'
   | 'flipVertical'
+  | 'createArray'
+  | 'quickNest'
 > {
   return {
     alignSelection: app.alignSelection,
@@ -250,6 +287,8 @@ function arrangeCommandContext(
     breakApartSelection: app.breakApartSelection,
     flipHorizontal: () => app.flipSelection('horizontal'),
     flipVertical: () => app.flipSelection('vertical'),
+    createArray: callbacks.requestArray,
+    quickNest: callbacks.requestQuickNest,
   };
 }
 
@@ -308,6 +347,10 @@ function saveGcodeAction(
         wcoCache: laser.wcoCache,
       },
       controllerSettings: laser.controllerSettings,
+      allowRotaryRaster:
+        useExperimentalLaserFeatures.getState().features.rotaryRaster &&
+        profileSupportsCapability(app.project.device, 'rotary'),
+      advanceVariablesAfter: app.advanceVariablesAfter,
       pushToast,
     });
 }

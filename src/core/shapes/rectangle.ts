@@ -4,7 +4,8 @@
 // geometry). The kind:'shape' SceneObject variant places it via bounds +
 // transform, so this module owns geometry only — no scene, no color, no I/O.
 
-import type { Polyline, Vec2 } from '../scene';
+import { parametricEllipseCurve } from '../geometry';
+import { polylineToCurveSubpath, type CurveSubpath, type Polyline, type Vec2 } from '../scene';
 
 export type RectangleSpec = {
   readonly widthMm: number;
@@ -43,6 +44,39 @@ export function rectangleToPolylines(spec: RectangleSpec): ReadonlyArray<Polylin
   return [{ points, closed: true }];
 }
 
+export function rectangleToCurve(spec: RectangleSpec): CurveSubpath {
+  const w = Math.max(0, spec.widthMm);
+  const h = Math.max(0, spec.heightMm);
+  const r = clampRadius(spec.cornerRadiusMm, w, h);
+  if (r <= 0) {
+    return polylineToCurveSubpath(rectangleToPolylines(spec)[0] as Polyline);
+  }
+  const corners = [
+    { center: pt(w - r, r), startParam: -Math.PI / 2 },
+    { center: pt(w - r, h - r), startParam: 0 },
+    { center: pt(r, h - r), startParam: Math.PI / 2 },
+    { center: pt(r, r), startParam: Math.PI },
+  ];
+  const start = pt(w - r, 0);
+  const segments: CurveSubpath['segments'][number][] = [];
+  let cursor = start;
+  for (const corner of corners) {
+    const arc = parametricEllipseCurve({
+      center: corner.center,
+      majorAxis: { x: r, y: 0 },
+      ratio: 1,
+      startParam: corner.startParam,
+      sweep: Math.PI / 2,
+      closed: false,
+    });
+    if (!samePoint(cursor, arc.start)) segments.push({ kind: 'line', to: arc.start });
+    segments.push(...arc.segments);
+    cursor = arc.segments.at(-1)?.to ?? arc.start;
+  }
+  if (!samePoint(cursor, start)) segments.push({ kind: 'line', to: start });
+  return { start, segments, closed: true };
+}
+
 // Repeat the first point so the polyline visually closes — the codebase
 // convention for closed shapes (the stroke renderer does not closePath).
 function closeLoop(points: Vec2[]): void {
@@ -72,4 +106,8 @@ function pushArc(
 
 function pt(x: number, y: number): Vec2 {
   return { x, y };
+}
+
+function samePoint(a: Vec2, b: Vec2): boolean {
+  return Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.y - b.y) < 1e-9;
 }

@@ -139,6 +139,25 @@ describe('installJobCheckpointTracking', () => {
     });
   });
 
+  it('normalizes a Fire disconnect as a connection-loss interruption', () => {
+    install();
+    writeJobCheckpoint(freshCheckpoint());
+    const base = baseStreamer(GCODE);
+    patchStreamer({ ...base, completed: 12 });
+    useLaserStore.setState({
+      safetyNotice: {
+        kind: 'disconnect-during-fire',
+        message: 'USB connection was lost while low-power Fire was active.',
+      },
+      streamer: { ...base, completed: 12, status: 'disconnected' },
+    });
+
+    expect(readJobCheckpoint()?.interruption).toEqual({
+      kind: 'disconnect',
+      message: 'USB connection was lost while low-power Fire was active.',
+    });
+  });
+
   it('freezes updates for a run with a foreign sendable total', () => {
     install();
     writeJobCheckpoint(freshCheckpoint());

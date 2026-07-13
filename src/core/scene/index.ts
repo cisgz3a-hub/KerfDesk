@@ -39,13 +39,19 @@ export type { RegistrationRunState } from './registration-layer';
 export type {
   Bounds,
   ColoredPath,
+  CubicPathSegment,
+  CurveSubpath,
   DitherAlgorithm,
   FontKey,
   ImportedSvg,
+  EllipticalArcPathSegment,
+  LinePathSegment,
   ObjectOperationOverride,
   ObjectPowerScale,
+  PathTextSettings,
   EllipseShape,
   Polyline,
+  PathSegment,
   PolygonShape,
   RasterImage,
   RectangleShape,
@@ -60,6 +66,32 @@ export type {
   Transform,
   Vec2,
 } from './scene-object';
+export {
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  MAX_FLATTENED_CURVE_SEGMENTS,
+  curveSubpathBounds,
+  flattenColoredPathCurves,
+  flattenCurveSubpath,
+  polylineToCurveSubpath,
+  transformCurveSubpathUniform,
+  type FlattenCurveOptions,
+  type FlattenColoredPathResult,
+  type FlattenCurveResult,
+  type UniformCurveTransform,
+} from './curve-path';
+export {
+  breakCurveAtNode,
+  cornerCurveNode,
+  convertCurveSegment,
+  curveControlPoint,
+  curveNodeCount,
+  curveNodePoint,
+  joinCurveSubpaths,
+  moveCurveAnchor,
+  moveCurveControl,
+  setCurveStartNode,
+  smoothCurveNode,
+} from './curve-edit';
 export {
   DITHER_ALGORITHMS,
   DEFAULT_RASTER_LAYER_COLOR,
@@ -131,6 +163,15 @@ export {
   type TileLayout,
   type TileOffset,
 } from './tile-into-region';
+export {
+  MAX_ARRAY_COPIES,
+  arrayPlacements,
+  type ArrayPlacement,
+  type ArraySpec,
+  type CircularArraySpec,
+  type GridArraySpec,
+} from './array-layout';
+export type { PrintAndCutDesignTargets } from './print-and-cut';
 export { sceneObjectHasVisibleLayer, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 export type { Scene, SceneGroup } from './scene';
@@ -149,6 +190,17 @@ export {
 
 export type { Project, ProjectOptimizationSettings, Workspace } from './project';
 export { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION, createProject } from './project';
+export type { EmbeddedFont } from './project';
+export type {
+  ProjectVariableData,
+  VariableAdvancementPolicy,
+  VariableCsvDataset,
+  VariableCutSettingField,
+  VariableDateTimeFormat,
+  VariableTemplate,
+  VariableTemplateToken,
+} from './variable-template';
+export { DEFAULT_PROJECT_VARIABLE_DATA } from './variable-template';
 
 export type {
   CncCoolantMode,

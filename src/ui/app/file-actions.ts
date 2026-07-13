@@ -7,9 +7,10 @@
 import { selectControllerDriver } from '../../core/controllers';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
-import { emitGcode } from '../../io/gcode';
+import { emitGcodeSnapshot } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, serializeProject } from '../../io/project';
+import { importLightBurnProject } from '../../io/lightburn';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
@@ -34,6 +35,8 @@ import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
+import { renderVariableText } from '../text/render-variable-text';
+import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -114,7 +117,9 @@ export type SaveGcodeCtx = {
   // null = never connected this session; a snapshot = run the $30/$32
   // comparison before saving (M11). Omitted = caller doesn't track it.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  readonly allowRotaryRaster?: boolean;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
 };
 
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
@@ -159,7 +164,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
-  const { gcode, preflight } = emitSaveGcode(ctx, placement);
+  const { gcode, preflight } = await emitSaveGcode(ctx, placement);
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
@@ -179,11 +184,17 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   if (target === null) return;
   try {
     await target.write(gcode);
+    advanceExportVariables(ctx);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
     pushPostSaveAdvisories(ctx);
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
+}
+
+function advanceExportVariables(ctx: SaveGcodeCtx): void {
+  if (ctx.advanceVariablesAfter === undefined) return;
+  ctx.advanceVariablesAfter(ctx.project, 'successful-export');
 }
 
 // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
@@ -203,16 +214,21 @@ function pushPostSaveAdvisories(ctx: SaveGcodeCtx): void {
   }
 }
 
-function emitSaveGcode(
+async function emitSaveGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
-): ReturnType<typeof emitGcode> {
+): ReturnType<typeof emitGcodeSnapshot> {
   const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
-  return emitGcode(ctx.project, {
+  const registration = currentPrintCutOutputRegistration(ctx.project);
+  return emitGcodeSnapshot(ctx.project, {
+    clock: () => new Date(),
+    renderVariableText,
+    ...(registration === undefined ? {} : { registration }),
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    ...(ctx.allowRotaryRaster === true ? { allowRotaryRaster: true } : {}),
   });
 }
 
@@ -280,7 +296,10 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     readonly text: () => Promise<string>;
   }>;
   try {
-    files = await ctx.platform.pickFilesForOpen({ accept: ['.lf2'], multiple: false });
+    files = await ctx.platform.pickFilesForOpen({
+      accept: ['.lf2', '.lbrn', '.lbrn2'],
+      multiple: false,
+    });
   } catch (err) {
     ctx.pushToast(`Could not open project: ${errMsg(err)}`, 'error');
     return;
@@ -292,6 +311,10 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     text = await file.text();
   } catch (err) {
     ctx.pushToast(`Could not open ${file.name}: ${errMsg(err)}`, 'error');
+    return;
+  }
+  if (/\.lbrn2?$/i.test(file.name)) {
+    openLightBurnMigration(ctx, file.name, text);
     return;
   }
   const result = deserializeProject(text);
@@ -314,6 +337,23 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     return;
   }
   ctx.pushToast(`Could not open ${file.name}: ${describeResult(result)}`, 'error');
+}
+
+function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: string): void {
+  const result = importLightBurnProject(text, fileName);
+  if (!result.ok) {
+    ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
+    return;
+  }
+  ctx.setProject(result.project);
+  ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'));
+  clearAutosave();
+  const unsupported = result.report.unsupportedShapeTypes.length;
+  const warnings = result.report.warnings.length;
+  ctx.pushToast(
+    `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${unsupported + warnings === 0 ? '' : `, ${unsupported + warnings} warning(s)`}. Save as .lf2 to keep changes.`,
+    unsupported + warnings === 0 ? 'success' : 'warning',
+  );
 }
 
 function errMsg(err: unknown): string {

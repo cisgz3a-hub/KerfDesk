@@ -21,6 +21,8 @@ import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
+import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
+import { RotarySetupHost } from '../laser/RotarySetupHost';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
@@ -45,10 +47,20 @@ import { selectedConvertibleVectors, selectedObjectIds } from './selection-comma
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
+import { ArrayDialogHost } from './ArrayDialogHost';
+import { QuickNestDialogHost } from './QuickNestDialogHost';
+import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
+
+type SettingsDialogKind =
+  | 'optimization'
+  | 'array'
+  | 'nest'
+  | 'print-cut'
+  | 'labs'
+  | 'rotary'
+  | null;
 
 export function CommandShell(): JSX.Element {
-  // Convert-to-Bitmap open state lives in the ui-store (not local state) so
-  // the Ctrl/Cmd+Shift+B shortcut in use-shortcuts can open it too.
   const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
   const openConvertBitmapDialog = useUiStore((s) => s.openConvertBitmapDialog);
   const closeConvertBitmapDialog = useUiStore((s) => s.closeConvertBitmapDialog);
@@ -58,7 +70,7 @@ export function CommandShell(): JSX.Element {
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
-  const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
+  const [settingsDialog, setSettingsDialog] = useState<SettingsDialogKind>(null);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
@@ -77,11 +89,13 @@ export function CommandShell(): JSX.Element {
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
-    requestFocusTest: () =>
-      jobAwareAlert(
-        'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
-      ),
-    requestOptimizationSettings: () => setOptimizationDialogOpen(true),
+    requestFocusTest: () => jobAwareAlert(FOCUS_TEST_UNAVAILABLE_MESSAGE),
+    requestOptimizationSettings: () => setSettingsDialog('optimization'),
+    requestArray: () => setSettingsDialog('array'),
+    requestQuickNest: () => setSettingsDialog('nest'),
+    requestPrintAndCut: () => setSettingsDialog('print-cut'),
+    requestRotarySetup: () => setSettingsDialog('rotary'),
+    requestLabsSettings: () => setSettingsDialog('labs'),
     requestProjectNotes: () => setProjectNotesOpen(true),
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
@@ -113,9 +127,7 @@ export function CommandShell(): JSX.Element {
         scanOffsetOpen={scanOffsetTestDialogOpen}
         onScanOffsetClose={() => setScanOffsetTestDialogOpen(false)}
       />
-      {optimizationDialogOpen ? (
-        <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
-      ) : null}
+      <SettingsDialogHost current={settingsDialog} onClose={() => setSettingsDialog(null)} />
       {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
       {undoHistoryOpen ? <UndoHistoryPanel onClose={() => setUndoHistoryOpen(false)} /> : null}
       {closeToleranceDialogOpen ? (
@@ -124,6 +136,21 @@ export function CommandShell(): JSX.Element {
     </>
   );
 }
+
+function SettingsDialogHost(props: {
+  readonly current: SettingsDialogKind;
+  readonly onClose: () => void;
+}): JSX.Element | null {
+  if (props.current === 'optimization') return <OptimizationDialog onClose={props.onClose} />;
+  if (props.current === 'array') return <ArrayDialogHost onClose={props.onClose} />;
+  if (props.current === 'nest') return <QuickNestDialogHost onClose={props.onClose} />;
+  if (props.current === 'print-cut') return <PrintAndCutDialogHost onClose={props.onClose} />;
+  if (props.current === 'labs') return <LabsSettingsDialog onClose={props.onClose} />;
+  if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;
+  return null;
+}
+const FOCUS_TEST_UNAVAILABLE_MESSAGE =
+  'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.';
 
 // The four scene-generator dialog mounts, grouped so CommandShell itself
 // stays inside the complexity cap.

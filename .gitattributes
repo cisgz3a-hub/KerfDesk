@@ -21,3 +21,8 @@
 *.pdf binary
 *.gcode binary
 *.lf2 binary
+
+# External compatibility fixtures are retained byte-for-byte so the pinned
+# upstream SHA-256 provenance remains verifiable after checkout.
+src/__fixtures__/lightburn/external/clb/** -text
+src/__fixtures__/lightburn/external/lbrn/** -text
