@@ -1,0 +1,168 @@
+import { useEffect, useState } from 'react';
+import { CutsLayersPanel } from '../layers';
+import { LaserWindow } from '../laser';
+
+type PanelId = 'cuts' | 'machine';
+
+export function WorkspaceSidePanels(): JSX.Element {
+  const [compact, setCompact] = useState(false);
+  const [active, setActive] = useState<PanelId>('cuts');
+  const [cutsOpen, setCutsOpen] = useState(true);
+  const [machineOpen, setMachineOpen] = useState(true);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      setCompact(window.innerWidth <= 1199);
+      return;
+    }
+    const query = window.matchMedia('(max-width: 1199px)');
+    const update = (): void => setCompact(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  if (compact) {
+    return (
+      <section aria-label="Workspace side panels" style={compactShellStyle}>
+        <div role="tablist" aria-label="Side panel" style={switcherStyle}>
+          <PanelTab
+            label="Cuts / Layers"
+            selected={active === 'cuts'}
+            onSelect={() => setActive('cuts')}
+          />
+          <PanelTab
+            label="Machine"
+            selected={active === 'machine'}
+            onSelect={() => setActive('machine')}
+          />
+        </div>
+        <div
+          role="tabpanel"
+          aria-label={active === 'cuts' ? 'Cuts / Layers' : 'Machine'}
+          style={compactPanelStyle}
+        >
+          {active === 'cuts' ? <CutsLayersPanel /> : <LaserWindow />}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Workspace side panels" style={desktopShellStyle}>
+      <div style={collapseBarStyle}>
+        <PanelToggle
+          label="Layers"
+          expanded={cutsOpen}
+          onToggle={() => setCutsOpen((open) => !open)}
+        />
+        <PanelToggle
+          label="Machine"
+          expanded={machineOpen}
+          onToggle={() => setMachineOpen((open) => !open)}
+        />
+      </div>
+      <div style={desktopPanelsStyle}>
+        {cutsOpen ? (
+          <ResizablePanel label="Cuts / Layers">
+            <CutsLayersPanel />
+          </ResizablePanel>
+        ) : null}
+        {machineOpen ? (
+          <ResizablePanel label="Machine controls">
+            <LaserWindow />
+          </ResizablePanel>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function PanelTab(props: {
+  readonly label: string;
+  readonly selected: boolean;
+  readonly onSelect: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={props.selected}
+      title={`Show ${props.label} panel`}
+      className={props.selected ? 'lf-btn lf-btn--primary' : 'lf-btn lf-btn--ghost'}
+      onClick={props.onSelect}
+    >
+      {props.label}
+    </button>
+  );
+}
+
+function PanelToggle(props: {
+  readonly label: string;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--ghost"
+      aria-expanded={props.expanded}
+      title={`${props.expanded ? 'Hide' : 'Show'} ${props.label} panel`}
+      onClick={props.onToggle}
+    >
+      {props.expanded ? 'Hide' : 'Show'} {props.label}
+    </button>
+  );
+}
+
+function ResizablePanel(props: {
+  readonly label: string;
+  readonly children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <div aria-label={`${props.label} resizable panel`} style={resizablePanelStyle}>
+      {props.children}
+    </div>
+  );
+}
+
+const desktopShellStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 0,
+  flexShrink: 0,
+};
+const collapseBarStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 4,
+  padding: 4,
+  borderBottom: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-0)',
+};
+const desktopPanelsStyle: React.CSSProperties = { display: 'flex', minHeight: 0, flex: 1 };
+const resizablePanelStyle: React.CSSProperties = {
+  width: 300,
+  minWidth: 240,
+  maxWidth: 480,
+  minHeight: 0,
+  resize: 'horizontal',
+  overflow: 'hidden',
+};
+const compactShellStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  width: 'min(38vw, 340px)',
+  minWidth: 260,
+  flexShrink: 0,
+  minHeight: 0,
+};
+const switcherStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 4,
+  padding: 4,
+  borderBottom: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-0)',
+};
+const compactPanelStyle: React.CSSProperties = { minHeight: 0, flex: 1, overflow: 'hidden' };

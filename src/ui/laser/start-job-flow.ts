@@ -13,7 +13,7 @@ import {
   buildResumeProgram,
   CNC_AUTOMATIC_RECOVERY_DISABLED_REASON,
 } from '../../core/controllers/grbl';
-import { profileSupportsCapability } from '../../core/devices';
+import { profileSupportsCapability, streamingModeForController } from '../../core/devices';
 import {
   createJobCheckpoint,
   fingerprintGcode,

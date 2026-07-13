@@ -105,4 +105,24 @@ describe('repository policy enforcement contract', () => {
       'pnpm build:electron-main && node dist-electron/rtsp-camera-bridge-cli.js',
     );
   });
+
+  it('gates public-export growth with a checked-in legacy baseline', () => {
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      readonly scripts?: { readonly ['release:check']?: string };
+    };
+    const gate = repoFile('scripts/check-index-exports.mjs');
+
+    expect(packageJson.scripts?.['release:check']).toContain('pnpm check:index-exports');
+    expect(gate).toContain('scripts/index-export-baseline.json');
+    expect(gate).toContain('process.exit(1)');
+    expect(repoFile('CLAUDE.md')).toContain('CI-ratcheted');
+  });
+
+  it('runs the isolated Chrome E2E suite in the release gate', () => {
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      readonly scripts?: { readonly ['release:check']?: string; readonly ['test:e2e']?: string };
+    };
+    expect(packageJson.scripts?.['test:e2e']).toBe('playwright test');
+    expect(packageJson.scripts?.['release:check']).toContain('pnpm test:e2e');
+  });
 });

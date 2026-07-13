@@ -120,6 +120,27 @@ describe('runStartJobFlow', () => {
     });
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });
+
+  it('forces ping-pong when a legacy Marlin profile retained char-counted streaming', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          controllerKind: 'marlin',
+          streamingMode: 'char-counted',
+        },
+      },
+    }));
+
+    await runStartJobFlow();
+
+    expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(expect.any(String), {
+      streamingMode: 'ping-pong',
+      rxBufferBytes: 96,
+      machineKind: 'laser',
+    });
+  });
 });
 
 describe('job checkpoint integration (ADR-118)', () => {
