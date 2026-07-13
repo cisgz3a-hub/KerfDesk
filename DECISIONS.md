@@ -34,6 +34,7 @@
 | ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
+| ADR-177 | 2026-07-13 | Accepted | Keep origin evidence honest per axis after G92 mutations |
 
 ---
 
@@ -6838,3 +6839,31 @@ validation, legacy defaults, output tests, and a new complexity bound.
 These tested capabilities are intentional product scope rather than undocumented exceptions. Their
 offline, bounded persistence contracts remain release gates; this decision does not authorize the
 larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.
+
+---
+
+## ADR-177 - Keep origin evidence honest per axis after G92 mutations
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL computes work position from machine position minus WCS, G92, and tool-length offsets. `G92`
+updates only the named axes, while `G92.1` clears the complete transient G92 offset. KerfDesk was
+synthesizing a full XYZ WCO from MPos after XY-only origin commands, and successful persistent/reset
+flows could retain `workZZeroKnown` after sending `G92.1`.
+
+### Decision
+
+- XY-only Set Origin derives new X/Y offsets but preserves Z only when a prior Z WCO is known.
+  Otherwise the WCO cache stays null until a fresh WCO-bearing status arrives.
+- Every acknowledged origin flow containing `G92.1` invalidates work-Z evidence and the WCO cache.
+- A persistent G54 XY origin may remain active after transient reset, but that does not prove stock-top
+  Z. The operator must establish Z again before relying on CNC setup evidence.
+
+### Consequences
+
+The host no longer fabricates an untouched axis or retains evidence for an offset the controller may
+have cleared. This is deliberately conservative when Z came from persistent probing because the
+current boolean does not encode provenance; a richer axis/source evidence model can later preserve
+only what readback proves.
