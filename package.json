@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test --config=playwright.config.mjs",
+    "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "license-check": "node scripts/check-licenses.mjs",
     "audit:deps": "pnpm audit --audit-level=low",
