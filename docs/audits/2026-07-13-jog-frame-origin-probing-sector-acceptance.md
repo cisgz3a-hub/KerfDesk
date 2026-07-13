@@ -6,7 +6,7 @@
 
 **Candidate stack:** PR #58 through PR #81 + `codex/motion-origin-9-acceptance`
 
-**Status:** Software candidate implemented; GitHub CI validation pending; not yet shipped on `main`
+**Status:** Software candidate complete; GitHub CI passed; not yet shipped on `main`
 
 ## Verdict
 
@@ -64,12 +64,12 @@ galvo, accessory, or controller-specific movement feature in those products.
 - Focused sector battery: **12 files, 85 tests passed**.
 - Chromium acceptance: shared pointer, keyboard, origin, and feed workflow passed.
 - Targeted ESLint: passed with no warnings or errors.
-- Full repository release gate: typecheck, lint, formatting, licenses, dependency audit, all product
-  assertions, 17 Chromium workflows, web build, Electron build, and both size policies passed. The
-  exact local command was stopped twice by the untouched outline-nesting wall-clock assertion at
-  2.106 s and 2.184 s against a 2.000 s budget while the full suite was contending for CPU. The
-  same benchmark then passed three consecutive isolated runs at 1.194 s, 1.032 s, and 1.044 s.
-  Uncontended GitHub CI remains the final release-gate authority.
+- Full repository release gate: GitHub CI passed the exact gate in **19m24s**, including typecheck,
+  lint, formatting, licenses, dependency audit, all product assertions, 17 Chromium workflows, web
+  build, Electron build, and both size policies.
+- Local full-suite note: the untouched outline-nesting wall-clock assertion exceeded its 2.000 s
+  budget twice under local CPU contention at 2.106 s and 2.184 s, then passed three consecutive
+  isolated runs at 1.194 s, 1.032 s, and 1.044 s. The uncontended CI pass is the release authority.
 
 ## Why 9.1
 
