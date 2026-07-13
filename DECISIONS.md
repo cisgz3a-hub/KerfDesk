@@ -35,8 +35,6 @@
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
-| ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
-| ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
 
 ---
 
@@ -4312,6 +4310,35 @@ sources consumed by both compilers.
 - The laser-only set grows past ~25 entries → the shared-shell decision
   itself is under strain; re-open ADR-098's shared-UI clause.
 
+### Amendment 2026-07-13 — Trace family reclassified machine-agnostic
+
+**Trigger:** the first "Reversal triggers" bullet above — the maintainer needs
+Trace available in CNC for cut-a-logo workflows (trace a raster to vectors, then
+cut those vectors on the router).
+
+**Change:** `tools.trace-image`, `tools.retrace-original`, and
+`tools.multi-file-trace` move out of `LASER_ONLY_COMMAND_IDS` and become
+machine-agnostic (visible in both laser and CNC). The other raster tools
+(`tools.adjust-image`, `tools.crop-image`, `tools.apply-image-mask`,
+`tools.remove-image-mask`, `tools.save-processed-bitmap`) stay laser-only — they
+prep a raster *engrave*, which CNC has no mode for.
+
+**Why it is safe:** a `traced-image` object already flows through the CNC cut
+pipeline unchanged (`compile-cnc-job.ts` `collectLayerPolylines` handles it like
+imported SVG/text/shape, and the kept trace-source raster is already excluded
+from the CNC "raster will be skipped" advisory via `role !== 'trace-source'`).
+No compile-pipeline change is needed.
+
+**Fidelity caveat (recorded for operators):** the tracer is outline-based, so a
+single thin stroke traces as two parallel contours. On a laser that is cosmetic;
+on a CNC *profile* cut it becomes two cuts bracketing the stroke rather than one
+centerline pass. Cutting out a filled shape/logo — the common CNC case — is
+unaffected. The Trace dialog shows a CNC note to this effect.
+
+**Verification:** `machine-command-gate.test.ts` moves the three Trace IDs into
+`CNC_SURVIVORS`, locking the new behavior; the data-driven "hidden set equals
+the laser-only set" assertion updates from the source of truth automatically.
+
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
 **Status:** Accepted
@@ -6609,8 +6636,10 @@ When > 0:
   proud of the finished wall (profileToolpathPolylines gained an allowance arg).
 - One finishing pass at the true contour (tool-radius offset, allowance 0) at
   full depth is appended after the roughing passes.
-- Holding tabs: the finishing pass runs through the SAME tab split the deepest
-  roughing pass uses, so tabs are preserved and the part stays attached.
+- Holding tabs: the finishing pass projects the deepest roughing path's
+  physical tab-center anchors onto the true contour before splitting it. This
+  preserves tab locations even when offset contours choose different start
+  vertices or distribute perimeter length differently.
 
 Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
 (which already has its own H.8 finishing skim) are out of scope, documented in
@@ -6619,12 +6648,10 @@ code, and covered by a test showing those cut types are unaffected.
 Consequences.
 - Determinism (#5): allowance 0/absent is byte-identical (tested).
 - HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
-- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
-  same perimeter-fraction logic on concentric contours, so they align for
-  typical convex profiles; on complex/concave geometry clipper's offset can pick
-  a different start vertex and misalign them, which could sever the part. Verify
-  with a test cut before trusting tabs + finish allowance together on intricate
-  parts.
+- Tab alignment is start-vertex invariant: finishing gaps are centered by
+  nearest-point projection from the matching roughing contour's physical tab
+  anchors. Automated tests cover contours with deliberately different start
+  vertices. Hardware verification remains required before production use.
 
 ---
 
@@ -6752,61 +6779,118 @@ the existing selection transform controls continue to own whole-object scale, ro
 
 ---
 
-## ADR-150 - Adopt bounded variable-data production as a Phase D extension
+## ADR-159 - Schema v2 curves are canonical and compatibility polylines are invalidated
 
 **Status:** Accepted | **Date:** 2026-07-13
 
-### Context
-
-Phase D originally scoped ordinary text in bundled fonts. The production workflow now also has
-typed serial, date/time, CSV, and cut-setting fields, while this branch adds bounded record and
-serial ranges, configurable step size, forward/reverse wrap, and reset. Leaving that capability
-outside PROJECT.md would make persistence and output behavior look accidental despite its bounded
-validators, deterministic tests, and explicit operator controls.
-
 ### Decision
 
-- Adopt variable text and bounded sequence controls as a Phase D production extension.
-- Keep imported CSV normalized and embedded in the project; no network or database source is
-  introduced.
-- Advance values only after explicit operator action, successful export, or completed streaming.
-  Failed or stale output must not advance production state.
-- Clamp persisted ranges to the embedded dataset and require safe integers for serial arithmetic.
-- Barcode/QR fields, live databases, and automatic label imposition remain out of scope.
+Project schema v2 stores line, cubic, and elliptical-arc curve subpaths. When `curves` are present,
+they are the editable source of truth and machine consumers flatten them with explicit tolerance and
+segment budgets. Curve edits regenerate compatibility polylines; a legacy polyline-only edit deletes
+the stale curve field. Serialization promotes remaining polyline-only paths to line curves, and the
+v1→v2 migrator performs the same one-way promotion for old projects.
 
 ### Consequences
 
-Variable production is now intentional product scope rather than an undocumented accretion.
-Projects remain offline and self-contained, and long runs have deterministic bounds and wrap
-semantics. The schema surface grows, so load validation and round-trip tests remain release gates.
+Preview, hit testing, save, laser compile, and CNC compile cannot silently choose conflicting copies
+of geometry. Topology-changing code must update curves and rematerialize polylines, or deliberately
+invalidate curves. Budget exhaustion refuses the operation instead of emitting partial geometry.
 
 ---
 
-## ADR-151 - Quick Nest uses bounded outline compaction with rectangular fallback
+## ADR-160 - Rotary raster is an explicit experimental amendment to ADR-127
 
 **Status:** Accepted | **Date:** 2026-07-13
 
-### Context
-
-Rectangle-only nesting wastes material around concave and irregular art. Exact outline compaction
-can reduce that waste, but its candidate search and polygon intersections run synchronously on the
-UI thread. An item-count limit alone does not bound dense outlines, and a large concave corpus can
-freeze the application before the operator can cancel.
-
 ### Decision
 
-- Quick Nest may compact placements using sanitized closed object outlines after a conservative
-  rectangular nest establishes a valid seed.
-- Outline mode is limited to 32 items and a deterministic point-weighted work budget of 250,000
-  (`itemCount² × totalOutlinePoints`). Candidate count is independently capped.
-- Inputs outside either budget use the existing rectangular algorithm immediately. Invalid
-  polygons, Clipper failures, or a non-improving search also fall back to the rectangular result.
-- Every accepted outline placement is revalidated against the bed, padding, obstacles, and peer
-  geometry before it can update the scene.
+ADR-127's vectors-only refusal remains the default. Raster rows may use the same rotary machine-space
+Y transform only when both rotary and rotary-raster Labs gates are enabled and the output caller
+passes the explicit permission. Otherwise preflight returns `rotary-raster-unsupported`. Surface
+row spacing is scaled; pixel power data and non-rotary output remain unchanged.
 
 ### Consequences
 
-Small and medium irregular jobs can save stock without changing the safe default for dense or large
-jobs. The synchronous algorithm now has an enforceable upper bound, while rectangular fallback
-preserves responsiveness and deterministic placement. Moving outline search to a worker remains a
-future optimization, not a prerequisite for safe use.
+The experimental path is testable without weakening saved-project or encoder defaults. It remains
+hardware CLAIMED and must not be presented as verified cylindrical photo engraving.
+
+---
+
+## ADR-161 - Labs gates experimental laser features locally and fail closed
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Tools → Labs owns explicit gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera
+alignment v2. Gates default false, tolerate unavailable/corrupt local storage by reverting false,
+and encode dependencies (`rotaryRaster` implies `rotary`; disabling rotary disables its raster gate).
+They are workstation consent, not portable project authorization; output paths must receive explicit
+permission rather than reading UI storage from core code.
+
+### Consequences
+
+Opening a project on another machine cannot silently arm experimental behavior. Each feature still
+requires its own profile, capability, preflight, and hardware-confidence checks.
+
+---
+
+## ADR-162 - Low-power Fire is profile-opted, hard-capped, and momentary
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Fire appears only for laser projects when the Labs gate, controller capability, profile capability,
+and profile `fireControl.enabled` all agree. Power is capped by the configured limit and an absolute
+5% ceiling. The control requires a known idle position with no alarm, job, motion, probe, autofocus,
+controller operation, or pending untracked acknowledgement. Pointer/key release, leave, cancel,
+window blur, visibility loss, unmount, and error all request laser-off; release emits `M5`.
+
+### Consequences
+
+Fire is a supervised positioning aid, not a persistent power toggle. Profiles without an explicit
+safe contract expose no control, and simulator coverage does not replace a physical safety pass.
+
+---
+
+## ADR-163 - Cut Planner exposes five persisted deterministic policies
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+The former `reduceTravelMoves` switch is retained only as a compatibility mirror. The persisted Cut
+Planner owns travel policy, inside-first ordering, layer priority, path-direction reversal, and the
+planning start reference. Nearest-neighbor ordering is deterministic, preserves semantically ordered
+raster/scanline work, and falls back to source order above its 2,000-segment synchronous budget.
+This is a bounded greedy planner, not a claim of full 2-opt optimality.
+
+### Consequences
+
+Operator intent round-trips and output remains deterministic. Adding another policy requires schema
+validation, legacy defaults, output tests, and a new complexity bound.
+
+---
+
+## ADR-164 - Adopt bounded offline editing and interoperability already shipped
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+- Adopt bounded node and Bezier-handle editing for imported/materialized paths under ADR-159's
+  geometry invalidation rule; general weld/boolean/offset kernel work remains deferred.
+- Adopt defensive LightBurn `.clb` import into native libraries and refreshable native preset-to-layer
+  bindings. `.clb` export, manufacturer packs, and LightBurn `LinkPath` synchronization remain deferred.
+- Adopt explicit `.ttf`/`.otf` import with project embedding under count and byte budgets. Automatic
+  host system-font enumeration remains out of scope.
+- Adopt bounded offline variable text from embedded CSV, serial, date/time, and cut-setting fields.
+  Network/database sources, barcode/QR generation, and automatic imposition remain out of scope.
+
+### Consequences
+
+These tested capabilities are intentional product scope rather than undocumented exceptions. Their
+offline, bounded persistence contracts remain release gates; this decision does not authorize the
+larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.

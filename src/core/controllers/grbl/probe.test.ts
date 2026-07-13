@@ -24,6 +24,7 @@ describe('buildZProbeLines', () => {
   it('emits the two-stage cycle with thickness-compensated zero', () => {
     expect(buildZProbeLines(DEFAULT_Z_PROBE_PARAMS)).toEqual([
       'G21',
+      'G94',
       'G91',
       'G38.2 Z-25.000 F150.000',
       'G0 Z2.000',
@@ -45,6 +46,10 @@ describe('buildZProbeLines', () => {
 });
 
 describe('buildCornerProbeLines', () => {
+  it('selects units-per-minute feed mode before any probe motion', () => {
+    expect(buildCornerProbeLines(CORNER).slice(0, 3)).toEqual(['G21', 'G94', 'G91']);
+  });
+
   it('zeros X and Y one bit-radius outside the stock faces (front-left)', () => {
     const lines = buildCornerProbeLines(CORNER);
     expect(lines).toContain('G10 L20 P0 X-3.175');

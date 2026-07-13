@@ -820,3 +820,14 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
     no copyleft). Added to the `scripts/check-licenses.mjs` allow-list on
     adoption (maintainer-approved 2026-07-04), consistent with the existing
     permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).
+
+## GRBL axis-specific origin semantics (2026-07-13)
+
+- **Source snapshot:** [gnea/grbl at bfb67f0c](https://github.com/gnea/grbl/tree/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e)
+- GRBL's parser computes `WPos = MPos - WCS - G92 - TLO`. Its G92 path recalculates only named
+  axes and retains the prior offset for unnamed axes; G92.1 clears the transient offset.
+- `$#` reports stored WCS, G92, TLO, and probe parameters, while intermittent status WCO reports the
+  effective combined offset. A mutation `ok` proves acceptance, not the value of every untouched axis.
+- **KerfDesk consequence:** XY-only commands may derive X/Y but must preserve known Z or wait for
+  readback. Any G92.1 path invalidates unqualified Z evidence until a new touch-off or richer readback
+  proof exists.

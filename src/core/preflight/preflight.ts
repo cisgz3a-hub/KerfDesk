@@ -58,6 +58,7 @@ export type PreflightCode =
   | 'cnc-depth-exceeds-stock'
   | 'cnc-overdeep-cut'
   | 'plunged-travel'
+  | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'
   | 'non-finite-coordinate'
   // ADR-127: image engraves are refused while the rotary is enabled (v1).

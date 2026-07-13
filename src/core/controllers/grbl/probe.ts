@@ -74,6 +74,9 @@ function fmt(value: number): string {
 export function buildZProbeLines(params: ZProbeParams): ReadonlyArray<string> {
   return [
     'G21',
+    // G93 is modal and reinterprets F as inverse time. Always restore the
+    // mm/min contract before any seek, probe, or retract motion.
+    'G94',
     'G91',
     `G38.2 Z${fmt(-params.maxTravelMm)} F${fmt(params.seekFeedMmPerMin)}`,
     `G0 Z${fmt(BACKOFF_MM)}`,

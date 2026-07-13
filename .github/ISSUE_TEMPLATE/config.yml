@@ -1,0 +1,9 @@
+# Bugs go through the structured form above; everything else (feature ideas,
+# questions, feedback) is routed to Discussions to keep the issue tracker
+# actionable. Flip blank_issues_enabled to true if you want to allow ad-hoc
+# blank issues as well.
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions, ideas & feedback
+    url: https://github.com/cisgz3a-hub/KerfDesk/discussions
+    about: For anything that isn't a bug — feature ideas, questions, and general feedback — start a Discussion.

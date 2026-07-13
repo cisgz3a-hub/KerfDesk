@@ -79,7 +79,7 @@ function importedLayers(root: Element, usedColors: ReadonlyArray<string>): Layer
   const settings = new Map<number, Element>();
   for (const element of [...root.children]) {
     if (normalized(element.tagName) !== 'cutsetting') continue;
-    const index = finiteNumber(element.getAttribute('index') ?? element.getAttribute('Index'));
+    const index = numericField(element, ['index']);
     if (index !== null) settings.set(Math.trunc(index), element);
   }
   const colors = [...new Set(usedColors)];

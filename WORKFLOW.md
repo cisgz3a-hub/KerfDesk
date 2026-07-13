@@ -436,10 +436,10 @@ If all applicable checks pass, the save/start proceeds.
 
 #### Success — schema older
 1. Migration runs to current version.
-2. Toast (info): `Project migrated from v0 to v1.`
+2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Phase A note:** only `schemaVersion: 1` exists; this branch is forward-looking infrastructure (registered migrator function + dispatch table) and cannot trigger in Phase A. Test by feeding a `schemaVersion: 0` synthetic fixture through the migrator unit test.
+> **Current note:** project schema v2 stores canonical curve subpaths. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; synthetic v0 fixtures still exercise multi-step migration dispatch (ADR-159).
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -1105,12 +1105,13 @@ existing SetupRow (Home / Auto-focus / Frame / Start) and the
 streaming controls. Two buttons:
 
 - **Set origin here** — sends `G92 X0 Y0`. Declares the current head
-  position as work-coord (0, 0). Toast confirms the write; the status
+  position as work-coord (0, 0). Toast confirms the controller's `ok`
+  acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
   next WCO-bearing status frame arrives. Frame and Start switch to
-  user-origin placement immediately after the write succeeds; they do
-  not wait for that later status frame.
+  user-origin placement only after that `ok`; they do not wait for the
+  later WCO-bearing status frame.
 - **Reset origin** — sends `G92.1`. Clears the offset, status returns
   to "machine 0,0". Disabled when no custom origin is active.
 
@@ -1120,7 +1121,19 @@ status frames). It must never read the raw `statusReport.wco` — GRBL
 only emits WCO every Nth frame, so the raw field is null on ~29
 frames out of 30 and would flicker the readout.
 
-**The four states.**
+Every origin command requires a connected controller with known Idle
+status and no outstanding acknowledgement. It exclusively owns the
+controller command arbiter until `ok`/`error`/`ALARM`, so Start,
+Console, settings, and other motion cannot steal its response. The two
+commands in a persistent-origin update are acknowledged one at a time;
+local origin truth changes atomically only after both succeed.
+
+The readout and Reset action treat any nonzero WCO axis as meaningful,
+but job placement is axis-specific: only a nonzero X or Y offset proves
+an XY custom origin. A Z-only touch-off remains visible and may establish
+work-Z evidence, but it cannot enable User Origin or Verified Origin.
+
+**The five states.**
 
 1. **Success.** Connected, idle, head jogged to a workpiece corner.
    Click Set origin here → toast "Origin set to current head position
@@ -1131,12 +1144,17 @@ frames out of 30 and would flicker the readout.
 2. **No connection.** Both buttons disabled (`busy = props.disabled
    || streaming`; `disabled` set by `LaserWindow` when connection
    isn't `connected`). User must connect first.
-3. **Alarm clears origin mid-session.** Operator sets origin, then a
+3. **Rejected / interrupted update.** If a command is rejected, times
+   out, disconnects, or a multi-command persistent update fails after
+   its first `ok`, the cached WCO and frame proof are cleared and the
+   origin source becomes `unknown`. Start remains unable to resolve a
+   custom placement until the operator re-establishes or resets it.
+4. **Alarm clears origin mid-session.** Operator sets origin, then a
    limit switch triggers (or `\x18` is sent). GRBL clears G92
    internally; the alarm branch in `laser-line-handler.ts` clears
    `wcoCache`; the status row reverts to "Origin: machine 0,0". User
    re-jogs and re-sets if they want the offset back.
-4. **Off-bed risk.** Operator sets origin near the bed edge, then
+5. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
    *machine* once the offset is applied. When WCO is known, Frame and
    Start preflight check the physical bounds (`job bounds + WCO`) and
@@ -2238,13 +2256,19 @@ F-CNC19 tiling.
 #### Success
 1. Material & Bit → "Surface spoilboard": width/height (prefilled from
    the stock), stepover % of the active bit, total depth. Save writes a
-   standalone .nc: serpentine rows per 0.5 mm depth step, spindle
-   spin-up first, park at the origin after M5.
+   provenance-stamped standalone .nc: serpentine rows per 0.5 mm depth
+   step, spindle-off safe-Z lift before M3/spin-up, park at the origin
+   after M5. Fixed feeds are capped to the device-profile maximum.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
+3. Before the picker opens, emitted-text preflight checks the work-origin
+   bed envelope, enabled no-go-zone uncertainty, feed/RPM ceilings,
+   finite coordinates, safe travel/depth, and spindle-start clearance.
+   Connected-controller $30/$32 mismatches use the normal export confirm.
 
 #### Error — save fails
-1. A failed dialog/write toasts the reason; nothing else changes.
+1. A preflight failure or failed dialog/write toasts the reason; nothing
+   is written.
 
 #### Empty
 1. Cancelling the save dialog writes nothing.
@@ -2465,6 +2489,26 @@ F-CNC19 tiling.
    that layer. Text and drawn shapes don't auto-seed (like laser defaults);
    set their material on the layer card, or re-pick the project material to
    apply to all.
+
+### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
+
+#### Success
+1. Set Origin changes X/Y only. If KerfDesk already knows the prior Z offset,
+   it preserves that Z; otherwise it waits for a fresh WCO-bearing status
+   instead of copying machine Z into the work-offset cache.
+2. Reset Origin and persistent-origin flows that send `G92.1` invalidate
+   work-Z evidence because GRBL clears every transient G92 axis.
+
+#### Error — acknowledgement or readback failure
+1. Existing origin transaction rules remain fail-closed: a rejected, alarmed,
+   timed-out, or disconnected mutation leaves origin truth unknown and Z
+   evidence unavailable.
+
+#### Edge — persistent probe-derived Z
+1. The current store records work-Z as a boolean, not its controller offset
+   source. After `G92.1`, KerfDesk conservatively requires a new touch-off even
+   when a persistent G54 Z may still exist; later `$#` readback may prove and
+   preserve that distinction.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 

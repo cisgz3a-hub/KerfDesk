@@ -19,6 +19,11 @@ import {
   type EntityConversion,
 } from './dxf-entities';
 import type { DxfTag } from './dxf-tags';
+import {
+  dxfInsertGrid,
+  isDxfInsertGridWithinBudget,
+  MAX_MINSERT_INSTANCES,
+} from './dxf-insert-grid';
 
 export type RawEntity = {
   readonly type: string;
@@ -178,6 +183,16 @@ function expandInsert(
       notes: [`INSERT "${name}" skipped: nesting deeper than ${MAX_INSERT_DEPTH} (cycle?)`],
     };
   }
+  const grid = dxfInsertGrid(entity.tags);
+  if (!isDxfInsertGridWithinBudget(grid)) {
+    return {
+      polylines: [],
+      skipped: new Map([['INSERT', 1]]),
+      notes: [
+        `INSERT "${name}" skipped: MINSERT grid has ${grid.instanceCount} instances (maximum ${MAX_MINSERT_INSTANCES})`,
+      ],
+    };
+  }
   const insertColor = resolveEntityColor(entity.tags, ctx.layerColors, inheritedColor);
   const child = expandEntities(block.entities, ctx, insertColor, depth + 1);
   const placed = placeInsertInstances(entity, block, ctx.scale, child.polylines);
@@ -203,8 +218,7 @@ function placeInsertInstances(
   const rotation = firstNumber(entity.tags, 50) * DEGREES_TO_RADIANS;
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
-  const columns = Math.max(1, Math.trunc(firstNumber(entity.tags, 70, 1)));
-  const rows = Math.max(1, Math.trunc(firstNumber(entity.tags, 71, 1)));
+  const { columns, rows } = dxfInsertGrid(entity.tags);
   const columnSpacing = firstNumber(entity.tags, 44) * scale;
   const rowSpacing = firstNumber(entity.tags, 45) * scale;
 
