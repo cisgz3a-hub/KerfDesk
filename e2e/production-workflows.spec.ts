@@ -405,6 +405,39 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await expect(page.getByRole('button', { name: 'Start job' })).toBeEnabled();
 });
 
+test('shares jog speed across buttons, keyboard movement, and return to work zero', async ({
+  page,
+  kerfdesk,
+}) => {
+  await connectAndHome(page, kerfdesk);
+  await page.getByRole('combobox', { name: 'Jog speed' }).selectOption('1000');
+
+  await page.getByRole('button', { name: 'Jog +X +Y 10 mm' }).click();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()))
+    .toContain('$J=G91 G21 X10.000 Y10.000 F1000');
+  await kerfdesk.emitSerialLine('<Idle|MPos:10.000,10.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+
+  await page.keyboard.press('ArrowUp');
+  await expect
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$J=G91 G21 Y10.000 F1000\n'))
+    .toBe(1);
+  await kerfdesk.emitSerialLine('<Idle|MPos:10.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+
+  await page.getByRole('button', { name: 'Set origin here' }).click();
+  await expect
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), 'G92 X0 Y0\n'))
+    .toBe(1);
+  await kerfdesk.emitSerialLine('<Idle|MPos:50.000,40.000,0.000|WCO:10.000,20.000,0.000|FS:0,0>');
+
+  await page.getByRole('button', { name: 'Go to work zero' }).click();
+  await expect
+    .poll(async () =>
+      exactSerialWriteCount(await kerfdesk.events(), '$J=G91 G21 X-40.000 Y-20.000 F1000\n'),
+    )
+    .toBe(1);
+});
+
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
 }

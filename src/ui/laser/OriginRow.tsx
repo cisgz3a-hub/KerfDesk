@@ -5,6 +5,8 @@ import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { clampJogFeed } from './jog-control-policy';
+import { useJogControlPreferences } from './jog-control-preferences';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
@@ -86,6 +88,7 @@ export function OriginRow(props: {
       >
         Reset origin
       </button>
+      <GoToWorkZeroButton busy={busy} hasCustom={hasCustom} />
       {wcs === 'g92-and-g10' && (
         <AdvancedOriginControls
           busy={busy}
@@ -150,6 +153,42 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
         );
     },
   };
+}
+
+function GoToWorkZeroButton(props: {
+  readonly busy: boolean;
+  readonly hasCustom: boolean;
+}): JSX.Element {
+  const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
+  const wcoCache = useLaserStore((state) => state.wcoCache);
+  const idle = useLaserStore((state) => state.statusReport?.state === 'Idle');
+  const maxFeed = useStore((state) => state.project.device.maxFeed);
+  const requestedFeed = useJogControlPreferences((state) => state.requestedFeedMmPerMin);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const ready = !props.busy && props.hasCustom && wcoCache !== null && idle;
+  const onGo = (): void => {
+    if (wcoCache === null) return;
+    void jogToMachinePosition(wcoCache.x, wcoCache.y, clampJogFeed(requestedFeed, maxFeed)).catch(
+      (error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        pushToast(`Cannot move to work zero: ${reason}`, 'warning');
+      },
+    );
+  };
+  return (
+    <button
+      type="button"
+      onClick={onGo}
+      disabled={!ready}
+      title={
+        props.hasCustom && wcoCache !== null
+          ? 'Move the head to work X0 Y0 with the beam off.'
+          : 'Set a work origin and wait for its controller position before returning to it.'
+      }
+    >
+      Go to work zero
+    </button>
+  );
 }
 
 function AdvancedOriginControls(props: {
