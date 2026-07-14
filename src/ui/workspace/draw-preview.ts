@@ -130,7 +130,9 @@ export function buildPreviewToolpath(
     options.outputScope === undefined
       ? null
       : validateOutputScope(project.scene, options.outputScope);
-  if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
+  if (scoped !== null && !scoped.ok) {
+    return emptyPreviewToolpath({ kind: 'preparation-failed', messages: scoped.messages });
+  }
   const complexityScene = scoped === null ? project.scene : scoped.scene;
   if (scenePreparationTooComplex(complexityScene))
     return emptyPreviewToolpath({ kind: 'too-complex' });
@@ -152,7 +154,9 @@ export async function buildPreviewToolpathSnapshot(
     options.outputScope === undefined
       ? null
       : validateOutputScope(project.scene, options.outputScope);
-  if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
+  if (scoped !== null && !scoped.ok) {
+    return emptyPreviewToolpath({ kind: 'preparation-failed', messages: scoped.messages });
+  }
   const complexityScene = scoped === null ? project.scene : scoped.scene;
   if (scenePreparationTooComplex(complexityScene)) {
     return emptyPreviewToolpath({ kind: 'too-complex' });
@@ -162,7 +166,12 @@ export async function buildPreviewToolpathSnapshot(
 }
 
 function previewFromPrepared(project: Project, prepared: PreparedOutput): PreviewToolpath {
-  if (!prepared.ok) return buildToolpath(EMPTY_JOB);
+  if (!prepared.ok) {
+    return emptyPreviewToolpath({
+      kind: 'preparation-failed',
+      messages: prepared.preflight.issues.map((issue) => issue.message),
+    });
+  }
   // The prepared job is in machine/work coordinates; the canvas (ghost +
   // raster sim) draws in scene space. Map back so the overlay registers with
   // the design instead of mirroring about the bed midline (H3).

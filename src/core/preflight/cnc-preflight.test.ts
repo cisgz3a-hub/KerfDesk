@@ -72,15 +72,7 @@ describe('runCncPreflight no-go zones (G20)', () => {
       coordinateMode: 'relative-origin',
     });
     const zoneIssue = result.issues.find((issue) => issue.code === 'no-go-zone-collision');
-    expect(zoneIssue?.message).toMatch(/Verified Origin/i);
-  });
-
-  it('lets a Verified Origin CNC start through — its frame trace substitutes for the check', () => {
-    const result = runCncPreflight(projectWithCncZone(), config, GOOD_GCODE, {
-      coordinateMode: 'relative-origin',
-      originVerifiedByFrame: true,
-    });
-    expect(result.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
+    expect(zoneIssue?.message).toMatch(/perimeter Frame does not prove/i);
   });
 });
 

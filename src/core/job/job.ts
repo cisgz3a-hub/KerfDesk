@@ -51,9 +51,11 @@ export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
   readonly segments: ReadonlyArray<FillSegment>;
 };
 
-// F.2 raster group. Carries the pre-dithered S-value buffer plus
+// F.2 raster group. Carries either a pre-dithered S-value buffer or a
+// deterministic row provider plus
 // the placement and feed needed by emit-raster.ts to render G-code.
-// `sValues.length` MUST equal `pixelWidth * pixelHeight`.
+// `sValues.length` MUST equal `pixelWidth * pixelHeight`, unless rowProvider
+// is present, in which case it may be empty to avoid a full-grid allocation.
 export type RasterGroup = {
   readonly kind: 'raster';
   readonly layerId: string;
@@ -66,6 +68,7 @@ export type RasterGroup = {
   readonly airAssist: boolean;
   // S-values per pixel, already scaled by power %. Row-major.
   readonly sValues: Uint16Array;
+  readonly rowProvider?: (y: number) => Uint16Array;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
   readonly bounds: {

@@ -314,6 +314,7 @@ function emitRasterGroupHere(
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   return emitRasterGroupGcode({
     sValues: group.sValues,
+    ...(group.rowProvider !== undefined ? { rowProvider: group.rowProvider } : {}),
     width: group.pixelWidth,
     height: group.pixelHeight,
     bounds: group.bounds,

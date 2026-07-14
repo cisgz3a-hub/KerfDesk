@@ -9,14 +9,39 @@ import type { Project } from '../../core/scene';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
 import { hasOutOfBoundsObjects } from './out-of-bounds';
-import { previewHasBurnableContent, previewIssueFor } from './preview-status';
+import { previewHasBurnableContent, previewIssueFor, type PreviewIssue } from './preview-status';
+
+function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX.Element | null {
+  if (props.issue?.kind === 'too-complex') {
+    return (
+      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
+        Route preview is too large to draw safely. Simplify the trace or reduce detail, then preview
+        again.
+      </div>
+    );
+  }
+  if (props.issue?.kind === 'placement-unavailable') {
+    return (
+      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
+        Preview unavailable: {props.issue.messages.join(' ')}
+      </div>
+    );
+  }
+  if (props.issue?.kind === 'preparation-failed') {
+    return (
+      <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
+        Preview blocked: {props.issue.messages.join(' ')}
+      </div>
+    );
+  }
+  return null;
+}
 
 export function PreviewStatusOverlays(props: {
   readonly project: Project;
   readonly toolpath: Toolpath;
 }): JSX.Element | null {
   const issue = previewIssueFor(props.toolpath);
-  const tooComplex = issue?.kind === 'too-complex';
   // Any preview issue (too-complex, placement failure) already explains the
   // blank route, so the scope-oriented "enable Output" hint must not fire.
   const empty = issue === null && !previewHasBurnableContent(props.project, props.toolpath);
@@ -24,17 +49,7 @@ export function PreviewStatusOverlays(props: {
   if (issue === null && !empty && !outOfBounds) return null;
   return (
     <div style={stackStyle}>
-      {tooComplex ? (
-        <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
-          Route preview is too large to draw safely. Simplify the trace or reduce detail, then
-          preview again.
-        </div>
-      ) : null}
-      {issue?.kind === 'placement-unavailable' ? (
-        <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
-          Preview unavailable: {issue.messages.join(' ')}
-        </div>
-      ) : null}
+      <PreviewIssueBanner issue={issue} />
       {empty ? (
         <div className="lf-chip" style={hintStyle} role="status">
           Nothing to preview — enable Output on at least one layer with objects.

@@ -21,6 +21,7 @@ import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
   cncControllerEpochOf,
   cncSetupAttestationMatches,
+  cncSetupOverrideAcknowledgement,
   type CncControllerEpoch,
 } from './cnc-setup-attestation';
 import { cncResumeBlockMessage } from './cnc-pause-resume-policy';
@@ -105,7 +106,8 @@ export function jobActions(
         assertStartReservation(get, setupEpoch);
         await refreshCncLiveStartState(set, get, safeWrite, driver, machineKind);
         assertStartAllowed(set, get, true);
-        assertCncLiveStartReady(set, get, machineKind);
+        const acknowledgedOverrides = cncSetupOverrideAcknowledgement(options.cncSetupAttestation);
+        assertCncLiveStartReady(set, get, machineKind, acknowledgedOverrides);
         assertStartReservation(get, setupEpoch);
         if (hasPendingControllerWrite(get())) throw new Error(START_PENDING_ACK_MESSAGE);
         assertGcodeFitsController(gcode, options);

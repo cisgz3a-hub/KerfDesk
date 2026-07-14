@@ -7,14 +7,21 @@
 // produced by the driver seam (the XY perimeter and the absolute-Z jog builder).
 //
 // The retract/restore is gated on a current work-Z zero. The retract targets the
-// WORK frame (`Z<safeZ>`); without an established Z0 that height is an arbitrary
-// physical position and the jog could drive the bit into the stock, so a frame
-// with no current Z evidence falls back to the XY-only perimeter — the historical
-// laser-mode behavior and no worse than pre-retract framing.
+// WORK frame (`Z<safeZ>`); without an established Z0 that height is arbitrary,
+// while an XY-only fallback could drag the bit through stock. Both cases block.
 
 // Below this |Δ mm| the pre-frame Z already equals safe Z, so the restore jog is
 // redundant and omitted.
 const FRAME_Z_RESTORE_EPSILON_MM = 1e-3;
+
+export const CNC_FRAME_WORK_Z_REQUIRED_MESSAGE =
+  'CNC Frame requires a current work Z zero so the bit can retract above the stock before XY motion. Zero Z or run a settled probe, then Frame again.';
+export const CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE =
+  'CNC Frame is unavailable because this controller cannot build the required safe-Z retract.';
+
+export type CncFrameMotionPlan =
+  | { readonly kind: 'ready'; readonly lines: ReadonlyArray<string> }
+  | { readonly kind: 'blocked'; readonly message: string };
 
 export function buildCncFrameMotion(input: {
   /** The driver's Z-silent XY perimeter jogs. */
@@ -28,9 +35,12 @@ export function buildCncFrameMotion(input: {
   /** Driver builder for an absolute `$J=` Z jog; undefined on drivers without one. */
   readonly buildRetract: ((zMm: number, feed: number) => string) | undefined;
   readonly feed: number;
-}): ReadonlyArray<string> {
-  if (!input.hasCurrentWorkZEvidence || input.buildRetract === undefined) {
-    return input.perimeter;
+}): CncFrameMotionPlan {
+  if (!input.hasCurrentWorkZEvidence) {
+    return { kind: 'blocked', message: CNC_FRAME_WORK_Z_REQUIRED_MESSAGE };
+  }
+  if (input.buildRetract === undefined) {
+    return { kind: 'blocked', message: CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE };
   }
   const retract = input.buildRetract(input.safeZMm, input.feed);
   const restore = frameZRestoreLine(
@@ -39,9 +49,9 @@ export function buildCncFrameMotion(input: {
     input.feed,
     input.buildRetract,
   );
-  return restore === undefined
-    ? [retract, ...input.perimeter]
-    : [retract, ...input.perimeter, restore];
+  const lines =
+    restore === undefined ? [retract, ...input.perimeter] : [retract, ...input.perimeter, restore];
+  return { kind: 'ready', lines };
 }
 
 // The restore is the same absolute-Z jog shape as the retract, aimed back at the

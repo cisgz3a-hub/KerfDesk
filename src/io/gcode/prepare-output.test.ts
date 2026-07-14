@@ -66,6 +66,33 @@ function hugeRasterProject(): Project {
   };
 }
 
+function streamableRasterProject(): Project {
+  const color = '#808080';
+  const raster: SceneObject = {
+    kind: 'raster-image',
+    id: 'streamed',
+    color,
+    source: 'line-art.png',
+    dataUrl: 'data:image/png;base64,source',
+    lumaBase64: 'AA==',
+    pixelWidth: 1,
+    pixelHeight: 1,
+    dither: 'threshold',
+    linesPerMm: 10,
+    bounds: { minX: 0, minY: 0, maxX: 201, maxY: 201 },
+    transform: IDENTITY_TRANSFORM,
+  };
+  const base = createProject();
+  return {
+    ...base,
+    scene: addLayer(addObject(base.scene, raster), {
+      ...createLayer({ id: color, color, mode: 'image' }),
+      ditherAlgorithm: 'threshold',
+      linesPerMm: 10,
+    }),
+  };
+}
+
 describe('prepareOutput', () => {
   it('returns an optimized job for a well-formed project', () => {
     const prepared = prepareOutput(vectorProject());
@@ -100,6 +127,18 @@ describe('prepareOutput', () => {
     expect(prepared.ok).toBe(false);
     if (!prepared.ok) {
       expect(prepared.preflight.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+    }
+  });
+
+  it('prepares a measured-safe raster above the former four-million-pixel ceiling', () => {
+    const prepared = prepareOutput(streamableRasterProject());
+
+    expect(prepared.ok).toBe(true);
+    if (prepared.ok) {
+      const raster = prepared.job.groups.find((group) => group.kind === 'raster');
+      expect(raster).toMatchObject({ pixelWidth: 2010, pixelHeight: 2010 });
+      expect(raster?.kind === 'raster' ? raster.sValues.length : -1).toBe(0);
+      expect(raster?.kind === 'raster' ? raster.rowProvider : undefined).toBeTypeOf('function');
     }
   });
 

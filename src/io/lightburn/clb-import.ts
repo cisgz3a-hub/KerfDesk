@@ -6,7 +6,7 @@ import {
   type MaterialPreset,
 } from '../material-library';
 
-const MAX_CLB_BYTES = 5_000_000;
+export const MAX_CLB_BYTES = 5_000_000;
 const MAX_CLB_ENTRIES = 10_000;
 const MAX_XML_DEPTH = 64;
 

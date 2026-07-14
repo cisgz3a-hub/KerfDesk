@@ -37,7 +37,12 @@ export type TransportCapability =
   // the Connect button and machine controls are disabled for the profile.
   | 'file-only';
 
+export type StartProtocolCapability = 'grbl-live' | 'marlin-line' | 'smoothie-live' | 'file-only';
+
 export type ControllerCapabilities = {
+  // Compatibility class for live Start semantics. Controller labels may
+  // differ while queue, status, realtime, and emitted-job contracts match.
+  readonly startProtocol: StartProtocolCapability;
   readonly transport: TransportCapability;
   readonly jog: JogCapability;
   readonly jogCancel: boolean;

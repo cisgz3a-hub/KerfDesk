@@ -205,7 +205,7 @@ describe('laser-store motion operation lifecycle', () => {
     expect(pending?.[pending.length - 1]).toBe('$J=G90 G21 Z0.000 F1000\n');
   });
 
-  it('frames XY-only with no Z retract when no work-Z zero is set (CNC)', async () => {
+  it('blocks CNC Frame before writing when no work-Z zero is set', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -219,13 +219,10 @@ describe('laser-store motion operation lifecycle', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     writes.length = 0;
 
-    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
-
-    // Without a work-Z zero the work-frame retract could target an arbitrary
-    // physical height, so framing is XY-only (ADR-192): the first line is an XY leg.
-    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
-      '$J=G90 G21 X0.000 Y0.000 F1000\n',
-    ]);
+    await expect(
+      useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000),
+    ).rejects.toThrow(/CNC Frame requires a current work Z zero/i);
+    expect(writes).toEqual([]);
   });
 
   it('stops dispatching Frame legs after the controller rejects a jog command', async () => {

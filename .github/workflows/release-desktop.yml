@@ -67,6 +67,9 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "Release version: ${VERSION}"
 
+      - name: Verify canonical release repository
+        run: pnpm guard:repo
+
       - name: Release verification gate
         # Same green-gate as the web CI, on Windows. Also builds dist/web and
         # dist-electron, which electron-builder then packages.

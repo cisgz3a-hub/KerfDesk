@@ -1,6 +1,8 @@
+import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import { activeCncTool, type Project } from '../../core/scene';
 
-export type WorkZZeroEvidenceSource = 'manual-zero' | 'probe';
+export type WorkZZeroEvidenceSource = 'manual-zero' | 'probe' | 'controller-readback';
+export const CONTROLLER_WORK_Z_FRESHNESS_MS = 5 * 60 * 1000;
 
 export const PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE =
   'Remove the touch plate and probe lead from the stock and cutter, then click ' +
@@ -21,10 +23,14 @@ export type WorkZZeroEvidence = {
   readonly toolId?: string;
   /** Probe plates are a collision hazard until the operator removes them. */
   readonly probePlateRemoved?: boolean;
+  readonly controllerSessionEpoch?: number;
+  readonly activeWcs?: ActiveWorkCoordinateSystem;
+  readonly offsetZMm?: number;
+  readonly observedAtMs?: number;
 };
 
 export function captureWorkZZeroEvidence(
-  source: WorkZZeroEvidenceSource,
+  source: Exclude<WorkZZeroEvidenceSource, 'controller-readback'>,
   referenceEpoch: number | undefined,
   toolId?: string,
 ): WorkZZeroEvidence {
@@ -33,6 +39,25 @@ export function captureWorkZZeroEvidence(
     referenceEpoch: referenceEpoch ?? 0,
     ...(toolId === undefined ? {} : { toolId }),
     ...(source === 'probe' ? { probePlateRemoved: false } : {}),
+  };
+}
+
+export function captureControllerWorkZEvidence(input: {
+  readonly referenceEpoch: number;
+  readonly controllerSessionEpoch: number;
+  readonly toolId: string;
+  readonly activeWcs: ActiveWorkCoordinateSystem;
+  readonly offsetZMm: number;
+  readonly observedAtMs: number;
+}): WorkZZeroEvidence {
+  return {
+    source: 'controller-readback',
+    referenceEpoch: input.referenceEpoch,
+    controllerSessionEpoch: input.controllerSessionEpoch,
+    toolId: input.toolId,
+    activeWcs: input.activeWcs,
+    offsetZMm: input.offsetZMm,
+    observedAtMs: input.observedAtMs,
   };
 }
 
@@ -47,6 +72,22 @@ export function isWorkZZeroEvidenceCurrent(
 ): boolean {
   return (
     evidence !== null && evidence !== undefined && evidence.referenceEpoch === (referenceEpoch ?? 0)
+  );
+}
+
+export function isWorkZEvidenceFreshForStart(
+  evidence: WorkZZeroEvidence | null | undefined,
+  referenceEpoch: number | undefined,
+  controllerSessionEpoch: number | undefined,
+  nowMs: number,
+): boolean {
+  if (!isWorkZZeroEvidenceCurrent(evidence, referenceEpoch)) return false;
+  if (evidence?.source !== 'controller-readback') return true;
+  const ageMs = nowMs - (evidence.observedAtMs ?? Number.NEGATIVE_INFINITY);
+  return (
+    evidence.controllerSessionEpoch === controllerSessionEpoch &&
+    ageMs >= 0 &&
+    ageMs <= CONTROLLER_WORK_Z_FRESHNESS_MS
   );
 }
 

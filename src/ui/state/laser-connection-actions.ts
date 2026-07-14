@@ -48,7 +48,7 @@ export function connectionActions(
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
-): Pick<LaserState, 'connect' | 'disconnect'> {
+): Pick<LaserState, 'connect' | 'disconnect' | 'forgetDevice'> {
   return {
     connect: async (adapter, options = {}) => {
       const previousConnection = refs.connection;
@@ -127,7 +127,8 @@ export function connectionActions(
         set({ connection: { kind: 'failed', error: message } });
       }
     },
-    disconnect: () => runDisconnect(set, get, refs, safeWrite),
+    disconnect: () => runDisconnect(set, get, refs, safeWrite, false),
+    forgetDevice: () => runDisconnect(set, get, refs, safeWrite, true),
   };
 }
 
@@ -136,6 +137,7 @@ async function runDisconnect(
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
+  forgetDevice: boolean,
 ): Promise<void> {
   assertAutofocusIdle(get());
   const conn = refs.connection;
@@ -153,7 +155,10 @@ async function runDisconnect(
     }
   }
   teardown(refs);
-  if (conn !== null) await conn.close().catch(() => undefined);
+  if (conn !== null) {
+    const close = forgetDevice && conn.forget !== undefined ? conn.forget : conn.close;
+    await close().catch(() => undefined);
+  }
   set((state) => ({
     connection: { kind: 'disconnected' },
     statusReport: null,

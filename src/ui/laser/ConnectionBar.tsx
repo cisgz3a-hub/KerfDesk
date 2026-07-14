@@ -16,22 +16,33 @@ type Props = {
   readonly machineNoun: string;
   readonly onConnect: () => void;
   readonly onDisconnect: () => void;
+  readonly onForget: () => void;
   readonly disabled: boolean;
 };
 
 export function ConnectionBar(props: Props): JSX.Element {
-  const { connection, machineNoun, onConnect, onDisconnect, disabled } = props;
+  const { connection, machineNoun, onConnect, onDisconnect, onForget, disabled } = props;
   return (
     <div style={rowStyle}>
       {connection.kind === 'connected' ? (
-        <button
-          type="button"
-          onClick={onDisconnect}
-          disabled={disabled}
-          title={`Close the current ${machineNoun} serial connection.`}
-        >
-          Disconnect
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={disabled}
+            title={`Close the current ${machineNoun} serial connection but keep device permission.`}
+          >
+            Disconnect
+          </button>
+          <button
+            type="button"
+            onClick={onForget}
+            disabled={disabled}
+            title={`Disconnect and remove this ${machineNoun} from the browser's permitted devices.`}
+          >
+            Forget Device
+          </button>
+        </>
       ) : (
         <button
           type="button"

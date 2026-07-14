@@ -1,7 +1,7 @@
 import { createLayer, createProject, type Layer, type Project } from '../../core/scene';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
 
-const MAX_LBRN_BYTES = 20_000_000;
+export const MAX_LBRN_BYTES = 20_000_000;
 const MAX_XML_DEPTH = 64;
 const MAX_SHAPES = 50_000;
 

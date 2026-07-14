@@ -140,7 +140,7 @@ function buildPreviewCanvas(
   device: DeviceProfile,
   maskObject: SceneObject | null,
 ): HTMLCanvasElement | null {
-  const bitmap = buildProcessedRasterBitmap(obj, layer, device, { maskObject });
+  const bitmap = buildProcessedRasterBitmap(obj, layer, device, { maskObject, maxEdge: 2048 });
   if (bitmap.kind === 'too-large') return null;
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;

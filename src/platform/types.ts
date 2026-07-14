@@ -50,6 +50,8 @@ export type SerialConnection = {
   // or close() called).
   readonly onClose: (handler: () => void) => () => void;
   readonly close: () => Promise<void>;
+  // Explicit permission revocation. Normal Disconnect must retain the pairing.
+  readonly forget?: () => Promise<void>;
 };
 
 export type SerialPortRef = {

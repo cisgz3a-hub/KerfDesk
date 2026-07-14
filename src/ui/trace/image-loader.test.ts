@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  BURN_MAX_EDGE_PX,
   PREVIEW_MAX_EDGE_PX,
+  burnDecodeMaxEdge,
   compositeRgbOverWhitePreservingAlpha,
   dataUrlToFile,
   loadImageAsRawData,
@@ -84,6 +86,13 @@ describe('image-loader trace preview sizing', () => {
     // 2048 (raised from 1024, ADR-037): doubles linear resolution so small
     // traced text keeps the detail it needs to trace as smooth curves.
     expect(PREVIEW_MAX_EDGE_PX).toBe(2048);
+  });
+
+  it('keeps burn decode independent from the smaller trace-preview cap', () => {
+    expect(BURN_MAX_EDGE_PX).toBe(8192);
+    expect(burnDecodeMaxEdge(6000, 3000)).toBe(8192);
+    expect(burnDecodeMaxEdge(12000, 6000)).toBeLessThan(BURN_MAX_EDGE_PX);
+    expect(burnDecodeMaxEdge(12000, 6000)).toBeGreaterThan(PREVIEW_MAX_EDGE_PX);
   });
 });
 

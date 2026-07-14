@@ -87,6 +87,21 @@ describe('compileJob raster image groups', () => {
     expect(raster?.sValues).toHaveLength(200);
   });
 
+  it('provides large local-dither rasters row-by-row without a full S-value allocation', () => {
+    const image: SceneObject = {
+      ...rasterObject('AA=='),
+      pixelWidth: 1,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 2100, maxY: 2100 },
+    };
+    const job = compileJob({ objects: [image], layers: [imageLayer()] }, dev);
+    const raster = firstRasterGroup(job);
+
+    expect(raster).toMatchObject({ pixelWidth: 2100, pixelHeight: 2100 });
+    expect(raster?.sValues).toHaveLength(0);
+    expect(raster?.rowProvider?.(0)).toEqual(new Uint16Array(2100).fill(300));
+  });
+
   it('keeps scan-offset compensation profile-scoped instead of baking it into raster groups', () => {
     const layer = imageLayer({ speed: 1000 });
     const calibratedDevice = {

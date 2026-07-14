@@ -10,7 +10,12 @@
 // the live estimate) treat both uniformly. Pure-core: no clock, no random, no
 // I/O.
 
-import { evaluateRasterBudget, pixelExtentForMm } from '../raster';
+import { pixelExtentForMm } from '../raster';
+import {
+  evaluateRasterBudget,
+  STREAMED_RASTER_PIXEL_THRESHOLD,
+  supportsStreamedRasterRows,
+} from '../raster/raster-budget';
 import { scenePreparationTooComplex } from '../job/preparation-complexity';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
@@ -33,32 +38,58 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
         'Registration jig: the box and your artwork are both set to burn. In the Registration Jig panel pick "Burn Box Only" or "Burn Artwork Only" so they do not burn in the same pass.',
     });
   }
-  for (const obj of project.machine?.kind === 'cnc' ? [] : project.scene.objects) {
+  issues.push(...rasterBudgetIssues(project));
+  return { ok: issues.length === 0, issues };
+}
+
+function rasterBudgetIssues(project: Project): PreflightIssue[] {
+  if (project.machine?.kind === 'cnc') return [];
+  const issues: PreflightIssue[] = [];
+  for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
-    const layers = project.scene.layers
-      .flatMap((l) => outputOperationLayers(l))
-      .filter(
-        (operationLayer) =>
-          operationLayer.color === obj.color &&
-          (obj.operationOverride?.mode ?? operationLayer.mode) === 'image',
-      );
-    for (const layer of layers) {
-      const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
-      const {
-        pixelWidth: pw,
-        pixelHeight: ph,
-        remedy,
-      } = rasterBudgetDimensions(obj, effectiveLayer, project);
-      const verdict = evaluateRasterBudget(pw, ph);
-      if (verdict.kind === 'too-large') {
-        issues.push({
-          code: 'raster-too-large',
-          message: `Layer ${layer.id} image would engrave at ${pw}x${ph} px (${verdict.reason}). ${remedy}`,
-        });
-      }
+    for (const layer of matchingImageLayers(project, obj)) {
+      const issue = rasterBudgetIssue(obj, layer, project);
+      if (issue !== null) issues.push(issue);
     }
   }
-  return { ok: issues.length === 0, issues };
+  return issues;
+}
+
+function matchingImageLayers(project: Project, obj: RasterImage): Layer[] {
+  return project.scene.layers
+    .flatMap((layer) => outputOperationLayers(layer))
+    .filter(
+      (layer) =>
+        layer.color === obj.color && (obj.operationOverride?.mode ?? layer.mode) === 'image',
+    );
+}
+
+function rasterBudgetIssue(
+  obj: RasterImage,
+  layer: Layer,
+  project: Project,
+): PreflightIssue | null {
+  const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
+  const {
+    pixelWidth: pw,
+    pixelHeight: ph,
+    remedy,
+  } = rasterBudgetDimensions(obj, effectiveLayer, project);
+  const verdict = evaluateRasterBudget(pw, ph, {
+    sourcePixelCount: obj.pixelWidth * obj.pixelHeight,
+    ditherAlgorithm: effectiveLayer.ditherAlgorithm,
+    passes: effectiveLayer.passes,
+    streamedRows:
+      pw * ph > STREAMED_RASTER_PIXEL_THRESHOLD &&
+      obj.imageMaskId === undefined &&
+      supportsStreamedRasterRows(effectiveLayer.ditherAlgorithm),
+  });
+  return verdict.kind === 'ok'
+    ? null
+    : {
+        code: 'raster-too-large',
+        message: `Layer ${layer.id} image would engrave at ${pw}x${ph} px (${verdict.reason}). ${remedy}`,
+      };
 }
 
 function rasterBudgetDimensions(

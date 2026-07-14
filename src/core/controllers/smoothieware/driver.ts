@@ -27,6 +27,7 @@ export const smoothiewareDriver: ControllerDriver = {
   label: 'Smoothieware',
   defaultBaudRate: SMOOTHIE_DEFAULT_BAUD_RATE,
   capabilities: {
+    startProtocol: 'smoothie-live',
     transport: 'serial',
     jog: 'gcode-relative',
     jogCancel: false,
@@ -57,6 +58,8 @@ export const smoothiewareDriver: ControllerDriver = {
     unlock: SMOOTHIE_CMD_UNLOCK,
     sleep: null,
     settingsQuery: null,
+    modalStateQuery: null,
+    offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: SMOOTHIE_STOP_LASER_LINES,
     settleDwell: SMOOTHIE_CMD_SETTLE,

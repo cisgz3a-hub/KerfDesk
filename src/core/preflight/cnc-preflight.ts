@@ -26,22 +26,19 @@ import { machineBoundsForDevice } from '../devices';
 import {
   DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
   findNonFiniteCoords,
-  findOutOfBoundsCoords,
   findOverdeepCutIssues,
   findPlungedTravelIssues,
   type MotionBoundsOffset,
 } from '../invariants';
 import type { CncMachineConfig, Layer, Project } from '../scene';
 import { DEFAULT_CNC_LAYER_SETTINGS, layerCncTool, type CncLayerSettings } from '../scene';
+import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export type CncPreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
   readonly coordinateMode?: 'machine' | 'relative-origin';
-  // A Verified Origin's mandatory frame trace substitutes for the no-go-zone
-  // crossing check that can't run without a trusted offset (G9/G19/G20).
-  readonly originVerifiedByFrame?: boolean;
 };
 
 const MAX_REPORTED_ISSUES = 5;
@@ -107,7 +104,7 @@ export function runCncPreflight(
       message: `Layer ${issue.layerId}: ${issue.reason} Adjust the inlay settings or choose another bit.`,
     });
   }
-  appendBoundsIssues(project, gcode, options, issues);
+  issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, gcode, options, issues);
   appendPlungedTravelIssues(gcode, config, issues);
@@ -195,20 +192,6 @@ function appendFeedIssue(
   });
 }
 
-function appendBoundsIssues(
-  project: Project,
-  gcode: string,
-  options: CncPreflightOptions,
-  issues: PreflightIssue[],
-): void {
-  const oob = findOutOfBoundsCoords(gcode, machineBoundsForDevice(project.device), {
-    motionOffset: options.motionOffset,
-  });
-  for (const issue of oob.slice(0, MAX_REPORTED_ISSUES)) {
-    issues.push({ code: 'out-of-bed', message: `Line ${issue.lineNumber}: ${issue.reason}` });
-  }
-}
-
 // See preflight.ts appendNonFiniteCoordIssues — a NaN/Infinity Z plunge or XY
 // coordinate is invisible to the bounds scanner and would fault the controller.
 function appendNonFiniteCoordIssues(gcode: string, issues: PreflightIssue[]): void {
@@ -229,18 +212,12 @@ function appendNoGoZoneIssues(
   const zones = project.device.noGoZones.filter((zone) => zone.enabled);
   if (zones.length === 0) return;
   if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
-    // A hand-set (relative) origin has no trusted work→machine offset, so
-    // scanning work-coordinate G-code against the machine-frame zones with a zero
-    // offset is a wrong-frame check that can FALSE-PASS a job straight through a
-    // clamp (G20). A Verified Origin's mandatory frame trace proves clearance
-    // instead (ADR-053) and substitutes for the check; every other
-    // relative-origin start fails closed rather than trusting a fictional frame.
-    if (options.originVerifiedByFrame === true) return;
     issues.push({
       code: 'no-go-zone-collision',
       message:
-        'No-go zones can’t be checked from a hand-set origin without homing. Frame the job in ' +
-        'Verified Origin mode to confirm clearance, or disable the zone.',
+        'No-go zones cannot be checked from this hand-set origin because its machine-space offset ' +
+        'is unknown. A perimeter Frame does not prove the job interior is clear. Use a placement ' +
+        'with a trusted machine position, or disable the zone only after manually verifying the full toolpath.',
     });
     return;
   }

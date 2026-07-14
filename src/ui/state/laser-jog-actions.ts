@@ -6,14 +6,14 @@
 // LiveRefs import — no runtime cycle.
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
-import { buildCncFrameMotion } from './cnc-frame-lines';
+import { buildCncFrameMotion, type CncFrameMotionPlan } from './cnc-frame-lines';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { runHomeAction } from './laser-home-action';
 import { markMotionOperationDispatched, startMotionOperation } from './laser-motion-operation';
 import { type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
-import { isWorkZZeroEvidenceCurrent } from './work-z-zero-evidence';
+import { isWorkZEvidenceFreshForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -54,10 +54,11 @@ export function jogActions(
       // Already there (within a step GRBL would round to zero): nothing to do,
       // and an all-zero jog would be rejected as a no-axis command.
       if (Math.abs(dx) < JOG_TO_POINT_EPSILON_MM && Math.abs(dy) < JOG_TO_POINT_EPSILON_MM) return;
-      // CNC: lift Z to the configured safe height before the XY traverse so the
-      // bit does not drag across stock/clamps on the way to work zero — the same
-      // retract frame() applies. A Z lift is always safe, so it precedes the jog
-      // gate. Laser projects have no Z retract seam and keep the flat move (F105).
+      assertAutofocusIdle(get());
+      assertJogFrameReady(set, get);
+      // CNC: after readiness is proven, lift Z to the configured safe height
+      // before the XY traverse so the bit does not drag across stock or clamps.
+      // Laser projects have no Z retract seam and keep the flat move (F105).
       await retractToCncSafeZ(refs, safeWrite, feed);
       await get().jog({ dx, dy, feed });
     },
@@ -89,7 +90,12 @@ export function jogActions(
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
-      const [firstLine, ...pendingLines] = buildFrameDispatchLines(refs, get, bounds, feed);
+      const plan = buildFrameDispatchPlan(refs, get, bounds, feed);
+      if (plan.kind === 'blocked') {
+        set({ lastWriteError: plan.message, log: pushLog(get(), `[lf2] ${plan.message}`) });
+        throw new Error(plan.message);
+      }
+      const [firstLine, ...pendingLines] = plan.lines;
       if (firstLine === undefined) return;
       set({ motionOperation: startMotionOperation('frame', pendingLines) });
       try {
@@ -111,23 +117,25 @@ export function jogActions(
 // the bit does not end parked at safe height (ADR-192). The retract/restore is
 // gated on a current work-Z zero; buildCncFrameMotion orders driver-produced
 // lines only (ADR-094 — no protocol bytes are hardcoded here).
-function buildFrameDispatchLines(
+function buildFrameDispatchPlan(
   refs: LiveRefs,
   get: GetFn,
   bounds: Parameters<LaserState['frame']>[0],
   feed: number,
-): ReadonlyArray<string> {
+): CncFrameMotionPlan {
   const perimeter = refs.driver.commands.buildFrameLines(bounds, feed);
   const machine = useStore.getState().project.machine;
-  if (machine?.kind !== 'cnc') return perimeter;
+  if (machine?.kind !== 'cnc') return { kind: 'ready', lines: perimeter };
   const state = get();
   return buildCncFrameMotion({
     perimeter,
     safeZMm: machine.params.safeZMm,
     preFrameWorkZMm: currentWorkZMm(state.statusReport, state.wcoCache),
-    hasCurrentWorkZEvidence: isWorkZZeroEvidenceCurrent(
+    hasCurrentWorkZEvidence: isWorkZEvidenceFreshForStart(
       state.workZZeroEvidence,
       state.workZReferenceEpoch,
+      state.controllerSessionEpoch,
+      Date.now(),
     ),
     buildRetract: refs.driver.commands.buildFrameRetract,
     feed,

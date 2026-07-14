@@ -27,6 +27,7 @@ import { type LiveJobEstimate } from './live-job-estimate';
 import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
+import { StartBlockerNotice } from './StartBlockerNotice';
 
 type Props = {
   readonly disabled: boolean;
@@ -63,6 +64,7 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   return (
     <div style={containerStyle}>
       <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
+      <StartBlockerNotice />
       <AccessoryResetControls
         accessories={accessoryCache}
         controlsBusy={controlsBusy}

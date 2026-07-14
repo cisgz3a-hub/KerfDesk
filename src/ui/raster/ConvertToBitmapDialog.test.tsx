@@ -128,7 +128,9 @@ describe('ConvertToBitmapDialog', () => {
     const { host, root } = await renderDialog({ bounds: hugeBounds, onConvert });
     try {
       expect(host.textContent).toContain('7782 x 5050 px');
-      expect(host.textContent).toContain('exceeds the 4000000 px limit');
+      expect(host.textContent).toContain(
+        '~300 MB materialized working set exceeds the 64 MB budget',
+      );
 
       const convert = findButton(host, 'Convert');
       expect(convert.disabled).toBe(true);

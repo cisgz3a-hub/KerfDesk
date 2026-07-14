@@ -75,15 +75,21 @@ describe('drawRasterPreview', () => {
     expect(createdCanvases).toHaveLength(2);
   });
 
-  it('skips over-budget raster previews before creating an offscreen canvas', () => {
+  it('builds a bounded preview canvas for a burn grid above the old pixel ceiling', () => {
     vi.stubGlobal('ImageData', FakeImageData);
+    let previewCanvas: { width: number; height: number } | undefined;
     const createElement = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
-      return {
+      const canvas = {
         width: 0,
         height: 0,
-        getContext: () => ({ putImageData: vi.fn() }),
-      } as unknown as HTMLCanvasElement;
+        getContext: () => ({
+          putImageData: vi.fn(() => {
+            previewCanvas = { width: canvas.width, height: canvas.height };
+          }),
+        }),
+      };
+      return canvas as unknown as HTMLCanvasElement;
     });
     const ctx = noOpContext();
     const view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
@@ -91,14 +97,15 @@ describe('drawRasterPreview', () => {
       burnRasterWithBounds('data:image/png;base64,over-budget-preview', {
         minX: 0,
         minY: 0,
-        maxX: 200.1,
-        maxY: 200.1,
+        maxX: 400.1,
+        maxY: 400.1,
       }),
     );
 
     drawRasterPreviewSync(ctx, project, view);
 
-    expect(createElement).not.toHaveBeenCalled();
+    expect(createElement).toHaveBeenCalledOnce();
+    expect(previewCanvas).toEqual({ width: 2048, height: 2048 });
   });
 
   it('uses image-layer minPower in grayscale preview while leaving white pixels white', () => {

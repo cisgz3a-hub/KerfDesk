@@ -13,6 +13,7 @@ export const ruidaDriver: ControllerDriver = {
   label: 'Ruida (.rd export)',
   defaultBaudRate: 115200, // unused — no serial transport
   capabilities: {
+    startProtocol: 'file-only',
     transport: 'file-only',
     jog: 'none',
     jogCancel: false,
@@ -43,6 +44,8 @@ export const ruidaDriver: ControllerDriver = {
     unlock: null,
     sleep: null,
     settingsQuery: null,
+    modalStateQuery: null,
+    offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: [],
     settleDwell: '',

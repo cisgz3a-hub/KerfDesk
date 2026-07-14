@@ -32,8 +32,9 @@ describe('estimateBitmapConversion transform handling', () => {
     const plan = estimateBitmapConversion({ bounds: SQUARE_180, transform: ROT_45 });
     expect(plan.pixelWidth).toBe(2546);
     expect(plan.pixelHeight).toBe(2546);
-    // 2546² > 4M px — the dialog must refuse exactly like the builder does.
-    expect(plan.verdict.kind).toBe('too-large');
+    // This formerly tripped the blunt 4M-pixel ceiling. Its measured working
+    // set fits, so the dialog and builder now allow it.
+    expect(plan.verdict.kind).toBe('ok');
   });
 
   it('matches the baked-bounds estimate the builder uses, for any transform', () => {

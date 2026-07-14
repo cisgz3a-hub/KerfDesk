@@ -154,15 +154,7 @@ describe('preflight no-go zones', () => {
       coordinateMode: 'relative-origin',
     });
     const zoneIssue = result.issues.find((issue) => issue.code === 'no-go-zone-collision');
-    expect(zoneIssue?.message).toMatch(/Verified Origin/i);
-  });
-
-  it('lets a Verified Origin start through — the frame trace substitutes for the zone check (G9/G19)', () => {
-    const result = runPreflight(projectWithNoGoZone(), CLEAR_GCODE, {
-      coordinateMode: 'relative-origin',
-      originVerifiedByFrame: true,
-    });
-    expect(result.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
+    expect(zoneIssue?.message).toMatch(/perimeter Frame does not prove/i);
   });
 });
 

@@ -85,6 +85,7 @@ describe('grblDriver', () => {
       cncJobs: true,
       lowPowerFire: true,
       overrides: true,
+      startProtocol: 'grbl-live',
     });
   });
 

@@ -20,7 +20,8 @@ export type ControllerCommandKind =
   | 'probe'
   | 'interactive-command'
   | 'recovery'
-  | 'start-arming';
+  | 'start-arming'
+  | 'work-z-recovery';
 
 export type ControllerLifecycleRefs = {
   controllerCommand: ControllerCommandRequest | null;
@@ -351,6 +352,12 @@ function updateOperationIdleReports(
 ): Partial<LaserState> {
   const operation = state.controllerOperation;
   if (operation === null || operation.kind !== kind) return {};
-  if (operation.kind === 'interactive-command' || operation.kind === 'start-arming') return {};
+  if (
+    operation.kind === 'interactive-command' ||
+    operation.kind === 'start-arming' ||
+    operation.kind === 'work-z-recovery'
+  ) {
+    return {};
+  }
   return { controllerOperation: { ...operation, idleReports } };
 }

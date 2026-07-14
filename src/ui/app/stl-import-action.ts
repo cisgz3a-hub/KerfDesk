@@ -17,6 +17,7 @@ import {
 } from '../../core/scene';
 import { parseStl } from '../../io/stl';
 import type { ToastVariant } from '../state/toast-store';
+import { importSourceSizeIssue } from './import-source-limits';
 
 export const DEFAULT_RELIEF_WIDTH_MM = 100;
 export const DEFAULT_RELIEF_DEPTH_MM = 5;
@@ -45,6 +46,11 @@ export async function importStlFiles(
   }
   let successIdx = 0;
   for (const file of files) {
+    const sizeIssue = importSourceSizeIssue(file, 'stl');
+    if (sizeIssue !== null) {
+      ctx.pushToast(sizeIssue, 'error');
+      continue;
+    }
     try {
       const relief = reliefFromStlBytes(await file.arrayBuffer(), file.name);
       if (typeof relief === 'string') {

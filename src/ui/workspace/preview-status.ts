@@ -9,6 +9,7 @@ import type { Project } from '../../core/scene';
 
 export type PreviewIssue =
   | { readonly kind: 'too-complex' }
+  | { readonly kind: 'preparation-failed'; readonly messages: ReadonlyArray<string> }
   // resolveJobPlacement refused (e.g. custom origin with no live position);
   // carries the placement failure messages so the overlay can name the reason
   // instead of the scope-oriented "enable Output" hint.

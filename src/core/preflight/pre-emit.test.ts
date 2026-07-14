@@ -70,6 +70,7 @@ function projectWithRaster(opts: {
   pixelWidth?: number;
   pixelHeight?: number;
   passThrough?: boolean;
+  ditherAlgorithm?: 'threshold' | 'floyd-steinberg';
 }): Project {
   const base = createProject();
   const raster: RasterImage = {
@@ -89,6 +90,7 @@ function projectWithRaster(opts: {
     ...createLayer({ id: COLOR, color: COLOR, mode: 'image' }),
     linesPerMm: opts.linesPerMm,
     passThrough: opts.passThrough ?? false,
+    ditherAlgorithm: opts.ditherAlgorithm ?? 'floyd-steinberg',
   };
   return { ...base, scene: addLayer(addObject(base.scene, raster), layer) };
 }
@@ -187,7 +189,7 @@ describe('runPreEmitPreflight', () => {
     ]);
   });
 
-  it('budgets pass-through rasters from source pixels before compile', () => {
+  it('allows a previously rejected pass-through raster when local dither can stream rows', () => {
     const result = runPreEmitPreflight(
       projectWithRaster({
         boundsMax: 10,
@@ -195,11 +197,27 @@ describe('runPreEmitPreflight', () => {
         pixelWidth: 2500,
         pixelHeight: 2500,
         passThrough: true,
+        ditherAlgorithm: 'threshold',
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('still rejects the same raster when error diffusion requires full-image state', () => {
+    const result = runPreEmitPreflight(
+      projectWithRaster({
+        boundsMax: 10,
+        linesPerMm: 1,
+        pixelWidth: 2500,
+        pixelHeight: 2500,
+        passThrough: true,
+        ditherAlgorithm: 'floyd-steinberg',
       }),
     );
 
     expect(result.ok).toBe(false);
-    expect(result.issues[0]?.message).toContain('2500x2500 px');
+    expect(result.issues[0]?.message).toContain('materialized working set');
   });
 
   it('does not reject a small pass-through source because of large physical bounds', () => {

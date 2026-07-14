@@ -75,12 +75,15 @@ function outputFillLayersByColor(layers: ReadonlyArray<Layer>): ReadonlyMap<stri
 }
 
 function countPathEstimatedHatches(path: ColoredPath, transform: Transform, layer: Layer): number {
-  let count = 0;
-  for (const polyline of path.polylines) {
-    if (!isClosedEnough(polyline)) continue;
-    count += estimateHatchRows(polyline.points, transform, layer);
-  }
-  return count;
+  if (layer.fillStyle === 'offset') return 0;
+  const contours = path.polylines
+    .filter(isClosedEnough)
+    .map((polyline) => polyline.points.map((point) => applyTransform(point, transform)));
+  if (contours.length === 0) return 0;
+  const primary = estimateHatchSegments(contours, layer.hatchAngleDeg, layer.hatchSpacingMm);
+  return layer.fillCrossHatch
+    ? primary + estimateHatchSegments(contours, layer.hatchAngleDeg + 90, layer.hatchSpacingMm)
+    : primary;
 }
 
 function vectorPaths(obj: SceneObject): ReadonlyArray<ColoredPath> {
@@ -119,26 +122,61 @@ function countPathSegments(path: ColoredPath): number {
     : PREPARATION_RAW_VECTOR_SEGMENT_BUDGET + 1;
 }
 
-function estimateHatchRows(
-  points: ReadonlyArray<Vec2>,
-  transform: Transform,
-  layer: Layer,
+function estimateHatchSegments(
+  contours: ReadonlyArray<ReadonlyArray<Vec2>>,
+  angleDeg: number,
+  spacingMm: number,
 ): number {
-  const spacing = Math.max(MIN_FILL_ESTIMATE_HATCH_SPACING_MM, layer.hatchSpacingMm);
-  const angle = normalizeHatchAngle(layer.hatchAngleDeg);
+  const spacing = Math.max(MIN_FILL_ESTIMATE_HATCH_SPACING_MM, spacingMm);
+  const angle = normalizeHatchAngle(angleDeg);
   const rad = (-angle * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
+  const rotated = contours.map((points) =>
+    points.map((point) => ({
+      x: point.x * cos - point.y * sin,
+      y: point.x * sin + point.y * cos,
+    })),
+  );
   let minY = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of points) {
-    const transformed = applyTransform(point, transform);
-    const y = transformed.x * sin + transformed.y * cos;
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
+  for (const points of rotated) {
+    for (const point of points) {
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    }
   }
   if (!Number.isFinite(minY) || !Number.isFinite(maxY) || maxY <= minY) return 0;
-  return Math.floor((maxY - minY) / spacing) + 1;
+  const yStart = Math.ceil(minY / spacing) * spacing;
+  const scanCount = Math.max(0, Math.floor((maxY - yStart) / spacing + 1e-6) + 1);
+  let segments = 0;
+  for (let scanIndex = 0; scanIndex < scanCount; scanIndex += 1) {
+    const y = yStart + scanIndex * spacing;
+    const intersections = hatchIntersections(rotated, y).sort((a, b) => a - b);
+    for (let i = 0; i + 1 < intersections.length; i += 2) {
+      const start = intersections[i];
+      const end = intersections[i + 1];
+      if (start !== undefined && end !== undefined && end - start >= 1e-6) segments += 1;
+    }
+    if (segments > PREPARATION_COMPILED_SEGMENT_BUDGET) return segments;
+  }
+  return segments;
+}
+
+function hatchIntersections(contours: ReadonlyArray<ReadonlyArray<Vec2>>, y: number): number[] {
+  const intersections: number[] = [];
+  for (const points of contours) {
+    for (let i = 0; i < points.length; i += 1) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      if (a === undefined || b === undefined) continue;
+      const yLo = Math.min(a.y, b.y);
+      const yHi = Math.max(a.y, b.y);
+      if (yHi - yLo < 1e-6 || y < yLo || y >= yHi) continue;
+      intersections.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x));
+    }
+  }
+  return intersections;
 }
 
 function normalizeHatchAngle(deg: number): number {
