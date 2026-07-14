@@ -233,13 +233,7 @@ function passesForLayer(
     allowanceMm > 0
       ? [
           ...roughing,
-          ...finishingProfilePasses(
-            polylines,
-            settings,
-            tool.diameterMm,
-            toolpaths,
-            tabSources,
-          ),
+          ...finishingProfilePasses(polylines, settings, tool.diameterMm, toolpaths, tabSources),
         ]
       : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.

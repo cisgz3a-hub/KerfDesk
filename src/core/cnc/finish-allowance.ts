@@ -1,10 +1,7 @@
 import type { CncPass } from '../job';
 import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { passNeedsTabs, splitPassForTabs, splitPassForTabsAlignedToReference } from './cnc-tabs';
-import {
-  manualTabCentersForToolpaths,
-  type CollectedCncContour,
-} from './cnc-manual-tab-mapping';
+import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 import { enforceCutDirection } from './motion-polish';
 import { orderInnerFirst } from './profile-ordering';
 import { profileToolpathPolylines } from './profile-paths';
