@@ -1,5 +1,10 @@
 import type { Scene } from './scene';
 
+const EMPTY_SELECTED_ARTWORK_MESSAGE =
+  'Selected artwork only is enabled, but no artwork is selected. Select artwork or turn off Selected artwork only.';
+const STALE_SELECTED_ARTWORK_MESSAGE =
+  'Selected artwork only is enabled, but none of the selected artwork exists anymore. Select artwork or turn off Selected artwork only.';
+
 export type OutputScope = {
   readonly cutSelectedGraphics: boolean;
   readonly useSelectionOrigin: boolean;
@@ -30,18 +35,14 @@ export function validateOutputScope(scene: Scene, scope: OutputScope): OutputSco
   if (scope.selectedObjectIds.length === 0) {
     return {
       ok: false,
-      messages: [
-        'Selected artwork only is enabled, but no artwork is selected. Select artwork or turn off Selected artwork only.',
-      ],
+      messages: [EMPTY_SELECTED_ARTWORK_MESSAGE],
     };
   }
   const scoped = filterSceneForOutputScope(scene, scope);
   if (scoped.objects.length === 0) {
     return {
       ok: false,
-      messages: [
-        'Selected artwork only is enabled, but none of the selected artwork exists anymore. Select artwork or turn off Selected artwork only.',
-      ],
+      messages: [STALE_SELECTED_ARTWORK_MESSAGE],
     };
   }
   return { ok: true, scene: scoped };

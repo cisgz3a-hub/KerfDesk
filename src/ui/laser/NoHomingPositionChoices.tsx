@@ -1,3 +1,16 @@
+const JOG_METHOD_LABEL = 'Jog with controls';
+const SELECTED_LABEL = 'Selected';
+const JOG_INSTRUCTION =
+  'Jog to the job anchor with the arrows. Frame to confirm the area, then Start.';
+const CHOOSE_JOG_LABEL = 'Choose jog positioning';
+const CHOOSE_JOG_TITLE =
+  'Select jog positioning. The live head position is read when Frame and Start run.';
+const RELEASE_MOTORS_LABEL = 'Release motors to move by hand';
+const RELEASING_MOTORS_LABEL = 'Releasing motors...';
+const RELEASE_MOTORS_TITLE = 'Release the motors before physically moving the laser head.';
+const NO_SLEEP_COMMAND_TITLE = 'Controller has no sleep command.';
+
+/** Renders the normal jog choice and the motor-release entry to hand positioning. */
 export function NoHomingPositionChoices(props: {
   readonly disabled: boolean;
   readonly canSleep: boolean;
@@ -11,20 +24,18 @@ export function NoHomingPositionChoices(props: {
     <>
       <div style={methodStyle}>
         <div style={methodHeadingStyle}>
-          <strong>Jog with controls</strong>
-          {props.isJogPositioning && <span style={selectedStyle}>Selected</span>}
+          <strong>{JOG_METHOD_LABEL}</strong>
+          {props.isJogPositioning && <span style={selectedStyle}>{SELECTED_LABEL}</span>}
         </div>
-        <p style={messageStyle}>
-          Jog to the job anchor with the arrows. Frame to confirm the area, then Start.
-        </p>
+        <p style={messageStyle}>{JOG_INSTRUCTION}</p>
         {!props.isJogPositioning && (
           <button
             type="button"
             disabled={props.disabled}
             onClick={props.onChooseJog}
-            title="Select jog positioning. The live head position is read when Frame and Start run."
+            title={CHOOSE_JOG_TITLE}
           >
-            Choose jog positioning
+            {CHOOSE_JOG_LABEL}
           </button>
         )}
       </div>
@@ -32,13 +43,9 @@ export function NoHomingPositionChoices(props: {
         type="button"
         disabled={props.disabled || !props.canSleep}
         onClick={props.onRelease}
-        title={
-          props.canSleep
-            ? 'Release the motors before physically moving the laser head.'
-            : 'Controller has no sleep command.'
-        }
+        title={props.canSleep ? RELEASE_MOTORS_TITLE : NO_SLEEP_COMMAND_TITLE}
       >
-        {props.releasing ? 'Releasing motors...' : 'Release motors to move by hand'}
+        {props.releasing ? RELEASING_MOTORS_LABEL : RELEASE_MOTORS_LABEL}
       </button>
       {props.error !== null && <p style={errorStyle}>{props.error}</p>}
     </>
