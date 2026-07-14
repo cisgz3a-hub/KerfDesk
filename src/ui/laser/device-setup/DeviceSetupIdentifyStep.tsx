@@ -34,7 +34,10 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
           key={suggestion.profileId}
           suggestion={suggestion}
           active={state.draft.profileId === suggestion.profile.profileId}
-          onUse={() => dispatch({ kind: 'apply-preset', profile: suggestion.profile })}
+          onUse={() => {
+            dispatch({ kind: 'apply-preset', profile: suggestion.profile });
+            dispatch({ kind: 'go', step: 'confirm' });
+          }}
         />
       ))}
     </div>

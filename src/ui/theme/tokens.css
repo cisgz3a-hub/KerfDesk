@@ -349,19 +349,19 @@ body {
   color-scheme: light;
 }
 .lf-dialog--sm {
-  min-width: 320px;
-  max-width: 420px;
+  min-width: min(320px, calc(100vw - 20px));
+  max-width: min(420px, calc(100vw - 20px));
 }
 .lf-dialog--md {
-  min-width: 420px;
-  max-width: 560px;
+  min-width: min(420px, calc(100vw - 20px));
+  max-width: min(560px, calc(100vw - 20px));
 }
 .lf-dialog--lg {
-  min-width: 540px;
-  max-width: 680px;
+  min-width: min(540px, calc(100vw - 20px));
+  max-width: min(680px, calc(100vw - 20px));
 }
 .lf-dialog--xl {
-  width: min(900px, calc(100vw - 40px));
+  width: min(900px, calc(100vw - 20px));
   max-width: none;
 }
 

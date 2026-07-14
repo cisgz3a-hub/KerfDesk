@@ -80,7 +80,7 @@ describe('DeviceSetupWizard', () => {
   it('opens on the connect step', async () => {
     const { host, unmount } = await renderWizard();
     try {
-      expect(host.textContent).toContain('Step 1 of 7');
+      expect(host.textContent).toContain('Step 1 of 6');
       expect(host.textContent).toContain('Connect & read');
     } finally {
       await unmount();
@@ -98,15 +98,18 @@ describe('DeviceSetupWizard', () => {
     useStore.getState().updateDeviceProfile({ controllerKind: 'marlin', baudRate: 250000 });
     const { host, unmount } = await renderWizard();
     try {
-      await act(async () => button(host, 'Connect…').click());
+      await act(async () => {
+        button(host, 'Connect…').click();
+        await Promise.resolve();
+      });
       expect(connect).toHaveBeenCalledTimes(1);
       expect(connect).toHaveBeenCalledWith(expect.anything(), {
         controllerKind: 'marlin',
         baudRate: 250000,
       });
     } finally {
-      useLaserStore.setState({ connect: originalConnect });
       await unmount();
+      useLaserStore.setState({ connect: originalConnect });
     }
   });
 
@@ -146,6 +149,8 @@ describe('DeviceSetupWizard', () => {
     try {
       await act(async () => button(host, 'Next').click()); // connect -> identify
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+      expect(host.textContent).toContain('Step 3 of 6');
+      expect(host.textContent).toContain('Confirm settings');
       // The preset edits the draft; the live profile is untouched until Finish.
       expect(useStore.getState().project.device.profileId).toBe(DEFAULT_DEVICE_PROFILE.profileId);
 
@@ -173,7 +178,6 @@ describe('DeviceSetupWizard', () => {
       });
       await act(async () => button(host, 'Next').click()); // connect -> identify
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click()); // a 400×400 preset
-      await act(async () => button(host, 'Next').click()); // identify -> confirm
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       // Detected 363 must win over the preset's nominal 400.
@@ -236,7 +240,7 @@ describe('DeviceSetupWizard', () => {
 
       await act(async () => button(host, 'Apply detected').click());
 
-      expect(host.textContent).toContain('Step 3 of 7');
+      expect(host.textContent).toContain('Step 3 of 6');
       expect(host.textContent).toContain('Confirm settings');
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
@@ -267,7 +271,6 @@ describe('DeviceSetupWizard', () => {
       // Picking a preset during that window must still overlay the last detected bed.
       await act(async () => button(host, 'Next').click()); // connect -> identify
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      await act(async () => button(host, 'Next').click()); // identify -> confirm
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       expect(bed.value).toBe('363');
@@ -306,7 +309,6 @@ describe('DeviceSetupWizard', () => {
     try {
       await act(async () => button(host, 'Next').click()); // connect -> identify
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      await act(async () => button(host, 'Next').click()); // identify -> confirm
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       await act(async () => {
@@ -340,6 +342,22 @@ describe('DeviceSetupWizard', () => {
       await advanceUntil(host, 'Finish setup');
       await act(async () => button(host, 'Finish setup').click());
       expect(useStore.getState().project.device.name).toBe('Shopfloor Falcon');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('routes a readiness item directly back to its editor', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      await advanceUntil(host, 'Finish setup');
+      const editWorkArea = host.querySelector('button[aria-label="Edit Work area"]');
+      if (!(editWorkArea instanceof HTMLButtonElement)) {
+        throw new Error('Edit Work area button missing');
+      }
+      await act(async () => editWorkArea.click());
+      expect(host.textContent).toContain('Step 3 of 6');
+      expect(host.textContent).toContain('Confirm settings');
     } finally {
       await unmount();
     }
