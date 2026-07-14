@@ -40,7 +40,9 @@ export function MachineCameraSection(props: {
           </button>
         ) : null}
       </div>
-      {state.kind === 'found' ? <NetworkCameraView frameUrl={state.proxyFrameUrl} /> : null}
+      {state.kind === 'found' ? (
+        <NetworkCameraView frameUrl={state.proxyFrameUrl} cameraUrl={state.cameraUrl} />
+      ) : null}
       {state.kind === 'not-found' ? (
         <p style={noteStyle}>
           No machine camera found. Connect the laser by USB, power it on, then retry.

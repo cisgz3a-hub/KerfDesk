@@ -32,7 +32,8 @@ export function RtspSourceControls(): JSX.Element {
         RTSP camera…
       </summary>
       <p style={noteStyle}>
-        For machines whose camera streams RTSP (e.g. rtsp://192.168.10.1:8554/).
+        For machines whose camera streams RTSP (e.g. rtsp://192.168.10.1:8554/). Credentials are
+        used for this connection but are never saved.
       </p>
       <div style={rowStyle}>
         <input

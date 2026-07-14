@@ -23,7 +23,14 @@ export type AlignMarkerOptions = {
 };
 
 export type MarkerDetection =
-  | { readonly kind: 'ok'; readonly imagePoints: readonly [Vec2, Vec2, Vec2, Vec2] }
+  | {
+      readonly kind: 'ok';
+      readonly imagePoints: readonly [Vec2, Vec2, Vec2, Vec2];
+      // The two independently detected patches whose midpoint defines origin.
+      // They are not used as separate solve points, so their known spacing can
+      // validate the resulting homography instead of reporting a zero fit error.
+      readonly originPair: readonly [Vec2, Vec2];
+    }
   | { readonly kind: 'failed'; readonly reason: MarkerFailure };
 
 export type MarkerFailure = 'too-few-markers' | 'ambiguous-origin' | 'degenerate';
@@ -81,7 +88,16 @@ export function detectAlignMarkers(img: GrayImage): MarkerDetection {
   if (origin === null) return { kind: 'failed', reason: 'ambiguous-origin' };
   const singles = pool.filter((_, index) => index !== pair.a && index !== pair.b).slice(0, 3);
   if (singles.length < 3) return { kind: 'failed', reason: 'too-few-markers' };
-  return { kind: 'ok', imagePoints: orderClockwiseFromOrigin(origin, singles) };
+  const first = pool[pair.a];
+  const second = pool[pair.b];
+  if (first === undefined || second === undefined) {
+    return { kind: 'failed', reason: 'ambiguous-origin' };
+  }
+  return {
+    kind: 'ok',
+    imagePoints: orderClockwiseFromOrigin(origin, singles),
+    originPair: [first, second],
+  };
 }
 
 /** Solve the image→bed homography for detected markers against the layout. */
@@ -89,7 +105,7 @@ export function solveMarkerAlignment(
   detection: Extract<MarkerDetection, { readonly kind: 'ok' }>,
   layout: AlignMarkerLayout,
 ):
-  | { readonly kind: 'ok'; readonly homography: Mat3 }
+  | { readonly kind: 'ok'; readonly homography: Mat3; readonly verificationErrorMm: number }
   | { readonly kind: 'failed'; readonly reason: 'degenerate' } {
   const pairs: PointPair[] = detection.imagePoints.map((src, index) => ({
     src,
@@ -98,7 +114,43 @@ export function solveMarkerAlignment(
   }));
   const result = solveHomography(pairs);
   if (!result.ok) return { kind: 'failed', reason: 'degenerate' };
-  return { kind: 'ok', homography: result.matrix };
+  return {
+    kind: 'ok',
+    homography: result.matrix,
+    verificationErrorMm: originPairVerificationError(detection, layout, result.matrix),
+  };
+}
+
+function originPairVerificationError(
+  detection: Extract<MarkerDetection, { readonly kind: 'ok' }>,
+  layout: AlignMarkerLayout,
+  homography: Mat3,
+): number {
+  const [first, second] = detection.originPair.map((point) => applyMap(homography, point)) as [
+    Vec2,
+    Vec2,
+  ];
+  const origin = layout.targets[0];
+  const half = layout.originPairSeparationMm / 2;
+  const left = { x: origin.x - half, y: origin.y };
+  const right = { x: origin.x + half, y: origin.y };
+  return Math.min(pairError(first, second, left, right), pairError(first, second, right, left));
+}
+
+function applyMap(matrix: Mat3, point: Vec2): Vec2 {
+  const w = matrix[6] * point.x + matrix[7] * point.y + matrix[8];
+  return {
+    x: (matrix[0] * point.x + matrix[1] * point.y + matrix[2]) / w,
+    y: (matrix[3] * point.x + matrix[4] * point.y + matrix[5]) / w,
+  };
+}
+
+function pairError(first: Vec2, second: Vec2, expectedFirst: Vec2, expectedSecond: Vec2): number {
+  return (distance(first, expectedFirst) + distance(second, expectedSecond)) / 2;
+}
+
+function distance(a: Vec2, b: Vec2): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 type PairIndices = { readonly a: number; readonly b: number };

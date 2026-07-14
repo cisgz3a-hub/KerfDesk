@@ -16,7 +16,9 @@ export function DetectStep(props: { readonly status: DetectStatus }): JSX.Elemen
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
+  const setSurfaceHeightMm = useCameraStore((s) => s.setSurfaceHeightMm);
   const setStep = useCameraAlignWizardStore((s) => s.setStep);
+  const planeHeightMm = useCameraAlignWizardStore((s) => s.planeHeightMm);
 
   const detect = useCallback(async (): Promise<void> => {
     if (sourceState.kind !== 'live') return;
@@ -26,14 +28,25 @@ export function DetectStep(props: { readonly status: DetectStatus }): JSX.Elemen
       calibration,
       bedWidth,
       bedHeight,
+      planeHeightMm,
       updateDeviceProfile,
     });
     if (outcome.kind === 'ok') {
+      setSurfaceHeightMm(planeHeightMm);
       setStep({ kind: 'done', basis: outcome.basis });
       return;
     }
     setStep({ kind: 'detect', status: { kind: 'failed', message: outcome.message } });
-  }, [sourceState, calibration, bedWidth, bedHeight, updateDeviceProfile, setStep]);
+  }, [
+    sourceState,
+    calibration,
+    bedWidth,
+    bedHeight,
+    planeHeightMm,
+    setSurfaceHeightMm,
+    updateDeviceProfile,
+    setStep,
+  ]);
 
   return (
     <div style={columnStyle}>
@@ -62,17 +75,26 @@ export function DetectStep(props: { readonly status: DetectStatus }): JSX.Elemen
 
 export function DoneStep(props: { readonly basis: 'raw' | 'rectified' }): JSX.Element {
   const closeWizard = useCameraAlignWizardStore((s) => s.closeWizard);
+  const verificationErrorMm = useStore(
+    (s) => s.project.device.cameraAlignment?.verificationErrorMm,
+  );
   return (
     <div style={columnStyle}>
       <p style={okStyle}>
         Camera aligned — the alignment is saved to the device and the workspace overlay is
-        registered to the bed.
+        registered to the measured marker plane.
       </p>
       <p style={noteStyle}>
         {props.basis === 'rectified'
           ? 'The alignment uses the lens-corrected (de-fisheyed) frame basis.'
           : 'No lens calibration was applied — calibrate the lens for best accuracy bed-wide.'}
       </p>
+      {verificationErrorMm === undefined ? null : (
+        <p style={noteStyle}>
+          Independent marker-spacing check: {verificationErrorMm.toFixed(2)} mm average error. Lower
+          is better; verify placement on scrap before production work.
+        </p>
+      )}
       <div style={rowStyle}>
         <button
           type="button"

@@ -3,6 +3,7 @@
 
 import { buildCameraTransforms } from './camera-transform';
 import { clamp } from '../math';
+import { cameraSourceIdWithoutCredentials } from './camera-capture-binding';
 
 export type CameraPoint = {
   readonly x: number;
@@ -219,7 +220,9 @@ function normalizeLensCalibration(calibration: CameraLensCalibration): CameraLen
 }
 
 function normalizeCameraSource(source: CameraSource): CameraSource {
-  return source.kind === 'rtsp' ? { kind: 'rtsp', url: source.url.trim() } : { kind: 'browser' };
+  return source.kind === 'rtsp'
+    ? { kind: 'rtsp', url: cameraSourceIdWithoutCredentials(source.url) }
+    : { kind: 'browser' };
 }
 
 function normalizeResolution(resolution: CameraResolution): CameraResolution {
