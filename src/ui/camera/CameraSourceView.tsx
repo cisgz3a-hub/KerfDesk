@@ -61,7 +61,14 @@ function PolledJpeg(props: {
   useEffect(() => {
     setSrc(withCacheBuster(props.url));
   }, [props.url, tick]);
-  return <CapturableImage src={src} alt="Machine camera" onElement={props.onElement} />;
+  return (
+    <CapturableImage
+      src={src}
+      alt="Machine camera"
+      onElement={props.onElement}
+      expectedRefreshMs={MACHINE_JPEG_POLL_INTERVAL_MS}
+    />
+  );
 }
 
 function MjpegImage(props: {
@@ -77,21 +84,49 @@ function CapturableImage(props: {
   readonly src: string;
   readonly alt: string;
   readonly onElement?: ((element: LiveCaptureElement | null) => void) | undefined;
+  readonly expectedRefreshMs?: number;
 }): JSX.Element {
   const { onElement } = props;
   const imgRef = useRef<HTMLImageElement>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'live' | 'stale' | 'error'>('loading');
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
   useEffect(() => {
     onElement?.(imgRef.current);
     return () => onElement?.(null);
   }, [onElement]);
+  useEffect(() => {
+    setLoadState('loading');
+  }, [props.src]);
+  useEffect(() => {
+    const refreshMs = props.expectedRefreshMs;
+    if (refreshMs === undefined || loadedAt === null) return undefined;
+    const id = setInterval(() => {
+      if (Date.now() - loadedAt > refreshMs * 2.5) setLoadState('stale');
+    }, refreshMs);
+    return () => clearInterval(id);
+  }, [loadedAt, props.expectedRefreshMs]);
   return (
-    <img
-      ref={imgRef}
-      crossOrigin="anonymous"
-      src={props.src}
-      alt={props.alt}
-      style={surfaceStyle}
-    />
+    <div>
+      <img
+        ref={imgRef}
+        crossOrigin="anonymous"
+        src={props.src}
+        alt={props.alt}
+        onLoad={() => {
+          setLoadedAt(Date.now());
+          setLoadState('live');
+        }}
+        onError={() => setLoadState('error')}
+        style={surfaceStyle}
+      />
+      {loadState === 'stale' || loadState === 'error' ? (
+        <p role="status" style={sourceErrorStyle}>
+          {loadState === 'stale'
+            ? 'Camera frame is stale. Check the connection; precision actions will verify a fresh capture before continuing.'
+            : 'Camera preview failed. Check the camera/bridge connection; KerfDesk will retry.'}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -110,4 +145,9 @@ const surfaceStyle: CSSProperties = {
   background: 'var(--lf-bg-2)',
   borderRadius: 4,
   objectFit: 'contain',
+};
+const sourceErrorStyle: CSSProperties = {
+  margin: '4px 0 0',
+  color: 'var(--lf-danger)',
+  fontSize: 12,
 };

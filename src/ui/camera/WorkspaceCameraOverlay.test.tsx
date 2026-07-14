@@ -22,6 +22,7 @@ const ALIGNMENT: CameraAlignment = {
   frameHeight: 720,
   basis: 'raw',
   alignedAt: 0,
+  planeHeightMm: 0,
 };
 
 const RECTIFIED_ALIGNMENT: CameraAlignment = { ...ALIGNMENT, basis: 'rectified' };
@@ -39,6 +40,15 @@ const STILL: RgbaImage = {
   data: new Uint8ClampedArray(4 * 4 * 4).fill(200),
   width: 4,
   height: 4,
+};
+
+const CAPTURE = {
+  version: 1 as const,
+  sourceKind: 'machine-jpeg' as const,
+  sourceId: 'http://192.168.10.1/frame.jpg',
+  width: 4,
+  height: 4,
+  resizeMode: 'unknown' as const,
 };
 
 let container: HTMLDivElement;
@@ -65,6 +75,8 @@ beforeEach(() => {
     overlayVisible: true,
     overlayOpacityPercent: 50,
     overlayStill: null,
+    overlayStillCapture: null,
+    surfaceHeightMm: 0,
     sourceState: { kind: 'idle' },
   });
 });
@@ -145,5 +157,16 @@ describe('WorkspaceCameraOverlay', () => {
     const notice = container.querySelector('[role="status"]');
     expect(notice).not.toBeNull();
     expect(notice!.textContent).toContain('captured still');
+  });
+
+  it('shows a setup warning instead of an overlay captured from another camera', () => {
+    setAlignment({ ...ALIGNMENT, capture: CAPTURE });
+    useCameraStore.setState({
+      overlayStill: STILL,
+      overlayStillCapture: { ...CAPTURE, sourceId: 'http://192.168.10.2/frame.jpg' },
+    });
+    act(() => root.render(<WorkspaceCameraOverlay />));
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(container.textContent).toContain('different camera');
   });
 });

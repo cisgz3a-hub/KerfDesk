@@ -14,6 +14,7 @@ import {
   type AlignmentState,
   type RgbaImage,
 } from '../../core/camera';
+import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 import type { Vec2 } from '../../core/scene';
 import type { CameraAdapter, CameraDevice } from '../../platform/types';
 import {
@@ -48,12 +49,31 @@ export type CameraStore = CameraSourceActions & {
   readonly overlayVisible: boolean;
   readonly overlayOpacityPercent: number;
   readonly overlayStill: RgbaImage | null;
+  readonly overlayStillCapture: CameraCaptureBinding | null;
+  // Top surface currently being viewed/placed on, measured above machine bed.
+  // Kept separate from the alignment plane so perspective can be compensated.
+  readonly surfaceHeightMm: number;
+  // Latches once the aligned overlay is used for physical placement. Hiding
+  // the image does not silently discard the safety contract; the operator
+  // exits placement mode explicitly after finishing camera-based layout.
+  readonly placementActive: boolean;
+  // No-homing machines need an explicit controller-to-bed confirmation. It is
+  // tied to LaserState.trustedPositionEpoch so reconnect/reset/alarm invalidates
+  // it without a cross-store subscription.
+  readonly confirmedPositionEpoch: number | null;
 
   readonly togglePanel: () => void;
   readonly closePanel: () => void;
   readonly setOverlayVisible: (on: boolean) => void;
   readonly setOverlayOpacityPercent: (percent: number) => void;
-  readonly setOverlayStill: (frame: RgbaImage | null) => void;
+  readonly setOverlayStill: (
+    frame: RgbaImage | null,
+    capture?: CameraCaptureBinding | null,
+  ) => void;
+  readonly setSurfaceHeightMm: (heightMm: number) => void;
+  readonly activatePlacement: () => void;
+  readonly deactivatePlacement: () => void;
+  readonly confirmPositionEpoch: (epoch: number) => void;
   readonly detectSupport: (camera: CameraAdapter | undefined) => void;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly selectCamera: (deviceId: string) => void;
@@ -93,13 +113,23 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   overlayVisible: true,
   overlayOpacityPercent: 50,
   overlayStill: null,
+  overlayStillCapture: null,
+  surfaceHeightMm: 0,
+  placementActive: false,
+  confirmedPositionEpoch: null,
 
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
   closePanel: () => set({ panelOpen: false }),
   setOverlayVisible: (on) => set({ overlayVisible: on }),
   setOverlayOpacityPercent: (percent) =>
     set({ overlayOpacityPercent: Math.max(0, Math.min(100, percent)) }),
-  setOverlayStill: (frame) => set({ overlayStill: frame }),
+  setOverlayStill: (frame, capture = null) =>
+    set({ overlayStill: frame, overlayStillCapture: frame === null ? null : capture }),
+  setSurfaceHeightMm: (heightMm) => set({ surfaceHeightMm: clampFinite(heightMm, 0, 500) }),
+  activatePlacement: () => set({ placementActive: true }),
+  deactivatePlacement: () =>
+    set({ placementActive: false, overlayVisible: false, confirmedPositionEpoch: null }),
+  confirmPositionEpoch: (epoch) => set({ confirmedPositionEpoch: epoch }),
   detectSupport: (camera) => set({ isSupported: camera?.isSupported() ?? false }),
 
   refreshCameras: async (camera) => {
@@ -123,3 +153,8 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
 
   resetAlignment: () => set({ alignment: { kind: 'idle' } }),
 }));
+
+function clampFinite(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}

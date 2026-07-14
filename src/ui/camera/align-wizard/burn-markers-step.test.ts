@@ -1,35 +1,39 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Project } from '../../../core/scene';
 import { useStore } from '../../state';
-import { useLaserStore } from '../../state/laser-store';
+import { useCameraStore } from '../../state/camera-store';
 import { burnAlignMarkers } from './burn-markers-step';
 
 afterEach(() => {
   useStore.getState().newProject();
-  useLaserStore.setState({ streamer: null });
+  useCameraStore.setState({ placementActive: false });
 });
 
 describe('burnAlignMarkers', () => {
-  it('replaces the scene with the marker pattern at the chosen settings and runs the job flow', async () => {
-    const flow = vi.fn(async () => undefined);
+  it('streams a temporary marker project without changing the user scene or undo history', async () => {
+    const before = useStore.getState();
+    const flow = vi.fn(async (_project: Project) => false);
     const result = await burnAlignMarkers({ powerPercent: 22, speedMmPerMin: 4500 }, flow);
 
     expect(flow).toHaveBeenCalledTimes(1);
-    const scene = useStore.getState().project.scene;
-    const layer = scene.layers.find((l) => l.id === 'camera-align-markers');
+    const temporaryProject = flow.mock.calls[0]?.[0];
+    if (temporaryProject === undefined) throw new Error('temporary project was not supplied');
+    const layer = temporaryProject.scene.layers.find((item) => item.id === 'camera-align-markers');
     expect(layer).toBeDefined();
     expect(layer?.power).toBe(22);
     expect(layer?.speed).toBe(4500);
-    expect(scene.objects.length).toBeGreaterThan(0);
-    // No streamer went active (the fake flow never started one).
+    expect(temporaryProject.scene.objects.length).toBeGreaterThan(0);
+
+    expect(useStore.getState().project.scene).toBe(before.project.scene);
+    expect(useStore.getState().undoStack).toEqual(before.undoStack);
+    expect(useStore.getState().dirty).toBe(before.dirty);
+    expect(useStore.getState().jobPlacement).toEqual(before.jobPlacement);
+    expect(useCameraStore.getState().placementActive).toBe(false);
     expect(result).toEqual({ kind: 'not-started' });
   });
 
-  it('reports started when the flow leaves a job streaming', async () => {
-    const flow = vi.fn(async () => {
-      useLaserStore.setState({
-        streamer: { status: 'streaming' } as never, // isActiveJob reads only status
-      });
-    });
+  it('reports started when the transient flow starts the marker job', async () => {
+    const flow = vi.fn(async (_project: Project) => true);
     const result = await burnAlignMarkers({ powerPercent: 35, speedMmPerMin: 3000 }, flow);
     expect(result).toEqual({ kind: 'started' });
   });

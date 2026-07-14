@@ -6,6 +6,7 @@
 // (or vice versa) would silently mis-register, so consumers must match it.
 
 import type { Mat3 } from './homography';
+import { normalizeCameraCaptureBinding, type CameraCaptureBinding } from './camera-capture-binding';
 
 export type CameraAlignment = {
   // Camera-pixel → bed-mm homography (row-major 3×3).
@@ -16,6 +17,13 @@ export type CameraAlignment = {
   readonly basis: 'raw' | 'rectified';
   // Epoch milliseconds, supplied by the caller — core reads no clock.
   readonly alignedAt: number;
+  // Physical height of the marker/alignment plane above the machine bed.
+  // Required for perspective-correct material-height compensation.
+  readonly planeHeightMm?: number;
+  // Independent error from the known spacing of the two origin patches. The
+  // pair midpoint participates in the solve; the endpoints do not.
+  readonly verificationErrorMm?: number;
+  readonly capture?: CameraCaptureBinding;
 };
 
 /** Validate persisted JSON into a CameraAlignment, or undefined if malformed. */
@@ -26,18 +34,41 @@ export function normalizeCameraAlignment(value: unknown): CameraAlignment | unde
   const homography = normalizeMat3(raw.homography);
   const frameWidth = finitePositive(raw.frameWidth);
   const frameHeight = finitePositive(raw.frameHeight);
-  const basis = raw.basis === 'raw' || raw.basis === 'rectified' ? raw.basis : undefined;
+  const basis = normalizeBasis(raw.basis);
   const alignedAt = finiteNonNegative(raw.alignedAt);
-  if (
-    homography === undefined ||
-    frameWidth === undefined ||
-    frameHeight === undefined ||
-    basis === undefined ||
-    alignedAt === undefined
-  ) {
+  const planeHeightMm = optionalFiniteNonNegative(raw.planeHeightMm);
+  const verificationErrorMm = optionalFiniteNonNegative(raw.verificationErrorMm);
+  const capture = normalizeOptionalCapture(raw.capture);
+  const requiredInvalid = [homography, frameWidth, frameHeight, basis, alignedAt].some(
+    (field) => field === undefined,
+  );
+  const optionalInvalid = [planeHeightMm, verificationErrorMm, capture].some(
+    (field) => field === null,
+  );
+  if (requiredInvalid || optionalInvalid) {
     return undefined;
   }
-  return { homography, frameWidth, frameHeight, basis, alignedAt };
+  return {
+    homography: homography as Mat3,
+    frameWidth: frameWidth as number,
+    frameHeight: frameHeight as number,
+    basis: basis as CameraAlignment['basis'],
+    alignedAt: alignedAt as number,
+    ...(planeHeightMm === undefined || planeHeightMm === null ? {} : { planeHeightMm }),
+    ...(verificationErrorMm === undefined || verificationErrorMm === null
+      ? {}
+      : { verificationErrorMm }),
+    ...(capture === undefined || capture === null ? {} : { capture }),
+  };
+}
+
+function normalizeOptionalCapture(value: unknown): CameraCaptureBinding | null | undefined {
+  if (value === undefined) return undefined;
+  return normalizeCameraCaptureBinding(value) ?? null;
+}
+
+function normalizeBasis(value: unknown): CameraAlignment['basis'] | undefined {
+  return value === 'raw' || value === 'rectified' ? value : undefined;
 }
 
 function normalizeMat3(value: unknown): Mat3 | undefined {
@@ -59,4 +90,9 @@ function finitePositive(value: unknown): number | undefined {
 
 function finiteNonNegative(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function optionalFiniteNonNegative(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  return finiteNonNegative(value) ?? null;
 }

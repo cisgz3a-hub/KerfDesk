@@ -14,6 +14,15 @@ const VALID: CameraCalibration = {
   calibratedAt: 1782648000000,
 };
 
+const CAPTURE = {
+  version: 1 as const,
+  sourceKind: 'usb' as const,
+  sourceId: 'overhead-camera',
+  width: 1920,
+  height: 1080,
+  resizeMode: 'none' as const,
+};
+
 describe('normalizeCameraCalibration', () => {
   it('accepts and round-trips a valid calibration', () => {
     expect(normalizeCameraCalibration(VALID)).toEqual(VALID);
@@ -21,6 +30,13 @@ describe('normalizeCameraCalibration', () => {
 
   it('accepts a structurally valid clone parsed from JSON', () => {
     expect(normalizeCameraCalibration(JSON.parse(JSON.stringify(VALID)))).toEqual(VALID);
+  });
+
+  it('round-trips a source/capture binding and rejects a malformed one', () => {
+    expect(normalizeCameraCalibration({ ...VALID, capture: CAPTURE })?.capture).toEqual(CAPTURE);
+    expect(
+      normalizeCameraCalibration({ ...VALID, capture: { ...CAPTURE, sourceId: '' } }),
+    ).toBeUndefined();
   });
 
   it.each([

@@ -40,6 +40,10 @@ describe('camera-align-wizard-store', () => {
     expect(useCameraAlignWizardStore.getState().speedMmPerMin).toBe(100);
     store.setSpeedMmPerMin(99999);
     expect(useCameraAlignWizardStore.getState().speedMmPerMin).toBe(20000);
+    store.setPlaneHeightMm(6.35);
+    expect(useCameraAlignWizardStore.getState().planeHeightMm).toBe(6.35);
+    store.setPlaneHeightMm(-1);
+    expect(useCameraAlignWizardStore.getState().planeHeightMm).toBe(0);
   });
 
   it('walks the burn path: setup → burning → clear-bed → detect → done', () => {

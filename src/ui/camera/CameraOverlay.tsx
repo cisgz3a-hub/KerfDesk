@@ -7,8 +7,10 @@
 
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { scaleAlignmentHomographyToFrame, type CameraAlignment } from '../../core/camera';
+import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 import type { ViewTransform } from '../workspace/view-transform';
 import { overlayMatrix3d } from './camera-overlay-transform';
+import { cameraBindingIssue } from './camera-binding-guard';
 
 type CameraOverlayProps = {
   readonly stream: MediaStream;
@@ -16,12 +18,13 @@ type CameraOverlayProps = {
   readonly view: ViewTransform;
   readonly opacityPercent: number;
   readonly cssScale?: number;
+  readonly captureBinding: CameraCaptureBinding | null;
 };
 
 type FrameSize = { readonly width: number; readonly height: number };
 
 export function CameraOverlay(props: CameraOverlayProps): JSX.Element {
-  const { stream, alignment, view, opacityPercent, cssScale = 1 } = props;
+  const { stream, alignment, view, opacityPercent, captureBinding, cssScale = 1 } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [frame, setFrame] = useState<FrameSize | null>(null);
   // The homography was solved in the calibration frame's pixel basis; a live
@@ -32,6 +35,14 @@ export function CameraOverlay(props: CameraOverlayProps): JSX.Element {
     frame === null
       ? alignment.homography
       : scaleAlignmentHomographyToFrame(alignment, frame.width, frame.height);
+  const currentCapture =
+    frame === null || captureBinding === null
+      ? null
+      : { ...captureBinding, width: frame.width, height: frame.height };
+  const bindingIssue =
+    currentCapture === null
+      ? null
+      : cameraBindingIssue('bed alignment', alignment.capture, currentCapture);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -48,6 +59,8 @@ export function CameraOverlay(props: CameraOverlayProps): JSX.Element {
 
   const size: CSSProperties =
     frame === null ? {} : { width: `${frame.width}px`, height: `${frame.height}px` };
+
+  if (bindingIssue !== null) return <div style={noticeStyle}>{bindingIssue}</div>;
 
   return (
     <video
@@ -72,3 +85,9 @@ export function CameraOverlay(props: CameraOverlayProps): JSX.Element {
     />
   );
 }
+
+const noticeStyle: React.CSSProperties = {
+  padding: '4px 10px',
+  background: 'var(--lf-bg-1)',
+  color: 'var(--lf-warning-fg)',
+};

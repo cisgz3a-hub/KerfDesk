@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { RgbaImage } from '../../core/camera';
 import type { FrameCaptureIo } from './decode-jpeg';
 import {
+  cameraCaptureBindingForFrame,
   captureSourceFrame,
   MACHINE_JPEG_POLL_INTERVAL_MS,
   sourcePollIntervalMs,
+  publicCameraSourceId,
   withCacheBuster,
   type ActiveCameraSource,
 } from './frame-source';
@@ -25,6 +27,7 @@ const RTSP_SOURCE: ActiveCameraSource = {
   kind: 'machine-rtsp',
   frameUrl: 'http://127.0.0.1:51731/frame.jpg?url=rtsp',
   previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=rtsp',
+  sourceId: 'rtsp://192.168.10.1/live',
 };
 
 function io(overrides?: Partial<FrameCaptureIo>): FrameCaptureIo {
@@ -60,11 +63,32 @@ describe('captureSourceFrame', () => {
   });
 });
 
+describe('camera capture identity', () => {
+  it('binds the physical source and frame geometry without persisting URL credentials', () => {
+    expect(cameraCaptureBindingForFrame(JPEG_SOURCE, 1280, 720)).toEqual({
+      version: 1,
+      sourceKind: 'machine-jpeg',
+      sourceId: 'http://192.168.10.1:8080/media/getCapturePhoto',
+      width: 1280,
+      height: 720,
+      resizeMode: 'unknown',
+    });
+    expect(publicCameraSourceId('rtsp://user:secret@192.168.1.5/live?token=secret#x')).toBe(
+      'rtsp://192.168.1.5/live',
+    );
+  });
+});
+
 describe('sourcePollIntervalMs', () => {
   it('maps each source kind to its frame cadence', () => {
     const usb: ActiveCameraSource = {
       kind: 'usb',
-      stream: { stream: {} as MediaStream, stop: () => undefined },
+      stream: {
+        stream: {} as MediaStream,
+        sourceId: 'usb-test',
+        resizeMode: 'none',
+        stop: () => undefined,
+      },
     };
     expect(sourcePollIntervalMs(usb)).toBe(250);
     expect(sourcePollIntervalMs(JPEG_SOURCE)).toBe(MACHINE_JPEG_POLL_INTERVAL_MS);

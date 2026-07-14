@@ -8,6 +8,8 @@ import { toCameraCalibration, type TrustReason } from '../../../core/camera';
 import { assertNever } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
+import { useCameraStore } from '../../state/camera-store';
+import { cameraCaptureBindingForFrame } from '../frame-source';
 import { useCameraWizardStore } from './camera-wizard-store';
 import { RgbaCanvas } from './RgbaCanvas';
 
@@ -56,11 +58,18 @@ function SolvedView(): JSX.Element {
   const setStep = useCameraWizardStore((s) => s.setStep);
   const closeWizard = useCameraWizardStore((s) => s.closeWizard);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
+  const sourceState = useCameraStore((s) => s.sourceState);
   if (session.kind !== 'solved') return <></>;
   const { result, diversity } = session;
 
   const apply = (): void => {
-    updateDeviceProfile({ cameraCalibration: toCameraCalibration(result, Date.now()) });
+    if (sourceState.kind !== 'live' || lastFrame === null) return;
+    const capture = cameraCaptureBindingForFrame(
+      sourceState.source,
+      lastFrame.width,
+      lastFrame.height,
+    );
+    updateDeviceProfile({ cameraCalibration: toCameraCalibration(result, Date.now(), capture) });
     closeWizard();
   };
 
@@ -99,7 +108,7 @@ function SolvedView(): JSX.Element {
         <Button variant="ghost" onClick={() => setStep('capture')}>
           Capture more poses
         </Button>
-        <Button variant="primary" onClick={apply}>
+        <Button variant="primary" onClick={apply} disabled={sourceState.kind !== 'live'}>
           Apply calibration
         </Button>
       </div>

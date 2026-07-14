@@ -5,6 +5,7 @@
 // normaliser validates untrusted persisted JSON and returns undefined on any defect.
 
 import type { CameraIntrinsics, FisheyeDistortion } from './fisheye';
+import { normalizeCameraCaptureBinding, type CameraCaptureBinding } from './camera-capture-binding';
 
 export type CameraCalibration = {
   readonly intrinsics: CameraIntrinsics;
@@ -14,6 +15,7 @@ export type CameraCalibration = {
   readonly rmsPx: number;
   // Epoch milliseconds, supplied by the caller — core reads no clock.
   readonly calibratedAt: number;
+  readonly capture?: CameraCaptureBinding;
 };
 
 /** The solved fields a CameraCalibration is built from (a CalibrationResult 'ok' is one). */
@@ -33,6 +35,7 @@ export type CalibrationSnapshot = {
 export function toCameraCalibration(
   solved: CalibrationSnapshot,
   calibratedAt: number,
+  capture?: CameraCaptureBinding,
 ): CameraCalibration {
   return {
     intrinsics: solved.intrinsics,
@@ -41,6 +44,7 @@ export function toCameraCalibration(
     imageHeight: solved.imageHeight,
     rmsPx: solved.rmsPx,
     calibratedAt,
+    ...(capture === undefined ? {} : { capture }),
   };
 }
 
@@ -55,17 +59,32 @@ export function normalizeCameraCalibration(value: unknown): CameraCalibration | 
   const imageHeight = finitePositive(raw.imageHeight);
   const rmsPx = finiteNonNegative(raw.rmsPx);
   const calibratedAt = finiteNonNegative(raw.calibratedAt);
+  const capture = normalizeOptionalCapture(raw.capture);
   if (
     intrinsics === undefined ||
     distortion === undefined ||
     imageWidth === undefined ||
     imageHeight === undefined ||
     rmsPx === undefined ||
-    calibratedAt === undefined
+    calibratedAt === undefined ||
+    capture === null
   ) {
     return undefined;
   }
-  return { intrinsics, distortion, imageWidth, imageHeight, rmsPx, calibratedAt };
+  return {
+    intrinsics,
+    distortion,
+    imageWidth,
+    imageHeight,
+    rmsPx,
+    calibratedAt,
+    ...(capture === undefined || capture === null ? {} : { capture }),
+  };
+}
+
+function normalizeOptionalCapture(value: unknown): CameraCaptureBinding | null | undefined {
+  if (value === undefined) return undefined;
+  return normalizeCameraCaptureBinding(value) ?? null;
 }
 
 function normalizeIntrinsics(value: unknown): CameraIntrinsics | undefined {

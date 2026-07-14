@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { RgbaImage } from '../../core/camera';
+import type { CameraCalibration, RgbaImage } from '../../core/camera';
 import type { FrameCaptureIo } from './decode-jpeg';
 import type { ActiveCameraSource } from './frame-source';
 import { runAutoAlign } from './auto-align';
@@ -28,6 +28,23 @@ function io(frame: RgbaImage | null): FrameCaptureIo {
   };
 }
 
+const OTHER_CAMERA_CALIBRATION: CameraCalibration = {
+  intrinsics: { fx: 200, fy: 200, cx: 160, cy: 120 },
+  distortion: [0, 0, 0, 0],
+  imageWidth: 320,
+  imageHeight: 240,
+  rmsPx: 0.2,
+  calibratedAt: 1,
+  capture: {
+    version: 1,
+    sourceKind: 'machine-jpeg',
+    sourceId: 'http://192.168.10.2/frame.jpg',
+    width: 320,
+    height: 240,
+    resizeMode: 'unknown',
+  },
+};
+
 describe('runAutoAlign', () => {
   it('fails typed when no frame can be captured, without persisting', async () => {
     const updateDeviceProfile = vi.fn();
@@ -36,6 +53,7 @@ describe('runAutoAlign', () => {
       calibration: undefined,
       bedWidth: 400,
       bedHeight: 400,
+      planeHeightMm: 0,
       updateDeviceProfile,
       io: io(null),
     });
@@ -50,11 +68,28 @@ describe('runAutoAlign', () => {
       calibration: undefined,
       bedWidth: 400,
       bedHeight: 400,
+      planeHeightMm: 0,
       updateDeviceProfile,
       io: io(grayFrame(320, 240)),
     });
     expect(outcome.kind).toBe('failed');
     if (outcome.kind === 'failed') expect(outcome.message).toContain('Markers not found');
+    expect(updateDeviceProfile).not.toHaveBeenCalled();
+  });
+
+  it('refuses lens calibration from another camera before solving alignment', async () => {
+    const updateDeviceProfile = vi.fn();
+    const outcome = await runAutoAlign({
+      source: SOURCE,
+      calibration: OTHER_CAMERA_CALIBRATION,
+      bedWidth: 400,
+      bedHeight: 400,
+      planeHeightMm: 0,
+      updateDeviceProfile,
+      io: io(grayFrame(320, 240)),
+    });
+    expect(outcome.kind).toBe('failed');
+    if (outcome.kind === 'failed') expect(outcome.message).toContain('different camera');
     expect(updateDeviceProfile).not.toHaveBeenCalled();
   });
 });

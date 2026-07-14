@@ -16,8 +16,13 @@ import {
   type CameraCalibration,
   type RgbaImage,
 } from '../../core/camera';
+import { cameraBindingCompatibility } from '../../core/camera/camera-capture-binding';
 import type { FrameCaptureIo } from './decode-jpeg';
-import { captureSourceFrame, type ActiveCameraSource } from './frame-source';
+import {
+  cameraCaptureBindingForFrame,
+  captureSourceFrame,
+  type ActiveCameraSource,
+} from './frame-source';
 
 export type AutoAlignOutcome =
   | { readonly kind: 'ok'; readonly basis: 'raw' | 'rectified' }
@@ -28,11 +33,15 @@ export async function runAutoAlign(deps: {
   readonly calibration: CameraCalibration | undefined;
   readonly bedWidth: number;
   readonly bedHeight: number;
+  readonly planeHeightMm: number;
   readonly updateDeviceProfile: (patch: { cameraAlignment: CameraAlignment }) => void;
   readonly io?: FrameCaptureIo;
 }): Promise<AutoAlignOutcome> {
   const raw = await captureSourceFrame(deps.source, deps.io);
   if (raw === null) return { kind: 'failed', message: 'Could not capture a camera frame.' };
+  const capture = cameraCaptureBindingForFrame(deps.source, raw.width, raw.height);
+  const calibrationIssue = calibrationBindingIssue(deps.calibration, capture);
+  if (calibrationIssue !== null) return { kind: 'failed', message: calibrationIssue };
   const { frame, basis } = rectifyIfCalibrated(raw, deps.calibration);
   const detection = detectAlignMarkers(toGrayImage(frame));
   if (detection.kind !== 'ok') {
@@ -49,9 +58,27 @@ export async function runAutoAlign(deps: {
       frameHeight: frame.height,
       basis,
       alignedAt: Date.now(),
+      planeHeightMm: deps.planeHeightMm,
+      verificationErrorMm: solved.verificationErrorMm,
+      capture,
     },
   });
   return { kind: 'ok', basis };
+}
+
+function calibrationBindingIssue(
+  calibration: CameraCalibration | undefined,
+  capture: ReturnType<typeof cameraCaptureBindingForFrame>,
+): string | null {
+  if (calibration === undefined) return null;
+  const compatibility = cameraBindingCompatibility(calibration.capture, capture);
+  if (compatibility === 'match') return null;
+  if (compatibility === 'unbound') {
+    return 'The saved lens calibration is not bound to a camera. Recalibrate this camera before aligning the bed.';
+  }
+  return compatibility === 'source-mismatch'
+    ? 'The saved lens calibration belongs to a different camera. Calibrate the active camera before aligning.'
+    : 'The active camera capture shape differs from lens calibration. Restore its calibrated resolution/aspect ratio or recalibrate.';
 }
 
 // De-fisheye the capture when a lens calibration exists — the alignment then

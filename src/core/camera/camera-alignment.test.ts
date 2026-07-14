@@ -9,9 +9,38 @@ const VALID = {
   alignedAt: 1_700_000_000_000,
 };
 
+const CAPTURE = {
+  version: 1,
+  sourceKind: 'machine-jpeg',
+  sourceId: 'http://192.168.10.1/frame.jpg',
+  width: 1920,
+  height: 1080,
+  resizeMode: 'unknown',
+} as const;
+
 describe('normalizeCameraAlignment', () => {
   it('accepts a well-formed persisted value', () => {
     expect(normalizeCameraAlignment(VALID)).toEqual(VALID);
+  });
+
+  it('round-trips a source/capture binding and rejects malformed binding data', () => {
+    expect(normalizeCameraAlignment({ ...VALID, capture: CAPTURE })?.capture).toEqual(CAPTURE);
+    expect(
+      normalizeCameraAlignment({ ...VALID, capture: { ...CAPTURE, height: 0 } }),
+    ).toBeUndefined();
+  });
+
+  it('round-trips a valid alignment-plane height and rejects malformed heights', () => {
+    expect(normalizeCameraAlignment({ ...VALID, planeHeightMm: 6.35 })?.planeHeightMm).toBe(6.35);
+    expect(normalizeCameraAlignment({ ...VALID, planeHeightMm: -1 })).toBeUndefined();
+    expect(normalizeCameraAlignment({ ...VALID, planeHeightMm: '3' })).toBeUndefined();
+  });
+
+  it('round-trips the independent marker verification error', () => {
+    expect(
+      normalizeCameraAlignment({ ...VALID, verificationErrorMm: 0.42 })?.verificationErrorMm,
+    ).toBe(0.42);
+    expect(normalizeCameraAlignment({ ...VALID, verificationErrorMm: -0.1 })).toBeUndefined();
   });
 
   it.each([

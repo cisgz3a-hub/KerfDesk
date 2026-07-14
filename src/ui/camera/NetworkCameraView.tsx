@@ -9,6 +9,7 @@ import type { AlignmentState, Mat3 } from '../../core/camera';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { overlayMatrix3d } from './camera-overlay-transform';
+import { cameraCaptureBindingForFrame, type ActiveCameraSource } from './frame-source';
 
 const NETWORK_FRAME_INTERVAL_MS = 1500;
 const PREVIEW_WIDTH_PX = 296;
@@ -57,7 +58,10 @@ export function clickToIntrinsicPixel(
   };
 }
 
-export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Element {
+export function NetworkCameraView(props: {
+  readonly frameUrl: string;
+  readonly cameraUrl: string;
+}): JSX.Element {
   const device = useStore((s) => s.project.device);
   const alignment = useCameraStore((s) => s.alignment);
   const beginAlignment = useCameraStore((s) => s.beginAlignment);
@@ -82,13 +86,7 @@ export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Ele
     if (point !== null) addAlignmentPoint(point);
   };
 
-  const beginBedAlignment = (): void =>
-    beginAlignment([
-      { x: 0, y: 0 },
-      { x: device.bedWidth, y: 0 },
-      { x: device.bedWidth, y: device.bedHeight },
-      { x: 0, y: device.bedHeight },
-    ]);
+  const beginBedAlignment = (): void => beginAlignment(bedCornerTargets(device));
 
   if (alignment.kind === 'aligned' && natural !== null) {
     return (
@@ -102,7 +100,11 @@ export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Ele
         />
         <span style={hintStyle}>Aligned — the bed is flattened to a rectangle.</span>
         <div style={rowStyle}>
-          <SaveAlignmentButton homography={alignment.homography} natural={natural} />
+          <SaveAlignmentButton
+            homography={alignment.homography}
+            natural={natural}
+            cameraUrl={props.cameraUrl}
+          />
           <button
             type="button"
             className="lf-btn"
@@ -137,12 +139,22 @@ export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Ele
   );
 }
 
+function bedCornerTargets(device: { readonly bedWidth: number; readonly bedHeight: number }) {
+  return [
+    { x: 0, y: 0 },
+    { x: device.bedWidth, y: 0 },
+    { x: device.bedWidth, y: device.bedHeight },
+    { x: 0, y: device.bedHeight },
+  ];
+}
+
 // Persist the solved homography onto the device profile (undoable) so the
 // workspace overlay survives reload. basis 'raw': the corners were clicked on
 // the distorted frame, so only same-basis (raw) frames may be warped with it.
 function SaveAlignmentButton(props: {
   readonly homography: Mat3;
   readonly natural: IntrinsicSize;
+  readonly cameraUrl: string;
 }): JSX.Element {
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const saved = useStore((s) => s.project.device.cameraAlignment);
@@ -160,6 +172,14 @@ function SaveAlignmentButton(props: {
             frameHeight: props.natural.height,
             basis: 'raw',
             alignedAt: Date.now(),
+            // Manual four-corner alignment targets the bare machine bed. Use
+            // the calibrated marker wizard for non-zero surface compensation.
+            planeHeightMm: 0,
+            capture: cameraCaptureBindingForFrame(
+              machineJpegSource(props.cameraUrl),
+              props.natural.width,
+              props.natural.height,
+            ),
           },
         })
       }
@@ -168,6 +188,10 @@ function SaveAlignmentButton(props: {
       {isCurrent ? 'Saved to device' : 'Save & show on canvas'}
     </button>
   );
+}
+
+function machineJpegSource(cameraUrl: string): ActiveCameraSource {
+  return { kind: 'machine-jpeg', cameraUrl, frameUrl: cameraUrl };
 }
 
 function usePollTick(): number {

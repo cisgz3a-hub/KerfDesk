@@ -18,6 +18,8 @@ import { noteStyle } from './panel-styles';
 import { RtspSourceControls } from './RtspSourceControls';
 import { SnapshotControls } from './SnapshotControls';
 import { UsbCameraSection } from './UsbCameraSection';
+import { localCameraBridgeAvailable } from './camera-platform-capability';
+import { DownloadDesktopLink } from '../../common/DownloadDesktopLink';
 
 export function CameraPanel(): JSX.Element | null {
   const open = useCameraStore((s) => s.panelOpen);
@@ -29,6 +31,7 @@ function CameraPanelOpen(): JSX.Element {
   const platform = usePlatform();
   const camera = platform.camera;
   const bridge = platform.cameraBridge;
+  const bridgeAvailable = localCameraBridgeAvailable(platform.id, window.location.hostname);
   const isSupported = useCameraStore((s) => s.isSupported);
   const detectSupport = useCameraStore((s) => s.detectSupport);
   const refreshCameras = useCameraStore((s) => s.refreshCameras);
@@ -47,12 +50,20 @@ function CameraPanelOpen(): JSX.Element {
     detectSupport(camera);
     void refreshCameras(camera);
     // Probe the machine-integrated camera once on open; the button re-probes.
-    if (machineCamera.kind === 'idle') void detectMachineCamera(bridge);
+    if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
     return () => stopSource();
     // machineCamera is deliberately NOT a dependency: the probe fires once per
     // panel open, not on every probe-state transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, bridge, detectSupport, refreshCameras, detectMachineCamera, stopSource]);
+  }, [
+    camera,
+    bridge,
+    bridgeAvailable,
+    detectSupport,
+    refreshCameras,
+    detectMachineCamera,
+    stopSource,
+  ]);
 
   return (
     <div
@@ -73,11 +84,17 @@ function CameraPanelOpen(): JSX.Element {
         </button>
       </div>
       <CameraSetupSteps />
-      <MachineCameraSection
-        state={machineCamera}
-        onDetect={() => void detectMachineCamera(bridge)}
-      />
-      <RtspSourceControls />
+      {bridgeAvailable ? (
+        <>
+          <MachineCameraSection
+            state={machineCamera}
+            onDetect={() => void detectMachineCamera(bridge)}
+          />
+          <RtspSourceControls />
+        </>
+      ) : (
+        <HostedNetworkCameraNotice />
+      )}
       {isSupported ? (
         <UsbCameraSection camera={camera} />
       ) : (
@@ -89,7 +106,20 @@ function CameraPanelOpen(): JSX.Element {
       <AutoAlignControls />
       <OverlayControls />
       <SnapshotControls wide={wide} onToggleWide={toggleWide} />
-      <CameraDiagnostics />
+      <CameraDiagnostics bridgeAvailable={bridgeAvailable} />
+    </div>
+  );
+}
+
+function HostedNetworkCameraNotice(): JSX.Element {
+  return (
+    <div style={hostedNoticeStyle}>
+      <strong>USB camera available here.</strong>
+      <span>
+        Machine and RTSP/IP cameras need KerfDesk Desktop, which runs the secure local camera bridge
+        automatically.
+      </span>
+      <DownloadDesktopLink />
     </div>
   );
 }
@@ -120,4 +150,14 @@ const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+};
+const hostedNoticeStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 6,
+  padding: 8,
+  border: '1px solid var(--lf-border)',
+  borderRadius: 6,
+  background: 'var(--lf-bg-1)',
 };

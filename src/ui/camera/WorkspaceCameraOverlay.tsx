@@ -6,12 +6,14 @@
 // the warped frame tracks zoom and pan exactly. Sources, in priority order:
 // a captured still (LightBurn's Update Overlay model), else the live video.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import {
   scaleAlignmentHomographyToFrame,
   type CameraAlignment,
+  type CameraCalibration,
   type RgbaImage,
 } from '../../core/camera';
+import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
@@ -20,6 +22,11 @@ import { computeView } from '../workspace/view-transform';
 import { CameraOverlay } from './CameraOverlay';
 import { overlayMatrix3d } from './camera-overlay-transform';
 import { resolveWorkspaceOverlay, type WorkspaceOverlayPlan } from './workspace-overlay-plan';
+import { cameraBindingIssue } from './camera-binding-guard';
+import { cameraCaptureBindingForFrame } from './frame-source';
+import { cameraSurfaceHeightIssue, resolveCameraSurfaceHeight } from './camera-surface-height';
+import { StillCameraOverlay } from './StillCameraOverlay';
+import { useElementSize, type ElementSize } from './use-element-size';
 
 export function WorkspaceCameraOverlay(): JSX.Element | null {
   const alignment = useStore((s) => s.project.device.cameraAlignment);
@@ -29,6 +36,8 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
   const visible = useCameraStore((s) => s.overlayVisible);
   const opacityPercent = useCameraStore((s) => s.overlayOpacityPercent);
   const still = useCameraStore((s) => s.overlayStill);
+  const stillCapture = useCameraStore((s) => s.overlayStillCapture);
+  const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
   const sourceState = useCameraStore((s) => s.sourceState);
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const panX = useUiStore((s) => s.panX);
@@ -37,41 +46,129 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
 
   // Live overlay needs a MediaStream (USB); machine sources overlay via the
   // captured still (LightBurn's Update Overlay model).
-  const liveStream =
-    sourceState.kind === 'live' && sourceState.source.kind === 'usb'
-      ? sourceState.source.stream.stream
-      : null;
+  const liveStream = liveUsbStream(sourceState);
   // Decide (and rectify the still, if the alignment is rectified) once per
   // source/alignment change, not on every zoom/pan render (R2).
   const plan = useMemo(
-    () =>
-      alignment === undefined
-        ? null
-        : resolveWorkspaceOverlay({
-            still,
-            hasLiveStream: liveStream !== null,
-            alignment,
-            calibration,
-          }),
+    () => optionalWorkspacePlan(alignment, calibration, still, liveStream !== null),
     [alignment, calibration, still, liveStream],
   );
 
-  if (alignment === undefined || !visible || plan === null || plan.kind === 'none') return null;
+  const currentCapture = currentOverlayCapture(sourceState, still, stillCapture, alignment);
+  const surface = optionalCameraSurface(alignment, calibration, surfaceHeightMm);
+  const geometryIssue = surface === null ? null : cameraSurfaceHeightIssue(surface);
+  const bindingIssue = overlayBindingIssue(alignment, currentCapture) ?? geometryIssue;
 
-  const view =
-    box === null
-      ? null
-      : computeView(box.width, box.height, bedWidth, bedHeight, { zoomFactor, panX, panY });
+  if (alignment === undefined) return null;
+  if (!visible) return null;
+  if (plan === null || plan.kind === 'none') return null;
+
+  const view = overlayView(box, bedWidth, bedHeight, zoomFactor, panX, panY);
   return (
-    <div ref={boxRef} style={boxStyle} aria-hidden={plan.kind !== 'basis-mismatch'}>
-      {renderOverlay(plan, {
+    <div
+      ref={boxRef}
+      style={boxStyle}
+      aria-hidden={bindingIssue === null && plan.kind !== 'basis-mismatch'}
+    >
+      {renderWorkspaceOverlayContent({
+        plan,
         view,
         liveStream,
         alignment,
         opacityPercent,
+        currentCapture,
+        bindingIssue,
+        surface,
       })}
     </div>
   );
+}
+
+function liveUsbStream(
+  sourceState: ReturnType<typeof useCameraStore.getState>['sourceState'],
+): MediaStream | null {
+  if (sourceState.kind !== 'live' || sourceState.source.kind !== 'usb') return null;
+  return sourceState.source.stream.stream;
+}
+
+function optionalWorkspacePlan(
+  alignment: CameraAlignment | undefined,
+  calibration: CameraCalibration | undefined,
+  still: RgbaImage | null,
+  hasLiveStream: boolean,
+): WorkspaceOverlayPlan | null {
+  if (alignment === undefined) return null;
+  return resolveWorkspaceOverlay({ still, hasLiveStream, alignment, calibration });
+}
+
+function optionalCameraSurface(
+  alignment: CameraAlignment | undefined,
+  calibration: CameraCalibration | undefined,
+  surfaceHeightMm: number,
+): ReturnType<typeof resolveCameraSurfaceHeight> | null {
+  return alignment === undefined
+    ? null
+    : resolveCameraSurfaceHeight(alignment, calibration, surfaceHeightMm);
+}
+
+function overlayView(
+  box: ElementSize | null,
+  bedWidth: number,
+  bedHeight: number,
+  zoomFactor: number,
+  panX: number,
+  panY: number,
+): ViewTransform | null {
+  if (box === null) return null;
+  return computeView(box.width, box.height, bedWidth, bedHeight, { zoomFactor, panX, panY });
+}
+
+function renderWorkspaceOverlayContent(args: {
+  readonly plan: WorkspaceOverlayPlan;
+  readonly view: ViewTransform | null;
+  readonly liveStream: MediaStream | null;
+  readonly alignment: CameraAlignment;
+  readonly opacityPercent: number;
+  readonly currentCapture: CameraCaptureBinding | null;
+  readonly bindingIssue: string | null;
+  readonly surface: ReturnType<typeof resolveCameraSurfaceHeight> | null;
+}): JSX.Element | null {
+  if (args.bindingIssue !== null || args.surface?.ok !== true) {
+    return (
+      <SetupMismatchNotice
+        message={args.bindingIssue ?? 'Camera surface geometry is unavailable.'}
+      />
+    );
+  }
+  return renderOverlay(args.plan, {
+    view: args.view,
+    liveStream: args.liveStream,
+    alignment: { ...args.alignment, homography: args.surface.homography },
+    opacityPercent: args.opacityPercent,
+    currentCapture: args.currentCapture,
+  });
+}
+
+function currentOverlayCapture(
+  sourceState: ReturnType<typeof useCameraStore.getState>['sourceState'],
+  still: RgbaImage | null,
+  stillCapture: CameraCaptureBinding | null,
+  alignment: CameraAlignment | undefined,
+): CameraCaptureBinding | null {
+  if (alignment === undefined) return null;
+  if (stillCapture !== null) return stillCapture;
+  if (sourceState.kind !== 'live') return null;
+  const width = still?.width ?? alignment.frameWidth;
+  const height = still?.height ?? alignment.frameHeight;
+  return cameraCaptureBindingForFrame(sourceState.source, width, height);
+}
+
+function overlayBindingIssue(
+  alignment: CameraAlignment | undefined,
+  current: CameraCaptureBinding | null,
+): string | null {
+  if (alignment === undefined || current === null) return null;
+  return cameraBindingIssue('bed alignment', alignment.capture, current);
 }
 
 function renderOverlay(
@@ -81,6 +178,7 @@ function renderOverlay(
     readonly liveStream: MediaStream | null;
     readonly alignment: CameraAlignment;
     readonly opacityPercent: number;
+    readonly currentCapture: CameraCaptureBinding | null;
   },
 ): JSX.Element | null {
   // A rectified alignment we cannot de-fisheye for display (no calibration, or a
@@ -89,7 +187,7 @@ function renderOverlay(
   if (ctx.view === null) return null;
   if (plan.kind === 'still') {
     return (
-      <StillOverlay
+      <StillCameraOverlay
         still={plan.frame}
         // Rescale to the still's own resolution (it may differ from the
         // calibration frame), matching the Trace path (Codex audit P2).
@@ -108,6 +206,7 @@ function renderOverlay(
         alignment={ctx.alignment}
         view={ctx.view}
         opacityPercent={ctx.opacityPercent}
+        captureBinding={ctx.currentCapture}
       />
     );
   }
@@ -125,71 +224,12 @@ function BasisMismatchNotice(): JSX.Element {
   );
 }
 
-function StillOverlay(props: {
-  readonly still: RgbaImage;
-  readonly matrix: ReadonlyArray<number>;
-  readonly opacityPercent: number;
-}): JSX.Element {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null) return;
-    canvas.width = props.still.width;
-    canvas.height = props.still.height;
-    const context = canvas.getContext('2d');
-    if (context === null) return;
-    context.putImageData(
-      new ImageData(new Uint8ClampedArray(props.still.data), props.still.width, props.still.height),
-      0,
-      0,
-    );
-  }, [props.still]);
+function SetupMismatchNotice(props: { readonly message: string }): JSX.Element {
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        transformOrigin: '0 0',
-        transform: `matrix3d(${props.matrix.join(', ')})`,
-        opacity: props.opacityPercent / 100,
-        pointerEvents: 'none',
-      }}
-    />
+    <div role="status" style={noticeStyle}>
+      {props.message}
+    </div>
   );
-}
-
-// The overlay box fills the canvas area, so its measured CSS size equals the
-// workspace canvas's bitmap size (the canvas is deliberately not DPR-scaled).
-function useElementSize(): [
-  { readonly width: number; readonly height: number } | null,
-  (node: HTMLDivElement | null) => void,
-] {
-  const [size, setSize] = useState<{ readonly width: number; readonly height: number } | null>(
-    null,
-  );
-  const observerRef = useRef<ResizeObserver | null>(null);
-  const setNode = (node: HTMLDivElement | null): void => {
-    observerRef.current?.disconnect();
-    observerRef.current = null;
-    if (node === null) return;
-    const apply = (): void => {
-      const rect = node.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return;
-      setSize((current) =>
-        current !== null && current.width === rect.width && current.height === rect.height
-          ? current
-          : { width: rect.width, height: rect.height },
-      );
-    };
-    apply();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(apply);
-    observer.observe(node);
-    observerRef.current = observer;
-  };
-  return [size, setNode];
 }
 
 // Under the floating panels (zIndex 5) and above the canvas; pointer-events

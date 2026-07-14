@@ -8,6 +8,20 @@ function stubNavigator(mediaDevices?: Partial<MediaDevices>): void {
   vi.stubGlobal('navigator', nav as unknown as Navigator);
 }
 
+const PREFERRED_VIDEO = {
+  width: { ideal: 1920 },
+  height: { ideal: 1080 },
+  frameRate: { ideal: 15, max: 30 },
+};
+
+function fakeStream(settings: MediaTrackSettings = {}): MediaStream {
+  const videoTrack = { stop: vi.fn(), getSettings: () => settings };
+  return {
+    getTracks: () => [videoTrack],
+    getVideoTracks: () => [videoTrack],
+  } as unknown as MediaStream;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -54,17 +68,24 @@ describe('webCamera', () => {
   });
 
   it('opens the requested device and stop() releases every track', async () => {
-    const tracks = [{ stop: vi.fn() }, { stop: vi.fn() }];
-    const stream = { getTracks: () => tracks } as unknown as MediaStream;
+    const tracks = [
+      { stop: vi.fn(), getSettings: () => ({ deviceId: 'cam1', resizeMode: 'none' }) },
+      { stop: vi.fn() },
+    ];
+    const stream = {
+      getTracks: () => tracks,
+      getVideoTracks: () => [tracks[0]],
+    } as unknown as MediaStream;
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     stubNavigator({ getUserMedia, enumerateDevices: vi.fn() });
 
     const result = await webCamera.openStream('cam1');
     expect(result).not.toBeNull();
     expect(getUserMedia).toHaveBeenCalledWith({
-      video: { deviceId: { ideal: 'cam1' } },
+      video: { ...PREFERRED_VIDEO, deviceId: { ideal: 'cam1' } },
       audio: false,
     });
+    expect(result).toMatchObject({ sourceId: 'cam1', resizeMode: 'none' });
 
     result!.stop();
     expect(tracks[0]!.stop).toHaveBeenCalledTimes(1);
@@ -72,23 +93,23 @@ describe('webCamera', () => {
   });
 
   it('requests the default camera when no deviceId is given', async () => {
-    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const stream = fakeStream({ deviceId: 'actual-default' });
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     stubNavigator({ getUserMedia, enumerateDevices: vi.fn() });
     await webCamera.openStream();
-    expect(getUserMedia).toHaveBeenCalledWith({ video: true, audio: false });
+    expect(getUserMedia).toHaveBeenCalledWith({ video: PREFERRED_VIDEO, audio: false });
   });
 
   it('requests the default camera when the deviceId is blank (pre-permission)', async () => {
-    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const stream = fakeStream();
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     stubNavigator({ getUserMedia, enumerateDevices: vi.fn() });
     await webCamera.openStream('');
-    expect(getUserMedia).toHaveBeenCalledWith({ video: true, audio: false });
+    expect(getUserMedia).toHaveBeenCalledWith({ video: PREFERRED_VIDEO, audio: false });
   });
 
   it('retries with the default camera when a deviceId over-constrains', async () => {
-    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const stream = fakeStream({ deviceId: 'fallback-camera' });
     const getUserMedia = vi
       .fn()
       .mockRejectedValueOnce(new DOMException('bad device', 'OverconstrainedError'))
@@ -97,10 +118,10 @@ describe('webCamera', () => {
     const result = await webCamera.openStream('stale-id');
     expect(result).not.toBeNull();
     expect(getUserMedia).toHaveBeenNthCalledWith(1, {
-      video: { deviceId: { ideal: 'stale-id' } },
+      video: { ...PREFERRED_VIDEO, deviceId: { ideal: 'stale-id' } },
       audio: false,
     });
-    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: true, audio: false });
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: PREFERRED_VIDEO, audio: false });
   });
 });
 
