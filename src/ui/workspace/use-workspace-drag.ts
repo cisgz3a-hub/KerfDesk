@@ -28,6 +28,7 @@ import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 import { openContextBarForRightClick } from './workspace-context-menu';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
+import { updateSelectionMoveCursor } from './selection-move-cursor';
 import {
   handleNonTransformDragUpdate,
   updateDrawDraft,
@@ -100,6 +101,17 @@ export function useDragMove(
   };
 
   const handlePointerMove = (e: CanvasPointerEvent): void => {
+    updateSelectionMoveCursor({
+      e,
+      canvas: ref.current,
+      drag,
+      project,
+      previewMode,
+      viewState,
+      toolMode: deps.toolMode,
+      selectedObjectId: deps.selectedObjectId,
+      additionalSelectedIds: deps.additionalSelectedIds,
+    });
     runWorkspaceDragMove({ e, ref, drag, project, viewState, deps });
   };
 

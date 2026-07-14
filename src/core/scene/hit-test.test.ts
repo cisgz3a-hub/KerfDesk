@@ -3,6 +3,7 @@ import { createLayer } from './layer';
 import { EMPTY_SCENE, addObject, type Scene } from './scene';
 import { IDENTITY_TRANSFORM, type Polyline, type SceneObject } from './scene-object';
 import { hitTest, transformedBBox } from './hit-test';
+import { hitTestCandidates } from './hit-test-candidates';
 
 function obj(args: {
   id: string;
@@ -237,5 +238,33 @@ describe('hitTest', () => {
         { x: 10, y: 10 },
       ),
     ).toBe('A');
+  });
+});
+
+describe('hitTestCandidates', () => {
+  it('returns every overlapping object from topmost to bottommost', () => {
+    const scene = withObjects(
+      obj({ id: 'bottom', minX: 0, minY: 0, maxX: 20, maxY: 20 }),
+      obj({ id: 'top', minX: 0, minY: 0, maxX: 20, maxY: 20 }),
+    );
+
+    expect(hitTestCandidates(scene, { x: 10, y: 10 })).toEqual(['top', 'bottom']);
+  });
+
+  it('keeps direct geometry ahead of enclosing line interiors', () => {
+    const inner = outlinedRect({ id: 'inner', minX: 30, minY: 30, maxX: 45, maxY: 45 });
+    const outer = outlinedRect({ id: 'outer', minX: 0, minY: 0, maxX: 100, maxY: 100 });
+    const scene = withObjects(inner, outer);
+
+    expect(hitTestCandidates(scene, { x: 35, y: 35 })).toEqual(['inner', 'outer']);
+  });
+
+  it('omits locked objects from the overlap cycle', () => {
+    const scene = withObjects(
+      obj({ id: 'bottom', minX: 0, minY: 0, maxX: 20, maxY: 20 }),
+      obj({ id: 'locked', minX: 0, minY: 0, maxX: 20, maxY: 20, locked: true }),
+    );
+
+    expect(hitTestCandidates(scene, { x: 10, y: 10 })).toEqual(['bottom']);
   });
 });

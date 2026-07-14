@@ -76,7 +76,8 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   },
   select: {
     label: 'Select / transform',
-    tooltip: 'Select, move, rotate, and resize existing artwork. Press Esc to return here.',
+    tooltip:
+      'Select, move, rotate, and resize artwork. Drag the center arrows to move a selection; Alt+click cycles crossing objects.',
   },
   node: {
     label: 'Edit nodes',

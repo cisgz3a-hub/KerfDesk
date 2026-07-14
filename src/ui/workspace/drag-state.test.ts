@@ -165,6 +165,39 @@ describe('nextTransformForDrag scale modifiers', () => {
 });
 
 describe('computeMouseDownDrag multi-selection', () => {
+  it('moves a selected sparse object from the center handle between its paths', () => {
+    const sparse = sparseObject();
+    const drag = computeMouseDownDrag({
+      e: mouseEventAtScenePoint({ x: 20, y: 5 }),
+      ref: canvasRef(),
+      project: projectWithObjects([sparse]),
+      selectedObjectId: sparse.id,
+      additionalSelectedIds: new Set(),
+      viewState: VIEW_STATE,
+      onShiftClick: vi.fn(),
+      onPlainClick: vi.fn(),
+    });
+
+    expect(drag).toMatchObject({ kind: 'move', objectId: sparse.id });
+  });
+
+  it('cycles to the next object under the pointer with Alt+click', () => {
+    const plainClick = vi.fn();
+    const drag = computeMouseDownDrag({
+      e: mouseEventAtScenePoint({ x: 1, y: 1 }, { altKey: true }),
+      ref: canvasRef(),
+      project: projectWithObjects([objectAt('bottom', 0, 0), objectAt('top', 0, 0)]),
+      selectedObjectId: 'top',
+      additionalSelectedIds: new Set(),
+      viewState: VIEW_STATE,
+      onShiftClick: vi.fn(),
+      onPlainClick: plainClick,
+    });
+
+    expect(drag).toBeNull();
+    expect(plainClick).toHaveBeenCalledWith('bottom');
+  });
+
   it('keeps the current multi-selection when dragging an already selected object', () => {
     const plainClick = vi.fn();
     const shiftClick = vi.fn();
@@ -323,6 +356,35 @@ function objectAt(id: string, x: number, y: number): SceneObject {
   };
 }
 
+function sparseObject(): SceneObject {
+  const color = '#ff0000';
+  return {
+    kind: 'imported-svg',
+    id: 'sparse',
+    source: 'sparse.svg',
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color,
+        polylines: [rectanglePolyline(0, 0, 10, 10), rectanglePolyline(30, 0, 40, 10)],
+      },
+    ],
+  };
+}
+
+function rectanglePolyline(minX: number, minY: number, maxX: number, maxY: number) {
+  return {
+    closed: true,
+    points: [
+      { x: minX, y: minY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+      { x: minX, y: maxY },
+    ],
+  };
+}
+
 function canvasRef(): React.RefObject<HTMLCanvasElement> {
   return {
     current: {
@@ -333,15 +395,16 @@ function canvasRef(): React.RefObject<HTMLCanvasElement> {
   };
 }
 
-function mouseEventAtScenePoint(point: {
-  readonly x: number;
-  readonly y: number;
-}): React.MouseEvent<HTMLCanvasElement> {
+function mouseEventAtScenePoint(
+  point: { readonly x: number; readonly y: number },
+  modifiers: { readonly altKey?: boolean; readonly shiftKey?: boolean } = {},
+): React.MouseEvent<HTMLCanvasElement> {
   return {
     button: 0,
     clientX: 24 + point.x,
     clientY: 24 + point.y,
-    shiftKey: false,
+    shiftKey: modifiers.shiftKey ?? false,
+    altKey: modifiers.altKey ?? false,
   } as React.MouseEvent<HTMLCanvasElement>;
 }
 
