@@ -39,7 +39,7 @@ export type ControllerCommands = {
    *  is streaming or awaiting acks (Marlin 'M114'). null when the firmware
    *  has a realtime report instead. */
   readonly queuedStatusQuery: string | null;
-  /** Lines written after a job stop/abort to guarantee the beam is off
+  /** Best-effort de-energize lines written after a job Abort
    *  (GRBL: ['M9']; Marlin: ['M5', 'M107']). No trailing newlines. */
   readonly stopLaserLines: ReadonlyArray<string>;
   /** Ack-fenced no-op used as a settle marker after motion (GRBL 'G4 P0.01';

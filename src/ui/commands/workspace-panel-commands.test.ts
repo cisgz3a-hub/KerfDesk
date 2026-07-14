@@ -26,7 +26,7 @@ describe('workspace panel commands', () => {
     );
 
     expect(command.enabled).toBe(false);
-    expect(command.disabledReason).toContain('Stop remains reachable');
+    expect(command.disabledReason).toContain('ABORT remains reachable');
     expect(runCommand(command)).toBe(false);
     expect(toggleSidePanels).not.toHaveBeenCalled();
   });

@@ -322,7 +322,7 @@ describe('handleLine streamer writes', () => {
     expect(get().safetyNotice).toEqual({
       kind: 'write-failed',
       action: 'stream',
-      message: expect.stringContaining('Stop'),
+      message: expect.stringContaining('ABORT'),
     });
   });
 });

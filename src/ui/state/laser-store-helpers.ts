@@ -31,7 +31,7 @@ const TOOL_CHANGE_STATE_DEFAULTS = {
 const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
-  'A job is active. Press Stop before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
+  'A job is active. Request ABORT before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
 export const UNKNOWN_IDLE_STATUS_MESSAGE =
   'Controller status is not known yet. Wait for an Idle status report before jogging or framing.';
 export const MOTION_OPERATION_ACTIVE_MESSAGE =

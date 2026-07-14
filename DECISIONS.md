@@ -26,7 +26,7 @@
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
-| ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
+| ADR-136 | 2026-07-12 | Superseded | CNC interruption recovery rewinds to a retract-first safe boundary (see ADR-143) |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
@@ -66,8 +66,11 @@
 | ADR-193 | 2026-07-14 | Accepted | No-homing placement defaults to guided relative positioning |
 | ADR-194 | 2026-07-14 | Accepted | Add native Hershey single-line CNC text without a runtime dependency |
 | ADR-195 | 2026-07-14 | Accepted | Make the CNC layer card guided, honest, and narrow-panel safe |
-| ADR-196 | 2026-07-14 | Accepted | Add a pinned OFL EMS stroke-font family with lazy data loading |
-| ADR-197 | 2026-07-14 | Accepted | Fair decorative stroke fonts with the shared trace cubic fitter |
+| ADR-196 | 2026-07-14 | Accepted | Separate selection movement from ordinary geometry picking |
+| ADR-197 | 2026-07-15 | Accepted | Let operators hide static canvas start markers without hiding live motion |
+| ADR-198 | 2026-07-14 | Accepted | Add a pinned OFL EMS stroke-font family with lazy data loading |
+| ADR-199 | 2026-07-14 | Accepted | Fair decorative stroke fonts with the shared trace cubic fitter |
+| ADR-200 | 2026-07-14 | Accepted | CNC recovery is evidence-gated and software Abort is not an E-stop |
 
 ---
 
@@ -6534,7 +6537,7 @@ install-on-natural-quit, and no `quitAndInstall()` call.
 
 ## ADR-136 - CNC interruption recovery rewinds to a retract-first safe boundary
 
-**Status:** Accepted | **Date:** 2026-07-12
+**Status:** Superseded by ADR-143 | **Date:** 2026-07-12
 
 ### Context
 
@@ -7947,7 +7950,6 @@ Existing project data and compiled G-code remain unchanged unless the operator e
 material, bit, preset, and stock-depth actions retain their undo/persistence behavior. The UI no
 longer implies that a generic calculation is hardware-proven or that exact nominal thickness always
 guarantees physical separation.
-
 ---
 
 ## ADR-196 - Separate selection movement from ordinary geometry picking
@@ -8082,3 +8084,58 @@ Decorative bowls and joins render with fair curves while CNC topology, determini
 the Engrave/on-path policy remain unchanged. Fitting is paid once when an EMS face enters the lazy
 font cache. It cannot normalize an intentionally handwritten baseline or redesign awkward source
 letterforms; those traits belong to the selected face rather than to polygon faceting.
+
+---
+
+## ADR-200 - CNC recovery is evidence-gated and software Abort is not an E-stop
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+KerfDesk exposed a GRBL Ctrl-X soft reset as **E-STOP**. A host-issued serial command can be lost when
+the application, operating system, USB link, controller, relay, or VFD fails, so it cannot represent
+a safety-rated physical emergency stop. CNC interruption recovery also cannot be reduced to a G-code
+line jump: parser acknowledgements do not prove physical execution, spindle rotation, cutter
+clearance, retained coordinates, or unchanged workholding.
+
+### Decision
+
+- Name the host command **ABORT** / **Controller Reset** and state that danger requires the machine's
+  physical E-stop or power isolation.
+- Keep generic CNC Resume, checkpoint resume, and start-from-line execution disabled.
+- Never command automatic motion when the cutter may be embedded and physical spindle rotation,
+  position, tool condition, or workholding is unknown.
+- Treat accepted-line checkpoints as diagnostic transport evidence, not proof of removed material.
+- A future automatic escape requires a controller- or PLC-owned transaction, stable Hold proof,
+  exclusive command ownership, retained-position proof, and physical spindle/VFD feedback on a
+  hardware-validated machine profile. A desktop process may not promise an escape it cannot finish
+  after its own failure.
+- A future re-entry is a newly generated native KerfDesk recovery job. It starts clear of material,
+  proves the exact job/tool/WCS package, brings the spindle to speed, enters through proven-cleared
+  geometry, replays the uncertainty zone, and refuses unsupported or imported G-code.
+
+### Consequences
+
+Current controllers remain manual-recovery-only. KerfDesk may add incident evidence, semantic
+toolpath identity, preview, and refusal-policy foundations without enabling machine motion. A
+stationary or possibly broken embedded tool always routes to inspection and supervised extraction.
+Simulator evidence cannot enable a machine profile; controller-specific fault injection and physical
+air-cut/scrap validation are required.
+
+The first software foundation assigns stable identities to individual native contour segments,
+binds their validated line sidecar into the SHA-256 recovery package, and provides pure contour
+review geometry. The package constructor rebuilds the canonical manifest from the exact Job before
+hashing. Review geometry requires a straight, same-direction tangent runway into the uncertainty
+segment; preceding distance across a corner cannot claim acceleration room. Every successful policy
+or geometry result carries `executable: false`; it emits no G-code and has no controller execution
+path. Opaque proof strings remain review evidence only until a controller-specific producer binds
+freshness, session, package, WCS, tool inspection, and hardware-profile identity.
+
+The first UI review is intentionally split into an evidence audit and a hypothetical geometry
+preview. Existing checkpoints contain acknowledged-line diagnostics but no emitter-owned semantic
+line map, exact SHA-256 recovery package, controller execution fence, physical RPM feedback, or
+hardware-qualified runway profile. The wizard reports those proofs as missing and never derives a
+physical cut position from acknowledgement count. It may draw an operator-selected native contour
+segment using explicitly illustrative acceleration assumptions, but its result carries
+`executable: false`; the dialog exposes no stream, spindle, G-code, or controller action.

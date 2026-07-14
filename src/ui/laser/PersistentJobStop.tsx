@@ -1,5 +1,6 @@
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { SOFTWARE_ABORT_LABEL, SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
 
@@ -12,10 +13,10 @@ export function PersistentJobStop(): JSX.Element | null {
       type="button"
       className="lf-btn lf-btn--danger"
       style={persistentStopStyle}
-      title="Halt the active job and force the beam or spindle off (Ctrl+.)"
+      title={SOFTWARE_ABORT_TITLE}
       onClick={() => void stopJob().catch(() => undefined)}
     >
-      Stop job
+      {SOFTWARE_ABORT_LABEL}
     </button>
   );
 }

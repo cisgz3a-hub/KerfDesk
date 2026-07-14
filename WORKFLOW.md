@@ -48,7 +48,7 @@
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
 - **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers." A header chevron collapses it to a narrow named strip; the same strip expands it.
-- **Machine controls panel**: docked at the far right. It uses the same collapse/expand pattern, except it cannot be collapsed while a job is active because the visible Stop control must remain reachable.
+- **Machine controls panel**: docked at the far right. It uses the same collapse/expand pattern, except it cannot be collapsed while a job is active because the visible software **ABORT** control must remain reachable.
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
 - **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
@@ -564,7 +564,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### Phase B+ shortcuts
 - `Cmd/Ctrl+Return` — Start job (Phase B)
-- `Cmd/Ctrl+.` — Stop job (Phase B)
+- `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B)
 
 ---
 
@@ -696,32 +696,32 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. Status report transitions to `Hold:0` or `Hold:1`.
 
 #### Blocked — laser mode unproven
-1. On a laser job, Pause is refused unless GRBL laser mode is confirmed (`$32=1`): modal `Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.`
-2. Rationale: a feed hold with `$32=0` (or unknown) can leave the beam on. Use **Stop** for a guaranteed beam-off halt.
+1. On a laser job, Pause is refused unless GRBL laser mode is confirmed (`$32=1`): the modal directs the operator to request **ABORT** because feed hold can leave the laser on when `$32=0` or unknown.
+2. Software Abort requests the controller-specific reset/de-energize path but cannot guarantee delivery or physical beam-off. Use the machine's physical E-stop or power isolation when unsafe.
 
 #### Exempt — CNC / router jobs
 1. A CNC (router) job pauses with `!` without the `$32` proof: feed hold with a spinning spindle is standard sender behavior, and a router runs `$32=0`. Demanding the laser proof would block CNC pause outright.
-2. The pause warning states that generic CNC continuation is not available; Pause is a controlled halt that routes to Stop and supervised manual recovery.
+2. The pause warning states that generic CNC continuation is not available; Pause is a controlled hold that routes to software Abort and supervised manual recovery.
 
 #### Degraded — controller with no realtime hold (e.g. Marlin)
-1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console notes `This controller has no realtime feed hold. Pause is stream-side only… Use Stop for an immediate halt.`
+1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console directs the operator to request **ABORT**, or use the physical E-stop when unsafe.
 
 #### Success — laser / non-CNC resume
 1. User clicks **Resume**. App writes real-time `~`.
 2. Streamer resumes; more bytes flow.
 
 #### Blocked — generic CNC resume
-1. The CNC **Resume** button remains visible but disabled, while **Stop** remains available.
+1. The CNC **Resume** button remains visible but disabled, while software **ABORT** remains available.
 2. The store independently refuses CNC Resume before writing `~` or refilling the stream because a GRBL status snapshot cannot prove that the physical spindle stayed turning while the cutter may be engaged.
-3. The operator must Stop, inspect and clear the cutter using a machine-specific procedure, and start a newly reviewed recovery job.
+3. The operator must request ABORT, inspect and clear the cutter using a machine-specific procedure, and start a newly reviewed recovery job.
 
-### F-B8. Stop
+### F-B8. Software Abort / Controller Reset
 
 #### Success
-1. User clicks **Stop**.
-2. App writes real-time `\x18` (Ctrl-X — soft reset).
-3. GRBL drops the planner, replies with the welcome banner; UI marks the streamer `cancelled`.
-4. Controller enters `Alarm` after reset; user clears with `$X` (F-B9).
+1. User clicks **ABORT** (Controller Reset). The control explicitly says it is not a safety-rated E-stop and directs the operator to the machine's physical E-stop for danger.
+2. The app sends the active driver's controller-specific abort/reset path: GRBL-family drivers may use realtime `\x18`; drivers without realtime reset use their queued best-effort de-energize commands.
+3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
+4. A GRBL controller enters `Alarm` after reset; the user clears with `$X` (F-B9).
 
 ### F-B9. Alarm
 
@@ -882,6 +882,8 @@ run that finishes cleanly clears it.
    cancellation) and shows it after reload/reconnect.
 7. The checkpoint clears only after the controller reports connected,
    physical Idle; the final GRBL `ok` alone is not physical completion.
+8. A CNC checkpoint with zero acknowledgements still shows the diagnostic review and manual-recovery
+   guidance; it never implies that no physical motion occurred.
 
 #### Error — project changed since the run
 1. Fingerprint mismatch → alert explains the project no longer produces
@@ -899,8 +901,8 @@ run that finishes cleanly clears it.
    banner says so. Laser recovery can replay from an earlier line. CNC recovery
    never converts that transport-level count into automatic machine motion.
 
-#### Edge — deliberate Stop
-1. Stop keeps the checkpoint (a stopped job is still resumable);
+#### Edge — deliberate software Abort
+1. Abort keeps the checkpoint (an aborted job still requires recovery review);
    **Dismiss** on the banner is the explicit discard.
 
 ---
@@ -1269,8 +1271,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    an alarm (e.g. hit a soft limit). The readout returns to
    `Origin: machine 0,0` on alarm receipt. Click Unlock; the readout
    stays at machine zero (GRBL keeps G92 cleared after `$X`).
-8. **Stop-clear path.** Set origin, start a job, press **Stop**
-   (sends `\x18`). The readout returns to machine zero.
+8. **Abort-clear path.** Set origin, start a job, press **ABORT**
+   (the GRBL path requests Ctrl-X plus accessory-off cleanup). The readout returns
+   to machine zero after the controller reports the reset state.
 9. **Reconnect-clear path.** Set origin, disconnect, reconnect. The
    readout shows `Origin: machine 0,0` (cache cleared on
    `teardown`).
@@ -2766,14 +2769,14 @@ F-CNC19 tiling.
 1. **Pause** still sends realtime feed hold and immediately stops refilling the
    controller stream. It remains useful as the first controlled response when
    continuing motion would be unsafe.
-2. The paused UI keeps **Stop** available and explains that this CNC job cannot
+2. The paused UI keeps **ABORT** available and explains that this CNC job cannot
    be resumed automatically.
 
 #### Error - cutter may be engaged and spindle continuity is unproven
 1. **Resume** is disabled for a CNC job. A direct/stale caller is also rejected
    by the store before the realtime cycle-start byte or any queued job bytes are
    written.
-2. The job remains paused so the operator can Stop and follow a machine-specific
+2. The job remains paused so the operator can request ABORT and follow a machine-specific
    manual recovery procedure. KerfDesk never attempts `M3`, spindle orientation,
    or a generic Z retract while cutter engagement is unknown.
 
@@ -2893,8 +2896,9 @@ F-CNC19 tiling.
    absolute `G0` legs; jobs stream ping-pong (one line per `ok`;
    `echo:busy` is not an ack).
 3. **Pause** stops sending — buffered moves finish (the button title and
-   safety copy say so). **Resume** continues the stream. **Stop** stops
-   sending and writes `M5` + `M107`.
+   safety copy say so). **Resume** continues the stream. **ABORT** requests the
+   controller-specific reset/de-energize path; it is not a physical E-stop. The
+   host stops sending and requests `M5` + `M107` cleanup.
 4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
 
 #### Error — firmware answers `Error:` or `Resend:`
@@ -2907,7 +2911,8 @@ F-CNC19 tiling.
 1. Realtime `?` / `!` / `~` work as on GRBL; pause is allowed WITHOUT the $32
    proof (Smoothie cannot report $-settings; its laser module ties beam to
    motion). Power words are fractional (S0.500 = 50% at the 0–1.0 scale).
-2. Stop sends Ctrl-X + `M5`/`M9`; a halted controller answers `!!` to normal
+2. Abort sends the controller-specific reset/de-energize sequence (Ctrl-X +
+   `M5`/`M9` for GRBL); a halted controller answers `!!` to normal
    lines; the alarm banner's unlock sends `M999` and the machine returns Idle.
 
 ### F-H4. Export a Ruida job (.rd, EXPERIMENTAL)

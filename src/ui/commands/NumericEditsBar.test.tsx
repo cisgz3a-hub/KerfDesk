@@ -34,7 +34,7 @@ describe('NumericEditsBar', () => {
     expect((toolbar as HTMLElement).style.minWidth).toBe('0');
     expect((toolbar as HTMLElement).style.maxWidth).toBe('100%');
     // The scroll lives on the inner edits group, not the whole bar, so the
-    // job-safety cluster (E-STOP) rendered alongside it can never be scrolled
+    // job-safety cluster (ABORT) rendered alongside it can never be scrolled
     // out of reach on a narrow window.
     const editsGroup = toolbar?.querySelector(':scope > div');
     expect(editsGroup).toBeInstanceOf(HTMLElement);

@@ -181,7 +181,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
     expect(sim.outbound()).toContain('\x18');
     // Characterized: while the streamer is 'errored', $X is gated behind Stop
-    // ("A job is active. Press Stop before sending ... unlock ...").
+    // ("A job is active. Request ABORT before sending ... unlock ...").
     await expect(useLaserStore.getState().unlockAlarm()).rejects.toThrow(/job is active/i);
     await useLaserStore.getState().stopJob();
     await pump(50);

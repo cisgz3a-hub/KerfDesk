@@ -236,7 +236,7 @@ function machineSettingsReadDisabledReason(state: {
   readonly autofocusBusy: boolean;
 }): string | null {
   if (!state.connected) return 'Connect to the laser before reading machine settings.';
-  if (state.activeJob) return 'A job is active. Press Stop before reading machine settings.';
+  if (state.activeJob) return 'A job is active. Request ABORT before reading machine settings.';
   if (state.motionOperationActive) {
     return 'A jog or frame operation is active. Wait for it to finish before reading settings.';
   }

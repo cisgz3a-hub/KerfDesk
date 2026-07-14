@@ -17,7 +17,7 @@ export function windowPanelCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
           'window.toggle-machine-panel',
           'window',
           'Machine Controls Panel',
-          'Machine controls stay visible while a job is active so Stop remains reachable',
+          'Machine controls stay visible while a job is active so ABORT remains reachable',
           ctx.toggleMachinePanel,
         ),
         active: true,
@@ -37,7 +37,7 @@ export function windowPanelCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
         'window.toggle-side-panels',
         'window',
         'Toggle Side Panels',
-        'Side panels stay visible while a job is active so Stop remains reachable',
+        'Side panels stay visible while a job is active so ABORT remains reachable',
         ctx.toggleSidePanels,
         'F12',
       )

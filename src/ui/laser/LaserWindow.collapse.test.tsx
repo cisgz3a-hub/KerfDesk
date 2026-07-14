@@ -51,7 +51,7 @@ describe('LaserWindow panel visibility', () => {
       expect(view.host.querySelector('aside[aria-label="Laser controls"]')).not.toBeNull();
       const collapse = requiredButton(view.host, 'Collapse Laser panel');
       expect(collapse.disabled).toBe(true);
-      expect(collapse.title).toContain('Stop remains reachable');
+      expect(collapse.title).toContain('ABORT remains reachable');
     } finally {
       await view.unmount();
     }

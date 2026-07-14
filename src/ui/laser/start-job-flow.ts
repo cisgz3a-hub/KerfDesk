@@ -7,7 +7,7 @@
 // when no job is active — which is the normal case here, since
 // prepareStartJob refuses to run while a job is active — but the
 // startJob-failed alert in the catch arm can fire after streaming began,
-// and a native dialog there would freeze the ack pump and Stop button.
+// and a native dialog there would freeze the ack pump and Abort button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
 import type { StatusQueryCapability } from '../../core/controllers';

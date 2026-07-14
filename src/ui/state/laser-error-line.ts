@@ -59,7 +59,7 @@ export function handleResendLine(
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
-// Stop (user or auto-stop-after-error) sends realtime reset plus a queued
+// Abort (user or auto-abort-after-error) sends realtime reset plus a queued
 // beam-off line; the locked controller bounces that line with error:9. Those
 // echoes of a shutdown the app itself requested must not raise a fresh "the
 // laser may have fired out of place" banner — on a stream that is already
@@ -111,7 +111,7 @@ function requestRealtimeStopAfterStreamError(
       // The sent reset wiped the firmware's RX buffer: the errored stream's
       // remaining in-flight lines will never be acked, so drop them or the
       // cleanup acks get claimed by the dead stream (audit F1). Status stays
-      // 'errored' — Stop remains mounted. The beam-off cleanup itself is
+      // 'errored' — Abort remains mounted. The beam-off cleanup itself is
       // deferred until the boot banner (audit F2), like stopJob's.
       set((s) => ({ streamer: s.streamer === null ? null : wipeInFlight(s.streamer) }));
       armResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'), [

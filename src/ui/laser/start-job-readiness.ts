@@ -393,7 +393,7 @@ function placementBoundsIssueFromPrepared(
 function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {
   const issues: string[] = [];
   if (machine.hasActiveStreamer) {
-    issues.push('A job is already active. Stop or finish it before starting another.');
+    issues.push('A job is already active. Request ABORT or finish it before starting another.');
   }
   if (machine.motionOperationActive === true) {
     issues.push('A jog or frame operation is active. Wait for it to finish before starting.');

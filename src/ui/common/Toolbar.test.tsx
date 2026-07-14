@@ -224,7 +224,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
       expect(title).toContain('Ctrl+D'); // duplicate (shortcuts.ts)
       expect(title).toContain('Shift+F'); // fit-to-selection
       expect(title).toContain('Ctrl+Enter'); // start job (M22)
-      expect(title).toContain('Ctrl+.'); // stop job (M22)
+      expect(title).toContain('Ctrl+.'); // software Abort (M22)
       expect(title).toContain('Ctrl+Shift+E'); // save G-code
       expect(title).not.toContain('Ctrl+E export G-code'); // reserved for future ellipse tool
       expect(title.toLowerCase()).toContain('right-drag'); // pan

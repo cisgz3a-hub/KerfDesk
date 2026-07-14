@@ -22,7 +22,7 @@ export async function confirmDiscardAsync(
   const state = useStore.getState();
   if (!state.dirty) return true;
   // Fail closed while a job is active (H13 / non-negotiable #9): the
-  // dialog backdrop would cover Pause/Stop with the beam live. Same
+  // dialog backdrop would cover Pause/Abort with the beam live. Same
   // policy as jobAwareConfirm; Ctrl+. still stops without confirmation.
   if (isActiveJob(useLaserStore.getState().streamer)) {
     useToastStore.getState().pushToast(JOB_ACTIVE_CONFIRM_BLOCKED, 'warning');

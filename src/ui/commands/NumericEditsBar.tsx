@@ -309,7 +309,7 @@ const barStyle: React.CSSProperties = {
   fontSize: 12,
 };
 // Only the transform controls scroll horizontally; the job-safety cluster is a
-// non-scrolling sibling so the E-STOP button can never be pushed out of reach
+// non-scrolling sibling so the ABORT button can never be pushed out of reach
 // when the fields overflow a narrow window.
 const editsGroupStyle: React.CSSProperties = {
   display: 'flex',

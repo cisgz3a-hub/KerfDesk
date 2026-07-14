@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 describe('RunningControls CNC Resume policy', () => {
-  it('keeps Stop available but disables unsafe automatic Resume', async () => {
+  it('keeps ABORT available but disables unsafe automatic Resume', async () => {
     useLaserStore.setState({ activeJobMachineKind: 'cnc' });
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -32,10 +32,10 @@ describe('RunningControls CNC Resume policy', () => {
 
     const buttons = [...host.querySelectorAll('button')];
     const resume = buttons.find((button) => button.textContent === 'Resume');
-    const stop = buttons.find((button) => button.textContent === 'Stop');
+    const abort = buttons.find((button) => button.textContent === 'ABORT');
     expect(resume?.disabled).toBe(true);
     expect(resume?.title).toMatch(/cannot prove.*spindle/i);
-    expect(stop?.disabled).toBe(false);
+    expect(abort?.disabled).toBe(false);
     expect(host.textContent).toMatch(/newly reviewed recovery job/i);
   });
 });

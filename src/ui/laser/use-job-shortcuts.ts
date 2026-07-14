@@ -1,11 +1,11 @@
-// useJobShortcuts — keyboard Start / Stop (M22, WORKFLOW F-A15 Phase B+).
+// useJobShortcuts — keyboard Start / software Abort (M22, WORKFLOW F-A15 Phase B+).
 //
 //   Ctrl/Cmd+Return  → Start job (same flow as the Start button)
-//   Ctrl/Cmd+.       → Stop job
+//   Ctrl/Cmd+.       → Request the controller-specific Abort
 //
-// Stop is the panic path: it intentionally IGNORES the modal-open and
+// Abort intentionally IGNORES the modal-open and
 // editable-target gates the other shortcuts honor — PROJECT.md
-// non-negotiable #9 says the stop must be reachable from any window state,
+// non-negotiable #9 says Abort must be reachable from any window state,
 // and a panic happens mid-typing as easily as mid-click. Start respects
 // the modal gate (starting a burn from inside a dialog is never intended).
 
