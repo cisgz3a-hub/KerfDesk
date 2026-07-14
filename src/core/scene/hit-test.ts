@@ -14,12 +14,12 @@ import { sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
 
-type ObjectHit =
+export type HitTestObjectResult =
   | { readonly kind: 'none' }
   | { readonly kind: 'primary' }
   | { readonly kind: 'line-interior'; readonly area: number };
 
-const NO_HIT: ObjectHit = { kind: 'none' };
+const NO_HIT: HitTestObjectResult = { kind: 'none' };
 
 export function hitTest(scene: Scene, point: Vec2): string | null {
   const layerByColor = new Map(scene.layers.map((layer) => [layer.color, layer]));
@@ -32,7 +32,7 @@ export function hitTest(scene: Scene, point: Vec2): string | null {
     if (obj.locked === true) continue;
     if (!sceneObjectHasVisibleLayerFromMap(obj, layerByColor)) continue;
 
-    const hit = hitObject(layerByColor, obj, point);
+    const hit = hitTestObject(layerByColor, obj, point);
     if (hit.kind === 'primary') return obj.id;
     if (
       hit.kind === 'line-interior' &&
@@ -44,11 +44,11 @@ export function hitTest(scene: Scene, point: Vec2): string | null {
   return bestLineInterior?.id ?? null;
 }
 
-function hitObject(
+export function hitTestObject(
   layerByColor: ReadonlyMap<string, Layer>,
   obj: SceneObject,
   point: Vec2,
-): ObjectHit {
+): HitTestObjectResult {
   const paths = vectorPathsFor(obj);
   if (paths === null) return pointInObjectBBox(point, obj) ? { kind: 'primary' } : NO_HIT;
   if (!pointInExpandedObjectBBox(point, obj, VECTOR_STROKE_HIT_TOLERANCE_MM)) return NO_HIT;
@@ -60,7 +60,7 @@ function hitVectorObject(
   obj: SceneObject,
   paths: ReadonlyArray<ColoredPath>,
   point: Vec2,
-): ObjectHit {
+): HitTestObjectResult {
   let hasPolyline = false;
   let lineInteriorArea: number | null = null;
   for (const path of paths) {
@@ -95,7 +95,7 @@ function hitPolyline(
   mode: LayerMode,
   polyline: Polyline,
   point: Vec2,
-): ObjectHit {
+): HitTestObjectResult {
   const transformed = transformedPolyline(polyline, obj.transform);
   if (pointNearPolyline(point, transformed.points, transformed.closed)) return { kind: 'primary' };
   if (!transformed.closed || !pointInPolygon(point, transformed.points)) return NO_HIT;

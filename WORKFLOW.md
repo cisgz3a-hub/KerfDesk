@@ -155,6 +155,13 @@ Identical to F-A3 except:
 2. Both objects are now selected; selection box wraps their combined bounding box.
 3. Resize handles operate on the combined box.
 
+#### Overlapping objects — Alt+click
+1. Alt+click where two or more selectable objects cross or overlap.
+2. The topmost candidate is selected first; repeated Alt+clicks at the same point cycle downward
+   through the local draw-order stack and wrap to the top.
+3. Shift+Alt+click toggles the cycled candidate in the current multi-selection.
+4. Hidden-layer and locked objects are excluded. Ordinary click selection remains geometry-based.
+
 #### Multi — marquee
 1. Click+drag in empty workspace area.
 2. Dashed-blue marquee box follows cursor.
@@ -177,8 +184,11 @@ Identical to F-A3 except:
 ### F-A6. Transform — move, scale, rotate, mirror
 
 #### Move — drag
-1. Click and drag inside selection.
-2. Cursor changes to move cursor.
+1. Drag visible selected geometry, or drag the four-arrow handle at the center of the single or
+   combined selection box. The center handle has a fixed screen-size target at every zoom.
+2. The center handle takes precedence over artwork below it and the cursor changes to a move cursor.
+   Blank space elsewhere inside a hollow object's bounds remains transparent to ordinary selection,
+   so large outlines do not become invisible slabs over nested artwork.
 3. Object follows cursor in real time.
 4. Status bar shows live coords.
 5. On release, change is committed to history.

@@ -7941,3 +7941,42 @@ Existing project data and compiled G-code remain unchanged unless the operator e
 material, bit, preset, and stock-depth actions retain their undo/persistence behavior. The UI no
 longer implies that a generic calculation is hardware-proven or that exact nominal thickness always
 guarantees physical separation.
+
+---
+
+## ADR-196 - Separate selection movement from ordinary geometry picking
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+KerfDesk deliberately hit-tests unfilled vector artwork against its paths so a large hollow outline
+does not behave like an invisible filled rectangle over smaller nested shapes. The same global hit
+test also started move drags, however, so a selected sparse design could only be moved by finding one
+of its physical lines. At coincident or crossing lines the topmost direct hit always won and repeated
+clicks could not reach the object below. This contradicted WORKFLOW F-A6's promise that the operator
+can drag inside the current selection.
+
+### Decision
+
+- Every single or combined selection renders a 14 px four-arrow move handle at its transformed
+  bounding-box center. Its screen-space hit target is stable across zoom and is resolved after the
+  existing rotate/scale handles but before ordinary scene geometry.
+- Dragging that handle moves the full current selection through the existing move-drag transaction,
+  snap, undo, and multi-transform paths. Hovering it uses the move cursor.
+- Ordinary click retains the existing geometry-first hit test. The rest of a hollow bounding box is
+  not made selectable, preserving access to nested artwork.
+- Alt+click requests a full local hit stack and selects the candidate after the currently selected
+  object, wrapping at the bottom. Shift+Alt+click toggles that candidate. Locked and hidden-layer
+  objects never enter the stack.
+- The full candidate scan is separate from normal `hitTest`, so ordinary pointer-down keeps its
+  early-exit performance. Direct geometry candidates remain topmost-first; enclosing Line interiors
+  follow by smallest area, preserving the existing first-choice semantics.
+
+### Consequences
+
+Sparse text, groups, and multi-selections have one visible, reliable place to grab without weakening
+precise vector selection. Crossing output layers can be resolved locally without hiding a layer or
+selecting every object of its color. This slice does not add global Tab/Shift+Tab object traversal or
+an object-tree panel; those remain optional discoverability enhancements rather than prerequisites
+for the reported workflow.

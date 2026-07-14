@@ -5,6 +5,8 @@ import { drawPathNodeHandles } from './draw-path-node-handles';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
 import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
 import { aabbHandlePoints } from './selection-handles';
+import { drawSelectionMoveHandle } from './draw-selection-move-handle';
+import { selectionMoveHandlePosition } from './selection-move-handle';
 import type { ViewTransform } from './view-transform';
 
 export function drawObjectSelectionOverlay(
@@ -57,6 +59,7 @@ export function drawSelectionSetOverlay(
   ctx.lineWidth = 1.5;
   const half = HANDLE_SCREEN_PX / 2;
   for (const handle of aabbHandlePoints(bbox)) drawSingleHandle(ctx, handle, view, half);
+  drawMoveHandleFor(ctx, objects, view);
 }
 
 function drawSelectionBox(
@@ -108,6 +111,16 @@ function drawHandles(ctx: CanvasRenderingContext2D, obj: SceneObject, view: View
   const half = HANDLE_SCREEN_PX / 2;
   for (const h of handlesFor(obj)) drawSingleHandle(ctx, h, view, half);
   drawRotateHandle(ctx, obj, view);
+  drawMoveHandleFor(ctx, [obj], view);
+}
+
+function drawMoveHandleFor(
+  ctx: CanvasRenderingContext2D,
+  objects: ReadonlyArray<SceneObject>,
+  view: ViewTransform,
+): void {
+  const position = selectionMoveHandlePosition(objects);
+  if (position !== null) drawSelectionMoveHandle(ctx, position, view);
 }
 
 function drawSingleHandle(

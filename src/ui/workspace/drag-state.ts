@@ -17,6 +17,8 @@ import {
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
 import { hitAabbHandle } from './selection-handles';
+import { handleAltSelectionCycle } from './selection-hit-cycle';
+import { hitSelectionMoveHandle } from './selection-move-handle';
 import type { PathNodeDragState } from './path-node-drag';
 import type { CncTabDragState } from './cnc-tab-editor';
 import {
@@ -131,7 +133,7 @@ const RIGHT_BUTTON = 2;
 // Resolve a mouse-down event to the drag it should initiate. Pure of
 // React — takes side-effect callbacks (selection updates) so the hook in
 // Workspace stays under the function-line cap.
-export function computeMouseDownDrag(args: {
+type MouseDownDragArgs = {
   readonly e: React.MouseEvent<HTMLCanvasElement>;
   readonly ref: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
@@ -142,7 +144,9 @@ export function computeMouseDownDrag(args: {
   readonly onPlainClick: (id: string | null) => void;
   // 9-dot rotate/scale pivot from the numeric-edits bar; defaults to center.
   readonly selectionAnchor?: SelectionAnchor;
-}): DragState | null {
+};
+
+export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null {
   const {
     e,
     ref,
@@ -170,6 +174,7 @@ export function computeMouseDownDrag(args: {
   }
   const point = canvasMouseToScene(e, ref.current, project, viewState);
   if (point === null) return null;
+  if (handleAltSelectionCycle({ ...args, point })) return null;
   const selectedIds = selectedObjectIds(selectedObjectId, additionalSelectedIds);
   const selectedObjects = selectedObjectsForIds(project.scene.objects, selectedIds);
   const selectedObj = project.scene.objects.find((o) => o.id === selectedObjectId);
@@ -269,13 +274,39 @@ function pickHandleOrRotateDrag(args: {
     pxToMm: args.pxToMm,
   });
   if (scale !== null) return scale;
-  if (args.selectedObj === undefined || args.selectedObjects.length > 1) return null;
-  return pickHandleDrag({
-    selectedObj: args.selectedObj,
-    point: args.point,
-    pxToMm: args.pxToMm,
-    ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
-  });
+  if (args.selectedObj !== undefined && args.selectedObjects.length === 1) {
+    const single = pickHandleDrag({
+      selectedObj: args.selectedObj,
+      point: args.point,
+      pxToMm: args.pxToMm,
+      ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
+    });
+    if (single !== null) return single;
+  }
+  return pickSelectionMoveDrag(args);
+}
+
+function pickSelectionMoveDrag(args: {
+  readonly selectedObjects: ReadonlyArray<SceneObject>;
+  readonly selectedObjectId: string | null;
+  readonly point: Vec2;
+  readonly pxToMm: number;
+}): Extract<DragState, { kind: 'move' }> | null {
+  if (!hitSelectionMoveHandle(args.selectedObjects, args.point, args.pxToMm)) return null;
+  const objectId = args.selectedObjectId ?? args.selectedObjects[0]?.id;
+  const object = args.selectedObjects.find((candidate) => candidate.id === objectId);
+  if (objectId === undefined || object === undefined) return null;
+  return {
+    kind: 'move',
+    objectId,
+    startScenePoint: args.point,
+    startTx: object.transform.x,
+    startTy: object.transform.y,
+    selectionStartTransforms: moveStartTransforms(
+      args.selectedObjects,
+      args.selectedObjects.map((candidate) => candidate.id),
+    ),
+  };
 }
 
 function pickSelectionScaleDrag(args: {
