@@ -19,6 +19,7 @@ import { useToastStore } from '../state/toast-store';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
+import { frameVerificationRequirement } from './frame-verification-policy';
 
 export function useFrameAction(): () => void {
   const frame = useLaserStore((s) => s.frame);
@@ -141,10 +142,10 @@ function dispatchFrameIfSafe(
     return;
   }
   const feed = project.device.framingFeedMmPerMin;
-  const isVerifiedOrigin = placement.jobOrigin?.startFrom === 'verified-origin';
+  const frameRequirement = frameVerificationRequirement(project.device, placement);
   void frame(bounds, feed)
     .then(() => {
-      if (!isVerifiedOrigin) return;
+      if (frameRequirement === 'none') return;
       const laser = useLaserStore.getState();
       laser.markFrameVerified({
         boundsSignature: frameBoundsSignature(bounds),

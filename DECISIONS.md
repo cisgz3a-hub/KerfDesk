@@ -63,6 +63,7 @@
 | ADR-190 | 2026-07-14 | Accepted | Make vector power mode explicit per layer without changing defaults |
 | ADR-191 | 2026-07-14 | Accepted | CNC 3D result pane is drag-resizable with a persisted width |
 | ADR-192 | 2026-07-14 | Accepted | CNC frame retracts to safe Z, traces, then restores the pre-frame Z |
+| ADR-193 | 2026-07-14 | Accepted | No-homing placement defaults to guided relative positioning |
 
 ---
 
@@ -7828,3 +7829,48 @@ protocol bytes outside the driver" boundary holds. The shared work-Z reader
 - WORKFLOW.md F-B4 gains a CNC framing subsection describing retract → trace → restore.
 - Not hardware-verified — proven by unit tests over the assembled line list, not by a
   probe→frame on a physical router.
+---
+
+## ADR-193 - No-homing placement defaults to guided relative positioning
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+A machine without homing has two materially different positioning paths. Button jogging preserves the
+controller's relative step count, so a one-off job can start from the live head position without first
+writing a work offset. Releasing the motors does not preserve position: stock GRBL `$SLP` disables the
+steppers, Wake requires soft reset, and the reset clears transient G92 state. The operator must finish
+the physical move before the controller can be recovered and a fresh origin established.
+
+The existing controls expose Absolute Coordinates, Current Position, User Origin, Verified Origin,
+Set origin, Release motors, Wake, and Unlock as separate concepts. That is controller-honest but makes
+the ordinary no-homing path depend on the operator assembling the state machine correctly. It also
+defaults a newly opened no-homing project to Absolute Coordinates, even though Current Position is the
+simpler relative-placement choice.
+
+### Decision
+
+- A newly created or opened project whose active device profile has homing disabled defaults to
+  **Current Position**. Homing-enabled profiles continue to default to Absolute Coordinates. Explicit
+  operator placement choices remain available and are not silently rewritten during ordinary use.
+- The machine panel shows a **Position job** guide for no-homing profiles. Its primary path selects
+  Current Position for button jogging. Its hand-position path sequences Release motors, physical move,
+  Wake, explicit safe Unlock when GRBL reports Alarm, Set origin, and Verified Origin selection.
+- Unlock is never sent merely because the controller reports Alarm. The operator must explicitly
+  confirm the head is safely positioned by pressing the guided Unlock action.
+- Relative Current Position and User Origin jobs on a no-homing profile require a matching completed
+  Frame before Start, using the same bounds/origin signature and invalidation rules as Verified Origin.
+  Absolute Coordinates remains available for an operator who deliberately performs repeatable manual
+  homing, and its existing safety behavior is unchanged.
+- The raw Release motors control remains available for homing-enabled and advanced workflows, but the
+  no-homing surface routes it through the guide so Wake and Set-origin ordering cannot be missed.
+
+### Consequences
+
+The common button-jog workflow becomes Jog, Frame, Start; Set origin is reserved for reusable origins
+or the guided hand-move path. The hand-move path still has unavoidable controller recovery steps, but
+the UI owns their order and never marks the position ready before controller acknowledgement and a
+fresh Idle report. Frame verification becomes consistently mandatory whenever a no-homing profile
+uses relative placement. Hardware validation remains required because OEM GRBL derivatives can vary
+in their `$SLP`, reset, and alarm behavior.

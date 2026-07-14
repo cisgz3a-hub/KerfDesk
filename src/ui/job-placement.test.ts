@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../core/devices';
-import { resolveJobPlacement, trustedMotionOffsetForPreflight } from './job-placement';
+import {
+  defaultJobPlacementForDevice,
+  jobPlacementAfterDeviceChange,
+  resolveJobPlacement,
+  trustedMotionOffsetForPreflight,
+} from './job-placement';
 
 const idleAtMachinePosition = (x: number, y: number): StatusReport => ({
   state: 'Idle',
@@ -11,6 +16,51 @@ const idleAtMachinePosition = (x: number, y: number): StatusReport => ({
   feed: 0,
   spindle: 0,
   wco: null,
+});
+
+describe('profile-aware placement defaults', () => {
+  it('defaults no-homing profiles to Current Position', () => {
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: false },
+    };
+    expect(defaultJobPlacementForDevice(device)).toEqual({
+      startFrom: 'current-position',
+      anchor: 'front-left',
+    });
+  });
+
+  it('keeps Absolute Coordinates as the homing-enabled default', () => {
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+    expect(defaultJobPlacementForDevice(device)).toEqual({
+      startFrom: 'absolute',
+      anchor: 'front-left',
+    });
+  });
+
+  it('moves an untouched default with a changed device while preserving explicit choices', () => {
+    const noHoming = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: false },
+    };
+    const homing = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+    expect(
+      jobPlacementAfterDeviceChange({ startFrom: 'absolute', anchor: 'center' }, homing, noHoming),
+    ).toEqual({ startFrom: 'current-position', anchor: 'center' });
+    expect(
+      jobPlacementAfterDeviceChange(
+        { startFrom: 'user-origin', anchor: 'center' },
+        homing,
+        noHoming,
+      ),
+    ).toEqual({ startFrom: 'user-origin', anchor: 'center' });
+  });
 });
 
 describe('resolveJobPlacement', () => {

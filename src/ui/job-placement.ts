@@ -11,6 +11,28 @@ export const DEFAULT_JOB_PLACEMENT: JobPlacementSettings = {
   anchor: 'front-left',
 };
 
+export function defaultJobPlacementForDevice(
+  device: Pick<DeviceProfile, 'homing'>,
+): JobPlacementSettings {
+  return {
+    ...DEFAULT_JOB_PLACEMENT,
+    startFrom: device.homing.enabled ? 'absolute' : 'current-position',
+  };
+}
+
+export function jobPlacementAfterDeviceChange(
+  current: JobPlacementSettings,
+  previousDevice: Pick<DeviceProfile, 'homing'>,
+  nextDevice: Pick<DeviceProfile, 'homing'>,
+): JobPlacementSettings {
+  const previousDefault = defaultJobPlacementForDevice(previousDevice).startFrom;
+  if (current.startFrom !== previousDefault) return current;
+  return {
+    ...current,
+    startFrom: defaultJobPlacementForDevice(nextDevice).startFrom,
+  };
+}
+
 export type MachinePlacementSnapshot = {
   readonly statusReport: StatusReport | null;
   readonly workOriginActive?: boolean;

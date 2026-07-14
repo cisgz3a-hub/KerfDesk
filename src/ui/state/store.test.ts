@@ -183,7 +183,7 @@ describe('useStore', () => {
     expect(s.selectedObjectId).toBeNull();
     expect(s.selectedPathNode).toBeNull();
     expect(s.selectedPathNodes).toEqual([]);
-    expect(s.jobPlacement).toEqual({ startFrom: 'absolute', anchor: 'front-left' });
+    expect(s.jobPlacement).toEqual({ startFrom: 'current-position', anchor: 'front-left' });
   });
 
   it('newProject preserves the configured machine profile (DEV-01 / F-A13)', () => {

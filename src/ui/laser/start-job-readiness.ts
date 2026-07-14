@@ -4,7 +4,6 @@ import type { SimilarityTransform } from '../../core/registration';
 import {
   computeJobBounds,
   describeFramePreflightFailure,
-  frameBoundsSignature,
   framePreflight,
   type JobOriginPlacement,
 } from '../../core/job';
@@ -24,7 +23,7 @@ import {
   type VariableTextRenderer,
 } from '../../io/gcode';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
-import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
+import type { FrameVerification } from '../state/frame-verification';
 import { cncToolPlan, type CncToolPlanEntry } from '../state/cnc-tool-plan';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
@@ -39,6 +38,7 @@ import { detectMachineJobWarnings } from './machine-job-warnings';
 import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
 import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
+import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -191,7 +191,12 @@ export function prepareStartJob(
     return { ok: false, messages: preflight.issues.map((i) => i.message) };
   }
 
-  const verifiedFrameIssue = verifiedFrameIssueFromPrepared(prepared, placement, machine);
+  const verifiedFrameIssue = requiredFrameIssueFromPrepared({
+    device: project.device,
+    prepared,
+    placement,
+    machine,
+  });
   if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
@@ -251,7 +256,12 @@ export async function prepareStartJobSnapshot(
   if (!preflight.ok) {
     return { ok: false, messages: preflight.issues.map((issue) => issue.message) };
   }
-  const verifiedFrameIssue = verifiedFrameIssueFromPrepared(prepared, placement, machine);
+  const verifiedFrameIssue = requiredFrameIssueFromPrepared({
+    device: project.device,
+    prepared,
+    placement,
+    machine,
+  });
   if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
@@ -377,32 +387,6 @@ function placementBoundsIssueFromPrepared(
     return `Selected job origin would place this job through no-go zone "${preflight.zoneName}".`;
   }
   return `Selected job origin would place this job outside the machine bed. ${describeFramePreflightFailure(preflight)}`;
-}
-
-// ADR-053 P2 — Verified Origin requires a clean Verified Frame for the current
-// job at the current origin before Start. The frame is the physical bounds check
-// that replaces the absolute position check we can't do without homing. A
-// mismatch (no frame yet, or the job moved/resized or the origin changed since)
-// means the frame's guarantee no longer holds, so re-frame. Other start modes
-// are unaffected.
-function verifiedFrameIssueFromPrepared(
-  prepared: Extract<PreparedOutput, { readonly ok: true }>,
-  placement: Extract<ResolvedJobPlacement, { ok: true }>,
-  machine: MachineStartSnapshot,
-): string | null {
-  if (placement.jobOrigin?.startFrom !== 'verified-origin') return null;
-  const bounds = computeJobBounds(prepared.job, prepared.project.device);
-  if (bounds === null) return null;
-  const valid = isVerifiedFrameValid(machine.frameVerification ?? null, {
-    boundsSignature: frameBoundsSignature(bounds),
-    wco: machine.wcoCache ?? null,
-    workOriginActive: machine.workOriginActive === true,
-  });
-  if (valid) return null;
-  return (
-    'Verified Origin needs a Verified Frame first: click Frame to trace the job and confirm ' +
-    'it fits, then Start. Re-frame after moving the origin or changing the job.'
-  );
 }
 
 function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {

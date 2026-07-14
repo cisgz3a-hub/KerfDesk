@@ -6,7 +6,7 @@ import {
   type Transform,
   updateLayer,
 } from '../../core/scene';
-import type { JobPlacementSettings } from '../job-placement';
+import { jobPlacementAfterDeviceChange, type JobPlacementSettings } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
@@ -58,6 +58,7 @@ export function sceneActions(
             : s.project.workspace;
         return {
           project: { ...s.project, device: nextDevice, workspace: nextWorkspace },
+          jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, nextDevice),
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
           dirty: true,
@@ -74,6 +75,7 @@ export function sceneActions(
             height: profile.bedHeight,
           },
         },
+        jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, profile),
         undoStack: pushUndo(s.project, s.undoStack),
         redoStack: [],
         dirty: true,

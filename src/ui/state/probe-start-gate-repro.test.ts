@@ -282,12 +282,25 @@ describe('probe -> CNC Start work-zero gate (field repro: "cannot start without 
       cncWorkZeroStartIssue(cncProject, after.workZZeroEvidence, after.workZReferenceEpoch),
     ).toBeNull();
 
-    // The operator's flow hand-sets the origin, so placement is User Origin
-    // (the default Absolute placement correctly refuses a custom origin).
-    const prepared = prepareStartJob(cncProject, controllerSettings, machineSnapshotFromStore(), {
-      startFrom: 'user-origin',
-      anchor: 'front-left',
-    });
+    // This repro isolates Z evidence freshness from the no-homing Frame gate,
+    // which has dedicated integration coverage. A homing-enabled profile keeps
+    // User Origin valid here without requiring unrelated Frame evidence.
+    const homingProject = {
+      ...cncProject,
+      device: {
+        ...cncProject.device,
+        homing: { ...cncProject.device.homing, enabled: true },
+      },
+    };
+    const prepared = prepareStartJob(
+      homingProject,
+      controllerSettings,
+      machineSnapshotFromStore(),
+      {
+        startFrom: 'user-origin',
+        anchor: 'front-left',
+      },
+    );
     // Reveal the blocking messages verbatim on failure.
     expect(prepared.ok ? [] : prepared.messages).toEqual([]);
     expect(prepared.ok).toBe(true);

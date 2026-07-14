@@ -1,7 +1,8 @@
-// FrameVerification — proof that a clean Verified Frame ran for the current job
-// at the current origin (ADR-053 P2).
+// FrameVerification — proof that a clean required Frame ran for the current job
+// at the current origin or relative head position (ADR-053 P2, ADR-193).
 //
-// Recorded when a frame is dispatched in 'verified-origin' mode, holding the
+// Recorded when a frame is dispatched for Verified Origin or a no-homing
+// relative placement, holding the
 // framed rectangle's signature plus the origin identity (WCO + active flag) at
 // that moment. Start compares it against the live values; any drift means the
 // frame no longer proves the job fits, so Start is blocked until a fresh frame.
