@@ -82,6 +82,7 @@ export type PreflightResult = {
 
 export type PreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
+  readonly initialMachinePosition?: { readonly x: number; readonly y: number } | undefined;
   readonly coordinateMode?: 'machine' | 'relative-origin';
   // Rotary (ADR-127): the Y limit is one object revolution, not the bed —
   // overrides the height used by the bounds checks when set.
@@ -181,8 +182,12 @@ function appendNoGoZoneIssues(
     });
     return;
   }
-  const collisionOptions =
-    options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset };
+  const collisionOptions = {
+    ...(options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset }),
+    ...(options.initialMachinePosition === undefined
+      ? {}
+      : { initialMachinePosition: options.initialMachinePosition }),
+  };
   const collisions = findNoGoZoneCollisions(
     gcode,
     zones,

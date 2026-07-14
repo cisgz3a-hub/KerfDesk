@@ -1,4 +1,6 @@
 import type { MachineBounds, NoGoZone } from '../devices';
+import { arcIntersectsRect } from '../invariants/arc-rect-intersection';
+import { isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
 import {
   isGcodeCommand,
   isGcodeMotionCommand,
@@ -46,7 +48,10 @@ export function findNoGoZoneCollisions(
   gcode: string,
   zones: ReadonlyArray<NoGoZone>,
   bed: MachineBounds,
-  options: { readonly motionOffset?: MotionBoundsOffset | undefined } = {},
+  options: {
+    readonly motionOffset?: MotionBoundsOffset | undefined;
+    readonly initialMachinePosition?: Point | undefined;
+  } = {},
 ): ReadonlyArray<NoGoZoneCollision> {
   const activeZones = zones
     .filter((zone) => zone.enabled)
@@ -56,7 +61,7 @@ export function findNoGoZoneCollisions(
 
   const offset = options.motionOffset ?? { x: 0, y: 0 };
   const collisions: NoGoZoneCollision[] = [];
-  let current: Point | null = null;
+  let current: Point | null = options.initialMachinePosition ?? null;
   let absolute = true;
 
   for (const [index, raw] of gcode.split('\n').entries()) {
@@ -65,7 +70,7 @@ export function findNoGoZoneCollisions(
     absolute = absoluteModeAfterLine(stripped, absolute);
     const next = nextPoint(stripped, current, absolute, offset);
     if (next === null) continue;
-    appendCollision(collisions, current, next, activeZones, index + 1);
+    appendCollision(collisions, current, next, stripped, activeZones, index + 1);
     current = next;
   }
 
@@ -80,7 +85,11 @@ function nextPoint(
 ): Point | null {
   if (!isGcodeMotionCommand(line)) return null;
   const axes = parseAxes(line);
-  if (axes.x === null && axes.y === null) return null;
+  if (axes.x === null && axes.y === null) {
+    const completeArc =
+      isArcMotion(line) && parseGcodeWord(line, 'I') !== null && parseGcodeWord(line, 'J') !== null;
+    return completeArc ? current : null;
+  }
   const base = current ?? offset;
   return absolute ? absolutePoint(axes, base, offset) : relativePoint(axes, base);
 }
@@ -95,12 +104,21 @@ function appendCollision(
   collisions: NoGoZoneCollision[],
   current: Point | null,
   next: Point,
+  line: string,
   activeZones: ReadonlyArray<ActiveZone>,
   lineNumber: number,
 ): void {
   if (current === null) return;
-  const hit = activeZones.find(({ rect }) => segmentIntersectsRect(current, next, rect));
+  const hit = activeZones.find(({ rect }) => motionIntersectsRect(current, next, line, rect));
   if (hit !== undefined) collisions.push({ lineNumber, zone: hit.zone });
+}
+
+function motionIntersectsRect(current: Point, next: Point, line: string, rect: Rect): boolean {
+  if (!isArcMotion(line)) return segmentIntersectsRect(current, next, rect);
+  const i = parseGcodeWord(line, 'I');
+  const j = parseGcodeWord(line, 'J');
+  if (i === null || j === null) return segmentIntersectsRect(current, next, rect);
+  return arcIntersectsRect(current, next, i, j, isClockwiseArc(line), rect);
 }
 
 function parseAxes(line: string): Axes {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../devices';
 import { createLayer, createProject, EMPTY_SCENE, type Project } from '../scene';
 import { runPreflight } from './preflight';
-import { firstZoneCrossedBySegment } from './no-go-zones';
+import { findNoGoZoneCollisions, firstZoneCrossedBySegment } from './no-go-zones';
 
 function projectWithNoGoZone(enabled = true): Project {
   return {
@@ -185,5 +185,55 @@ describe('firstZoneCrossedBySegment (jog/click guard — DEV-04)', () => {
     expect(
       firstZoneCrossedBySegment({ x: 0, y: 0 }, { x: 50, y: 50 }, [{ ...zone, enabled: false }]),
     ).toBeNull();
+  });
+});
+
+describe('findNoGoZoneCollisions motion path coverage', () => {
+  const zone: NoGoZone = {
+    id: 'clamp',
+    name: 'Clamp',
+    enabled: true,
+    x: 20,
+    y: 20,
+    width: 20,
+    height: 20,
+  };
+  const bed = { width: 400, height: 400, minX: 0, minY: 0, maxX: 400, maxY: 400 };
+
+  it('checks the entry move from a known live machine position', () => {
+    const collisions = findNoGoZoneCollisions('G0 X50 Y30', [zone], bed, {
+      initialMachinePosition: { x: 0, y: 30 },
+    });
+
+    expect(collisions).toEqual([{ lineNumber: 1, zone }]);
+  });
+
+  it('checks an arc sweep instead of only its endpoint chord', () => {
+    const arcZone = { ...zone, x: 4, y: 4, width: 2, height: 2 };
+    const collisions = findNoGoZoneCollisions(
+      ['G0 X0 Y0', 'G2 X10 Y0 I5 J0'].join('\n'),
+      [arcZone],
+      bed,
+    );
+
+    expect(collisions).toEqual([{ lineNumber: 2, zone: arcZone }]);
+  });
+
+  it('checks a full-circle arc that omits redundant endpoint axes', () => {
+    const arcZone = { ...zone, x: 4, y: 4, width: 2, height: 2 };
+    const collisions = findNoGoZoneCollisions(['G0 X0 Y0', 'G2 I5 J0'].join('\n'), [arcZone], bed);
+
+    expect(collisions).toEqual([{ lineNumber: 2, zone: arcZone }]);
+  });
+
+  it('does not block a zone inside the arc AABB but outside the swept path', () => {
+    const clearZone = { ...zone, x: 4, y: -6, width: 2, height: 2 };
+    const collisions = findNoGoZoneCollisions(
+      ['G0 X0 Y0', 'G2 X10 Y0 I5 J0'].join('\n'),
+      [clearZone],
+      { width: 420, height: 420, minX: -20, minY: -20, maxX: 400, maxY: 400 },
+    );
+
+    expect(collisions).toEqual([]);
   });
 });

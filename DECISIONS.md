@@ -74,6 +74,7 @@
 | ADR-201 | 2026-07-15 | Accepted | Gate CNC Start by protocol capability and exact override acknowledgement |
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
 | ADR-203 | 2026-07-15 | Accepted | Recover Work-Z only from owned, fresh controller offset readback |
+| ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
 
 ---
 
@@ -6374,6 +6375,15 @@ The check is skipped (motion allowed) when there is no known machine position fo
 
 A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.
 
+### 2026-07-15 audit amendment
+
+The emitted-job scanner follows the same physical-path rule. It evaluates the actual G2/G3 sweep
+rather than the endpoint chord, and a live Start supplies the qualified machine position so the
+head-to-first-XY entry move is checked too. File export has no trustworthy future head position and
+therefore checks only motions encoded in the file. Arc/rectangle checks use the swept curve, not the
+whole arc bounding box, so a fixture inside the box but outside the path does not become a nuisance
+blocker.
+
 ## ADR-130 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
 
 **Status:** accepted (audit CAM-04: the Registration Jig panel could silently unlock/replace a captured board, breaking its physical registration).
@@ -7822,6 +7832,11 @@ An XY-only perimeter is not a safe substitute for CNC: it can drag a cutter thro
 workholding. CNC Frame therefore refuses before any write when either proof is absent. When the
 pre-frame Z already equals safe Z, the redundant restore jog is omitted.
 
+The same evidence rule applies to click/command point moves that prefix XY motion with an absolute
+work-frame safe-Z retract. A CNC point move with missing, stale, or wrong-session Work-Z evidence is
+refused before the retract or XY jog writes any controller byte. Relative Z-only and ordinary jogs
+that do not synthesize an absolute safe-Z target are unchanged.
+
 Line assembly lives in `ui/state/cnc-frame-lines.ts` (`buildCncFrameMotion`), which only
 ORDERS lines produced by the driver seam — the XY perimeter and the absolute-Z jog builder
 (`buildFrameRetract`, reused for both the retract and the restore) — so ADR-094's "no
@@ -8202,6 +8217,9 @@ only move the failure point.
   between rows without first allocating the remaining raster output.
 - Vector fill estimates account for selected strategy, holes, hatch directions, and compiled work;
   static source-point counts remain only cheap early diagnostics, not the final refusal proof.
+- Cheap preparation estimates resolve enabled operation sublayers and per-object operation
+  overrides before classifying vector, fill, or image work. A base-layer mode is not enough evidence
+  to block or allow Start, Preview, or Save when the effective operation differs.
 
 ### Consequences
 
@@ -8241,3 +8259,32 @@ Qualified persistent controller setup can be recovered without making the stock-
 The workflow adds one explicit recovery transaction and operator review; unsupported firmwares keep
 the existing Zero Z/probe path. Hardware qualification remains required before claiming physical
 stock-top correctness.
+
+---
+
+## ADR-204 - Refuse project saves that would normalize machine or output semantics
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+Project Open deliberately sanitizes malformed optional and legacy fields. Reusing that tolerant
+normalizer during Save could turn invalid live CNC, controller, tool, layer, or object data into
+different valid values on disk, while the unchanged in-memory project was marked clean. The saved
+file could therefore reopen with different machine or output behavior than the operator had before
+Save.
+
+### Decision
+
+Save and autosave still serialize, deserialize, and reserialize through the normal validation
+boundary. Before writing, they compare the persisted machine/output semantics before and after that
+normalization. Any drift is refused with the first changed field path; the picker is not opened and
+the project is not marked saved. Adding a missing empty scene-group list remains allowed because it
+is structural organization metadata and cannot change emitted motion.
+
+### Consequences
+
+Open remains backward-compatible and fail-safe for old files, while Save can no longer silently
+repair a live project into different disk semantics. A corrupted runtime project must be reloaded or
+explicitly repaired before it can be marked clean. The integrity comparison is pure and covered at
+both the project boundary and the file-action boundary.

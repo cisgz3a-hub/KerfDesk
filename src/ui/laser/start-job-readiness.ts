@@ -41,6 +41,7 @@ import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import {
   controllerReportsInches,
+  initialMachinePositionOption,
   okPreparation,
   resolveStartPlacement,
   withControllerReportUnits,
@@ -166,11 +167,8 @@ export function prepareStartJob(
   const gateIssues = findStartGateIssues(project, machine, jobPlacement);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
-  const placement = resolveStartPlacement(
-    jobPlacement,
-    withControllerReportUnits(machine, controllerSettings),
-    resolvedJobOrigin,
-  );
+  const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
+  const placement = resolveStartPlacement(jobPlacement, machineWithReportUnits, resolvedJobOrigin);
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
   const inspected = inspectPreparedStart(
@@ -189,6 +187,7 @@ export function prepareStartJob(
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    ...initialMachinePositionOption(machineWithReportUnits),
     allowRotaryRaster: allowRotaryRaster === true,
   });
   if (!preflight.ok) {
@@ -242,11 +241,8 @@ export async function prepareStartJobSnapshot(
   const gateIssues = findStartGateIssues(project, machine, jobPlacement);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
-  const placement = resolveStartPlacement(
-    jobPlacement,
-    withControllerReportUnits(machine, controllerSettings),
-    undefined,
-  );
+  const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
+  const placement = resolveStartPlacement(jobPlacement, machineWithReportUnits, undefined);
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
 
@@ -269,6 +265,7 @@ export async function prepareStartJobSnapshot(
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    ...initialMachinePositionOption(machineWithReportUnits),
     allowRotaryRaster,
   });
   if (!preflight.ok) {

@@ -52,6 +52,23 @@ describe('CNC relative-origin bounds', () => {
       }),
     );
   });
+
+  it('includes a full-circle arc sweep in the relative motion span', () => {
+    const oversizedArc = FITTING_RELATIVE_GCODE.replace(
+      'G1 X10.000 Y-10.000 F1000',
+      'G2 X-10.000 Y-10.000 I250.000 J0.000 F1000',
+    );
+    const result = runCncPreflight(projectWithCnc(), DEFAULT_CNC_MACHINE_CONFIG, oversizedArc, {
+      coordinateMode: 'relative-origin',
+    });
+
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'out-of-bed',
+        message: expect.stringContaining('Relative job motion spans'),
+      }),
+    );
+  });
 });
 
 function projectWithCnc(): Project {
