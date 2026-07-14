@@ -86,14 +86,9 @@ describe('Machine Setup profile choice', () => {
       const marlinCard = [...view.host.querySelectorAll('article')].find((card) =>
         card.textContent?.includes('Generic Marlin'),
       );
-      expect(button(marlinCard as HTMLElement, 'Use Generic Marlin laser 300×200').disabled).toBe(
-        false,
-      );
+      const apply = button(marlinCard as HTMLElement, 'Use Generic Marlin laser 300×200');
+      expect(apply.disabled).toBe(false);
       expect(marlinCard?.textContent).not.toContain('Will set controllerKind');
-      const apply = [...(marlinCard as HTMLElement).querySelectorAll('button')].find((candidate) =>
-        candidate.textContent?.startsWith('Use Generic Marlin'),
-      );
-      if (!(apply instanceof HTMLButtonElement)) throw new Error('Marlin apply button missing');
       await act(async () => apply.click());
       expect(useStore.getState().project.device).toMatchObject({
         controllerKind: 'marlin',

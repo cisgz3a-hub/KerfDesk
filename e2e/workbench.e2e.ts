@@ -238,6 +238,7 @@ async function installFileSystemMocks(page: Page): Promise<void> {
 async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Machine settings detected:/)).toBeVisible();
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');

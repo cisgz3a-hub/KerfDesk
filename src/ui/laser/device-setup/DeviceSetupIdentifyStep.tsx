@@ -33,7 +33,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
         <PresetCard
           key={suggestion.profileId}
           suggestion={suggestion}
-          active={state.draft.profileId === suggestion.profile.profileId}
+          isActive={state.draft.profileId === suggestion.profile.profileId}
           onUse={() => {
             dispatch({ kind: 'apply-preset', profile: suggestion.profile });
             dispatch({ kind: 'go', step: 'confirm' });
@@ -46,10 +46,14 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
 
 function PresetCard(props: {
   readonly suggestion: MachineProfileSuggestion;
-  readonly active: boolean;
+  readonly isActive: boolean;
   readonly onUse: () => void;
 }): JSX.Element {
   const profile = props.suggestion.profile;
+  const buttonTitle = props.isActive
+    ? 'This machine is selected.'
+    : `Start from ${profile.name}'s defaults.`;
+  const buttonLabel = props.isActive ? 'Selected' : `Use ${profile.name}`;
   return (
     <article style={cardStyle}>
       <div style={cardHeaderStyle}>
@@ -77,14 +81,12 @@ function PresetCard(props: {
         ))}
       </ul>
       <Button
-        variant={props.active ? 'default' : 'primary'}
-        disabled={props.active}
+        variant={props.isActive ? 'default' : 'primary'}
+        disabled={props.isActive}
         onClick={props.onUse}
-        title={
-          props.active ? 'This machine is selected.' : `Start from ${profile.name}'s defaults.`
-        }
+        title={buttonTitle}
       >
-        {props.active ? 'Selected' : `Use ${profile.name}`}
+        {buttonLabel}
       </Button>
     </article>
   );

@@ -218,13 +218,35 @@ async function runHandshake(
   safeWrite: (line: string) => Promise<void>,
   baudRate: number,
 ): Promise<void> {
-  const startingWriteEpoch = refs.writeEpoch ?? 0;
+  const connection = refs.connection;
+  if (connection === null) return;
+  let expectedWriteEpoch = refs.writeEpoch ?? 0;
+  let sawWelcomeBoundary = false;
+  const acceptControllerLineEpoch = (): boolean => {
+    if (refs.connection !== connection) return false;
+    const currentWriteEpoch = refs.writeEpoch ?? 0;
+    if (currentWriteEpoch === expectedWriteEpoch) return true;
+    // The first welcome banner is the expected controller-reset boundary for
+    // a new port. Adopt that one epoch after the line has identified firmware;
+    // all later awaits are strict so a reset during settle still aborts.
+    if (currentWriteEpoch === expectedWriteEpoch + 1 && get().detectedControllerKind !== null) {
+      expectedWriteEpoch = currentWriteEpoch;
+      sawWelcomeBoundary = true;
+      return true;
+    }
+    return false;
+  };
   let gotLine = await waitForNextControllerLine(refs, PASSIVE_STARTUP_WAIT_MS);
+  if (!acceptControllerLineEpoch()) return;
   if (!gotLine) {
     const realtimeQuery = refs.driver.realtime.statusQuery;
     const nextLine = waitForNextControllerLine(refs, ACTIVE_HANDSHAKE_WAIT_MS);
-    if (realtimeQuery !== null) await safeWrite(realtimeQuery);
+    if (realtimeQuery !== null) {
+      await safeWrite(realtimeQuery);
+      if (!acceptControllerLineEpoch()) return;
+    }
     gotLine = await nextLine;
+    if (!acceptControllerLineEpoch()) return;
   }
 
   if (!gotLine) {
@@ -238,10 +260,8 @@ async function runHandshake(
     );
     return;
   }
-  if ((refs.writeEpoch ?? 0) === startingWriteEpoch) {
-    await new Promise<void>((resolve) => setTimeout(resolve, LATE_BANNER_SETTLE_MS));
-  }
-  if (refs.connection === null) return;
+  await settleAfterControllerLine(sawWelcomeBoundary);
+  if (!acceptControllerLineEpoch()) return;
   const settingsQuery = refs.driver.commands.settingsQuery;
   if (settingsQuery === null) {
     set({ log: pushLog(get(), '[lf2] Connected.') });
@@ -257,20 +277,41 @@ async function runHandshake(
   });
   beginSettingsCollection(refs, get().controllerSessionEpoch);
   await safeWrite(`${settingsQuery}\n`);
+  if (!handshakeIsCurrent(refs, connection, expectedWriteEpoch)) return;
+}
+
+function settleAfterControllerLine(sawWelcomeBoundary: boolean): Promise<void> {
+  if (sawWelcomeBoundary) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, LATE_BANNER_SETTLE_MS));
 }
 
 function waitForNextControllerLine(refs: HandlerRefs, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      refs.onLineArrived = null;
-      resolve(false);
-    }, timeoutMs);
-    refs.onLineArrived = (): void => {
-      clearTimeout(timer);
-      refs.onLineArrived = null;
-      resolve(true);
+    let settled = false;
+    const settle = (gotLine: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(gotLine);
     };
+    const onLineArrived = (): void => {
+      clearTimeout(timer);
+      if (refs.onLineArrived === onLineArrived) refs.onLineArrived = null;
+      settle(true);
+    };
+    const timer = setTimeout(() => {
+      if (refs.onLineArrived === onLineArrived) refs.onLineArrived = null;
+      settle(false);
+    }, timeoutMs);
+    refs.onLineArrived = onLineArrived;
   });
+}
+
+function handshakeIsCurrent(
+  refs: LiveRefs,
+  connection: NonNullable<LiveRefs['connection']>,
+  writeEpoch: number,
+): boolean {
+  return refs.connection === connection && (refs.writeEpoch ?? 0) === writeEpoch;
 }
 
 function teardown(refs: LiveRefs): void {

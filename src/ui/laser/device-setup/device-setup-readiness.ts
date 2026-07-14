@@ -37,6 +37,11 @@ export type SetupReadiness = {
   readonly ready: boolean;
 };
 
+export type SetupSpindleConfirmation = {
+  readonly maxRpm: number | null;
+  readonly confirmed: boolean;
+};
+
 const ORIGIN_LABELS: Record<Origin, string> = {
   'front-left': 'Front left',
   'front-right': 'Front right',
@@ -49,6 +54,7 @@ export function computeSetupReadiness(
   draft: DeviceProfile,
   detected: Partial<DeviceProfile> | null,
   machineKind: MachineKind = 'laser',
+  spindleConfirmation?: SetupSpindleConfirmation,
 ): SetupReadiness {
   const patch = detected ?? {};
   // "The operator told us which machine this is" — picking any non-default
@@ -59,7 +65,7 @@ export function computeSetupReadiness(
     identityItem(draft),
     bedItem(draft, patch, pickedRealProfile),
     ...(machineKind === 'cnc'
-      ? [spindleItem(patch, pickedRealProfile)]
+      ? [spindleItem(patch, pickedRealProfile, spindleConfirmation)]
       : [powerScaleItem(draft, patch, pickedRealProfile), laserHeadItem(draft)]),
     originItem(draft),
     homingItem(draft),
@@ -71,17 +77,22 @@ export function computeSetupReadiness(
 function spindleItem(
   patch: Partial<DeviceProfile>,
   pickedRealProfile: boolean,
+  confirmation: SetupSpindleConfirmation | undefined,
 ): SetupChecklistItem {
-  const spindleMaxRpm = patch.maxPowerS;
-  const confirmed = pickedRealProfile || (spindleMaxRpm !== undefined && spindleMaxRpm > 0);
+  const spindleMaxRpm = confirmation === undefined ? patch.maxPowerS : confirmation.maxRpm;
+  const confirmed =
+    pickedRealProfile ||
+    (confirmation === undefined
+      ? spindleMaxRpm != null && spindleMaxRpm > 0
+      : confirmation.confirmed && spindleMaxRpm != null && spindleMaxRpm > 0);
   return {
     id: 'spindle',
     label: 'Spindle maximum ($30)',
     status: confirmed ? 'confirmed' : 'needs-attention',
     blocking: true,
     detail:
-      spindleMaxRpm === undefined
-        ? 'Not reported. Confirm the spindle maximum in CNC Setup.'
+      spindleMaxRpm == null
+        ? 'Not reported. Enter and confirm the spindle maximum in Confirm settings.'
         : `${spindleMaxRpm} RPM`,
   };
 }

@@ -14,7 +14,10 @@ import {
 export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   // Score against the detected snapshot the draft was seeded from (state.detected),
   // not the live store, so the checklist always reflects what Finish will commit.
-  const readiness = computeSetupReadiness(state.draft, state.detected, state.machineKind);
+  const readiness = computeSetupReadiness(state.draft, state.detected, state.machineKind, {
+    maxRpm: state.spindleMaxRpm,
+    confirmed: state.spindleConfirmed,
+  });
   return (
     <section style={sectionStyle}>
       <p style={readiness.ready ? readyStyle : pendingStyle}>

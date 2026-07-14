@@ -87,7 +87,7 @@ describe('DeviceSetupWizard router commit', () => {
         });
       });
       await advanceUntil(view.host, 'Confirm settings');
-      expect(view.host.textContent).toContain('Spindle maximum ($30): not reported');
+      expect(view.host.textContent).toContain('Controller report: not reported');
       expect(view.host.textContent).not.toContain('24000 RPM');
     } finally {
       await view.unmount();

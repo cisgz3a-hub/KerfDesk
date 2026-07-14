@@ -62,18 +62,19 @@ export function DeviceSetupWizard(props: {
       detectedControllerKind,
       controllerRead: lastReadAt !== null,
       machineKind,
+      ...(machine?.kind === 'cnc' ? { spindleMaxRpm: machine.params.spindleMaxRpm } : {}),
     }),
   );
-  useDetectedSetupSync(
-    dispatch,
-    detected,
-    detectedControllerKind,
-    lastReadAt !== null,
-    connectionKind === 'connected',
-  );
+  useDetectedSetupSync(dispatch, detected, detectedControllerKind, {
+    controllerRead: lastReadAt !== null,
+    connected: connectionKind === 'connected',
+  });
   // Readiness scores against state.detected (kept in sync by the effect above),
   // so the footer's Finish gate matches the committed draft.
-  const ready = computeSetupReadiness(state.draft, state.detected, state.machineKind).ready;
+  const ready = computeSetupReadiness(state.draft, state.detected, state.machineKind, {
+    maxRpm: state.spindleMaxRpm,
+    confirmed: state.spindleConfirmed,
+  }).ready;
   const stepOrder = deviceSetupStepOrder(state.machineKind);
   const stepNumber = stepOrder.indexOf(state.step) + 1;
   const onFinish = (): void => {
@@ -129,9 +130,9 @@ function useDetectedSetupSync(
   dispatch: React.Dispatch<DeviceSetupAction>,
   detected: Partial<DeviceProfile> | null,
   detectedControllerKind: DeviceProfile['controllerKind'] | null,
-  controllerRead: boolean,
-  connected: boolean,
+  syncState: { readonly controllerRead: boolean; readonly connected: boolean },
 ): void {
+  const { connected, controllerRead } = syncState;
   // Preserve the last read during the transient null before a re-read reply,
   // but clear it once the controller session is actually gone.
   useEffect(() => {
@@ -157,11 +158,15 @@ function commitDeviceSetup(
   const detectedApply = state.detectedAccepted
     ? computeCncDetectedApply(state.detected, machine, state.draft)
     : null;
+  const confirmedSpindlePatch =
+    state.spindleConfirmed && state.spindleMaxRpm !== null
+      ? { spindleMaxRpm: state.spindleMaxRpm }
+      : {};
+  const paramsPatch = { ...(detectedApply?.paramsPatch ?? {}), ...confirmedSpindlePatch };
   applyCncMachineSetup({
     deviceProfile: state.draft,
-    ...(detectedApply === null
-      ? {}
-      : { paramsPatch: detectedApply.paramsPatch, devicePatch: detectedApply.devicePatch }),
+    ...(Object.keys(paramsPatch).length === 0 ? {} : { paramsPatch }),
+    ...(detectedApply === null ? {} : { devicePatch: detectedApply.devicePatch }),
   });
 }
 

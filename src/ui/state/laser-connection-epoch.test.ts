@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -8,12 +8,14 @@ type FakeConnection = SerialConnection & {
   readonly closeCount: () => number;
 };
 
-function makeConnection(): FakeConnection {
+function makeConnection(writes: string[] = []): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
   let closes = 0;
   return {
-    write: async () => undefined,
+    write: async (data) => {
+      writes.push(data);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
@@ -55,6 +57,7 @@ async function connect(connection: FakeConnection): Promise<void> {
 
 afterEach(async () => {
   await useLaserStore.getState().disconnect();
+  vi.useRealTimers();
 });
 
 describe('serial connection epoch guards', () => {
@@ -73,5 +76,22 @@ describe('serial connection epoch guards', () => {
     expect(oldConnection.closeCount()).toBe(1);
     expect(useLaserStore.getState().controllerSessionEpoch).toBe(sessionEpoch);
     expect(useLaserStore.getState().detectedControllerKind).toBe(detectedControllerKind);
+  });
+
+  it('does not let an old handshake timeout erase the replacement connection callback', async () => {
+    vi.useFakeTimers();
+    const oldConnection = makeConnection();
+    const currentWrites: string[] = [];
+    const currentConnection = makeConnection(currentWrites);
+
+    await useLaserStore.getState().connect(adapterFor(oldConnection));
+    await vi.advanceTimersByTimeAsync(100);
+    await useLaserStore.getState().connect(adapterFor(currentConnection));
+    await vi.advanceTimersByTimeAsync(151);
+    currentConnection.emitLine('Grbl 1.1h');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(currentWrites).toContain('$$\n');
+    expect(currentWrites).not.toContain('?');
   });
 });

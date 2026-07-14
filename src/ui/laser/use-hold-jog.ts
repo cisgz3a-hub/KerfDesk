@@ -47,7 +47,7 @@ export function useHoldJog(args: {
       if (holdActiveRef.current) {
         holdActiveRef.current = false;
         argsRef.current.onCancel();
-      } else if (runStep) {
+      } else if (runStep && !argsRef.current.disabled) {
         argsRef.current.onStep();
       }
     },
@@ -79,7 +79,7 @@ export function useHoldJog(args: {
       if (!args.holdEnabled) return;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        if (!pointerActiveRef.current) return;
+        if (!pointerActiveRef.current || argsRef.current.disabled) return;
         holdActiveRef.current = true;
         argsRef.current.onHold();
       }, HOLD_DELAY_MS);

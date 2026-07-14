@@ -43,11 +43,12 @@ export function DeviceSetupFirmwareStep({
       </section>
     );
   }
+  const stagedSpindleMaxRpm = state.spindleConfirmed ? state.spindleMaxRpm : null;
   const stagedMachine =
-    machine?.kind === 'cnc' && state.detected.maxPowerS !== undefined
+    machine?.kind === 'cnc' && stagedSpindleMaxRpm !== null
       ? {
           ...machine,
-          params: { ...machine.params, spindleMaxRpm: state.detected.maxPowerS },
+          params: { ...machine.params, spindleMaxRpm: stagedSpindleMaxRpm },
         }
       : machine;
   const diffs = computeFirmwareDiffs(state.draft, rows, stagedMachine);

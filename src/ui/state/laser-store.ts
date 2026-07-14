@@ -42,7 +42,6 @@ import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
-import type { StartJobOptions } from './laser-job-options';
 import type {
   ControllerObservationStamp,
   HomingProof,

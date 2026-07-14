@@ -225,9 +225,9 @@ function isJogPadDisabled(
   connected: boolean,
   controllerIdle: boolean,
   machineOperationBusy: boolean,
-  setupBlockedByActiveJob: boolean,
+  jogBlocked: boolean,
 ): boolean {
-  return !connected || !controllerIdle || machineOperationBusy || setupBlockedByActiveJob;
+  return !connected || !controllerIdle || machineOperationBusy || jogBlocked;
 }
 
 function isMachineOperationBusy(state: {

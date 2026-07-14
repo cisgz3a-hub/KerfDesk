@@ -90,8 +90,8 @@ function CatalogCard({
   const current = useStore((s) => s.project.device);
   const activeId = useStore((s) => s.project.device.profileId);
   const profile = suggestion.profile;
-  const active = activeId === profile.profileId && current === profile;
-  const applyProfile = (): void => {
+  const isActive = activeId === profile.profileId && current === profile;
+  const handleApplyProfile = (): void => {
     replaceDeviceProfile(profile);
   };
   return (
@@ -120,21 +120,25 @@ function CatalogCard({
           <li key={warning}>{warning}</li>
         ))}
       </ul>
-      <CatalogApplyButton active={active} profileName={profile.name} onApply={applyProfile} />
+      <CatalogApplyButton
+        isActive={isActive}
+        profileName={profile.name}
+        onApply={handleApplyProfile}
+      />
     </article>
   );
 }
 
 function CatalogApplyButton(props: {
-  readonly active: boolean;
+  readonly isActive: boolean;
   readonly profileName: string;
   readonly onApply: () => void;
 }): JSX.Element {
-  const label = props.active ? 'Active profile' : `Use ${props.profileName}`;
+  const label = props.isActive ? 'Active profile' : `Use ${props.profileName}`;
   return (
     <Button
-      variant={props.active ? 'default' : 'primary'}
-      disabled={props.active}
+      variant={props.isActive ? 'default' : 'primary'}
+      disabled={props.isActive}
       onClick={props.onApply}
     >
       {label}

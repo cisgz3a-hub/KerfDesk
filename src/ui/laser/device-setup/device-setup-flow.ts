@@ -63,6 +63,12 @@ export type DeviceSetupState = {
   // Controller-reported values are committed only after the operator clicks
   // Apply detected; merely reading $$ must never alter the chosen profile.
   readonly detectedAccepted: boolean;
+  // CNC spindle limits live on the machine config rather than DeviceProfile.
+  // Keep the editable value and its explicit operator confirmation alongside
+  // the profile draft so Review can always route a blocker to an actionable
+  // control and Finish can commit both in one undoable update.
+  readonly spindleMaxRpm: number | null;
+  readonly spindleConfirmed: boolean;
 };
 
 export type DeviceSetupAction =
@@ -70,6 +76,8 @@ export type DeviceSetupAction =
   | { readonly kind: 'back' }
   | { readonly kind: 'go'; readonly step: DeviceSetupStep }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
+  | { readonly kind: 'edit-spindle'; readonly spindleMaxRpm: number | null }
+  | { readonly kind: 'confirm-spindle'; readonly confirmed: boolean }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
   | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
   | {
@@ -83,6 +91,7 @@ export type DeviceSetupDetectedFacts = {
   readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
   readonly controllerRead?: boolean;
   readonly machineKind?: MachineKind;
+  readonly spindleMaxRpm?: number;
 };
 
 // Shared props for the wizard step components: the current flow state plus the
@@ -112,6 +121,8 @@ export function initDeviceSetup(
     draft: profile,
     presetApplied: false,
     detectedAccepted: false,
+    spindleMaxRpm: facts.spindleMaxRpm ?? null,
+    spindleConfirmed: false,
   };
 }
 
@@ -130,6 +141,14 @@ export function deviceSetupReducer(
         : state;
     case 'edit':
       return { ...state, draft: { ...state.draft, ...action.patch } };
+    case 'edit-spindle':
+      return {
+        ...state,
+        spindleMaxRpm: action.spindleMaxRpm,
+        spindleConfirmed: action.spindleMaxRpm !== null,
+      };
+    case 'confirm-spindle':
+      return { ...state, spindleConfirmed: action.confirmed };
     case 'accept-detected':
       return acceptDetected(state, action.patch);
     case 'apply-preset':
@@ -177,10 +196,17 @@ function updateDetectedFacts(
 }
 
 function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>): DeviceSetupState {
+  const detectedSpindleMaxRpm =
+    state.machineKind === 'cnc' && patch.maxPowerS !== undefined && patch.maxPowerS > 0
+      ? patch.maxPowerS
+      : null;
   return {
     ...state,
     draft: { ...state.draft, ...profilePatchForMachineKind(patch, state.machineKind) },
     detectedAccepted: true,
+    ...(detectedSpindleMaxRpm === null
+      ? {}
+      : { spindleMaxRpm: detectedSpindleMaxRpm, spindleConfirmed: true }),
   };
 }
 
