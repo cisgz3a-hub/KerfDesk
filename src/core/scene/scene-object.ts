@@ -115,6 +115,16 @@ export type ObjectPowerScale = {
   // Object locking V1: locked artwork is skipped by normal selection and
   // transform tools, but still renders and compiles.
   readonly locked?: boolean;
+  // Manual CNC holding-tab locations. The normalized contour position keeps
+  // each tab attached when its object is moved, rotated, mirrored, or scaled.
+  readonly cncTabAnchors?: ReadonlyArray<CncTabAnchor>;
+};
+
+export type CncTabAnchor = {
+  readonly layerColor: string;
+  readonly pathIndex: number;
+  readonly polylineIndex: number;
+  readonly pathT: number;
 };
 
 export type ImportedSvg = ObjectPowerScale & {

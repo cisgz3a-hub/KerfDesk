@@ -9,6 +9,7 @@
 
 import {
   applyAutomaticTabsToPolylines,
+  applyManualTabsToPolyline,
   automaticTabAnchorPoints,
   splitClosedPolylineForTabsAtAnchors,
 } from '../geometry/tabs-bridges';
@@ -36,11 +37,16 @@ export function passNeedsTabs(zMm: number, depthMm: number, tabHeightMm: number)
 export function splitPassForTabs(
   polyline: Polyline,
   settings: CncTabSettings,
+  manualCenters?: ReadonlyArray<number>,
 ): ReadonlyArray<Polyline> {
   if (!polyline.closed) return [polyline];
+  const tabSizeMm = Math.max(0, settings.tabWidthMm) + Math.max(0, settings.toolDiameterMm);
+  if (manualCenters !== undefined) {
+    return applyManualTabsToPolyline(polyline, manualCenters, tabSizeMm);
+  }
   return applyAutomaticTabsToPolylines([polyline], {
     tabsEnabled: true,
-    tabSizeMm: Math.max(0, settings.tabWidthMm) + Math.max(0, settings.toolDiameterMm),
+    tabSizeMm,
     tabsPerShape: settings.tabsPerShape,
     // CNC tabs go on every through-cut contour — a freed hole slug is as
     // dangerous as a freed part.

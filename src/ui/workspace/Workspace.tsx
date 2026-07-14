@@ -66,6 +66,7 @@ export function Workspace(): JSX.Element {
     selectedPathNode,
     selectedPathNodes,
     showPathNodeHandles: toolMode.kind === 'node',
+    ...(toolMode.kind === 'cnc-tabs' ? { cncTabLayerColor: toolMode.layerColor } : {}),
     additionalSelectedIds,
     previewMode,
     previewToolpath,
@@ -216,6 +217,7 @@ function useWorkspaceDraw(args: {
   readonly selectedPathNode: ReturnType<typeof useStore.getState>['selectedPathNode'];
   readonly selectedPathNodes: ReturnType<typeof useStore.getState>['selectedPathNodes'];
   readonly showPathNodeHandles: boolean;
+  readonly cncTabLayerColor?: string;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
   readonly previewToolpath: Toolpath | null;
@@ -237,11 +239,7 @@ function useWorkspaceDraw(args: {
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
-  const displayPolylineCacheRef = useRef<DisplayPolylineCache | null>(null);
-  if (displayPolylineCacheRef.current === null) {
-    displayPolylineCacheRef.current = createDisplayPolylineCache();
-  }
-  const displayPolylineCache = displayPolylineCacheRef.current;
+  const displayPolylineCache = useDisplayPolylineCache();
   const requestRasterRedraw = useCallback(() => {
     setRasterRedrawTick((tick) => tick + 1);
   }, []);
@@ -269,6 +267,7 @@ function useWorkspaceDraw(args: {
       ...(selectionMarquee === null ? {} : { selectionMarquee }),
       ...(measureDraft === null ? {} : { measureDraft }),
       ...(snapGuides.length === 0 ? {} : { snapGuides }),
+      ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
     });
   }, [
     args.ref,
@@ -277,6 +276,7 @@ function useWorkspaceDraw(args: {
     args.selectedPathNode,
     args.selectedPathNodes,
     args.showPathNodeHandles,
+    args.cncTabLayerColor,
     args.additionalSelectedIds,
     args.previewMode,
     args.scrubberT,
@@ -294,6 +294,12 @@ function useWorkspaceDraw(args: {
     selectionMarquee,
     snapGuides,
   ]);
+}
+
+function useDisplayPolylineCache(): DisplayPolylineCache {
+  const cacheRef = useRef<DisplayPolylineCache | null>(null);
+  if (cacheRef.current === null) cacheRef.current = createDisplayPolylineCache();
+  return cacheRef.current;
 }
 
 // Phase G (B6) — double-click exits sticky shape tools; in pen mode it finishes

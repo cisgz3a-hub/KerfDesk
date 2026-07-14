@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
 import {
   applyAutomaticTabsToPolylines,
+  applyManualTabsToPolyline,
   automaticTabAnchorPoints,
   splitClosedPolylineForTabsAtAnchors,
 } from './tabs-bridges';
@@ -88,6 +89,18 @@ describe('automatic tabs / bridges geometry', () => {
       { x: 10, y: 18 },
       { x: 18, y: 10 },
     ]);
+  });
+
+  it('splits at explicit normalized contour positions', () => {
+    const result = applyManualTabsToPolyline(
+      { closed: true, points: squarePoints(0, 0, 10) },
+      [0, 0.5],
+      2,
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[0]?.points[0]).toEqual({ x: 1, y: 0 });
+    expect(result[1]?.points[0]).toEqual({ x: 9, y: 10 });
   });
 });
 

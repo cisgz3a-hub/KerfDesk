@@ -42,6 +42,7 @@ import type { RemovalGrid } from '../../core/sim';
 import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
+import { drawCncTabAnchors } from './cnc-tab-editor';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
   drawLargeSceneNotice,
@@ -82,6 +83,7 @@ export type DrawOpts = {
   readonly selectionMarquee?: SelectionMarquee;
   readonly measureDraft?: MeasureDraft;
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
+  readonly cncTabLayerColor?: string;
 };
 
 export function drawScene(
@@ -134,7 +136,7 @@ export function drawScene(
     );
     // ADR-124: label the captured-board / jig outline with its measured size.
     drawRegistrationBoxDimensions(ctx, project, view);
-    drawLiveWorkspaceOverlays(ctx, opts, view);
+    drawLiveWorkspaceOverlays(ctx, project, opts, view);
   }
   if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);
   drawOutOfBoundsOutlines(ctx, project, view);
@@ -173,6 +175,7 @@ function drawPreviewModeScene(
 
 function drawLiveWorkspaceOverlays(
   ctx: CanvasRenderingContext2D,
+  project: Project,
   opts: DrawOpts,
   view: ViewTransform,
 ): void {
@@ -180,6 +183,10 @@ function drawLiveWorkspaceOverlays(
   if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
   if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
   if (opts.measureDraft !== undefined) drawMeasurement(ctx, opts.measureDraft, view);
+  if (opts.cncTabLayerColor !== undefined && opts.selectedId !== null) {
+    const selected = project.scene.objects.find((object) => object.id === opts.selectedId);
+    if (selected !== undefined) drawCncTabAnchors(ctx, selected, opts.cncTabLayerColor, view);
+  }
 }
 
 // Phase G (B5): render the shape being dragged out as a dashed accent outline.

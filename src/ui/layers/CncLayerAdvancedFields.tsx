@@ -23,6 +23,7 @@ import { NumberField, Row } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
 import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
+import { CncTabPositionControls } from './CncTabPositionControls';
 
 // The whole advanced field set, gated by one conditional in the parent
 // (ADR-111 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
@@ -342,6 +343,7 @@ export function TabFields(props: {
             title="Number of tabs spread around each closed shape."
             onCommit={(tabsPerShape) => onCommit({ tabsPerShape: Math.floor(tabsPerShape) })}
           />
+          <CncTabPositionControls layer={layer} settings={settings} />
         </>
       ) : null}
     </>

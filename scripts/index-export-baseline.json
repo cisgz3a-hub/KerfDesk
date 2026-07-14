@@ -1,10 +1,10 @@
 {
-  "src/core/scene/index.ts": 207,
+  "src/core/scene/index.ts": 208,
   "src/core/controllers/grbl/index.ts": 105,
   "src/core/camera/index.ts": 90,
   "src/core/job/index.ts": 88,
   "src/core/devices/index.ts": 86,
-  "src/core/cnc/index.ts": 63,
+  "src/core/cnc/index.ts": 67,
   "src/core/trace/index.ts": 33,
   "src/core/raster/index.ts": 32,
   "src/core/relief/index.ts": 25,

@@ -12,6 +12,7 @@ import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
   type Layer,
+  type ImportedSvg,
   type Project,
   type ReliefObject,
 } from '../../core/scene';
@@ -180,6 +181,70 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
       expect(
         host.querySelector(`input[aria-label="Insert depth for ${layer.color}"]`),
       ).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('seeds editable tab handles for one selected profile object and can reset them', async () => {
+    const layer: Layer = {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'profile-outside',
+        tabsEnabled: true,
+        tabsPerShape: 4,
+      },
+    };
+    const object: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'part',
+      source: 'part.svg',
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: layer.color,
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 20, y: 0 },
+                { x: 20, y: 20 },
+                { x: 0, y: 20 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    installProject(layer, false);
+    useStore.setState((state) => ({
+      project: { ...state.project, scene: { objects: [object], layers: [layer] } },
+      selectedObjectId: object.id,
+    }));
+    const { host, root } = await render(layer);
+    try {
+      const edit = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Edit positions',
+      );
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('Edit positions missing');
+      await act(async () => edit.click());
+      expect(useStore.getState().project.scene.objects[0]?.cncTabAnchors).toHaveLength(4);
+      expect(useUiStore.getState().toolMode).toEqual({
+        kind: 'cnc-tabs',
+        layerColor: layer.color,
+      });
+
+      const reset = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Reset automatic',
+      );
+      if (!(reset instanceof HTMLButtonElement)) throw new Error('Reset automatic missing');
+      await act(async () => reset.click());
+      expect(useStore.getState().project.scene.objects[0]?.cncTabAnchors).toBeUndefined();
+      expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     } finally {
       await act(async () => root.unmount());
       host.remove();
