@@ -1,6 +1,7 @@
 import type { Project } from '../../core/scene';
 import { deserializeProject, type DeserializeResult } from './deserialize-project';
 import { serializeProject } from './serialize-project';
+import { firstPersistenceSemanticDrift } from './persistence-semantic-integrity';
 
 export type PreparedProjectPersistence =
   | { readonly kind: 'ok'; readonly project: Project; readonly json: string }
@@ -21,10 +22,18 @@ export function prepareProjectForPersistence(project: Project): PreparedProjectP
   if (validated.kind !== 'ok') {
     return { kind: 'invalid', reason: deserializeFailureReason(validated) };
   }
+  const normalizedJson = serializeProject(validated.project);
+  const driftPath = firstPersistenceSemanticDrift(serialized, normalizedJson);
+  if (driftPath !== null) {
+    return {
+      kind: 'invalid',
+      reason: `saving would change \`${driftPath}\` during validation; repair or reload the project before saving`,
+    };
+  }
   return {
     kind: 'ok',
     project: validated.project,
-    json: serializeProject(validated.project),
+    json: normalizedJson,
   };
 }
 

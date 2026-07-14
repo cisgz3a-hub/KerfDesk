@@ -35,6 +35,7 @@ export type EmitGcodeOptions = {
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
+  readonly preflightInitialMachinePosition?: PreflightOptions['initialMachinePosition'];
   readonly allowRotaryRaster?: boolean;
   // When set, a provenance comment header (build/commit/emitter) is prepended to
   // the returned G-code. Preflight runs on the motion body only, so the header
@@ -101,11 +102,13 @@ function runEmitPreflight(
   if (machine !== undefined && machine.kind === 'cnc') {
     return runCncPreflight(project, machine, body, {
       motionOffset: options.preflightMotionOffset,
+      initialMachinePosition: options.preflightInitialMachinePosition,
       coordinateMode,
     });
   }
   return runPreflight(project, body, {
     motionOffset: options.preflightMotionOffset,
+    initialMachinePosition: options.preflightInitialMachinePosition,
     coordinateMode,
     // One revolution is the wrap limit: a taller job burns onto its own
     // start (ADR-127).

@@ -50,7 +50,7 @@ export function arcAabb(
   ];
 
   for (const c of cardinals) {
-    if (fullCircle || angleOnArc(c.angle, startAngle, endAngle, clockwise)) {
+    if (fullCircle || isAngleOnArc(c.angle, startAngle, endAngle, clockwise)) {
       minX = Math.min(minX, c.x);
       maxX = Math.max(maxX, c.x);
       minY = Math.min(minY, c.y);
@@ -63,7 +63,7 @@ export function arcAabb(
 // Is `angle` within the arc swept from startAngle to endAngle in the given
 // direction? Everything is measured as CCW travel; a clockwise arc is just the
 // CCW arc traversed from end back to start.
-function angleOnArc(
+export function isAngleOnArc(
   angle: number,
   startAngle: number,
   endAngle: number,

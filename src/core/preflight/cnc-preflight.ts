@@ -38,6 +38,7 @@ import type { PreflightIssue, PreflightResult } from './preflight';
 
 export type CncPreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
+  readonly initialMachinePosition?: { readonly x: number; readonly y: number } | undefined;
   readonly coordinateMode?: 'machine' | 'relative-origin';
 };
 
@@ -221,8 +222,12 @@ function appendNoGoZoneIssues(
     });
     return;
   }
-  const collisionOptions =
-    options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset };
+  const collisionOptions = {
+    ...(options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset }),
+    ...(options.initialMachinePosition === undefined
+      ? {}
+      : { initialMachinePosition: options.initialMachinePosition }),
+  };
   const collisions = findNoGoZoneCollisions(
     gcode,
     zones,

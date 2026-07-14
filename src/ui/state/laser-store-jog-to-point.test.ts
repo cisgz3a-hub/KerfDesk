@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 
 // Minimal serial harness (mirrors laser-store-motion-operation.test.ts).
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
@@ -52,6 +53,7 @@ afterEach(async () => {
     statusReport: null,
     lastWriteError: null,
     motionOperation: null,
+    workZZeroEvidence: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
   vi.restoreAllMocks();
 });
@@ -113,6 +115,10 @@ describe('jogToMachinePosition', () => {
     useStore.getState().setMachineKind('cnc');
     const machine = useStore.getState().project.machine;
     const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : 0;
+    const state = useLaserStore.getState();
+    useLaserStore.setState({
+      workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', state.workZReferenceEpoch),
+    });
     connection.emitLine('<Idle|MPos:50.000,30.000,0.000|FS:0,0>');
     writes.length = 0;
 
@@ -123,6 +129,23 @@ describe('jogToMachinePosition', () => {
       `$J=G90 G21 Z${safeZMm.toFixed(3)} F1000\n`,
       '$J=G91 G21 X70.000 Y50.000 F1000\n',
     ]);
+  });
+
+  it('writes nothing when a CNC point move lacks current Work-Z evidence', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useStore.getState().setMachineKind('cnc');
+    connection.emitLine('<Idle|MPos:50.000,30.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await expect(useLaserStore.getState().jogToMachinePosition(120, 80, 1000)).rejects.toThrow(
+      /work z/i,
+    );
+
+    expect(writes).toEqual([]);
   });
 
   it('does not add a Z retract for a laser project', async () => {

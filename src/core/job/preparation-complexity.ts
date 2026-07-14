@@ -8,6 +8,7 @@ import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   flattenColoredPathCurves,
   isClosedEnough,
+  outputOperationLayers,
   type ColoredPath,
   type Layer,
   type Scene,
@@ -29,49 +30,38 @@ export function scenePreparationTooComplex(scene: Scene): boolean {
 }
 
 export function countOutputVectorSegments(scene: Scene): number {
-  const outputLayers = outputVectorLayersByColor(scene.layers);
-  if (outputLayers.size === 0) return 0;
   let count = 0;
-  for (const obj of scene.objects) {
-    for (const path of vectorPaths(obj)) {
-      if (!outputLayers.has(path.color)) continue;
-      count += countPathSegments(path);
+  for (const layer of scene.layers.flatMap(outputOperationLayers)) {
+    for (const obj of scene.objects) {
+      if (effectiveLayer(layer, obj).mode === 'image') continue;
+      for (const path of vectorPaths(obj)) {
+        if (path.color !== layer.color) continue;
+        count += countPathSegments(path);
+      }
     }
   }
   return count;
 }
 
 export function countEstimatedFillSegments(scene: Scene): number {
-  const outputLayers = outputFillLayersByColor(scene.layers);
-  if (outputLayers.size === 0) return 0;
   let count = 0;
-  for (const obj of scene.objects) {
-    const transform = vectorTransform(obj);
-    if (transform === null) continue;
-    for (const path of vectorPaths(obj)) {
-      const layer = outputLayers.get(path.color);
-      if (layer === undefined) continue;
-      count += countPathEstimatedHatches(path, transform, layer);
-      if (count > PREPARATION_COMPILED_SEGMENT_BUDGET) return count;
+  for (const layer of scene.layers.flatMap(outputOperationLayers)) {
+    for (const obj of scene.objects) {
+      const transform = vectorTransform(obj);
+      const operation = effectiveLayer(layer, obj);
+      if (transform === null || operation.mode !== 'fill') continue;
+      for (const path of vectorPaths(obj)) {
+        if (path.color !== layer.color) continue;
+        count += countPathEstimatedHatches(path, transform, operation);
+        if (count > PREPARATION_COMPILED_SEGMENT_BUDGET) return count;
+      }
     }
   }
   return count;
 }
 
-function outputVectorLayersByColor(layers: ReadonlyArray<Layer>): ReadonlyMap<string, Layer> {
-  const out = new Map<string, Layer>();
-  for (const layer of layers) {
-    if (layer.output && layer.mode !== 'image') out.set(layer.color, layer);
-  }
-  return out;
-}
-
-function outputFillLayersByColor(layers: ReadonlyArray<Layer>): ReadonlyMap<string, Layer> {
-  const out = new Map<string, Layer>();
-  for (const layer of layers) {
-    if (layer.output && layer.mode === 'fill') out.set(layer.color, layer);
-  }
-  return out;
+function effectiveLayer(layer: Layer, object: SceneObject): Layer {
+  return object.operationOverride === undefined ? layer : { ...layer, ...object.operationOverride };
 }
 
 function countPathEstimatedHatches(path: ColoredPath, transform: Transform, layer: Layer): number {

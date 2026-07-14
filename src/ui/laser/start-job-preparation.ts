@@ -1,3 +1,4 @@
+import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { JobOriginPlacement } from '../../core/job';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PreparedOutput } from '../../io/gcode';
@@ -8,6 +9,7 @@ import {
 } from '../job-placement';
 import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
+import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
 
 export function withControllerReportUnits(
@@ -21,6 +23,18 @@ export function controllerReportsInches(
   controllerSettings: ControllerSettingsSnapshot | null,
 ): boolean {
   return controllerSettings?.reportInches === true;
+}
+
+export function initialMachinePositionOption(machine: MachineStartSnapshot): {
+  readonly preflightInitialMachinePosition?: { readonly x: number; readonly y: number };
+} {
+  const raw = inferCurrentMachinePosition(
+    machine.statusReport,
+    machine.wcoCache ?? machine.statusReport?.wco ?? null,
+  );
+  if (raw === null) return {};
+  const [x, y] = normalizeReportedMPosToMm([raw.x, raw.y, raw.z], machine.reportInches === true);
+  return { preflightInitialMachinePosition: { x, y } };
 }
 
 export function okPreparation(

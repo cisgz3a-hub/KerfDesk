@@ -56,6 +56,7 @@ export function jogActions(
       if (Math.abs(dx) < JOG_TO_POINT_EPSILON_MM && Math.abs(dy) < JOG_TO_POINT_EPSILON_MM) return;
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
+      assertCncPointMoveWorkZReady(set, get);
       // CNC: after readiness is proven, lift Z to the configured safe height
       // before the XY traverse so the bit does not drag across stock or clamps.
       // Laser projects have no Z retract seam and keep the flat move (F105).
@@ -157,6 +158,25 @@ async function retractToCncSafeZ(
   const retractLine = refs.driver.commands.buildFrameRetract?.(safeZMm, feed);
   if (retractLine === undefined) return;
   await safeWrite(retractLine, 'frame');
+}
+
+function assertCncPointMoveWorkZReady(set: SetFn, get: GetFn): void {
+  if (useStore.getState().project.machine?.kind !== 'cnc') return;
+  const state = get();
+  if (
+    isWorkZEvidenceFreshForStart(
+      state.workZZeroEvidence,
+      state.workZReferenceEpoch,
+      state.controllerSessionEpoch,
+      Date.now(),
+    )
+  ) {
+    return;
+  }
+  const message =
+    'CNC point move blocked: set or probe Work Z before moving. The safe-Z retract uses absolute work coordinates.';
+  set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
+  throw new Error(message);
 }
 
 function assertJogFrameReady(set: SetFn, get: GetFn): void {
