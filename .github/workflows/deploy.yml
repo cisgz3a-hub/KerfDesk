@@ -81,4 +81,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # The 'laserforge' Pages project serves the canonical release URL
+          # https://kerfdesk.com (Pages default fallback: laserforge-2fj.pages.dev).
           command: pages deploy dist/web --project-name=laserforge --branch=main
