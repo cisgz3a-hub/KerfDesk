@@ -7875,7 +7875,6 @@ the UI owns their order and never marks the position ready before controller ack
 fresh Idle report. Frame verification becomes consistently mandatory whenever a no-homing profile
 uses relative placement. Hardware validation remains required because OEM GRBL derivatives can vary
 in their `$SLP`, reset, and alarm behavior.
-
 ---
 
 ## ADR-194 - Add native Hershey single-line CNC text without a runtime dependency
@@ -7909,3 +7908,36 @@ KerfDesk can create editable CNC single-line labels natively while old projects 
 output stay unchanged. Roman Simplex initially covers printable ASCII only; broader stroke-font and
 Unicode coverage requires separately licensed font data and a later bounded decision. This decision
 does not change the existing offset-ladder V-carve algorithm.
+---
+
+## ADR-195 - Make the CNC layer card guided, honest, and narrow-panel safe
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+The CNC layer card exposed working CAM parameters but did not meet its beginner-facing contract. The
+material decision appeared after operation and bit controls, manual defaults looked authoritative,
+the exact-stock-depth shortcut called itself a through cut, and feed-preset apply/save controls
+overflowed the resizable panel. Basic/Advanced documentation also lagged the shipped choice to keep
+the four core machining values visible.
+
+### Decision
+
+- Lead each CNC layer card with Material. Manual mode visibly tells the operator to verify the values;
+  calculated values are described as starting points, never universally safe settings.
+- Keep Depth per pass, Feed, Plunge, and Spindle visible in Basic. Advanced is an in-card labelled
+  section for helpers and specialist controls, not a claim that the core machining values disappear.
+- Rename the exact-depth shortcut to **Set to stock thickness**. It adds no hidden overcut; cutting
+  below measured stock remains an explicit, setup-specific operator decision.
+- Split feed-preset application and creation into separate responsive rows. Empty libraries say so,
+  and Save is disabled until a non-blank name exists.
+- Shared CNC rows wrap their value area and use shrink-safe controls so the supported 240 px panel
+  minimum remains usable instead of clipping actions.
+
+### Consequences
+
+Existing project data and compiled G-code remain unchanged unless the operator edits a value. The
+material, bit, preset, and stock-depth actions retain their undo/persistence behavior. The UI no
+longer implies that a generic calculation is hardware-proven or that exact nominal thickness always
+guarantees physical separation.

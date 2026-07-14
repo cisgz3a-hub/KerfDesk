@@ -44,6 +44,12 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
 
   return (
     <>
+      <CncMaterialRow
+        layer={layer}
+        settings={settings}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
       <Row label="Cut type">
         <select
           value={settings.cutType}
@@ -60,12 +66,6 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         </select>
       </Row>
       <LayerBitSelect
-        layer={layer}
-        settings={settings}
-        onCommit={commit}
-        onCommitSettings={commitSettings}
-      />
-      <CncMaterialRow
         layer={layer}
         settings={settings}
         onCommit={commit}
@@ -98,8 +98,9 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-// Cut depth + a one-click "through cut" that sets depth to the stock
-// thickness (the confusing Cut-depth-vs-Stock-thickness pair, ADR-111).
+// Cut depth + a one-click stock-depth action. Calling exact stock thickness a
+// "through cut" over-promises: real stock varies, while any spoilboard overcut
+// must be a measured operator choice rather than a hidden extra depth.
 function CutDepthField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -128,10 +129,10 @@ function CutDepthField(props: {
           <button
             type="button"
             onClick={() => props.onCommit({ depthMm: props.stockThicknessMm })}
-            title="Set cut depth to the stock thickness for a full through cut."
+            title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
             style={throughButtonStyle}
           >
-            Through cut (= {props.stockThicknessMm} mm)
+            Set to stock thickness ({props.stockThicknessMm} mm)
           </button>
         </Row>
       ) : null}
@@ -139,4 +140,8 @@ function CutDepthField(props: {
   );
 }
 
-const throughButtonStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px' };
+const throughButtonStyle: React.CSSProperties = {
+  width: '100%',
+  fontSize: 11,
+  padding: '4px 8px',
+};

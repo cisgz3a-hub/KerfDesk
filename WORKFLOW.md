@@ -2532,14 +2532,15 @@ F-CNC19 tiling.
 ### F-CNC32. Switch a layer card between Basic and Advanced — ADR-111 #4
 
 #### Success
-1. CNC layer cards default to **Basic**: Material, Cut type, Bit, Cut
-   depth, Tabs — the essentials to cut a part. The Cuts/Layers panel's
-   "Advanced cut settings" checkbox reveals the rest (feeds, stepover,
-   pocket fill, cut-type tails) on every card; the choice persists across
-   sessions.
-2. Cut depth carries a one-click "Through cut (= N mm)" button that sets
-   the depth to the stock thickness — no mental math against the Material
-   & Bit card.
+1. CNC layer cards default to **Basic** and lead with Material, followed by
+   Cut type, Bit, Cut depth, Depth per pass, Feed, Plunge, Spindle, and Tabs.
+   The core machining values stay visible for review. The Cuts/Layers panel's
+   "Advanced cut settings" checkbox reveals helpers and specialist controls
+   (presets, calculator, stepover, pocket fill, and cut-type tails) on every
+   card; the choice persists across sessions.
+2. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
+   sets the exact measured thickness without silently adding spoilboard
+   overcut; any verified overcut remains an explicit operator edit.
 
 #### Error — none (view toggle only)
 1. Toggling never changes cut settings; it only shows/hides fields.
@@ -2548,8 +2549,8 @@ F-CNC19 tiling.
 1. The toggle and its fields appear only in CNC mode.
 
 #### Edge — a hidden advanced value still applies
-1. Fields hidden by Basic keep their values and still drive output (e.g. a
-   pocket's stepover); Basic hides complexity, it does not reset it.
+1. Specialist fields hidden by Basic keep their values and still drive output
+   (e.g. a pocket's stepover); Basic hides complexity, it does not reset it.
 
 ### F-CNC33. Fill machine settings from the connected controller — ADR-111 #3a
 

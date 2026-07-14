@@ -11,12 +11,12 @@ import { activeCncTool, type CncLayerSettings, type Layer } from '../../core/sce
 import { useStore } from '../state';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
 import {
-  FeedPresetRow,
   HelicalEntryRows,
   MotionPolishRows,
   ReliefLayerRows,
   VClearToolSelect,
 } from './CncLayerToolFields';
+import { CncFeedPresetRows } from './CncFeedPresetRows';
 import { RestPocketToolSelect } from './CncRestPocketFields';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField, Row } from './CncLayerPrimitives';
@@ -35,7 +35,8 @@ export function CncLayerAdvancedGroup(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
-    <>
+    <section aria-label="Advanced cut settings" style={advancedSectionStyle}>
+      <div style={advancedHeadingStyle}>Advanced</div>
       <FeedHelperRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
       <StepoverField
         layer={props.layer}
@@ -57,7 +58,7 @@ export function CncLayerAdvancedGroup(props: {
         onCommit={props.onCommit}
         onCommitSettings={props.onCommitSettings}
       />
-    </>
+    </section>
   );
 }
 
@@ -133,7 +134,7 @@ function FeedHelperRows(props: {
 }): JSX.Element {
   return (
     <>
-      <FeedPresetRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <CncFeedPresetRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
       <FeedsCalculatorRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
     </>
   );
@@ -354,4 +355,20 @@ const vbitWarningStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-danger)',
   padding: '2px 0 2px 4px',
+};
+
+const advancedSectionStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  minWidth: 0,
+};
+const advancedHeadingStyle: React.CSSProperties = {
+  borderTop: '1px solid var(--lf-border)',
+  paddingTop: 8,
+  fontSize: 11,
+  fontWeight: 600,
+  color: 'var(--lf-text-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
 };

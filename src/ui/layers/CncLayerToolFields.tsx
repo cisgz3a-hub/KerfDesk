@@ -3,7 +3,6 @@
 // VClearToolSelect arms the two-stage v-carve's flat-floor clearing bit.
 // Split from CncLayerFields.tsx, which sits near the file-size cap.
 
-import { useState } from 'react';
 import {
   DEFAULT_CNC_TOOLS,
   activeCncTool,
@@ -13,7 +12,6 @@ import {
 } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
-import { feedPresetPatch } from '../state/cnc-library-actions';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 
 export function useCncTools(): ReadonlyArray<CncTool> {
@@ -338,61 +336,6 @@ function HelixNumberRow(props: {
   );
 }
 
-// Feeds/speeds presets (H.7, F-CNC12): apply-on-select patches the layer's
-// feed/plunge/spindle/depth-per-pass/stepover; Save snapshots the current
-// values under a name into the app-level library.
-export function FeedPresetRow(props: {
-  readonly layer: Layer;
-  readonly settings: CncLayerSettings;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-}): JSX.Element {
-  const presets = useStore((s) => s.cncLibrary.feedPresets);
-  const saveCncFeedPreset = useStore((s) => s.saveCncFeedPreset);
-  const [saveName, setSaveName] = useState('');
-  return (
-    <Row label="Feeds preset">
-      <select
-        value=""
-        onChange={(e) => {
-          const preset = presets.find((candidate) => candidate.id === e.target.value);
-          if (preset !== undefined) props.onCommit(feedPresetPatch(preset));
-        }}
-        aria-label={`Feeds preset for ${props.layer.color}`}
-        title="Apply a saved feeds/speeds preset to this layer."
-        style={selectStyle}
-      >
-        <option value="">Apply…</option>
-        {presets.map((preset) => (
-          <option key={preset.id} value={preset.id}>
-            {preset.name}
-          </option>
-        ))}
-      </select>
-      <input
-        type="text"
-        value={saveName}
-        onChange={(e) => setSaveName(e.target.value)}
-        placeholder="Name"
-        aria-label={`New feeds preset name for ${props.layer.color}`}
-        title="Name for saving this layer's feeds/speeds as a preset."
-        style={presetNameStyle}
-      />
-      <button
-        type="button"
-        onClick={() => {
-          if (saveName.trim() === '') return;
-          saveCncFeedPreset(saveName.trim(), props.settings);
-          setSaveName('');
-        }}
-        aria-label={`Save feeds preset for ${props.layer.color}`}
-        title="Save this layer's feed, plunge, spindle, depth/pass, and stepover under a name."
-      >
-        Save
-      </button>
-    </Row>
-  );
-}
-
 function Row(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
     <div style={rowStyle}>
@@ -404,14 +347,25 @@ function Row(props: { readonly label: string; readonly children: React.ReactNode
 
 const rowStyle: React.CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 8,
   minHeight: 28,
 };
-const labelStyle: React.CSSProperties = { width: 96, fontSize: 12, color: 'var(--lf-text-muted)' };
-const valueStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, flex: 1 };
+const labelStyle: React.CSSProperties = {
+  flex: '0 0 96px',
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+const valueStyle: React.CSSProperties = {
+  display: 'flex',
+  flex: '1 1 140px',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 4,
+  minWidth: 0,
+};
 const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
-const presetNameStyle: React.CSSProperties = { width: 72, padding: '2px 6px', fontSize: 12 };
 const scallopInputStyle: React.CSSProperties = { width: 64, padding: '2px 6px' };
 const directionSelectStyle: React.CSSProperties = {
   flex: 1,
