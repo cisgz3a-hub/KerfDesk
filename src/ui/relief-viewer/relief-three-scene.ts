@@ -10,6 +10,10 @@ import type { ReliefSurfaceMesh } from '../../core/relief';
 
 export type ReliefSceneHandle = {
   readonly dispose: () => void;
+  // Re-fit the renderer + camera to a new canvas size. The scene renders on
+  // demand (no rAF loop), so a resizable host must call this when its box
+  // changes or the buffer stays at its mount-time size and scales blurrily.
+  readonly resize: (width: number, height: number) => void;
 };
 
 export type ReliefSceneResult =
@@ -90,6 +94,13 @@ export async function createReliefThreeScene(
   return {
     kind: 'ok',
     handle: {
+      resize: (width, height) => {
+        if (width <= 0 || height <= 0) return;
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        render();
+      },
       dispose: () => {
         controls.removeEventListener('change', render);
         controls.dispose();

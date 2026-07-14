@@ -69,7 +69,14 @@ const sectionStyle: React.CSSProperties = {
   paddingTop: 8,
 };
 const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
-const controlStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+// Wrap so the Outward/Inward buttons drop to the next line instead of clipping
+// off the right edge when the panel is narrow.
+const controlStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 6,
+};
 const inputStyle: React.CSSProperties = {
   width: 64,
   boxSizing: 'border-box',

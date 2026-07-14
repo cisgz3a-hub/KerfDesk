@@ -174,6 +174,10 @@ function ShapeNumberField(props: {
     value: props.value,
     commit: props.commit,
     parse: (input) => clampFieldValue(Number(input), props),
+    // Display-only rounding: a drag-resized shape stores a long float
+    // (e.g. 35.107387681635146) that overflowed the box. Show a clean value
+    // like LightBurn; the underlying spec keeps full precision until edited.
+    format: (value) => formatShapeValue(value, props.integer),
   });
   return (
     <Field
@@ -195,6 +199,16 @@ function ShapeNumberField(props: {
       />
     </Field>
   );
+}
+
+// At most 3 decimals (0.001 mm — finer than anyone types), trailing zeros
+// stripped. toFixed always emits a decimal point, so the zero-strip can't eat
+// integer digits (e.g. "100" → "100.000" → "100").
+const MAX_DIMENSION_DECIMALS = 3;
+function formatShapeValue(value: number, integer?: boolean): string {
+  if (!Number.isFinite(value)) return '';
+  if (integer === true) return String(Math.round(value));
+  return value.toFixed(MAX_DIMENSION_DECIMALS).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function clampFieldValue(

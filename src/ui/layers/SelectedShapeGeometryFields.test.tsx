@@ -30,6 +30,25 @@ describe('SelectedShapeGeometryFields', () => {
     }
   });
 
+  it('rounds a long-float dimension for display but keeps the stored value exact', async () => {
+    // A drag-resized shape stores a long float that overflowed the input box.
+    const ellipse = createEllipse({
+      id: 'ellipse-precise',
+      color: '#ff0000',
+      spec: { widthMm: 20, heightMm: 35.107387681635146 },
+    });
+    const view = await renderShape(ellipse);
+    try {
+      const input = view.host.querySelector('input[aria-label="Ellipse height"]');
+      if (!(input instanceof HTMLInputElement)) throw new Error('Ellipse height input missing');
+      expect(input.value).toBe('35.107');
+      // Display rounds; the underlying spec keeps full precision until edited.
+      expect(selectedShape().spec).toMatchObject({ heightMm: 35.107387681635146 });
+    } finally {
+      await view.dispose();
+    }
+  });
+
   it('updates polygon side count and rematerializes its vertices', async () => {
     const polygon = createPolygon({
       id: 'polygon-1',

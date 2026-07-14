@@ -16,13 +16,17 @@ import {
 } from '../../core/sim';
 import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
 import { useOutputScope, useStore } from '../state';
-import { createReliefThreeScene } from '../relief-viewer/relief-three-scene';
+import {
+  createReliefThreeScene,
+  type ReliefSceneHandle,
+} from '../relief-viewer/relief-three-scene';
 import { buildPreviewToolpath } from './draw-preview';
+import { useCncPaneWidth } from './use-cnc-pane-width';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
 const PANE_TARGET_CELLS_PER_AXIS = 500;
 const PANE_DISPLAY_CELLS_ACROSS = 300;
-const CANVAS_WIDTH_PX = 296;
+const CANVAS_WIDTH_PX = 244;
 const CANVAS_HEIGHT_PX = 240;
 
 type PaneSceneState = 'loading' | 'ready' | 'failed';
@@ -34,11 +38,28 @@ export function Cnc3DPane(): JSX.Element | null {
   // useMemo below recompiled the ~500×500 grid on every pointer move (PRF-01).
   const outputScope = useOutputScope();
   const [collapsed, setCollapsed] = useState(false);
+  const resize = useCncPaneWidth();
   const deferredProject = useDeferredValue(project);
   const grid = useDesignRemovalGrid(deferredProject, outputScope, collapsed);
   if (project.machine?.kind !== 'cnc') return null;
   return (
-    <aside aria-label="3D result pane" className="lf-rail" style={paneStyle(collapsed)}>
+    <aside
+      aria-label="3D result pane"
+      className="lf-rail"
+      style={paneStyle(collapsed, resize.widthPx)}
+    >
+      {!collapsed && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize 3D result pane"
+          tabIndex={0}
+          title="Drag (or use ← / →) to resize the 3D result pane."
+          style={resizeHandleStyle}
+          onPointerDown={resize.onHandlePointerDown}
+          onKeyDown={resize.onHandleKeyDown}
+        />
+      )}
       <div style={headerStyle}>
         {!collapsed && <span style={titleStyle}>3D result</span>}
         <button
@@ -111,13 +132,13 @@ function PaneScene(props: {
   readonly stockThicknessMm: number;
 }): JSX.Element | null {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const handleRef = useRef<ReliefSceneHandle | null>(null);
   const [state, setState] = useState<PaneSceneState>('loading');
   const { grid, stockThicknessMm: thickness } = props;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null || grid === null) return;
-    let handle: { readonly dispose: () => void } | null = null;
     let cancelled = false;
     setState('loading');
     const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
@@ -128,7 +149,10 @@ function PaneScene(props: {
           return;
         }
         if (outcome.kind === 'ok') {
-          handle = outcome.handle;
+          handleRef.current = outcome.handle;
+          // The pane is resizable, so fit the freshly-built scene to the
+          // canvas's actual laid-out size rather than its mount-time attrs.
+          outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
           setState('ready');
         } else {
           setState('failed');
@@ -139,9 +163,22 @@ function PaneScene(props: {
       });
     return () => {
       cancelled = true;
-      handle?.dispose();
+      handleRef.current?.dispose();
+      handleRef.current = null;
     };
   }, [grid, thickness]);
+
+  // Keep the renderer buffer in step with the resizable pane so the 3D view
+  // stays crisp at any width (the scene renders on demand, not on a rAF loop).
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      handleRef.current?.resize(canvas.clientWidth, canvas.clientHeight);
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   if (grid === null) return null;
   return (
@@ -164,10 +201,14 @@ function PaneScene(props: {
   );
 }
 
-function paneStyle(collapsed: boolean): React.CSSProperties {
+function paneStyle(collapsed: boolean, widthPx: number): React.CSSProperties {
   return {
-    width: collapsed ? 44 : 312,
+    // Operator-set width (ADR-191): narrowing the pane hands room back to the
+    // adjacent fixed columns so their content stops clipping off the right edge
+    // when the machine rail and Cuts/Layers are held open on a laptop window.
+    width: collapsed ? 44 : widthPx,
     flexShrink: 0,
+    position: 'relative', // anchors the absolutely-positioned resize handle
     overflowY: 'auto',
     overflowX: 'hidden',
     padding: '8px 8px',
@@ -178,6 +219,17 @@ function paneStyle(collapsed: boolean): React.CSSProperties {
     gap: 6,
   };
 }
+// Thin grab strip on the pane's left edge (the seam with the flexible canvas).
+const resizeHandleStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  bottom: 0,
+  width: 6,
+  cursor: 'col-resize',
+  touchAction: 'none',
+  zIndex: 1,
+};
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -187,7 +239,8 @@ const headerStyle: React.CSSProperties = {
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const canvasStyle: React.CSSProperties = {
   display: 'block',
-  maxWidth: '100%',
+  width: '100%', // fill the resizable pane; the ResizeObserver re-fits the buffer
+  height: CANVAS_HEIGHT_PX,
   borderRadius: 4,
 };
 const hintStyle: React.CSSProperties = {
