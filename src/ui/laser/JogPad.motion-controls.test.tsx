@@ -14,6 +14,7 @@ import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
 
 const originalJog = useLaserStore.getState().jog;
 const originalCancelJog = useLaserStore.getState().cancelJog;
+const originalCapabilities = useLaserStore.getState().capabilities;
 
 function buttonByLabel(host: HTMLElement, label: string): HTMLButtonElement | null {
   return (
@@ -47,6 +48,7 @@ afterEach(() => {
   useLaserStore.setState({
     jog: originalJog,
     cancelJog: originalCancelJog,
+    capabilities: originalCapabilities,
     statusReport: null,
     wcoCache: null,
   });
@@ -135,6 +137,40 @@ describe('JogPad motion controls', () => {
         right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
       });
       expect(cancelJog).toHaveBeenCalledTimes(1);
+    } finally {
+      await unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not start a continuous jog on firmware without a jog-cancel (holding steps once)', async () => {
+    // F101: a bed-length continuous jog is unstoppable on Marlin/Smoothieware
+    // (realtime.jogCancel === null → capabilities.jogCancel false). Holding must
+    // NOT dispatch it; the gesture degrades to a single step so release cannot
+    // strand the head mid-traverse.
+    vi.useFakeTimers();
+    const jog = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      jog,
+      cancelJog,
+      capabilities: { ...originalCapabilities, jogCancel: false },
+    });
+    useStore.getState().updateDeviceProfile({ bedWidth: 400, maxFeed: 6000 });
+    const { host, unmount } = await renderJogPad();
+    try {
+      const right = buttonByLabel(host, 'Jog +X 10 mm');
+      if (right === null) throw new Error('right jog button missing');
+      await startHold(right);
+      // No continuous (bed-length) jog was dispatched while held.
+      expect(jog).not.toHaveBeenCalled();
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+      });
+      // Release performs a single step, and no phantom cancel is issued.
+      expect(jog).toHaveBeenCalledTimes(1);
+      expect(jog).toHaveBeenCalledWith({ dx: 10, feed: 3000 });
+      expect(cancelJog).not.toHaveBeenCalled();
     } finally {
       await unmount();
       vi.useRealTimers();

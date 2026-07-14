@@ -38,6 +38,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const maxFeed = device.maxFeed;
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
+  const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
   const zeroZHere = useLaserStore((s) => s.zeroZHere);
   const statusReport = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
@@ -89,6 +90,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
           signs={signs}
           position={position}
           bed={{ width: device.bedWidth, height: device.bedHeight }}
+          continuousJogSupported={continuousJogSupported}
           onJog={sendVector}
           onCancel={cancelContinuousJog}
         />
