@@ -61,6 +61,7 @@
 | ADR-188 | 2026-07-14 | Accepted | Reject unproved XYZ corner-probe plate geometry before controller output |
 | ADR-189 | 2026-07-14 | Accepted | Bind controller observations and Home proof to controller sessions |
 | ADR-190 | 2026-07-14 | Accepted | Make vector power mode explicit per layer without changing defaults |
+| ADR-191 | 2026-07-14 | Accepted | CNC 3D result pane is drag-resizable with a persisted width |
 
 ---
 
@@ -7766,3 +7767,24 @@ session evidence. This change sends no new controller commands and does not yet 
 coordinates or enable probing. The ordinary settings collector remains advisory; the later safety
 path must own `$I` and `$$`, reject duplicate/missing settings, require a fresh direct MPos, and consume
 the current Home proof before constructing a probe envelope.
+
+## ADR-191 - CNC 3D result pane is drag-resizable with a persisted width
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Decision
+
+The CNC "3D result" pane (`Cnc3DPane`) exposes a drag handle on its left edge — the seam with the
+flexible canvas. Dragging it, or focusing it and pressing ArrowLeft/ArrowRight, sets the pane width,
+clamped to [200, 560] px. The chosen width persists in localStorage
+(`laserforge.cnc-3d-pane-width.v1`), guarded for non-browser contexts, so it survives reloads like the
+CNC Basic/Advanced disclosure (ADR-111). The three.js scene handle gains a `resize(w, h)` method, and
+a ResizeObserver re-fits the renderer and camera on every width change so the render-on-demand scene
+stays crisp instead of scaling a stale buffer.
+
+### Consequences
+
+The operator recovers horizontal room for the adjacent fixed columns (Cuts/Layers, machine rail) by
+narrowing the pane, which was clipping their content off the right edge on smaller windows. Pane width
+is session-durable UI state, not project data, so it is not in undo or `.lf2`. The pane still collapses
+to a 44 px strip via its existing toggle; the resize handle is hidden while collapsed.
