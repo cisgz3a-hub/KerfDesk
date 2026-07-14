@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { createProject, type Project } from '../../core/scene';
-import { CONTROLLER_PROFILE_MISMATCH_MESSAGE, prepareStartJob } from './start-job-readiness';
+import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -19,57 +19,44 @@ const readyMachine = {
   hasActiveStreamer: false,
 };
 
-describe('Start controller compatibility gate', () => {
-  it('blocks when configured, active, and detected controller identities disagree', () => {
+describe('Start controller selection policy', () => {
+  it('allows the user-selected profile when detected firmware differs', () => {
     const result = prepareStartJob(projectFor('grbl-v1.1'), null, {
       ...readyMachine,
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'marlin',
     });
 
-    expect(result).toEqual({ ok: false, messages: [CONTROLLER_PROFILE_MISMATCH_MESSAGE] });
+    expectControllerSelectionNotBlocked(result);
   });
 
-  it('blocks after the profile changes until the active connection is reopened', () => {
+  it('does not require reconnecting after the user selects another profile', () => {
     const result = prepareStartJob(projectFor('marlin'), null, {
       ...readyMachine,
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'grbl-v1.1',
     });
 
-    expect(result).toEqual({ ok: false, messages: [CONTROLLER_PROFILE_MISMATCH_MESSAGE] });
+    expectControllerSelectionNotBlocked(result);
   });
 
-  it.each([
-    ['grbl-v1.1', 'grblhal', 'fluidnc'],
-    ['grblhal', 'grbl-v1.1', 'grblhal'],
-    ['fluidnc', 'fluidnc', 'grbl-v1.1'],
-  ] as const)(
-    'accepts compatible GRBL-family Start protocols: profile %s, active %s, detected %s',
-    (configured, active, detected) => {
-      const result = prepareStartJob(projectFor(configured), null, {
-        ...readyMachine,
-        activeControllerKind: active,
-        detectedControllerKind: detected,
-      });
-
-      const messages = result.ok ? [] : result.messages;
-      expect(messages).not.toContain(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
-    },
-  );
-
-  it('removes the mismatch blocker after setup is saved and the matching driver reconnects', () => {
+  it('also allows matching profile and controller identities', () => {
     const result = prepareStartJob(projectFor('grblhal'), null, {
       ...readyMachine,
       activeControllerKind: 'grblhal',
       detectedControllerKind: 'grblhal',
     });
 
-    expect(result.ok ? [] : result.messages).not.toContain(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
+    expectControllerSelectionNotBlocked(result);
   });
 });
 
 function projectFor(controllerKind: NonNullable<Project['device']['controllerKind']>): Project {
   const project = createProject();
   return { ...project, device: { ...project.device, controllerKind } };
+}
+
+function expectControllerSelectionNotBlocked(result: ReturnType<typeof prepareStartJob>): void {
+  const messages = result.ok ? [] : result.messages;
+  expect(messages.some((message) => /controller.*match.*profile/i.test(message))).toBe(false);
 }

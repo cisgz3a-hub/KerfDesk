@@ -5,12 +5,7 @@
 // unit-testable in isolation.
 
 import type { Dispatch } from 'react';
-import {
-  controllerCompatibleProfile,
-  profileWithControllerFacts,
-  validateMachineProfile,
-  type DeviceProfile,
-} from '../../../core/devices';
+import { validateMachineProfile, type DeviceProfile } from '../../../core/devices';
 import { assertNever, type MachineKind } from '../../../core/scene';
 
 // The flow is Connect -> Identify -> Confirm -> Safety -> Probe -> Sync
@@ -56,9 +51,8 @@ export type DeviceSetupState = {
   // The profile as the wizard opened: lets Finish diff against it and lets
   // Cancel mean "discard" (the draft is never written until Finish).
   readonly baseline: DeviceProfile;
-  // The latest $$ patch — seeded at open and refreshed via `detected-updated`
-  // whenever the controller is (re-)read, so apply-preset and readiness overlay
-  // current controller truth instead of a stale open-time snapshot.
+  // The latest $$ observation. It stays separate from the draft until the
+  // operator explicitly chooses Apply detected.
   readonly detected: Partial<DeviceProfile>;
   readonly detectedControllerKind: DeviceProfile['controllerKind'] | null;
   readonly controllerRead: boolean;
@@ -66,6 +60,9 @@ export type DeviceSetupState = {
   readonly draft: DeviceProfile;
   // True once a catalog preset was applied this session.
   readonly presetApplied: boolean;
+  // Controller-reported values are committed only after the operator clicks
+  // Apply detected; merely reading $$ must never alter the chosen profile.
+  readonly detectedAccepted: boolean;
 };
 
 export type DeviceSetupAction =
@@ -112,11 +109,9 @@ export function initDeviceSetup(
     detected: safeDetected,
     detectedControllerKind,
     controllerRead,
-    draft: controllerCompatibleProfile(
-      { ...profile, ...profilePatchForMachineKind(safeDetected, machineKind) },
-      detectedControllerKind ?? profile.controllerKind,
-    ).profile,
+    draft: profile,
     presetApplied: false,
+    detectedAccepted: false,
   };
 }
 
@@ -149,16 +144,9 @@ export function deviceSetupReducer(
 function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSetupState {
   return {
     ...state,
-    draft: profileWithControllerFacts({
-      profile,
-      current: state.draft,
-      detectedSettings: state.detected,
-      controllerSettings: state.detected,
-      detectedControllerKind: state.detectedControllerKind,
-      lastSettingsReadAt: state.controllerRead ? 1 : null,
-      machineKind: state.machineKind,
-    }),
+    draft: profile,
     presetApplied: true,
+    detectedAccepted: false,
   };
 }
 
@@ -184,24 +172,15 @@ function updateDetectedFacts(
     detected: action.detected ?? state.detected,
     detectedControllerKind,
     controllerRead: action.controllerRead ?? true,
-    draft:
-      detectedControllerKind === null
-        ? state.draft
-        : controllerCompatibleProfile(state.draft, detectedControllerKind).profile,
+    draft: state.draft,
   };
 }
 
 function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>): DeviceSetupState {
-  const merged = {
-    ...state.draft,
-    ...profilePatchForMachineKind(patch, state.machineKind),
-  };
   return {
     ...state,
-    draft: controllerCompatibleProfile(
-      merged,
-      state.detectedControllerKind ?? merged.controllerKind,
-    ).profile,
+    draft: { ...state.draft, ...profilePatchForMachineKind(patch, state.machineKind) },
+    detectedAccepted: true,
   };
 }
 

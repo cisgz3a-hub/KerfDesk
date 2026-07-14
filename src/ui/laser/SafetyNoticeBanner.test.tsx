@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { useLaserStore } from '../state/laser-store';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 
@@ -57,32 +57,6 @@ describe('SafetyNoticeBanner', () => {
       expect(useLaserStore.getState().safetyNotice).toBeNull();
       expect(host.querySelector('[role="alert"]')).toBeNull();
     } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
-
-  it('offers a real disconnect for controller ownership loss instead of a soft reset', async () => {
-    const originalDisconnect = useLaserStore.getState().disconnect;
-    const disconnect = vi.fn(async () => undefined);
-    useLaserStore.setState({
-      disconnect,
-      safetyNotice: {
-        kind: 'controller-ownership',
-        message: 'Controller reply ownership was lost.',
-      },
-    });
-    const { host, root } = await renderBanner();
-    try {
-      const action = [...host.querySelectorAll('button')].find((button) =>
-        button.textContent?.includes('Disconnect controller'),
-      );
-      expect(action).toBeInstanceOf(HTMLButtonElement);
-      await act(async () => action?.click());
-      expect(disconnect).toHaveBeenCalledTimes(1);
-      expect(host.textContent).not.toContain('Recover controller');
-    } finally {
-      await act(async () => useLaserStore.setState({ disconnect: originalDisconnect }));
       await act(async () => root.unmount());
       host.remove();
     }

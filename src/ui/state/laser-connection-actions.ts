@@ -44,7 +44,6 @@ const STATUS_POLL_MS = 250;
 const IDLE_POLL_DIVISOR = 4;
 const PASSIVE_STARTUP_WAIT_MS = 250;
 const ACTIVE_HANDSHAKE_WAIT_MS = 1750;
-const LATE_BANNER_SETTLE_MS = 300;
 
 export function connectionActions(
   set: SetFn,
@@ -101,7 +100,6 @@ export function connectionActions(
           homingState: 'unknown',
           pendingUntrackedAcks: 0,
           pendingTransportWrites: 0,
-          unexpectedTerminalResponse: null,
         });
         void runHandshake(set, get, refs, safeWrite, baudRate)
           .catch(() => undefined)
@@ -141,7 +139,6 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     activeControllerKind: refs.driver.kind,
     detectedControllerKind: null,
     mpgActive: null,
-    unexpectedTerminalResponse: null,
   };
 }
 
@@ -189,7 +186,6 @@ async function runDisconnect(
     wcoCache: null,
     accessoryCache: null,
     mpgActive: null,
-    unexpectedTerminalResponse: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,
@@ -208,12 +204,9 @@ async function runDisconnect(
   }));
 }
 
-// Establish a quiet startup boundary before sending the queued settings query.
-// A status poll used to trigger `$$` immediately; a delayed welcome banner could
-// then reset the ack ledger before the query's `ok`, falsely reporting that
-// reply as unowned on the next jog. Wait briefly for a passive banner, use only
-// a realtime status probe when needed, and give a non-banner first line one
-// final settle window before any ack-producing command is sent.
+// Wait briefly for passive startup output, then use a realtime status probe if
+// needed. Once any controller line arrives, request settings immediately so
+// setup readiness is not delayed behind unrelated Home/Jog actions.
 async function runHandshake(
   set: SetFn,
   get: GetFn,
@@ -221,7 +214,6 @@ async function runHandshake(
   safeWrite: (line: string) => Promise<void>,
   baudRate: number,
 ): Promise<void> {
-  const startingWriteEpoch = refs.writeEpoch ?? 0;
   let gotLine = await waitForNextControllerLine(refs, PASSIVE_STARTUP_WAIT_MS);
   if (!gotLine) {
     const realtimeQuery = refs.driver.realtime.statusQuery;
@@ -240,9 +232,6 @@ async function runHandshake(
       ),
     );
     return;
-  }
-  if ((refs.writeEpoch ?? 0) === startingWriteEpoch) {
-    await new Promise<void>((resolve) => setTimeout(resolve, LATE_BANNER_SETTLE_MS));
   }
   if (refs.connection === null) return;
   const settingsQuery = refs.driver.commands.settingsQuery;

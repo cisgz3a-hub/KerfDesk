@@ -7,7 +7,6 @@ import { createStreamer, onAck, step, type StatusReport } from '../../core/contr
 import type { LaserState } from './laser-store';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
-  CONTROLLER_MOTION_PROFILE_MISMATCH_MESSAGE,
   TOOL_CHANGE_NOT_IDLE_MESSAGE,
   TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE,
   activeJobCommandBlockMessage,
@@ -105,22 +104,15 @@ describe('setupBlockingJobCommandBlockMessage (CNC-03)', () => {
     expect(jogFrameCommandBlockMessage(s)).toBeNull();
   });
 
-  it('blocks motion when controller ownership was lost or the live firmware is mismatched', () => {
+  it('does not block motion because detected firmware differs from the chosen profile', () => {
     const base = gateState({
+      streamer: null,
       connection: { kind: 'connected' },
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'grbl-v1.1',
       statusReport: statusReport('Idle'),
     });
-    expect(
-      jogFrameCommandBlockMessage({
-        ...base,
-        unexpectedTerminalResponse: { kind: 'ok', raw: 'ok', observedAt: 1 },
-      }),
-    ).toMatch(/no KerfDesk command owns/i);
-    expect(jogFrameCommandBlockMessage({ ...base, detectedControllerKind: 'grblhal' })).toBe(
-      CONTROLLER_MOTION_PROFILE_MISMATCH_MESSAGE,
-    );
+    expect(jogFrameCommandBlockMessage({ ...base, detectedControllerKind: 'grblhal' })).toBeNull();
   });
 
   it('KEEPS Start blocked during a tool change — Start must never unblock', () => {

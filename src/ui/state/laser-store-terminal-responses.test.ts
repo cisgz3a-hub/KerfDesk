@@ -1,11 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
+import { cncControllerEpochOf } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
-
-const CNC_PROGRAM = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
 
 function makeConnection(writes: string[]): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
@@ -54,18 +52,17 @@ afterEach(async () => {
   await useLaserStore.getState().disconnect();
 });
 
-describe('unexpected controller terminal ownership', () => {
-  it('waits through a late startup banner before owning the settings query reply', async () => {
+describe('ordinary controller terminal responses', () => {
+  it('keeps a late startup banner and settings reply harmless', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await useLaserStore.getState().connect(adapter(connection));
 
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await flush();
-    expect(writes).not.toContain('$$\n');
+    expect(writes).toContain('$$\n');
 
     connection.emitLine('Grbl 1.1f');
-    await new Promise((resolve) => setTimeout(resolve, 350));
     await flush();
     expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
 
@@ -73,10 +70,9 @@ describe('unexpected controller terminal ownership', () => {
     connection.emitLine('ok');
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
-    expect(useLaserStore.getState().unexpectedTerminalResponse).toBeNull();
   });
 
-  it('latches the first orphan response, invalidates setup once, and survives notice dismissal', async () => {
+  it('ignores an unsolicited ok without invalidating setup or blocking jog', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await connectReady(connection);
@@ -84,7 +80,7 @@ describe('unexpected controller terminal ownership', () => {
     useLaserStore.setState({
       workZZeroEvidence: { source: 'manual-zero', referenceEpoch: before.workZReference },
       frameVerification: {
-        boundsSignature: 'verified-before-orphan',
+        boundsSignature: 'verified-before-ok',
         wco: null,
         workOriginActive: false,
       },
@@ -92,32 +88,18 @@ describe('unexpected controller terminal ownership', () => {
 
     connection.emitLine('ok');
 
-    expect(useLaserStore.getState().unexpectedTerminalResponse).toMatchObject({
-      kind: 'ok',
-      raw: 'ok',
-    });
-    expect(useLaserStore.getState().safetyNotice?.kind).toBe('controller-ownership');
-    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().frameVerification).toBeNull();
-    expect(cncControllerEpochOf(useLaserStore.getState())).toEqual({
-      trustedPosition: before.trustedPosition + 1,
-      workZReference: before.workZReference + 1,
-    });
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
+    expect(useLaserStore.getState().workZZeroEvidence).not.toBeNull();
+    expect(useLaserStore.getState().frameVerification).not.toBeNull();
+    expect(cncControllerEpochOf(useLaserStore.getState())).toEqual(before);
 
-    const afterFirst = cncControllerEpochOf(useLaserStore.getState());
-    useLaserStore.getState().clearSafetyNotice();
-    connection.emitLine('error:7');
-    expect(useLaserStore.getState().unexpectedTerminalResponse).toMatchObject({ kind: 'ok' });
-    expect(useLaserStore.getState().lastError).toBe(7);
-    expect(cncControllerEpochOf(useLaserStore.getState())).toEqual(afterFirst);
-
-    connection.emitLine('Grbl 1.1f');
-    expect(useLaserStore.getState().unexpectedTerminalResponse).toMatchObject({ kind: 'ok' });
-    await useLaserStore.getState().disconnect();
-    expect(useLaserStore.getState().unexpectedTerminalResponse).toBeNull();
+    writes.length = 0;
+    await useLaserStore.getState().jog({ dx: 5, feed: 1000 });
+    expect(writes).toContain('$J=G91 G21 X5.000 F1000\n');
   });
 
-  it('accepts a terminal response reserved by an app write', async () => {
+  it('still settles a terminal response reserved by an app write', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await connectReady(connection);
@@ -129,30 +111,5 @@ describe('unexpected controller terminal ownership', () => {
     await command;
 
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
-    expect(useLaserStore.getState().unexpectedTerminalResponse).toBeNull();
-  });
-
-  it('blocks CNC Start before writing its queue fence', async () => {
-    const writes: string[] = [];
-    const connection = makeConnection(writes);
-    await connectReady(connection);
-    writes.length = 0;
-    useLaserStore.setState({
-      unexpectedTerminalResponse: { kind: 'ok', raw: 'ok', observedAt: Date.now() },
-    });
-    const attestation = createCncSetupAttestation(
-      CNC_PROGRAM,
-      cncControllerEpochOf(useLaserStore.getState()),
-    );
-
-    await expect(
-      useLaserStore.getState().startJob(CNC_PROGRAM, {
-        machineKind: 'cnc',
-        cncSetupAttestation: attestation,
-      }),
-    ).rejects.toThrow(/unowned controller reply/i);
-
-    expect(writes).toEqual([]);
-    expect(useLaserStore.getState().streamer).toBeNull();
   });
 });
