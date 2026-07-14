@@ -4,9 +4,10 @@
 // retract, post-frame safe-Z) from silently moving work Z0 into the air.
 
 import { useCallback } from 'react';
+import { currentWorkZMm } from '../state/infer-machine-position';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
-import { currentWorkZMm, zeroZOverwriteWarning } from './zero-z-guard';
+import { zeroZOverwriteWarning } from './zero-z-guard';
 
 export function useZeroZAction(): () => void {
   const zeroZHere = useLaserStore((s) => s.zeroZHere);

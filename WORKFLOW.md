@@ -626,6 +626,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 5. The first jog is written immediately; each remaining line is dispatched as the previous jog completes. Status polling shows `Jog`, then `Idle` when the box closes.
 6. When framing from a verified origin, a successful pass records frame verification for the Start-job preflight.
 
+#### CNC — safe-Z retract and restore
+1. For a CNC project with a current work-Z zero, the XY perimeter is wrapped with Z motion (ADR-192): a safe-Z retract (`$J=G90 G21 Z<safeZ>`) is written first so the bit clears the stock, and after the box closes a final jog restores the bit to its pre-frame work Z. The bit ends where it started — at Z0 when it was touching the stock — never parked at the clearance height.
+2. Without a current work-Z zero the work-frame retract would target an arbitrary physical height, so framing falls back to the XY-only perimeter (as in laser mode). The restore jog is also omitted when the pre-frame Z is unknown or already equals safe Z.
+
 #### Error — origin cannot be resolved
 1. Placement resolution fails (e.g. selection origin requested with nothing usable); error toast, no bytes sent.
 

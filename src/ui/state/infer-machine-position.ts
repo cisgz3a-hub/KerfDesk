@@ -15,3 +15,21 @@ export function inferCurrentMachinePosition(
   }
   return null;
 }
+
+/**
+ * The bit's Z in the WORK frame right now: WPos.z directly, or MPos.z minus the
+ * cached work offset. Null when the height is unknowable (MPos without a cached
+ * WCO, or no report). The Z-only dual of {@link inferCurrentMachinePosition},
+ * used by the Zero-Z overwrite guard and CNC framing to reason about how far the
+ * bit sits above the established work zero.
+ */
+export function currentWorkZMm(
+  report: Pick<StatusReport, 'mPos' | 'wPos'> | null,
+  wcoCache: WorkCoordinateOffset | null,
+): number | null {
+  if (report?.wPos !== null && report?.wPos !== undefined) return report.wPos.z;
+  if (report?.mPos !== null && report?.mPos !== undefined && wcoCache !== null) {
+    return report.mPos.z - wcoCache.z;
+  }
+  return null;
+}
