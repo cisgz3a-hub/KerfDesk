@@ -2,6 +2,7 @@ import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
 
 type Accessories = NonNullable<StatusReport['accessories']>;
+export type ReducedOverrideAcknowledgement = OverrideValues;
 
 export function invalidateAccessoryObservation(
   accessories: Accessories | null | undefined,
@@ -69,12 +70,76 @@ export function cncOverrideStartIssue(
       'Wait for an Ov: status report that confirms feed, rapid, and spindle overrides.'
     );
   }
-  if (overrides.feed === 100 && overrides.rapid === 100 && overrides.spindle === 100) return null;
+  if (overrideIsBaseline(overrides) || overrideIsSafeReduction(overrides)) return null;
   return (
-    'CNC Start requires controller overrides at the compiled baseline: feed 100%, rapid 100%, ' +
-    `spindle 100%. Current live values are feed ${overrides.feed}%, rapid ${overrides.rapid}%, ` +
-    `spindle ${overrides.spindle}%. Reset each override to 100% before starting.`
+    'CNC Start blocks increased/invalid motion overrides and every changed spindle override. ' +
+    `${overrideValuesLabel(overrides)} Reset spindle to 100% and keep feed/rapid within 1-100%.`
   );
+}
+
+export function cncOverrideStartWarning(
+  machineKind: MachineKind,
+  overrides: OverrideValues | null | undefined,
+): string | null {
+  if (machineKind !== 'cnc' || overrides == null || !overrideIsSafeReduction(overrides))
+    return null;
+  if (overrideIsBaseline(overrides)) return null;
+  return (
+    `CNC will start with reduced controller overrides: feed ${overrides.feed}%, rapid ${overrides.rapid}%, spindle 100%. ` +
+    'Lower motion can change chip load, heat, and cut quality. Confirm these exact values are safe for the stock and tool.'
+  );
+}
+
+export function reducedOverrideAcknowledgement(
+  overrides: OverrideValues | null | undefined,
+): ReducedOverrideAcknowledgement | undefined {
+  if (overrides == null || overrideIsBaseline(overrides) || !overrideIsSafeReduction(overrides)) {
+    return undefined;
+  }
+  return { ...overrides };
+}
+
+export function cncOverrideFinalStartIssue(
+  machineKind: MachineKind,
+  overrides: OverrideValues | null | undefined,
+  acknowledged: ReducedOverrideAcknowledgement | undefined,
+): string | null {
+  const blocker = cncOverrideStartIssue(machineKind, overrides);
+  if (blocker !== null || machineKind !== 'cnc' || overrides == null) return blocker;
+  if (overrideIsBaseline(overrides)) return null;
+  if (acknowledged === undefined) {
+    return `CNC Start requires acknowledgement of the exact reduced feed/rapid values. ${overrideValuesLabel(overrides)}`;
+  }
+  if (overrideValuesEqual(overrides, acknowledged)) return null;
+  return (
+    'Controller overrides changed after acknowledgement. ' +
+    `${overrideValuesLabel(overrides)} Review and confirm the new values before starting.`
+  );
+}
+
+function overrideIsBaseline(overrides: OverrideValues): boolean {
+  return overrides.feed === 100 && overrides.rapid === 100 && overrides.spindle === 100;
+}
+
+function overrideIsSafeReduction(overrides: OverrideValues): boolean {
+  return (
+    Number.isFinite(overrides.feed) &&
+    Number.isFinite(overrides.rapid) &&
+    Number.isFinite(overrides.spindle) &&
+    overrides.feed > 0 &&
+    overrides.feed <= 100 &&
+    overrides.rapid > 0 &&
+    overrides.rapid <= 100 &&
+    overrides.spindle === 100
+  );
+}
+
+function overrideValuesEqual(left: OverrideValues, right: OverrideValues): boolean {
+  return left.feed === right.feed && left.rapid === right.rapid && left.spindle === right.spindle;
+}
+
+function overrideValuesLabel(overrides: OverrideValues): string {
+  return `Current live values are feed ${overrides.feed}%, rapid ${overrides.rapid}%, spindle ${overrides.spindle}%.`;
 }
 
 function activeAccessoryLabels(accessories: Accessories): string[] {

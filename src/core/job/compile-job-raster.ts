@@ -8,6 +8,11 @@ import {
   pixelExtentForMm,
   resampleLumaNearest,
 } from '../raster';
+import { ditherIndependentRow } from '../raster/dither';
+import {
+  STREAMED_RASTER_PIXEL_THRESHOLD,
+  supportsStreamedRasterRows,
+} from '../raster/raster-budget';
 import { type Layer, type RasterImage, type SceneObject } from '../scene';
 import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
@@ -54,25 +59,40 @@ function compileRasterGroup(
     ? obj.pixelHeight
     : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
   const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
-  const luma = layer.passThrough
-    ? preparedLuma
-    : resampleLumaNearest(
-        { luma: preparedLuma, width: obj.pixelWidth, height: obj.pixelHeight },
-        pixelWidth,
-        pixelHeight,
-      );
-  const maskedLuma = applyImageMaskToLuma({
-    image: obj,
-    maskObject: imageMaskObjectFor(obj, objects),
-    luma,
-    width: pixelWidth,
-    height: pixelHeight,
-  });
-  const orientedLuma = orientRasterLumaForMachine(maskedLuma, pixelWidth, pixelHeight, obj, device);
-  const sValues = dither(
-    { luma: orientedLuma, width: pixelWidth, height: pixelHeight },
-    { algorithm: layer.ditherAlgorithm, sMax, sMin },
-  );
+  const maskObject = imageMaskObjectFor(obj, objects);
+  const streamRows =
+    pixelWidth * pixelHeight > STREAMED_RASTER_PIXEL_THRESHOLD &&
+    maskObject === null &&
+    supportsStreamedRasterRows(layer.ditherAlgorithm);
+  const rasterValues = streamRows
+    ? {
+        sValues: new Uint16Array(0),
+        rowProvider: streamedRasterRowProvider({
+          sourceLuma: preparedLuma,
+          sourceWidth: obj.pixelWidth,
+          sourceHeight: obj.pixelHeight,
+          pixelWidth,
+          pixelHeight,
+          obj,
+          device,
+          algorithm: layer.ditherAlgorithm,
+          sMax,
+          sMin,
+        }),
+      }
+    : {
+        sValues: materializedRasterValues({
+          preparedLuma,
+          obj,
+          layer,
+          device,
+          maskObject,
+          pixelWidth,
+          pixelHeight,
+          sMax,
+          sMin,
+        }),
+      };
   return {
     kind: 'raster',
     layerId: layer.id,
@@ -83,7 +103,7 @@ function compileRasterGroup(
     speed: Math.min(layer.speed, device.maxFeed),
     passes: Math.max(1, Math.floor(layer.passes)),
     airAssist: layer.airAssist,
-    sValues,
+    ...rasterValues,
     pixelWidth,
     pixelHeight,
     bounds,
@@ -91,6 +111,103 @@ function compileRasterGroup(
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
     bidirectional: layer.imageBidirectional,
   };
+}
+
+type MaterializedRasterInput = {
+  readonly preparedLuma: Uint8Array;
+  readonly obj: RasterImage;
+  readonly layer: Layer;
+  readonly device: DeviceProfile;
+  readonly maskObject: SceneObject | null;
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly sMax: number;
+  readonly sMin: number;
+};
+
+function materializedRasterValues(input: MaterializedRasterInput): Uint16Array {
+  const luma = input.layer.passThrough
+    ? input.preparedLuma
+    : resampleLumaNearest(
+        {
+          luma: input.preparedLuma,
+          width: input.obj.pixelWidth,
+          height: input.obj.pixelHeight,
+        },
+        input.pixelWidth,
+        input.pixelHeight,
+      );
+  const maskedLuma = applyImageMaskToLuma({
+    image: input.obj,
+    maskObject: input.maskObject,
+    luma,
+    width: input.pixelWidth,
+    height: input.pixelHeight,
+  });
+  const orientedLuma = orientRasterLumaForMachine(
+    maskedLuma,
+    input.pixelWidth,
+    input.pixelHeight,
+    input.obj,
+    input.device,
+  );
+  return dither(
+    { luma: orientedLuma, width: input.pixelWidth, height: input.pixelHeight },
+    { algorithm: input.layer.ditherAlgorithm, sMax: input.sMax, sMin: input.sMin },
+  );
+}
+
+type StreamedRasterInput = {
+  readonly sourceLuma: Uint8Array;
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly obj: RasterImage;
+  readonly device: DeviceProfile;
+  readonly algorithm: Layer['ditherAlgorithm'];
+  readonly sMax: number;
+  readonly sMin: number;
+};
+
+function streamedRasterRowProvider(input: StreamedRasterInput): (y: number) => Uint16Array {
+  const objFlipX = input.obj.transform.mirrorX !== input.obj.transform.scaleX < 0;
+  const objFlipY = input.obj.transform.mirrorY !== input.obj.transform.scaleY < 0;
+  const flipX = originFlipsRasterX(input.device) !== objFlipX;
+  const flipY = originFlipsRasterY(input.device) !== objFlipY;
+  return (y: number): Uint16Array => {
+    const luma = resampledOrientedRow(input, y, flipX, flipY);
+    return ditherIndependentRow(luma, y, {
+      algorithm: input.algorithm,
+      sMax: input.sMax,
+      sMin: input.sMin,
+    });
+  };
+}
+
+function resampledOrientedRow(
+  input: StreamedRasterInput,
+  y: number,
+  flipX: boolean,
+  flipY: boolean,
+): Uint8Array {
+  const targetY = flipY ? input.pixelHeight - 1 - y : y;
+  const sourceY = nearestSourceCoordinate(targetY, input.sourceHeight, input.pixelHeight);
+  const row = new Uint8Array(input.pixelWidth);
+  for (let x = 0; x < input.pixelWidth; x += 1) {
+    const targetX = flipX ? input.pixelWidth - 1 - x : x;
+    const sourceX = nearestSourceCoordinate(targetX, input.sourceWidth, input.pixelWidth);
+    row[x] = input.sourceLuma[sourceY * input.sourceWidth + sourceX] ?? WHITE_LUMA_BYTE;
+  }
+  return row;
+}
+
+function nearestSourceCoordinate(
+  target: number,
+  sourceExtent: number,
+  targetExtent: number,
+): number {
+  return Math.min(sourceExtent - 1, Math.floor(((target + 0.5) * sourceExtent) / targetExtent));
 }
 
 function layerWithObjectOverride(layer: Layer, obj: SceneObject): Layer {

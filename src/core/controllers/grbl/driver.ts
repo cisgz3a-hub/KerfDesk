@@ -37,6 +37,7 @@ export const grblDriver: ControllerDriver = {
   label: 'GRBL v1.1',
   defaultBaudRate: GRBL_DEFAULT_BAUD_RATE,
   capabilities: {
+    startProtocol: 'grbl-live',
     transport: 'serial',
     jog: 'native-jog',
     jogCancel: true,
@@ -67,6 +68,8 @@ export const grblDriver: ControllerDriver = {
     unlock: CMD_UNLOCK,
     sleep: CMD_SLEEP,
     settingsQuery: CMD_SETTINGS,
+    modalStateQuery: CMD_MODAL_STATE,
+    offsetsQuery: CMD_OFFSETS,
     queuedStatusQuery: null,
     stopLaserLines: [CMD_COOLANT_OFF],
     settleDwell: GRBL_SETTLE_DWELL,

@@ -18,7 +18,7 @@
 // project-file schema-migration policy.
 
 import { deserializeProject } from '../../io/project/deserialize-project';
-import { serializeProject } from '../../io/project/serialize-project';
+import { prepareProjectForPersistence } from '../../io/project/prepare-project-persistence';
 import type { Project } from '../../core/scene';
 
 const LEGACY_AUTOSAVE_KEY = 'lf2:autosave:v1';
@@ -51,7 +51,7 @@ export type AutosaveWriteResult =
   | { readonly kind: 'unavailable'; readonly reason: 'storage-unavailable' }
   | {
       readonly kind: 'failed';
-      readonly reason: 'quota' | 'storage-error';
+      readonly reason: 'invalid-project' | 'quota' | 'storage-error';
       readonly error: unknown;
     };
 
@@ -71,13 +71,17 @@ export function writeAutosave(
   if (typeof localStorage === 'undefined') {
     return { kind: 'unavailable', reason: 'storage-unavailable' };
   }
+  const prepared = prepareProjectForPersistence(project);
+  if (prepared.kind !== 'ok') {
+    return { kind: 'failed', reason: 'invalid-project', error: new Error(prepared.reason) };
+  }
   const sessionId = scope.sessionId ?? autosaveSessionId();
   const storageKey = autosaveKeyForSession(sessionId);
   try {
     const record: AutosaveRecord = {
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
       savedAt: now,
-      projectJson: serializeProject(project),
+      projectJson: prepared.json,
       sessionId,
     };
     localStorage.setItem(storageKey, JSON.stringify(record));

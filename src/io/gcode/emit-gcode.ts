@@ -98,31 +98,15 @@ function runEmitPreflight(
     options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
       ? 'relative-origin'
       : 'machine';
-  // A start gated on a mandatory Verified Frame proves its bounds are clear by
-  // physically tracing them, which substitutes for the no-go-zone crossing check
-  // that can't run without a trusted work→machine offset (G9/G19/G20). That is
-  // Verified Origin always, and — on a no-homing machine — Current Position and
-  // User Origin too (their offsets are equally untrusted). This MUST match
-  // frameVerificationRequirement() (the UI policy that hard-refuses a start whose
-  // required frame isn't valid, verifiedFrameIssueFromPrepared) — keep them in
-  // sync. This only relaxes the zone gate; the frame itself is enforced there.
-  const jobOrigin = options.jobOrigin;
-  const originVerifiedByFrame =
-    jobOrigin !== undefined &&
-    (jobOrigin.startFrom === 'verified-origin' ||
-      (!project.device.homing.enabled &&
-        (jobOrigin.startFrom === 'current-position' || jobOrigin.startFrom === 'user-origin')));
   if (machine !== undefined && machine.kind === 'cnc') {
     return runCncPreflight(project, machine, body, {
       motionOffset: options.preflightMotionOffset,
       coordinateMode,
-      originVerifiedByFrame,
     });
   }
   return runPreflight(project, body, {
     motionOffset: options.preflightMotionOffset,
     coordinateMode,
-    originVerifiedByFrame,
     // One revolution is the wrap limit: a taller job burns onto its own
     // start (ADR-127).
     ...(rotaryStage.boundsHeightOverrideMm !== undefined

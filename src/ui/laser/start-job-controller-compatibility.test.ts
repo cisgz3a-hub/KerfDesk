@@ -39,6 +39,24 @@ describe('Start controller compatibility gate', () => {
 
     expect(result).toEqual({ ok: false, messages: [CONTROLLER_PROFILE_MISMATCH_MESSAGE] });
   });
+
+  it.each([
+    ['grbl-v1.1', 'grblhal', 'fluidnc'],
+    ['grblhal', 'grbl-v1.1', 'grblhal'],
+    ['fluidnc', 'fluidnc', 'grbl-v1.1'],
+  ] as const)(
+    'accepts compatible GRBL-family Start protocols: profile %s, active %s, detected %s',
+    (configured, active, detected) => {
+      const result = prepareStartJob(projectFor(configured), null, {
+        ...readyMachine,
+        activeControllerKind: active,
+        detectedControllerKind: detected,
+      });
+
+      const messages = result.ok ? [] : result.messages;
+      expect(messages).not.toContain(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
+    },
+  );
 });
 
 function projectFor(controllerKind: NonNullable<Project['device']['controllerKind']>): Project {

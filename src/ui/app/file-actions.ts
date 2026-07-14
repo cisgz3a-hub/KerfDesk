@@ -9,7 +9,7 @@ import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { emitGcodeSnapshot } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
-import { deserializeProject, serializeProject } from '../../io/project';
+import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
 import { importLightBurnProject } from '../../io/lightburn';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
@@ -37,6 +37,7 @@ import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
+import { importSourceSizeIssue } from './import-source-limits';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -254,6 +255,11 @@ export async function handleSaveProject(
   ctx: SaveProjectCtx,
   forceDialog = false,
 ): Promise<SaveProjectOutcome> {
+  const prepared = prepareProjectForPersistence(ctx.project);
+  if (prepared.kind !== 'ok') {
+    ctx.pushToast(`Could not save project: ${prepared.reason}`, 'error');
+    return 'error';
+  }
   const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
   let target: SaveTarget | null;
   try {
@@ -269,7 +275,7 @@ export async function handleSaveProject(
   }
   if (target === null) return 'cancelled';
   try {
-    await target.write(serializeProject(ctx.project));
+    await target.write(prepared.json);
     ctx.markSaved(target);
     // Manual save succeeded → autosave slot is redundant. Drop it so
     // the recovery prompt doesn't fire on the next boot.
@@ -306,6 +312,14 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   }
   const file = files[0];
   if (file === undefined) return;
+  const sizeIssue = importSourceSizeIssue(
+    file,
+    /\.lbrn2?$/i.test(file.name) ? 'lightburn-project' : 'native-project',
+  );
+  if (sizeIssue !== null) {
+    ctx.pushToast(`Could not open ${file.name}: ${sizeIssue}`, 'error');
+    return;
+  }
   let text: string;
   try {
     text = await file.text();

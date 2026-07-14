@@ -154,7 +154,11 @@ export function migrateLegacyLibrary(
     legacy.library,
     now,
   );
-  persistCollection(storage, collection);
+  if (!persistCollection(storage, collection)) return null;
+  const readback = restoreCollection(storage);
+  if (readback === null || serializeCollection(readback) !== serializeCollection(collection)) {
+    return null;
+  }
   try {
     storage.removeItem(MATERIAL_LIBRARY_STORAGE_KEY);
   } catch {

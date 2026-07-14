@@ -27,6 +27,7 @@ export const marlinDriver: ControllerDriver = {
   label: 'Marlin',
   defaultBaudRate: MARLIN_DEFAULT_BAUD_RATE,
   capabilities: {
+    startProtocol: 'marlin-line',
     transport: 'serial',
     jog: 'gcode-relative',
     jogCancel: false,
@@ -61,6 +62,8 @@ export const marlinDriver: ControllerDriver = {
     unlock: null,
     sleep: null,
     settingsQuery: null,
+    modalStateQuery: null,
+    offsetsQuery: null,
     queuedStatusQuery: MARLIN_CMD_POSITION,
     stopLaserLines: MARLIN_STOP_LASER_LINES,
     settleDwell: MARLIN_CMD_SETTLE,

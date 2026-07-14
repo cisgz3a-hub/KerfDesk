@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, IDENTITY_TRANSFORM, type Layer, type RasterImage } from '../../core/scene';
-import { buildProcessedRasterBitmap, processedRasterDimensions } from './processed-bitmap';
+import {
+  buildProcessedRasterBitmap,
+  processedRasterDimensions,
+  processedRasterPreviewDimensions,
+} from './processed-bitmap';
 
 describe('processed raster bitmap', () => {
   it('matches image-layer grayscale preview power and min-power scaling', () => {
@@ -53,20 +57,52 @@ describe('processed raster bitmap', () => {
     expect(processedRasterDimensions(image, layer)).toEqual({ width: 10, height: 2 });
   });
 
-  it('rejects over-budget processed bitmaps before allocating the preview buffer', () => {
+  it('rejects over-budget processed bitmaps before allocating the output buffer', () => {
     const layer = imageLayer({ linesPerMm: 10, passThrough: false });
     const result = buildProcessedRasterBitmap(
       rasterImage({
         pixelWidth: 2,
         pixelHeight: 2,
-        bounds: { minX: 0, minY: 0, maxX: 200.1, maxY: 200.1 },
+        bounds: { minX: 0, minY: 0, maxX: 400.1, maxY: 400.1 },
         luma: [0, 0, 0, 0],
       }),
       layer,
       DEFAULT_DEVICE_PROFILE,
     );
 
-    expect(result).toMatchObject({ kind: 'too-large', width: 2001, height: 2001 });
+    expect(result).toMatchObject({ kind: 'too-large', width: 4001, height: 4001 });
+  });
+
+  it('caps only preview dimensions while leaving burn dimensions unchanged', () => {
+    const image = rasterImage({
+      pixelWidth: 6000,
+      pixelHeight: 3000,
+      bounds: { minX: 0, minY: 0, maxX: 600, maxY: 300 },
+    });
+    const layer = imageLayer({ passThrough: true });
+
+    expect(processedRasterDimensions(image, layer)).toEqual({ width: 6000, height: 3000 });
+    expect(processedRasterPreviewDimensions(image, layer)).toEqual({
+      width: 2048,
+      height: 1024,
+    });
+  });
+
+  it('builds a bounded preview without changing the full burn bitmap result', () => {
+    const image = rasterImage({
+      pixelWidth: 4,
+      pixelHeight: 2,
+      luma: [0, 0, 255, 255, 0, 0, 255, 255],
+    });
+    const layer = imageLayer({ passThrough: true, ditherAlgorithm: 'threshold' });
+
+    const burn = buildProcessedRasterBitmap(image, layer, DEFAULT_DEVICE_PROFILE);
+    const preview = buildProcessedRasterBitmap(image, layer, DEFAULT_DEVICE_PROFILE, {
+      maxEdge: 2,
+    });
+
+    expect(burn).toMatchObject({ kind: 'ok', width: 4, height: 2 });
+    expect(preview).toMatchObject({ kind: 'ok', width: 2, height: 1 });
   });
 
   it('applies an image mask before dithering the processed bitmap', () => {

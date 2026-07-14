@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { runPreflight } from '../../core/preflight';
-import { evaluateRasterBudget, MAX_RASTER_PIXELS, type VectorRaster } from '../../core/raster';
+import { evaluateRasterBudget, type VectorRaster } from '../../core/raster';
 import { createRectangle } from '../../core/shapes';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
@@ -392,7 +392,7 @@ describe('assembleBitmap', () => {
     const encode = vi.fn(fakeEncode);
 
     expect(() => assembleBitmap([makeHugeSvg()], encode, 'new-id')).toThrow(
-      `exceeds the ${MAX_RASTER_PIXELS} px limit`,
+      /materialized working set exceeds the 64 MB budget/,
     );
     expect(encode).not.toHaveBeenCalled();
   });

@@ -5,7 +5,6 @@ import { create } from 'zustand';
 import {
   type GrblSettingRow,
   idleCollector,
-  type JogParams,
   type SettingsCollectorState,
   type StatusReport,
   type StreamerState,
@@ -18,9 +17,9 @@ import {
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { MachineKind } from '../../core/scene';
-import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { type AutofocusResult, runAutofocus } from './autofocus-action';
-import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
+import type { SerialConnection } from '../../platform/types';
+import { runAutofocus } from './autofocus-action';
+import { consoleActions } from './laser-console-actions';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
@@ -38,14 +37,11 @@ import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import { overrideActions } from './override-actions';
 import { probeActions } from './laser-probe-actions';
-import type { ProbeResult } from './probe-actions';
-import type { ProbeRequest } from '../../core/controllers/grbl/probe';
-import type { OverrideValues, RealtimeOverrideByte } from '../../core/controllers/grbl';
+import type { OverrideValues } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
-import type { StartJobOptions } from './laser-job-options';
 import type { UnexpectedTerminalResponse } from './controller-terminal-contamination';
 import type {
   ControllerObservationStamp,
@@ -57,6 +53,8 @@ import { createSafeWrite, type SafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { fireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
+import { workZRecoveryActions } from './work-z-recovery-actions';
+import type { LaserStoreActions } from './laser-store-action-types';
 import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
@@ -72,11 +70,6 @@ export type { StartJobOptions } from './laser-job-options';
 
 /** Connect-time controller selection. Omitted fields fall back to the GRBL
  *  driver and its default baud — the only behavior that existed pre-ADR-094. */
-export type ConnectControllerOptions = {
-  readonly controllerKind?: ControllerKind | undefined;
-  readonly baudRate?: number | undefined;
-};
-
 export type ConnectionState =
   | { readonly kind: 'disconnected' }
   | { readonly kind: 'connecting' }
@@ -85,9 +78,9 @@ export type ConnectionState =
 export type HomingState = 'unknown' | 'homing' | 'confirmed';
 export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 
-// Streamer options plus the machine kind the job was compiled for, so pause
-// safety can distinguish laser ($32 proof required) from router (must not).
-export type LaserState = {
+export type { ConnectControllerOptions } from './laser-store-action-types';
+
+export type LaserState = LaserStoreActions & {
   readonly connection: ConnectionState;
   readonly statusReport: StatusReport | null;
   readonly controllerSessionEpoch: number;
@@ -222,66 +215,6 @@ export type LaserState = {
   /** Firmware family detected from the welcome banner, null until seen. May
    *  disagree with the profile-selected driver (advisory — see line handler). */
   readonly detectedControllerKind: ControllerKind | null;
-
-  readonly connect: (adapter: PlatformAdapter, options?: ConnectControllerOptions) => Promise<void>;
-  readonly disconnect: () => Promise<void>;
-  readonly home: () => Promise<void>;
-  readonly autofocus: (command: string) => Promise<AutofocusResult>;
-  // ADR-103 G2 - run a prepared touch-plate probing sequence.
-  readonly probe: (request: ProbeRequest) => Promise<ProbeResult>;
-  readonly confirmProbePlateRemoved: () => void;
-  // ADR-103 G3 - send a real-time override byte (legal mid-job by design).
-  readonly sendRealtimeOverride: (byte: RealtimeOverrideByte) => Promise<void>;
-  readonly unlockAlarm: () => Promise<void>;
-  readonly wakeController: () => Promise<void>;
-  readonly configureGrblLaserSetup: () => Promise<void>;
-  readonly readMachineSettings: () => Promise<void>;
-  readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
-  readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
-  readonly clearTranscript: () => void;
-  readonly jog: (params: JogParams) => Promise<void>;
-  // ADR-124 — jog the head to a captured board point (a corner or the centre),
-  // given as a machine coordinate. Computed as a relative delta from the current
-  // machine position so it reuses `jog`'s guards and works for the (0,0) corner.
-  readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
-  readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
-  readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;
-  readonly cancelJog: () => Promise<void>;
-  readonly frame: (
-    bounds: {
-      readonly minX: number;
-      readonly minY: number;
-      readonly maxX: number;
-      readonly maxY: number;
-    },
-    feed: number,
-  ) => Promise<void>;
-  readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
-  readonly pauseJob: () => Promise<void>;
-  readonly resumeJob: () => Promise<void>;
-  // Leave a multi-tool CNC job's M0 tool-change hold and resume the stream.
-  readonly continueToolChange: () => Promise<void>;
-  readonly stopJob: () => Promise<void>;
-  readonly clearSafetyNotice: () => void;
-  // Write an app diagnostic to the Console transcript + log. Used by UI callers
-  // (e.g. the wake-lock hook) that have no access to the store's refs; the action
-  // supplies them so transcript ids stay on the one shared counter.
-  readonly pushSystemNotice: (line: string) => void;
-  readonly applyDetectedSettings: () => void;
-  readonly dismissDetectedSettings: () => void;
-  // G92 is the default session-scoped origin; advanced controls use G10/G54.
-  readonly setOriginHere: () => Promise<void>;
-  // CNC stock-top zeroing: G92 Z0 at the current bit height. XY untouched.
-  readonly zeroZHere: () => Promise<void>;
-  readonly resetOrigin: () => Promise<void>;
-  readonly setPersistentOriginHere: () => Promise<void>;
-  readonly clearPersistentOrigin: () => Promise<void>;
-  // ADR-053 P4 — $SLP to release the steppers for hand-positioning. Drops the
-  // origin + Verified Frame, since the head is about to move and waking needs a
-  // soft-reset that clears G92.
-  readonly releaseMotors: () => Promise<void>;
-  // ADR-053 P2 — record a clean Verified Frame for the current job + origin.
-  readonly markFrameVerified: (verification: FrameVerification) => void;
 };
 
 export type LiveRefs = ControllerLifecycleRefs & {
@@ -521,6 +454,13 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ),
   ...originActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
+  ),
+  ...workZRecoveryActions(
+    set,
+    get,
+    refs,
+    (line) => safeWrite(set, get, line),
+    () => refs.driver,
   ),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),

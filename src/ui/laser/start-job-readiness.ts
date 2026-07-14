@@ -1,6 +1,7 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { StatusQueryCapability } from '../../core/controllers';
-import { controllerProfilesAreCompatible, type ControllerKind } from '../../core/devices';
+import { controllerStartSnapshotIsCompatible } from '../../core/controllers/controller-start-compatibility';
+import type { ControllerKind } from '../../core/devices';
 import type { SimilarityTransform } from '../../core/registration';
 import {
   computeJobBounds,
@@ -34,7 +35,6 @@ import {
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
-import { detectMachineJobWarnings } from './machine-job-warnings';
 import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
 import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
@@ -46,6 +46,7 @@ import {
   resolveStartPlacement,
   withControllerReportUnits,
 } from './start-job-preparation';
+import { collectStartWarnings } from './start-job-warnings';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -82,6 +83,8 @@ export type MachineStartSnapshot = {
   readonly workOriginActive?: boolean;
   readonly workZZeroEvidence?: WorkZZeroEvidence | null;
   readonly workZReferenceEpoch?: number;
+  readonly controllerSessionEpoch?: number;
+  readonly nowMs?: number;
   readonly wcoCache?: WorkCoordinateOffset | null;
   // Last live GRBL Ov: field, cached across intermittent status frames.
   // A known non-default value changes physical feed/RPM independently of the
@@ -120,13 +123,11 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
   const issues = [...findMachineStartIssues(machine)];
   const configuredControllerKind = project.device.controllerKind ?? 'grbl-v1.1';
   if (
-    (machine.activeControllerKind !== undefined &&
-      !controllerProfilesAreCompatible(configuredControllerKind, machine.activeControllerKind)) ||
-    (machine.detectedControllerKind !== undefined &&
-      !controllerProfilesAreCompatible(configuredControllerKind, machine.detectedControllerKind)) ||
-    (machine.activeControllerKind !== undefined &&
-      machine.detectedControllerKind != null &&
-      machine.activeControllerKind !== machine.detectedControllerKind)
+    !controllerStartSnapshotIsCompatible(
+      configuredControllerKind,
+      machine.activeControllerKind,
+      machine.detectedControllerKind,
+    )
   ) {
     issues.push(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
   }
@@ -139,6 +140,8 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
     project,
     machine.workZZeroEvidence,
     machine.workZReferenceEpoch,
+    machine.controllerSessionEpoch,
+    machine.nowMs,
   );
   if (workZeroIssue !== null) issues.push(workZeroIssue);
   return issues;
@@ -222,6 +225,7 @@ export function prepareStartJob(
     project,
     controllerSettings,
     controller.warnings.map((i) => i.message),
+    machine.ovCache,
   );
   return okPreparation(
     gcode,
@@ -299,6 +303,7 @@ export async function prepareStartJobSnapshot(
     project,
     controllerSettings,
     controller.warnings.map((issue) => issue.message),
+    machine.ovCache,
   );
   return okPreparation(
     gcode,
@@ -316,22 +321,6 @@ function registrationOption(registration: SimilarityTransform | null | undefined
   readonly registration?: SimilarityTransform | null;
 } {
   return registration === undefined ? {} : { registration };
-}
-
-// Resolve the origin for a Start or a resume. A fresh Start resolves the
-// operator's settings against the live machine. A resume passes the FROZEN
-// origin the original run compiled with: we still re-validate the live machine
-// through that origin's MODE (a vanished custom origin / unknown position still
-// refuses), but the frozen origin drives the compile so a 'current-position'
-// job reproduces its bytes instead of re-resolving to the post-crash head (R1).
-// The Start-path warning list: controller-readiness warnings plus machine-kind
-// advisories. Qualified CNC work-Z is a non-overridable early machine gate.
-function collectStartWarnings(
-  project: Project,
-  controllerSettings: ControllerSettingsSnapshot | null,
-  controllerWarnings: ReadonlyArray<string>,
-): string[] {
-  return [...controllerWarnings, ...detectMachineJobWarnings(project, controllerSettings)];
 }
 
 function readinessMode(machine: MachineStartSnapshot): ReadinessSettingsCapability {

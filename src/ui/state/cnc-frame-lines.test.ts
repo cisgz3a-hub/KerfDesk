@@ -3,17 +3,22 @@ import {
   buildGrblFrameJogLines,
   buildGrblFrameRetract,
 } from '../../core/controllers/grbl/frame-lines';
-import { buildCncFrameMotion } from './cnc-frame-lines';
+import {
+  CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE,
+  CNC_FRAME_WORK_Z_REQUIRED_MESSAGE,
+  buildCncFrameMotion,
+  type CncFrameMotionPlan,
+} from './cnc-frame-lines';
 
 const PERIMETER = buildGrblFrameJogLines({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 1000);
 const SAFE_Z = 3.81;
 const FEED = 1000;
 
-function motion(overrides: {
+function plan(overrides: {
   readonly preFrameWorkZMm: number | null;
   readonly hasCurrentWorkZEvidence: boolean;
   readonly buildRetract?: ((zMm: number, feed: number) => string) | undefined;
-}): ReadonlyArray<string> {
+}): CncFrameMotionPlan {
   return buildCncFrameMotion({
     perimeter: PERIMETER,
     safeZMm: SAFE_Z,
@@ -21,6 +26,12 @@ function motion(overrides: {
     buildRetract: 'buildRetract' in overrides ? overrides.buildRetract : buildGrblFrameRetract,
     ...overrides,
   });
+}
+
+function motion(overrides: Parameters<typeof plan>[0]): ReadonlyArray<string> {
+  const result = plan(overrides);
+  if (result.kind === 'blocked') throw new Error(result.message);
+  return result.lines;
 }
 
 describe('buildCncFrameMotion', () => {
@@ -39,16 +50,20 @@ describe('buildCncFrameMotion', () => {
     expect(lines[lines.length - 1]).toBe('$J=G90 G21 Z20.000 F1000\n');
   });
 
-  // Without a known Z0 the work-frame retract targets an arbitrary physical
-  // height, so the frame degrades to XY-only rather than risk a blind Z move.
-  it('emits an XY-only perimeter when there is no current work-Z evidence', () => {
-    expect(motion({ preFrameWorkZMm: 0, hasCurrentWorkZEvidence: false })).toEqual(PERIMETER);
+  it('blocks when there is no current work-Z evidence', () => {
+    expect(plan({ preFrameWorkZMm: 0, hasCurrentWorkZEvidence: false })).toEqual({
+      kind: 'blocked',
+      message: CNC_FRAME_WORK_Z_REQUIRED_MESSAGE,
+    });
   });
 
-  it('emits an XY-only perimeter when the driver has no Z-jog builder', () => {
+  it('blocks when the driver has no Z-jog builder', () => {
     expect(
-      motion({ preFrameWorkZMm: 0, hasCurrentWorkZEvidence: true, buildRetract: undefined }),
-    ).toEqual(PERIMETER);
+      plan({ preFrameWorkZMm: 0, hasCurrentWorkZEvidence: true, buildRetract: undefined }),
+    ).toEqual({
+      kind: 'blocked',
+      message: CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE,
+    });
   });
 
   // Unknown pre-frame Z: retract but do not guess a restore target — leave the

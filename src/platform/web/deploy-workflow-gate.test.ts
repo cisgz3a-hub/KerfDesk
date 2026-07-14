@@ -78,10 +78,12 @@ describe('Cloudflare production deploy gate', () => {
     const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@');
     expect(publishIndex).toBeGreaterThanOrEqual(0);
 
+    const repoGuardIndex = commandIndex(workflow, 'pnpm guard:repo');
     expect(commandIndex(workflow, 'pnpm release:check')).toBeLessThan(publishIndex);
+    expect(repoGuardIndex).toBeLessThan(publishIndex);
+    expect(releaseCheck).not.toContain('pnpm guard:repo');
 
     const requiredBeforePublish = [
-      'pnpm guard:repo',
       'pnpm typecheck',
       'pnpm lint',
       'pnpm lint:electron',
@@ -97,6 +99,11 @@ describe('Cloudflare production deploy gate', () => {
     for (const command of requiredBeforePublish) {
       expect(releaseCheck, `release:check must include ${command}`).toContain(command);
     }
+
+    expect(packageJson.scripts['deploy:web']).toMatch(/^pnpm guard:repo && pnpm release:check && /);
+    expect(packageJson.scripts['deploy:web:preview']).toMatch(
+      /^pnpm guard:repo && pnpm release:check && /,
+    );
   });
 
   it('repo guard accepts the canonical GitHub Actions remote without .git', () => {

@@ -6,6 +6,7 @@ import type { Toolpath } from '../../core/job';
 import { parseGcodeProgram } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { ToastVariant } from '../state/toast-store';
+import { importSourceSizeIssue } from './import-source-limits';
 
 export async function handleOpenGcodePreview(
   platform: PlatformAdapter,
@@ -27,6 +28,11 @@ export async function handleOpenGcodePreview(
   }
   const file = files[0];
   if (file === undefined) return;
+  const sizeIssue = importSourceSizeIssue(file, 'gcode');
+  if (sizeIssue !== null) {
+    pushToast(sizeIssue, 'error');
+    return;
+  }
   try {
     const result = parseGcodeProgram(await file.text());
     if (result.kind === 'error') {

@@ -12,7 +12,6 @@ export function currentPrintCutOutputRegistration(
 ): SimilarityTransform | null | undefined {
   if (project.printAndCutTargets === undefined) return undefined;
   if (!useExperimentalLaserFeatures.getState().features.printAndCut) return null;
-  if (!project.device.homing.enabled) return null;
   const laser = useLaserStore.getState();
   const resolved = resolvePrintCutRegistration(
     project,

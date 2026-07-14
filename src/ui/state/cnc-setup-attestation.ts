@@ -1,4 +1,5 @@
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
+import type { ReducedOverrideAcknowledgement } from './cnc-accessory-readiness';
 
 export const CNC_SETUP_ATTESTATION_PROMPT = `Before starting the CNC spindle, confirm all of the following:
 
@@ -36,11 +37,13 @@ export type CncSetupAttestation = {
   readonly exclusiveControllerAccess: true;
   readonly controllerEpoch: CncControllerEpoch;
   readonly programFingerprint: GcodeFingerprint;
+  readonly acknowledgedReducedOverrides?: ReducedOverrideAcknowledgement;
 };
 
 export function createCncSetupAttestation(
   gcode: string,
   controllerEpoch: CncControllerEpoch,
+  acknowledgedReducedOverrides?: ReducedOverrideAcknowledgement,
 ): CncSetupAttestation {
   return {
     workholdingSecured: true,
@@ -49,7 +52,16 @@ export function createCncSetupAttestation(
     exclusiveControllerAccess: true,
     controllerEpoch,
     programFingerprint: fingerprintGcode(gcode),
+    ...(acknowledgedReducedOverrides === undefined
+      ? {}
+      : { acknowledgedReducedOverrides: { ...acknowledgedReducedOverrides } }),
   };
+}
+
+export function cncSetupOverrideAcknowledgement(
+  attestation: CncSetupAttestation | null | undefined,
+): ReducedOverrideAcknowledgement | undefined {
+  return attestation?.acknowledgedReducedOverrides;
 }
 
 export function cncSetupAttestationMatches(

@@ -13,7 +13,6 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
   const epoch = laser.trustedPositionEpoch ?? 0;
   const captureEnabled =
     laser.connection.kind === 'connected' &&
-    laser.homingState === 'confirmed' &&
     laser.statusReport?.state === 'Idle' &&
     laser.statusReport.mPos !== null;
   const capture = (which: 'first' | 'second'): void => {

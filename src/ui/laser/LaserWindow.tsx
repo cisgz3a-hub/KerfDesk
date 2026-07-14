@@ -23,6 +23,7 @@ import { ProbePanel } from './ProbePanel';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 
 export function LaserWindow(): JSX.Element {
   const machinePanel = useMachinePanelVisibility();
@@ -85,6 +86,7 @@ export function LaserWindow(): JSX.Element {
         machineNoun={machineNoun(machineKind)}
         onConnect={() => void connect(platform, { controllerKind, baudRate: profileBaudRate })}
         onDisconnect={() => void disconnect().catch(() => undefined)}
+        onForget={confirmForgetDevice}
         disabled={!supportsSerial || machineOperationBusy || isFileOnlyProfile}
       />
       {showAlarmBanner && (
@@ -111,6 +113,14 @@ export function LaserWindow(): JSX.Element {
       <MachineConsoleSection />
     </aside>
   );
+}
+
+function confirmForgetDevice(): void {
+  if (!jobAwareConfirm('Forget this device and remove its browser serial permission?')) return;
+  void useLaserStore
+    .getState()
+    .forgetDevice?.()
+    .catch(() => undefined);
 }
 
 function useMachinePanelVisibility(): {

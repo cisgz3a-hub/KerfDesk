@@ -35,6 +35,10 @@ export type ControllerCommands = {
   readonly unlock: string | null;
   readonly sleep: string | null;
   readonly settingsQuery: string | null;
+  /** Owned active-modal query used with offsetsQuery for Work-Z recovery. */
+  readonly modalStateQuery: string | null;
+  /** Owned WCS-offset query used with modalStateQuery for Work-Z recovery. */
+  readonly offsetsQuery: string | null;
   /** Queued (non-realtime) position/status query, polled ONLY while nothing
    *  is streaming or awaiting acks (Marlin 'M114'). null when the firmware
    *  has a realtime report instead. */

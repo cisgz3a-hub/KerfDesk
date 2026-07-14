@@ -30,6 +30,7 @@ export type ProcessedRasterBitmap =
 
 export type ProcessedRasterBitmapOptions = {
   readonly maskObject?: SceneObject | null;
+  readonly maxEdge?: number;
 };
 
 export function buildProcessedRasterBitmap(
@@ -38,21 +39,38 @@ export function buildProcessedRasterBitmap(
   device: DeviceProfile,
   options: ProcessedRasterBitmapOptions = {},
 ): ProcessedRasterBitmap {
-  const { width, height } = processedRasterDimensions(image, layer);
-  const budget = evaluateRasterBudget(width, height);
+  const outputDimensions = processedRasterDimensions(image, layer);
+  const { width, height } = capRasterDimensions(outputDimensions, options.maxEdge);
+  const budget = evaluateRasterBudget(width, height, {
+    sourcePixelCount: image.pixelWidth * image.pixelHeight,
+    sourceWorkingBytesPerPixel: options.maxEdge === undefined ? 3 : 1,
+    ditherAlgorithm: layer.ditherAlgorithm,
+  });
   if (budget.kind === 'too-large') {
     return { kind: 'too-large', width, height, reason: budget.reason };
   }
-  const sourceLuma = decodeLuma(image.lumaBase64, image.pixelWidth * image.pixelHeight);
-  const adjustedLuma = applyLumaAdjustments(sourceLuma, image);
-  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
-  const luma = layer.passThrough
-    ? preparedLuma
-    : resampleLumaNearest(
-        { luma: preparedLuma, width: image.pixelWidth, height: image.pixelHeight },
+  const decodedLuma = decodeLuma(image.lumaBase64, image.pixelWidth * image.pixelHeight);
+  const previewResamplesSource =
+    options.maxEdge !== undefined && (width !== image.pixelWidth || height !== image.pixelHeight);
+  const sourceLuma = previewResamplesSource
+    ? resampleLumaNearest(
+        { luma: decodedLuma, width: image.pixelWidth, height: image.pixelHeight },
         width,
         height,
-      );
+      )
+    : decodedLuma;
+  const adjustedLuma = applyLumaAdjustments(sourceLuma, image);
+  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
+  const sourceWidth = previewResamplesSource ? width : image.pixelWidth;
+  const sourceHeight = previewResamplesSource ? height : image.pixelHeight;
+  const luma =
+    width === sourceWidth && height === sourceHeight
+      ? preparedLuma
+      : resampleLumaNearest(
+          { luma: preparedLuma, width: sourceWidth, height: sourceHeight },
+          width,
+          height,
+        );
   const maskedLuma = applyImageMaskToLuma({
     image,
     maskObject: options.maskObject,
@@ -68,6 +86,13 @@ export function buildProcessedRasterBitmap(
   );
   const rgba = new Uint8ClampedArray(rasterPreviewRgba(sValues, sMax, width, height));
   return { kind: 'ok', width, height, rgba };
+}
+
+export function processedRasterPreviewDimensions(
+  image: RasterImage,
+  layer: Layer,
+): { readonly width: number; readonly height: number } {
+  return capRasterDimensions(processedRasterDimensions(image, layer), 2048);
 }
 
 export function processedRasterDimensions(
@@ -89,6 +114,20 @@ export function processedRasterDimensions(
       (image.bounds.maxY - image.bounds.minY) * Math.abs(image.transform.scaleY),
       layer.linesPerMm,
     ),
+  };
+}
+
+function capRasterDimensions(
+  dimensions: { readonly width: number; readonly height: number },
+  maxEdge: number | undefined,
+): { readonly width: number; readonly height: number } {
+  if (maxEdge === undefined || maxEdge <= 0) return dimensions;
+  const edge = Math.max(dimensions.width, dimensions.height);
+  if (edge <= maxEdge) return dimensions;
+  const scale = maxEdge / edge;
+  return {
+    width: Math.max(1, Math.round(dimensions.width * scale)),
+    height: Math.max(1, Math.round(dimensions.height * scale)),
   };
 }
 

@@ -70,6 +70,55 @@ export function dither(input: DitherInput, options: DitherOptions): Uint16Array 
   }
 }
 
+export function ditherIndependentRow(
+  luma: Uint8Array,
+  rowIndex: number,
+  options: DitherOptions,
+): Uint16Array {
+  const algorithm = options.algorithm;
+  if (!isIndependentDitherMode(algorithm)) {
+    throw new Error(`Dither algorithm ${algorithm} requires full-image state.`);
+  }
+  const out = new Uint16Array(luma.length);
+  const cutoff = options.thresholdLuma ?? DEFAULT_THRESHOLD;
+  const sMax = normalizeS(options.sMax);
+  const sMin = Math.min(sMax, normalizeS(options.sMin ?? 0));
+  for (let x = 0; x < luma.length; x += 1) {
+    const value = luma[x] ?? TWO_FIFTY_FIVE;
+    out[x] = independentDitherValue(algorithm, value, x, rowIndex, cutoff, sMin, sMax);
+  }
+  return out;
+}
+
+type IndependentDitherMode = Extract<DitherAlgorithm, 'threshold' | 'ordered' | 'grayscale'>;
+
+function isIndependentDitherMode(algorithm: DitherAlgorithm): algorithm is IndependentDitherMode {
+  return algorithm === 'threshold' || algorithm === 'ordered' || algorithm === 'grayscale';
+}
+
+function independentDitherValue(
+  algorithm: IndependentDitherMode,
+  value: number,
+  x: number,
+  rowIndex: number,
+  cutoff: number,
+  sMin: number,
+  sMax: number,
+): number {
+  switch (algorithm) {
+    case 'threshold':
+      return value < cutoff ? sMax : 0;
+    case 'ordered': {
+      const threshold = BAYER_4X4[rowIndex % 4]?.[x % 4] ?? DEFAULT_THRESHOLD;
+      return value < threshold ? sMax : 0;
+    }
+    case 'grayscale': {
+      const strength = (TWO_FIFTY_FIVE - value) / TWO_FIFTY_FIVE;
+      return strength <= 0 ? 0 : Math.round(sMin + strength * (sMax - sMin));
+    }
+  }
+}
+
 type ErrorDiffusionMode =
   | 'floyd-steinberg'
   | 'jarvis'

@@ -29,6 +29,10 @@ export type LaserControllerOperation =
   | {
       readonly kind: 'start-arming';
       readonly phase: 'queue-fence' | 'live-status';
+    }
+  | {
+      readonly kind: 'work-z-recovery';
+      readonly phase: 'modal-state' | 'offsets';
     };
 
 export const CONTROLLER_OPERATION_ACTIVE_MESSAGE =
@@ -58,6 +62,11 @@ export function describeControllerOperation(operation: LaserControllerOperation 
   }
   if (operation.kind === 'start-arming') {
     return describeStartArming(operation.phase);
+  }
+  if (operation.kind === 'work-z-recovery') {
+    return operation.phase === 'modal-state'
+      ? 'Reading active CNC work coordinates'
+      : 'Reading CNC work offsets';
   }
   return operation.label;
 }

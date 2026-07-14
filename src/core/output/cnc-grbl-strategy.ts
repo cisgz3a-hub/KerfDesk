@@ -504,7 +504,4 @@ function appendRetract(lines: string[], head: Head, safeZMm: number): void {
   head.z = safeZ;
 }
 
-export const cncGrblStrategy: OutputStrategy = {
-  id: 'grbl-cnc',
-  emit: emitJob,
-};
+export const cncGrblStrategy: OutputStrategy = { id: 'grbl-cnc', emit: emitJob };

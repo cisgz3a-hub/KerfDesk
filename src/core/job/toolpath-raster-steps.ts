@@ -6,6 +6,7 @@
 
 import type { Vec2 } from '../scene';
 import type { RasterGroup } from './job';
+import { rasterRow } from './raster-rows';
 import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
 import { appendTravelStep, dist } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
@@ -63,7 +64,8 @@ function hasUsableRasterGeometry(group: RasterGroup): boolean {
   return (
     group.pixelWidth > 0 &&
     group.pixelHeight > 0 &&
-    group.sValues.length >= group.pixelWidth * group.pixelHeight &&
+    (group.rowProvider !== undefined ||
+      group.sValues.length >= group.pixelWidth * group.pixelHeight) &&
     group.bounds.maxX > group.bounds.minX &&
     group.bounds.maxY > group.bounds.minY
   );
@@ -74,12 +76,12 @@ function rasterActiveSpans(
   y: number,
   pixelWidthMm: number,
 ): ReadonlyArray<RasterSpan> {
-  const rowStart = y * group.pixelWidth;
+  const row = rasterRow(group, y);
   const spans: RasterSpan[] = [];
   let firstX = -1;
   let lastInk = -1;
   for (let x = 0; x < group.pixelWidth; x += 1) {
-    if ((group.sValues[rowStart + x] ?? 0) <= 0) continue;
+    if ((row[x] ?? 0) <= 0) continue;
     if (firstX === -1) {
       firstX = x;
       lastInk = x;

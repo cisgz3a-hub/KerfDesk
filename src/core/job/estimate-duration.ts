@@ -34,6 +34,7 @@ import {
   type RasterGroup,
 } from './job';
 import { estimateWithPlanner } from './planner';
+import { rasterRow } from './raster-rows';
 
 export type JobDurationEstimate = {
   readonly totalSeconds: number;
@@ -182,11 +183,11 @@ function rasterActiveSpans(
   y: number,
   pixelWidthMm: number,
 ): ReadonlyArray<RasterSpan> {
-  const rowStart = y * group.pixelWidth;
+  const row = rasterRow(group, y);
   const spans: RasterSpan[] = [];
   let firstX = -1;
   for (let x = 0; x < group.pixelWidth; x += 1) {
-    if ((group.sValues[rowStart + x] ?? 0) > 0) {
+    if ((row[x] ?? 0) > 0) {
       firstX = x;
       break;
     }
@@ -194,7 +195,7 @@ function rasterActiveSpans(
   if (firstX === -1) return spans;
   let lastInk = firstX;
   for (let x = firstX + 1; x < group.pixelWidth; x += 1) {
-    if ((group.sValues[rowStart + x] ?? 0) <= 0) continue;
+    if ((row[x] ?? 0) <= 0) continue;
     const gapMm = (x - lastInk - 1) * pixelWidthMm;
     if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
       spans.push({ firstX, lastX: lastInk });

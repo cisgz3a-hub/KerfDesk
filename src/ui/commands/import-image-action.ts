@@ -1,5 +1,6 @@
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import {
+  burnDecodeMaxEdge,
   extractLumaBase64,
   loadImageAsRawData,
   readFileAsDataUrl,
@@ -20,7 +21,7 @@ export async function importImageFile(
   if (!confirmOversizeImport(file.name, file.size)) return;
   try {
     const natural = await readImageNaturalSize(file);
-    const image = await loadImageAsRawData(file);
+    const image = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));
     const density = await readImageDensity(file);
     const geometry = rasterImportGeometry({
       naturalWidth: natural.width,

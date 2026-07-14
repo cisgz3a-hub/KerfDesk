@@ -2,8 +2,9 @@ import type { ControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
 import {
   cncAccessoryStartIssue,
-  cncOverrideStartIssue,
+  cncOverrideFinalStartIssue,
   invalidateAccessoryObservation,
+  type ReducedOverrideAcknowledgement,
 } from './cnc-accessory-readiness';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -78,7 +79,12 @@ export async function refreshCncLiveStartState(
   rejectCncStart(set, get, LIVE_STATUS_TIMEOUT_MESSAGE);
 }
 
-export function assertCncLiveStartReady(set: SetFn, get: GetFn, machineKind: MachineKind): void {
+export function assertCncLiveStartReady(
+  set: SetFn,
+  get: GetFn,
+  machineKind: MachineKind,
+  acknowledgedOverrides?: ReducedOverrideAcknowledgement,
+): void {
   if (machineKind !== 'cnc') return;
   assertCncControllerOwnershipClean(set, get, machineKind);
   assertCncMpgInactive(set, get, machineKind);
@@ -99,7 +105,11 @@ export function assertCncLiveStartReady(set: SetFn, get: GetFn, machineKind: Mac
       `CNC Start requires a fresh Idle report; the controller currently reports ${state.statusReport.state}.`,
     );
   }
-  const overrideIssue = cncOverrideStartIssue(machineKind, state.ovCache);
+  const overrideIssue = cncOverrideFinalStartIssue(
+    machineKind,
+    state.ovCache,
+    acknowledgedOverrides,
+  );
   if (overrideIssue !== null) rejectCncStart(set, get, overrideIssue);
   const accessoryIssue = cncAccessoryStartIssue(machineKind, state.accessoryCache);
   if (accessoryIssue !== null) rejectCncStart(set, get, accessoryIssue);

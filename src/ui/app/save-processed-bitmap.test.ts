@@ -81,7 +81,8 @@ describe('handleSaveProcessedBitmap', () => {
     expect(platform.pickFileForSave).not.toHaveBeenCalled();
     expect(toast.messages).toEqual([
       {
-        message: 'Could not save processed bitmap: 4004001 px exceeds the 4000000 px limit',
+        message:
+          'Could not save processed bitmap: ~123 MB materialized working set exceeds the 64 MB budget',
         variant: 'error',
       },
     ]);
@@ -137,7 +138,7 @@ function overBudgetRasterProject(): Project {
       objects: [
         {
           ...raster,
-          bounds: { minX: 0, minY: 0, maxX: 200.1, maxY: 200.1 },
+          bounds: { minX: 0, minY: 0, maxX: 400.1, maxY: 400.1 },
         },
       ],
     },

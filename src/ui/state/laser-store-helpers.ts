@@ -15,7 +15,7 @@ import { controllerOperationCommandBlockMessage } from './laser-controller-opera
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import {
-  isWorkZZeroEvidenceCurrent,
+  isWorkZEvidenceFreshForStart,
   probePlateRemovalRequired,
   PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
 } from './work-z-zero-evidence';
@@ -123,7 +123,14 @@ export function toolChangeHoldEntryPatch(
 // trusted to target the configured safe height.
 export function toolChangeContinueBlockMessage(state: LaserState): string | null {
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
-  if (!isWorkZZeroEvidenceCurrent(state.workZZeroEvidence, state.workZReferenceEpoch)) {
+  if (
+    !isWorkZEvidenceFreshForStart(
+      state.workZZeroEvidence,
+      state.workZReferenceEpoch,
+      state.controllerSessionEpoch,
+      Date.now(),
+    )
+  ) {
     return TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
   }
   if (probePlateRemovalRequired(state.workZZeroEvidence)) {

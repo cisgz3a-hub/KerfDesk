@@ -120,6 +120,19 @@ function makeConnection(port: SerialPort): SerialConnection {
 
   void runReadLoop(ctx.reader, lineSubs, handleDroppedConnection);
 
+  const closeConnection = async (): Promise<void> => {
+    if (ctx.closed) return;
+    ctx.closed = true;
+    port.removeEventListener('disconnect', handleDroppedConnection);
+    await closeStreamsOnce();
+    try {
+      await port.close();
+    } catch (err) {
+      console.warn('port.close() rejected:', err);
+    }
+    for (const h of closeSubs) h();
+  };
+
   return {
     write: async (data: string) => {
       if (ctx.writer === undefined) throw new Error('Serial port not writable.');
@@ -133,7 +146,8 @@ function makeConnection(port: SerialPort): SerialConnection {
       closeSubs.add(handler);
       return () => closeSubs.delete(handler);
     },
-    close: async () => {
+    close: closeConnection,
+    forget: async () => {
       if (ctx.closed) return;
       ctx.closed = true;
       port.removeEventListener('disconnect', handleDroppedConnection);
@@ -144,7 +158,7 @@ function makeConnection(port: SerialPort): SerialConnection {
         console.warn('port.close() rejected:', err);
       }
       // A2 audit finding: revoke the in-page permission for this port on
-      // explicit user-disconnect so a long-running tab doesn't accumulate
+      // explicit Forget Device so a long-running tab doesn't accumulate
       // per-port permissions across many laser sessions. Only do this
       // here — the cable-yank path (disconnect event → fireClose) goes
       // through a different code path and intentionally leaves the

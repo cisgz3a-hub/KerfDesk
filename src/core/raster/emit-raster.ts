@@ -50,6 +50,7 @@ export type EmitRasterInput = {
   // width * height. Each value is in [0, sMax] — the caller (the
   // dither module) has already applied the power scale.
   readonly sValues: Uint16Array;
+  readonly rowProvider?: (y: number) => Uint16Array;
   readonly width: number;
   readonly height: number;
   // World bounds of the image in mm. The image is rendered with its
@@ -86,13 +87,16 @@ export type EmitRasterInput = {
 };
 
 export function emitRasterGroup(input: EmitRasterInput): string {
+  return [...emitRasterGroupChunks(input)].join('');
+}
+
+export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string> {
   validate(input);
-  const chunks: string[] = [];
-  chunks.push(headerComment(input));
+  yield `${headerComment(input)}${LINE_END}`;
   // M5 first so we don't get stuck in M3 from a preceding cut group.
   // Then M4 S0 to arm dynamic-power mode at zero output.
-  chunks.push('M5');
-  chunks.push(`${input.laserModeCommand ?? 'M4'} S0`);
+  yield `M5${LINE_END}`;
+  yield `${input.laserModeCommand ?? 'M4'} S0${LINE_END}`;
   const feed = Math.round(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
@@ -114,11 +118,12 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   // we skip a band of empty rows — the controller plans an oblique
   // travel from the end of one active row to the start of the next.
   for (let pass = 0; pass < passes; pass += 1) {
-    if (passes > 1) chunks.push(`; raster pass ${pass + 1} of ${passes}`);
+    if (passes > 1) yield `; raster pass ${pass + 1} of ${passes}${LINE_END}`;
     let emittedRowCount = 0;
     let feedEmitted = false;
     for (let y = 0; y < input.height; y += 1) {
-      const spans = activeSpans(input, y, pixelWidthMm);
+      const row = inputRow(input, y);
+      const spans = activeSpans(row, pixelWidthMm);
       if (spans.length === 0) continue;
       const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
       // Snake direction alternates per emitted ROW; within a reverse row the
@@ -130,19 +135,17 @@ export function emitRasterGroup(input: EmitRasterInput): string {
         // crosses the wide white gap between them as a rapid (laser off) rather
         // than a slow G1 S0 feed move — the raster analogue of ADR-035 (ADR-039).
         // F rides only the very first G1 of the whole group.
-        chunks.push(
-          emitSpanSweep(
-            input,
-            y,
-            worldY,
-            pixelWidthMm,
-            feed,
-            !feedEmitted,
-            reverse,
-            span,
-            dotWidthCorrectionMm,
-          ),
-        );
+        yield `${emitSpanSweep(
+          input,
+          row,
+          worldY,
+          pixelWidthMm,
+          feed,
+          !feedEmitted,
+          reverse,
+          span,
+          dotWidthCorrectionMm,
+        )}${LINE_END}`;
         feedEmitted = true;
       }
       emittedRowCount += 1;
@@ -150,8 +153,21 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   }
   // Trailing M5 so any subsequent cut group starts from a known
   // mode-off state. The cut group will re-issue its own M3.
-  chunks.push('M5');
-  return chunks.join(LINE_END) + LINE_END;
+  yield `M5${LINE_END}`;
+}
+
+function inputRow(input: EmitRasterInput, y: number): Uint16Array {
+  if (input.rowProvider !== undefined) {
+    const row = input.rowProvider(y);
+    if (row.length !== input.width) {
+      throw new Error(
+        `emitRasterGroup: row provider returned ${row.length} values; expected ${input.width}`,
+      );
+    }
+    return row;
+  }
+  const start = y * input.width;
+  return input.sValues.subarray(start, start + input.width);
 }
 
 type ActiveSpan = { readonly firstX: number; readonly lastX: number };
@@ -161,13 +177,12 @@ type ActiveSpan = { readonly firstX: number; readonly lastX: number };
 // RASTER_GAP_RAPID_THRESHOLD_MM is split into separate spans, so the emitter
 // crosses that gap with a G0 rapid (ADR-039); smaller interior gaps stay within
 // one span (blanked at feed, as before). Returns [] for an all-white row.
-function activeSpans(input: EmitRasterInput, y: number, pixelWidthMm: number): ActiveSpan[] {
-  const rowStart = y * input.width;
+function activeSpans(row: Uint16Array, pixelWidthMm: number): ActiveSpan[] {
   const spans: ActiveSpan[] = [];
   let firstX = -1;
   let lastInk = -1;
-  for (let i = 0; i < input.width; i += 1) {
-    if ((input.sValues[rowStart + i] ?? 0) === 0) continue;
+  for (let i = 0; i < row.length; i += 1) {
+    if ((row[i] ?? 0) === 0) continue;
     if (firstX === -1) {
       firstX = i;
       lastInk = i;
@@ -186,7 +201,7 @@ function activeSpans(input: EmitRasterInput, y: number, pixelWidthMm: number): A
 
 function emitSpanSweep(
   input: EmitRasterInput,
-  y: number,
+  row: Uint16Array,
   worldY: number,
   pixelWidthMm: number,
   feed: number,
@@ -227,7 +242,7 @@ function emitSpanSweep(
   if (input.overscanMm > 0) {
     pushRun(reverse ? activeEndX : activeStartX, 0);
   }
-  emitRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+  emitRowRuns(input, row, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
   // Exit overscan with S0 so the diode is dark during deceleration. The
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
@@ -254,7 +269,7 @@ type PushRasterRun = (x: number, s: number) => void;
 
 function emitRowRuns(
   input: EmitRasterInput,
-  y: number,
+  row: Uint16Array,
   pixelWidthMm: number,
   span: ActiveSpan,
   reverse: boolean,
@@ -262,14 +277,14 @@ function emitRowRuns(
   pushRun: PushRasterRun,
 ): void {
   if (dotWidthCorrectionMm > 0) {
-    emitCorrectedRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+    emitCorrectedRowRuns(input, row, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
     return;
   }
   if (reverse) {
-    emitReverseRowRuns(input, y, pixelWidthMm, span, pushRun);
+    emitReverseRowRuns(input, row, pixelWidthMm, span, pushRun);
     return;
   }
-  emitForwardRowRuns(input, y, pixelWidthMm, span, pushRun);
+  emitForwardRowRuns(input, row, pixelWidthMm, span, pushRun);
 }
 
 type RasterRun = {
@@ -280,14 +295,14 @@ type RasterRun = {
 
 function emitCorrectedRowRuns(
   input: EmitRasterInput,
-  y: number,
+  row: Uint16Array,
   pixelWidthMm: number,
   span: ActiveSpan,
   reverse: boolean,
   dotWidthCorrectionMm: number,
   pushRun: PushRasterRun,
 ): void {
-  const runs = rowRuns(input, y, span);
+  const runs = rowRuns(row, span);
   if (reverse) {
     emitCorrectedReverseRowRuns(
       input,
@@ -301,13 +316,12 @@ function emitCorrectedRowRuns(
   emitCorrectedForwardRowRuns(input, pixelWidthMm, runs, dotWidthCorrectionMm, pushRun);
 }
 
-function rowRuns(input: EmitRasterInput, y: number, span: ActiveSpan): RasterRun[] {
-  const rowStart = y * input.width;
+function rowRuns(row: Uint16Array, span: ActiveSpan): RasterRun[] {
   const runs: RasterRun[] = [];
   let firstX = span.firstX;
-  let s = input.sValues[rowStart + firstX] ?? 0;
+  let s = row[firstX] ?? 0;
   for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
-    const cellS = input.sValues[rowStart + i] ?? 0;
+    const cellS = row[i] ?? 0;
     if (cellS === s) continue;
     runs.push({ firstX, lastX: i - 1, s });
     firstX = i;
@@ -371,14 +385,14 @@ function emitCorrectedReverseRowRuns(
 
 function emitReverseRowRuns(
   input: EmitRasterInput,
-  y: number,
+  row: Uint16Array,
   pixelWidthMm: number,
   span: ActiveSpan,
   pushRun: PushRasterRun,
 ): void {
-  let runS = input.sValues[y * input.width + span.lastX] ?? 0;
+  let runS = row[span.lastX] ?? 0;
   for (let i = span.lastX - 1; i >= span.firstX; i -= 1) {
-    const cellS = input.sValues[y * input.width + i] ?? 0;
+    const cellS = row[i] ?? 0;
     if (cellS !== runS) {
       pushRun(input.bounds.minX + (i + 1) * pixelWidthMm, runS);
       runS = cellS;
@@ -389,14 +403,14 @@ function emitReverseRowRuns(
 
 function emitForwardRowRuns(
   input: EmitRasterInput,
-  y: number,
+  row: Uint16Array,
   pixelWidthMm: number,
   span: ActiveSpan,
   pushRun: PushRasterRun,
 ): void {
-  let runS = input.sValues[y * input.width + span.firstX] ?? 0;
+  let runS = row[span.firstX] ?? 0;
   for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
-    const cellS = input.sValues[y * input.width + i] ?? 0;
+    const cellS = row[i] ?? 0;
     if (cellS !== runS) {
       pushRun(input.bounds.minX + i * pixelWidthMm, runS);
       runS = cellS;
@@ -451,7 +465,7 @@ function validate(input: EmitRasterInput): void {
   if (input.width <= 0 || input.height <= 0) {
     throw new Error(`emitRasterGroup: invalid dimensions ${input.width}×${input.height}`);
   }
-  if (input.sValues.length !== input.width * input.height) {
+  if (input.rowProvider === undefined && input.sValues.length !== input.width * input.height) {
     throw new Error(
       `emitRasterGroup: sValues length ${input.sValues.length} does not match ${input.width}×${input.height}`,
     );

@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('AutoAlignControls', () => {
-  it('requires the Labs opt-in and a homing-enabled profile', () => {
+  it('requires the Labs opt-in but allows no-homing profiles to use epoch confirmation', () => {
     act(() => root.render(<AutoAlignControls />));
     const button = alignButton(host);
     expect(button.disabled).toBe(true);
@@ -60,9 +60,9 @@ describe('AutoAlignControls', () => {
         },
       }));
     });
-    expect(button.disabled).toBe(true);
-    expect(button.title).toContain('homing-enabled');
-    expect(useCameraAlignWizardStore.getState().open).toBe(false);
+    expect(button.disabled).toBe(false);
+    expect(button.title).toContain('Confirm bed coordinates');
+    expect(useCameraAlignWizardStore.getState().open).toBe(true);
   });
 });
 

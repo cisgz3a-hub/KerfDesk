@@ -15,7 +15,7 @@ export function AutoAlignControls(): JSX.Element {
   const closeWizard = useCameraAlignWizardStore((s) => s.closeWizard);
   const featureEnabled = useExperimentalLaserFeatures((state) => state.features.cameraAlignmentV2);
   const homingEnabled = useStore((state) => state.project.device.homing.enabled);
-  const available = featureEnabled && homingEnabled;
+  const available = featureEnabled;
 
   useEffect(() => {
     if (!available && open) closeWizard();
@@ -39,7 +39,9 @@ export function AutoAlignControls(): JSX.Element {
 
 function alignmentButtonTitle(featureEnabled: boolean, homingEnabled: boolean): string {
   if (!featureEnabled) return 'Enable Camera alignment v2 in Tools > Labs first.';
-  if (!homingEnabled) return 'Camera bed alignment requires a homing-enabled machine profile.';
+  if (!homingEnabled) {
+    return 'Align the camera to the bed. Confirm bed coordinates inside the wizard before burning markers.';
+  }
   return 'Align the camera to the bed: burn the marker target (or reuse a burned one), then detect it.';
 }
 

@@ -71,6 +71,9 @@
 | ADR-198 | 2026-07-14 | Accepted | Add a pinned OFL EMS stroke-font family with lazy data loading |
 | ADR-199 | 2026-07-14 | Accepted | Fair decorative stroke fonts with the shared trace cubic fitter |
 | ADR-200 | 2026-07-14 | Accepted | CNC recovery is evidence-gated and software Abort is not an E-stop |
+| ADR-201 | 2026-07-15 | Accepted | Gate CNC Start by protocol capability and exact override acknowledgement |
+| ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
+| ADR-203 | 2026-07-15 | Accepted | Recover Work-Z only from owned, fresh controller offset readback |
 
 ---
 
@@ -7812,12 +7815,12 @@ except a manual jog or a second Zero Z. Pressed at that parked height, Zero Z si
 Z0 upward (the air-cut trap addressed in ADR-adjacent probe/Zero-Z work). Frame is a
 non-destructive preview, so it must leave the machine at the Z it found.
 
-The retract and restore are gated on a current work-Z zero (`isWorkZZeroEvidenceCurrent`).
-The retract targets the WORK frame, so without an established Z0 that height is an arbitrary
-physical position and the jog could drive the bit into the stock; a frame with no current Z
-evidence therefore falls back to an XY-only perimeter — the historical laser-mode behavior,
-no worse than framing before the CNC retract existed. When the pre-frame Z is unknown (no
-live position) or already equals safe Z, the restore jog is omitted.
+The retract and restore are gated on a current work-Z zero (`isWorkZZeroEvidenceCurrent`) and a
+known pre-frame Work-Z position. The retract targets the WORK frame, so without an established Z0
+that height is an arbitrary physical position and the jog could drive the bit into the stock.
+An XY-only perimeter is not a safe substitute for CNC: it can drag a cutter through stock or
+workholding. CNC Frame therefore refuses before any write when either proof is absent. When the
+pre-frame Z already equals safe Z, the redundant restore jog is omitted.
 
 Line assembly lives in `ui/state/cnc-frame-lines.ts` (`buildCncFrameMotion`), which only
 ORDERS lines produced by the driver seam — the XY perimeter and the absolute-Z jog builder
@@ -7831,7 +7834,7 @@ protocol bytes outside the driver" boundary holds. The shared work-Z reader
 - Fixes the reported "frame lifts the bit even after a Zero Z": the bit returns to its
   pre-frame height (Z0 when it was touching the stock) instead of parking at safe Z.
 - The previously unconditional CNC retract (a blind work-frame Z jog with no Z0) is gone;
-  framing without current Z evidence is XY-only.
+  framing without current Z evidence or a known pre-frame Z is blocked with an exact message.
 - A normal CNC frame gains one queued `$J=` restore line; laser framing is byte-identical.
 - WORKFLOW.md F-B4 gains a CNC framing subsection describing retract → trace → restore.
 - Not hardware-verified — proven by unit tests over the assembled line list, not by a
@@ -8139,3 +8142,102 @@ hardware-qualified runway profile. The wizard reports those proofs as missing an
 physical cut position from acknowledgement count. It may draw an operator-selected native contour
 segment using explicitly illustrative acceleration assumptions, but its result carries
 `executable: false`; the dialog exposes no stream, spindle, G-code, or controller action.
+
+---
+
+## ADR-201 - Gate CNC Start by protocol capability and exact override acknowledgement
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+CNC Start compared configured, active, and detected controller names exactly. GRBL v1.1, grblHAL,
+and FluidNC use the same live job protocol in KerfDesk, so a safe compatible variant could be
+refused solely because its label differed. The override gate also required 100/100/100. That
+prevented an operator from deliberately starting more slowly, while treating reduced feed and
+rapid exactly like a changed spindle command or an increased feed.
+
+### Decision
+
+- Every controller driver declares a Start protocol capability. Start compares that capability,
+  not the controller label. GRBL v1.1, grblHAL, and FluidNC share one protocol capability; Marlin,
+  Smoothieware, and file-only output remain distinct.
+- A changed spindle override, an increased feed/rapid override, an invalid percentage, or missing
+  fresh `Ov:` evidence remains a hard CNC Start blocker.
+- Positive feed and rapid reductions with spindle at 100% may proceed only after the operator sees
+  their exact percentages and confirms the machining warning.
+- The acknowledgement is carried with the exact program/setup attestation. After the queue fence,
+  fresh live `Ov:` values must exactly match the acknowledged reduction. A changed or newly reduced
+  value refuses before any job byte and requires a new review.
+
+### Consequences
+
+Compatible GRBL-family firmware variants no longer create a false profile-name blocker. Reduced
+motion can be used deliberately, but it is never inferred as safe: changed chip load and cutting
+behavior are named, spindle speed cannot be silently reduced, and the final controller observation
+remains authoritative. Cross-protocol controller combinations continue to fail closed.
+
+---
+
+## ADR-202 - Separate burn raster fidelity from bounded preview and stream work
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+The raster pipeline uses one decoded representation for both interactive preview and machine output,
+then materializes large working grids and complete emitted strings. A fixed four-million-pixel guard
+limits crashes, but it also rejects work based on one static count and can make preview downsampling
+silently become burn downsampling. Raising that number without changing allocation behavior would
+only move the failure point.
+
+### Decision
+
+- Preserve a burn-source representation independently from a bounded, asynchronously generated
+  preview representation. Preview limits must never reduce emitted burn resolution.
+- Compile raster work in row chunks and emit chunks incrementally so decoded source, full working
+  grid, and complete raster G-code are not all required in memory at once.
+- Replace the fixed pixel refusal with measured source, row-work, and emitted-command budgets.
+  Every budget verdict carries its measured estimate; the chunk iterator lets a consumer stop
+  between rows without first allocating the remaining raster output.
+- Vector fill estimates account for selected strategy, holes, hatch directions, and compiled work;
+  static source-point counts remain only cheap early diagnostics, not the final refusal proof.
+
+### Consequences
+
+Larger jobs become possible when their measured working set is safe, while pathological jobs still
+fail before uncontrolled allocation. Preview remains responsive and may be lower resolution, but
+machine output is evaluated from the burn source. Local dithers use deterministic row providers;
+error-diffusion algorithms remain materialized because their error state crosses rows. The legacy
+string API joins the same byte-identical chunks and is bounded by the compiled-output estimate.
+
+---
+
+## ADR-203 - Recover Work-Z only from owned, fresh controller offset readback
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+KerfDesk correctly blocks CNC Start when its session-local Work-Z evidence is missing, but a
+controller can retain a qualified WCS offset across an app reconnect. Simply trusting a status-frame
+`WCO` or removing the gate would not prove which coordinate system, tool, setup epoch, or command
+owner established that offset.
+
+### Decision
+
+- Recovery uses an app-owned, acknowledged controller-offset query made while no job or competing
+  operation owns the line queue. The response must belong to the current controller session and a
+  bounded freshness window.
+- The readback records the active WCS, its Z offset, controller/setup epochs, and the operator-confirmed
+  active tool. Ambiguous, duplicate, missing, unsupported, or changed responses fail closed.
+- Recovered evidence is a distinct source and remains subject to the same tool-plan match, plate/tool
+  handling, invalidation, and final Start reservation rules as manual Zero Z and probing.
+- A status-frame `WCO`, machine position, or prior-session cache alone never creates Work-Z evidence.
+
+### Consequences
+
+Qualified persistent controller setup can be recovered without making the stock-top gate cosmetic.
+The workflow adds one explicit recovery transaction and operator review; unsupported firmwares keep
+the existing Zero Z/probe path. Hardware qualification remains required before claiming physical
+stock-top correctness.

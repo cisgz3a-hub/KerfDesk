@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
   cncSetupAttestationMatches,
+  cncSetupOverrideAcknowledgement,
   createCncSetupAttestation,
   type CncSetupAttestation,
 } from './cnc-setup-attestation';
@@ -21,6 +22,13 @@ describe('CNC setup attestation', () => {
       controllerEpoch,
     });
     expect(cncSetupAttestationMatches(attestation, gcode, controllerEpoch)).toBe(true);
+  });
+
+  it('binds an acknowledged reduced override to the exact attestation', () => {
+    const overrides = { feed: 80, rapid: 50, spindle: 100 };
+    const attestation = createCncSetupAttestation(gcode, controllerEpoch, overrides);
+
+    expect(cncSetupOverrideAcknowledgement(attestation)).toEqual(overrides);
   });
 
   it('rejects reuse after any program byte changes', () => {

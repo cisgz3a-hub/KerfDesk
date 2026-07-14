@@ -114,7 +114,7 @@ describe('webSerial connection cleanup', () => {
     expect(port.forget).not.toHaveBeenCalled();
   });
 
-  it('calls forget only on explicit user close', async () => {
+  it('closes a normal user disconnect without revoking the paired port permission', async () => {
     const port = installMockSerial(new MockPort());
     const ref = await webSerial.requestPort();
     if (ref === null) throw new Error('expected port ref');
@@ -126,6 +126,18 @@ describe('webSerial connection cleanup', () => {
     expect(port.reader.releaseLock).toHaveBeenCalledTimes(1);
     expect(port.writer.close).toHaveBeenCalledTimes(1);
     expect(port.writer.releaseLock).toHaveBeenCalledTimes(1);
+    expect(port.close).toHaveBeenCalledTimes(1);
+    expect(port.forget).not.toHaveBeenCalled();
+  });
+
+  it('revokes the paired port permission only through explicit Forget Device', async () => {
+    const port = installMockSerial(new MockPort());
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    const conn = await ref.open({ baudRate: 115200 });
+
+    await conn.forget?.();
+
     expect(port.close).toHaveBeenCalledTimes(1);
     expect(port.forget).toHaveBeenCalledTimes(1);
   });

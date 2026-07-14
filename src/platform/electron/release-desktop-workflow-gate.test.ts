@@ -23,10 +23,13 @@ describe('Desktop release workflow gate (ADR-024/152)', () => {
   });
 
   it('runs the full release:check gate before packaging the installer', () => {
+    const repoGuardIndex = workflow.indexOf('run: pnpm guard:repo');
     const gateIndex = workflow.indexOf('run: pnpm release:check');
     const buildIndex = workflow.indexOf('electron-builder --win --x64');
+    expect(repoGuardIndex).toBeGreaterThanOrEqual(0);
     expect(gateIndex).toBeGreaterThanOrEqual(0);
     expect(buildIndex).toBeGreaterThanOrEqual(0);
+    expect(repoGuardIndex).toBeLessThan(gateIndex);
     expect(gateIndex).toBeLessThan(buildIndex);
   });
 

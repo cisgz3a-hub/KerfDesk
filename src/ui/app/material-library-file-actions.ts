@@ -8,6 +8,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 import { importLightBurnClb } from '../../io/lightburn';
+import { importSourceSizeIssue } from './import-source-limits';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
@@ -35,6 +36,11 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
 
   const file = files[0];
   if (file === undefined) return;
+  const sizeIssue = importSourceSizeIssue(file, 'material-library');
+  if (sizeIssue !== null) {
+    ctx.pushToast(sizeIssue, 'error');
+    return;
+  }
 
   let text: string;
   try {
@@ -71,6 +77,11 @@ export async function handleImportClbMaterialLibrary(ctx: OpenMaterialLibraryCtx
   }
   const file = files[0];
   if (file === undefined) return;
+  const sizeIssue = importSourceSizeIssue(file, 'lightburn-clb');
+  if (sizeIssue !== null) {
+    ctx.pushToast(sizeIssue, 'error');
+    return;
+  }
   let text: string;
   try {
     text = await file.text();

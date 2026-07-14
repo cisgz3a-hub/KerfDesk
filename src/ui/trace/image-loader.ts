@@ -29,6 +29,22 @@ const MAX_EDGE_PX = 2048;
 // pixel grid and then commit a different trace.
 export const PREVIEW_MAX_EDGE_PX = MAX_EDGE_PX;
 
+// A burn image is not a trace preview. Keep enough source detail for the
+// requested engraving grid while bounding the decoded RGB/luma allocation.
+// The total-pixel cap matters for very wide panoramas even when each edge is
+// individually reasonable.
+export const BURN_MAX_EDGE_PX = 8192;
+export const BURN_MAX_SOURCE_PIXELS = 32_000_000;
+
+export function burnDecodeMaxEdge(naturalWidth: number, naturalHeight: number): number {
+  const width = Math.max(1, Math.floor(naturalWidth));
+  const height = Math.max(1, Math.floor(naturalHeight));
+  const sourcePixels = width * height;
+  if (sourcePixels <= BURN_MAX_SOURCE_PIXELS) return BURN_MAX_EDGE_PX;
+  const pixelScale = Math.sqrt(BURN_MAX_SOURCE_PIXELS / sourcePixels);
+  return Math.max(1, Math.min(BURN_MAX_EDGE_PX, Math.floor(Math.max(width, height) * pixelScale)));
+}
+
 const PAPER_WHITE = 255;
 const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
 const MAX_SAFE_DECODE_EDGE_PX = 32_768;

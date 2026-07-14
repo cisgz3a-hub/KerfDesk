@@ -29,7 +29,7 @@
     "check:file-size": "node scripts/check-file-size-policy.mjs",
     "check:soft-size": "node scripts/check-soft-line-limit.mjs",
     "check:index-exports": "node scripts/check-index-exports.mjs",
-    "release:check": "pnpm guard:repo && pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm license-check && pnpm audit:deps && pnpm test && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
+    "release:check": "pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm license-check && pnpm audit:deps && pnpm test && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
     "guard:repo": "node scripts/assert-correct-repo.mjs",
     "dev:web": "vite",
     "build": "pnpm build:web",
@@ -41,8 +41,8 @@
     "build:desktop": "pnpm build:electron-main && vite build && electron-builder --win --x64",
     "electron:start": "electron .",
     "camera:bridge": "pnpm build:electron-main && node dist-electron/rtsp-camera-bridge-cli.js",
-    "deploy:web": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=main",
-    "deploy:web:preview": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
+    "deploy:web": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=main",
+    "deploy:web:preview": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },
   "dependencies": {
     "clipper2-ts": "2.0.1-17",

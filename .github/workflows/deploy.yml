@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify canonical deployment repository
+        run: pnpm guard:repo
+
       - name: Release verification gate
         run: pnpm release:check
 

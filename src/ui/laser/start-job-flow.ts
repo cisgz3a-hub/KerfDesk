@@ -9,7 +9,7 @@
 // startJob-failed alert in the catch arm can fire after streaming began,
 // and a native dialog there would freeze the ack pump and Abort button.
 
-import { buildResumeProgram } from '../../core/controllers/grbl';
+import { buildResumeProgram, type OverrideValues } from '../../core/controllers/grbl';
 import type { StatusQueryCapability } from '../../core/controllers';
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import {
@@ -51,14 +51,18 @@ import {
   reportedWorkPositionMm,
   type CanvasMotionPlan,
 } from '../state/canvas-motion-plan';
+import { useStartBlockerStore } from './start-blocker-store';
+import { reducedOverrideAcknowledgement } from '../state/cnc-accessory-readiness';
 
 export async function runStartJobFlow(): Promise<void> {
+  useStartBlockerStore.getState().clear();
   const app = useStore.getState();
   const { project } = app;
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
   const prepared = await prepareCurrentStartJob(app, laser, camera);
   if (!prepared.ok) {
+    useStartBlockerStore.getState().report(prepared.messages);
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start job:\n\n${lines}`);
     return;
@@ -68,7 +72,7 @@ export async function runStartJobFlow(): Promise<void> {
     if (!jobAwareConfirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
   }
   const machineKind = machineKindOf(project.machine);
-  const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode);
+  const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
   if (cncSetupAttestation === null) return;
   try {
     await laser.startJob(prepared.gcode, {
@@ -100,6 +104,7 @@ export async function runStartJobFlow(): Promise<void> {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
 }
@@ -125,6 +130,8 @@ async function prepareCurrentStartJob(
       workOriginActive: laser.workOriginActive,
       workZZeroEvidence: laser.workZZeroEvidence,
       workZReferenceEpoch: laser.workZReferenceEpoch,
+      controllerSessionEpoch: laser.controllerSessionEpoch,
+      nowMs: Date.now(),
       wcoCache: laser.wcoCache,
       ovCache: laser.ovCache,
       accessoryCache: laser.accessoryCache ?? null,
@@ -161,10 +168,15 @@ async function prepareCurrentStartJob(
 function confirmCncSetup(
   machineKind: MachineKind,
   gcode: string,
+  overrides: OverrideValues | null,
 ): CncSetupAttestation | null | undefined {
   if (machineKind !== 'cnc') return undefined;
   if (!jobAwareConfirm(CNC_SETUP_ATTESTATION_PROMPT)) return null;
-  return createCncSetupAttestation(gcode, cncControllerEpochOf(useLaserStore.getState()));
+  return createCncSetupAttestation(
+    gcode,
+    cncControllerEpochOf(useLaserStore.getState()),
+    reducedOverrideAcknowledgement(overrides),
+  );
 }
 
 // Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC
@@ -245,6 +257,8 @@ function prepareResume(overrides?: {
       workOriginActive: laser.workOriginActive,
       workZZeroEvidence: laser.workZZeroEvidence,
       workZReferenceEpoch: laser.workZReferenceEpoch,
+      controllerSessionEpoch: laser.controllerSessionEpoch,
+      nowMs: Date.now(),
       wcoCache: laser.wcoCache,
       ovCache: laser.ovCache,
       accessoryCache: laser.accessoryCache ?? null,

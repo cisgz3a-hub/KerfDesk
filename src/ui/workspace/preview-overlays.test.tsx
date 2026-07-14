@@ -110,6 +110,21 @@ describe('PreviewStatusOverlays', () => {
     expect(host.textContent).toContain('Move to the work origin first.');
     expect(host.textContent).not.toContain('Nothing to preview');
   });
+
+  it('shows the exact preparation failure instead of the empty-project hint', async () => {
+    const host = await renderStatus({
+      steps: [],
+      totalLength: 0,
+      previewIssue: {
+        kind: 'preparation-failed',
+        messages: ['Raster output requires 5,000,000 burn pixels.'],
+      },
+    } as Toolpath & { readonly previewIssue: PreviewIssue });
+
+    expect(host.textContent).toContain('Preview blocked');
+    expect(host.textContent).toContain('Raster output requires 5,000,000 burn pixels.');
+    expect(host.textContent).not.toContain('Nothing to preview');
+  });
 });
 
 describe('PreviewRouteControls', () => {
