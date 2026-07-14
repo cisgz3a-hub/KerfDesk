@@ -42,6 +42,7 @@ import {
   pushLog,
   setupCommandBlockMessage,
   toolChangeContinueBlockMessage,
+  toolChangeHoldEntryPatch,
 } from './laser-store-helpers';
 import type { LaserState, StartJobOptions } from './laser-store';
 
@@ -404,7 +405,16 @@ async function runContinueToolChange(
     if (s.streamer === null) return s;
     const stepped = step(continueToolChangeStreamer(s.streamer));
     toSend = stepped.toSend;
-    return { streamer: stepped.state };
+    // Continuing always consumes the current M0, so a resulting 'tool-change'
+    // status is a NEW hold reached within this single fill. The ack-path
+    // transition patch never sees it (status was already 'tool-change'), so the
+    // prior tool's Z evidence, the stale toolChangeIdleSeen, and the tool label
+    // would carry into the next hold — apply the shared entry patch here (F22).
+    const enteredNextHold = stepped.state.status === 'tool-change';
+    return {
+      streamer: stepped.state,
+      ...(enteredNextHold ? toolChangeHoldEntryPatch(s) : {}),
+    };
   });
   if (toSend.length > 0) {
     try {

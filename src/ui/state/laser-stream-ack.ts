@@ -6,7 +6,7 @@ import { markErrored, onAck, step, type StreamerState } from '../../core/control
 import { beginPostJobSettle } from './laser-post-job-settle';
 import { writeFailedNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { hasUnsettledStreamAcks } from './laser-store-helpers';
+import { hasUnsettledStreamAcks, toolChangeHoldEntryPatch } from './laser-store-helpers';
 import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
@@ -44,19 +44,10 @@ export function advanceStream(
   // (the setup gate allows it during the hold). Invalidate so the no-work-zero
   // advisory is honest again until they do (Codex audit P1).
   if (s.status !== 'tool-change' && stepped.state.status === 'tool-change') {
-    // New bit going in: void the prior Z0, and require a FRESH Idle (observed
-    // after the pre-M0 retract drains) before the setup gate / Continue unlock —
-    // any Idle currently in statusReport predates reaching the boundary. Also
-    // consume the next tool label so the pause UI can name the bit (R5).
-    set((state) => ({
-      workZZeroEvidence: null,
-      workZReferenceEpoch: state.workZReferenceEpoch + 1,
-      toolChangeIdleSeen: false,
-      pendingToolLabel: state.toolChangeLabels[0] ?? null,
-      pendingToolId: state.toolChangeToolIds[0] ?? null,
-      toolChangeLabels: state.toolChangeLabels.slice(1),
-      toolChangeToolIds: state.toolChangeToolIds.slice(1),
-    }));
+    // New bit going in: void the prior Z0, require a FRESH Idle before the setup
+    // gate / Continue unlock, and consume the next tool label so the pause UI can
+    // name the bit (R5). Shared with the Continue entry site (F22).
+    set((state) => toolChangeHoldEntryPatch(state));
   }
   if (s.status !== 'done' && stepped.state.status === 'done') {
     beginPostJobSettle(set, get, refs, safeWrite);
