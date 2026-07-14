@@ -20,12 +20,13 @@ export function TextLayerField(props: {
               height: 14,
               borderRadius: 3,
               background: props.value,
-              border: '1px solid var(--border)',
+              border: '1px solid var(--lf-border)',
             }}
           />
           <select
             className="lf-input"
             aria-label="Text output layer"
+            title="Choose the layer and operation settings used for this text."
             value={props.value}
             onChange={(event) => props.onChange(event.target.value)}
             style={{ flex: 1 }}
@@ -45,7 +46,7 @@ export function TextLayerField(props: {
             role={props.notice.kind === 'error' ? 'alert' : 'status'}
             style={{
               fontSize: 11,
-              color: props.notice.kind === 'error' ? 'var(--danger)' : 'var(--warning)',
+              color: props.notice.kind === 'error' ? 'var(--lf-danger-fg)' : 'var(--lf-warning-fg)',
             }}
           >
             {props.notice.message}
