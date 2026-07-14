@@ -16,6 +16,11 @@ function record(kind, detail = {}) {
 function installSerial() {
   let readController = null;
   let currentStatus = '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>';
+  const settings = new Map([
+    [30, '1000'],
+    [31, '0'],
+    [32, '1'],
+  ]);
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const port = new EventTarget();
@@ -35,7 +40,7 @@ function installSerial() {
       write(chunk) {
         const text = decoder.decode(chunk);
         record('serial-write', { text });
-        respondToSerialWrite(text, emitLine, () => currentStatus);
+        respondToSerialWrite(text, emitLine, () => currentStatus, settings);
       },
     });
     queueMicrotask(() => {
@@ -82,15 +87,17 @@ function installSerial() {
   };
 }
 
-function respondToSerialWrite(text, emitLine, currentStatus) {
+function respondToSerialWrite(text, emitLine, currentStatus, settings) {
   if (text === '?') {
     emitLine(currentStatus());
     return;
   }
+  for (const line of text.split('\n')) {
+    const write = /^\$(\d+)=([^\s]+)$/.exec(line.trim());
+    if (write !== null) settings.set(Number(write[1]), write[2]);
+  }
   if (text.includes('$$')) {
-    emitLine('$30=1000');
-    emitLine('$31=0');
-    emitLine('$32=1');
+    for (const [id, value] of settings) emitLine(`$${id}=${value}`);
   }
   const acknowledgements = [...text].filter((character) => character === '\n').length;
   if (!state.autoAcknowledge && acknowledgements > 0) {

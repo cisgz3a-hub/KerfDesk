@@ -548,3 +548,26 @@ body {
 .lf-scroll::-webkit-scrollbar-track {
   background: var(--lf-bg-1);
 }
+/* Machine Setup keeps its numbered sequence usable on narrow desktop/mobile
+   windows without squeezing the form beside a fixed sidebar. */
+@media (max-width: 700px) {
+  .lf-machine-setup-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 8px !important;
+    min-height: 0 !important;
+  }
+
+  .lf-machine-setup-stepper {
+    display: grid !important;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(145px, 1fr);
+    overflow-x: auto;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--lf-border);
+    padding: 0 0 8px !important;
+  }
+
+  .lf-dialog-actions {
+    flex-wrap: wrap;
+  }
+}

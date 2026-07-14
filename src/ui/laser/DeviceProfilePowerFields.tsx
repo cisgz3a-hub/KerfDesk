@@ -1,8 +1,7 @@
 // DeviceProfilePowerFields — the laser-output field editors: GRBL power range
 // ($30/$31/$32) and the air-assist coolant command. Split from
-// DeviceProfileFields so the Device Setup wizard can place the controller-
-// reported power on its "confirm settings" step and air-assist (which $$ cannot
-// report) on its "placement & safety" step. The inline Device Profile panel
+// DeviceProfileFields so Machine Setup can place controller power and air-assist
+// together on its machine-output step. The inline Device Profile panel
 // renders both directly and hides them in CNC mode (ADR-101 §6).
 
 import {
@@ -19,14 +18,17 @@ const MAX_POWER_S = 100000;
 type DeviceRowsProps = {
   readonly device: DeviceProfile;
   readonly update: (patch: Partial<DeviceProfile>) => void;
+  /** Default preserves the GRBL-specific labels used by the legacy panels. */
+  readonly grblLabels?: boolean;
 };
 
 // GRBL $30/$31 power range + $32 laser mode — the machine-reported beam scale.
 export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
+  const grblLabels = props.grblLabels ?? true;
   return (
     <>
-      <Row label="$30 (max S)">
+      <Row label={grblLabels ? '$30 (max S)' : 'Maximum S'}>
         <ClearableNumberField
           min={1}
           max={MAX_POWER_S}
@@ -34,11 +36,15 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           value={device.maxPowerS}
           onCommit={(v) => update({ maxPowerS: Math.floor(v) })}
           style={numInputStyle}
-          ariaLabel="GRBL $30 max power S"
-          title="Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
+          ariaLabel={grblLabels ? 'GRBL $30 max power S' : 'Maximum laser power S'}
+          title={
+            grblLabels
+              ? "Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
+              : 'Maximum S value expected by the selected firmware and laser output mode.'
+          }
         />
       </Row>
-      <Row label="$31 (min S)">
+      <Row label={grblLabels ? '$31 (min S)' : 'Minimum S'}>
         <ClearableNumberField
           min={0}
           max={MAX_POWER_S}
@@ -46,21 +52,25 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           value={device.minPowerS}
           onCommit={(v) => update({ minPowerS: Math.floor(v) })}
           style={numInputStyle}
-          ariaLabel="GRBL $31 min power S"
-          title="Minimum nonzero spindle/laser S value. Diode lasers usually use 0."
+          ariaLabel={grblLabels ? 'GRBL $31 min power S' : 'Minimum laser power S'}
+          title="Minimum nonzero laser S value. Diode lasers usually use 0."
         />
       </Row>
-      <Row label="$32 laser mode">
+      <Row label={grblLabels ? '$32 laser mode' : 'Laser mode'}>
         <label
           style={inlineLabelStyle}
-          title="GRBL laser mode. Keep this enabled for M4 dynamic-power image engraving."
+          title="Keep laser mode enabled when the firmware supports dynamic-power engraving."
         >
           <input
             type="checkbox"
             checked={device.laserModeEnabled}
             onChange={(e) => update({ laserModeEnabled: e.target.checked })}
-            aria-label="GRBL $32 laser mode enabled"
-            title="Enable GRBL laser mode ($32=1) for laser jobs."
+            aria-label={grblLabels ? 'GRBL $32 laser mode enabled' : 'Laser mode enabled'}
+            title={
+              grblLabels
+                ? 'Enable GRBL laser mode ($32=1) for laser jobs.'
+                : 'Record that the controller is configured for laser output.'
+            }
           />
           <span>Enabled</span>
         </label>

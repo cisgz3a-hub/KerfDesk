@@ -91,6 +91,156 @@ baseTest(
   },
 );
 
+baseTest(
+  'Machine Setup saves a complete laser draft through the beginner flow',
+  async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
+    await expect(dialog).toContainText('Step 1 of 7 — Machine & controller');
+    await expect(dialog.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('Step 2 of 7 — Connect & read');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByLabel('Device name').fill('E2E beginner laser');
+    await dialog.getByLabel('Bed width (mm)').fill('510');
+    await dialog.getByLabel('Bed width (mm)').blur();
+    for (let step = 0; step < 4; step += 1) {
+      await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+
+    await expect(dialog).toContainText('Software configuration is internally consistent');
+    await expect(dialog).toContainText('Hardware commissioning — operator check after saving');
+    await expect(dialog).not.toContainText('ready to cut');
+    await dialog.getByRole('button', { name: 'Save machine setup', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+    const reopened = page.getByRole('dialog', { name: 'Machine Setup' });
+    await reopened.getByRole('button', { name: 'Next', exact: true }).click();
+    await reopened.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(reopened.getByLabel('Device name')).toHaveValue('E2E beginner laser');
+    await expect(reopened.getByLabel('Bed width (mm)')).toHaveValue('510');
+  },
+);
+
+baseTest(
+  'Machine Setup switches to CNC and commits CNC-only machine parameters',
+  async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
+
+    await dialog.getByRole('radio', { name: /CNC router \/ mill/ }).check();
+    await dialog.getByLabel('Built-in CNC machine').selectOption('genmitsu-3018');
+    await dialog.getByRole('button', { name: 'Load into draft', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('CNC clearance and spindle contract');
+    await expect(dialog).not.toContainText('Laser output and accessories');
+    await dialog.getByLabel('Safe Z').fill('9');
+    await dialog.getByLabel('Safe Z').blur();
+    for (let step = 0; step < 3; step += 1) {
+      await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await expect(dialog).toContainText(
+      'Probe plate thickness, electrical contact, and plate removal',
+    );
+    await dialog.getByRole('button', { name: 'Save machine setup', exact: true }).click();
+
+    await expect(page.getByLabel('Router controls')).toBeVisible();
+    await expect(page.getByLabel('Safe Z')).toHaveValue('9');
+    await expect(page.getByLabel('Spindle max')).toHaveValue('10000');
+  },
+);
+
+baseTest('Machine Setup stays navigable at the narrow breakpoint', async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Machine' }).click();
+  await page.getByRole('button', { name: 'Expand Laser panel' }).click();
+  await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
+  await expect(dialog).toContainText('Step 1 of 7 — Machine & controller');
+  await expect(dialog.getByRole('navigation', { name: 'Machine Setup steps' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Next', exact: true })).toBeVisible();
+  const responsiveLayout = await dialog.locator('.lf-machine-setup-layout').evaluate((element) => ({
+    columns: getComputedStyle(element).gridTemplateColumns,
+    width: element.getBoundingClientRect().width,
+  }));
+  expect(responsiveLayout.columns.split(' ')).toHaveLength(1);
+  expect(responsiveLayout.width).toBeGreaterThan(500);
+
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(dialog).toContainText('Step 2 of 7 — Connect & read');
+});
+
+kerfDeskTest(
+  'Machine Setup reads first, queues safely, then writes and verifies after Save',
+  async ({ page, kerfdesk }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: /^Connect/ }).click();
+    await expect(dialog).toContainText('Controller connected.');
+
+    const beforeRead = serialWrites(await kerfdesk.events()).length;
+    await dialog.getByRole('button', { name: 'Run read-only checks', exact: true }).click();
+    await expect
+      .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeRead))
+      .toContain('$I\n');
+    await expect
+      .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeRead))
+      .toContain('$$\n');
+    expect(serialWrites(await kerfdesk.events()).slice(beforeRead)).not.toMatch(/\$\d+=/);
+
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByLabel('GRBL $30 max power S').fill('900');
+    await dialog.getByLabel('GRBL $30 max power S').blur();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('Queue $30 for Save');
+
+    await dialog.getByRole('button', { name: 'Export backup', exact: true }).click();
+    await expect
+      .poll(async () => Object.keys(await kerfdesk.savedFiles()).length)
+      .toBeGreaterThan(0);
+    await dialog.getByLabel('Confirm controller backup exported').check();
+    await dialog.getByLabel('Confirm write $30').check();
+    const beforeQueue = serialWrites(await kerfdesk.events()).length;
+    await dialog.getByRole('button', { name: 'Queue $30 for Save', exact: true }).click();
+    await expect(dialog).toContainText('Remove queued $30');
+    expect(serialWrites(await kerfdesk.events()).slice(beforeQueue)).not.toContain('$30=900');
+
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('$30=900; exact re-read required');
+    const beforeSave = serialWrites(await kerfdesk.events()).length;
+    await dialog
+      .getByRole('button', { name: 'Save setup and write 1 setting', exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0);
+    await expect
+      .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeSave))
+      .toContain('$30=900\n');
+    expect(serialWrites(await kerfdesk.events()).slice(beforeSave)).toContain('$$\n');
+
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+    const reopened = page.getByRole('dialog', { name: 'Machine Setup' });
+    for (let step = 0; step < 3; step += 1) {
+      await reopened.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await expect(reopened.getByLabel('GRBL $30 max power S')).toHaveValue('900');
+  },
+);
+
 baseTest('synthetic bitmap reaches Trace preview and commits a traced object', async ({ page }) => {
   await installFileSystemMocks(page);
   await page.goto('/');

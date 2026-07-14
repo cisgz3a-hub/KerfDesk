@@ -1,11 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
-import { useStore } from './store';
 
-type FakeConnection = SerialConnection & {
-  readonly emitLine: (line: string) => void;
-};
+type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
@@ -17,134 +14,55 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: (line) => lineHandlers.forEach((handler) => handler(line)),
   };
 }
 
-function makeAdapter(connection: SerialConnection): PlatformAdapter {
+function adapter(connection: SerialConnection): PlatformAdapter {
   return {
     id: 'mock',
     pickFilesForOpen: async () => [],
     pickFileForSave: async () => null,
     serial: {
       isSupported: () => true,
-      requestPort: async () => ({
-        open: async () => connection,
-      }),
+      requestPort: async () => ({ open: async () => connection }),
     },
   };
 }
 
-async function connectWith(connection: FakeConnection): Promise<void> {
-  await useLaserStore.getState().connect(makeAdapter(connection));
-  connection.emitLine('Grbl 1.1f');
-  await Promise.resolve();
-}
-
-beforeEach(() => {
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
-});
-
 afterEach(async () => {
-  useStore.getState().setMachineKind('laser');
-  useLaserStore.setState({ autofocusBusy: false });
   await useLaserStore.getState().disconnect();
-  useLaserStore.setState({
-    connection: { kind: 'disconnected' },
-    statusReport: null,
-    alarmCode: null,
-    lastError: null,
-    lastWriteError: null,
-    safetyNotice: null,
-    autofocusBusy: false,
-    motionOperation: null,
-    streamer: null,
-    log: [],
-    detectedSettings: null,
-    controllerSettings: null,
-    wcoCache: null,
-    workOriginActive: false,
-  });
   vi.restoreAllMocks();
 });
 
-describe('laser-store GRBL laser setup', () => {
-  it('blocks GRBL laser setup until controller settings have been read', async () => {
+describe('retired fixed GRBL setup action', () => {
+  it('is inert even when called directly by an old UI or fixture', async () => {
+    await expect(useLaserStore.getState().configureGrblLaserSetup()).rejects.toThrow(
+      /fixed GRBL setup batches were removed/i,
+    );
+    expect(useLaserStore.getState().lastWriteError).toMatch(
+      /one verified common setting at a time/i,
+    );
+  });
+
+  it('never writes after a controller is connected and settings are available', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
     });
-    await connectWith(connection);
+    await useLaserStore.getState().connect(adapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('$30=1000');
+    connection.emitLine('$32=1');
+    connection.emitLine('$130=400');
+    connection.emitLine('ok');
+    await new Promise((resolve) => setTimeout(resolve, 0));
     writes.length = 0;
 
     await expect(useLaserStore.getState().configureGrblLaserSetup()).rejects.toThrow(
-      /read machine settings/i,
+      /machine travel and power values must never be assumed/i,
     );
-
-    expect(writes).toEqual([]);
-  });
-
-  it('sends the explicit Neotronics-safe GRBL laser setup sequence and refreshes $$ settings', async () => {
-    const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
-    await connectWith(connection);
-    seedSettingsRead(connection);
-    writes.length = 0;
-
-    await useLaserStore.getState().configureGrblLaserSetup();
-
-    expect(writes).toEqual(['$32=1\n', '$30=1000\n', '$130=400\n', '$131=400\n', '$$\n']);
-  });
-
-  it('refuses the laser-mode $32 write while the project machine is CNC', async () => {
-    const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
-    await connectWith(connection);
-    seedSettingsRead(connection);
-    useStore.getState().setMachineKind('cnc');
-    writes.length = 0;
-
-    await expect(useLaserStore.getState().configureGrblLaserSetup()).rejects.toThrow(/laser mode/i);
-
-    expect(writes).toEqual([]);
-    expect(useLaserStore.getState().lastWriteError).toMatch(/laser mode/i);
-  });
-
-  it('blocks GRBL laser setup while a job is active', async () => {
-    const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
-    await connectWith(connection);
-    seedSettingsRead(connection);
-    writes.length = 0;
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
-    writes.length = 0;
-
-    await expect(useLaserStore.getState().configureGrblLaserSetup()).rejects.toThrow(
-      /job is active/i,
-    );
-
     expect(writes).toEqual([]);
   });
 });
-
-function seedSettingsRead(connection: FakeConnection): void {
-  connection.emitLine('$20=1');
-  connection.emitLine('$21=1');
-  connection.emitLine('$22=1');
-  connection.emitLine('$23=3');
-  connection.emitLine('$30=1000');
-  connection.emitLine('$31=0');
-  connection.emitLine('$32=1');
-  connection.emitLine('$130=400');
-  connection.emitLine('$131=400');
-  connection.emitLine('$132=75');
-  connection.emitLine('ok');
-}

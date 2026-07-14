@@ -1,7 +1,5 @@
-// Zustand store: active Project + UI state (selection, preview toggle) +
-// undo/redo history (F-A14) + dirty/save tracking (F-A11). Each action is
-// built as a slice factory below so the `create` call stays small enough
-// to satisfy ADR-015's function-size rule.
+// Zustand store: project/UI state, undo/redo, and dirty/save tracking.
+// Slice factories keep the create call within ADR-015's size rule.
 
 import { create } from 'zustand';
 import type { InsertablePart } from './box-insert-mutation';
@@ -11,6 +9,7 @@ import {
   type BoardShape,
   type Layer,
   type LayerMoveDirection,
+  type MachineConfig,
   type Project,
   type RasterImage,
   type Scene,
@@ -302,10 +301,9 @@ export type AppState = ObjectPropertiesActions &
     readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
     readonly replaceDeviceProfile: (profile: DeviceProfile) => void;
-
+    readonly replaceMachineSetup: (...args: [DeviceProfile, MachineConfig, MachineConfig?]) => void;
     readonly undo: () => void;
     readonly redo: () => void;
-
     // Single-select on plain click; clears all when id is null.
     readonly selectObject: (id: string | null) => void;
     // Shift+click toggle; never clears the primary.
@@ -321,7 +319,6 @@ export type AppState = ObjectPropertiesActions &
     readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;
     readonly setOutputScopeSettings: (patch: Partial<OutputScopeSettings>) => void;
     readonly setCursorMm: (cursor: Vec2 | null) => void;
-
     readonly beginInteraction: () => void;
     readonly setObjectTransform: (id: string, transform: Transform) => void;
     readonly endInteraction: () => void;
@@ -383,7 +380,6 @@ function initialState(
     jobPlacement: defaultJobPlacementForDevice(project.device),
     outputScopeSettings: DEFAULT_OUTPUT_SCOPE_SETTINGS,
     registrationArtworkOutputSnapshot: null,
-    // Fresh project is clean — no edits have happened, no name on disk.
     dirty: false,
     savedName: null,
     lastSaveTarget: null,

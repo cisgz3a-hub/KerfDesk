@@ -11,7 +11,7 @@ import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
 
-export function MachineSettingsPanel(): JSX.Element {
+export function MachineSettingsPanel(props: { readonly defaultOpen?: boolean } = {}): JSX.Element {
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const streamer = useLaserStore((s) => s.streamer);
@@ -58,7 +58,7 @@ export function MachineSettingsPanel(): JSX.Element {
   };
 
   return (
-    <details style={panelStyle} {...panelHelp}>
+    <details open={props.defaultOpen} style={panelStyle} {...panelHelp}>
       <summary
         style={summaryStyle}
         title={panelHelp.title}

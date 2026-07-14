@@ -1,6 +1,5 @@
-// device-setup-firmware-diff.ts — pure comparison between the wizard's draft
-// profile and the controller's last $$ readback, used by the Sync step
-// (ADR-092) to offer guarded firmware writes. Only settings GRBL marks as
+// device-setup-firmware-diff.ts — pure comparison between the Machine Setup
+// draft and the controller's last $$ readback. Only settings GRBL marks as
 // 'common'-risk are writable here, matching the existing FirmwareWrites guard;
 // machine-critical ones (bed travel) are surfaced read-only for awareness.
 
@@ -31,7 +30,7 @@ type DiffedSetting = {
 // The settings the wizard reconciles. $30/$31/$32 are 'common'-risk and
 // writable through the existing guard; $130/$131 are machine-critical and
 // included read-only so a bed mismatch is visible without offering a risky
-// write here (use the batch GRBL setup for those). On a router the desired
+// write here (use the controller manufacturer's backed-up procedure). On a router the desired
 // values invert: $32 must be 0 (laser mode zeroes spindle power during
 // rapids) and $30 is the spindle max RPM, never the laser S scale.
 const DIFFED_SETTINGS: ReadonlyArray<DiffedSetting> = [

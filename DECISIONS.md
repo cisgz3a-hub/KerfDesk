@@ -75,6 +75,7 @@
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
 | ADR-203 | 2026-07-15 | Accepted | Recover Work-Z only from owned, fresh controller offset readback |
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
+| ADR-205 | 2026-07-15 | Accepted | Machine Setup is one controller-first atomic workflow |
 
 ---
 
@@ -8288,3 +8289,48 @@ Open remains backward-compatible and fail-safe for old files, while Save can no 
 repair a live project into different disk semantics. A corrupted runtime project must be reloaded or
 explicitly repaired before it can be marked clean. The integrity comparison is pure and covered at
 both the project boundary and the file-action boundary.
+
+---
+
+## ADR-205 - Machine Setup is one controller-first atomic workflow
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+Machine configuration had two conflicting surfaces. The seven-tab Machine Setup dialog edited the
+live project immediately, while Device Setup used a draft and different Cancel semantics. The
+wizard connected before controller selection, mixed laser-only settings into CNC, omitted CNC
+machine parameters, described every controller as GRBL `$$`, and ended with an unproved "ready to
+cut" claim. A separate fixed batch could write assumed `$30`, `$32`, `$130`, and `$131` values to
+any GRBL-dollar controller.
+
+### Decision
+
+- Expose one seven-step **Machine Setup** flow and route the legacy dialog entry to it.
+- Choose Laser/CNC, controller family, baud, dialect, and streaming before opening serial.
+- Keep controller identity/readback separate from the draft until an explicit operator action.
+  Detected identity never silently replaces a selected catalog/import/manual profile; accepted CNC
+  `$30` readback updates the CNC spindle ceiling rather than laser-power fields.
+- Draft `DeviceProfile` and `MachineConfig` together. Save device, workspace, machine config, CNC
+  cache, job placement, and spindle-ceiling effects as one undoable store transaction.
+- Render laser output or CNC spindle/clearance controls according to the draft machine kind; probing
+  remains a separate supervised hardware operation.
+- Keep one controller guide for GRBL, grblHAL, FluidNC, Marlin, Smoothieware, and Ruida, checked
+  against the selected `ControllerDriver` for transport, baud, home, status, streaming, and CNC
+  capability.
+- Remove the fixed GRBL setup batch. Only GRBL/grblHAL common settings may use the existing
+  read/backup/confirm/queue/save/write/re-read/verify path. Cancel sends no firmware command;
+  software commits before queued writes execute. Machine-critical travel stays review-only; other
+  controller families use their native configuration tools.
+- Finish with a software-consistency report and an explicit operator hardware-commissioning list.
+  Saving sends no home, jog, probe, beam, spindle, or coolant command. Firmware changes occur only
+  when the operator explicitly queued supported common settings after the backup/confirmation gate.
+
+### Consequences
+
+Cancel has one meaning and cannot leave a half-edited machine. Controller selection, connection,
+output generation, workspace bounds, origin transforms, homing, framing, power/spindle behavior,
+accessories, safety zones, and optional calibration now derive from one reviewed draft. Software
+tests can prove this wiring and command policy; physical direction, switches, relays, interlocks,
+beam/spindle behavior, clearances, and calibration remain the operator's hardware gate.

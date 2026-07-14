@@ -1,7 +1,7 @@
 // DeviceSetupControls - one context-aware rail entry for machine configuration.
 // The button opens Machine Setup in every state and gains primary emphasis only
-// when the connected profile still needs guided setup. The Overview tab owns
-// the explicit wizard launch, removing two near-synonym buttons from the rail.
+// when the connected profile still needs guided setup. This is the single
+// explicit setup launch, removing the former pair of near-synonym workflows.
 
 import { useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
@@ -14,13 +14,11 @@ import {
   persistConfiguredSignatures,
 } from '../../state/device-setup-configured-persistence';
 import { useLaserStore } from '../../state/laser-store';
-import { MachineSetupDialog } from '../MachineSetupDialog';
 import { deviceProfileSignature, shouldPromptDeviceSetup } from './device-setup-nudge';
 import { DeviceSetupWizard } from './DeviceSetupWizard';
 
 export function DeviceSetupControls(): JSX.Element {
   const [machineSetupOpen, setMachineSetupOpen] = useState(false);
-  const [deviceSetupOpen, setDeviceSetupOpen] = useState(false);
   const [configured, setConfigured] = useState<ReadonlySet<string>>(() => {
     const storage = browserLocalStorage();
     return storage === null ? new Set() : loadConfiguredSignatures(storage);
@@ -34,10 +32,6 @@ export function DeviceSetupControls(): JSX.Element {
     setConfigured(next);
     const storage = browserLocalStorage();
     if (storage !== null) persistConfiguredSignatures(storage, next);
-  };
-  const openWizardFromMachineSetup = (): void => {
-    setMachineSetupOpen(false);
-    setDeviceSetupOpen(true);
   };
   return (
     <>
@@ -53,16 +47,10 @@ export function DeviceSetupControls(): JSX.Element {
           This machine isn&apos;t set up yet.
         </p>
       )}
-      {deviceSetupOpen && (
-        <DeviceSetupWizard
-          onClose={() => setDeviceSetupOpen(false)}
-          onConfigured={markConfigured}
-        />
-      )}
       {machineSetupOpen && (
-        <MachineSetupDialog
+        <DeviceSetupWizard
           onClose={() => setMachineSetupOpen(false)}
-          onRunGuidedSetup={openWizardFromMachineSetup}
+          onConfigured={markConfigured}
         />
       )}
     </>

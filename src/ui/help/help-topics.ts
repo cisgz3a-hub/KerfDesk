@@ -237,7 +237,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-setup.launch': {
     label: 'Machine Setup',
     tooltip:
-      'Open the Machine Setup dialog: profile, catalog, controller settings, firmware writes, safety zones, diagnostics, and import/export.',
+      'Open the single step-by-step setup for machine type, profile, controller, workspace, output, safety, guarded firmware review, and hardware handoff.',
   },
   'laser.machine-setup.tab.overview': {
     label: 'Machine overview',
@@ -274,37 +274,39 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
       'Import, review, and export KerfDesk machine profiles or supported LightBurn device files.',
   },
   'laser.device-setup.launch': {
-    label: 'Set up device',
+    label: 'Machine Setup',
     tooltip:
-      'Open the guided Device Setup wizard to configure this machine from what the controller reports.',
+      'Configure machine type, controller, coordinates, output, safety, firmware policy, and hardware handoff in one draft-based flow.',
   },
   'laser.device-setup.next': {
     label: 'Next step',
-    tooltip: 'Continue to the next step of the Device Setup wizard.',
+    tooltip: 'Continue to the next step of Machine Setup.',
   },
   'laser.device-setup.back': {
     label: 'Previous step',
-    tooltip: 'Return to the previous step of the Device Setup wizard.',
+    tooltip: 'Return to the previous step of Machine Setup.',
   },
   'laser.device-setup.finish': {
-    label: 'Finish setup',
-    tooltip: 'Save the confirmed machine profile and close the Device Setup wizard.',
+    label: 'Save machine setup',
+    tooltip:
+      'Atomically save the reviewed software configuration, then write and verify any explicitly queued common firmware settings.',
   },
   'laser.device-setup.cancel': {
     label: 'Cancel setup',
-    tooltip: 'Discard the Device Setup draft without changing the active machine profile.',
+    tooltip:
+      'Discard the complete Machine Setup draft. Queued firmware settings are not sent on Cancel.',
   },
   'laser.device-setup.connect': {
     label: 'Connect controller',
-    tooltip: 'Open the WebSerial port picker and connect to the laser controller.',
+    tooltip: 'Open the serial port with the controller family and baud selected on step 1.',
   },
   'laser.device-setup.reread': {
-    label: 'Re-read settings',
-    tooltip: 'Re-read the controller GRBL settings with $$ to refresh the detected values.',
+    label: 'Run read-only checks',
+    tooltip: 'Run the selected controller family’s non-motion identity and settings-read commands.',
   },
   'laser.device-setup.apply-detected': {
     label: 'Apply detected settings',
-    tooltip: 'Copy the controller-reported settings into the Device Setup draft.',
+    tooltip: 'Copy supported controller-reported values into the Machine Setup draft.',
   },
   'laser.output-scope.cut-selected': {
     label: 'Selected artwork only',

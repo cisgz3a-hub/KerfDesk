@@ -341,19 +341,20 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await page.getByRole('tab', { name: 'Machine', exact: true }).click();
   await page.getByRole('button', { name: 'Expand Laser panel' }).click();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-  await page.getByRole('button', { name: 'Run guided setup', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Device Setup' })).toContainText('Step 1 of 6');
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  const setup = page.getByRole('dialog', { name: 'Machine Setup' });
+  await expect(setup).toContainText('Step 1 of 7');
+  await setup.getByLabel('Controller firmware').selectOption('grblhal');
+  await setup.getByText('Optional: start from a tested machine profile').click();
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
-  for (let step = 0; step < 3; step += 1) {
+  for (let step = 0; step < 6; step += 1) {
     await page.getByRole('button', { name: 'Next', exact: true }).click();
   }
-  await expect(page.getByRole('button', { name: 'Finish setup' })).toBeEnabled();
-  const finishBox = await page.getByRole('button', { name: 'Finish setup' }).boundingBox();
+  await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();
+  const finishBox = await page.getByRole('button', { name: 'Save machine setup' }).boundingBox();
   expect(finishBox).not.toBeNull();
   expect((finishBox?.x ?? 0) + (finishBox?.width ?? 0)).toBeLessThanOrEqual(390);
   expect((finishBox?.y ?? 0) + (finishBox?.height ?? 0)).toBeLessThanOrEqual(844);
-  await page.getByRole('button', { name: 'Finish setup' }).click();
+  await page.getByRole('button', { name: 'Save machine setup' }).click();
   await page.getByRole('button', { name: 'Save As...' }).click();
 
   const saved = await savedProject(kerfdesk);
@@ -375,17 +376,19 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   await kerfdesk.emitSerialLine("Grbl 1.1h ['$' for help]");
 
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Machine Setup' })).toContainText(
-    'Detectedgrbl-v1.1',
-  );
-  await page.getByRole('button', { name: 'Profile Catalog' }).click();
+  const setup = page.getByRole('dialog', { name: 'Machine Setup' });
+  await expect(setup.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
+  await setup.getByText('Optional: start from a tested machine profile').click();
 
   const marlinCard = page.locator('article').filter({ hasText: 'Generic Marlin laser 300' });
   await expect(marlinCard.getByRole('button', { name: 'Firmware mismatch' })).toBeDisabled();
 
   const xToolCard = page.locator('article').filter({ hasText: 'xTool D1 Pro' });
   await xToolCard.getByRole('button', { name: 'Use xTool D1 Pro' }).click();
-  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  for (let step = 0; step < 6; step += 1) {
+    await setup.getByRole('button', { name: 'Next', exact: true }).click();
+  }
+  await setup.getByRole('button', { name: 'Save machine setup' }).click();
   await page.getByRole('button', { name: 'Save As...' }).click();
 
   const saved = await savedProject(kerfdesk);

@@ -915,31 +915,67 @@ run that finishes cleanly clears it.
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
 - F-C6. Crash reporter
-- F-C7. Device Setup wizard (connect-time, guided) — specified below; the first Phase-C flow being built (ADR-092)
+- F-C7. Unified Machine Setup — specified below (ADR-205; supersedes the split ADR-092 surface)
 
-### F-C7. Device Setup wizard (connect-time)
+### F-C7. Unified Machine Setup
 
-The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092), or from the cross-link **Machine Setup → Overview → Run guided setup** (same wizard, same draft-commit; still never auto-opens). The Laser-panel button carries primary emphasis only while the connected machine has not been set up yet (the FU-4 nudge state); once setup is recorded it renders with normal weight. Edits a draft `DeviceProfile` and commits only on **Finish**. Laser setup uses six relevant steps: Connect & read → Identify machine → Confirm detected settings → Homing & options → Sync to controller → Review & finish. CNC setup inserts an optional **Set work zero (probe)** step before controller sync. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
+The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
+Setup** button; old `MachineSetupDialog` callers resolve to the same flow rather than a competing
+live-edit tab dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` draft until **Save
+machine setup**, which commits the complete configuration as one undoable project change.
 
-#### Success — connected machine answers `$$`
-1. Operator clicks **Set up device** while connected.
-2. Step 1 confirms the connection is live and reads `$$` (or reuses the connect-time read).
-3. Selecting a catalog machine advances directly to confirmation. The draft is prefilled from controller-reported settings; the operator confirms bed/power/feed, then sets the origin corner, homing, and air-assist wiring that `$$` cannot report.
-4. CNC projects may optionally probe work zero; laser projects do not show that irrelevant step.
-5. The optional Sync step lists settings where the draft differs from the controller and offers a guarded per-setting write (confirm → write → auto re-read + verify).
-6. Review shows a "ready to cut" checklist. Every row has a direct **Edit** action that returns to the relevant setup step. **Finish** commits the draft via `replaceDeviceProfile`; Cancel at any point discards it.
+The seven steps are always visible and always ordered:
 
-#### Error — `$$` times out (silent or non-GRBL controller)
-1. Step 1 reports no settings were read; the wizard continues in manual-entry mode (nothing is blocked) so the operator can still set the profile by hand.
+1. **Machine & controller** — choose Laser/CNC, controller family, baud, output dialect, streaming,
+   optional catalog profile, and import/export. Controller selection precedes serial connection.
+2. **Connect & read** — connect with the reviewed driver/baud and run that controller family's
+   read-only identity/settings commands. Ruida correctly presents file-only behavior.
+3. **Work area & coordinates** — name, usable bed, max/frame feed, origin, and homing policy.
+4. **Machine output** — laser S range/air/Fire or CNC safe Z/spindle/dwell/coolant/park. Stock,
+   material, and bit remain job-specific and stay in Material & Bit.
+5. **Safety & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, and the
+   relevant laser-only scan/autofocus/rotary/camera status.
+6. **Firmware review** — controller-specific configuration location and write policy. GRBL/grblHAL
+   can queue common per-setting writes only after read + backup acknowledgement; FluidNC, Marlin,
+   Smoothieware, and Ruida never receive numeric GRBL setup writes. Queuing is draft-only: Cancel
+   sends nothing.
+7. **Review & hardware handoff** — summarize every software consumer and list the separate physical
+   commissioning checklist. The flow says software is internally consistent, never "ready to cut."
 
-#### Empty — default profile, nothing detected
-1. The draft is the generic 400×400 default. Work area and power scale are blocking until confirmed by detection, a catalog profile, or an explicit edit. Identity, laser-head metadata, origin, and homing remain visible review rows without blocking a deliberate custom profile.
+#### Success — connected controller answers its read commands
+
+1. Detected identity remains a separate observation. It never silently replaces the operator's
+   selected profile/controller contract; a mismatch is explicit and must be resolved deliberately.
+2. Supported numeric readback values can be copied into the draft with **Use detected values**; in
+   CNC mode `$30` routes to the spindle ceiling rather than laser-power fields. The live project
+   remains unchanged.
+3. On the last step, **Save machine setup** commits device, workspace, machine config, job placement,
+   CNC cache, and any spindle-ceiling clamp through one store action and one undo entry. Only after
+   that commit does it execute and exactly re-read any explicitly queued common firmware writes.
+
+#### Error — read times out or the controller has no mapped settings
+
+1. The flow reports that nothing was imported and continues in manual-entry mode.
+2. The controller's actual command/configuration surface remains visible so the operator knows
+   whether to use `$$`, FluidNC YAML/WebUI, Marlin configuration/EEPROM tools, a Smoothieware config
+   file, or Ruida vendor tooling.
+
+#### Edge — controller mismatch
+
+1. A connected active/detected controller that differs from the selected draft blocks reads/writes
+   and offers an explicit reconnect action using the reviewed selected contract. Changing to the
+   detected controller is a separate, deliberate profile edit.
 
 #### Edge — opened while disconnected
-1. The wizard runs as a plain profile editor; the Connect and Sync-to-controller steps are gated with a "connect to use this" note. Finish still commits the profile.
+
+1. Manual configuration and final save remain available. Firmware comparison/writes stay optional.
 
 #### Edge — firmware write blocked
-1. If the controller is not Idle, or no `$$` read has happened yet, the Sync step's write is disabled with the reason shown (same guard as F-B14 / Machine Setup → Firmware Writes).
+
+1. No read/backup, non-Idle state, active operation/job, autofocus, or controller mismatch keeps a
+   write from being queued or executed. Every supported write has its own value confirmation and
+   exact re-read check.
+2. Machine-critical travel settings are review-only. There is no fixed-value setup batch.
 
 ---
 
