@@ -24,19 +24,6 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
-<<<<<<< HEAD
-| ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
-| ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
-| ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
-| ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
-| ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
-| ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
-| ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
-| ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
-| ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
-| ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
-| ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
-=======
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
@@ -52,10 +39,19 @@
 | ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
 | ADR-152 | 2026-07-13 | Accepted | Offset pockets may use locally tangent native helical entries |
 | ADR-153 | 2026-07-13 | Accepted | Two-tool pocket rest machining uses bounded 2D stock subtraction |
+| ADR-154 | 2026-07-13 | Accepted | Adaptive pockets require verified constant-load ring sequences |
+| ADR-155 | 2026-07-13 | Accepted | Straight inlays compile as one radius-matched linked pair |
+| ADR-156 | 2026-07-13 | Accepted | Manual CNC tabs use persisted normalized contour anchors |
+| ADR-157 | 2026-07-13 | Accepted | Detected controller identity gates profile transport and output |
+| ADR-159 | 2026-07-13 | Accepted | Schema v2 curves are canonical and compatibility polylines are invalidated |
+| ADR-160 | 2026-07-13 | Accepted | Rotary raster is an explicit experimental amendment to ADR-127 |
+| ADR-161 | 2026-07-13 | Accepted | Labs gates experimental laser features locally and fail closed |
+| ADR-162 | 2026-07-13 | Accepted | Low-power Fire is profile-opted, hard-capped, and momentary |
+| ADR-163 | 2026-07-13 | Accepted | Cut Planner exposes five persisted deterministic policies |
+| ADR-164 | 2026-07-13 | Accepted | Adopt bounded offline editing and interoperability already shipped |
 | ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
->>>>>>> aed41269 (fix: bind CNC Z evidence to tool plan)
 
 ---
 
@@ -6473,7 +6469,6 @@ The rectify runs once per source/alignment change (memoized), not per zoom/pan r
 
 ### Consequences
 
-<<<<<<< HEAD
 Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.
 
 ---
@@ -6682,457 +6677,6 @@ Consequences.
   nearest-point projection from the matching roughing contour's physical tab
   anchors. Automated tests cover contours with deliberately different start
   vertices. Hardware verification remains required before production use.
-
----
-
-## ADR-141 - The network-camera bridge is desktop and local-development only
-
-**Status:** Accepted | **Date:** 2026-07-12
-
-> **Numbering note.** ADR-140 records the CNC finish allowance; **ADR-141** is the next allocated decision number.
-
-### Context
-
-An exact hosted-origin allowlist still lets same-origin XSS drive the operator's
-loopback bridge and reach private-network cameras. A token delivered to browser
-JavaScript would not close that threat because the same XSS could reuse it.
-
-### Decision
-
-The bridge accepts browser requests only from `app://app` and HTTP loopback
-origins used by local development. Hosted origins are rejected before any
-discovery, probe, proxy, or ffmpeg work. Hosted builds retain USB cameras;
-network cameras require Desktop or local development.
-
-### Consequences
-
-A compromised hosted page can no longer use KerfDesk's bridge as a private
-network camera oracle. Desktop is the supported network-camera workflow.
-
----
-
-## ADR-142 - Production desktop tags require a valid Windows signature
-
-**Status:** Accepted | **Date:** 2026-07-12
-
-> **Numbering note.** ADR-141 records the network-camera bridge restriction; **ADR-142** is the next allocated decision number.
-
-### Context
-
-The release workflow could publish an unsigned Windows installer when signing
-secrets were absent.
-
-### Decision
-
-Tag builds fail before packaging unless `CSC_LINK` and `CSC_KEY_PASSWORD`
-exist. After packaging, `Get-AuthenticodeSignature` must report `Valid` before
-publication. Manual dispatch remains an unsigned, non-publishing dry run.
-
-### Consequences
-
-A Windows code-signing certificate is required for the next tagged release.
-Missing or invalid signing material fails closed. ADR-135's automatic-update
-trust constant remains a separate, deliberate release switch.
-
----
-
-## ADR-143 - Disable executable CNC checkpoint and start-from-line recovery
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Context
-
-ADR-136 improved one failure mode by rewinding CNC recovery to a retract-first
-boundary, but the app still could not prove that retract was safe. A GRBL `ok`
-means a line was accepted into controller/planner processing; it does not prove
-that the physical cut completed, that position survived the interruption, or
-that the cutter is clear. Automatically moving Z can therefore pull a stopped
-or broken tool through stock, clamps, or a shifted workpiece. No generic G-code
-preamble can infer tool engagement, retained work coordinates, workholding
-integrity, or the correct extraction direction.
-
-### Decision
-
-- Automatic CNC restart from both checkpoints and arbitrary G-code lines is
-  disabled. The core resume builder returns a stable policy error for every CNC
-  request before it parses or emits any motion.
-- The UI removes the executable CNC recovery controls and replaces them with a
-  supervised recovery message: inspect engagement, establish clearance with a
-  machine-specific procedure, re-home if position may be lost, verify WCS/Z
-  zero/tool/workholding, and start a newly reviewed recovery job.
-- CNC checkpoints remain visible as diagnostic evidence, including accepted-line
-  counts and the recorded interruption cause, until the operator dismisses them.
-  Their counts are labelled as controller acknowledgements, not completed motion.
-- Laser start-from-line and checkpoint recovery remain available with their
-  beam-off positioning rules. Ordinary live Feed Hold/Resume is unchanged; it
-  resumes the same controller session and is not crash/start-from-line recovery.
-
-### Consequences
-
-KerfDesk no longer offers one-click continuation for an interrupted router job.
-Operators may lose machining time and must create a deliberate recovery job,
-but the application will not guess physical cutter state from transport-level
-acknowledgements. A future CNC recovery feature requires machine-specific,
-hardware-validated state acquisition and a supervised recovery state machine;
-re-enabling the old retract-first preamble is not an acceptable shortcut.
-
----
-
-## ADR-144 - Parametric shape edits rematerialize canonical geometry
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Context
-
-Rectangle, ellipse, polygon, and star objects retain their generating parameters, but those
-parameters were immutable after the initial canvas drag. The selected-object panel exposed only
-laser output overrides, despite calling itself Shape Properties, and disappeared entirely in CNC
-mode. Resizing could change the overall transform but could not change a rectangle corner radius,
-polygon side count, or star inset.
-
-### Decision
-
-- A single selected parametric shape exposes validated geometry fields in Shape Properties for
-  both laser and CNC projects. Multi-selection and polyline node editing keep their existing tools.
-- Each edit sanitizes the complete discriminated shape spec, then regenerates bounds,
-  compatibility polylines, and schema-v2 canonical curves through the established shape factories.
-- Rematerialization preserves object ID, transform, color, power scale, operation override,
-  provenance, stacking order, and group ownership.
-- One committed field edit creates one undo frame. Invalid or unchanged input creates none.
-
-### Consequences
-
-Parametric objects remain editable instead of becoming effectively baked after creation. Preview,
-save, laser compilation, and CNC compilation continue to consume the same materialized paths, so
-no downstream shape-specific branch is added. Width and radius values remain object-local geometry;
-the existing selection transform controls continue to own whole-object scale, rotation, and mirror.
-
----
-
-## ADR-159 - Schema v2 curves are canonical and compatibility polylines are invalidated
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Decision
-
-Project schema v2 stores line, cubic, and elliptical-arc curve subpaths. When `curves` are present,
-they are the editable source of truth and machine consumers flatten them with explicit tolerance and
-segment budgets. Curve edits regenerate compatibility polylines; a legacy polyline-only edit deletes
-the stale curve field. Serialization promotes remaining polyline-only paths to line curves, and the
-v1→v2 migrator performs the same one-way promotion for old projects.
-
-### Consequences
-
-Preview, hit testing, save, laser compile, and CNC compile cannot silently choose conflicting copies
-of geometry. Topology-changing code must update curves and rematerialize polylines, or deliberately
-invalidate curves. Budget exhaustion refuses the operation instead of emitting partial geometry.
-
----
-
-## ADR-160 - Rotary raster is an explicit experimental amendment to ADR-127
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Decision
-
-ADR-127's vectors-only refusal remains the default. Raster rows may use the same rotary machine-space
-Y transform only when both rotary and rotary-raster Labs gates are enabled and the output caller
-passes the explicit permission. Otherwise preflight returns `rotary-raster-unsupported`. Surface
-row spacing is scaled; pixel power data and non-rotary output remain unchanged.
-
-### Consequences
-
-The experimental path is testable without weakening saved-project or encoder defaults. It remains
-hardware CLAIMED and must not be presented as verified cylindrical photo engraving.
-
----
-
-## ADR-161 - Labs gates experimental laser features locally and fail closed
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Decision
-
-Tools → Labs owns explicit gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera
-alignment v2. Gates default false, tolerate unavailable/corrupt local storage by reverting false,
-and encode dependencies (`rotaryRaster` implies `rotary`; disabling rotary disables its raster gate).
-They are workstation consent, not portable project authorization; output paths must receive explicit
-permission rather than reading UI storage from core code.
-
-### Consequences
-
-Opening a project on another machine cannot silently arm experimental behavior. Each feature still
-requires its own profile, capability, preflight, and hardware-confidence checks.
-
----
-
-## ADR-162 - Low-power Fire is profile-opted, hard-capped, and momentary
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Decision
-
-Fire appears only for laser projects when the Labs gate, controller capability, profile capability,
-and profile `fireControl.enabled` all agree. Power is capped by the configured limit and an absolute
-5% ceiling. The control requires a known idle position with no alarm, job, motion, probe, autofocus,
-controller operation, or pending untracked acknowledgement. Pointer/key release, leave, cancel,
-window blur, visibility loss, unmount, and error all request laser-off; release emits `M5`.
-
-### Consequences
-
-Fire is a supervised positioning aid, not a persistent power toggle. Profiles without an explicit
-safe contract expose no control, and simulator coverage does not replace a physical safety pass.
-
----
-
-## ADR-163 - Cut Planner exposes five persisted deterministic policies
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Decision
-
-The former `reduceTravelMoves` switch is retained only as a compatibility mirror. The persisted Cut
-Planner owns travel policy, inside-first ordering, layer priority, path-direction reversal, and the
-planning start reference. Nearest-neighbor ordering is deterministic, preserves semantically ordered
-raster/scanline work, and falls back to source order above its 2,000-segment synchronous budget.
-This is a bounded greedy planner, not a claim of full 2-opt optimality.
-
-### Consequences
-
-Operator intent round-trips and output remains deterministic. Adding another policy requires schema
-validation, legacy defaults, output tests, and a new complexity bound.
-
----
-
-## ADR-164 - Adopt bounded offline editing and interoperability already shipped
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Decision
-
-- Adopt bounded node and Bezier-handle editing for imported/materialized paths under ADR-159's
-  geometry invalidation rule; general weld/boolean/offset kernel work remains deferred.
-- Adopt defensive LightBurn `.clb` import into native libraries and refreshable native preset-to-layer
-  bindings. `.clb` export, manufacturer packs, and LightBurn `LinkPath` synchronization remain deferred.
-- Adopt explicit `.ttf`/`.otf` import with project embedding under count and byte budgets. Automatic
-  host system-font enumeration remains out of scope.
-- Adopt bounded offline variable text from embedded CSV, serial, date/time, and cut-setting fields.
-  Network/database sources, barcode/QR generation, and automatic imposition remain out of scope.
-
-### Consequences
-
-These tested capabilities are intentional product scope rather than undocumented exceptions. Their
-offline, bounded persistence contracts remain release gates; this decision does not authorize the
-larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.
-=======
-Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.
-
----
-
-## ADR-135 - Gate desktop auto-update on a trusted, code-signed channel
-
-**Status:** Accepted | **Date:** 2026-07-12
-
-### Context
-
-ADR-024 allowed unsigned Windows builds to download an update from the pinned
-R2 feed and install it on quit. The feed's SHA-512 value proves only that the
-download matches `latest.yml`; both files come from the same origin. An attacker
-who can replace the feed can therefore publish a higher-version installer and a
-matching hash. With `autoDownload` and `autoInstallOnAppQuit` enabled, that code
-would be accepted without an independent publisher identity check.
-
-### Decision
-
-Desktop auto-update is fail-closed behind an explicit trust gate. The updater
-may run only when both conditions hold:
-
-1. Electron reports a packaged build through `app.isPackaged`.
-2. `IS_DESKTOP_UPDATE_CHANNEL_TRUSTED` is true because production installers
-   and update artifacts are code-signed by the same approved Windows publisher.
-
-Until signing is operational, the trust constant stays false. Packaged builds
-remain fully usable but perform no update check, download, or install. Operators
-update manually from the pinned KerfDesk download page. Enabling the constant
-requires a separate release change that configures signing in CI, fails closed
-when signing credentials are absent, and verifies a packaged update on Windows.
-
-Once trusted, ADR-024's burn-safe behavior remains: background download,
-install-on-natural-quit, and no `quitAndInstall()` call.
-
-### Consequences
-
-- An unsigned release-feed compromise cannot become a silent code-install path.
-- Unsigned builds do not notify about new versions; manual download is the safe
-  interim experience.
-- The R2 publishing workflow may continue producing artifacts, but clients do
-  not consume its update metadata until the signing gate is deliberately opened.
-- Code signing is now a functional prerequisite for automatic updates, not only
-  a SmartScreen/reputation improvement.
-
----
-
-## ADR-136 - CNC interruption recovery rewinds to a retract-first safe boundary
-
-**Status:** Accepted | **Date:** 2026-07-12
-
-### Context
-
-ADR-103/118 rebuilt modal state at the first unconfirmed line and emitted a CNC
-preamble that started the spindle while the bit could still be embedded, then
-rapid-retracted and plunged back to the recorded depth. A stopped spindle may
-not accelerate under cutting load. GRBL acknowledgements also prove parsing or
-planner admission, not physical execution, so an exact acknowledgement-line
-resume can skip accepted-but-unexecuted motion. Finally, the checkpoint kept
-progress but discarded the terminal safety reason after reload/reconnect.
-
-### Decision
-
-- CNC recovery treats the first unconfirmed line as an interruption vicinity,
-  scans backward to the previous pure `G0 Z<safe>` retract, and replays from
-  that semantic boundary. No safe boundary means no automatic resume.
-- Its preamble emits a controlled `G1 Z<safe> F<recovered plunge>` extraction
-  before any `M3`/`M4`, then starts the last active spindle mode and waits for
-  the configured dwell at clearance. The replayed boundary owns XY travel and
-  the plunge. Laser recovery keeps its beam-off position-first order.
-- The checkpoint optionally persists the terminal safety category, operator
-  message, and rejected line without a schema bump; existing schema-v3 records
-  remain readable.
-- A final `ok` advances progress but does not clear recovery. Clearing requires
-  the completed stream to be released while connected at physical `Idle`.
-
-### Consequences
-
-Router recovery deliberately recuts from the start of a cutting segment rather
-than trusting an arbitrary buffered line. This can mark already-cut material,
-but avoids both gaps and a spindle restart while embedded. The operator still
-must preserve work zero and pass all normal readiness checks. The behavior is
-unit/integration verified; real interruption and embedded-tool hardware tests
-remain unverified and must use the standing air-cut/scrap protocol first.
-
-## ADR-137 - Trace reliability: latest request wins and completed work is reusable (2026-07-11)
-
-**Status:** accepted.
-
-> **Numbering note.** ADR-136 (CNC retract-first interruption recovery) was the last used; **ADR-137** is the next free.
-
-### Context
-
-The trace dialog debounces preview state, but the shared worker client still queues every request. A CPU-bound worker cannot receive a cancellation message until its current synchronous trace returns, so rapid preset changes can put obsolete jobs ahead of the only result the user wants. Every queued request also starts its own fixed timeout. Clicking Trace then decodes and traces the same source again even when the current preview already contains the matching geometry. On large or supersampled images, this duplicate and queued work is a more credible failure source than the tracing quality itself.
-
-### Decision
-
-Make the tracing pipeline explicitly single-flight and latest-wins. Starting a new worker trace retires the worker that owns an unfinished request, rejects that request with a typed superseded error, and runs the new request on a fresh worker. Supersession is control flow, not a preview error and not a reason to retry inline. The timeout applies only to the active request. A ready preview carries the identity of the file, options, boundary, and boundary mode; commit may reuse its paths and bounds only while all of those inputs still match. Bounded resize-at-decode, transferable worker buffers, and backend-specific working-pixel budgets preserve this one-live-job contract while limiting large-image memory and compute.
-
-### Consequences
-
-- Rapid option changes can pay worker startup again, but never wait behind stale CPU work; old worker memory becomes reclaimable as soon as it is terminated.
-- The preview and commit paths share one completed result when their inputs match, removing the most common duplicate full trace.
-- Large images are bounded before allocation-heavy tracing, and Region Enhance cannot stack an inner 4x supersampling pass on top of its own work scale.
-- This is in-process cancellation, not cooperative cancellation inside the tracing algorithms. A backend that monopolizes the main thread remains out of scope, and worker termination latency remains browser-controlled.
-- Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
-
-## ADR-138 - The primary toolbar is icon-first and never wraps
-The primary toolbar had fourteen text buttons and wrapped into a second row at
-compact desktop widths. That reduced canvas height, shifted the numeric toolbar
-and workspace during resize, and made the command surface visually dominant.
-Removing commands would improve density at the cost of discoverability.
-
-### Decision
-
-- Every toolbar command uses a pinned `lucide-static` icon. Familiar file,
-  import, export, Preview, and Shortcuts actions are icon-only at all widths.
-- Specialist commands retain icon-plus-label presentation above 1280 px and
-  switch to icon-only at 1280 px and below.
-- Icon-only buttons keep the complete command label as their accessible name
-  and retain the command registry's tooltip, shortcut, disabled reason, and
-  pressed state.
-- The toolbar is one non-wrapping row. Its command-group region may scroll
-  horizontally on unusually narrow windows; the brand and Shortcuts control
-  remain fixed outside that region, except the redundant brand wordmark hides
-  below 700 px to preserve every command before scrolling is needed.
-- Icons come from the already-approved `lucide-static` dependency. Imported SVG
-  strings are build assets, never project or user content.
-
-### Consequences
-
-The workspace no longer jumps between one-row and two-row chrome. Common
-desktop widths gain vertical space while specialist labels remain available
-where room permits. Operators on narrow windows may need to horizontally scroll
-the command group, but every command also remains available from the menus.
-
-## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
-
-**Status:** Accepted | **Date:** 2026-07-13
-
-### Context
-
-The fixed 320 px Cuts/Layers rail and 300 px machine rail consume most of a
-1024 px workspace before the drawing tool strip. The canvas remains technically
-responsive but becomes too narrow for practical layout work. Neither rail had a
-visibility command, so operators could not trade inspector space for canvas
-space without resizing the whole application.
-
-The machine rail also owns the visible Stop control. Treating it like an
-ordinary hideable inspector during a stream would remove the primary pointer
-target for an emergency stop, even though the global keyboard shortcut remains.
-
-### Decision
-
-- Ephemeral UI state tracks Cuts/Layers and machine-panel visibility
-  independently. It is not project data and is not included in undo or `.lf2`.
-- Each expanded rail has a header collapse button. A collapsed rail remains as
-  a narrow named strip with an expand button, preserving location and
-  discoverability.
-- Checked commands in the Window menu mirror both visibility states.
-- Entering a viewport 700 px wide or narrower collapses both rails once. Users
-  may expand either rail while remaining compact; the default reapplies only on
-  the next transition into compact mode.
-- An active job makes the machine panel fail-visible regardless of its stored
-  preference. Its collapse button and Window command are disabled until the job
-  is no longer active, so the visible Stop control remains reachable.
-
-### Consequences
-
-Compact windows can recover 280 px per collapsed rail without hiding how to
-restore the panels. Ending a job restores the operator's prior machine-panel
-preference, so a panel that was collapsed before Start collapses again after the
-stream fully settles. Panel visibility remains session-only; persistence across
-launches can be added later if user testing shows that preference is valuable.
-At 700 px and below, the initial canvas no longer collapses to zero width.
-
-## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
-
-> **Numbering note.** ADR-137 through ADR-139 are accepted. **ADR-140** is allocated to this decision.
-
-Context. A profile cut removes the full wall across its depth passes, so the
-finished edge carries the roughing tool's deflection and chatter. Production CNC
-work leaves a small "stock to leave" allowance on roughing and removes it with a
-light finishing pass along the true contour for a cleaner wall.
-
-Decision. Optional per-layer `finishAllowanceMm` on CncLayerSettings, for
-profile-outside / profile-inside cuts only (0/absent = off, byte-identical).
-When > 0:
-- Roughing offsets the contour by tool-radius + allowance, staying that far
-  proud of the finished wall (profileToolpathPolylines gained an allowance arg).
-- One finishing pass at the true contour (tool-radius offset, allowance 0) at
-  full depth is appended after the roughing passes.
-- Holding tabs: the finishing pass runs through the SAME tab split the deepest
-  roughing pass uses, so tabs are preserved and the part stays attached.
-
-Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
-(which already has its own H.8 finishing skim) are out of scope, documented in
-code, and covered by a test showing those cut types are unaffected.
-
-Consequences.
-- Determinism (#5): allowance 0/absent is byte-identical (tested).
-- HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
-- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
-  same perimeter-fraction logic on concentric contours, so they align for
-  typical convex profiles; on complex/concave geometry clipper's offset can pick
-  a different start vertex and misalign them, which could sever the part. Verify
-  with a test cut before trusting tabs + finish allowance together on intricate
-  parts.
 
 ---
 
@@ -7520,6 +7064,123 @@ families, and unsafe cross-family combinations fail visibly rather than being co
 stream time. The policy expands safety coverage without claiming a broader hardware ecosystem.
 
 ---
+## ADR-159 - Schema v2 curves are canonical and compatibility polylines are invalidated
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Project schema v2 stores line, cubic, and elliptical-arc curve subpaths. When `curves` are present,
+they are the editable source of truth and machine consumers flatten them with explicit tolerance and
+segment budgets. Curve edits regenerate compatibility polylines; a legacy polyline-only edit deletes
+the stale curve field. Serialization promotes remaining polyline-only paths to line curves, and the
+v1→v2 migrator performs the same one-way promotion for old projects.
+
+### Consequences
+
+Preview, hit testing, save, laser compile, and CNC compile cannot silently choose conflicting copies
+of geometry. Topology-changing code must update curves and rematerialize polylines, or deliberately
+invalidate curves. Budget exhaustion refuses the operation instead of emitting partial geometry.
+
+---
+
+## ADR-160 - Rotary raster is an explicit experimental amendment to ADR-127
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+ADR-127's vectors-only refusal remains the default. Raster rows may use the same rotary machine-space
+Y transform only when both rotary and rotary-raster Labs gates are enabled and the output caller
+passes the explicit permission. Otherwise preflight returns `rotary-raster-unsupported`. Surface
+row spacing is scaled; pixel power data and non-rotary output remain unchanged.
+
+### Consequences
+
+The experimental path is testable without weakening saved-project or encoder defaults. It remains
+hardware CLAIMED and must not be presented as verified cylindrical photo engraving.
+
+---
+
+## ADR-161 - Labs gates experimental laser features locally and fail closed
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Tools → Labs owns explicit gates for rotary, rotary raster, low-power Fire, print-and-cut, and camera
+alignment v2. Gates default false, tolerate unavailable/corrupt local storage by reverting false,
+and encode dependencies (`rotaryRaster` implies `rotary`; disabling rotary disables its raster gate).
+They are workstation consent, not portable project authorization; output paths must receive explicit
+permission rather than reading UI storage from core code.
+
+### Consequences
+
+Opening a project on another machine cannot silently arm experimental behavior. Each feature still
+requires its own profile, capability, preflight, and hardware-confidence checks.
+
+---
+
+## ADR-162 - Low-power Fire is profile-opted, hard-capped, and momentary
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+Fire appears only for laser projects when the Labs gate, controller capability, profile capability,
+and profile `fireControl.enabled` all agree. Power is capped by the configured limit and an absolute
+5% ceiling. The control requires a known idle position with no alarm, job, motion, probe, autofocus,
+controller operation, or pending untracked acknowledgement. Pointer/key release, leave, cancel,
+window blur, visibility loss, unmount, and error all request laser-off; release emits `M5`.
+
+### Consequences
+
+Fire is a supervised positioning aid, not a persistent power toggle. Profiles without an explicit
+safe contract expose no control, and simulator coverage does not replace a physical safety pass.
+
+---
+
+## ADR-163 - Cut Planner exposes five persisted deterministic policies
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+The former `reduceTravelMoves` switch is retained only as a compatibility mirror. The persisted Cut
+Planner owns travel policy, inside-first ordering, layer priority, path-direction reversal, and the
+planning start reference. Nearest-neighbor ordering is deterministic, preserves semantically ordered
+raster/scanline work, and falls back to source order above its 2,000-segment synchronous budget.
+This is a bounded greedy planner, not a claim of full 2-opt optimality.
+
+### Consequences
+
+Operator intent round-trips and output remains deterministic. Adding another policy requires schema
+validation, legacy defaults, output tests, and a new complexity bound.
+
+---
+
+## ADR-164 - Adopt bounded offline editing and interoperability already shipped
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+- Adopt bounded node and Bezier-handle editing for imported/materialized paths under ADR-159's
+  geometry invalidation rule; general weld/boolean/offset kernel work remains deferred.
+- Adopt defensive LightBurn `.clb` import into native libraries and refreshable native preset-to-layer
+  bindings. `.clb` export, manufacturer packs, and LightBurn `LinkPath` synchronization remain deferred.
+- Adopt explicit `.ttf`/`.otf` import with project embedding under count and byte budgets. Automatic
+  host system-font enumeration remains out of scope.
+- Adopt bounded offline variable text from embedded CSV, serial, date/time, and cut-setting fields.
+  Network/database sources, barcode/QR generation, and automatic imposition remain out of scope.
+
+### Consequences
+
+These tested capabilities are intentional product scope rather than undocumented exceptions. Their
+offline, bounded persistence contracts remain release gates; this decision does not authorize the
+larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.
+
+---
 
 ## ADR-171 - Work-Z readiness uses source-qualified, epoch-bound evidence
 
@@ -7613,4 +7274,3 @@ could unlock Continue. Comment labels improved operator guidance but were not st
 Changing the selected cutter or compiling a different first section can no longer reuse unrelated
 Z evidence. The host proves consistency between operator-selected tool identity, Z evidence, and
 the compiled plan; it still cannot physically sense the cutter, clamp, touch plate, or spindle.
->>>>>>> aed41269 (fix: bind CNC Z evidence to tool plan)
