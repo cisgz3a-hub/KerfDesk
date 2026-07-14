@@ -33,6 +33,7 @@ import {
   refreshCncLiveStartState,
 } from './cnc-live-start-readiness';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
+import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
@@ -146,7 +147,10 @@ async function runStopJob(
   driver: DriverFn,
 ): Promise<void> {
   const softReset = driver().realtime.softReset;
-  if (softReset !== null) await safeWrite(softReset, 'stop');
+  if (softReset !== null) {
+    set((state) => invalidateControllerSessionEvidence(state));
+    await safeWrite(softReset, 'stop');
+  }
   if (softReset === null) {
     try {
       for (const line of driver().commands.stopLaserLines) await safeWrite(`${line}\n`, 'stop');

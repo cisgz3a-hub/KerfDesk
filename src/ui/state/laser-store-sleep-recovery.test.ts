@@ -98,7 +98,19 @@ describe('laser-store Sleep recovery', () => {
         wco: { x: 12, y: 34, z: 0 },
         workOriginActive: true,
       },
+      homingState: 'confirmed',
+      homingProof: {
+        sessionEpoch: useLaserStore.getState().controllerSessionEpoch,
+        positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
+        confirmedStatusSequence: useLaserStore.getState().statusSequence,
+      },
+      controllerSettings: { homingEnabled: true },
+      controllerSettingsObservation: {
+        sessionEpoch: useLaserStore.getState().controllerSessionEpoch,
+        observedAt: 1,
+      },
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const sessionEpoch = useLaserStore.getState().controllerSessionEpoch;
 
     const wake = useLaserStore.getState().wakeController();
     await flush();
@@ -106,6 +118,11 @@ describe('laser-store Sleep recovery', () => {
     expect(write).toHaveBeenCalledWith('\x18');
     expect(useLaserStore.getState().connection.kind).toBe('connected');
     expect(useLaserStore.getState().statusReport).toBeNull();
+    expect(useLaserStore.getState().controllerSessionEpoch).toBe(sessionEpoch + 1);
+    expect(useLaserStore.getState().controllerSettings).toBeNull();
+    expect(useLaserStore.getState().controllerSettingsObservation).toBeNull();
+    expect(useLaserStore.getState().homingState).toBe('unknown');
+    expect(useLaserStore.getState().homingProof).toBeNull();
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().wcoCache).toBeNull();

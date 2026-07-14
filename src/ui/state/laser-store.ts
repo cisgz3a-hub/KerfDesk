@@ -48,6 +48,11 @@ import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { CncToolPlanEntry } from './cnc-tool-plan';
 import type { CncSetupAttestation } from './cnc-setup-attestation';
 import type { UnexpectedTerminalResponse } from './controller-terminal-contamination';
+import type {
+  ControllerObservationStamp,
+  HomingProof,
+  SessionObservationStamp,
+} from './laser-controller-observation';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite, type SafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
@@ -91,6 +96,9 @@ export type StartJobOptions = CreateStreamerOptions & {
 export type LaserState = {
   readonly connection: ConnectionState;
   readonly statusReport: StatusReport | null;
+  readonly controllerSessionEpoch: number;
+  readonly statusSequence: number;
+  readonly statusObservation: ControllerObservationStamp | null;
   readonly alarmCode: number | null;
   readonly lastError: number | null;
   readonly lastWriteError: string | null;
@@ -128,6 +136,7 @@ export type LaserState = {
   // an earlier command is accepted by the controller but absent from the ack ledger.
   readonly pendingTransportWrites?: number;
   readonly homingState: HomingState;
+  readonly homingProof: HomingProof | null;
   readonly trustedPositionEpoch?: number;
   readonly workZReferenceEpoch: number;
   readonly log: ReadonlyArray<string>;
@@ -138,6 +147,7 @@ export type LaserState = {
   // Dismiss (which left the profile alone).
   readonly detectedSettings: Partial<DeviceProfile> | null;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
+  readonly controllerSettingsObservation: SessionObservationStamp | null;
   readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
   readonly lastSettingsReadAt: number | null;
   /**
@@ -290,6 +300,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // line would otherwise re-render Laser components for no reason —
   // only the final `done` patch matters to the UI.
   settingsCollector: SettingsCollectorState;
+  settingsCollectorSessionEpoch: number | null;
   onLineArrived: (() => void) | null;
   nextTranscriptId: number;
   // M13 ack-watchdog probe: last-seen stream position + when it was first
@@ -304,6 +315,7 @@ const refs: LiveRefs = {
   unsubscribeClose: null,
   pollHandle: null,
   settingsCollector: idleCollector(),
+  settingsCollectorSessionEpoch: null,
   onLineArrived: null,
   nextTranscriptId: 1,
   stallProbe: null,

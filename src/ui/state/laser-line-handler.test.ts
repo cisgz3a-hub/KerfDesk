@@ -22,6 +22,9 @@ function makeLaserState(): LaserState {
     detectedControllerKind: null,
     connection: { kind: 'connected' },
     statusReport: null,
+    controllerSessionEpoch: 0,
+    statusSequence: 0,
+    statusObservation: null,
     alarmCode: null,
     lastError: null,
     lastWriteError: null,
@@ -36,10 +39,12 @@ function makeLaserState(): LaserState {
     activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     homingState: 'unknown',
+    homingProof: null,
     log: [],
     transcript: [],
     detectedSettings: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
@@ -107,6 +112,7 @@ function makeHarness(): {
     refs: {
       driver: grblDriver,
       settingsCollector: startCollecting(),
+      settingsCollectorSessionEpoch: 0,
       onLineArrived: null,
       controllerCommand: null,
       controllerIdleWait: null,
@@ -136,6 +142,9 @@ describe('handleLine detected controller settings', () => {
       maxPowerS: 255,
       minPowerS: 0,
       laserModeEnabled: true,
+    });
+    expect(get().controllerSettingsObservation).toMatchObject({
+      sessionEpoch: get().controllerSessionEpoch,
     });
     expect(get().grblSettingsRows.map((row) => row.code)).toEqual(['$22', '$30', '$31', '$32']);
   });

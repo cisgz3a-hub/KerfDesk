@@ -117,7 +117,33 @@ describe('home command timeout', () => {
     await flush();
 
     await home;
-    expect(useLaserStore.getState().homingState).toBe('confirmed');
-    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    const state = useLaserStore.getState();
+    expect(state.homingState).toBe('confirmed');
+    expect(state.controllerOperation).toBeNull();
+    expect(state.homingProof).toEqual({
+      sessionEpoch: state.controllerSessionEpoch,
+      positionEpoch: state.trustedPositionEpoch,
+      confirmedStatusSequence: state.statusObservation?.sequence,
+    });
+  });
+
+  it('cannot confirm Home when a reboot lands after the final Idle observation', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    const home = useLaserStore.getState().home();
+    await flush();
+    connection.emitLine('ok');
+    await flush();
+    connection.emitLine('ok');
+    await flush();
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('Grbl 1.1h');
+    await flush();
+
+    await expect(home).rejects.toThrow(/invalidated|reboot/i);
+    expect(useLaserStore.getState().homingState).toBe('unknown');
+    expect(useLaserStore.getState().homingProof).toBeNull();
   });
 });

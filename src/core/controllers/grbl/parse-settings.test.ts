@@ -69,6 +69,9 @@ describe('settingsMapToProfilePatch', () => {
       [21, '1'],
       [22, '1'],
       [23, '3'],
+      [10, '1'],
+      [13, '0'],
+      [27, '2.500'],
       [112, '800.000'],
       [122, '50.000'],
       [132, '75.000'],
@@ -79,11 +82,20 @@ describe('settingsMapToProfilePatch', () => {
       hardLimitsEnabled: true,
       homingEnabled: true,
       homingDirectionMask: 3,
+      statusReportMask: 1,
+      reportInches: false,
+      homingPullOffMm: 2.5,
       zMaxFeed: 800,
       zAccelMmPerSec2: 50,
       zTravelMm: 75,
     });
     expect(settingsMapToProfilePatch(map)).toEqual({ zTravelMm: 75 });
+  });
+
+  it('preserves a stock-valid zero homing pull-off for later product policy', () => {
+    expect(settingsMapToControllerSettings(new Map([[27, '0']]))).toEqual({
+      homingPullOffMm: 0,
+    });
   });
 
   it('takes the max of $110/$111 for maxFeed (vector reach)', () => {

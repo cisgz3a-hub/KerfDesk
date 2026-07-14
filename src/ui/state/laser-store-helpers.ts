@@ -263,6 +263,9 @@ type InitialLaserState = Pick<
   | 'detectedControllerKind'
   | 'connection'
   | 'statusReport'
+  | 'controllerSessionEpoch'
+  | 'statusSequence'
+  | 'statusObservation'
   | 'alarmCode'
   | 'lastError'
   | 'lastWriteError'
@@ -278,12 +281,14 @@ type InitialLaserState = Pick<
   | 'pendingUntrackedAcks'
   | 'pendingTransportWrites'
   | 'homingState'
+  | 'homingProof'
   | 'trustedPositionEpoch'
   | 'workZReferenceEpoch'
   | 'log'
   | 'transcript'
   | 'detectedSettings'
   | 'controllerSettings'
+  | 'controllerSettingsObservation'
   | 'grblSettingsRows'
   | 'lastSettingsReadAt'
   | 'wcoCache'
@@ -309,6 +314,9 @@ export function initialLaserState(): InitialLaserState {
     detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     statusReport: null,
+    controllerSessionEpoch: 0,
+    statusSequence: 0,
+    statusObservation: null,
     alarmCode: null,
     lastError: null,
     lastWriteError: null,
@@ -324,12 +332,14 @@ export function initialLaserState(): InitialLaserState {
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
     homingState: 'unknown',
+    homingProof: null,
     trustedPositionEpoch: 0,
     workZReferenceEpoch: 0,
     log: [],
     transcript: [],
     detectedSettings: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
@@ -361,7 +371,10 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
   return {
     connection: { kind: 'disconnected' },
     statusReport: null,
+    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    statusObservation: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     // GRBL clears G92 on the reset that fires when the port closes; persistent
@@ -382,6 +395,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     airAssistOn: false,
     fireActive: false,
     homingState: 'unknown',
+    homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
