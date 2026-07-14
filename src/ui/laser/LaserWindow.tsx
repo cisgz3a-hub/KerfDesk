@@ -3,13 +3,18 @@
 
 import { describeAlarm } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
+import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
 import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob, setupBlockingJobCommandBlockMessage } from '../state/laser-store-helpers';
+import {
+  isActiveJob,
+  jogFrameCommandBlockMessage,
+  setupBlockingJobCommandBlockMessage,
+} from '../state/laser-store-helpers';
 import { machineControlsLabel, machineDisplayName, machineNoun } from '../machine/machine-labels';
 import { ConnectionBar } from './ConnectionBar';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
@@ -55,7 +60,7 @@ export function LaserWindow(): JSX.Element {
   // every ack pops the stream head, so the 120-byte RX accounting drifts and
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
-  const jobBlocksJog = useLaserStore((s) => setupBlockingJobCommandBlockMessage(s) !== null);
+  const jogBlocked = useJogBlocked(controllerKind);
   const controllerIdle = statusReport?.state === 'Idle';
   const controllerSleep = statusReport?.state === 'Sleep';
   const showAlarmBanner = !controllerSleep && hasAlarmRecovery(alarmCode, statusReport?.state);
@@ -103,7 +108,7 @@ export function LaserWindow(): JSX.Element {
       )}
       <StatusDisplay />
       <JogPad
-        disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobBlocksJog)}
+        disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jogBlocked)}
       />
       <ProbePanel />
       <JobControls
@@ -121,6 +126,14 @@ function confirmForgetDevice(): void {
     .getState()
     .forgetDevice?.()
     .catch(() => undefined);
+}
+
+function useJogBlocked(controllerKind: ControllerKind | undefined): boolean {
+  const jobBlocked = useLaserStore((s) => setupBlockingJobCommandBlockMessage(s) !== null);
+  const controllerBlocked = useLaserStore(
+    (s) => jogFrameCommandBlockMessage(s, controllerKind) !== null,
+  );
+  return jobBlocked || controllerBlocked;
 }
 
 function useMachinePanelVisibility(): {

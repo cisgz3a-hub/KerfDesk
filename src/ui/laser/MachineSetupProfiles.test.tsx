@@ -39,12 +39,18 @@ describe('Machine Setup controller compatibility', () => {
       expect(view.host.querySelector('[role="alert"]')?.textContent).toContain(
         'Controller mismatch',
       );
+      await act(async () => button(view.host, 'Apply detected firmware').click());
+      expect(useStore.getState().project.device).toMatchObject({
+        controllerKind: 'marlin',
+        streamingMode: 'ping-pong',
+        gcodeDialect: { dialectId: 'marlin-inline' },
+      });
     } finally {
       await view.unmount();
     }
   });
 
-  it('disables and explains catalog profiles for another detected firmware family', async () => {
+  it('allows a catalog profile to adopt the detected firmware family', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       activeControllerKind: 'marlin',
@@ -57,7 +63,9 @@ describe('Machine Setup controller compatibility', () => {
       const falconCard = [...view.host.querySelectorAll('article')].find((card) =>
         card.textContent?.includes('Creality Falcon A1 Pro'),
       );
-      expect(button(falconCard as HTMLElement, 'Firmware mismatch').disabled).toBe(true);
+      expect(
+        button(falconCard as HTMLElement, 'Use Creality Falcon A1 Pro (grblHAL)').disabled,
+      ).toBe(false);
       expect(falconCard?.textContent).toContain('Will set controllerKind to marlin');
       expect(falconCard?.textContent).toContain('Will set streamingMode to ping-pong');
       expect(falconCard?.textContent).toContain('Will set gcodeDialect to marlin-inline');
@@ -66,8 +74,8 @@ describe('Machine Setup controller compatibility', () => {
     }
   });
 
-  it('uses the active driver after a settings read when the welcome banner was missed', async () => {
-    useStore.getState().updateDeviceProfile({ controllerKind: 'grbl-v1.1' });
+  it('uses the active driver to make a cross-firmware catalog profile repairable when the banner was missed', async () => {
+    useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
     useLaserStore.setState({
       connection: { kind: 'connected' },
       activeControllerKind: 'grbl-v1.1',
@@ -81,7 +89,10 @@ describe('Machine Setup controller compatibility', () => {
       const marlinCard = [...view.host.querySelectorAll('article')].find((card) =>
         card.textContent?.includes('Generic Marlin'),
       );
-      expect(button(marlinCard as HTMLElement, 'Firmware mismatch').disabled).toBe(true);
+      expect(button(marlinCard as HTMLElement, 'Use Generic Marlin laser 300×200').disabled).toBe(
+        false,
+      );
+      expect(marlinCard?.textContent).toContain('Will set controllerKind to grbl-v1.1');
     } finally {
       await view.unmount();
     }

@@ -77,7 +77,7 @@ export type DeviceSetupAction =
   | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
   | {
       readonly kind: 'detected-updated';
-      readonly detected: Partial<DeviceProfile>;
+      readonly detected?: Partial<DeviceProfile>;
       readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
       readonly controllerRead?: boolean;
     };
@@ -101,18 +101,19 @@ export function initDeviceSetup(
   facts: DeviceSetupDetectedFacts = {},
 ): DeviceSetupState {
   const safeDetected = detected ?? {};
+  const machineKind = facts.machineKind ?? 'laser';
   const controllerRead =
     facts.controllerRead ?? (detected !== null || facts.detectedControllerKind !== undefined);
   const detectedControllerKind = facts.detectedControllerKind ?? null;
   return {
     step: 'connect',
-    machineKind: facts.machineKind ?? 'laser',
+    machineKind,
     baseline: profile,
     detected: safeDetected,
     detectedControllerKind,
     controllerRead,
     draft: controllerCompatibleProfile(
-      { ...profile, ...safeDetected },
+      { ...profile, ...profilePatchForMachineKind(safeDetected, machineKind) },
       detectedControllerKind ?? profile.controllerKind,
     ).profile,
     presetApplied: false,
@@ -133,8 +134,9 @@ export function deviceSetupReducer(
         ? { ...state, step: action.step }
         : state;
     case 'edit':
-    case 'accept-detected':
       return { ...state, draft: { ...state.draft, ...action.patch } };
+    case 'accept-detected':
+      return acceptDetected(state, action.patch);
     case 'apply-preset':
       return applyPreset(state, action.profile);
     case 'detected-updated':
@@ -154,6 +156,7 @@ function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSet
       controllerSettings: state.detected,
       detectedControllerKind: state.detectedControllerKind,
       lastSettingsReadAt: state.controllerRead ? 1 : null,
+      machineKind: state.machineKind,
     }),
     presetApplied: true,
   };
@@ -166,18 +169,52 @@ function updateDetectedFacts(
   // The wizard re-dispatches the live $$ patch on every read; a ref-equal
   // dispatch (the mount re-sync) is a no-op so it does not force a render.
   if (
-    action.detected === state.detected &&
+    (action.detected === undefined || action.detected === state.detected) &&
     action.detectedControllerKind === undefined &&
     action.controllerRead === undefined
   ) {
     return state;
   }
+  const detectedControllerKind =
+    action.detectedControllerKind === undefined
+      ? state.detectedControllerKind
+      : action.detectedControllerKind;
   return {
     ...state,
-    detected: action.detected,
-    detectedControllerKind: action.detectedControllerKind ?? state.detectedControllerKind,
+    detected: action.detected ?? state.detected,
+    detectedControllerKind,
     controllerRead: action.controllerRead ?? true,
+    draft:
+      detectedControllerKind === null
+        ? state.draft
+        : controllerCompatibleProfile(state.draft, detectedControllerKind).profile,
   };
+}
+
+function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>): DeviceSetupState {
+  const merged = {
+    ...state.draft,
+    ...profilePatchForMachineKind(patch, state.machineKind),
+  };
+  return {
+    ...state,
+    draft: controllerCompatibleProfile(
+      merged,
+      state.detectedControllerKind ?? merged.controllerKind,
+    ).profile,
+  };
+}
+
+function profilePatchForMachineKind(
+  patch: Partial<DeviceProfile>,
+  machineKind: MachineKind,
+): Partial<DeviceProfile> {
+  if (machineKind !== 'cnc') return patch;
+  const shared = { ...patch };
+  delete shared.maxPowerS;
+  delete shared.minPowerS;
+  delete shared.laserModeEnabled;
+  return shared;
 }
 
 // Next is allowed on the lead-in steps unconditionally (the operator may

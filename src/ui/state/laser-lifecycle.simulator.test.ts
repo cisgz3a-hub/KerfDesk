@@ -14,6 +14,8 @@ import {
 import { grblDriver } from '../../core/controllers';
 import type { ConnectControllerOptions } from './laser-store';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -47,6 +49,7 @@ afterEach(async () => {
     frameVerification: null,
     homingState: 'unknown',
   });
+  resetStore();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -61,6 +64,9 @@ async function connectSim(
   connectOptions: ConnectControllerOptions = {},
 ): Promise<GrblSimulator> {
   const sim = createGrblSimulator(options);
+  if (connectOptions.controllerKind !== undefined) {
+    useStore.getState().updateDeviceProfile({ controllerKind: connectOptions.controllerKind });
+  }
   await useLaserStore.getState().connect(sim.adapter, connectOptions);
   await pump(20); // banner → $$ harvest → settings collected
   return sim;

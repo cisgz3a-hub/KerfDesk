@@ -11,8 +11,13 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { grblDriver, type ControllerDriver } from '../../core/controllers';
+import { controllerProfilesAreCompatible, type ControllerKind } from '../../core/devices';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
-import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import {
+  CONTROLLER_OWNERSHIP_LOST_MESSAGE,
+  disconnectDuringFireNotice,
+  disconnectDuringJobNotice,
+} from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import {
   isWorkZEvidenceFreshForStart,
@@ -42,6 +47,8 @@ export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
   'Load the new bit, select it as the Active bit, and establish its Z zero on the stock top before continuing.';
+export const CONTROLLER_MOTION_PROFILE_MISMATCH_MESSAGE =
+  'Motion is blocked because the connected controller does not match the active machine profile. Apply the detected firmware profile, disconnect, and reconnect before jogging, framing, or homing.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -169,7 +176,30 @@ export function setupCommandBlockMessage(state: LaserState): string | null {
   return activeJobCommandBlockMessage(state) ?? motionOperationCommandBlockMessage(state);
 }
 
-export function jogFrameCommandBlockMessage(state: LaserState): string | null {
+export function controllerMotionTrustBlockMessage(
+  state: LaserState,
+  configuredControllerKind?: ControllerKind,
+): string | null {
+  if (state.unexpectedTerminalResponse != null) return CONTROLLER_OWNERSHIP_LOST_MESSAGE;
+  if (state.connection?.kind !== 'connected') return null;
+  const configured = configuredControllerKind ?? 'grbl-v1.1';
+  if (
+    !controllerProfilesAreCompatible(configured, state.activeControllerKind) ||
+    !controllerProfilesAreCompatible(configured, state.detectedControllerKind) ||
+    (state.detectedControllerKind !== null &&
+      state.activeControllerKind !== state.detectedControllerKind)
+  ) {
+    return CONTROLLER_MOTION_PROFILE_MISMATCH_MESSAGE;
+  }
+  return null;
+}
+
+export function jogFrameCommandBlockMessage(
+  state: LaserState,
+  configuredControllerKind?: ControllerKind,
+): string | null {
+  const trustMessage = controllerMotionTrustBlockMessage(state, configuredControllerKind);
+  if (trustMessage !== null) return trustMessage;
   const activeJobMessage = setupBlockingJobCommandBlockMessage(state);
   if (activeJobMessage !== null) return activeJobMessage;
   const motionOperationMessage = motionOperationCommandBlockMessage(state);
@@ -411,6 +441,8 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
+    detectedSettings: null,
+    detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
     grblSettingsRows: [],

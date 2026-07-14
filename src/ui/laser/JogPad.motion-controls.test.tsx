@@ -131,6 +131,31 @@ describe('JogPad motion controls', () => {
     }
   });
 
+  it('does not cancel an active hold merely because live machine state re-renders the pad', async () => {
+    vi.useFakeTimers();
+    const jog = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog, cancelJog });
+    const { host, unmount } = await renderJogPad();
+    try {
+      const right = buttonByLabel(host, 'Jog +X 10 mm');
+      if (right === null) throw new Error('right jog button missing');
+      await startHold(right);
+      expect(jog).toHaveBeenCalledTimes(1);
+
+      await act(async () => useStore.getState().updateDeviceProfile({ maxFeed: 5000 }));
+      expect(cancelJog).not.toHaveBeenCalled();
+
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+      });
+      expect(cancelJog).toHaveBeenCalledTimes(1);
+    } finally {
+      await unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it('does not start a continuous jog on firmware without a jog-cancel (holding steps once)', async () => {
     // F101: a bed-length continuous jog is unstoppable on Marlin/Smoothieware
     // (realtime.jogCancel === null → capabilities.jogCancel false). Holding must

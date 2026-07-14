@@ -12,12 +12,24 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
   return (
     <section style={sectionStyle}>
       <p style={hintStyle}>
-        These are the values your controller reported via $$. Confirm the work area, feed, and power
-        scale, and fix anything that doesn&apos;t match your laser.
+        {state.machineKind === 'cnc'
+          ? 'These are the values your controller reported via $$. Confirm the router work area and feed limits. GRBL $30 is applied as the spindle RPM ceiling.'
+          : 'These are the values your controller reported via $$. Confirm the work area, feed, and power scale, and fix anything that does not match your laser.'}
       </p>
       <BedRows device={state.draft} update={update} />
       <FeedRows device={state.draft} update={update} />
-      <LaserPowerRows device={state.draft} update={update} />
+      {state.machineKind === 'cnc' ? (
+        <p style={spindleStyle}>
+          Spindle maximum ($30):{' '}
+          <strong>
+            {state.detected.maxPowerS === undefined
+              ? 'not reported'
+              : `${state.detected.maxPowerS} RPM`}
+          </strong>
+        </p>
+      ) : (
+        <LaserPowerRows device={state.draft} update={update} />
+      )}
     </section>
   );
 }
@@ -29,3 +41,4 @@ const hintStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   lineHeight: 1.4,
 };
+const spindleStyle: React.CSSProperties = { margin: 0, fontSize: 12 };

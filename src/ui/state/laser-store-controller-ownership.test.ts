@@ -55,6 +55,27 @@ afterEach(async () => {
 });
 
 describe('unexpected controller terminal ownership', () => {
+  it('waits through a late startup banner before owning the settings query reply', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await useLaserStore.getState().connect(adapter(connection));
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(writes).not.toContain('$$\n');
+
+    connection.emitLine('Grbl 1.1f');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await flush();
+    expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
+
+    connection.emitLine('$30=1000');
+    connection.emitLine('ok');
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().unexpectedTerminalResponse).toBeNull();
+  });
+
   it('latches the first orphan response, invalidates setup once, and survives notice dismissal', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);

@@ -12,6 +12,7 @@ export function SafetyNoticeBanner(): JSX.Element | null {
   const notice = useLaserStore((s) => s.safetyNotice);
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   const wakeController = useLaserStore((s) => s.wakeController);
+  const disconnect = useLaserStore((s) => s.disconnect);
   if (notice === null) return null;
   const title =
     notice.kind === 'disconnect-during-job'
@@ -23,6 +24,7 @@ export function SafetyNoticeBanner(): JSX.Element | null {
           : notice.kind === 'controller-reboot'
             ? 'Controller rebooted mid-job'
             : 'Command may not have sent';
+  const ownershipLost = notice.kind === 'controller-ownership';
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
@@ -30,11 +32,17 @@ export function SafetyNoticeBanner(): JSX.Element | null {
       <div style={actionsStyle}>
         <button
           type="button"
-          onClick={() => void wakeController().catch(() => undefined)}
+          onClick={() =>
+            void (ownershipLost ? disconnect() : wakeController()).catch(() => undefined)
+          }
           style={recoverStyle}
-          title="Send Ctrl-X soft reset and clear stuck local controller state."
+          title={
+            ownershipLost
+              ? 'Disconnect this controller session. Reconnect after stopping every other sender.'
+              : 'Send Ctrl-X soft reset and clear stuck local controller state.'
+          }
         >
-          Recover controller
+          {ownershipLost ? 'Disconnect controller' : 'Recover controller'}
         </button>
         <button
           type="button"

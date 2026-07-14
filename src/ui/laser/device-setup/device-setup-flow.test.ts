@@ -211,6 +211,51 @@ describe('deviceSetupReducer detected-updated', () => {
     expect(state.draft.bedHeight).toBe(273);
   });
 
+  it('normalizes the draft when the detected controller kind arrives after the wizard opens', () => {
+    const marlinProfile: DeviceProfile = {
+      ...PROFILE,
+      controllerKind: 'marlin',
+      streamingMode: 'ping-pong',
+      gcodeDialect: { dialectId: 'marlin-inline' },
+    };
+    let state = initDeviceSetup(marlinProfile, null);
+
+    state = deviceSetupReducer(state, {
+      kind: 'detected-updated',
+      detected: {},
+      detectedControllerKind: 'grblhal',
+      controllerRead: true,
+    });
+
+    expect(state.draft).toMatchObject({
+      controllerKind: 'grblhal',
+      streamingMode: 'char-counted',
+      gcodeDialect: { dialectId: 'grbl-dynamic' },
+    });
+  });
+
+  it('clears the detected controller kind when the live fact is explicitly null', () => {
+    let state = initDeviceSetup(
+      PROFILE,
+      { bedWidth: 363 },
+      {
+        detectedControllerKind: 'grblhal',
+        controllerRead: true,
+      },
+    );
+
+    state = deviceSetupReducer(state, {
+      kind: 'detected-updated',
+      detected: {},
+      detectedControllerKind: null,
+      controllerRead: false,
+    });
+
+    expect(state.detected).toEqual({});
+    expect(state.detectedControllerKind).toBeNull();
+    expect(state.controllerRead).toBe(false);
+  });
+
   it('is a no-op when the detected reference is unchanged', () => {
     const state = open({ bedWidth: 363 });
     expect(deviceSetupReducer(state, { kind: 'detected-updated', detected: state.detected })).toBe(

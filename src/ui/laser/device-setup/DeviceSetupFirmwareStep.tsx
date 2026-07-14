@@ -43,7 +43,14 @@ export function DeviceSetupFirmwareStep({
       </section>
     );
   }
-  const diffs = computeFirmwareDiffs(state.draft, rows, machine);
+  const stagedMachine =
+    machine?.kind === 'cnc' && state.detected.maxPowerS !== undefined
+      ? {
+          ...machine,
+          params: { ...machine.params, spindleMaxRpm: state.detected.maxPowerS },
+        }
+      : machine;
+  const diffs = computeFirmwareDiffs(state.draft, rows, stagedMachine);
   const writable = diffs.filter((diff) => diff.differs && diff.writable);
   const infoOnly = diffs.filter((diff) => diff.differs && !diff.writable);
   return (
