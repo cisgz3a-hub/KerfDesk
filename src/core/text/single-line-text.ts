@@ -1,4 +1,5 @@
 import type { Bounds, ColoredPath, CurveSubpath, Polyline, Vec2 } from '../scene';
+import { refineChainForOutput } from '../trace/centerline/curve-refine';
 import { hersheyGlyphForCharacter, parseHersheyJhf, type HersheyGlyph } from './hershey-font';
 import { HERSHEY_SIMPLEX_JHF } from './hershey-simplex-data';
 import type { TextRenderResult } from './text-to-polylines';
@@ -63,7 +64,7 @@ function glyphPolylines(
 ): ReadonlyArray<Polyline> {
   return glyph.strokes.map((stroke) => ({
     closed: false,
-    points: stroke.map((point) => ({
+    points: refineChainForOutput(stroke, false).map((point) => ({
       x: penX + (point.x - glyph.left) * scale,
       y: baselineY + point.y * scale,
     })),
