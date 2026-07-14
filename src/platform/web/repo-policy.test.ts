@@ -118,11 +118,24 @@ describe('repository policy enforcement contract', () => {
     expect(repoFile('CLAUDE.md')).toContain('CI-ratcheted');
   });
 
-  it('runs the isolated Chrome E2E suite in the release gate', () => {
+  it('runs Chrome E2E in a dedicated workflow outside release and deploy gates', () => {
     const packageJson = JSON.parse(repoFile('package.json')) as {
-      readonly scripts?: { readonly ['release:check']?: string; readonly ['test:e2e']?: string };
+      readonly scripts?: {
+        readonly ['release:check']?: string;
+        readonly ['test:e2e']?: string;
+        readonly ['typecheck:e2e']?: string;
+      };
     };
+    const browserWorkflow = repoFile('.github/workflows/e2e.yml');
+    const ciWorkflow = repoFile('.github/workflows/ci.yml');
+    const deployWorkflow = repoFile('.github/workflows/deploy.yml');
+
     expect(packageJson.scripts?.['test:e2e']).toBe('playwright test');
-    expect(packageJson.scripts?.['release:check']).toContain('pnpm test:e2e');
+    expect(packageJson.scripts?.['typecheck:e2e']).toBe('tsc --noEmit -p e2e/tsconfig.json');
+    expect(packageJson.scripts?.['release:check']).not.toContain('pnpm test:e2e');
+    expect(browserWorkflow).toContain('run: pnpm typecheck:e2e');
+    expect(browserWorkflow).toContain('run: pnpm test:e2e');
+    expect(ciWorkflow).not.toContain('playwright install');
+    expect(deployWorkflow).not.toContain('playwright install');
   });
 });
