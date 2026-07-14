@@ -7997,8 +7997,8 @@ during a run.
 
 ### Decision
 
-- Reduce the white `FRAME START` and `JOB START` label background opacity to 20%. Marker text, dots,
-  and the frame-direction arrow remain fully opaque safety red.
+- Render `FRAME START` and `JOB START` label text at 50% opacity over a 20%-opaque white backdrop.
+  Keep the safety-red marker dots and frame-direction arrow fully opaque.
 - Add a pressed eye toggle immediately after Snap in the floating canvas controls. The default is on,
   and the preference is stored locally across reloads.
 - Turning the toggle off hides only the two static start markers and frame-direction arrow. The

@@ -637,9 +637,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 6. When framing from a verified origin, a successful pass records frame verification for the Start-job preflight.
 
 #### Canvas start markers
-1. The canvas shows `FRAME START` and `JOB START` markers by default. Their 20%-opaque label
-   backgrounds keep artwork visible underneath while the red marker text and direction arrow remain
-   fully opaque.
+1. The canvas shows `FRAME START` and `JOB START` markers by default. Label text renders at 50%
+   opacity over a 20%-opaque white backdrop so artwork remains visible underneath. Marker dots and
+   the frame-direction arrow stay fully opaque for clear start-point positioning.
 2. The eye toggle immediately after **Snap** in the bottom-right canvas controls hides or restores
    those two static markers. The preference survives reloads.
 3. The toggle never hides the approach route, live controller head, completed-route trail, or motion
