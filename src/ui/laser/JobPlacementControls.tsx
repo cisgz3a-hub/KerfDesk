@@ -26,14 +26,14 @@ const ANCHOR_LABELS: Readonly<Record<JobOriginAnchor, string>> = {
 const CUT_SELECTED_HELP_ID = 'control:laser.output-scope.cut-selected';
 const SELECTION_ORIGIN_HELP_ID = 'control:laser.output-scope.selection-origin';
 
-export function JobPlacementControls(props: {
-  readonly disabled: boolean;
-  readonly streaming: boolean;
-}): JSX.Element {
+export function JobPlacementControls(props: { readonly streaming: boolean }): JSX.Element {
   const placement = useStore((s) => s.jobPlacement);
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const cameraPlacementActive = useCameraStore((s) => s.placementActive);
-  const busy = props.disabled || props.streaming;
+  // Placement and output scope are compile settings, not controller commands.
+  // Keep them editable while disconnected so Current Position can be changed
+  // to Absolute for offline export; only an active machine operation locks them.
+  const busy = props.streaming;
   return (
     <div style={placementStackStyle}>
       <div style={placementRowStyle}>
