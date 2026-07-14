@@ -9,7 +9,7 @@ import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { isActiveJob, setupBlockingJobCommandBlockMessage } from '../state/laser-store-helpers';
 import { machineControlsLabel, machineDisplayName, machineNoun } from '../machine/machine-labels';
 import { ConnectionBar } from './ConnectionBar';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
@@ -54,6 +54,7 @@ export function LaserWindow(): JSX.Element {
   // every ack pops the stream head, so the 120-byte RX accounting drifts and
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
+  const jobBlocksJog = useLaserStore((s) => setupBlockingJobCommandBlockMessage(s) !== null);
   const controllerIdle = statusReport?.state === 'Idle';
   const controllerSleep = statusReport?.state === 'Sleep';
   const showAlarmBanner = !controllerSleep && hasAlarmRecovery(alarmCode, statusReport?.state);
@@ -100,7 +101,7 @@ export function LaserWindow(): JSX.Element {
       )}
       <StatusDisplay />
       <JogPad
-        disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobActive)}
+        disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobBlocksJog)}
       />
       <ProbePanel />
       <JobControls
@@ -193,13 +194,20 @@ function hasAlarmRecovery(code: number | null, state: string | undefined): boole
   return code !== null || state === 'Alarm';
 }
 
+// A settled tool-change hold deliberately permits jog + Zero-Z so the operator
+// can touch off the new bit — the same carve-out the store's setup gate makes
+// (setupBlockingJobCommandBlockMessage). Without honouring it the multi-tool CNC
+// flow dead-ends: Continue needs fresh work-Z evidence and the JogPad is the only
+// UI that establishes it (G38). Passing that gate result here keeps the button
+// state matched to what the store will actually allow; unsettled holds and any
+// other active job keep the JogPad blocked.
 function isJogPadDisabled(
   connected: boolean,
   controllerIdle: boolean,
   machineOperationBusy: boolean,
-  jobActive: boolean,
+  setupBlockedByActiveJob: boolean,
 ): boolean {
-  return !connected || !controllerIdle || machineOperationBusy || jobActive;
+  return !connected || !controllerIdle || machineOperationBusy || setupBlockedByActiveJob;
 }
 
 function isMachineOperationBusy(state: {
