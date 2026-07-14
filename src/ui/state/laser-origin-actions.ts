@@ -119,7 +119,19 @@ async function setOriginHere(
     safeWrite,
     'Set work origin',
     (write) => setOriginHereAction(write, usesPrimaryWcs(get())),
-    () => {
+    // After the G92, a full-WCS (GRBL-family) controller reports the new work
+    // offset on its next status frame, which populates wcoCache. Right after
+    // Release motors ($SLP) + Wake — the no-homing hand-set workflow — the prior
+    // offset is unknown, so transientXyOriginPatch honestly declines to fabricate
+    // it and leaves wcoCache null; Start then refuses the location-unknown origin
+    // until a jog forces a frame (the reported bug). Wait for that frame so the
+    // origin is usable the instant Set origin reports success. A G92 does not move
+    // the head, and no homing is needed. g92-only (Smoothie) / WCS-less (Marlin)
+    // controllers never report WCO, so skip the wait there.
+    async () => {
+      if (usesPrimaryWcs(get())) {
+        await waitForOriginWcoFrame(get);
+      }
       const { statusReport, wcoCache } = get();
       return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
     },
@@ -213,6 +225,26 @@ async function releaseMotors(
 
 function usesPrimaryWcs(state: LaserState): boolean {
   return state.capabilities.wcs === 'g92-and-g10';
+}
+
+// Bounded so a silent controller cannot hang Set origin; a full-WCS controller
+// emits the work offset on its next status after a G92, so a usable value
+// normally lands within a poll cycle. On timeout it records with whatever is
+// available (as before), so a silent controller is no worse off than before.
+const ORIGIN_WCO_WAIT_TIMEOUT_MS = 3_000;
+const ORIGIN_WCO_POLL_MS = 50;
+
+async function waitForOriginWcoFrame(get: GetFn): Promise<void> {
+  const deadline = Date.now() + ORIGIN_WCO_WAIT_TIMEOUT_MS;
+  while (get().wcoCache === null && Date.now() <= deadline) {
+    await sleep(ORIGIN_WCO_POLL_MS);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function transientXyOriginPatch(

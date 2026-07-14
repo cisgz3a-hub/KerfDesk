@@ -134,14 +134,56 @@ describe('laser-store origin actions', () => {
     );
 
     connection.emitLine('ok');
+    // Set Origin now waits for the post-G92 work-offset report before finishing,
+    // so the origin is usable the moment it completes — the Z still comes from this
+    // real frame, never fabricated from MPos.z.
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:12.000,34.000,0.000|FS:0,0>');
     await action;
 
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g92');
-    // The command proves X/Y zero, but the pre-command Z offset was unknown.
-    // Wait for a WCO-bearing status instead of inventing WCO.z from MPos.z.
-    expect(useLaserStore.getState().wcoCache).toBeNull();
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
     expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
+  it('does not finish Set Origin until the work offset is known (post-Release/Wake)', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    // Idle but no WCO frame yet → wcoCache null. The no-homing hand-set workflow:
+    // Release motors → hand-move → Wake → Set origin, before any WCO frame lands.
+    // transientXyOriginPatch declines to fabricate the offset, so Set origin would
+    // leave wcoCache null and Start would refuse the origin as location-unknown
+    // until a jog forced a WCO frame — the reported bug.
+    connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+
+    let settled = false;
+    const action = useLaserStore
+      .getState()
+      .setOriginHere()
+      .then(() => {
+        settled = true;
+      });
+    await flush();
+    connection.emitLine('ok'); // G92 acknowledged
+    await flush();
+
+    // Acknowledged, but the offset is still unknown — Set origin must keep waiting,
+    // not finish having recorded a location-unknown origin.
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+    expect(settled).toBe(false);
+
+    // A full-WCS controller reports the new WCO after the G92 (emitted regardless
+    // of homing). A G92 does not move the head, so this is its true location.
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:12.000,34.000,0.000|FS:0,0>');
+    await action;
+
+    expect(settled).toBe(true);
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().workOriginSource).toBe('g92');
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
   });
 
   it('preserves a known Z offset when Set Origin changes X/Y only', async () => {
@@ -168,7 +210,11 @@ describe('laser-store origin actions', () => {
 
     // G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
     // advisory (which keys on workZZeroEvidence) must stay live.
-    await acknowledge(connection, useLaserStore.getState().setOriginHere());
+    const setOrigin = useLaserStore.getState().setOriginHere();
+    await flush();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:12.000,34.000,0.000|FS:0,0>');
+    await setOrigin;
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
 

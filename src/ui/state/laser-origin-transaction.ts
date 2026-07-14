@@ -23,7 +23,7 @@ export async function runOriginTransaction(
   safeWrite: OriginSafeWrite,
   label: string,
   writeCommands: OriginCommandWriter,
-  successPatch: () => Partial<LaserState>,
+  successPatch: () => Partial<LaserState> | Promise<Partial<LaserState>>,
 ): Promise<void> {
   const operation: LaserControllerOperation = {
     kind: 'interactive-command',
@@ -43,8 +43,11 @@ export async function runOriginTransaction(
         source: 'origin',
       });
     });
+    // successPatch may await a fresh controller frame — Set Origin waits for the
+    // post-G92 work-offset report so it never records a location-unknown origin.
+    const patch = await successPatch();
     set((state) => ({
-      ...successPatch(),
+      ...patch,
       controllerOperation:
         state.controllerOperation === operation ? null : state.controllerOperation,
       lastWriteError: null,
