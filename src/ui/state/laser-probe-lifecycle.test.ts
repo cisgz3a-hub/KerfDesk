@@ -5,8 +5,10 @@ import {
   DEFAULT_SIDE_DROP_MM,
   DEFAULT_Z_PROBE_PARAMS,
 } from '../../core/controllers/grbl';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -92,6 +94,7 @@ afterEach(async () => {
     workZZeroEvidence: null,
     log: [],
   });
+  useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
 
@@ -103,6 +106,9 @@ describe('probe controller transaction lifecycle', () => {
     });
     await connectWith(connection);
     writes.length = 0;
+    useStore.setState({
+      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+    });
 
     let resolved = false;
     const probe = useLaserStore
@@ -113,6 +119,9 @@ describe('probe controller transaction lifecycle', () => {
         return result;
       });
     await flush();
+    // The evidence binds to the cutter selected when probing began; a project
+    // edit while the physical transaction is in flight cannot relabel it.
+    useStore.getState().updateCncMachine({ toolId: 'em-6350' });
 
     expect(writes).toEqual(['G21\n']);
     expect(connection.listenerCount()).toBe(1);
@@ -163,6 +172,7 @@ describe('probe controller transaction lifecycle', () => {
     expect(useLaserStore.getState().workZZeroEvidence).toEqual({
       source: 'probe',
       referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      toolId: 'em-3175',
     });
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });

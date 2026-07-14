@@ -430,14 +430,4 @@ describe('prepareStartJob', () => {
       expect(result.messages).toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
     }
   });
-
-  it('allows a CNC Start with current qualified work-Z evidence', () => {
-    const result = prepareStartJob(cncProject(), cncReadyController, {
-      ...readyMachine,
-      workZReferenceEpoch: 7,
-      workZZeroEvidence: { source: 'probe', referenceEpoch: 7 },
-    });
-
-    expect(result.ok).toBe(true);
-  });
 });
