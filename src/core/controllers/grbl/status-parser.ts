@@ -101,6 +101,10 @@ export type StatusReport = {
    * to distinguish a grblHAL fault-clear report from an ordinary Ov-only
    * frame, which cannot prove exceptional A:E/A:T flags cleared. */
   readonly accessoryReportPresent?: boolean;
+  /** grblHAL manual-pulse-generator ownership evidence. `true` means the
+   * MPG input stream owns controller commands; null means this frame did not
+   * carry valid ownership evidence. */
+  readonly mpgActive?: boolean | null;
   /**
    * Work Coordinate Offset — the machine-to-work translation that
    * GRBL is currently applying. WPos = MPos - WCO. Reported on a
@@ -149,7 +153,16 @@ export function parseStatusReport(line: string): StatusReport | null {
     ov,
     accessories: pickAccessories(fields, ov),
     accessoryReportPresent,
+    mpgActive: pickMpgActive(fields),
   };
+}
+
+function pickMpgActive(fields: ReadonlyArray<string>): boolean | null {
+  for (const field of fields) {
+    if (field === 'MPG:1') return true;
+    if (field === 'MPG:0') return false;
+  }
+  return null;
 }
 
 function pickAccessories(

@@ -222,6 +222,7 @@ describe('handleLine controller error (P0-1)', () => {
   it('uses non-job wording when GRBL rejects a frame jog command', () => {
     const { refs, set, get } = makeHarness();
     set({
+      pendingUntrackedAcks: 1,
       motionOperation: {
         kind: 'frame',
         sawControllerBusy: false,

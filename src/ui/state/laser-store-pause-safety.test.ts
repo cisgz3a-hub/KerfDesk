@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_HOLD, RT_RESUME } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { createCncSetupAttestation } from './cnc-setup-attestation';
+import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -125,7 +125,10 @@ describe('laser-store pause safety', () => {
     const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
     await useLaserStore.getState().startJob(gcode, {
       machineKind: 'cnc',
-      cncSetupAttestation: createCncSetupAttestation(gcode),
+      cncSetupAttestation: createCncSetupAttestation(
+        gcode,
+        cncControllerEpochOf(useLaserStore.getState()),
+      ),
     });
     writes.length = 0;
 
@@ -161,7 +164,10 @@ describe('laser-store pause safety', () => {
     const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
     await useLaserStore.getState().startJob(gcode, {
       machineKind: 'cnc',
-      cncSetupAttestation: createCncSetupAttestation(gcode),
+      cncSetupAttestation: createCncSetupAttestation(
+        gcode,
+        cncControllerEpochOf(useLaserStore.getState()),
+      ),
     });
     await useLaserStore.getState().pauseJob();
     writes.length = 0;

@@ -30,6 +30,7 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { isActiveJob } from '../state/laser-store-helpers';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
+  cncControllerEpochOf,
   createCncSetupAttestation,
   type CncSetupAttestation,
 } from '../state/cnc-setup-attestation';
@@ -145,7 +146,7 @@ function confirmCncSetup(
 ): CncSetupAttestation | null | undefined {
   if (machineKind !== 'cnc') return undefined;
   if (!jobAwareConfirm(CNC_SETUP_ATTESTATION_PROMPT)) return null;
-  return createCncSetupAttestation(gcode);
+  return createCncSetupAttestation(gcode, cncControllerEpochOf(useLaserStore.getState()));
 }
 
 // Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC

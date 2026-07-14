@@ -73,6 +73,7 @@ describe('safe-write transport epochs', () => {
     const oldWrite = write('G1 X1\n');
     const oldFailure = expect(oldWrite).rejects.toThrow(/serial session changed/i);
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
     refs.writeEpoch = 1;
     useLaserStore.setState({ pendingTransportWrites: 0, pendingUntrackedAcks: 0 });
@@ -81,16 +82,43 @@ describe('safe-write transport epochs', () => {
     });
     const newWrite = write('G1 X2\n');
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
     releaseOld();
     await oldFailure;
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
     releaseNew();
     await newWrite;
     expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+  });
+
+  it('owns a fast terminal response that arrives before the transport promise resolves', async () => {
+    let release: () => void = () => undefined;
+    const refs: SafeWriteRefs = {
+      connection: deferredConnection((resolve) => {
+        release = resolve;
+      }),
+      driver: grblDriver,
+      nextTranscriptId: 1,
+      writeEpoch: 0,
+    };
+    const write = createSafeWrite(useLaserStore.setState, useLaserStore.getState, refs);
+
+    const pending = write('G1 X3\n');
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    useLaserStore.setState((state) => ({
+      pendingUntrackedAcks: Math.max(0, state.pendingUntrackedAcks - 1),
+    }));
+    release();
+    await pending;
+
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
   it('does not reassert work-Z evidence when a reset overtakes deferred G92 Z0', async () => {
@@ -106,7 +134,9 @@ describe('safe-write transport epochs', () => {
     await flush();
 
     const zeroing = useLaserStore.getState().zeroZHere();
-    const zeroFailure = expect(zeroing).rejects.toThrow(/serial session changed/i);
+    const zeroFailure = expect(zeroing).rejects.toThrow(
+      /serial session changed|controller rebooted/i,
+    );
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
     const previousEpoch = useLaserStore.getState().workZReferenceEpoch;
 
