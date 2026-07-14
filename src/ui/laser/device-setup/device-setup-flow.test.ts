@@ -8,6 +8,7 @@ import {
 import {
   canAdvanceDeviceSetup,
   DEVICE_SETUP_STEP_ORDER,
+  deviceSetupStepOrder,
   deviceSetupReducer,
   initDeviceSetup,
   isFirstDeviceSetupStep,
@@ -49,11 +50,11 @@ describe('initDeviceSetup', () => {
 describe('deviceSetupReducer navigation', () => {
   it('walks next through the whole step order and clamps at the last step', () => {
     let state = open();
-    for (const expected of DEVICE_SETUP_STEP_ORDER.slice(1)) {
+    for (const expected of deviceSetupStepOrder('laser').slice(1)) {
       state = deviceSetupReducer(state, { kind: 'next' });
       expect(state.step).toBe(expected);
     }
-    expect(isLastDeviceSetupStep(state.step)).toBe(true);
+    expect(isLastDeviceSetupStep(state.step, state.machineKind)).toBe(true);
     const atLast = state.step;
     state = deviceSetupReducer(state, { kind: 'next' });
     expect(state.step).toBe(atLast);
@@ -61,7 +62,7 @@ describe('deviceSetupReducer navigation', () => {
 
   it('walks back to the first step and clamps there', () => {
     let state = deviceSetupReducer(open(), { kind: 'go', step: 'review' });
-    while (!isFirstDeviceSetupStep(state.step)) {
+    while (!isFirstDeviceSetupStep(state.step, state.machineKind)) {
       state = deviceSetupReducer(state, { kind: 'back' });
     }
     expect(state.step).toBe('connect');
@@ -71,6 +72,18 @@ describe('deviceSetupReducer navigation', () => {
 
   it('jumps to an arbitrary step with go', () => {
     expect(deviceSetupReducer(open(), { kind: 'go', step: 'safety' }).step).toBe('safety');
+  });
+
+  it('omits CNC probing for laser setup and retains it for CNC setup', () => {
+    expect(deviceSetupStepOrder('laser')).not.toContain('probe');
+    expect(deviceSetupStepOrder('cnc')).toEqual(DEVICE_SETUP_STEP_ORDER);
+
+    const laser = deviceSetupReducer(open(), { kind: 'go', step: 'probe' });
+    expect(laser.step).toBe('connect');
+
+    let cnc = initDeviceSetup(PROFILE, null, { machineKind: 'cnc' });
+    cnc = deviceSetupReducer(cnc, { kind: 'go', step: 'probe' });
+    expect(cnc.step).toBe('probe');
   });
 });
 

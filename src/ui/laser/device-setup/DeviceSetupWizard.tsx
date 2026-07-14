@@ -7,7 +7,7 @@
 
 import { useEffect, useReducer } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
-import { assertNever } from '../../../core/scene';
+import { assertNever, machineKindOf } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button, Dialog, DialogActions } from '../../kit';
 import { useStore } from '../../state';
@@ -17,7 +17,7 @@ import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
 import {
   canAdvanceDeviceSetup,
-  DEVICE_SETUP_STEP_ORDER,
+  deviceSetupStepOrder,
   deviceSetupReducer,
   initDeviceSetup,
   isFirstDeviceSetupStep,
@@ -47,6 +47,7 @@ export function DeviceSetupWizard(props: {
   readonly onConfigured?: (profile: DeviceProfile) => void;
 }): JSX.Element {
   const device = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const detected = useLaserStore((s) => s.detectedSettings);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
@@ -55,6 +56,7 @@ export function DeviceSetupWizard(props: {
     initDeviceSetup(seed, detected, {
       detectedControllerKind,
       controllerRead: lastReadAt !== null,
+      machineKind,
     }),
   );
   // Keep the reducer's detected value in sync with the live controller read, so
@@ -75,7 +77,8 @@ export function DeviceSetupWizard(props: {
   // Readiness scores against state.detected (kept in sync by the effect above),
   // so the footer's Finish gate matches the committed draft.
   const ready = computeSetupReadiness(state.draft, state.detected).ready;
-  const stepNumber = DEVICE_SETUP_STEP_ORDER.indexOf(state.step) + 1;
+  const stepOrder = deviceSetupStepOrder(state.machineKind);
+  const stepNumber = stepOrder.indexOf(state.step) + 1;
   const onFinish = (): void => {
     replaceDeviceProfile(state.draft);
     props.onConfigured?.(state.draft);
@@ -84,7 +87,7 @@ export function DeviceSetupWizard(props: {
   return (
     <Dialog title="Device Setup" size="lg" onClose={props.onClose}>
       <p style={stepHintStyle}>
-        Step {stepNumber} of {DEVICE_SETUP_STEP_ORDER.length} — {STEP_TITLES[state.step]}
+        Step {stepNumber} of {stepOrder.length} — {STEP_TITLES[state.step]}
       </p>
       <div style={bodyStyle}>{renderStep(state, dispatch)}</div>
       <DialogActions>
@@ -93,12 +96,12 @@ export function DeviceSetupWizard(props: {
         </Button>
         <Button
           onClick={() => dispatch({ kind: 'back' })}
-          disabled={isFirstDeviceSetupStep(state.step)}
+          disabled={isFirstDeviceSetupStep(state.step, state.machineKind)}
           {...helpProps('control:laser.device-setup.back')}
         >
           Back
         </Button>
-        {isLastDeviceSetupStep(state.step) ? (
+        {isLastDeviceSetupStep(state.step, state.machineKind) ? (
           <Button
             variant="primary"
             onClick={onFinish}
@@ -143,7 +146,7 @@ function renderStep(
     case 'firmware':
       return <DeviceSetupFirmwareStep state={state} />;
     case 'review':
-      return <DeviceSetupReviewStep state={state} />;
+      return <DeviceSetupReviewStep state={state} dispatch={dispatch} />;
     default:
       return assertNever(state.step);
   }

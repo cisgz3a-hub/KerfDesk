@@ -42,7 +42,10 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
                 (state.controllerRead ? (state.draft.controllerKind ?? null) : null),
             )
           }
-          onUse={() => dispatch({ kind: 'apply-preset', profile: suggestion.profile })}
+          onUse={() => {
+            dispatch({ kind: 'apply-preset', profile: suggestion.profile });
+            dispatch({ kind: 'go', step: 'confirm' });
+          }}
         />
       ))}
     </div>

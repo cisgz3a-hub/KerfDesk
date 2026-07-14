@@ -336,15 +336,22 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   page,
   kerfdesk,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand Laser panel' }).click();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   await page.getByRole('button', { name: 'Run guided setup', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Device Setup' })).toContainText('Step 1 of 7');
+  await expect(page.getByRole('dialog', { name: 'Device Setup' })).toContainText('Step 1 of 6');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
-  for (let step = 0; step < 5; step += 1) {
+  for (let step = 0; step < 3; step += 1) {
     await page.getByRole('button', { name: 'Next', exact: true }).click();
   }
   await expect(page.getByRole('button', { name: 'Finish setup' })).toBeEnabled();
+  const finishBox = await page.getByRole('button', { name: 'Finish setup' }).boundingBox();
+  expect(finishBox).not.toBeNull();
+  expect((finishBox?.x ?? 0) + (finishBox?.width ?? 0)).toBeLessThanOrEqual(390);
+  expect((finishBox?.y ?? 0) + (finishBox?.height ?? 0)).toBeLessThanOrEqual(844);
   await page.getByRole('button', { name: 'Finish setup' }).click();
   await page.getByRole('button', { name: 'Save As...' }).click();
 
