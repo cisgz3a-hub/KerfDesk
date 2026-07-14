@@ -1,8 +1,6 @@
 import {
   suggestMachineProfiles,
   profileConfidenceLabel,
-  profileWithControllerFactsResult,
-  controllerProfilesAreCompatible,
   type MachineProfileSuggestion,
 } from '../../core/devices';
 import { Button } from '../kit';
@@ -30,10 +28,6 @@ export function OverviewPanel(): JSX.Element {
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const connected = connection.kind === 'connected';
   const configuredControllerKind = device.controllerKind ?? 'grbl-v1.1';
-  const mismatch =
-    connected &&
-    (configuredControllerKind !== activeControllerKind ||
-      (detectedControllerKind !== null && detectedControllerKind !== activeControllerKind));
   return (
     <div style={stackStyle}>
       <section style={sectionStyle}>
@@ -61,11 +55,6 @@ export function OverviewPanel(): JSX.Element {
             {device.streamingMode === 'char-counted' ? `, ${device.rxBufferBytes} bytes` : ''}
           </dd>
         </dl>
-        {mismatch ? (
-          <p role="alert" style={warningStyle}>
-            Controller mismatch. Apply the detected firmware profile, then disconnect and reconnect.
-          </p>
-        ) : null}
       </section>
       <DeviceSettings />
     </div>
@@ -99,32 +88,11 @@ function CatalogCard({
 }): JSX.Element {
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const current = useStore((s) => s.project.device);
-  const detectedSettings = useLaserStore((s) => s.detectedSettings);
-  const controllerSettings = useLaserStore((s) => s.controllerSettings);
-  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
-  const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
-  const connectionKind = useLaserStore((s) => s.connection.kind);
-  const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
   const activeId = useStore((s) => s.project.device.profileId);
   const profile = suggestion.profile;
-  const active = activeId === profile.profileId;
-  const knownControllerKind =
-    detectedControllerKind ??
-    (connectionKind === 'connected' && lastSettingsReadAt !== null ? activeControllerKind : null);
-  const controllerMismatch = !controllerProfilesAreCompatible(
-    profile.controllerKind,
-    knownControllerKind,
-  );
-  const application = profileWithControllerFactsResult({
-    profile,
-    current,
-    detectedSettings,
-    controllerSettings,
-    detectedControllerKind,
-    lastSettingsReadAt,
-  });
-  const applyProfile = (): void => {
-    replaceDeviceProfile(application.profile);
+  const isActive = activeId === profile.profileId && current === profile;
+  const handleApplyProfile = (): void => {
+    replaceDeviceProfile(profile);
   };
   return (
     <article style={cardStyle}>
@@ -151,42 +119,27 @@ function CatalogCard({
         {suggestion.warnings.map((warning) => (
           <li key={warning}>{warning}</li>
         ))}
-        {application.corrections.map((item) => (
-          <li key={`${item.field}-${item.to}`}>
-            Will set {item.field} to {item.to}: {item.reason}
-          </li>
-        ))}
       </ul>
       <CatalogApplyButton
-        active={active}
-        controllerMismatch={controllerMismatch}
+        isActive={isActive}
         profileName={profile.name}
-        onApply={applyProfile}
+        onApply={handleApplyProfile}
       />
     </article>
   );
 }
 
 function CatalogApplyButton(props: {
-  readonly active: boolean;
-  readonly controllerMismatch: boolean;
+  readonly isActive: boolean;
   readonly profileName: string;
   readonly onApply: () => void;
 }): JSX.Element {
-  const title = props.controllerMismatch
-    ? 'This profile uses a different controller family than the connected firmware.'
-    : undefined;
-  const label = props.active
-    ? 'Active profile'
-    : props.controllerMismatch
-      ? 'Firmware mismatch'
-      : `Use ${props.profileName}`;
+  const label = props.isActive ? 'Active profile' : `Use ${props.profileName}`;
   return (
     <Button
-      variant={props.active ? 'default' : 'primary'}
-      disabled={props.active || props.controllerMismatch}
+      variant={props.isActive ? 'default' : 'primary'}
+      disabled={props.isActive}
       onClick={props.onApply}
-      title={title}
     >
       {label}
     </Button>
@@ -198,10 +151,3 @@ function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confide
   if (confidence === 'possible') return 'Possible match';
   return 'Manual choice';
 }
-
-const warningStyle: React.CSSProperties = {
-  margin: '8px 0 0',
-  color: 'var(--lf-warning)',
-  fontSize: 12,
-  fontWeight: 600,
-};

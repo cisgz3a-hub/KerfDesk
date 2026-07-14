@@ -19,6 +19,8 @@ import {
   type Scene,
 } from '../../core/scene';
 import type { CncMachinePreset } from '../../core/cnc';
+import type { DeviceProfile } from '../../core/devices';
+import { jobPlacementAfterDeviceChange, type JobPlacementSettings } from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { pushUndo } from './scene-mutations';
@@ -28,6 +30,7 @@ type MachineState = {
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: boolean;
+  readonly jobPlacement: JobPlacementSettings;
   readonly cachedCncMachine: CncMachineConfig | null;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
@@ -45,6 +48,12 @@ export type CncMachinePatch = {
   readonly tiling?: CncTiling | null;
 };
 
+export type CncMachineSetupPatch = {
+  readonly deviceProfile?: DeviceProfile;
+  readonly devicePatch?: Partial<DeviceProfile>;
+  readonly paramsPatch?: Partial<CncMachineParams>;
+};
+
 export type MachineActions = {
   readonly setMachineKind: (kind: MachineKind) => void;
   readonly updateCncMachine: (patch: CncMachinePatch) => void;
@@ -54,6 +63,7 @@ export type MachineActions = {
   // Load a built-in CNC machine preset: seed the shared device bed and the CNC
   // spindle ceiling in one undoable step. CNC-only.
   readonly applyCncMachinePreset: (preset: CncMachinePreset) => void;
+  readonly applyCncMachineSetup: (patch: CncMachineSetupPatch) => void;
 };
 
 // Library bits the session's tool list doesn't already carry are appended
@@ -133,26 +143,47 @@ export function machineActions(set: MachineSet): MachineActions {
         // params. Layer RPMs above the new ceiling clamp down in the same
         // step — otherwise preflight rejects every export until each layer
         // is edited by hand (Easel clamps to machine limits the same way).
-        const project: Project = {
-          ...state.project,
-          scene: sceneWithSpindleCeiling(state.project.scene, preset.spindleMaxRpm),
-          device: {
-            ...state.project.device,
+        return cncMachineSetupStatePatch(state, {
+          devicePatch: {
             bedWidth: preset.bedWidthMm,
             bedHeight: preset.bedHeightMm,
           },
-          machine: {
-            ...machine,
-            params: { ...machine.params, spindleMaxRpm: preset.spindleMaxRpm },
-          },
-        };
-        return {
-          project,
-          undoStack: pushUndo(state.project, state.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
+          paramsPatch: { spindleMaxRpm: preset.spindleMaxRpm },
+        });
       }),
+    applyCncMachineSetup: (patch) => set((state) => cncMachineSetupStatePatch(state, patch)),
+  };
+}
+
+function cncMachineSetupStatePatch(
+  state: MachineState,
+  patch: CncMachineSetupPatch,
+): Partial<MachineState> {
+  const machine = state.project.machine;
+  if (machine?.kind !== 'cnc') return {};
+  const baseDevice = patch.deviceProfile ?? state.project.device;
+  const device: DeviceProfile = { ...baseDevice, ...patch.devicePatch };
+  const params = { ...machine.params, ...patch.paramsPatch };
+  const project: Project = {
+    ...state.project,
+    scene:
+      patch.paramsPatch?.spindleMaxRpm === undefined
+        ? state.project.scene
+        : sceneWithSpindleCeiling(state.project.scene, patch.paramsPatch.spindleMaxRpm),
+    device,
+    workspace: {
+      ...state.project.workspace,
+      width: device.bedWidth,
+      height: device.bedHeight,
+    },
+    machine: { ...machine, params },
+  };
+  return {
+    project,
+    jobPlacement: jobPlacementAfterDeviceChange(state.jobPlacement, state.project.device, device),
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 

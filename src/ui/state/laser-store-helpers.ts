@@ -332,7 +332,6 @@ type InitialLaserState = Pick<
   | 'ovCache'
   | 'accessoryCache'
   | 'mpgActive'
-  | 'unexpectedTerminalResponse'
   | 'workOriginActive'
   | 'workOriginSource'
   | 'workZZeroEvidence'
@@ -384,7 +383,6 @@ export function initialLaserState(): InitialLaserState {
     ovCache: null,
     accessoryCache: null,
     mpgActive: null,
-    unexpectedTerminalResponse: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,
@@ -411,6 +409,8 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
+    detectedSettings: null,
+    detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
     grblSettingsRows: [],
@@ -422,7 +422,6 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     ovCache: null,
     accessoryCache: null,
     mpgActive: null,
-    unexpectedTerminalResponse: null,
     workOriginActive: state.workOriginSource === 'g54-persistent',
     workOriginSource: state.workOriginSource === 'g54-persistent' ? 'unknown' : 'none',
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).

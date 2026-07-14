@@ -25,6 +25,8 @@ describe('applyCncMachinePreset', () => {
 
     expect(useStore.getState().project.device.bedWidth).toBe(preset.bedWidthMm);
     expect(useStore.getState().project.device.bedHeight).toBe(preset.bedHeightMm);
+    expect(useStore.getState().project.workspace.width).toBe(preset.bedWidthMm);
+    expect(useStore.getState().project.workspace.height).toBe(preset.bedHeightMm);
     expect(spindleMax()).toBe(preset.spindleMaxRpm);
     expect(useStore.getState().dirty).toBe(true);
 

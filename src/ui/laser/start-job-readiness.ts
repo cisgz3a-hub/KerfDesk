@@ -1,6 +1,5 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { StatusQueryCapability } from '../../core/controllers';
-import { controllerStartSnapshotIsCompatible } from '../../core/controllers/controller-start-compatibility';
 import type { ControllerKind } from '../../core/devices';
 import type { SimilarityTransform } from '../../core/registration';
 import {
@@ -54,8 +53,6 @@ export const STATUS_ALARM_START_MESSAGE =
   'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
 export const CNC_REQUIRES_GRBL_MESSAGE =
   'CNC jobs require a GRBL-family controller (GRBL, grblHAL, FluidNC). The connected firmware does not accept the GRBL CNC dialect — e.g. it reads the G4 spin-up dwell in milliseconds instead of seconds, so the bit would plunge before the spindle is at speed.';
-export const CONTROLLER_PROFILE_MISMATCH_MESSAGE =
-  'The connected controller does not match the active machine profile. Apply the detected firmware profile, disconnect, and reconnect before starting.';
 
 export type StartJobPreparation =
   | {
@@ -121,16 +118,6 @@ export type MachineStartSnapshot = {
 // parse it differently.
 function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): string[] {
   const issues = [...findMachineStartIssues(machine)];
-  const configuredControllerKind = project.device.controllerKind ?? 'grbl-v1.1';
-  if (
-    !controllerStartSnapshotIsCompatible(
-      configuredControllerKind,
-      machine.activeControllerKind,
-      machine.detectedControllerKind,
-    )
-  ) {
-    issues.push(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
-  }
   if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
     issues.push(CNC_REQUIRES_GRBL_MESSAGE);
   }

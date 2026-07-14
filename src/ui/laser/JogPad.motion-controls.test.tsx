@@ -26,6 +26,7 @@ function buttonByLabel(host: HTMLElement, label: string): HTMLButtonElement | nu
 
 async function renderJogPad(): Promise<{
   readonly host: HTMLDivElement;
+  readonly rerender: (disabled: boolean) => Promise<void>;
   readonly unmount: () => Promise<void>;
 }> {
   const host = document.createElement('div');
@@ -37,6 +38,9 @@ async function renderJogPad(): Promise<{
   });
   return {
     host,
+    rerender: async (disabled) => {
+      if (root !== null) await act(async () => root?.render(<JogPad disabled={disabled} />));
+    },
     unmount: async () => {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -125,6 +129,57 @@ describe('JogPad motion controls', () => {
         right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
       });
       expect(cancelJog).toHaveBeenCalledTimes(1);
+    } finally {
+      await unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not cancel an active hold merely because live machine state re-renders the pad', async () => {
+    vi.useFakeTimers();
+    const jog = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog, cancelJog });
+    const { host, unmount } = await renderJogPad();
+    try {
+      const right = buttonByLabel(host, 'Jog +X 10 mm');
+      if (right === null) throw new Error('right jog button missing');
+      await startHold(right);
+      expect(jog).toHaveBeenCalledTimes(1);
+
+      await act(async () => useStore.getState().updateDeviceProfile({ maxFeed: 5000 }));
+      expect(cancelJog).not.toHaveBeenCalled();
+
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+      });
+      expect(cancelJog).toHaveBeenCalledTimes(1);
+    } finally {
+      await unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not start a hold or release step after the pad becomes disabled mid-press', async () => {
+    vi.useFakeTimers();
+    const jog = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog, cancelJog });
+    const { host, rerender, unmount } = await renderJogPad();
+    try {
+      const right = buttonByLabel(host, 'Jog +X 10 mm');
+      if (right === null) throw new Error('right jog button missing');
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      });
+      await rerender(true);
+      await act(async () => vi.advanceTimersByTimeAsync(250));
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+      });
+
+      expect(jog).not.toHaveBeenCalled();
+      expect(cancelJog).not.toHaveBeenCalled();
     } finally {
       await unmount();
       vi.useRealTimers();

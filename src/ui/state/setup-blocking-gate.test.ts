@@ -104,6 +104,17 @@ describe('setupBlockingJobCommandBlockMessage (CNC-03)', () => {
     expect(jogFrameCommandBlockMessage(s)).toBeNull();
   });
 
+  it('does not block motion because detected firmware differs from the chosen profile', () => {
+    const base = gateState({
+      streamer: null,
+      connection: { kind: 'connected' },
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
+      statusReport: statusReport('Idle'),
+    });
+    expect(jogFrameCommandBlockMessage({ ...base, detectedControllerKind: 'grblhal' })).toBeNull();
+  });
+
   it('KEEPS Start blocked during a tool change — Start must never unblock', () => {
     // setupCommandBlockMessage backs assertStartAllowed, and it uses the STRICT
     // activeJobCommandBlockMessage, so even a ready tool-change still blocks Start.

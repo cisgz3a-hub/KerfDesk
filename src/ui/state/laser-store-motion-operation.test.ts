@@ -129,6 +129,18 @@ describe('laser-store motion operation disconnect safety', () => {
 });
 
 describe('laser-store motion operation lifecycle', () => {
+  it('writes a jog when detected firmware differs from the user-selected profile', async () => {
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    useLaserStore.setState({ detectedControllerKind: 'grblhal' });
+    write.mockClear();
+
+    await useLaserStore.getState().jog({ dx: 10, feed: 1000 });
+    expect(write).toHaveBeenCalledWith('$J=G91 G21 X10.000 F1000\n');
+  });
+
   it('keeps Jog busy until GRBL reports motion and returns to Idle', async () => {
     const write = vi.fn(async () => undefined);
     const connection = makeConnection(write);

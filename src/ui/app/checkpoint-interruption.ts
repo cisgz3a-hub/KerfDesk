@@ -23,7 +23,7 @@ function noticeKind(notice: LaserSafetyNotice): JobInterruption['kind'] {
   if (notice.kind === 'disconnect-during-job' || notice.kind === 'disconnect-during-fire') {
     return 'disconnect';
   }
-  if (notice.kind === 'frame-limit' || notice.kind === 'controller-ownership') return 'unknown';
+  if (notice.kind === 'frame-limit') return 'unknown';
   return notice.kind;
 }
 

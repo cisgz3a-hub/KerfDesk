@@ -179,6 +179,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await enableLab(page, 'Print and Cut');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Machine settings detected:/)).toBeVisible();
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect
     .poll(async () =>

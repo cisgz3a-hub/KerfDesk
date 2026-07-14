@@ -5,12 +5,7 @@
 // unit-testable in isolation.
 
 import type { Dispatch } from 'react';
-import {
-  controllerCompatibleProfile,
-  profileWithControllerFacts,
-  validateMachineProfile,
-  type DeviceProfile,
-} from '../../../core/devices';
+import { validateMachineProfile, type DeviceProfile } from '../../../core/devices';
 import { assertNever, type MachineKind } from '../../../core/scene';
 
 // The flow is Connect -> Identify -> Confirm -> Safety -> Probe -> Sync
@@ -56,9 +51,8 @@ export type DeviceSetupState = {
   // The profile as the wizard opened: lets Finish diff against it and lets
   // Cancel mean "discard" (the draft is never written until Finish).
   readonly baseline: DeviceProfile;
-  // The latest $$ patch — seeded at open and refreshed via `detected-updated`
-  // whenever the controller is (re-)read, so apply-preset and readiness overlay
-  // current controller truth instead of a stale open-time snapshot.
+  // The latest $$ observation. It stays separate from the draft until the
+  // operator explicitly chooses Apply detected.
   readonly detected: Partial<DeviceProfile>;
   readonly detectedControllerKind: DeviceProfile['controllerKind'] | null;
   readonly controllerRead: boolean;
@@ -66,6 +60,15 @@ export type DeviceSetupState = {
   readonly draft: DeviceProfile;
   // True once a catalog preset was applied this session.
   readonly presetApplied: boolean;
+  // Controller-reported values are committed only after the operator clicks
+  // Apply detected; merely reading $$ must never alter the chosen profile.
+  readonly detectedAccepted: boolean;
+  // CNC spindle limits live on the machine config rather than DeviceProfile.
+  // Keep the editable value and its explicit operator confirmation alongside
+  // the profile draft so Review can always route a blocker to an actionable
+  // control and Finish can commit both in one undoable update.
+  readonly spindleMaxRpm: number | null;
+  readonly spindleConfirmed: boolean;
 };
 
 export type DeviceSetupAction =
@@ -73,11 +76,13 @@ export type DeviceSetupAction =
   | { readonly kind: 'back' }
   | { readonly kind: 'go'; readonly step: DeviceSetupStep }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
+  | { readonly kind: 'edit-spindle'; readonly spindleMaxRpm: number | null }
+  | { readonly kind: 'confirm-spindle'; readonly confirmed: boolean }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
   | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
   | {
       readonly kind: 'detected-updated';
-      readonly detected: Partial<DeviceProfile>;
+      readonly detected?: Partial<DeviceProfile>;
       readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
       readonly controllerRead?: boolean;
     };
@@ -86,6 +91,7 @@ export type DeviceSetupDetectedFacts = {
   readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
   readonly controllerRead?: boolean;
   readonly machineKind?: MachineKind;
+  readonly spindleMaxRpm?: number;
 };
 
 // Shared props for the wizard step components: the current flow state plus the
@@ -101,21 +107,22 @@ export function initDeviceSetup(
   facts: DeviceSetupDetectedFacts = {},
 ): DeviceSetupState {
   const safeDetected = detected ?? {};
+  const machineKind = facts.machineKind ?? 'laser';
   const controllerRead =
     facts.controllerRead ?? (detected !== null || facts.detectedControllerKind !== undefined);
   const detectedControllerKind = facts.detectedControllerKind ?? null;
   return {
     step: 'connect',
-    machineKind: facts.machineKind ?? 'laser',
+    machineKind,
     baseline: profile,
     detected: safeDetected,
     detectedControllerKind,
     controllerRead,
-    draft: controllerCompatibleProfile(
-      { ...profile, ...safeDetected },
-      detectedControllerKind ?? profile.controllerKind,
-    ).profile,
+    draft: profile,
     presetApplied: false,
+    detectedAccepted: false,
+    spindleMaxRpm: facts.spindleMaxRpm ?? null,
+    spindleConfirmed: false,
   };
 }
 
@@ -133,8 +140,17 @@ export function deviceSetupReducer(
         ? { ...state, step: action.step }
         : state;
     case 'edit':
-    case 'accept-detected':
       return { ...state, draft: { ...state.draft, ...action.patch } };
+    case 'edit-spindle':
+      return {
+        ...state,
+        spindleMaxRpm: action.spindleMaxRpm,
+        spindleConfirmed: action.spindleMaxRpm !== null,
+      };
+    case 'confirm-spindle':
+      return { ...state, spindleConfirmed: action.confirmed };
+    case 'accept-detected':
+      return acceptDetected(state, action.patch);
     case 'apply-preset':
       return applyPreset(state, action.profile);
     case 'detected-updated':
@@ -147,15 +163,9 @@ export function deviceSetupReducer(
 function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSetupState {
   return {
     ...state,
-    draft: profileWithControllerFacts({
-      profile,
-      current: state.draft,
-      detectedSettings: state.detected,
-      controllerSettings: state.detected,
-      detectedControllerKind: state.detectedControllerKind,
-      lastSettingsReadAt: state.controllerRead ? 1 : null,
-    }),
+    draft: profile,
     presetApplied: true,
+    detectedAccepted: false,
   };
 }
 
@@ -166,18 +176,50 @@ function updateDetectedFacts(
   // The wizard re-dispatches the live $$ patch on every read; a ref-equal
   // dispatch (the mount re-sync) is a no-op so it does not force a render.
   if (
-    action.detected === state.detected &&
+    (action.detected === undefined || action.detected === state.detected) &&
     action.detectedControllerKind === undefined &&
     action.controllerRead === undefined
   ) {
     return state;
   }
+  const detectedControllerKind =
+    action.detectedControllerKind === undefined
+      ? state.detectedControllerKind
+      : action.detectedControllerKind;
   return {
     ...state,
-    detected: action.detected,
-    detectedControllerKind: action.detectedControllerKind ?? state.detectedControllerKind,
+    detected: action.detected ?? state.detected,
+    detectedControllerKind,
     controllerRead: action.controllerRead ?? true,
+    draft: state.draft,
   };
+}
+
+function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>): DeviceSetupState {
+  const detectedSpindleMaxRpm =
+    state.machineKind === 'cnc' && patch.maxPowerS !== undefined && patch.maxPowerS > 0
+      ? patch.maxPowerS
+      : null;
+  return {
+    ...state,
+    draft: { ...state.draft, ...profilePatchForMachineKind(patch, state.machineKind) },
+    detectedAccepted: true,
+    ...(detectedSpindleMaxRpm === null
+      ? {}
+      : { spindleMaxRpm: detectedSpindleMaxRpm, spindleConfirmed: true }),
+  };
+}
+
+function profilePatchForMachineKind(
+  patch: Partial<DeviceProfile>,
+  machineKind: MachineKind,
+): Partial<DeviceProfile> {
+  if (machineKind !== 'cnc') return patch;
+  const shared = { ...patch };
+  delete shared.maxPowerS;
+  delete shared.minPowerS;
+  delete shared.laserModeEnabled;
+  return shared;
 }
 
 // Next is allowed on the lead-in steps unconditionally (the operator may

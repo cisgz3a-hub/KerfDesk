@@ -4,7 +4,6 @@
 // committed until Finish.
 
 import {
-  controllerProfilesAreCompatible,
   profileConfidenceLabel,
   suggestMachineProfiles,
   type MachineProfileSuggestion,
@@ -34,14 +33,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
         <PresetCard
           key={suggestion.profileId}
           suggestion={suggestion}
-          active={state.draft.profileId === suggestion.profile.profileId}
-          controllerMismatch={
-            !controllerProfilesAreCompatible(
-              suggestion.profile.controllerKind,
-              state.detectedControllerKind ??
-                (state.controllerRead ? (state.draft.controllerKind ?? null) : null),
-            )
-          }
+          isActive={state.draft.profileId === suggestion.profile.profileId}
           onUse={() => {
             dispatch({ kind: 'apply-preset', profile: suggestion.profile });
             dispatch({ kind: 'go', step: 'confirm' });
@@ -54,11 +46,14 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
 
 function PresetCard(props: {
   readonly suggestion: MachineProfileSuggestion;
-  readonly active: boolean;
-  readonly controllerMismatch: boolean;
+  readonly isActive: boolean;
   readonly onUse: () => void;
 }): JSX.Element {
   const profile = props.suggestion.profile;
+  const buttonTitle = props.isActive
+    ? 'This machine is selected.'
+    : `Start from ${profile.name}'s defaults.`;
+  const buttonLabel = props.isActive ? 'Selected' : `Use ${profile.name}`;
   return (
     <article style={cardStyle}>
       <div style={cardHeaderStyle}>
@@ -86,22 +81,12 @@ function PresetCard(props: {
         ))}
       </ul>
       <Button
-        variant={props.active ? 'default' : 'primary'}
-        disabled={props.active || props.controllerMismatch}
+        variant={props.isActive ? 'default' : 'primary'}
+        disabled={props.isActive}
         onClick={props.onUse}
-        title={
-          props.active
-            ? 'This machine is selected.'
-            : props.controllerMismatch
-              ? 'This profile uses a different controller family than the connected firmware.'
-              : `Start from ${profile.name}'s defaults.`
-        }
+        title={buttonTitle}
       >
-        {props.active
-          ? 'Selected'
-          : props.controllerMismatch
-            ? 'Firmware mismatch'
-            : `Use ${profile.name}`}
+        {buttonLabel}
       </Button>
     </article>
   );

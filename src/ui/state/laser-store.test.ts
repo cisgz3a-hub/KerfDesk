@@ -130,10 +130,16 @@ describe('laser-store safety notices (P0-B)', () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     expect(useLaserStore.getState().streamer).toBeNull();
+    useLaserStore.setState({
+      detectedSettings: { bedWidth: 999, maxPowerS: 24000 },
+      detectedControllerKind: 'grblhal',
+    });
 
     connection.emitClose();
 
     expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(useLaserStore.getState().detectedSettings).toBeNull();
+    expect(useLaserStore.getState().detectedControllerKind).toBeNull();
   });
 
   it('clearSafetyNotice acknowledges and removes the notice', async () => {
@@ -361,12 +367,14 @@ describe('laser-store serial write failures', () => {
   ] as const)(
     'raises a safety notice when the %s write fails',
     async (_label, expectedAction, runCommand) => {
+      let shouldFail = false;
       const write = vi.fn(async () => {
-        throw new Error(`${expectedAction} rejected`);
+        if (shouldFail) throw new Error(`${expectedAction} rejected`);
       });
       const connection = makeConnection(write);
       await connectWith(connection);
 
+      shouldFail = true;
       await expect(runCommand()).rejects.toThrow(`${expectedAction} rejected`);
 
       expect(useLaserStore.getState().safetyNotice).toMatchObject({

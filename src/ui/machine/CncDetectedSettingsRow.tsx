@@ -16,14 +16,11 @@ export function CncDetectedSettingsRow(props: {
 }): JSX.Element | null {
   const detected = useLaserStore((s) => s.controllerSettings);
   const device = useStore((s) => s.project.device);
-  const updateCncMachine = useStore((s) => s.updateCncMachine);
-  const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
+  const applyCncMachineSetup = useStore((s) => s.applyCncMachineSetup);
   const apply = detected === null ? null : computeCncDetectedApply(detected, props.machine, device);
   if (apply === null) return null;
   const handleApply = (): void => {
-    if (apply.paramsPatch.spindleMaxRpm !== undefined)
-      updateCncMachine({ params: apply.paramsPatch });
-    if (Object.keys(apply.devicePatch).length > 0) updateDeviceProfile(apply.devicePatch);
+    applyCncMachineSetup(apply);
   };
   return (
     <div style={bannerStyle} role="status" aria-label="Detected machine settings">

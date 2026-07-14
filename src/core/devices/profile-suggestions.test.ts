@@ -19,7 +19,7 @@ const FALCON_SETTINGS = new Map<number, string>([
 ]);
 
 describe('suggestMachineProfiles', () => {
-  it('suggests the Falcon grblHAL profile from grblHAL plus 400x400 and S1000 facts', () => {
+  it('reports matching firmware profiles as possible without identifying hardware from generic settings', () => {
     const suggestions = suggestMachineProfiles({
       detectedControllerKind: 'grblhal',
       detectedProfilePatch: settingsMapToProfilePatch(FALCON_SETTINGS),
@@ -29,7 +29,7 @@ describe('suggestMachineProfiles', () => {
 
     expect(suggestions[0]).toMatchObject({
       profileId: 'creality-falcon-a1-pro-grblhal',
-      confidence: 'suggested',
+      confidence: 'possible',
     });
     expect(suggestions[0]?.reasons).toEqual(
       expect.arrayContaining([
@@ -38,6 +38,7 @@ describe('suggestMachineProfiles', () => {
         'Controller reports S range 0-1000.',
       ]),
     );
+    expect(suggestions.some((suggestion) => suggestion.confidence === 'suggested')).toBe(false);
   });
 
   it('keeps generic grblHAL possible instead of replacing the Falcon suggestion', () => {

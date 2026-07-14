@@ -42,6 +42,39 @@ describe('computeSetupReadiness', () => {
     expect(readiness.ready).toBe(true);
   });
 
+  it('uses router spindle readiness without laser power or laser-head rows in CNC mode', () => {
+    const readiness = computeSetupReadiness(
+      DEFAULT_DEVICE_PROFILE,
+      { bedWidth: 400, bedHeight: 400, maxPowerS: 24000 },
+      'cnc',
+    );
+    expect(readiness.ready).toBe(true);
+    expect(readiness.items.find((item) => item.id === 'spindle')).toMatchObject({
+      status: 'confirmed',
+      detail: '24000 RPM',
+    });
+    expect(readiness.items.some((item) => item.id === 'power-scale')).toBe(false);
+    expect(readiness.items.some((item) => item.id === 'laser-head')).toBe(false);
+  });
+
+  it('makes a missing router spindle ceiling resolvable by explicit confirmation', () => {
+    const pending = computeSetupReadiness(DEFAULT_DEVICE_PROFILE, null, 'cnc', {
+      maxRpm: 12_000,
+      confirmed: false,
+    });
+    expect(pending.ready).toBe(false);
+    expect(pending.items.find((item) => item.id === 'spindle')).toMatchObject({
+      status: 'needs-attention',
+      detail: '12000 RPM',
+    });
+
+    const confirmed = computeSetupReadiness(DEFAULT_DEVICE_PROFILE, null, 'cnc', {
+      maxRpm: 12_000,
+      confirmed: true,
+    });
+    expect(confirmed.items.find((item) => item.id === 'spindle')?.status).toBe('confirmed');
+  });
+
   it('is ready once a real catalog profile is chosen, even with default-matching numbers', () => {
     const readiness = computeSetupReadiness(nonDefaultPreset(), null);
     expect(readiness.ready).toBe(true);

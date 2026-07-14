@@ -1,16 +1,18 @@
 // DeviceSetupWizard — the connect-time guided setup surface (ADR-092). A
-// manually-launched, multi-step Dialog that seeds a draft DeviceProfile from
-// the active profile + the controller's $$ readback, walks the operator
-// through confirming it, and commits via replaceDeviceProfile only on Finish.
+// manually-launched, multi-step Dialog that keeps an exact profile draft plus
+// a separate controller $$ observation, walks the operator through confirming
+// explicit changes, and commits only on Finish.
 // The step logic is the pure reducer in device-setup-flow.ts; this file is the
 // shell + footer navigation.
 
 import { useEffect, useReducer } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
-import { assertNever, machineKindOf } from '../../../core/scene';
+import { assertNever, machineKindOf, type MachineConfig } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button, Dialog, DialogActions } from '../../kit';
+import { computeCncDetectedApply } from '../../machine/cnc-detected-apply';
 import { useStore } from '../../state';
+import type { CncMachineSetupPatch } from '../../state/machine-actions';
 import { useLaserStore } from '../../state/laser-store';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
@@ -48,39 +50,35 @@ export function DeviceSetupWizard(props: {
 }): JSX.Element {
   const device = useStore((s) => s.project.device);
   const machineKind = useStore((s) => machineKindOf(s.project.machine));
+  const machine = useStore((s) => s.project.machine);
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
+  const applyCncMachineSetup = useStore((s) => s.applyCncMachineSetup);
   const detected = useLaserStore((s) => s.detectedSettings);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
+  const connectionKind = useLaserStore((s) => s.connection.kind);
   const [state, dispatch] = useReducer(deviceSetupReducer, device, (seed) =>
     initDeviceSetup(seed, detected, {
       detectedControllerKind,
       controllerRead: lastReadAt !== null,
       machineKind,
+      ...(machine?.kind === 'cnc' ? { spindleMaxRpm: machine.params.spindleMaxRpm } : {}),
     }),
   );
-  // Keep the reducer's detected value in sync with the live controller read, so
-  // apply-preset and the readiness gate use current $$ values even when the
-  // operator connects or re-reads after the wizard opened (audit fix B). Skip the
-  // transient null a re-read sets before its reply lands, so the last-known
-  // detection survives the window instead of briefly emptying.
-  useEffect(() => {
-    if (detected !== null) {
-      dispatch({
-        kind: 'detected-updated',
-        detected,
-        detectedControllerKind,
-        controllerRead: lastReadAt !== null,
-      });
-    }
-  }, [detected, detectedControllerKind, lastReadAt]);
+  useDetectedSetupSync(dispatch, detected, detectedControllerKind, {
+    controllerRead: lastReadAt !== null,
+    connected: connectionKind === 'connected',
+  });
   // Readiness scores against state.detected (kept in sync by the effect above),
   // so the footer's Finish gate matches the committed draft.
-  const ready = computeSetupReadiness(state.draft, state.detected).ready;
+  const ready = computeSetupReadiness(state.draft, state.detected, state.machineKind, {
+    maxRpm: state.spindleMaxRpm,
+    confirmed: state.spindleConfirmed,
+  }).ready;
   const stepOrder = deviceSetupStepOrder(state.machineKind);
   const stepNumber = stepOrder.indexOf(state.step) + 1;
   const onFinish = (): void => {
-    replaceDeviceProfile(state.draft);
+    commitDeviceSetup(state, machine, replaceDeviceProfile, applyCncMachineSetup);
     props.onConfigured?.(state.draft);
     props.onClose();
   };
@@ -126,6 +124,50 @@ export function DeviceSetupWizard(props: {
       </DialogActions>
     </Dialog>
   );
+}
+
+function useDetectedSetupSync(
+  dispatch: React.Dispatch<DeviceSetupAction>,
+  detected: Partial<DeviceProfile> | null,
+  detectedControllerKind: DeviceProfile['controllerKind'] | null,
+  syncState: { readonly controllerRead: boolean; readonly connected: boolean },
+): void {
+  const { connected, controllerRead } = syncState;
+  // Preserve the last read during the transient null before a re-read reply,
+  // but clear it once the controller session is actually gone.
+  useEffect(() => {
+    dispatch({
+      kind: 'detected-updated',
+      ...(detected === null ? (connected ? {} : { detected: {} }) : { detected }),
+      detectedControllerKind,
+      ...(controllerRead ? { controllerRead: true } : connected ? {} : { controllerRead: false }),
+    });
+  }, [connected, controllerRead, detected, detectedControllerKind, dispatch]);
+}
+
+function commitDeviceSetup(
+  state: DeviceSetupState,
+  machine: MachineConfig | null | undefined,
+  replaceDeviceProfile: (profile: DeviceProfile) => void,
+  applyCncMachineSetup: (patch: CncMachineSetupPatch) => void,
+): void {
+  if (machine?.kind !== 'cnc') {
+    replaceDeviceProfile(state.draft);
+    return;
+  }
+  const detectedApply = state.detectedAccepted
+    ? computeCncDetectedApply(state.detected, machine, state.draft)
+    : null;
+  const confirmedSpindlePatch =
+    state.spindleConfirmed && state.spindleMaxRpm !== null
+      ? { spindleMaxRpm: state.spindleMaxRpm }
+      : {};
+  const paramsPatch = { ...(detectedApply?.paramsPatch ?? {}), ...confirmedSpindlePatch };
+  applyCncMachineSetup({
+    deviceProfile: state.draft,
+    ...(Object.keys(paramsPatch).length === 0 ? {} : { paramsPatch }),
+    ...(detectedApply === null ? {} : { devicePatch: detectedApply.devicePatch }),
+  });
 }
 
 function renderStep(
