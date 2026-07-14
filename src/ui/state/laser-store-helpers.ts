@@ -133,7 +133,7 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
     const expected = state.pendingToolLabel ?? state.pendingToolId;
     return (
       `Work Z belongs to a different bit. Load ${expected}, select it as the Active bit, ` +
-      'then Zero Z or probe again before continuing.'
+      'then touch it to the stock top and Zero Z — or probe again — before continuing.'
     );
   }
   return null;

@@ -12,8 +12,9 @@ import {
 } from '../state/work-z-zero-evidence';
 
 export const CNC_NO_WORK_ZERO_START_MESSAGE =
-  'No work zero is set — the CNC toolpath assumes Z0 is the stock top. Jog to the ' +
-  'stock surface and Zero Z (or probe) before running, or the cut depth will be wrong.';
+  'No work zero is set — the CNC toolpath assumes Z0 is the stock top. Touch the bit to the ' +
+  'stock top and press Zero Z, or run a touch-plate probe, before starting. Zeroing with the ' +
+  'bit parked above the stock makes the job cut in the air by that height.';
 export const CNC_UNKNOWN_INITIAL_TOOL_START_MESSAGE =
   'The compiled CNC job does not identify its first bit, so KerfDesk cannot prove that work Z ' +
   'belongs to the cutter that will move. Recompile the job with a valid tool assignment.';
@@ -53,6 +54,7 @@ export function cncWorkZeroToolStartIssue(
       : (machine.tools.find((tool) => tool.id === evidence.toolId)?.name ?? evidence.toolId);
   return (
     `This job starts with ${expectedName}, but work Z was established for ${evidenceName}. ` +
-    `Load ${expectedName}, select it as the Active bit, then Zero Z or probe again.`
+    `Load ${expectedName}, select it as the Active bit, then touch it to the stock top and ` +
+    'Zero Z — or probe again.'
   );
 }

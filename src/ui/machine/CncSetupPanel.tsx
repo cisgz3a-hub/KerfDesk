@@ -12,6 +12,7 @@ import {
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { ProbeControls } from '../laser/ProbeControls';
+import { ProbePlateRemovalNotice } from '../laser/ProbePlateRemovalNotice';
 import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncMachineCatalogRow } from './CncMachineCatalogRow';
@@ -59,6 +60,9 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         </summary>
         <ProbeControls />
       </details>
+      {/* Outside the collapsed details: the confirmation gates CNC Start, so it
+          must be visible even when the probe section is folded. */}
+      <ProbePlateRemovalNotice />
       <CncToolManager machine={machine} />
       <CncMachineCatalogRow />
       <CncMachineProfilesRow />

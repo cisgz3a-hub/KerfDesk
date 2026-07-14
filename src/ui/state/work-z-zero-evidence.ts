@@ -3,7 +3,9 @@ import { activeCncTool, type Project } from '../../core/scene';
 export type WorkZZeroEvidenceSource = 'manual-zero' | 'probe';
 
 export const PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE =
-  'Remove the touch plate and probe lead from the stock and cutter, then confirm removal before continuing.';
+  'Remove the touch plate and probe lead from the stock and cutter, then click ' +
+  '"Confirm plate removed" in the probe panel. Do not press Zero Z with the bit parked in ' +
+  'the air — that discards the probed work zero.';
 
 /**
  * Session-scoped proof that the active bit was referenced to the stock-top Z0.
