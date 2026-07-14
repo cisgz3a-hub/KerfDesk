@@ -7,17 +7,11 @@ import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
+import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
 // release -> hand-move -> Wake (Ctrl-X) -> Set origin LAST.
-const RELEASE_MOTORS_CONFIRM =
-  'Release motors?\n\n' +
-  'This sends $SLP to put the controller to sleep so you can push the head by hand. ' +
-  'The controller will ignore normal commands until you Wake it with Ctrl-X, which clears ' +
-  'the work origin. Move the head first, then Wake, wait for Idle, and Set origin again. ' +
-  'Do not release motors during a job.';
-
 const SET_PERSISTENT_ORIGIN_CONFIRM =
   'Set persistent G54 origin?\n\n' +
   'This sends G10 L20 P1 X0 Y0 and writes the current head position into the controller. ' +
@@ -41,6 +35,7 @@ export function OriginRow(props: {
 }): JSX.Element | null {
   const wcs = useLaserStore((s) => s.capabilities.wcs);
   const canSleep = useLaserStore((s) => s.capabilities.sleep);
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const setOrigin = useLaserStore((s) => s.setOriginHere);
   const resetOrigin = useLaserStore((s) => s.resetOrigin);
   const releaseMotors = useLaserStore((s) => s.releaseMotors);
@@ -96,7 +91,7 @@ export function OriginRow(props: {
           persistentOriginReady={persistentOriginReady}
         />
       )}
-      {canSleep && (
+      {canSleep && homingEnabled && (
         <button
           type="button"
           onClick={onRelease}

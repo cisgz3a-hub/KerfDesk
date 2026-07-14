@@ -124,6 +124,7 @@ afterEach(() => {
 describe('JobControls Frame action', () => {
   it('blocks Frame when fill overscan would make Start fail out of bounds', async () => {
     installFillProjectAtLeftEdge();
+    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const originalFrame = useLaserStore.getState().frame;
     const frame = vi.fn(async () => undefined);
     useLaserStore.setState({

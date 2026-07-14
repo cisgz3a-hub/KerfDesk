@@ -389,6 +389,11 @@ describe('job checkpoint integration (ADR-118)', () => {
       ...idleStatus,
       mPos: { x, y, z: 0 },
     });
+    // This test isolates checkpoint placement behavior from the no-homing
+    // Frame gate, which has its own integration coverage.
+    useStore.getState().updateDeviceProfile({
+      homing: { ...useStore.getState().project.device.homing, enabled: true },
+    });
     // Start a Current-Position job with the head at (10,10): the compiled bytes
     // anchor the job to that work position.
     useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
@@ -419,9 +424,6 @@ describe('job checkpoint integration (ADR-118)', () => {
       expect.stringContaining('no longer produces the same G-code'),
     );
     expect(startJob).toHaveBeenCalledTimes(1);
-
-    // Reset placement so later tests keep the Absolute default.
-    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
   });
 
   it('manual start-from-line also suspends checkpoint tracking', async () => {

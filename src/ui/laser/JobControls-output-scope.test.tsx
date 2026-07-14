@@ -15,6 +15,7 @@ afterEach(() => {
 
 describe('JobControls output scope controls', () => {
   it('renders Cut Selected Graphics and gates Use Selection Origin by placement mode', async () => {
+    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;

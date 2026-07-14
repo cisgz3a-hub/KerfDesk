@@ -47,6 +47,20 @@ const userOriginFrontLeft: JobPlacementSettings = {
   anchor: 'front-left',
 };
 
+function userOriginVerification(
+  project: Project,
+  wco: { readonly x: number; readonly y: number; readonly z: number },
+): FrameVerification {
+  const prepared = prepareOutput(project, {
+    jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+  });
+  if (!prepared.ok) throw new Error('test setup: prepareOutput failed');
+  const bounds = computeJobBounds(prepared.job);
+  if (bounds === null) throw new Error('test setup: no bounds');
+  return { boundsSignature: frameBoundsSignature(bounds), wco, workOriginActive: true };
+}
+
 const centeredTraceObject: SceneObject = {
   kind: 'traced-image',
   id: 'centered-trace',
@@ -117,7 +131,7 @@ function fillOverscanProject(): Project {
 describe('prepareStartJob job placement', () => {
   it('places the selected anchor at the current machine position for Current Position jobs', () => {
     const result = prepareStartJob(
-      calibratedProjectWith(centeredTraceObject),
+      homedProjectWith(centeredTraceObject),
       readyController,
       {
         ...readyMachine,
@@ -139,7 +153,7 @@ describe('prepareStartJob job placement', () => {
 
   it('blocks User Origin when the operator has not set a custom origin', () => {
     const result = prepareStartJob(
-      calibratedProjectWith(centeredTraceObject),
+      homedProjectWith(centeredTraceObject),
       readyController,
       readyMachine,
       userOriginFrontLeft,
@@ -153,7 +167,7 @@ describe('prepareStartJob job placement', () => {
 
   it('anchors a centered traced image to the custom work origin before emitting G-code', () => {
     const result = prepareStartJob(
-      calibratedProjectWith(centeredTraceObject),
+      homedProjectWith(centeredTraceObject),
       readyController,
       {
         ...readyMachine,
@@ -173,13 +187,16 @@ describe('prepareStartJob job placement', () => {
   });
 
   it('does not treat negative WCO as a physical overhang when homing is disabled', () => {
+    const project = calibratedProjectWith(centeredTraceObject);
+    const wco = { x: 0, y: -90, z: 0 };
     const result = prepareStartJob(
-      calibratedProjectWith(centeredTraceObject),
+      project,
       readyController,
       {
         ...readyMachine,
         workOriginActive: true,
-        wcoCache: { x: 0, y: -90, z: 0 },
+        wcoCache: wco,
+        frameVerification: userOriginVerification(project, wco),
       },
       userOriginFrontLeft,
     );
@@ -192,13 +209,16 @@ describe('prepareStartJob job placement', () => {
   });
 
   it('does not treat unhomed custom-origin overscan runway as absolute machine overhang', () => {
+    const project = fillOverscanProject();
+    const wco = { x: 0, y: -90, z: 0 };
     const result = prepareStartJob(
-      fillOverscanProject(),
+      project,
       readyController,
       {
         ...readyMachine,
         workOriginActive: true,
-        wcoCache: { x: 0, y: -90, z: 0 },
+        wcoCache: wco,
+        frameVerification: userOriginVerification(project, wco),
       },
       userOriginFrontLeft,
     );

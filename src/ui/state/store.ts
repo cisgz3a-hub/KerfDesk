@@ -23,7 +23,7 @@ import {
 } from '../../core/scene';
 import type { Toolpath } from '../../core/job';
 import type { SaveTarget } from '../../platform/types';
-import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
+import { defaultJobPlacementForDevice, type JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
 import type { CncMachineConfig, EmbeddedFont } from '../../core/scene';
@@ -335,7 +335,9 @@ type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
 ) => void;
 
-function initialState(): Pick<
+function initialState(
+  project = createProject(),
+): Pick<
   AppState,
   | 'project'
   | 'cachedCncMachine'
@@ -363,7 +365,7 @@ function initialState(): Pick<
   ReturnType<typeof currentMaterialLibraryState> &
   ReturnType<typeof currentSavedLibrariesState> {
   return {
-    project: createProject(),
+    project,
     cachedCncMachine: null,
     selectedObjectId: null,
     selectedPathNode: null,
@@ -376,7 +378,7 @@ function initialState(): Pick<
     redoStack: [],
     pendingUndo: null,
     cursorMm: null,
-    jobPlacement: DEFAULT_JOB_PLACEMENT,
+    jobPlacement: defaultJobPlacementForDevice(project.device),
     outputScopeSettings: DEFAULT_OUTPUT_SCOPE_SETTINGS,
     registrationArtworkOutputSnapshot: null,
     // Fresh project is clean — no edits have happened, no name on disk.
@@ -407,26 +409,27 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
   return {
     setProject: (project) =>
       set((s) => ({
-        ...initialState(),
-        project,
+        ...initialState(project),
         ...currentMaterialLibraryState(s),
         ...currentSavedLibrariesState(s),
         ...currentLayerDefaultsState(s),
         ...currentCncLibraryState(s),
       })),
     newProject: () =>
-      set((s) => ({
-        ...initialState(),
-        // Machine profiles are app-level (like the material and CNC libraries
-        // above): File -> New keeps the configured device — bed, origin, no-go
-        // zones, scan offsets, camera alignment — instead of silently reverting
-        // to the Default 400x400 (LightBurn parity; ADR device-lifecycle).
-        project: createProject(s.project.device),
-        ...currentMaterialLibraryState(s),
-        ...currentSavedLibrariesState(s),
-        ...currentLayerDefaultsState(s),
-        ...currentCncLibraryState(s),
-      })),
+      set((s) => {
+        const project = createProject(s.project.device);
+        return {
+          ...initialState(project),
+          // Machine profiles are app-level (like the material and CNC libraries
+          // above): File -> New keeps the configured device — bed, origin, no-go
+          // zones, scan offsets, camera alignment — instead of silently reverting
+          // to the Default 400x400 (LightBurn parity; ADR device-lifecycle).
+          ...currentMaterialLibraryState(s),
+          ...currentSavedLibrariesState(s),
+          ...currentLayerDefaultsState(s),
+          ...currentCncLibraryState(s),
+        };
+      }),
   };
 }
 

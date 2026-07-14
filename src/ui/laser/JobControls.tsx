@@ -26,6 +26,7 @@ import { StartFromLineControl } from './StartFromLineControl';
 import { type LiveJobEstimate } from './live-job-estimate';
 import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
+import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 
 type Props = {
   readonly disabled: boolean;
@@ -82,6 +83,7 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
         />
       )}
       <JobPlacementControls disabled={disabled} streaming={controlsBusy} />
+      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner disabled={disabled} busy={controlsBusy} />

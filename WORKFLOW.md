@@ -1232,6 +1232,31 @@ When this checklist passes on the Falcon, promote Phase F.3's
 "Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
 Shipped" and update the hardware verification inventory.
 
+#### No-homing positioning guide (ADR-193)
+
+For a device profile with Homing disabled, a newly created or opened project
+starts in **Current Position** rather than Absolute Coordinates. The machine
+panel shows **Position job** with two paths:
+
+1. **Jog with buttons (recommended).** The operator selects **Use current head
+   position**, jogs to the chosen 9-dot job anchor, clicks Frame, then Start.
+   Set origin is not required. Start remains blocked until the current job and
+   live head position have a matching completed Frame.
+2. **Move head by hand.** The operator selects **Move head by hand**, confirms
+   Release motors, and physically moves the head. The guide then exposes
+   **Use this position**, which sends Wake and waits for controller recovery.
+   If GRBL reports Alarm, the guide names the state and requires the operator
+   to press **Unlock and continue** after confirming the head is safe. Only
+   after fresh Idle does the app send Set origin, select Verified Origin, and
+   report that the hand position is ready. Frame is mandatory before Start.
+
+Errors remain recoverable in place. A rejected Release, Wake, Unlock, or Set
+origin displays its controller-derived reason and does not advance the guide.
+Disconnect cancels the local guide state. An alarm, reset, disconnect, origin
+change, job change, or subsequent jog invalidates the applicable Frame proof.
+The raw placement dropdown and advanced origin controls remain available for
+fixtures and deliberately manually-homed Absolute Coordinates workflows.
+
 ---
 
 ### F-BC1. Capture a placed board's corners (ADR-124)
