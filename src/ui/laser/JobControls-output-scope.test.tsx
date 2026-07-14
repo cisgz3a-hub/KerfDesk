@@ -26,7 +26,7 @@ describe('JobControls output scope controls', () => {
     }
   });
 
-  it('renders Cut Selected Graphics and gates Use Selection Origin by placement mode', async () => {
+  it('reveals the selected-artwork anchor only when that output mode can use it', async () => {
     useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -37,21 +37,20 @@ describe('JobControls output scope controls', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
 
-      const cutSelected = input(host, 'Cut Selected Graphics');
-      const useSelectionOrigin = input(host, 'Use Selection Origin');
+      const cutSelected = input(host, 'Selected artwork only');
       expect(cutSelected.checked).toBe(false);
-      expect(useSelectionOrigin.disabled).toBe(true);
+      expect(optionalInput(host, 'Anchor from selected artwork')).toBeNull();
 
       await act(async () => {
         cutSelected.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
       expect(useStore.getState().outputScopeSettings.cutSelectedGraphics).toBe(true);
-      expect(input(host, 'Use Selection Origin').disabled).toBe(true);
+      expect(optionalInput(host, 'Anchor from selected artwork')).toBeNull();
 
       await act(async () => {
         useStore.getState().setJobPlacement({ startFrom: 'current-position' });
       });
-      expect(input(host, 'Use Selection Origin').disabled).toBe(false);
+      expect(input(host, 'Anchor from selected artwork').disabled).toBe(false);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -67,6 +66,11 @@ function input(host: HTMLElement, label: string): HTMLInputElement {
     throw new Error(`Expected input: ${label}`);
   }
   return found;
+}
+
+function optionalInput(host: HTMLElement, label: string): HTMLInputElement | null {
+  const found = host.querySelector(`input[aria-label="${label}"]`);
+  return found instanceof HTMLInputElement ? found : null;
 }
 
 function select(host: HTMLElement, label: string): HTMLSelectElement {

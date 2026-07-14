@@ -39,7 +39,7 @@ describe('output scope', () => {
     expect(validateOutputScope(EMPTY_SCENE, selectedScope([]))).toEqual({
       ok: false,
       messages: [
-        'Cut Selected Graphics is enabled, but no artwork is selected. Select artwork or turn off Cut Selected Graphics.',
+        'Selected artwork only is enabled, but no artwork is selected. Select artwork or turn off Selected artwork only.',
       ],
     });
   });
@@ -48,7 +48,7 @@ describe('output scope', () => {
     expect(validateOutputScope(sceneWithObjects(['A']), selectedScope(['missing']))).toEqual({
       ok: false,
       messages: [
-        'Cut Selected Graphics is enabled, but none of the selected artwork exists anymore. Select artwork or turn off Cut Selected Graphics.',
+        'Selected artwork only is enabled, but none of the selected artwork exists anymore. Select artwork or turn off Selected artwork only.',
       ],
     });
   });

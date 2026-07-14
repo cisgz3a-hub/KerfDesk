@@ -824,24 +824,23 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 3. No Load-from-backup button.
 4. No `$RST`, startup block, manufacturer, or axis calibration workflow.
 
-### F-B15. Cut Selected Graphics and Selection Origin
+### F-B15. Selected artwork output and anchor
 
 #### Success - output only selected artwork
-1. The Laser panel shows **Cut selected** near Start From / Job Origin.
-2. User selects one or more objects and enables **Cut selected**.
+1. The Laser panel shows **Selected artwork only** near Start From / Job Origin.
+2. User selects one or more objects and enables **Selected artwork only**.
 3. Preview, live estimate, Frame, Start job, and Save G-code all compile the same selected-only output scope.
 4. Source scene geometry is not moved or deleted.
 5. If selected-only output is enabled with no current selection, output generation returns a clear blocker instead of silently burning the full design.
 
-#### Success - Use Selection Origin
-1. **Selection origin** is enabled only when **Cut selected** is on and Start From is not Absolute Coordinates.
+#### Success - Anchor from selected artwork
+1. **Anchor from selected artwork** is shown only when **Selected artwork only** is on and Start From is not Absolute Coordinates.
 2. When enabled, job-origin math uses the selected artwork bounds.
 3. When disabled, job-origin math uses the full output design bounds, while still emitting only the selected artwork.
 4. This matches LightBurn's separation between cutting selected graphics and using the selected graphics as the origin reference.
 
 #### Error - Absolute Coordinates
-1. **Selection origin** is disabled in Absolute Coordinates.
-2. Tooltip explains that selection origin is not used in Absolute Coordinates.
+1. **Anchor from selected artwork** is hidden in Absolute Coordinates because absolute output does not use relative anchor placement.
 
 #### Explicit non-goals for this lane
 1. No Position Laser physical move.
@@ -1271,12 +1270,14 @@ For a device profile with Homing disabled, a newly created or opened project
 starts in **Current Position** rather than Absolute Coordinates. The machine
 panel shows **Position job** with two paths:
 
-1. **Jog with buttons (recommended).** The operator selects **Use current head
-   position**, jogs to the chosen 9-dot job anchor, clicks Frame, then Start.
-   Set origin is not required. Start remains blocked until the current job and
-   live head position have a matching completed Frame.
-2. **Move head by hand.** The operator selects **Move head by hand**, confirms
-   Release motors, and physically moves the head. The guide then exposes
+1. **Jog with controls (recommended).** The guide shows this mode as **Selected**
+   when Current Position is active; it does not present a capture-style action.
+   The operator jogs to the chosen 9-dot job anchor, clicks Frame, then Start.
+   Set origin is not required. If another placement mode was chosen, **Choose
+   jog positioning** restores Current Position. Start remains blocked until the
+   current job and live head position have a matching completed Frame.
+2. **Move head by hand.** The operator selects **Release motors to move by hand**,
+   confirms Release motors, and physically moves the head. The guide then exposes
    **Use this position**, which sends Wake and waits for controller recovery.
    If GRBL reports Alarm, the guide names the state and requires the operator
    to press **Unlock and continue** after confirming the head is safe. Only

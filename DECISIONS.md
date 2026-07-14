@@ -7855,9 +7855,11 @@ simpler relative-placement choice.
 - A newly created or opened project whose active device profile has homing disabled defaults to
   **Current Position**. Homing-enabled profiles continue to default to Absolute Coordinates. Explicit
   operator placement choices remain available and are not silently rewritten during ordinary use.
-- The machine panel shows a **Position job** guide for no-homing profiles. Its primary path selects
-  Current Position for button jogging. Its hand-position path sequences Release motors, physical move,
-  Wake, explicit safe Unlock when GRBL reports Alarm, Set origin, and Verified Origin selection.
+- The machine panel shows a **Position job** guide for no-homing profiles. Its primary path presents
+  Current Position as the selected **Jog with controls** mode instead of a button that appears to
+  capture coordinates. Its hand-position path starts with an explicit **Release motors to move by
+  hand** action, then sequences physical move, Wake, explicit safe Unlock when GRBL reports Alarm,
+  Set origin, and Verified Origin selection.
 - Unlock is never sent merely because the controller reports Alarm. The operator must explicitly
   confirm the head is safely positioned by pressing the guided Unlock action.
 - Relative Current Position and User Origin jobs on a no-homing profile require a matching completed
@@ -7869,8 +7871,9 @@ simpler relative-placement choice.
 
 ### Consequences
 
-The common button-jog workflow becomes Jog, Frame, Start; Set origin is reserved for reusable origins
-or the guided hand-move path. The hand-move path still has unavoidable controller recovery steps, but
+The common button-jog workflow becomes Jog, Frame, Start, with no preliminary capture action; Set
+origin is reserved for reusable origins or the guided hand-move path. The hand-move path still has
+unavoidable controller recovery steps, but
 the UI owns their order and never marks the position ready before controller acknowledgement and a
 fresh Idle report. Frame verification becomes consistently mandatory whenever a no-homing profile
 uses relative placement. Hardware validation remains required because OEM GRBL derivatives can vary

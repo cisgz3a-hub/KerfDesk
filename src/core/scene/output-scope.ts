@@ -31,7 +31,7 @@ export function validateOutputScope(scene: Scene, scope: OutputScope): OutputSco
     return {
       ok: false,
       messages: [
-        'Cut Selected Graphics is enabled, but no artwork is selected. Select artwork or turn off Cut Selected Graphics.',
+        'Selected artwork only is enabled, but no artwork is selected. Select artwork or turn off Selected artwork only.',
       ],
     };
   }
@@ -40,7 +40,7 @@ export function validateOutputScope(scene: Scene, scope: OutputScope): OutputSco
     return {
       ok: false,
       messages: [
-        'Cut Selected Graphics is enabled, but none of the selected artwork exists anymore. Select artwork or turn off Cut Selected Graphics.',
+        'Selected artwork only is enabled, but none of the selected artwork exists anymore. Select artwork or turn off Selected artwork only.',
       ],
     };
   }

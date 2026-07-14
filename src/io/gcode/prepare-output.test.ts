@@ -118,7 +118,7 @@ describe('prepareOutput', () => {
         {
           code: 'selected-output-empty',
           message:
-            'Cut Selected Graphics is enabled, but no artwork is selected. Select artwork or turn off Cut Selected Graphics.',
+            'Selected artwork only is enabled, but no artwork is selected. Select artwork or turn off Selected artwork only.',
         },
       ]);
     }

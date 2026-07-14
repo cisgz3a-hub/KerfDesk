@@ -75,51 +75,37 @@ function OutputScopeControls(props: {
 }): JSX.Element {
   const scope = useStore((s) => s.outputScopeSettings);
   const setScope = useStore((s) => s.setOutputScopeSettings);
-  const selectionOriginDisabled =
-    props.disabled || !scope.cutSelectedGraphics || props.placement.startFrom === 'absolute';
+  const showSelectionAnchor = scope.cutSelectedGraphics && props.placement.startFrom !== 'absolute';
   return (
     <div style={scopeRowStyle}>
       <label style={scopeLabelStyle}>
         <input
           type="checkbox"
-          aria-label="Cut Selected Graphics"
+          aria-label="Selected artwork only"
           checked={scope.cutSelectedGraphics}
           disabled={props.disabled}
           onChange={(e) => setScope({ cutSelectedGraphics: e.currentTarget.checked })}
           title={controlHelp(CUT_SELECTED_HELP_ID)}
           data-help-id={CUT_SELECTED_HELP_ID}
         />
-        <span>Cut selected</span>
+        <span>Selected artwork only</span>
       </label>
-      <label style={scopeLabelStyle}>
-        <input
-          type="checkbox"
-          aria-label="Use Selection Origin"
-          checked={scope.useSelectionOrigin}
-          disabled={selectionOriginDisabled}
-          onChange={(e) => setScope({ useSelectionOrigin: e.currentTarget.checked })}
-          title={controlHelp(
-            SELECTION_ORIGIN_HELP_ID,
-            selectionOriginDisabled
-              ? selectionOriginDisabledReason(scope, props.placement)
-              : undefined,
-          )}
-          data-help-id={SELECTION_ORIGIN_HELP_ID}
-        />
-        <span>Selection origin</span>
-      </label>
+      {showSelectionAnchor && (
+        <label style={scopeLabelStyle}>
+          <input
+            type="checkbox"
+            aria-label="Anchor from selected artwork"
+            checked={scope.useSelectionOrigin}
+            disabled={props.disabled}
+            onChange={(e) => setScope({ useSelectionOrigin: e.currentTarget.checked })}
+            title={controlHelp(SELECTION_ORIGIN_HELP_ID)}
+            data-help-id={SELECTION_ORIGIN_HELP_ID}
+          />
+          <span>Anchor from selected artwork</span>
+        </label>
+      )}
     </div>
   );
-}
-
-function selectionOriginDisabledReason(
-  scope: { readonly cutSelectedGraphics: boolean },
-  placement: JobPlacementSettings,
-): string {
-  if (!scope.cutSelectedGraphics) return 'Turn on Cut Selected Graphics first.';
-  if (placement.startFrom === 'absolute')
-    return 'Selection Origin is not used in Absolute Coordinates.';
-  return 'Output controls are busy.';
 }
 
 function AnchorPicker(props: {

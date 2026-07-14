@@ -307,14 +307,14 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     tooltip: 'Copy the controller-reported settings into the Device Setup draft.',
   },
   'laser.output-scope.cut-selected': {
-    label: 'Cut Selected Graphics',
+    label: 'Selected artwork only',
     tooltip:
       'Output only the currently selected artwork for preview, frame, start, and G-code export.',
   },
   'laser.output-scope.selection-origin': {
-    label: 'Use Selection Origin',
+    label: 'Anchor from selected artwork',
     tooltip:
-      'Calculate job origin from the selected artwork instead of the whole workspace design.',
+      'Position the job from the selected artwork bounds instead of the whole workspace design.',
   },
   'preview.showTraversalMoves': {
     label: 'Traversal moves',

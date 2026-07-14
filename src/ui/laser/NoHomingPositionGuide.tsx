@@ -4,6 +4,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
+import { NoHomingPositionChoices } from './NoHomingPositionChoices';
 
 type GuidePhase =
   | 'idle'
@@ -34,6 +35,7 @@ export function NoHomingPositionGuide(props: {
   const status = useLaserStore((state) => state.statusReport?.state ?? null);
   const canSleep = useLaserStore((state) => state.capabilities.sleep);
   const canUnlock = useLaserStore((state) => state.capabilities.unlock);
+  const isJogPositioning = useStore((state) => state.jobPlacement.startFrom === 'current-position');
   const actions = useGuideActions(connection.kind === 'connected', status);
   if (homingEnabled) return null;
   const phase = status === 'Sleep' && actions.phase === 'idle' ? 'positioning' : actions.phase;
@@ -48,6 +50,7 @@ export function NoHomingPositionGuide(props: {
         normalBusy={normalBusy}
         canSleep={canSleep}
         canUnlock={canUnlock}
+        isJogPositioning={isJogPositioning}
       />
     </section>
   );
@@ -145,6 +148,7 @@ function GuideBody(props: {
   readonly normalBusy: boolean;
   readonly canSleep: boolean;
   readonly canUnlock: boolean;
+  readonly isJogPositioning: boolean;
 }): JSX.Element {
   if (props.phase === 'positioning') {
     return (
@@ -172,54 +176,15 @@ function GuideBody(props: {
     return <p style={messageStyle}>Hand position ready. Frame must succeed before Start.</p>;
   }
   return (
-    <IdleStep
+    <NoHomingPositionChoices
       disabled={props.normalBusy || props.phase === 'releasing'}
       canSleep={props.canSleep}
       error={props.actions.error}
       releasing={props.phase === 'releasing'}
-      onUseCurrent={props.actions.onUseCurrent}
+      isJogPositioning={props.isJogPositioning}
+      onChooseJog={props.actions.onUseCurrent}
       onRelease={props.actions.onRelease}
     />
-  );
-}
-
-function IdleStep(props: {
-  readonly disabled: boolean;
-  readonly canSleep: boolean;
-  readonly error: string | null;
-  readonly releasing: boolean;
-  readonly onUseCurrent: () => void;
-  readonly onRelease: () => void;
-}): JSX.Element {
-  return (
-    <>
-      <p style={messageStyle}>
-        Jog with the arrows, then Frame and Start. Set origin is not required.
-      </p>
-      <div style={buttonRowStyle}>
-        <button
-          type="button"
-          disabled={props.disabled}
-          onClick={props.onUseCurrent}
-          title="Use the live head position; then Frame before Start."
-        >
-          Use current head position
-        </button>
-        <button
-          type="button"
-          disabled={props.disabled || !props.canSleep}
-          onClick={props.onRelease}
-          title={
-            props.canSleep
-              ? 'Release motors for hand positioning.'
-              : 'Controller has no sleep command.'
-          }
-        >
-          {props.releasing ? 'Releasing motors...' : 'Move head by hand'}
-        </button>
-      </div>
-      {props.error !== null && <p style={errorStyle}>{props.error}</p>}
-    </>
   );
 }
 
@@ -229,7 +194,9 @@ function PositioningStep(props: {
 }): JSX.Element {
   return (
     <>
-      <p style={messageStyle}>Motors are released. Move the head to the job anchor.</p>
+      <p style={messageStyle}>
+        Motors are released. Move the head to the job anchor, then confirm its position.
+      </p>
       <button
         type="button"
         disabled={!props.controllerSleeping}
@@ -278,5 +245,3 @@ const guideStyle: React.CSSProperties = {
   background: 'var(--lf-bg-1)',
 };
 const messageStyle: React.CSSProperties = { margin: '4px 0 6px', fontSize: 12 };
-const errorStyle: React.CSSProperties = { ...messageStyle, color: 'var(--lf-danger-fg)' };
-const buttonRowStyle: React.CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
