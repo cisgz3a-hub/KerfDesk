@@ -11,6 +11,7 @@ import {
   type Scene,
   updateLayer,
 } from '../../core/scene';
+import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedLayerFromStockMaterial } from './cnc-project-material';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
@@ -57,6 +58,7 @@ type LayerActionSet = (
 
 export type LayerActions = {
   readonly createManualLayer: (color: string) => void;
+  readonly setLayerColor: (layerId: string, color: string) => void;
   readonly switchIslandFillLayersToScanline: () => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
   readonly selectObjectsOnLayer: (layerId: string) => void;
@@ -91,6 +93,7 @@ export function layerActions(set: LayerActionSet): LayerActions {
         const scene = addLayer(state.project.scene, layer);
         return mutation(state, { ...state.project, scene });
       }),
+    setLayerColor: layerColorSetter(set),
     switchIslandFillLayersToScanline: () =>
       set((state) => {
         let changed = false;
@@ -151,6 +154,14 @@ export function layerActions(set: LayerActionSet): LayerActions {
       }),
     ...layerSubLayerActions(set),
   };
+}
+
+function layerColorSetter(set: LayerActionSet): LayerActions['setLayerColor'] {
+  return (layerId, color) =>
+    set((state) => {
+      const scene = recolorLayer(state.project.scene, layerId, color);
+      return scene === state.project.scene ? {} : mutation(state, { ...state.project, scene });
+    });
 }
 
 function selectedObjectIds(state: LayerActionState): ReadonlyArray<string> {

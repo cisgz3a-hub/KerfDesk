@@ -40,6 +40,27 @@ describe('layer store actions', () => {
     expect(useStore.getState().project.scene.layers).toHaveLength(0);
   });
 
+  it('setLayerColor syncs bound artwork and is undoable', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    const undoBefore = useStore.getState().undoStack.length;
+
+    useStore.getState().setLayerColor('#ff0000', '#00FF00');
+
+    const state = useStore.getState();
+    expect(state.project.scene.layers.map((layer) => layer.color)).toEqual(['#00ff00', '#0000ff']);
+    const object = state.project.scene.objects[0];
+    expect(object?.kind).toBe('imported-svg');
+    if (object?.kind !== 'imported-svg') throw new Error('expected imported svg');
+    expect(object.paths.map((path) => path.color)).toEqual(['#00ff00', '#0000ff']);
+    expect(state.undoStack).toHaveLength(undoBefore + 1);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+      '#ff0000',
+      '#0000ff',
+    ]);
+  });
+
   it('assignSelectionToLayer moves selected object colors and prunes orphan layers', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().createManualLayer('#00ff00');
