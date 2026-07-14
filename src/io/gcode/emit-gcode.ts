@@ -94,18 +94,26 @@ function runEmitPreflight(
   rotaryStage: Extract<RotaryStage, { kind: 'ok' }>,
 ): PreflightResult {
   const machine = project.machine;
-  if (machine !== undefined && machine.kind === 'cnc') {
-    return runCncPreflight(project, machine, body, {
-      motionOffset: options.preflightMotionOffset,
-    });
-  }
   const coordinateMode =
     options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
       ? 'relative-origin'
       : 'machine';
+  // Verified Origin's mandatory frame trace substitutes for the no-go-zone
+  // crossing check that can't run without a trusted offset (G9/G19/G20). The
+  // start flow still hard-refuses a verified-origin start whose frame isn't valid
+  // (verifiedFrameIssueFromPrepared), so this only relaxes the zone gate.
+  const originVerifiedByFrame = options.jobOrigin?.startFrom === 'verified-origin';
+  if (machine !== undefined && machine.kind === 'cnc') {
+    return runCncPreflight(project, machine, body, {
+      motionOffset: options.preflightMotionOffset,
+      coordinateMode,
+      originVerifiedByFrame,
+    });
+  }
   return runPreflight(project, body, {
     motionOffset: options.preflightMotionOffset,
     coordinateMode,
+    originVerifiedByFrame,
     // One revolution is the wrap limit: a taller job burns onto its own
     // start (ADR-127).
     ...(rotaryStage.boundsHeightOverrideMm !== undefined

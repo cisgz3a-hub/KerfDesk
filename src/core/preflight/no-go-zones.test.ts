@@ -142,6 +142,28 @@ describe('preflight no-go zones', () => {
     expect(disabled.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
     expect(outsideBed.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
   });
+
+  // This burn stays well clear of the clamp zone (x20-40,y20-40), so any
+  // no-go-zone issue can only come from the relative-origin short-circuit.
+  const CLEAR_GCODE = ['G21', 'G90', 'M3 S0', 'G1 X5 Y5 F1000 S500', 'G1 X8 Y5 S500', 'M5'].join(
+    '\n',
+  );
+
+  it('blocks a relative-origin start with any enabled zone — no trusted offset to check crossings', () => {
+    const result = runPreflight(projectWithNoGoZone(), CLEAR_GCODE, {
+      coordinateMode: 'relative-origin',
+    });
+    const zoneIssue = result.issues.find((issue) => issue.code === 'no-go-zone-collision');
+    expect(zoneIssue?.message).toMatch(/Verified Origin/i);
+  });
+
+  it('lets a Verified Origin start through — the frame trace substitutes for the zone check (G9/G19)', () => {
+    const result = runPreflight(projectWithNoGoZone(), CLEAR_GCODE, {
+      coordinateMode: 'relative-origin',
+      originVerifiedByFrame: true,
+    });
+    expect(result.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
+  });
 });
 
 describe('firstZoneCrossedBySegment (jog/click guard — DEV-04)', () => {
