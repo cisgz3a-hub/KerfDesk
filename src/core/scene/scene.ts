@@ -2,7 +2,7 @@
 // operation returns a fresh Scene (CLAUDE.md "Mutable state — none").
 
 import { normalizeLayerColor, type Layer } from './layer';
-import { assertNever, type ColoredPath, type SceneObject } from './scene-object';
+import { assertNever, type CncTabAnchor, type ColoredPath, type SceneObject } from './scene-object';
 
 export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -66,6 +66,27 @@ export function updateLayer(
   };
 }
 
+/** Changes a layer's scene-wide color key while preserving its stable id.
+ * Every bound artwork path and CNC tab anchor follows the new color. A color
+ * already owned by another layer is rejected as a no-op instead of silently
+ * merging two independently configured operations. */
+export function recolorLayer(scene: Scene, layerId: string, color: string): Scene {
+  const target = scene.layers.find((layer) => layer.id === layerId);
+  if (target === undefined) return scene;
+  const nextColor = normalizeLayerColor(color);
+  if (target.color === nextColor) return scene;
+  if (scene.layers.some((layer) => layer.id !== layerId && layer.color === nextColor)) return scene;
+  return {
+    ...scene,
+    layers: scene.layers.map((layer) =>
+      layer.id === layerId ? { ...layer, color: nextColor } : layer,
+    ),
+    objects: scene.objects.map((object) =>
+      recolorSceneObjectLayer(object, target.color, nextColor),
+    ),
+  };
+}
+
 export function removeLayer(scene: Scene, layerId: string): Scene {
   return { ...scene, layers: scene.layers.filter((l) => l.id !== layerId) };
 }
@@ -113,4 +134,74 @@ function recolorPaths(
 ): ReadonlyArray<ColoredPath> {
   if (paths.every((path) => path.color === color)) return paths;
   return paths.map((path) => ({ ...path, color }));
+}
+
+function recolorSceneObjectLayer(object: SceneObject, from: string, to: string): SceneObject {
+  switch (object.kind) {
+    case 'imported-svg':
+    case 'traced-image':
+      return recolorPathObject(object, from, to);
+    case 'text':
+    case 'shape':
+      return recolorColoredPathObject(object, from, to);
+    case 'raster-image':
+    case 'relief':
+      return recolorColoredObject(object, from, to);
+    default:
+      return assertNever(object, 'SceneObject');
+  }
+}
+
+type PathObject = Extract<SceneObject, { kind: 'imported-svg' | 'traced-image' }>;
+type ColoredPathObject = Extract<SceneObject, { kind: 'text' | 'shape' }>;
+type ColoredObject = Extract<SceneObject, { kind: 'raster-image' | 'relief' }>;
+
+function recolorPathObject(object: PathObject, from: string, to: string): PathObject {
+  const paths = recolorMatchingPaths(object.paths, from, to);
+  const anchors = recolorMatchingAnchors(object.cncTabAnchors, from, to);
+  return paths === object.paths && anchors === object.cncTabAnchors
+    ? object
+    : { ...object, paths, ...(anchors === undefined ? {} : { cncTabAnchors: anchors }) };
+}
+
+function recolorColoredPathObject(
+  object: ColoredPathObject,
+  from: string,
+  to: string,
+): ColoredPathObject {
+  const paths = recolorMatchingPaths(object.paths, from, to);
+  const anchors = recolorMatchingAnchors(object.cncTabAnchors, from, to);
+  const color = object.color === from ? to : object.color;
+  return paths === object.paths && color === object.color && anchors === object.cncTabAnchors
+    ? object
+    : { ...object, color, paths, ...(anchors === undefined ? {} : { cncTabAnchors: anchors }) };
+}
+
+function recolorColoredObject(object: ColoredObject, from: string, to: string): ColoredObject {
+  const anchors = recolorMatchingAnchors(object.cncTabAnchors, from, to);
+  const color = object.color === from ? to : object.color;
+  return color === object.color && anchors === object.cncTabAnchors
+    ? object
+    : { ...object, color, ...(anchors === undefined ? {} : { cncTabAnchors: anchors }) };
+}
+
+function recolorMatchingPaths(
+  paths: ReadonlyArray<ColoredPath>,
+  from: string,
+  to: string,
+): ReadonlyArray<ColoredPath> {
+  if (!paths.some((path) => path.color === from)) return paths;
+  return paths.map((path) => (path.color === from ? { ...path, color: to } : path));
+}
+
+function recolorMatchingAnchors(
+  anchors: ReadonlyArray<CncTabAnchor> | undefined,
+  from: string,
+  to: string,
+): ReadonlyArray<CncTabAnchor> | undefined {
+  if (anchors === undefined || !anchors.some((anchor) => anchor.layerColor === from))
+    return anchors;
+  return anchors.map((anchor) =>
+    anchor.layerColor === from ? { ...anchor, layerColor: to } : anchor,
+  );
 }

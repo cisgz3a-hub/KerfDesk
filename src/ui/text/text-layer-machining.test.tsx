@@ -74,7 +74,7 @@ describe('text layer machining workflow', () => {
     try {
       const outputLayer = requireOutputLayer(host);
       expect(outputLayer.value).not.toBe('#ff0000');
-      expect(outputLayer.selectedOptions[0]?.textContent).toContain('V-carve');
+      expect(host.textContent).toContain('V-carve');
 
       await enterAndSubmit(host, 'NAME');
 

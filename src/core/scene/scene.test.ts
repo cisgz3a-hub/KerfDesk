@@ -6,6 +6,7 @@ import {
   EMPTY_SCENE,
   assignObjectToLayer,
   moveLayer,
+  recolorLayer,
   removeLayer,
   removeObject,
   updateLayer,
@@ -136,5 +137,33 @@ describe('Scene layer operations', () => {
     expect(moveLayer(scene, 'red', 'up')).toBe(scene);
     expect(moveLayer(scene, 'blue', 'down')).toBe(scene);
     expect(moveLayer(scene, 'missing', 'up')).toBe(scene);
+  });
+
+  it('recolors one layer key across matching artwork while preserving other colors', () => {
+    const red = createLayer({ id: 'stable-red-id', color: '#ff0000' });
+    const blue = createLayer({ id: 'blue', color: '#0000ff' });
+    const object = {
+      ...sampleObject,
+      cncTabAnchors: [{ layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.25 }],
+    };
+    const scene = { ...EMPTY_SCENE, layers: [red, blue], objects: [object] };
+
+    const recolored = recolorLayer(scene, 'stable-red-id', '#00FF00');
+
+    expect(recolored.layers[0]).toMatchObject({ id: 'stable-red-id', color: '#00ff00' });
+    const result = recolored.objects[0];
+    expect(result?.kind).toBe('imported-svg');
+    if (result?.kind !== 'imported-svg') throw new Error('expected imported svg');
+    expect(result.paths.map((path) => path.color)).toEqual(['#00ff00', '#0000ff']);
+    expect(result.cncTabAnchors?.[0]?.layerColor).toBe('#00ff00');
+    expect(scene.objects[0]).toBe(object);
+  });
+
+  it('does not merge layer settings when the requested color already exists', () => {
+    const red = createLayer({ id: 'red', color: '#ff0000' });
+    const blue = createLayer({ id: 'blue', color: '#0000ff' });
+    const scene = { ...EMPTY_SCENE, layers: [red, blue], objects: [sampleObject] };
+
+    expect(recolorLayer(scene, 'red', '#0000ff')).toBe(scene);
   });
 });
