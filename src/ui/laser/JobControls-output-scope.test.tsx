@@ -14,6 +14,18 @@ afterEach(() => {
 });
 
 describe('JobControls output scope controls', () => {
+  it('keeps compile placement editable while machine commands are disconnected', async () => {
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<JobControls disabled onStartJob={() => undefined} />));
+      expect(select(host, 'Start from').disabled).toBe(false);
+      expect(button(host, 'Start job')).toHaveProperty('disabled', true);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('renders Cut Selected Graphics and gates Use Selection Origin by placement mode', async () => {
     useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const host = document.createElement('div');
@@ -54,5 +66,17 @@ function input(host: HTMLElement, label: string): HTMLInputElement {
   if (!(found instanceof HTMLInputElement)) {
     throw new Error(`Expected input: ${label}`);
   }
+  return found;
+}
+
+function select(host: HTMLElement, label: string): HTMLSelectElement {
+  const found = host.querySelector(`select[aria-label="${label}"]`);
+  if (!(found instanceof HTMLSelectElement)) throw new Error(`Expected select: ${label}`);
+  return found;
+}
+
+function button(host: HTMLElement, label: string): HTMLButtonElement {
+  const found = [...host.querySelectorAll('button')].find((item) => item.textContent === label);
+  if (!(found instanceof HTMLButtonElement)) throw new Error(`Expected button: ${label}`);
   return found;
 }

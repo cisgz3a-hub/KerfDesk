@@ -82,7 +82,7 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
           isToolChange={isToolChange}
         />
       )}
-      <JobPlacementControls disabled={disabled} streaming={controlsBusy} />
+      <JobPlacementControls streaming={controlsBusy} />
       <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
