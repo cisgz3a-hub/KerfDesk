@@ -3,15 +3,16 @@
 //
 // Checks:
 //   1. At least one output layer exists.
-//   2. Per-layer CNC settings are sane: depth > 0, depth/pass > 0, feeds in
+//   2. Spindle spin-up dwell is a positive finite duration.
+//   3. Per-layer CNC settings are sane: depth > 0, depth/pass > 0, feeds in
 //      (0, device.maxFeed], spindle RPM in (0, spindleMaxRpm].
-//   3. Cut depth does not exceed stock thickness by more than the through-cut
+//   4. Cut depth does not exceed stock thickness by more than the through-cut
 //      allowance (cutting into the spoilboard beyond that is a setup error).
-//   4. All motion fits inside the bed (shared bounds scanner).
-//   5. No-go zones are respected (shared scanner — clamps matter on a router).
-//   6. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
-//   7. Generated G-code is non-empty (at least one G1 line).
-//   8. No emitted Z below -(stock + through-cut allowance) — proves the depth
+//   5. All motion fits inside the bed (shared bounds scanner).
+//   6. No-go zones are respected (shared scanner — clamps matter on a router).
+//   7. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
+//   8. Generated G-code is non-empty (at least one G1 line).
+//   9. No emitted Z below -(stock + through-cut allowance) — proves the depth
 //      invariant on the final text, not just the settings (findOverdeepCutIssues).
 
 import {
@@ -40,6 +41,7 @@ export type CncPreflightOptions = {
 };
 
 const MAX_REPORTED_ISSUES = 5;
+const MIN_SPINDLE_SPINUP_SEC = 0.5;
 // Through-cuts intentionally run slightly past the stock bottom so the last
 // pass fully severs; more than this is a mis-set depth or stock thickness.
 // Shared with the emitted-text depth invariant (cnc-depth.ts) so the settings
@@ -61,6 +63,7 @@ export function runCncPreflight(
       message: 'No output layers. Enable Output on at least one layer.',
     });
   }
+  appendCncMachineIssues(config, issues);
   for (const layer of outputLayers) {
     appendCncLayerIssues(layer, project.device.maxFeed, config, issues);
   }
@@ -116,6 +119,16 @@ export function runCncPreflight(
     });
   }
   return { ok: issues.length === 0, issues };
+}
+
+function appendCncMachineIssues(config: CncMachineConfig, issues: PreflightIssue[]): void {
+  const spinupSec = config.params.spindleSpinupSec;
+  if (Number.isFinite(spinupSec) && spinupSec >= MIN_SPINDLE_SPINUP_SEC) return;
+  issues.push({
+    code: 'cnc-settings-invalid',
+    message:
+      'CNC spindle spin-up delay must be at least 0.5 seconds. Set enough time for the spindle to reach cutting speed before the first plunge.',
+  });
 }
 
 function appendCncLayerIssues(

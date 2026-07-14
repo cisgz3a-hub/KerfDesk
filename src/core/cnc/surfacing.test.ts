@@ -67,10 +67,12 @@ describe('buildSurfacingProgram', () => {
     // it with the spindle off; only then may M3 and its dwell run.
     const firstMotion = lines.findIndex((line) => /^G[01]\b/.test(line));
     expect(lines[firstMotion]).toBe('G0 Z5.000');
-    expect(firstMotion).toBeLessThan(lines.indexOf('M3 S12000'));
-    expect(lines.indexOf('M3 S12000')).toBeLessThan(
-      lines.findIndex((line) => line.startsWith('G1 Z-')),
-    );
+    const spindleIndex = lines.indexOf('M3 S12000');
+    const dwellIndex = lines.indexOf('G4 P3.000');
+    const plungeIndex = lines.findIndex((line) => line.startsWith('G1 Z-'));
+    expect(firstMotion).toBeLessThan(spindleIndex);
+    expect(spindleIndex).toBeLessThan(dwellIndex);
+    expect(dwellIndex).toBeLessThan(plungeIndex);
   });
 
   it('ladders depth per pass and clamps the final pass to the total', () => {
@@ -118,6 +120,13 @@ describe('buildSurfacingProgram', () => {
     expect(buildSurfacingProgram({ ...PARAMS, widthMm: Number.NaN })).toEqual({
       ok: false,
       reason: 'Surfacing width must be a positive finite number.',
+    });
+  });
+
+  it.each([0, 0.499])('rejects a %s-second spin-up delay below the safety floor', (spinupSec) => {
+    expect(buildSurfacingProgram({ ...PARAMS, spindleSpinupSec: spinupSec })).toEqual({
+      ok: false,
+      reason: 'Surfacing spindle spin-up must be at least 0.5 seconds.',
     });
   });
 });

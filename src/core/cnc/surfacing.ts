@@ -46,8 +46,8 @@ const MIN_STEP_MM = 0.05;
 // arrays. 100k rows is ~a 5 m area at the 0.05 mm minimum step — far beyond
 // any real bed — so no valid job is affected. Checked before allocation.
 const MAX_SURFACING_ITERATIONS = 100_000;
+const MIN_SPINDLE_SPINUP_SEC = 0.5;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
-const NON_NEGATIVE_FINITE_REASON = 'must be a non-negative finite number.';
 
 function fmt(value: number): string {
   const text = value.toFixed(3);
@@ -143,7 +143,7 @@ function validateSurfacingParams(params: SurfacingParams): string | null {
     positiveFiniteReason('feed', params.feedMmPerMin) ??
     positiveFiniteReason('plunge feed', params.plungeMmPerMin) ??
     positiveFiniteReason('spindle RPM', params.spindleRpm) ??
-    nonNegativeFiniteReason('spindle spin-up', params.spindleSpinupSec) ??
+    spindleSpinupReason(params.spindleSpinupSec) ??
     positiveFiniteReason('safe Z', params.safeZMm)
   );
 }
@@ -154,8 +154,8 @@ function positiveFiniteReason(label: string, value: number): string | null {
     : `Surfacing ${label} ${POSITIVE_FINITE_REASON}`;
 }
 
-function nonNegativeFiniteReason(label: string, value: number): string | null {
-  return Number.isFinite(value) && value >= 0
+function spindleSpinupReason(value: number): string | null {
+  return Number.isFinite(value) && value >= MIN_SPINDLE_SPINUP_SEC
     ? null
-    : `Surfacing ${label} ${NON_NEGATIVE_FINITE_REASON}`;
+    : `Surfacing spindle spin-up must be at least ${MIN_SPINDLE_SPINUP_SEC} seconds.`;
 }
