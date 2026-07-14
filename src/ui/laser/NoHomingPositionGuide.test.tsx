@@ -58,7 +58,26 @@ afterEach(() => {
 });
 
 describe('NoHomingPositionGuide', () => {
-  it('selects Current Position without setting an origin', async () => {
+  it('shows jog positioning as already selected without a capture-style action', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Idle'),
+      capabilities: { ...originalLaser.capabilities, sleep: true },
+    });
+    const host = document.createElement('div');
+    const root = await renderGuide(host);
+    try {
+      expect(host.textContent).toContain('Jog with controls');
+      expect(host.textContent).toContain('Selected');
+      expect(host.textContent).toContain('Jog to the job anchor');
+      expect(host.textContent).not.toContain('Use current head position');
+      expect(button(host, 'Release motors to move by hand')).toHaveProperty('disabled', false);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('selects jog positioning without setting an origin', async () => {
     const setOriginHere = vi.fn(async () => undefined);
     useLaserStore.setState({
       connection: { kind: 'connected' },
@@ -70,7 +89,7 @@ describe('NoHomingPositionGuide', () => {
     const host = document.createElement('div');
     const root = await renderGuide(host);
     try {
-      await act(async () => button(host, 'Use current head position').click());
+      await act(async () => button(host, 'Choose jog positioning').click());
       expect(useStore.getState().jobPlacement).toEqual({
         startFrom: 'current-position',
         anchor: 'center',
@@ -106,7 +125,7 @@ describe('NoHomingPositionGuide', () => {
     const root = await renderGuide(host);
     try {
       await act(async () => {
-        button(host, 'Move head by hand').click();
+        button(host, 'Release motors to move by hand').click();
         await Promise.resolve();
       });
       expect(releaseMotors).toHaveBeenCalledTimes(1);
