@@ -2692,6 +2692,84 @@ F-CNC19 tiling.
    realtime-status arbiter that proves stable `Hold:0` continuity before `~`.
    This flow does not silently opt any current profile into that contract.
 
+### F-CNC42. Attest exclusive controller access at CNC Start - Phase H.11
+
+#### Success - one fresh Start confirmation
+1. After compile/readiness succeeds, the CNC confirmation names physical
+   workholding/clearance and every common competing command path: pendant/MPG,
+   WebUI/network, another sender app, PLC motion or spindle commands, controller
+   macros, and SD/file jobs.
+2. The operator confirms KerfDesk is the sole command owner while emergency-
+   stop, safety-door, and feed-hold circuits remain enabled.
+3. The resulting evidence is bound to the exact program fingerprint plus the
+   current trusted-position and work-Z-reference epochs.
+
+#### Error - missing, incomplete, or stale evidence
+1. The store rejects direct or stale callers before the queue fence, realtime
+   query, or job bytes are written.
+2. A reconnect, controller banner/reset, alarm/sleep, homing, origin/probe
+   change, tool change, or other setup-trust invalidation requires a new
+   confirmation.
+
+#### Edge - declaration is not protocol ownership
+1. GRBL cannot identify a sender or grant an exclusive lease. The confirmation
+   is an operational contract, not proof that another path is inactive.
+2. Machines with multiple intentional senders require a sole gateway/firmware
+   lease and machine-level selector/interlock design before CNC Start can claim
+   enforced ownership.
+
+### F-CNC43. Refuse CNC Start while grblHAL MPG owns input - Phase H.11
+
+#### Success - explicit MPG release or no MPG telemetry
+1. `MPG:0` records that grblHAL released manual-pulse-generator ownership for
+   the current controller session. CNC Start continues through all other gates.
+2. Controllers that do not implement the field remain unknown and use the
+   operator exclusive-access contract in F-CNC42.
+
+#### Error - known competing owner
+1. A latched `MPG:1` blocks CNC Start before the queue fence, status query, or
+   job bytes and tells the operator to return control to KerfDesk.
+2. If `MPG:1` arrives during the fresh live-state phase, the final Start gate
+   refuses before any job byte is armed.
+
+#### Edge - intermittent reports and reset
+1. A status frame without `MPG:` does not clear prior evidence. Only explicit
+   `MPG:0` or a new controller/transport session clears the active latch.
+2. First `MPG:1` invalidates trusted-position, work-Z, Verified Frame, and the
+   prior epoch-bound setup confirmation. `MPG:0` removes the owner blocker but
+   does not restore that evidence.
+3. `MPG:0` covers the grblHAL MPG stream only; WebUI, network, second serial,
+   PLC, macro, and physical inputs remain under F-CNC42 and external interlocks.
+
+### F-CNC44. Detect unowned GRBL terminal responses - Phase H.12
+
+#### Success - every response has one KerfDesk owner
+1. Stream terminal replies consume an in-flight stream line; app command
+   replies consume a synchronously reserved non-stream ack and, where needed,
+   the shared semantic command request.
+2. Autofocus remains busy until its owned terminal `ok` and qualified Idle
+   completion arrive through the main line pump. Status still updates the live
+   store, including when both lines arrive in one serial read.
+
+#### Error - orphan `ok` or `error`
+1. On GRBL, grblHAL, or FluidNC, a terminal response with no stream line,
+   reserved app ack, transport write, or shared command owner is intercepted.
+2. It cannot advance the stream or trigger ordinary stream-error handling. The
+   first orphan is retained as session evidence, and trusted-position, work-Z,
+   Verified Frame, and prior CNC setup confirmation become stale exactly once.
+3. CNC Start refuses before its queue fence and names the recovery: stop every
+   competing sender, disconnect/reconnect, then repeat setup.
+
+#### Edge - persistence and protocol limits
+1. Dismissing the safety notice does not clear the orphan record. Alarm, Sleep,
+   and welcome/reset banners also do not restore ownership confidence.
+2. A disconnect or new connection clears the session record. A failed write
+   releases only the ack reservation it created; a late response after command
+   timeout remains attributable to that reservation.
+3. Marlin, Smoothieware, and Ruida are excluded until their terminal/queue
+   semantics receive a separate audit. Even on monitored families, this guard
+   detects anomalies but cannot prove which external sender produced a reply.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

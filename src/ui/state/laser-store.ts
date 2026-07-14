@@ -46,8 +46,9 @@ import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { CncToolPlanEntry } from './cnc-tool-plan';
 import type { CncSetupAttestation } from './cnc-setup-attestation';
+import type { UnexpectedTerminalResponse } from './controller-terminal-contamination';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
-import { createSafeWrite } from './laser-safe-write';
+import { createSafeWrite, type SafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { fireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
@@ -155,6 +156,15 @@ export type LaserState = {
   // GRBL A:. Optional only so older hand-built test states remain valid.
   // null/undefined means unknown, not known off.
   readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
+  // Explicit grblHAL MPG:1/0 ownership evidence. Latches across status frames
+  // that omit the intermittent field; null/undefined means never observed in
+  // this controller/transport session.
+  readonly mpgActive?: boolean | null;
+  // First unowned GRBL-family ok/error observed in this serial session. This
+  // is persistent safety state: dismissing the notice cannot make controller
+  // command ownership trustworthy again. Only a disconnect/new connection
+  // clears it.
+  readonly unexpectedTerminalResponse?: UnexpectedTerminalResponse | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
   // Qualified evidence for the CNC stock-top contract. Separate from
@@ -317,7 +327,12 @@ type SetFn = (
 ) => void;
 type GetFn = () => LaserState;
 
-function autofocusActions(set: SetFn, get: GetFn): Pick<LaserState, 'autofocus' | 'unlockAlarm'> {
+function autofocusActions(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  write: SafeWrite,
+): Pick<LaserState, 'autofocus' | 'unlockAlarm'> {
   return {
     autofocus: async (command) => {
       const activeJobBlock = activeJobCommandBlockMessage(get());
@@ -329,12 +344,26 @@ function autofocusActions(set: SetFn, get: GetFn): Pick<LaserState, 'autofocus' 
       if (get().autofocusBusy) {
         return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
       }
+      const state = get();
+      if (
+        state.pendingUntrackedAcks > 0 ||
+        (state.pendingTransportWrites ?? 0) > 0 ||
+        refs.controllerCommand !== null ||
+        refs.controllerIdleWait !== null
+      ) {
+        return {
+          kind: 'preflight-failed',
+          reason: 'Wait for the previous controller command to finish before auto-focusing.',
+        };
+      }
       set({ autofocusBusy: true });
       try {
         return await runAutofocus({
-          connection: refs.connection,
+          connected: refs.connection !== null,
           statusReport: get().statusReport,
           command,
+          refs,
+          write,
         });
       } finally {
         set({ autofocusBusy: false });
@@ -440,7 +469,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...connectionActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),
-  ...autofocusActions(set, get),
+  ...autofocusActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
   ...jogActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),

@@ -898,3 +898,86 @@ proof exists.
 - **Use:** read-only protocol/manual research; no upstream code copied.
 - **Confidence:** high for the generic refusal. Any future opt-in still requires
   machine-specific hardware and fault-injection validation.
+
+---
+
+## CNC controller ownership and Start attestation (2026-07-13, ADR-181)
+
+- **Stock GRBL attribution limit:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c
+  and
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c
+  implement a shared input order with bare terminal responses; no client ID,
+  nonce, command ID, or lease is returned.
+- **Realtime mutation:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md
+  documents realtime reset/hold/resume/override handling outside the normal
+  line buffer. These mutations generally have no attributable terminal ack.
+- **grblHAL competing-owner evidence:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/report.c#L1494-L1503
+  reports `MPG:1`/`MPG:0`, which can expose MPG ownership but is not a general
+  lease across network, serial, PLC, macro, or physical inputs.
+- **Browser boundary:** https://wicg.github.io/serial/#dom-serialport-open
+  defines opening the browser's serial port; it cannot prove that other
+  controller-side transports or command sources are inactive.
+- **Decision impact:** require a fresh, exact-program exclusive-access operator
+  attestation for each CNC Start, bind it to the existing controller/setup
+  epochs, and reject stale evidence before any fence or job byte.
+- **Use:** read-only protocol/specification research; no upstream code copied.
+- **Confidence:** high that legacy GRBL cannot prove ownership. The attestation
+  reduces operational ambiguity but does not replace a gateway or interlock.
+
+---
+
+## grblHAL MPG ownership telemetry (2026-07-13, ADR-182)
+
+- **Ownership transition:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L707-L762
+  switches input streams for MPG mode and disables the previous stream's
+  receive path while the manual source owns commands.
+- **Wire evidence:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/report.c#L1494-L1503
+  emits `MPG:1` and `MPG:0` status fields for acquisition/release.
+- **Broadcast caveat:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L265-L273
+  and
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L328-L431
+  show that receiving controller output is not equivalent to owning its input.
+- **Decision impact:** parse and latch explicit MPG state, refuse known-active
+  MPG before the Start fence and after live refresh, and require explicit
+  release or session reset before CNC Start can proceed. First acquisition also
+  invalidates position/Z/frame evidence so a later release requires fresh setup.
+- **Use:** read-only upstream protocol research; no upstream code copied.
+- **Confidence:** high for grblHAL MPG field semantics. It covers MPG ownership
+  only and does not establish a general multi-sender lease.
+
+---
+
+## GRBL-family terminal response ownership (2026-07-13, ADR-183)
+
+- **Stock GRBL terminal protocol:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c
+  and
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c
+  emit ordered, bare `ok`/`error` responses with no sender identity, command
+  nonce, or ownership lease.
+- **grblHAL multi-stream boundary:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L265-L273
+  and
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L328-L431
+  show that controller output can remain visible across input-stream changes;
+  receiving a terminal line is not proof KerfDesk owned the command.
+- **Internal ownership audit:** every KerfDesk newline write owes one ordered
+  terminal response except job-stream chunks, whose replies belong to stream
+  RX accounting. The previous autofocus private subscription and post-write
+  ack reservation created double-consumption and fast-response gaps.
+- **Decision impact:** pre-reserve non-stream acks, route autofocus through the
+  shared semantic owner, latch truly ownerless GRBL-family terminal replies,
+  invalidate CNC setup evidence once, and block Start until reconnect/setup.
+- **Boundary:** an external reply can coincide with a valid KerfDesk-owned
+  response window and be indistinguishable. The feature detects ownership
+  anomalies; it does not convert legacy GRBL into a multi-client protocol.
+- **Use:** read-only upstream source research plus local architecture audit; no
+  upstream code copied.
+- **Confidence:** high for the response-attribution limitation and local ledger
+  behavior; physical multi-transport fault injection remains required.

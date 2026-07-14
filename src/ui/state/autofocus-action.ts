@@ -6,20 +6,20 @@
 // M-codes (some don't support it at all). This module owns the wire
 // protocol regardless of which command body the user pasted:
 //   1. Pre-flight: connection open, controller idle, single-line command.
-//   2. Send the command. Request status immediately so we see the
-//      transition without waiting for the next 250ms poll cycle.
-//   3. Watch incoming lines for `ok` / `error:` / status reports.
-//   4. Resolve when the controller transitions through any non-idle
-//      status and back to Idle (or ack + Idle, since some Falcon
-//      firmwares never expose an active state during $HZ1).
+//   2. Send the command through the shared write/ack ledger.
+//   3. Let the store's one line pump own `ok` / `error:` / status reports.
+//   4. Resolve after both the terminal ok and either a later Idle report or
+//      an active -> Idle cycle (Falcon firmwares do not all expose activity).
 //   5. Reject on `error:`, on `<Alarm|...>`, or on 15s timeout.
 //
 // The 15s default mirrors the firmware behavior observed on Falcon A1
 // Pro — the probe cycle takes ~5-8s, anything longer is a hang and
 // continuing would risk crashing the head into the workpiece.
 
-import { classifyResponse, RT_STATUS, type StatusReport } from '../../core/controllers/grbl';
-import type { SerialConnection } from '../../platform/types';
+import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
+import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
+import type { LaserSafetyAction } from './laser-safety-notice';
+import type { TranscriptSource } from './laser-transcript';
 
 export const AUTOFOCUS_TIMEOUT_MS = 15_000;
 
@@ -31,93 +31,40 @@ export type AutofocusResult =
   | { readonly kind: 'preflight-failed'; readonly reason: string };
 
 export type RunAutofocusArgs = {
-  readonly connection: SerialConnection | null;
+  readonly connected: boolean;
   readonly statusReport: StatusReport | null;
   readonly command: string;
+  readonly refs: ControllerLifecycleRefs;
+  readonly write: (
+    line: string,
+    action?: LaserSafetyAction,
+    source?: TranscriptSource,
+  ) => Promise<void>;
   readonly timeoutMs?: number;
 };
 
 export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusResult> {
   const preflight = checkPreflight(args);
   if (preflight !== null) return preflight;
-  // Non-null after preflight; narrowed for the closure below.
-  const conn = args.connection as SerialConnection;
   const command = args.command.trim();
   const timeoutMs = args.timeoutMs ?? AUTOFOCUS_TIMEOUT_MS;
-
-  return await new Promise<AutofocusResult>((resolve) => {
-    // Phase tracking: we resolve only after seeing the controller leave
-    // Idle and come back, OR (Falcon edge case) after the command is
-    // ack'd AND we see Idle in a later status report. The two flags
-    // discriminate "first Idle is stale pre-command" vs "Idle after ack".
-    let commandAcknowledged = false;
-    let sawActiveState = false;
-    let settled = false;
-    let unsubscribe: (() => void) | null = null;
-
-    const finish = (result: AutofocusResult): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      unsubscribe?.();
-      resolve(result);
-    };
-
-    const timer = setTimeout(() => finish({ kind: 'timeout' }), timeoutMs);
-
-    unsubscribe = conn.onLine((line) => {
-      const cls = classifyResponse(line);
-      if (cls.kind === 'ok' && !commandAcknowledged) {
-        commandAcknowledged = true;
-        // Nudge for an immediate status so we don't wait the full 250ms
-        // for the next poll to learn the controller state.
-        void conn.write(RT_STATUS).catch(() => undefined);
-        return;
-      }
-      if (cls.kind === 'error') {
-        finish({ kind: 'rejected', errorCode: cls.code, raw: line });
-        return;
-      }
-      if (cls.kind === 'alarm') {
-        finish({ kind: 'alarm', alarmCode: cls.code });
-        return;
-      }
-      if (cls.kind !== 'status') return;
-      const state = cls.report.state.toLowerCase();
-      if (state === 'alarm') {
-        finish({ kind: 'alarm', alarmCode: null });
-        return;
-      }
-      // Any non-idle/non-alarm state token (Home / Run / Focus /
-      // non-standard Falcon tokens) signals the probe cycle is active.
-      if (state !== 'idle') {
-        sawActiveState = true;
-        return;
-      }
-      // Idle. Only treat it as success once we've either seen an active
-      // phase OR the command was acknowledged — otherwise we'd resolve
-      // on the pre-command Idle that arrived between us subscribing and
-      // the controller noticing the new command.
-      if (sawActiveState || commandAcknowledged) {
-        finish({ kind: 'ok' });
-      }
+  try {
+    await startControllerCommand(args.refs, args.write, {
+      kind: 'autofocus',
+      label: 'Auto-focus',
+      command: `${command}\n`,
+      source: 'motion',
+      timeoutMs,
+      completion: 'terminal-and-idle',
     });
-
-    // Send the command and immediately request a status so the first
-    // post-command poll arrives within ~one round-trip rather than up
-    // to STATUS_POLL_MS later.
-    void conn
-      .write(`${command}\n`)
-      .then(() => conn.write(RT_STATUS))
-      .catch((err: unknown) => {
-        const reason = err instanceof Error ? err.message : String(err);
-        finish({ kind: 'preflight-failed', reason: `Write failed: ${reason}` });
-      });
-  });
+    return { kind: 'ok' };
+  } catch (err) {
+    return autofocusFailureResult(err);
+  }
 }
 
 function checkPreflight(args: RunAutofocusArgs): AutofocusResult | null {
-  if (args.connection === null) {
+  if (!args.connected) {
     return { kind: 'preflight-failed', reason: 'Not connected to a controller' };
   }
   const command = args.command.trim();
@@ -137,6 +84,22 @@ function checkPreflight(args: RunAutofocusArgs): AutofocusResult | null {
     };
   }
   return null;
+}
+
+function autofocusFailureResult(err: unknown): AutofocusResult {
+  const message = err instanceof Error ? err.message : String(err);
+  const response = classifyResponse(message);
+  if (response.kind === 'error') {
+    return {
+      kind: 'rejected',
+      errorCode: response.code,
+      raw: response.raw ?? (response.code === null ? message : `error:${response.code}`),
+    };
+  }
+  if (response.kind === 'alarm') return { kind: 'alarm', alarmCode: response.code };
+  if (/\balarm\b/i.test(message)) return { kind: 'alarm', alarmCode: null };
+  if (/timed out/i.test(message)) return { kind: 'timeout' };
+  return { kind: 'preflight-failed', reason: message };
 }
 
 // Map an AutofocusResult to a user-friendly toast message + variant.

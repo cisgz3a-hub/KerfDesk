@@ -7419,3 +7419,127 @@ engagement boundary and removes the stationary-cutter failure described by the
 maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
+
+---
+
+## ADR-181 - CNC Start requires epoch-bound exclusive-access attestation
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL terminal responses are bare `ok`/`error` lines with no sender identity,
+session nonce, or command ID. Status reports describe global controller state,
+not who caused it. A queue fence and fresh Idle/accessory snapshot therefore
+have meaning only while KerfDesk is the sole mutating sender. A pendant/MPG,
+controller WebUI, network or second serial sender, PLC command path, macro, or
+SD/file job can change motion, offsets, spindle, coolant, or overrides before
+the first job bytes without producing evidence KerfDesk can attribute.
+
+### Decision
+
+- The existing per-Start CNC physical-setup confirmation also requires the
+  operator to affirm that KerfDesk is the only command owner. The prompt names
+  common alternate paths and explicitly preserves emergency-stop, safety-door,
+  and feed-hold circuits.
+- The attestation is bound to the exact G-code fingerprint and to the current
+  composite controller/setup epoch: trusted-position and work-Z-reference
+  generations. Reconnect, reset/banner, alarm/sleep, homing, origin/probe
+  changes, tool changes, and other trust invalidations make it stale.
+- The store revalidates the attestation before the Start queue fence. Missing,
+  incomplete, wrong-program, or stale evidence writes no controller byte.
+- The existing Start reservation continues to require the same epochs through
+  the queue fence and fresh live-readiness observations.
+
+### Consequences
+
+This is a fail-closed operator declaration, not protocol proof or a hardware
+ownership lease. Stock GRBL still cannot exclude or identify other command
+paths. True multi-sender support requires a sole gateway or firmware lease plus
+machine-level selector/interlock enforcement; physical spindle-at-speed and VFD
+feedback remain separate evidence.
+
+---
+
+## ADR-182 - grblHAL MPG ownership is a latched CNC Start blocker
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+ADR-181 makes sole command ownership an operator contract because stock GRBL
+cannot identify input owners. grblHAL provides one narrower piece of explicit
+evidence: status field `MPG:1` reports that manual-pulse-generator mode has
+taken controller input ownership, and `MPG:0` reports its release. The field is
+intermittent, so a later status frame that omits it cannot prove ownership was
+returned. Starting a queue fence while a known MPG owner is active can also
+misattribute another sender's bare `ok` to KerfDesk.
+
+### Decision
+
+- Parse only exact `MPG:1` and `MPG:0` fields. Missing or malformed fields are
+  unknown, not inactive.
+- Latch explicit MPG evidence across ordinary status reports. Clear an active
+  latch only on explicit `MPG:0` or a new controller/transport session.
+- On the first transition to active, invalidate trusted position, work-Z, and
+  Verified Frame evidence. Repeated sparse/redundant reports do not churn the
+  epochs, and `MPG:0` does not restore the invalidated setup.
+- For CNC only, block a known active MPG owner before the Start queue fence.
+  Recheck the latch after the fresh live-status query and before arming job
+  bytes, so an acquisition observed during Start also fails closed.
+- Laser jobs and controllers that never report MPG retain existing behavior.
+  ADR-181's operator attestation remains required because `MPG:0` is not proof
+  that every network, serial, PLC, macro, or physical command path is inactive.
+
+### Consequences
+
+KerfDesk no longer sends CNC Start traffic after receiving explicit evidence
+that a grblHAL pendant/MPG owns input. The operator must return control and wait
+for `MPG:0`. This is one protocol-visible competing-owner signal, not a general
+ownership lease; unexpected-ack contamination is intentionally a separate
+decision because attribution false positives require a broader ledger audit.
+
+---
+
+## ADR-183 - Unexpected GRBL terminal responses invalidate controller ownership
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL-family `ok` and `error` replies do not identify their sender or command.
+KerfDesk can attribute them only while one of its own ledgers owns a response:
+an in-flight stream line, a reserved non-stream line, or the shared interactive
+command arbiter. The existing autofocus path bypassed those ledgers with a
+second line subscription, while the transport ledger reserved an owed ack only
+after `write()` resolved. Both created false attribution windows. Conversely, a
+bare terminal response with no owner is evidence that a second sender, macro,
+or controller-side path may be mutating the same session.
+
+### Decision
+
+- GRBL, grblHAL, and FluidNC classify every terminal response against the
+  pre-consumption ownership snapshot. Marlin, Smoothieware, Ruida, and
+  nonterminal lines are not included in this first policy.
+- Non-stream writes reserve their owed terminal responses synchronously before
+  awaiting the transport. Failed writes release the reservation; a reply that
+  arrives inside the transport Promise window is therefore still attributable.
+- Autofocus uses the single shared command arbiter and write/ack ledger. Its
+  composite completion requires a terminal `ok` plus a qualified later Idle or
+  an observed active-to-Idle cycle, without installing a private line reader.
+- A terminal response with no KerfDesk owner is intercepted before it can
+  advance a stream or enter ordinary error routing. The first response is
+  latched for the serial session, invalidates trusted-position, work-Z, and
+  Verified Frame evidence once, and raises a safety notice.
+- Notice dismissal, alarm, and controller banner/reset do not erase the latch.
+  Disconnect or a new connection clears it. CNC Start checks the latch before
+  its queue fence and again at final live readiness.
+
+### Consequences
+
+KerfDesk detects command-channel contamination that legacy GRBL cannot identify
+directly, and it no longer lets autofocus double-consume shared replies. The
+detector is intentionally conservative: a reply observed while KerfDesk owns a
+different valid command can still be misattributed because the firmware has no
+client identity. This is anomaly detection, not an exclusive lease; production
+multi-sender machines still require a sole gateway or machine interlock.
