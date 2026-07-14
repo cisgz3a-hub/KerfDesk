@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -115,4 +115,4 @@ function formatPageErrors(errors: readonly Error[]): string {
     : errors.map((error) => error.stack).join('\n');
 }
 
-export { expect, type Page };
+export { expect, type Locator, type Page };
