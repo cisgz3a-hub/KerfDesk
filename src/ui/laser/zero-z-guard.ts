@@ -10,28 +10,11 @@
 // trusted. A first-time zero (no current evidence) stays silent: with no
 // established zero the work-frame Z carries no meaning to warn about.
 
-import type { StatusReport } from '../../core/controllers/grbl';
-import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { isWorkZZeroEvidenceCurrent, type WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 
 /** Below this |work Z| the bit is at the established zero (touching the
  *  stock top), so re-zeroing is a correction, not an overwrite. */
 export const ZERO_Z_OVERWRITE_WARNING_THRESHOLD_MM = 0.5;
-
-type ReportedPositions = Pick<StatusReport, 'mPos' | 'wPos'>;
-
-/** Work-frame Z of the bit right now: WPos directly, or MPos minus the
- *  cached work offset. Null when the height is unknowable. */
-export function currentWorkZMm(
-  report: ReportedPositions | null,
-  wcoCache: WorkCoordinateOffset | null,
-): number | null {
-  if (report?.wPos !== null && report?.wPos !== undefined) return report.wPos.z;
-  if (report?.mPos !== null && report?.mPos !== undefined && wcoCache !== null) {
-    return report.mPos.z - wcoCache.z;
-  }
-  return null;
-}
 
 /** The confirmation to show before Zero Z, or null when no confirmation is
  *  needed and the zero may be written directly. */

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
-import {
-  currentWorkZMm,
-  ZERO_Z_OVERWRITE_WARNING_THRESHOLD_MM,
-  zeroZOverwriteWarning,
-} from './zero-z-guard';
+import { ZERO_Z_OVERWRITE_WARNING_THRESHOLD_MM, zeroZOverwriteWarning } from './zero-z-guard';
 
 const EPOCH = 4;
 const probeEvidence: WorkZZeroEvidence = {
@@ -85,22 +81,5 @@ describe('zeroZOverwriteWarning', () => {
     expect(
       zeroZOverwriteWarning({ evidence: manualEvidence, referenceEpoch: EPOCH, workZMm: null }),
     ).toBeNull();
-  });
-});
-
-describe('currentWorkZMm', () => {
-  it('reads WPos directly when reported', () => {
-    expect(currentWorkZMm({ wPos: { x: 1, y: 2, z: 7.5 }, mPos: null }, null)).toBe(7.5);
-  });
-
-  it('derives work Z from MPos minus the cached work offset', () => {
-    expect(
-      currentWorkZMm({ wPos: null, mPos: { x: 0, y: 0, z: -10 } }, { x: 0, y: 0, z: -30 }),
-    ).toBe(20);
-  });
-
-  it('is unknowable from MPos without a cached offset, or with no report', () => {
-    expect(currentWorkZMm({ wPos: null, mPos: { x: 0, y: 0, z: -10 } }, null)).toBeNull();
-    expect(currentWorkZMm(null, { x: 0, y: 0, z: -30 })).toBeNull();
   });
 });
