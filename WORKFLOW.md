@@ -3337,14 +3337,17 @@ Until every box is checked on real hardware, the desktop installer stays
 3. KerfDesk reserves one exclusive transaction, invalidates affected setup
    evidence, sends `M5` and `M9`, expands the audited GRBL probe builder, and
    owns every terminal response before awaiting transport completion.
-4. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
+4. A corner request leaves the previous WCS unchanged through all six contacts,
+   then commits X, Y, and Z together in one `G10 L20 P0` block before parking.
+5. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
    reports, and unchanged connection/transaction identity. The resulting work-Z
    evidence remains blocked for Start until the operator confirms plate removal.
 
 #### Error — alarm or partial probe failure
 
 1. A probe alarm enters global GRBL alarm handling and clears affected setup
-   evidence. It never establishes work zero from a partial response sequence.
+   evidence. It never establishes work zero from a partial response sequence;
+   a corner failure before the combined commit leaves the prior WCS unchanged.
 2. Any uncertain non-alarm failure sends soft reset and keeps the controller
    operation locked until a reboot banner and two subsequent Idle reports are
    observed. Missing proof remains locked until disconnect.
