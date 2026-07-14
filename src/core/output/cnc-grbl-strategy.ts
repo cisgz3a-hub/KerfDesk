@@ -223,9 +223,7 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm:
   // that pass happens to start at the park XY — otherwise the alreadyAtStartXy
   // shortcut would skip it and the spinning bit would plunge at the touch-off
   // location and drag to the start (F23).
-  head.x = null;
-  head.y = null;
-  head.z = null;
+  head.x = head.y = head.z = null;
   appendSpindleStart(lines, head, safeZMm, group.spindleRpm, group.spindleSpinupSec);
 }
 
