@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCornerProbeLines,
   buildZProbeLines,
+  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
   DEFAULT_SIDE_CLEARANCE_MM,
   DEFAULT_SIDE_DROP_MM,
   DEFAULT_Z_PROBE_PARAMS,
@@ -15,7 +17,10 @@ import {
 const CORNER: CornerProbeParams = {
   ...DEFAULT_Z_PROBE_PARAMS,
   bitDiameterMm: 6.35,
+  toolKind: 'end-mill',
   corner: 'front-left',
+  plateCenterOffsetXmm: DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  plateCenterOffsetYmm: DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
   sideDropMm: DEFAULT_SIDE_DROP_MM,
   sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
 };
@@ -71,6 +76,21 @@ describe('buildCornerProbeLines', () => {
     // which remains above the stock top without relying on a partial Z zero.
     expect(lines.filter((line) => line === 'G0 Z-11.000')).toHaveLength(2);
     expect(lines.filter((line) => line === 'G0 Z11.000')).toHaveLength(2);
+  });
+
+  it('uses the measured X inset independently for a rectangular plate', () => {
+    const lines = buildCornerProbeLines({
+      ...CORNER,
+      plateCenterOffsetXmm: 20,
+      plateCenterOffsetYmm: 12,
+    });
+    expect(lines).toContain('G0 X27.175');
+    expect(lines).toContain('G10 L20 P0 X20.000 Y-7.175 Z20.000');
+  });
+
+  it('expands the absolute park for a cutter wider than the legacy 5 mm distance', () => {
+    const lines = buildCornerProbeLines({ ...CORNER, bitDiameterMm: 10 });
+    expect(lines.at(-1)).toBe('G0 X-6.000 Y-6.000');
   });
 
   it.each([

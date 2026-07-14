@@ -1025,3 +1025,24 @@ proof exists.
 - Software tests cover all corner signs and a final-side alarm before G10.
   Real plate dimensions, squareness, contact repeatability, and safe clearance
   remain hardware-unverified.
+
+## Static XYZ corner-probe geometry preflight â€” 2026-07-14 (ADR-188)
+
+- The prior builder assumed a 15 mm plate-center inset, 35 mm outward clearance,
+  6 mm side drop, and 5 mm final park while the UI accepted cutter diameters up
+  to 100 mm. Those individually valid inputs did not prove a collision-free set.
+- For plate thickness `T`, side drop `D`, per-axis center offsets `dx/dy`, cutter
+  radius `r`, outward clearance `C`, and external margin `m`, the static proof
+  requires `T-D >= 1`, `dx >= r+m`, `dy >= r+m`, and
+  `C >= max(dx,dy)+r+m`; final park is the next emitted 0.001 mm at or above
+  `max(5,r+m)`.
+- Side contact currently supports cylindrical end mills only. Ball-nose, V-bit,
+  and engraving-tool radius varies with contact height, so their catalog
+  diameter cannot safely drive collision proof or XY compensation.
+- The validator runs before line generation and store reservation. Integration
+  coverage proves an invalid request sends neither `M5`/`M9` nor probe motion.
+- A profile bed rectangle is not yet machine-envelope evidence. Stock GRBL can
+  report machine positions in inches (`$13`), its homing frame can vary by build
+  option, and a reset can invalidate position trust. A later owned qualification
+  must establish units, homing-frame identity, fresh MPos, and axis bounds before
+  XYZ probing is production-qualified.

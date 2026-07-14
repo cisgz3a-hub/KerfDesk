@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildCornerProbeLines,
+  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
   DEFAULT_SIDE_CLEARANCE_MM,
   DEFAULT_SIDE_DROP_MM,
   DEFAULT_Z_PROBE_PARAMS,
@@ -18,7 +20,10 @@ const CORNER_REQUEST = {
   params: {
     ...DEFAULT_Z_PROBE_PARAMS,
     bitDiameterMm: 6.35,
+    toolKind: 'end-mill',
     corner: 'front-left',
+    plateCenterOffsetXmm: DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+    plateCenterOffsetYmm: DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
     sideDropMm: DEFAULT_SIDE_DROP_MM,
     sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
   },
@@ -106,6 +111,54 @@ afterEach(async () => {
 });
 
 describe('atomic corner-probe controller transaction', () => {
+  it('writes no controller bytes when static plate and cutter geometry is unsafe', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const result = await useLaserStore.getState().probe({
+      ...CORNER_REQUEST,
+      params: { ...CORNER_REQUEST.params, bitDiameterMm: 100 },
+    });
+
+    expect(result).toMatchObject({
+      kind: 'preflight-failed',
+      reason: expect.stringContaining('plate center offsets'),
+    });
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState()).toMatchObject({
+      probeBusy: false,
+      controllerOperation: null,
+    });
+  });
+
+  it.each([
+    [{ toolKind: 'v-bit' as const }, 'cylindrical end mill'],
+    [{ sideDropMm: 0.0001 }, '0.001 mm precision'],
+    [{ sideClearanceMm: 1e20 }, 'at most 100 mm'],
+  ])('writes no bytes for unsupported runtime parameters %#', async (patch, reason) => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const result = await useLaserStore.getState().probe({
+      ...CORNER_REQUEST,
+      params: { ...CORNER_REQUEST.params, ...patch },
+    });
+
+    expect(result).toMatchObject({
+      kind: 'preflight-failed',
+      reason: expect.stringContaining(reason),
+    });
+    expect(writes).toEqual([]);
+  });
+
   it.each([0, 1, 2, 3, 4, 5])(
     'does not write a partial WCS when probe contact %i fails',
     async (failedProbeIndex) => {

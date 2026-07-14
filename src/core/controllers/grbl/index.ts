@@ -1,8 +1,8 @@
 export type { AlarmCode, AlarmDescription } from './alarm-codes';
-export { ALARM_CODES, describeAlarm } from './alarm-codes';
+export { describeAlarm } from './alarm-codes';
 
 export type { ErrorDescription } from './error-codes';
-export { ALL_ERROR_CODES, describeError } from './error-codes';
+export { describeError } from './error-codes';
 
 export type { GrblPins, GrblState, OverrideValues, StatusReport } from './status-parser';
 export { parseStatusReport } from './status-parser';
@@ -75,6 +75,8 @@ export { buildResumeProgram, type ResumeOptions, type ResumeProgramResult } from
 export {
   buildCornerProbeLines,
   buildZProbeLines,
+  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
   DEFAULT_SIDE_CLEARANCE_MM,
   DEFAULT_SIDE_DROP_MM,
   DEFAULT_Z_PROBE_PARAMS,

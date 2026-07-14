@@ -58,6 +58,7 @@
 | ADR-185 | 2026-07-13 | Accepted | Commit XYZ corner-probe offsets in one GRBL block |
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
 | ADR-187 | 2026-07-14 | Accepted | Validate every supported laser G-code dialect with one property corpus |
+| ADR-188 | 2026-07-14 | Accepted | Reject unproved XYZ corner-probe plate geometry before controller output |
 
 ---
 
@@ -7662,3 +7663,44 @@ properties and creates reviewable snapshot churn at the production output bounda
 tests improve confidence without changing emitted machine behavior. Ruida remains an experimental,
 file-only encoder and is outside this G-code acceptance claim until independently decoded or tested
 on representative hardware.
+
+---
+
+## ADR-188 - Reject unproved XYZ corner-probe plate geometry before controller output
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Decision
+
+An XYZ corner-probe request must name the starting cutter-center X and Y offsets, tool kind,
+side-contact drop, and outward side clearance. Before generating a line, a pure validator proves:
+
+- the side-contact height remains at least 1 mm above the stock and below the plate top;
+- the starting cutter is fully supported over the plate by its radius plus 1 mm margin;
+- the outward rapid clears the plate face by the cutter radius plus 1 mm margin; and
+- the final park is derived to clear the stock by the cutter radius plus 1 mm margin.
+
+Only cylindrical end mills with a straight side flank are accepted; ball-nose, V-bit, and engraving
+tool diameters do not represent the contact radius at an arbitrary flank height. Every dimension is
+bounded to 100 mm and must be representable at the emitted 0.001 mm G-code precision; cutter
+diameter therefore uses 0.002 mm increments so its derived radius is also representable.
+
+Invalid, missing, non-finite, or non-positive geometry produces no probe program. The live store
+returns a preflight reason before reservation, `M5`, `M9`, or any other serial write; an already-busy
+machine may report that higher-priority blocker instead of the geometry detail.
+The formerly hidden square 15 mm plate-center assumption becomes separate editable X/Y measurements
+so rectangular corner plates are modeled without pretending both insets are equal.
+
+### Consequences
+
+Thin plates, tapered/profiled tools, oversized cutters, unrepresentable values, and insufficient
+clearance can no longer enter the owned probe transaction. Exact boundary and randomized invariant
+tests cover the static model. The entered plate thickness remains a metrology input: its measurement
+error shifts the resulting stock Z0 by the same amount, so the UI must not describe it as
+self-calibrating.
+
+This decision does not claim a safe machine-travel envelope. Raw GRBL `MPos` cannot yet be compared
+honestly with KerfDesk's profile bounds because position units, homing-frame origin, reset epoch, and
+firmware build options are not all qualified. XYZ corner probing remains non-production-qualified
+until that owned coordinate proof, the pre-G10 planner fence, TLO/G92 readback, and accessory
+coast-down safeguards land.

@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildCornerProbeLines, buildZProbeLines } from '../../core/controllers/grbl';
+import {
+  buildCornerProbeLines,
+  buildZProbeLines,
+  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
+  DEFAULT_SIDE_CLEARANCE_MM,
+} from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
@@ -26,9 +32,12 @@ const CORNER_REQUEST = {
   params: {
     ...Z_REQUEST.params,
     bitDiameterMm: 6.35,
+    toolKind: 'end-mill',
     corner: 'front-left',
+    plateCenterOffsetXmm: DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+    plateCenterOffsetYmm: DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
     sideDropMm: 3,
-    sideClearanceMm: 2,
+    sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
   },
 } satisfies ProbeRequest;
 

@@ -5,21 +5,40 @@
 
 import { useState } from 'react';
 import {
+  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
   DEFAULT_SIDE_CLEARANCE_MM,
   DEFAULT_SIDE_DROP_MM,
   DEFAULT_Z_PROBE_PARAMS,
   type ProbeCorner,
   type ZProbeParams,
 } from '../../core/controllers/grbl';
+import { type CornerProbeParams, type ProbeRequest } from '../../core/controllers/grbl/probe';
 import { activeCncTool } from '../../core/scene';
-import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
 import { probePlateRemovalRequired } from '../state/work-z-zero-evidence';
 import { useToastStore } from '../state/toast-store';
+import {
+  CornerProbeGeometryFields,
+  type CornerProbeGeometryDraft,
+} from './CornerProbeGeometryFields';
+import { ProbeNumberField } from './ProbeNumberField';
 
 type ProbeMode = 'z' | 'corner';
+type ProbeFieldsProps = {
+  readonly mode: ProbeMode;
+  readonly corner: ProbeCorner;
+  readonly zParams: ZProbeParams;
+  readonly bitDiameterMm: number;
+  readonly cornerGeometry: CornerProbeGeometryDraft;
+  readonly onMode: (mode: ProbeMode) => void;
+  readonly onCorner: (corner: ProbeCorner) => void;
+  readonly onZParams: (params: ZProbeParams) => void;
+  readonly onBitDiameter: (value: number) => void;
+  readonly onCornerGeometry: (value: CornerProbeGeometryDraft) => void;
+};
 
 const CORNERS: ReadonlyArray<{ readonly value: ProbeCorner; readonly label: string }> = [
   { value: 'front-left', label: 'Front-left' },
@@ -40,6 +59,12 @@ export function ProbeControls(): JSX.Element | null {
   const [corner, setCorner] = useState<ProbeCorner>('front-left');
   const [zParams, setZParams] = useState<ZProbeParams>(DEFAULT_Z_PROBE_PARAMS);
   const [bitDiameterMm, setBitDiameterMm] = useState<number | null>(null);
+  const [cornerGeometry, setCornerGeometry] = useState({
+    plateCenterOffsetXmm: DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+    plateCenterOffsetYmm: DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
+    sideDropMm: DEFAULT_SIDE_DROP_MM,
+    sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
+  });
   if (machine?.kind !== 'cnc') return null;
   if (!probingSupported) {
     // The probe runner speaks the GRBL response grammar; on firmwares with a
@@ -53,23 +78,25 @@ export function ProbeControls(): JSX.Element | null {
     );
   }
 
-  const effectiveBitDiameter = bitDiameterMm ?? activeCncTool(machine).diameterMm;
-  const ready = connection.kind === 'connected' && statusReport?.state === 'Idle' && !probeBusy;
+  const effectiveTool = activeCncTool(machine);
+  const effectiveBitDiameter = bitDiameterMm ?? effectiveTool.diameterMm;
+  const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
+  const readiness = probeControlReadiness({
+    isConnected: connection.kind === 'connected',
+    isIdle: statusReport?.state === 'Idle',
+    isBusy: probeBusy,
+    toolSupported,
+  });
 
   const run = (): void => {
-    const request =
-      mode === 'z'
-        ? ({ kind: 'z', params: zParams } as const)
-        : ({
-            kind: 'corner',
-            params: {
-              ...zParams,
-              bitDiameterMm: effectiveBitDiameter,
-              corner,
-              sideDropMm: DEFAULT_SIDE_DROP_MM,
-              sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
-            },
-          } as const);
+    const request = buildProbeRequest({
+      mode,
+      zParams,
+      bitDiameterMm: effectiveBitDiameter,
+      toolKind: effectiveTool.kind,
+      corner,
+      cornerGeometry,
+    });
     void probe(request).then((result) => {
       const described = describeProbeResult(result);
       pushToast(described.message, described.variant);
@@ -79,9 +106,7 @@ export function ProbeControls(): JSX.Element | null {
   return (
     <>
       <p style={hintStyle}>
-        {mode === 'z'
-          ? 'Rest the plate on the stock top under the bit and clip the probe lead to the bit. Z0 lands on the stock top.'
-          : 'Rest the plate flush on the chosen stock corner with the bit hovering over the plate center, 5–15 mm above. X0 Y0 Z0 land on that corner.'}
+        {probeHint(mode)}
         {' Spindle must be off.'}
       </p>
       <ProbeFields
@@ -89,22 +114,15 @@ export function ProbeControls(): JSX.Element | null {
         corner={corner}
         zParams={zParams}
         bitDiameterMm={effectiveBitDiameter}
+        cornerGeometry={cornerGeometry}
         onMode={setMode}
         onCorner={setCorner}
         onZParams={setZParams}
         onBitDiameter={setBitDiameterMm}
+        onCornerGeometry={setCornerGeometry}
       />
-      <button
-        type="button"
-        onClick={run}
-        disabled={!ready}
-        title={
-          ready
-            ? 'Start the probing cycle. The bit moves toward the plate at the seek feed.'
-            : 'Connect and wait for Idle before probing.'
-        }
-      >
-        {probeBusy ? 'Probing…' : 'Run probe'}
+      <button type="button" onClick={run} disabled={!readiness.ready} title={readiness.title}>
+        {probeButtonLabel(probeBusy)}
       </button>
       <ProbePlateRemovalConfirmation />
     </>
@@ -130,16 +148,59 @@ function ProbePlateRemovalConfirmation(): JSX.Element | null {
   );
 }
 
-function ProbeFields(props: {
+function probeControlReadiness(input: {
+  readonly isConnected: boolean;
+  readonly isIdle: boolean;
+  readonly isBusy: boolean;
+  readonly toolSupported: boolean;
+}): { readonly ready: boolean; readonly title: string } {
+  if (!input.toolSupported) {
+    return {
+      ready: false,
+      title: 'XYZ corner probing requires a cylindrical end mill with a straight flank.',
+    };
+  }
+  const ready = input.isConnected && input.isIdle && !input.isBusy;
+  return {
+    ready,
+    title: ready
+      ? 'Start the probing cycle. The bit moves toward the plate at the seek feed.'
+      : 'Connect and wait for Idle before probing.',
+  };
+}
+
+function probeHint(mode: ProbeMode): string {
+  return mode === 'z'
+    ? 'Rest the plate on the stock top under the bit and clip the probe lead to the bit. Z0 lands on the stock top.'
+    : 'Rest the plate flush on the chosen stock corner with the bit at the measured X/Y offsets, 5–15 mm above. X0 Y0 Z0 land on that corner.';
+}
+
+function probeButtonLabel(isBusy: boolean): string {
+  return isBusy ? 'Probing…' : 'Run probe';
+}
+
+function buildProbeRequest(input: {
   readonly mode: ProbeMode;
-  readonly corner: ProbeCorner;
   readonly zParams: ZProbeParams;
   readonly bitDiameterMm: number;
-  readonly onMode: (mode: ProbeMode) => void;
-  readonly onCorner: (corner: ProbeCorner) => void;
-  readonly onZParams: (params: ZProbeParams) => void;
-  readonly onBitDiameter: (value: number) => void;
-}): JSX.Element {
+  readonly toolKind: CornerProbeParams['toolKind'];
+  readonly corner: ProbeCorner;
+  readonly cornerGeometry: CornerProbeGeometryDraft;
+}): ProbeRequest {
+  if (input.mode === 'z') return { kind: 'z', params: input.zParams };
+  return {
+    kind: 'corner',
+    params: {
+      ...input.zParams,
+      bitDiameterMm: input.bitDiameterMm,
+      toolKind: input.toolKind,
+      corner: input.corner,
+      ...input.cornerGeometry,
+    },
+  };
+}
+
+function ProbeFields(props: ProbeFieldsProps): JSX.Element {
   return (
     <>
       <div style={rowStyle}>
@@ -177,61 +238,26 @@ function ProbeFields(props: {
         )}
       </div>
       <div style={rowStyle}>
-        <NumberField
+        <ProbeNumberField
           label="Plate thickness"
           value={props.zParams.plateThicknessMm}
           onCommit={(v) => props.onZParams({ ...props.zParams, plateThicknessMm: v })}
         />
-        <NumberField
+        <ProbeNumberField
           label="Max travel"
           value={props.zParams.maxTravelMm}
           onCommit={(v) => props.onZParams({ ...props.zParams, maxTravelMm: v })}
         />
       </div>
       {props.mode === 'corner' && (
-        <div style={rowStyle}>
-          <NumberField
-            label="Bit diameter"
-            value={props.bitDiameterMm}
-            onCommit={props.onBitDiameter}
-          />
-        </div>
+        <CornerProbeGeometryFields
+          bitDiameterMm={props.bitDiameterMm}
+          geometry={props.cornerGeometry}
+          onBitDiameter={props.onBitDiameter}
+          onGeometry={props.onCornerGeometry}
+        />
       )}
     </>
-  );
-}
-
-const PROBE_VALUE_MIN_MM = 0.1;
-const PROBE_VALUE_MAX_MM = 100;
-
-const NUMBER_FIELD_TITLES: Readonly<Record<string, string>> = {
-  'Plate thickness': 'Distance from the plate top to its underside — sets where work Z0 lands.',
-  'Max travel': 'How far a probe move may travel before failing with ALARM:5.',
-  'Bit diameter': 'Used to offset the X and Y zeros by one bit radius at side contact.',
-};
-
-function NumberField(props: {
-  readonly label: string;
-  readonly value: number;
-  readonly onCommit: (value: number) => void;
-}): JSX.Element {
-  return (
-    <label style={fieldStyle}>
-      {props.label}
-      <span style={unitWrapStyle}>
-        <ClearableNumberField
-          ariaLabel={props.label}
-          title={NUMBER_FIELD_TITLES[props.label] ?? props.label}
-          value={props.value}
-          min={PROBE_VALUE_MIN_MM}
-          max={PROBE_VALUE_MAX_MM}
-          step={0.01}
-          onCommit={props.onCommit}
-          style={inputStyle}
-        />
-        mm
-      </span>
-    </label>
   );
 }
 
@@ -259,5 +285,3 @@ const fieldStyle: React.CSSProperties = {
   fontSize: 12,
   flex: 1,
 };
-const unitWrapStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4 };
-const inputStyle: React.CSSProperties = { width: 70 };

@@ -63,7 +63,7 @@ async function runProbe(
   request: ProbeRequest,
 ): Promise<ProbeResult> {
   const lines = probeLines(request);
-  const preflight = probePreflight(get(), refs, lines);
+  const preflight = probePreflight(get(), refs, lines, request);
   if (preflight !== null) return preflight;
   const connection = refs.connection as SerialConnection;
   const toolId = selectedCncToolId(useStore.getState().project);
