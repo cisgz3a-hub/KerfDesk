@@ -81,6 +81,9 @@ export default defineConfig({
           ) {
             return 'vendor-cam';
           }
+          if (normalized.endsWith('/src/core/text/ems-stroke-font-data.ts')) {
+            return 'ems-stroke-fonts';
+          }
           if (normalized.includes('/src/core/')) return 'core';
           if (normalized.includes('/src/io/')) return 'io';
           if (normalized.includes('/src/ui/laser/') || normalized.includes('/src/ui/workspace/')) {

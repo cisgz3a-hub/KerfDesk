@@ -5,6 +5,7 @@ release
 dist-electron
 coverage
 pnpm-lock.yaml
+src/core/text/ems-stroke-font-data.ts
 .claude
 references
 

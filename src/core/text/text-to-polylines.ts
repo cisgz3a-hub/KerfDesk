@@ -89,7 +89,7 @@ type TextRenderSharedInput = {
 export type TextRenderInput = TextRenderSharedInput &
   (
     | { readonly geometry?: 'outline'; readonly fontBuffer: ArrayBuffer }
-    | { readonly geometry: 'single-line' }
+    | { readonly geometry: 'single-line'; readonly fontKey: string }
   );
 
 export type TextRenderResult = {

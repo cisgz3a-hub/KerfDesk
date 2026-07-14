@@ -952,17 +952,21 @@ The guided alternative to hunting through the Device Profile panel and the seven
 ### F-D6. Add CNC single-line text
 
 #### Success
-1. Open Add Text and choose **Hershey Simplex (single-line)**.
+1. Open Add Text and choose a single-line face: **Hershey Simplex**, **EMS Allure**,
+   **EMS Delight**, **EMS Tech**, or **EMS Osmotron**.
 2. The preview and saved text contain open center strokes rather than inner and outer
    glyph outlines. An `O` is one tool-following loop, not two concentric contours.
-3. A fresh CNC text layer defaults to **Engrave/on-path**, including when the active
+3. Decorative EMS strokes use bounded smooth curves in the preview and machining path;
+   sharp corners, endpoints, separate strokes, and Osmotron's angular design stay intact.
+4. A fresh CNC text layer defaults to **Engrave/on-path**, including when the active
    tool is a V-bit. Existing outline fonts keep the normal V-carve default with a V-bit.
-4. Edit, bend, path placement, save/load, variable text, and G-code compilation reuse
+5. Edit, bend, path placement, save/load, variable text, and G-code compilation reuse
    the same materialized text-path flow as outline fonts.
 
 #### Error — unsupported character
-1. Roman Simplex covers printable ASCII. An unsupported character renders as `?` so
-   missing geometry is visible rather than silently omitted.
+1. Roman Simplex covers printable ASCII; the EMS faces also include their upstream
+   Latin-1 glyph set. An unsupported character renders as `?` so missing geometry is
+   visible rather than silently omitted.
 
 #### Empty
 1. Blank or whitespace-only input remains blocked by the existing text-dialog guard.
@@ -971,6 +975,11 @@ The guided alternative to hunting through the Device Profile panel and the seven
 1. The font hint identifies single-line text as Engrave/on-path geometry. KerfDesk does
    not rewrite an existing layer because doing so could change other objects on it; the
    operator moves the text to an Engrave layer when needed.
+
+#### Edge — decorative script below machinable size
+1. Allure has tight turns and close strokes at small sizes. The generated geometry stays
+   centerline-only, but the operator must choose a text size and bit diameter that leave
+   enough physical detail for the material and machine.
 
 ---
 

@@ -26,7 +26,7 @@ export async function renderTextGeometry(
     color: input.color,
   };
   if (findFontEntry(input.fontKey)?.geometry === 'single-line') {
-    return textToPolylines({ ...shared, geometry: 'single-line' });
+    return textToPolylines({ ...shared, geometry: 'single-line', fontKey: input.fontKey });
   }
   return textToPolylines({
     ...shared,

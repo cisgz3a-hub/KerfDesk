@@ -5,13 +5,17 @@
 // the registry; the keys themselves never change so a 3-year-old .lf2
 // still resolves.
 //
-// Phase D bundles four outline fonts plus one CNC single-line font.
+// Phase D bundles four outline fonts plus five CNC single-line fonts.
 // All are redistributable under ADR-017 and ADR-012/191:
 //   - Roboto Regular          Apache-2.0     sans
 //   - Inconsolata Regular     OFL-1.1        mono
 //   - Pacifico Regular        OFL-1.1        script (handwritten)
 //   - Dancing Script Regular  OFL-1.1        script (calligraphic)
 //   - Hershey Roman Simplex   public-domain data with acknowledgement terms
+//   - EMS Allure              OFL-1.1        single-line calligraphy
+//   - EMS Delight             OFL-1.1        single-line handwriting
+//   - EMS Tech                OFL-1.1        single-line architectural hand
+//   - EMS Osmotron            OFL-1.1        single-line geometric display
 //
 // File loading: the UI layer fetches the .ttf via a browser fetch()
 // to a known asset path. Pure-core stays binary-free; this module
@@ -27,7 +31,13 @@ export type KnownFontKey =
   | 'inconsolata-regular'
   | 'pacifico-regular'
   | 'dancing-script-regular'
-  | 'hershey-simplex';
+  | 'hershey-simplex'
+  | 'ems-allure'
+  | 'ems-delight'
+  | 'ems-tech'
+  | 'ems-osmotron';
+
+type SingleLineFontKey = Extract<KnownFontKey, 'hershey-simplex' | `ems-${string}`>;
 
 type FontEntryBase = {
   readonly displayName: string;
@@ -37,11 +47,11 @@ type FontEntryBase = {
 
 export type FontEntry =
   | (FontEntryBase & {
-      readonly key: Exclude<KnownFontKey, 'hershey-simplex'>;
+      readonly key: Exclude<KnownFontKey, SingleLineFontKey>;
       readonly geometry: 'outline';
     })
   | (FontEntryBase & {
-      readonly key: Extract<KnownFontKey, 'hershey-simplex'>;
+      readonly key: SingleLineFontKey;
       readonly geometry: 'single-line';
     });
 
@@ -78,6 +88,34 @@ export const FONT_REGISTRY: ReadonlyArray<FontEntry> = [
     key: 'hershey-simplex',
     displayName: 'Hershey Simplex',
     license: 'Hershey redistribution terms',
+    styleClass: 'single-line',
+    geometry: 'single-line',
+  },
+  {
+    key: 'ems-allure',
+    displayName: 'EMS Allure',
+    license: 'OFL-1.1',
+    styleClass: 'single-line',
+    geometry: 'single-line',
+  },
+  {
+    key: 'ems-delight',
+    displayName: 'EMS Delight',
+    license: 'OFL-1.1',
+    styleClass: 'single-line',
+    geometry: 'single-line',
+  },
+  {
+    key: 'ems-tech',
+    displayName: 'EMS Tech',
+    license: 'OFL-1.1',
+    styleClass: 'single-line',
+    geometry: 'single-line',
+  },
+  {
+    key: 'ems-osmotron',
+    displayName: 'EMS Osmotron',
+    license: 'OFL-1.1',
     styleClass: 'single-line',
     geometry: 'single-line',
   },
