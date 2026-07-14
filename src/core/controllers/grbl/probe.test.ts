@@ -73,13 +73,21 @@ describe('buildCornerProbeLines', () => {
     expect(lines.filter((line) => line === 'G0 Z11.000')).toHaveLength(2);
   });
 
-  it('mirrors probe directions and the atomic commit per corner', () => {
-    const backRight = buildCornerProbeLines({ ...CORNER, corner: 'back-right' });
-    expect(backRight).toContain('G10 L20 P0 X-15.000 Y7.175 Z20.000');
-    // Probes travel in −X / −Y toward the faces.
-    expect(backRight.some((line) => line.startsWith('G38.2 X-40.000'))).toBe(true);
-    expect(backRight.some((line) => line.startsWith('G38.2 Y-40.000'))).toBe(true);
-  });
+  it.each([
+    ['front-left', 'X15.000 Y-7.175', 'X40.000', 'Y40.000', 'X-5.000 Y-5.000'],
+    ['front-right', 'X-15.000 Y-7.175', 'X-40.000', 'Y40.000', 'X5.000 Y-5.000'],
+    ['back-left', 'X15.000 Y7.175', 'X40.000', 'Y-40.000', 'X-5.000 Y5.000'],
+    ['back-right', 'X-15.000 Y7.175', 'X-40.000', 'Y-40.000', 'X5.000 Y5.000'],
+  ] as const)(
+    'mirrors probe directions, commit, and park for %s',
+    (corner, committedXY, xProbe, yProbe, parkXY) => {
+      const lines = buildCornerProbeLines({ ...CORNER, corner });
+      expect(lines).toContain(`G10 L20 P0 ${committedXY} Z20.000`);
+      expect(lines.some((line) => line.startsWith(`G38.2 ${xProbe}`))).toBe(true);
+      expect(lines.some((line) => line.startsWith(`G38.2 ${yProbe}`))).toBe(true);
+      expect(lines.at(-1)).toBe(`G0 ${parkXY}`);
+    },
+  );
 
   it('every probe is followed by a back-off before the slow re-touch', () => {
     const lines = buildCornerProbeLines(CORNER);

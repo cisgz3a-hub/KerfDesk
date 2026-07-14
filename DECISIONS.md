@@ -55,6 +55,7 @@
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Accepted | Block controller-reported active spindle/coolant before CNC Start |
 | ADR-184 | 2026-07-13 | Accepted | Probe cycles are exclusive, typed, and settlement-qualified |
+| ADR-185 | 2026-07-13 | Accepted | Commit XYZ corner-probe offsets in one GRBL block |
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
 
 ---
@@ -7600,3 +7601,29 @@ overrides are blocked for the whole transaction.
 An arbitrary command list or parser `ok` cannot establish stock-top evidence. A timeout cannot
 release Start while buffered probe motion may remain. Probe success is qualified software evidence,
 not a claim that the physical plate, wiring, spindle coast-down, or machine geometry was verified.
+
+---
+
+## ADR-185 - Commit XYZ corner-probe offsets in one GRBL block
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+The XYZ corner-probe builder performs its Z, X, and Y contacts without changing the selected work
+coordinate system. All positioning before the final commit is relative to the measured contacts and
+fixed retreats. After all six contacts succeed, one `G10 L20 P0 X... Y... Z...` block writes the
+complete corner frame. Only its acknowledged result permits the final absolute park and the normal
+settlement proof from ADR-184.
+
+### Consequences
+
+A failed X or Y leg cannot leave GRBL with only Z or X rewritten. This is command-level atomicity,
+not a claim that GRBL's EEPROM write is power-loss transactional. Failure after the combined G10 is
+still coordinate-uncertain and remains covered by ADR-184's evidence invalidation and reset/recovery
+lock. The computed geometry is unit/integration tested but still requires supervised, tool-free
+hardware validation for plate dimensions, corner signs, clearances, and repeatability.
+
+This decision depends on the separate G54-selection and G94-feed-normalization changes. Until those
+land, `P0` can target a stale active WCS and probe feeds can inherit inverse-time mode. TLO/G92
+readback remains a separate fail-closed prerequisite before this workflow is production-qualified.

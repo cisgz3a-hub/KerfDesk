@@ -1006,3 +1006,22 @@ proof exists.
 - No new dependency was adopted. Hardware confirmation remains outstanding for
   probe wiring, plate geometry, spindle coast-down, controller variants, and
   real-machine reset/recovery behavior.
+
+## Atomic GRBL corner-probe offsets — 2026-07-13 (ADR-185)
+
+- **Source:** GRBL `gcode.c` at upstream commit
+  `bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e`, especially G10 L20 block
+  preprocessing and `settings_write_coord_data()` execution.
+- Separate Z, X, and Y `G10 L20` lines are individually persistent. If the
+  later side probe alarms, GRBL retains the axes committed before that alarm,
+  creating a mixed old/new work frame even though KerfDesk rejects the cycle.
+- GRBL precomputes every axis named in one G10 block, then calls its coordinate
+  settings writer once with the complete vector. A single
+  `G10 L20 P0 X... Y... Z...` is therefore the correct command-level commit
+  boundary. It does not guarantee EEPROM integrity across sudden power loss.
+- The pre-commit path remains relative. After each slow contact it retreats by
+  a deterministic amount, so the final current XYZ values can be expressed in
+  the intended corner frame without using a partially updated WCS for motion.
+- Software tests cover all corner signs and a final-side alarm before G10.
+  Real plate dimensions, squareness, contact repeatability, and safe clearance
+  remain hardware-unverified.
