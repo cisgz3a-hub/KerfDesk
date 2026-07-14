@@ -69,18 +69,20 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
     const owedAcks = owedTerminalAcks(line, writeSource);
     const writeEpoch = refs.writeEpoch ?? 0;
-    // Reserve transport ownership synchronously, before the first await. On
-    // success the same atomic patch transfers it into the ack ledger, so Start
-    // can never observe both counters at zero between those phases.
+    // Reserve both transport and terminal-response ownership before the first
+    // await. Some adapters can dispatch an immediate controller reply before
+    // conn.write() resolves; pre-reserving prevents that valid reply from
+    // looking orphaned or advancing a job stream.
     set((state) => ({
       pendingTransportWrites: (state.pendingTransportWrites ?? 0) + 1,
+      ...(owedAcks > 0 ? { pendingUntrackedAcks: state.pendingUntrackedAcks + owedAcks } : {}),
     }));
     try {
       await conn.write(line);
       assertCurrentWriteEpoch(refs, writeEpoch);
-      commitSuccessfulWrite(set, refs, line, writeSource, owedAcks);
+      commitSuccessfulWrite(set, refs, line, writeSource);
     } catch (err) {
-      recordWriteFailure(set, refs, writeEpoch, err, action);
+      recordWriteFailure(set, refs, writeEpoch, err, action, owedAcks);
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
@@ -96,7 +98,6 @@ function commitSuccessfulWrite(
   refs: SafeWriteRefs,
   line: string,
   source: TranscriptSource,
-  owedAcks: number,
 ): void {
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
@@ -104,7 +105,6 @@ function commitSuccessfulWrite(
       state.transcript,
       outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, source),
     ),
-    ...(owedAcks > 0 ? { pendingUntrackedAcks: state.pendingUntrackedAcks + owedAcks } : {}),
   }));
 }
 
@@ -114,11 +114,13 @@ function recordWriteFailure(
   expectedEpoch: number,
   err: unknown,
   action: LaserSafetyAction | undefined,
+  reservedAcks: number,
 ): void {
   if ((refs.writeEpoch ?? 0) !== expectedEpoch) return;
   const message = serialWriteErrorMessage(err);
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+    pendingUntrackedAcks: Math.max(0, state.pendingUntrackedAcks - reservedAcks),
     lastWriteError: message,
     log: pushLog(
       state,

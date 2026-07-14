@@ -21,10 +21,17 @@ import { extractToolChangeLabels } from '../../core/output';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
+  cncControllerEpochOf,
   cncSetupAttestationMatches,
+  type CncControllerEpoch,
 } from './cnc-setup-attestation';
 import { cncResumeBlockMessage } from './cnc-pause-resume-policy';
-import { assertCncLiveStartReady, refreshCncLiveStartState } from './cnc-live-start-readiness';
+import {
+  assertCncControllerOwnershipClean,
+  assertCncLiveStartReady,
+  assertCncMpgInactive,
+  refreshCncLiveStartState,
+} from './cnc-live-start-readiness';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
@@ -43,10 +50,7 @@ type SetFn = (
 type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type DriverFn = () => ControllerDriver;
-type StartSetupEpoch = {
-  readonly trustedPosition: number;
-  readonly workZReference: number;
-};
+type StartSetupEpoch = CncControllerEpoch;
 
 const PAUSE_REQUIRES_LASER_MODE_MESSAGE =
   'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.';
@@ -84,8 +88,10 @@ export function jobActions(
           await waitForUntrackedAckDrain(get);
           assertStartAllowed(set, get, true);
         }
-        assertCncSetupAttested(gcode, options);
+        assertCncSetupAttested(gcode, options, setupEpoch);
         const machineKind = options.machineKind ?? 'laser';
+        assertCncControllerOwnershipClean(set, get, machineKind);
+        assertCncMpgInactive(set, get, machineKind);
         if (machineKind === 'cnc') {
           await startControllerCommand(refs, safeWrite, {
             kind: 'start-arming',
@@ -188,9 +194,13 @@ function prepareInitialStream(
   return { stepped, ...toolChangeManifest(gcode, options) };
 }
 
-function assertCncSetupAttested(gcode: string, options: StartJobOptions): void {
+function assertCncSetupAttested(
+  gcode: string,
+  options: StartJobOptions,
+  controllerEpoch: CncControllerEpoch,
+): void {
   if (options.machineKind !== 'cnc') return;
-  if (cncSetupAttestationMatches(options.cncSetupAttestation, gcode)) return;
+  if (cncSetupAttestationMatches(options.cncSetupAttestation, gcode, controllerEpoch)) return;
   throw new Error(CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE);
 }
 
@@ -251,10 +261,7 @@ function assertStartAllowed(set: SetFn, get: GetFn, allowStartArming = false): v
 }
 
 function captureStartSetupEpoch(state: LaserState): StartSetupEpoch {
-  return {
-    trustedPosition: state.trustedPositionEpoch ?? 0,
-    workZReference: state.workZReferenceEpoch,
-  };
+  return cncControllerEpochOf(state);
 }
 
 function assertStartReservation(get: GetFn, expected: StartSetupEpoch): void {

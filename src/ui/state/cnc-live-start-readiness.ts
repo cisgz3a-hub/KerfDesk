@@ -19,6 +19,26 @@ const LIVE_STATUS_TIMEOUT_MS = 3_000;
 const LIVE_STATUS_POLL_MS = 10;
 const LIVE_STATUS_TIMEOUT_MESSAGE =
   'CNC Start could not obtain a fresh GRBL Ov:/A: live-state report. Check controller status reporting and try again.';
+const MPG_ACTIVE_START_MESSAGE =
+  'CNC Start is blocked while grblHAL reports MPG mode active. Return command control from the pendant/MPG to KerfDesk, wait for an MPG:0 report, then re-check setup.';
+const CONTROLLER_OWNERSHIP_START_MESSAGE =
+  'CNC Start is blocked because KerfDesk received an unowned controller reply. Stop every other sender, disconnect and reconnect, then repeat CNC setup before starting.';
+
+export function assertCncControllerOwnershipClean(
+  set: SetFn,
+  get: GetFn,
+  machineKind: MachineKind,
+): void {
+  if (machineKind === 'cnc' && get().unexpectedTerminalResponse != null) {
+    rejectCncStart(set, get, CONTROLLER_OWNERSHIP_START_MESSAGE);
+  }
+}
+
+export function assertCncMpgInactive(set: SetFn, get: GetFn, machineKind: MachineKind): void {
+  if (machineKind === 'cnc' && get().mpgActive === true) {
+    rejectCncStart(set, get, MPG_ACTIVE_START_MESSAGE);
+  }
+}
 
 export async function refreshCncLiveStartState(
   set: SetFn,
@@ -51,6 +71,7 @@ export async function refreshCncLiveStartState(
     // Return promptly so the final synchronous gate can name a disconnect,
     // alarm, non-Idle state, or exceptional grblHAL accessory condition.
     if (get().connection.kind !== 'connected' || report.state !== 'Idle') return;
+    if (get().mpgActive === true) return;
     if (hasExceptionalAccessoryState(report.accessories)) return;
     if (report.ov != null && report.accessories != null) return;
   }
@@ -59,6 +80,8 @@ export async function refreshCncLiveStartState(
 
 export function assertCncLiveStartReady(set: SetFn, get: GetFn, machineKind: MachineKind): void {
   if (machineKind !== 'cnc') return;
+  assertCncControllerOwnershipClean(set, get, machineKind);
+  assertCncMpgInactive(set, get, machineKind);
   const state = get();
   if (state.connection.kind !== 'connected') {
     rejectCncStart(set, get, 'CNC Start requires an active controller connection.');

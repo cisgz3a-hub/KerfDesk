@@ -64,6 +64,8 @@ export function connectionActions(
         capabilities: refs.driver.capabilities,
         activeControllerKind: refs.driver.kind,
         detectedControllerKind: null,
+        mpgActive: null,
+        unexpectedTerminalResponse: null,
       }));
       try {
         // Inside the try: requestPort throws on browsers without Web Serial
@@ -101,6 +103,7 @@ export function connectionActions(
           homingState: 'unknown',
           pendingUntrackedAcks: 0,
           pendingTransportWrites: 0,
+          unexpectedTerminalResponse: null,
         });
         void runHandshake(set, get, refs, safeWrite).catch(() => undefined);
       } catch (err) {
@@ -146,6 +149,8 @@ async function runDisconnect(
     fireActive: false,
     wcoCache: null,
     accessoryCache: null,
+    mpgActive: null,
+    unexpectedTerminalResponse: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,

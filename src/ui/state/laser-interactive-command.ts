@@ -14,6 +14,7 @@ type CommandWriteFn = (
 ) => Promise<void>;
 
 export type ControllerCommandKind =
+  | 'autofocus'
   | 'home'
   | 'post-job-settle'
   | 'probe'
@@ -34,11 +35,19 @@ type ControllerCommandRequest = {
   readonly label: string;
   readonly timeoutMs: number;
   readonly timeoutMode: ControllerCommandTimeoutMode;
+  readonly completion: ControllerCommandCompletion;
   readonly responses: string[];
   readonly resolve: (responses: ReadonlyArray<string>) => void;
   readonly reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout>;
   acceptingResponses: boolean;
+  terminalAckSeen: boolean;
+  sawActiveState: boolean;
+  activeCycleSettled: boolean;
+  readonly pendingResponses: Array<{
+    readonly response: ControllerEvent;
+    readonly rawLine: string;
+  }>;
 };
 
 type ControllerIdleWaitRequest = {
@@ -59,6 +68,7 @@ export type StartControllerCommandOptions = {
   readonly source?: TranscriptSource;
   readonly timeoutMs?: number;
   readonly timeoutMode?: ControllerCommandTimeoutMode;
+  readonly completion?: ControllerCommandCompletion;
 };
 
 export type FreshIdleWaitOptions = {
@@ -71,6 +81,7 @@ const DEFAULT_COMMAND_TIMEOUT_MS = 8_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 8_000;
 
 type ControllerCommandTimeoutMode = 'fixed' | 'non-idle-status-activity';
+export type ControllerCommandCompletion = 'terminal' | 'terminal-and-idle';
 
 export function startControllerCommand(
   refs: ControllerLifecycleRefs,
@@ -89,10 +100,15 @@ export function startControllerCommand(
       label: options.label,
       timeoutMs,
       timeoutMode: options.timeoutMode ?? 'fixed',
+      completion: options.completion ?? 'terminal',
       responses: [],
       resolve,
       reject,
       acceptingResponses: false,
+      terminalAckSeen: false,
+      sawActiveState: false,
+      activeCycleSettled: false,
+      pendingResponses: [],
       timer: setTimeout(() => {
         finishControllerCommand(refs, request, 'reject', `${options.label} timed out.`);
       }, timeoutMs),
@@ -100,7 +116,13 @@ export function startControllerCommand(
     refs.controllerCommand = request;
     write(options.command, options.action, options.source)
       .then(() => {
-        if (refs.controllerCommand === request) request.acceptingResponses = true;
+        if (refs.controllerCommand !== request) return;
+        request.acceptingResponses = true;
+        const pending = request.pendingResponses.splice(0);
+        for (const item of pending) {
+          consumeControllerCommandResponse(refs, item.response, item.rawLine);
+          if (refs.controllerCommand !== request) break;
+        }
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -116,9 +138,19 @@ export function consumeControllerCommandResponse(
 ): boolean {
   const request = refs.controllerCommand;
   if (request === null) return false;
-  if (!request.acceptingResponses) return false;
+  if (!request.acceptingResponses) {
+    // A fast adapter/controller can deliver a reply before conn.write()'s
+    // Promise resolves. The safe-write ledger has already reserved ownership,
+    // so retain semantic responses and replay them in wire order once the
+    // transport accepts. Status/ALARM still continue through global handling.
+    request.pendingResponses.push({ response, rawLine });
+    return response.kind !== 'status' && response.kind !== 'alarm';
+  }
   if (response.kind === 'ok') {
-    finishControllerCommand(refs, request, 'resolve');
+    request.terminalAckSeen = true;
+    if (request.completion === 'terminal' || request.activeCycleSettled) {
+      finishControllerCommand(refs, request, 'resolve');
+    }
     return true;
   }
   if (response.kind === 'error') {
@@ -136,10 +168,30 @@ export function consumeControllerCommandResponse(
   }
   if (response.kind === 'status') {
     keepCommandAliveFromStatus(refs, request, response.report);
+    observeCompositeCommandStatus(refs, request, response.report);
     return false;
   }
   request.responses.push(rawLine.trim());
   return true;
+}
+
+function observeCompositeCommandStatus(
+  refs: ControllerLifecycleRefs,
+  request: ControllerCommandRequest,
+  report: StatusReport,
+): void {
+  if (request.completion !== 'terminal-and-idle') return;
+  if (report.state === 'Alarm' || report.state === 'Sleep') return;
+  if (report.state !== 'Idle') {
+    request.sawActiveState = true;
+    return;
+  }
+  if (request.sawActiveState) request.activeCycleSettled = true;
+  // A post-ack Idle is sufficient for Falcon firmwares that do not expose an
+  // active autofocus state. Conversely, when the active -> Idle cycle arrives
+  // before the terminal ok, activeCycleSettled lets that later ok complete the
+  // same request without losing either line to a Promise-continuation race.
+  if (request.terminalAckSeen) finishControllerCommand(refs, request, 'resolve');
 }
 
 export function waitForFreshIdle(

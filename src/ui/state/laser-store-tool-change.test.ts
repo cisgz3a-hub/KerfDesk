@@ -7,7 +7,9 @@ import { createProject } from '../../core/scene';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
 import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
+  cncControllerEpochOf,
   createCncSetupAttestation,
+  type CncSetupAttestation,
 } from './cnc-setup-attestation';
 import { TOOL_CHANGE_PLAN_MISMATCH_MESSAGE } from './laser-job-actions';
 import { useStore } from './store';
@@ -101,6 +103,10 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await flush();
 }
 
+function currentCncSetupAttestation(gcode: string): CncSetupAttestation {
+  return createCncSetupAttestation(gcode, cncControllerEpochOf(useLaserStore.getState()));
+}
+
 // pre-M0 section, M0 boundary, spindle-off clearance, spin-up + second section.
 const CNC_MULTI_TOOL = [
   'G1 X1 Y1 F600',
@@ -147,7 +153,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await expect(
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
-        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(/clockwise spindle/i);
 
@@ -165,7 +171,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await expect(
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
-        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(/feed 110%/i);
 
@@ -183,7 +189,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await expect(
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
-        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(/spindle encoder fault/i);
 
@@ -198,7 +204,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
 
     const starting = useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
-      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
     });
     expect(useLaserStore.getState().controllerOperation?.kind).toBe('start-arming');
     await expect(useLaserStore.getState().sendConsoleCommand('M8')).rejects.toThrow(
@@ -218,7 +224,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await expect(
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
-        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(/controller rebooted/i);
 
@@ -235,7 +241,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await expect(
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
-        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(/error:20/i);
 
@@ -251,9 +257,10 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
 
     const priorCommand = useLaserStore.getState().sendConsoleCommand('$G');
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     const starting = useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
-      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
     });
     await flush();
     expect(writes).toEqual(['$G\n']);
@@ -282,6 +289,26 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
   });
 
+  it('refuses an exclusive-access confirmation from an older controller/setup epoch', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+    writes.length = 0;
+    const staleAttestation = currentCncSetupAttestation(CNC_MULTI_TOOL);
+    useLaserStore.setState((state) => ({
+      workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    }));
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncSetupAttestation: staleAttestation,
+      }),
+    ).rejects.toThrow(CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE);
+
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
   it('refuses a structured tool plan that cannot align with every M0 boundary', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes));
@@ -290,7 +317,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
       useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
         machineKind: 'cnc',
         cncToolPlan: CNC_TOOL_PLAN.slice(0, 1),
-        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
       }),
     ).rejects.toThrow(TOOL_CHANGE_PLAN_MISMATCH_MESSAGE);
     expect(useLaserStore.getState().streamer).toBeNull();
@@ -314,7 +341,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
       cncToolPlan: CNC_TOOL_PLAN,
-      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
     });
 
     // The pre-M0 lines went out; the M0 did NOT, and the stream is held.
@@ -392,7 +419,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
       machineKind: 'cnc',
       cncToolPlan: CNC_TOOL_PLAN,
-      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
     });
 
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
