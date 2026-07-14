@@ -28,6 +28,29 @@ const FONTS = [
   { file: 'src/ui/text/fonts/DancingScript-Regular.ttf', name: 'Dancing Script', spdx: 'OFL-1.1' },
 ];
 
+const EMS_STROKE_FONTS = [
+  {
+    name: 'EMS Allure',
+    derivative: 'Allura',
+    designer: 'Rob Leuschke, TypeSETit',
+  },
+  {
+    name: 'EMS Delight',
+    derivative: 'Delius',
+    designer: 'Natalia Raices',
+  },
+  {
+    name: 'EMS Tech',
+    derivative: 'Architects Daughter',
+    designer: 'Kimberly Geswein, Kimberly Geswein Fonts',
+  },
+  {
+    name: 'EMS Osmotron',
+    derivative: 'Orbitron (Regular)',
+    designer: 'Matt McInerney, the League of Moveable Type',
+  },
+];
+
 const LICENSE_TEXTS = {
   'Apache-2.0': fs.readFileSync(path.join(root, 'scripts/license-texts/Apache-2.0.txt'), 'utf8'),
   'OFL-1.1': fs.readFileSync(path.join(root, 'scripts/license-texts/OFL-1.1.txt'), 'utf8'),
@@ -71,8 +94,19 @@ function fontSections() {
       `Full license text: see the ${spdx} section at the end of this file.`,
     ].join('\n');
   });
+  const emsStrokeFonts = EMS_STROKE_FONTS.map(({ name, derivative, designer }) =>
+    [
+      `--- Font: ${name} (OFL-1.1) ---`,
+      `Single-line derivative of ${derivative} by ${designer}.`,
+      'Stroke-font creation by Sheldon B. Michaels.',
+      'SVG font conversion by Windell H. Oskay.',
+      'Source: https://gitlab.com/oskay/svg-fonts',
+      'Full license text: see the OFL-1.1 section at the end of this file.',
+    ].join('\n'),
+  );
   return [
     ...outlineFonts,
+    ...emsStrokeFonts,
     [
       '--- Font: Hershey Roman Simplex (Hershey redistribution terms) ---',
       'Created by Dr. A. V. Hershey at the U. S. National Bureau of Standards.',

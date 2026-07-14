@@ -46,10 +46,15 @@ copyright notice and license to accompany the font in any distribution.
 | Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
 | Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
 | Hershey Roman Simplex | Hershey redistribution terms | Dr. A. V. Hershey, U. S. National Bureau of Standards; distribution format by James Hurt, Cognition, Inc. |
+| EMS Allure | OFL-1.1 | Derivative of Allura by Rob Leuschke; stroke conversion by Sheldon B. Michaels and Windell H. Oskay |
+| EMS Delight | OFL-1.1 | Derivative of Delius by Natalia Raices; stroke conversion by Sheldon B. Michaels and Windell H. Oskay |
+| EMS Tech | OFL-1.1 | Derivative of Architects Daughter by Kimberly Geswein; stroke conversion by Sheldon B. Michaels and Windell H. Oskay |
+| EMS Osmotron | OFL-1.1 | Derivative of Orbitron by Matt McInerney; stroke conversion by Sheldon B. Michaels and Windell H. Oskay |
 
 - **Apache-2.0** (Roboto): full text at https://www.apache.org/licenses/LICENSE-2.0 —
   the license and any `NOTICE` file must accompany the distribution.
-- **SIL Open Font License 1.1** (Inconsolata, Pacifico, Dancing Script): full text at
+- **SIL Open Font License 1.1** (Inconsolata, Pacifico, Dancing Script, and the four
+  EMS stroke fonts): full text at
   https://openfontlicense.org — the above copyright notice and this license must be
   bundled with the fonts; the fonts may be redistributed but not sold on their own,
   and the Reserved Font Names must not be reused for modified versions.

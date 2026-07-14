@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe('single-line text dialog flow', () => {
-  it('creates native open CNC geometry and an Engrave layer', async () => {
+  it('creates smooth EMS geometry and an Engrave layer', async () => {
     useStore.getState().setMachineKind('cnc');
     useStore.getState().updateCncMachine({ toolId: 'vb-60' });
     useUiStore.setState({ textDialog: { mode: 'add' } });
@@ -32,27 +32,29 @@ describe('single-line text dialog flow', () => {
       await act(async () => root.render(<AddTextDialog />));
       await act(async () => {
         const content = requireTextarea(host);
-        content.value = 'CNC';
+        content.value = 'Beautiful CNC';
         Simulate.change(content);
         requireButton(host, 'Open the font picker and choose the text typeface.').click();
       });
       await act(async () => {
-        requireButton(host, 'Use Hershey Simplex for this text object.').click();
+        requireButton(host, 'Use EMS Allure for this text object.').click();
       });
 
       expect(host.textContent).toContain('CNC single-line font');
+      expect(host.textContent).toContain('verify the text size and bit diameter');
       await act(async () => {
         Simulate.submit(requireForm(host));
-        await Promise.resolve();
+        await waitForTextObject();
       });
 
       const text = useStore
         .getState()
         .project.scene.objects.find((object) => object.kind === 'text');
-      expect(text).toMatchObject({ kind: 'text', fontKey: 'hershey-simplex' });
+      expect(text).toMatchObject({ kind: 'text', fontKey: 'ems-allure' });
       expect(text?.kind === 'text' && text.paths[0]?.polylines.every((line) => !line.closed)).toBe(
         true,
       );
+      expect(text?.kind === 'text' && (text.paths[0]?.curves?.length ?? 0) > 0).toBe(true);
       expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('engrave');
     } finally {
       await act(async () => root.unmount());
@@ -77,4 +79,12 @@ function requireForm(host: HTMLElement): HTMLFormElement {
   const form = host.querySelector('form');
   if (!(form instanceof HTMLFormElement)) throw new Error('Text form not rendered');
   return form;
+}
+
+async function waitForTextObject(): Promise<void> {
+  for (let attempt = 0; attempt < 150; attempt += 1) {
+    if (useStore.getState().project.scene.objects.some((object) => object.kind === 'text')) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('Timed out waiting for rendered EMS text');
 }

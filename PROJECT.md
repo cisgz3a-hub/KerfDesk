@@ -90,7 +90,7 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 - Text-to-path via `opentype.js` (MIT).
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
-- Native Hershey Roman Simplex single-line text renders as open CNC engraving paths; outline fonts remain the input for pocketing and variable-depth V-carving (ADR-194).
+- Five native CNC single-line faces cover technical, handwritten, calligraphic, and geometric engraving styles; decorative centerlines use bounded trace-derived cubic fairing, while outline fonts remain the input for pocketing and variable-depth V-carving (ADR-194, ADR-198, ADR-199).
 - Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields; live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]

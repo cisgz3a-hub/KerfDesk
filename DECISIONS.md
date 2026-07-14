@@ -65,6 +65,9 @@
 | ADR-192 | 2026-07-14 | Accepted | CNC frame retracts to safe Z, traces, then restores the pre-frame Z |
 | ADR-193 | 2026-07-14 | Accepted | No-homing placement defaults to guided relative positioning |
 | ADR-194 | 2026-07-14 | Accepted | Add native Hershey single-line CNC text without a runtime dependency |
+| ADR-195 | 2026-07-14 | Accepted | Make the CNC layer card guided, honest, and narrow-panel safe |
+| ADR-196 | 2026-07-14 | Accepted | Add a pinned OFL EMS stroke-font family with lazy data loading |
+| ADR-197 | 2026-07-14 | Accepted | Fair decorative stroke fonts with the shared trace cubic fitter |
 
 ---
 
@@ -8012,3 +8015,70 @@ during a run.
 Operators can see artwork through the labels or remove the static markers entirely without weakening
 live machine feedback. The preference is UI-only: it does not alter the project, generated G-code,
 frame verification, job placement, or controller behavior.
+
+---
+
+## ADR-198 - Add a pinned OFL EMS stroke-font family with lazy data loading
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+Roman Simplex proves the single-line machining path but offers only one utilitarian appearance.
+The curated Evil Mad Scientist SVG Fonts collection contains OFL-licensed single-line derivatives
+with calligraphic, handwritten, architectural, and geometric styles. These SVG fonts are data, not
+browser-installable TTF faces, and their provenance and open topology must remain auditable.
+
+### Decision
+
+- Bundle EMS Allure, EMS Delight, EMS Tech, and EMS Osmotron from upstream commit
+  `8c71f2d9e1a5292047bb88e5595a766241b82cc6`, preserving each SVG's authorship and OFL notice.
+- Generate compact TypeScript glyph data with a checked-in script that validates the embedded
+  license, font identity, path-command subset, fallback glyph, and source SHA-256.
+- Parse the SVG stroke path subset in pure core and emit open schema-v2 paths plus deterministic
+  machining polylines. Unsupported characters visibly fall back to `?`.
+- Lazy-load the generated EMS data chunk only when an EMS face is rendered. Existing outline and
+  Hershey text do not pay the data-transfer or parse cost.
+- Reuse the existing single-line machining policy: fresh CNC text uses Engrave/on-path, while
+  existing shared layers are never silently rewritten.
+
+### Consequences
+
+The Add Text workflow now offers five genuinely centerline-based CNC styles without a runtime
+dependency or project-schema migration. The EMS fonts add Latin-1 coverage and approximately 165 KB
+of compact source data in a lazy chunk. Decorative scripts can contain tight turns that are visually
+valid but physically unsuitable below a bit- and material-dependent size, so machining suitability
+remains an operator choice rather than an invented universal cutoff.
+
+---
+
+## ADR-199 - Fair decorative stroke fonts with the shared trace cubic fitter
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+The EMS sources are genuine open centerlines, but many curved glyph strokes are stored as coarse
+straight-segment conversions. At engraving scale their bowls and script joins therefore appear
+faceted even though their topology is correct. The in-house tracer already contains a deterministic
+least-squares G1 cubic fitter designed to average point noise while respecting marked corners.
+
+### Decision
+
+- Promote the trace cubic fitter into shared geometry while retaining the tracer's compatibility
+  seam and existing tests.
+- At lazy EMS font compilation, fit Allure, Delight, and Tech line-only strokes to cubic Béziers.
+  Scale each tolerance from the font's cap height so the result is independent of output text size.
+- Preserve endpoints and hard corners, never join separate strokes, and never close an open path.
+- Sample every fitted cubic against its source polyline. If it exceeds the bounded deviation guard,
+  retry at tighter tolerances, then keep that source stroke unchanged if every fit remains unsafe.
+- Keep Osmotron's deliberately angular geometry byte-for-byte; its corners are the design.
+- Continue flattening the resulting canonical curves at the existing machine tolerance when
+  producing machining polylines.
+
+### Consequences
+
+Decorative bowls and joins render with fair curves while CNC topology, deterministic output, and
+the Engrave/on-path policy remain unchanged. Fitting is paid once when an EMS face enters the lazy
+font cache. It cannot normalize an intentionally handwritten baseline or redesign awkward source
+letterforms; those traits belong to the selected face rather than to polygon faceting.

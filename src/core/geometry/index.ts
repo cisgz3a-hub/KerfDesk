@@ -17,3 +17,4 @@ export {
 export { DOGBONE_MAX_CORNER_DEG, dogboneVectorObject } from './dogbone';
 export { arcStepRad, sampleArcPoints } from './arc-sampling';
 export { parametricEllipseCurve } from './ellipse-curve';
+export { fitCubicsThroughPoints, sampleCubics, type CubicBezier } from './cubic-fit';

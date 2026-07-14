@@ -3,6 +3,7 @@ import { singleLineTextToPolylines } from './single-line-text';
 
 const BASE_INPUT = {
   content: 'IO',
+  fontKey: 'hershey-simplex',
   sizeMm: 21,
   alignment: 'left' as const,
   lineHeight: 1.4,
@@ -11,8 +12,8 @@ const BASE_INPUT = {
 };
 
 describe('singleLineTextToPolylines', () => {
-  it('renders character strokes as open one-tool-pass geometry', () => {
-    const rendered = singleLineTextToPolylines(BASE_INPUT);
+  it('renders character strokes as open one-tool-pass geometry', async () => {
+    const rendered = await singleLineTextToPolylines(BASE_INPUT);
     const polylines = rendered.paths[0]?.polylines ?? [];
 
     expect(polylines.length).toBeGreaterThan(0);
@@ -22,31 +23,31 @@ describe('singleLineTextToPolylines', () => {
     expect(rendered.bounds.maxY).toBeGreaterThan(0);
   });
 
-  it('keeps an O as one stroke instead of inner and outer outlines', () => {
-    const rendered = singleLineTextToPolylines({ ...BASE_INPUT, content: 'O' });
+  it('keeps an O as one stroke instead of inner and outer outlines', async () => {
+    const rendered = await singleLineTextToPolylines({ ...BASE_INPUT, content: 'O' });
 
     expect(rendered.paths[0]?.polylines).toHaveLength(1);
   });
 
-  it('reuses tracer curve refinement to round a C instead of drawing coarse chords', () => {
-    const rendered = singleLineTextToPolylines({ ...BASE_INPUT, content: 'C' });
+  it('reuses tracer curve refinement to round a C instead of drawing coarse chords', async () => {
+    const rendered = await singleLineTextToPolylines({ ...BASE_INPUT, content: 'C' });
     const points = rendered.paths[0]?.polylines[0]?.points ?? [];
 
     expect(points.length).toBeGreaterThan(30);
     expect(maxInteriorTurnDeg(points)).toBeLessThan(15);
   });
 
-  it('keeps straight construction strokes exact while rounding curved strokes', () => {
-    const rendered = singleLineTextToPolylines({ ...BASE_INPUT, content: 'A' });
+  it('keeps straight construction strokes exact while rounding curved strokes', async () => {
+    const rendered = await singleLineTextToPolylines({ ...BASE_INPUT, content: 'A' });
     const strokes = rendered.paths[0]?.polylines ?? [];
 
     expect(strokes).toHaveLength(3);
     expect(strokes.every((stroke) => stroke.points.length === 2)).toBe(true);
   });
 
-  it('keeps the refined glyph shape consistent at every text size', () => {
-    const small = singleLineTextToPolylines({ ...BASE_INPUT, content: 'C', sizeMm: 7 });
-    const large = singleLineTextToPolylines({ ...BASE_INPUT, content: 'C', sizeMm: 42 });
+  it('keeps the refined glyph shape consistent at every text size', async () => {
+    const small = await singleLineTextToPolylines({ ...BASE_INPUT, content: 'C', sizeMm: 7 });
+    const large = await singleLineTextToPolylines({ ...BASE_INPUT, content: 'C', sizeMm: 42 });
     const smallPoints = small.paths[0]?.polylines[0]?.points ?? [];
     const largePoints = large.paths[0]?.polylines[0]?.points ?? [];
 
@@ -58,9 +59,9 @@ describe('singleLineTextToPolylines', () => {
     });
   });
 
-  it('aligns shorter lines against the longest line', () => {
-    const left = singleLineTextToPolylines({ ...BASE_INPUT, content: 'I\nMMMM' });
-    const right = singleLineTextToPolylines({
+  it('aligns shorter lines against the longest line', async () => {
+    const left = await singleLineTextToPolylines({ ...BASE_INPUT, content: 'I\nMMMM' });
+    const right = await singleLineTextToPolylines({
       ...BASE_INPUT,
       content: 'I\nMMMM',
       alignment: 'right',
@@ -69,6 +70,62 @@ describe('singleLineTextToPolylines', () => {
     expect(right.paths[0]?.polylines[0]?.points[0]?.x).toBeGreaterThan(
       left.paths[0]?.polylines[0]?.points[0]?.x ?? 0,
     );
+  });
+
+  it.each(['ems-allure', 'ems-delight', 'ems-tech', 'ems-osmotron'])(
+    'renders %s as detailed open stroke geometry',
+    async (fontKey) => {
+      const rendered = await singleLineTextToPolylines({
+        ...BASE_INPUT,
+        content: 'Beautiful',
+        fontKey,
+      });
+      const path = rendered.paths[0];
+
+      expect(path?.polylines.length).toBeGreaterThan(0);
+      expect(path?.polylines.every((polyline) => !polyline.closed)).toBe(true);
+      expect(path?.curves?.every((curve) => !curve.closed)).toBe(true);
+      expect(path?.polylines.some((polyline) => polyline.points.length > 4)).toBe(true);
+    },
+  );
+
+  it('keeps EMS accented glyphs and substitutes unsupported characters visibly', async () => {
+    const accented = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'Caf\u00e9',
+      fontKey: 'ems-delight',
+    });
+    const fallback = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: '\ud83e\udd84',
+      fontKey: 'ems-delight',
+    });
+    const question = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: '?',
+      fontKey: 'ems-delight',
+    });
+
+    expect(accented.bounds.maxX).toBeGreaterThan(0);
+    expect(fallback.paths).toEqual(question.paths);
+  });
+
+  it('fair-fits decorative EMS strokes but preserves Osmotron geometry', async () => {
+    const allure = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'Beautiful',
+      fontKey: 'ems-allure',
+    });
+    const osmotron = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'Beautiful',
+      fontKey: 'ems-osmotron',
+    });
+    const allureSegments = allure.paths[0]?.curves?.flatMap((curve) => curve.segments) ?? [];
+    const osmotronSegments = osmotron.paths[0]?.curves?.flatMap((curve) => curve.segments) ?? [];
+
+    expect(allureSegments.some((segment) => segment.kind === 'cubic')).toBe(true);
+    expect(osmotronSegments.every((segment) => segment.kind === 'line')).toBe(true);
   });
 });
 

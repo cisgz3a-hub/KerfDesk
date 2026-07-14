@@ -32,6 +32,34 @@ This Font Software is licensed under the SIL Open Font License, Version 1.1. Thi
 License URL: http://scripts.sil.org/OFL
 Full license text: see the OFL-1.1 section at the end of this file.
 
+--- Font: EMS Allure (OFL-1.1) ---
+Single-line derivative of Allura by Rob Leuschke, TypeSETit.
+Stroke-font creation by Sheldon B. Michaels.
+SVG font conversion by Windell H. Oskay.
+Source: https://gitlab.com/oskay/svg-fonts
+Full license text: see the OFL-1.1 section at the end of this file.
+
+--- Font: EMS Delight (OFL-1.1) ---
+Single-line derivative of Delius by Natalia Raices.
+Stroke-font creation by Sheldon B. Michaels.
+SVG font conversion by Windell H. Oskay.
+Source: https://gitlab.com/oskay/svg-fonts
+Full license text: see the OFL-1.1 section at the end of this file.
+
+--- Font: EMS Tech (OFL-1.1) ---
+Single-line derivative of Architects Daughter by Kimberly Geswein, Kimberly Geswein Fonts.
+Stroke-font creation by Sheldon B. Michaels.
+SVG font conversion by Windell H. Oskay.
+Source: https://gitlab.com/oskay/svg-fonts
+Full license text: see the OFL-1.1 section at the end of this file.
+
+--- Font: EMS Osmotron (OFL-1.1) ---
+Single-line derivative of Orbitron (Regular) by Matt McInerney, the League of Moveable Type.
+Stroke-font creation by Sheldon B. Michaels.
+SVG font conversion by Windell H. Oskay.
+Source: https://gitlab.com/oskay/svg-fonts
+Full license text: see the OFL-1.1 section at the end of this file.
+
 --- Font: Hershey Roman Simplex (Hershey redistribution terms) ---
 Created by Dr. A. V. Hershey at the U. S. National Bureau of Standards.
 Distribution format created by James Hurt, Cognition, Inc.

@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FONT_REGISTRY, type FontEntry, type KnownFontKey } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
+import { SingleLineFontPreview } from './SingleLineFontPreview';
 
 type Props = {
   readonly value: string;
@@ -94,7 +95,7 @@ export function FontPicker(props: Props): JSX.Element {
                 title={`Use ${f.displayName} for this text object.`}
                 style={optionStyleFor(f.key, f.key === props.value)}
               >
-                <span style={optionNameStyle}>{f.displayName}</span>
+                <FontOptionName font={f} />
                 <span style={optionMetaStyle(f.key === props.value)}>({f.styleClass})</span>
               </button>
             </li>
@@ -110,6 +111,15 @@ export function FontPicker(props: Props): JSX.Element {
         </ul>
       )}
     </div>
+  );
+}
+
+function FontOptionName(props: { readonly font: FontEntry }): JSX.Element {
+  return (
+    <span style={optionNameStyle}>
+      <span>{props.font.displayName}</span>
+      {props.font.geometry === 'single-line' && <SingleLineFontPreview fontKey={props.font.key} />}
+    </span>
   );
 }
 
@@ -256,4 +266,10 @@ const optionBaseStyle: React.CSSProperties = {
   fontSize: 16,
 };
 
-const optionNameStyle: React.CSSProperties = { flex: 1 };
+const optionNameStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  flex: 1,
+};
