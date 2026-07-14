@@ -3326,3 +3326,36 @@ runs this on real Windows:
 
 Until every box is checked on real hardware, the desktop installer stays
 **CLAIMED** in the hardware verification inventory.
+
+### F-CNC-PROBE. Owned and settlement-qualified probe cycle
+
+1. The operator chooses a Z or corner probe and enters positive, finite plate,
+   feed, travel, retract, and geometry values. The UI sends typed probe geometry,
+   not caller-authored G-code.
+2. Start is allowed only while connected at a current Idle report with spindle
+   speed proven zero and no job, motion, controller command, or probe active.
+3. KerfDesk reserves one exclusive transaction, invalidates affected setup
+   evidence, sends `M5` and `M9`, expands the audited GRBL probe builder, and
+   owns every terminal response before awaiting transport completion.
+4. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
+   reports, and unchanged connection/transaction identity. The resulting work-Z
+   evidence remains blocked for Start until the operator confirms plate removal.
+
+#### Error — alarm or partial probe failure
+
+1. A probe alarm enters global GRBL alarm handling and clears affected setup
+   evidence. It never establishes work zero from a partial response sequence.
+2. Any uncertain non-alarm failure sends soft reset and keeps the controller
+   operation locked until a reboot banner and two subsequent Idle reports are
+   observed. Missing proof remains locked until disconnect.
+
+#### Edge — coordinate scope
+
+1. A Z-only request preserves existing XY-origin, WCO, and Verified Frame
+   identity while invalidating work-Z evidence.
+2. A corner request may mutate XY and therefore invalidates XY-origin, WCO, and
+   Verified Frame evidence at reservation time.
+
+This software qualification does not prove physical plate geometry, probe
+wiring, spindle coast-down, or real-machine reset behavior. First hardware
+validation must be supervised without cutting load.

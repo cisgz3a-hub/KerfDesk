@@ -24,6 +24,7 @@ import { consumeSettingsResponse, type DetectedSettingsResult } from './detected
 import {
   cancelControllerLifecycleRefs,
   consumeControllerCommandResponse,
+  observeControllerResetBoundary,
 } from './laser-interactive-command';
 import { handleErrorLine, handleResendLine } from './laser-error-line';
 import type { GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
@@ -214,6 +215,11 @@ function handleWelcomeLine(
   if (detected === null) return;
   const state = get();
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
+  observeControllerResetBoundary(refs);
+  const probeRecovering =
+    state.controllerOperation?.kind === 'probe' && state.controllerOperation.phase === 'recovering';
+  const probeRebooted =
+    state.controllerOperation?.kind === 'probe' && state.controllerOperation.phase !== 'recovering';
   const mismatchLog =
     detected === refs.driver.kind
       ? {}
@@ -236,14 +242,19 @@ function handleWelcomeLine(
     mpgActive: null,
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
-    controllerOperation: null,
+    ...(probeRecovering ? {} : { controllerOperation: null, probeBusy: false }),
     fireActive: false,
     frameVerification: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     ...mismatchLog,
     ...rebootDuringJobPatch(state),
   });
-  cancelControllerLifecycleRefs(refs, 'Controller rebooted.');
+  if (!probeRecovering) {
+    cancelControllerLifecycleRefs(
+      refs,
+      probeRebooted ? 'Controller rebooted during the probe transaction.' : 'Controller rebooted.',
+    );
+  }
   // Beam-off cleanup deferred by a commanded reset (Stop, auto-stop) goes
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and

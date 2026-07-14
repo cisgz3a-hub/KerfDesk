@@ -49,6 +49,7 @@ export function connectionActions(
 ): Pick<LaserState, 'connect' | 'disconnect'> {
   return {
     connect: async (adapter, options = {}) => {
+      refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
       refs.nextTranscriptId = 1;
       refs.driver = selectControllerDriver(options.controllerKind);
       set((state) => ({
@@ -233,6 +234,7 @@ function teardown(refs: LiveRefs): void {
   refs.stallProbe = null;
   refs.controllerCommand = null;
   refs.controllerIdleWait = null;
+  refs.controllerResetWait = null;
 }
 
 function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: SafeWriteFn): void {

@@ -54,6 +54,7 @@
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Accepted | Block controller-reported active spindle/coolant before CNC Start |
+| ADR-184 | 2026-07-13 | Accepted | Probe cycles are exclusive, typed, and settlement-qualified |
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
 
 ---
@@ -7572,3 +7573,30 @@ to identity, confirmation, or homing/options without bypassing validation or com
 - Hidden machine-irrelevant steps cannot be reached through reducer navigation.
 - Every dialog size is viewport-bounded so the wizard footer remains reachable on compact screens.
 - Reducer, component, and compact Chromium workflow tests pin both machine paths.
+
+---
+
+## ADR-184 - Probe cycles are exclusive, typed, and settlement-qualified
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Decision
+
+The live store accepts probe geometry and mode, never caller-authored G-code. It expands that typed
+request with the audited GRBL builders, commands spindle and coolant off, and requires a current
+Idle report whose spindle speed is zero. Every probe line owns one response through the shared
+controller arbiter. Success requires the complete sequence, a FIFO planner fence, two fresh Idle
+reports, and the same connection/transaction identity.
+
+Probe reservation invalidates work-Z evidence; an XYZ-corner cycle also invalidates WCO, Verified
+Frame, and XY-origin identity, while a Z-only cycle preserves them. A failure after any possible
+motion or coordinate write either enters GRBL alarm handling or sends soft reset and retains an
+exclusive recovery lock until the controller's reboot banner and subsequent fresh Idle. A missing
+reset/Idle proof stays locked until disconnect; it never falls back to a Start-able state. Realtime
+overrides are blocked for the whole transaction.
+
+### Consequences
+
+An arbitrary command list or parser `ok` cannot establish stock-top evidence. A timeout cannot
+release Start while buffered probe motion may remain. Probe success is qualified software evidence,
+not a claim that the physical plate, wiring, spindle coast-down, or machine geometry was verified.

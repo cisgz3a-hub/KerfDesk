@@ -12,6 +12,7 @@ type WriteFn = (line: string) => Promise<void>;
 export function overrideActions(
   write: WriteFn,
   hasOverrides: () => boolean,
+  blockReason: () => string | null = () => null,
 ): Pick<LaserState, 'sendRealtimeOverride'> {
   return {
     sendRealtimeOverride: async (byte: RealtimeOverrideByte) => {
@@ -20,6 +21,8 @@ export function overrideActions(
       // overrides — it would land in the line buffer and corrupt the running
       // stream (CTL-01). The UI mount is gated on the same capability.
       if (!hasOverrides()) return;
+      const blocked = blockReason();
+      if (blocked !== null) throw new Error(blocked);
       await write(byte);
     },
   };

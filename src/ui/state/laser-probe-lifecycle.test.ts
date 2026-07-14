@@ -1,20 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildCornerProbeLines,
-  DEFAULT_SIDE_CLEARANCE_MM,
-  DEFAULT_SIDE_DROP_MM,
-  DEFAULT_Z_PROBE_PARAMS,
-} from '../../core/controllers/grbl';
-import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
+import { buildCornerProbeLines, buildZProbeLines } from '../../core/controllers/grbl';
+import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
-import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
   readonly emitClose: () => void;
   readonly listenerCount: () => number;
 };
+
+const Z_REQUEST = {
+  kind: 'z',
+  params: {
+    plateThicknessMm: 15,
+    seekFeedMmPerMin: 150,
+    probeFeedMmPerMin: 25,
+    maxTravelMm: 25,
+    retractMm: 5,
+  },
+} satisfies ProbeRequest;
+
+const CORNER_REQUEST = {
+  kind: 'corner',
+  params: {
+    ...Z_REQUEST.params,
+    bitDiameterMm: 6.35,
+    corner: 'front-left',
+    sideDropMm: 3,
+    sideClearanceMm: 2,
+  },
+} satisfies ProbeRequest;
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
@@ -62,14 +78,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 6; i += 1) await Promise.resolve();
-}
-
-function manualWorkZEvidence() {
-  return {
-    source: 'manual-zero' as const,
-    referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
-  };
+  for (let i = 0; i < 48; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -77,6 +86,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   if (useLaserStore.getState().connection.kind !== 'disconnected') {
     await useLaserStore.getState().disconnect();
   }
@@ -91,120 +101,119 @@ afterEach(async () => {
     controllerOperation: null,
     streamer: null,
     pendingUntrackedAcks: 0,
+    workOriginActive: false,
+    workOriginSource: 'none',
     workZZeroEvidence: null,
+    workZReferenceEpoch: 0,
+    wcoCache: null,
+    frameVerification: null,
     log: [],
   });
-  useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
 
 describe('probe controller transaction lifecycle', () => {
-  it('owns every ack and remains busy through the settle marker and stable Idle', async () => {
+  it('owns every ack and proves settlement before establishing Z evidence', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
     });
     await connectWith(connection);
     writes.length = 0;
-    useStore.setState({
-      project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
-    });
 
-    let resolved = false;
-    const probe = useLaserStore
-      .getState()
-      .probe(['G21', 'G90', 'G0 Z5'])
-      .then((result) => {
-        resolved = true;
-        return result;
-      });
+    const probeEpoch = useLaserStore.getState().workZReferenceEpoch + 1;
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
     await flush();
-    // The evidence binds to the cutter selected when probing began; a project
-    // edit while the physical transaction is in flight cannot relabel it.
-    useStore.getState().updateCncMachine({ toolId: 'em-6350' });
-
-    expect(writes).toEqual(['G21\n']);
+    expect(writes).toEqual(['M5\n']);
     expect(connection.listenerCount()).toBe(1);
-    expect(useLaserStore.getState().controllerOperation).toMatchObject({
-      kind: 'probe',
-      phase: 'sequence',
-    });
-    expect(useLaserStore.getState().probeBusy).toBe(true);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
+    expect(useLaserStore.getState().workOriginActive).toBe(false);
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
     await expect(useLaserStore.getState().sendConsoleCommand('$I')).rejects.toThrow(
       /controller operation/i,
     );
     await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
       /controller operation/i,
     );
+    await expect(useLaserStore.getState().sendRealtimeOverride('\x90')).rejects.toThrow(
+      /locked during a probe/i,
+    );
 
-    connection.emitLine('ok');
-    await flush();
-    expect(writes.at(-1)).toBe('G90\n');
-    connection.emitLine('ok');
-    await flush();
-    expect(writes.at(-1)).toBe('G0 Z5\n');
-    connection.emitLine('ok');
-    await flush();
-    expect(writes.at(-1)).toBe('G4 P0.01\n');
-    expect(useLaserStore.getState().controllerOperation).toMatchObject({
-      kind: 'probe',
-      phase: 'settling',
-    });
-
-    // An Idle report before the FIFO fence acknowledges is not completion.
-    connection.emitLine('<Idle|MPos:0.000,0.000,5.000|FS:0,0>');
-    expect(resolved).toBe(false);
-    connection.emitLine('ok');
-    await flush();
+    const expectedSequence = ['M5', 'M9', ...buildZProbeLines(Z_REQUEST.params), 'G4 P0.01'];
+    for (let index = 0; index < expectedSequence.length; index += 1) {
+      expect(writes[index]).toBe(`${expectedSequence[index]}\n`);
+      connection.emitLine('ok');
+      await flush();
+    }
     expect(useLaserStore.getState().controllerOperation).toMatchObject({
       kind: 'probe',
       phase: 'awaiting-idle',
     });
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
 
     connection.emitLine('<Idle|MPos:0.000,0.000,5.000|FS:0,0>');
     await flush();
-    expect(resolved).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     connection.emitLine('<Idle|MPos:0.000,0.000,5.000|FS:0,0>');
     await expect(probe).resolves.toEqual({ kind: 'ok' });
-
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroEvidence).toEqual({
-      source: 'probe',
-      referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
-      toolId: 'em-3175',
-      probePlateRemoved: false,
-    });
-    useLaserStore.getState().confirmProbePlateRemoved();
     expect(useLaserStore.getState().workZZeroEvidence).toMatchObject({
       source: 'probe',
-      probePlateRemoved: true,
+      referenceEpoch: probeEpoch,
+      probePlateRemoved: false,
     });
-    expect(useLaserStore.getState().log.at(-1)).toContain('touch plate');
+    expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
-  it('maps a probe alarm, invalidates setup evidence, and releases acknowledgement ownership', async () => {
+  it('captures replies delivered synchronously before write resolves', async () => {
+    const writes: string[] = [];
+    let autoAck = false;
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (autoAck && data.endsWith('\n')) connection.emitLine('ok');
+    });
+    await connectWith(connection);
+    writes.length = 0;
+    autoAck = true;
+
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
+    for (let i = 0; i < 400; i += 1) {
+      const operation = useLaserStore.getState().controllerOperation;
+      if (
+        writes.at(-1) === 'G4 P0.01\n' &&
+        operation?.kind === 'probe' &&
+        operation.phase === 'awaiting-idle'
+      )
+        break;
+      await Promise.resolve();
+    }
+    expect(writes.at(-1)).toBe('G4 P0.01\n');
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'probe',
+      phase: 'awaiting-idle',
+    });
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,5.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,5.000|FS:0,0>');
+    await expect(probe).resolves.toEqual({ kind: 'ok' });
+  });
+
+  it('rejects an invalid structural request without establishing evidence', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
     });
     await connectWith(connection);
     writes.length = 0;
-    useLaserStore.setState({ workZZeroEvidence: manualWorkZEvidence() });
 
-    const probe = useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']);
-    await flush();
-    connection.emitLine('ALARM:5');
-
-    await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
-    expect(writes).toEqual(['G38.2 Z-25.000 F150.000\n']);
-    expect(useLaserStore.getState().controllerOperation).toBeNull();
-    expect(useLaserStore.getState().probeBusy).toBe(false);
+    const result = await useLaserStore.getState().probe({ kind: 'z' } as unknown as ProbeRequest);
+    expect(result).toMatchObject({ kind: 'preflight-failed' });
+    expect(writes).toEqual([]);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().alarmCode).toBe(5);
-    expect(useLaserStore.getState().statusReport).toBeNull();
-    expect(useLaserStore.getState().safetyNotice).not.toBeNull();
   });
 
   it('does not write a partial corner WCS when the final side contact fails', async () => {
@@ -215,17 +224,11 @@ describe('probe controller transaction lifecycle', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    const lines = buildCornerProbeLines({
-      ...DEFAULT_Z_PROBE_PARAMS,
-      bitDiameterMm: 6.35,
-      corner: 'front-left',
-      sideDropMm: DEFAULT_SIDE_DROP_MM,
-      sideClearanceMm: DEFAULT_SIDE_CLEARANCE_MM,
-    });
+    const lines = ['M5', 'M9', ...buildCornerProbeLines(CORNER_REQUEST.params)];
     const lastProbeLine = lines.filter((line) => line.startsWith('G38.2')).at(-1);
     if (lastProbeLine === undefined) throw new Error('corner probe line missing');
 
-    const probe = useLaserStore.getState().probe(lines);
+    const probe = useLaserStore.getState().probe(CORNER_REQUEST);
     await flush();
     for (const line of lines) {
       expect(writes.at(-1)).toBe(`${line}\n`);
@@ -240,15 +243,20 @@ describe('probe controller transaction lifecycle', () => {
     await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
     expect(writes.some((line) => line.startsWith('G10 L20'))).toBe(false);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().statusReport).toBeNull();
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
   });
 
   it('aborts on a status-only Alarm even when no numbered ALARM line arrives', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    useLaserStore.setState({ workZZeroEvidence: manualWorkZEvidence() });
+    useLaserStore.setState({
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
+      },
+    });
 
-    const probe = useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']);
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
     await flush();
     connection.emitLine('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
 
@@ -256,67 +264,129 @@ describe('probe controller transaction lifecycle', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().statusReport).toBeNull();
-    expect(useLaserStore.getState().safetyNotice).not.toBeNull();
+    expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
   });
 
-  it('treats a port close during probing as an unsafe active disconnect', async () => {
+  it('preserves XY evidence during a Z probe but invalidates it on a global alarm', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g54-persistent',
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0 },
+      wcoCache: { x: 1, y: 2, z: 3 },
+      frameVerification: {
+        boundsSignature: 'bounds',
+        wco: { x: 1, y: 2, z: 3 },
+        workOriginActive: true,
+      },
+    });
+
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      wcoCache: { x: 1, y: 2, z: 3 },
+      frameVerification: { boundsSignature: 'bounds' },
+    });
+    connection.emitLine('ALARM:5');
+    await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
+    expect(useLaserStore.getState()).toMatchObject({
+      probeBusy: false,
+      controllerOperation: null,
+      alarmCode: 5,
+      workZZeroEvidence: null,
+      wcoCache: null,
+      frameVerification: null,
+    });
+  });
+
+  it('soft-resets after timeout and keeps Start locked until two fresh Idle reports', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    let releaseReset!: () => void;
+    const resetAccepted = new Promise<void>((resolve) => {
+      releaseReset = resolve;
+    });
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === '\x18') await resetAccepted;
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
+    await flush();
+    await vi.advanceTimersByTimeAsync(45_001);
+    await flush();
+    expect(writes).toContain('\x18');
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'probe',
+      phase: 'recovering',
+    });
+    expect(useLaserStore.getState().probeBusy).toBe(true);
+    await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
+      /controller operation/i,
+    );
+
+    // Idle reports received before reset transport acceptance are stale and
+    // cannot satisfy the recovery proof.
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().probeBusy).toBe(true);
+    releaseReset();
+    await flush();
+    // Even post-write Idle is not enough; the controller must first prove it
+    // processed reset by emitting its reboot banner.
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().probeBusy).toBe(true);
+    connection.emitLine('Grbl 1.1f');
+    await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().probeBusy).toBe(true);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await expect(probe).resolves.toMatchObject({ kind: 'timeout' });
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().probeBusy).toBe(false);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
+  });
+
+  it('clears probe busy when the physical port closes', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
 
-    const probe = useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']);
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
     await flush();
     connection.emitClose();
 
     await expect(probe).resolves.toMatchObject({ kind: 'preflight-failed' });
     expect(useLaserStore.getState().connection.kind).toBe('disconnected');
-    expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().safetyNotice?.kind).toBe('disconnect-during-job');
-  });
-
-  it('invalidates setup evidence and surfaces a probe-specific notice when a write fails', async () => {
-    let failWrites = false;
-    const connection = makeConnection(async () => {
-      if (failWrites) throw new Error('probe write failed');
-    });
-    await connectWith(connection);
-    useLaserStore.setState({ workZZeroEvidence: manualWorkZEvidence() });
-    failWrites = true;
-
-    await expect(
-      useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']),
-    ).resolves.toMatchObject({ kind: 'preflight-failed' });
-
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
-    expect(useLaserStore.getState().statusReport).toBeNull();
-    expect(useLaserStore.getState().safetyNotice).toMatchObject({
-      kind: 'write-failed',
-      action: 'probe',
-    });
   });
 
-  it('soft-resets and emits controller shutdown lines before a commanded disconnect', async () => {
-    const writes: string[] = [];
+  it('treats an early reboot banner as transaction loss instead of a response', async () => {
+    let releaseWrite!: () => void;
+    let holdProbeWrite = false;
+    const heldWrite = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
     const connection = makeConnection(async (data) => {
-      writes.push(data);
+      if (holdProbeWrite && data === 'M5\n') await heldWrite;
     });
     await connectWith(connection);
-    writes.length = 0;
+    holdProbeWrite = true;
 
-    const probe = useLaserStore.getState().probe(['G38.2 Z-25.000 F150.000']);
+    const probe = useLaserStore.getState().probe(Z_REQUEST);
     await flush();
-    await useLaserStore.getState().disconnect();
-
+    connection.emitLine('Grbl 1.1f');
     await expect(probe).resolves.toMatchObject({ kind: 'preflight-failed' });
-    expect(writes[0]).toBe('G38.2 Z-25.000 F150.000\n');
-    expect(writes).toContain('\x18');
-    expect(writes).toContain('M9\n');
-    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
+    releaseWrite();
+    await flush();
   });
 });

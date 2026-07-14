@@ -138,6 +138,72 @@ describe('untracked-ack start guard', () => {
 
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
+
+  it('a late old-session write rejection cannot subtract a new-session ack', async () => {
+    let rejectOldWrite!: (reason: Error) => void;
+    let holdOldWrite = false;
+    const oldWrite = new Promise<void>((_resolve, reject) => {
+      rejectOldWrite = reject;
+    });
+    const oldConnection = makeConnection(async (data) => {
+      if (holdOldWrite && data === '$I\n') await oldWrite;
+    });
+    await connectWith(oldConnection);
+    holdOldWrite = true;
+
+    const oldCommand = useLaserStore
+      .getState()
+      .sendConsoleCommand('$I')
+      .catch((error: unknown) => error);
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    await useLaserStore.getState().disconnect();
+
+    const newConnection = makeConnection(async () => undefined);
+    await connectWith(newConnection);
+    const newCommand = useLaserStore.getState().sendConsoleCommand('$I');
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    rejectOldWrite(new Error('old port failed late'));
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    newConnection.emitLine('ok');
+    await expect(newCommand).resolves.toBeUndefined();
+    await expect(oldCommand).resolves.toBeInstanceOf(Error);
+  });
+
+  it('a status-only Alarm epochs out a pending write before unlock owns an ack', async () => {
+    let rejectOldWrite!: (reason: Error) => void;
+    let holdOldWrite = false;
+    const oldWrite = new Promise<void>((_resolve, reject) => {
+      rejectOldWrite = reject;
+    });
+    const connection = makeConnection(async (data) => {
+      if (holdOldWrite && data === '$I\n') await oldWrite;
+    });
+    await connectWith(connection);
+    holdOldWrite = true;
+
+    const oldCommand = useLaserStore
+      .getState()
+      .sendConsoleCommand('$I')
+      .catch((error: unknown) => error);
+    await flush();
+    connection.emitLine('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+
+    await useLaserStore.getState().unlockAlarm();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    rejectOldWrite(new Error('old status-era write failed late'));
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitLine('ok');
+    await expect(oldCommand).resolves.toBeInstanceOf(Error);
+  });
 });
 
 // Audit F1: one physical ok must never settle BOTH ledgers. While the

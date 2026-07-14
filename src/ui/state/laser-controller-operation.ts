@@ -11,8 +11,10 @@ export type LaserControllerOperation =
     }
   | {
       readonly kind: 'probe';
-      readonly phase: 'sequence' | 'settling' | 'awaiting-idle';
+      readonly phase: 'sequence' | 'settling' | 'awaiting-idle' | 'recovering';
       readonly idleReports: number;
+      readonly transactionId: number;
+      readonly affectsXy: boolean;
     }
   | {
       readonly kind: 'interactive-command';
@@ -49,9 +51,7 @@ export function describeControllerOperation(operation: LaserControllerOperation 
     return describePostJobSettle(operation.phase);
   }
   if (operation.kind === 'probe') {
-    if (operation.phase === 'sequence') return 'Probing';
-    if (operation.phase === 'settling') return 'Settling after probe';
-    return 'Waiting for fresh Idle after probe';
+    return describeProbeOperation(operation.phase);
   }
   if (operation.kind === 'recovery') {
     return operation.phase === 'reset' ? 'Recovering controller' : 'Waiting for Idle after reset';
@@ -70,4 +70,13 @@ function describeStartArming(phase: 'queue-fence' | 'live-status'): string {
   return phase === 'queue-fence'
     ? 'Fencing controller queue before Start'
     : 'Verifying live controller state before Start';
+}
+
+function describeProbeOperation(
+  phase: Extract<LaserControllerOperation, { kind: 'probe' }>['phase'],
+): string {
+  if (phase === 'sequence') return 'Probing';
+  if (phase === 'settling') return 'Settling after probe';
+  if (phase === 'awaiting-idle') return 'Waiting for fresh Idle after probe';
+  return 'Recovering after an uncertain probe';
 }

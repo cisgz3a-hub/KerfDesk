@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { ProbePanel } from './ProbePanel';
@@ -83,7 +84,7 @@ describe('ProbePanel', () => {
   it('runs the Z sequence through the store probe action', async () => {
     useStore.getState().setMachineKind('cnc');
     const originalProbe = useLaserStore.getState().probe;
-    const probe = vi.fn(async (_lines: ReadonlyArray<string>) => ({ kind: 'ok' }) as const);
+    const probe = vi.fn(async (_request: ProbeRequest) => ({ kind: 'ok' }) as const);
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: idleStatus(),
@@ -99,10 +100,11 @@ describe('ProbePanel', () => {
         button.click();
       });
       expect(probe).toHaveBeenCalledTimes(1);
-      const lines = probe.mock.calls[0]?.[0] ?? [];
-      expect(lines.slice(0, 2)).toEqual(['G54', 'G21']);
-      expect(lines.some((line: string) => line.startsWith('G38.2 Z-'))).toBe(true);
-      expect(lines.some((line: string) => line.startsWith('G10 L20 P0 Z'))).toBe(true);
+      const request = probe.mock.calls[0]?.[0];
+      expect(request).toEqual({
+        kind: 'z',
+        params: expect.objectContaining({ plateThicknessMm: 15, maxTravelMm: 25 }),
+      });
     } finally {
       useLaserStore.setState({ probe: originalProbe } as Partial<
         ReturnType<typeof useLaserStore.getState>
