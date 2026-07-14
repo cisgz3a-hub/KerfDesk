@@ -2584,6 +2584,28 @@ F-CNC19 tiling.
    feedback must not be used as proof of measured physical RPM; machines that
    need more than the 0.5-second input floor must use a longer delay.
 
+### F-CNC39. Start from the compiled controller-override baseline — Phase H.11
+
+#### Success
+1. When the live GRBL `Ov:` cache is known, CNC Start requires feed, rapid,
+   and spindle overrides to be exactly 100/100/100.
+2. A capable Idle controller with any non-default value shows the existing
+   per-channel override controls so the operator can reset and observe each
+   value before retrying Start.
+3. Once streaming begins, the operator may still adjust overrides deliberately
+   through the existing in-job controls.
+
+#### Error — stale override changes the physical plan
+1. CNC Start blocks and names all three current percentages when any known
+   value differs from 100%. The compiled G-code, fingerprint, and setup
+   attestation do not substitute for this live controller state.
+
+#### Edge — unknown or externally changed state
+1. A missing `Ov:` cache is not presented as observed 100% state. Firmware that
+   omits the field has no live guarantee yet; external senders changing it
+   between reports remain outside the single-sender contract.
+2. Laser Start is unchanged by this CNC-only gate.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

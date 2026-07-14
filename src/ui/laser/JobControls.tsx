@@ -18,6 +18,7 @@ import {
 import { JobPlacementControls } from './JobPlacementControls';
 import { OriginRow } from './OriginRow';
 import { ControllerOperationControls, MotionControls, RunningControls } from './JobRunControls';
+import { OverrideControls } from './OverrideControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 import { StartFromLineControl } from './StartFromLineControl';
@@ -50,11 +51,15 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
     ['streaming', 'paused', 'tool-change', 'errored', 'done'].includes(status);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
+  const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
+  const ovCache = useLaserStore((s) => s.ovCache);
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
+  const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
   return (
     <div style={containerStyle}>
       <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
+      {showIdleOverrideReset && <OverrideControls />}
       {motionOperation !== null && <MotionControls operationKind={motionOperation.kind} />}
       {controllerOperation !== null && (
         <ControllerOperationControls label={describeControllerOperation(controllerOperation)} />
@@ -74,6 +79,22 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
   );
+}
+
+function hasNonDefaultOverrides(overrides: {
+  feed: number;
+  rapid: number;
+  spindle: number;
+}): boolean {
+  return overrides.feed !== 100 || overrides.rapid !== 100 || overrides.spindle !== 100;
+}
+
+function shouldShowIdleOverrideReset(
+  controlsBusy: boolean,
+  hasOverrides: boolean,
+  overrides: { feed: number; rapid: number; spindle: number } | null,
+): boolean {
+  return !controlsBusy && hasOverrides && overrides !== null && hasNonDefaultOverrides(overrides);
 }
 
 function SetupRow(props: {

@@ -1,4 +1,4 @@
-import type { StatusReport } from '../../core/controllers/grbl';
+import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { SimilarityTransform } from '../../core/registration';
 import {
   computeJobBounds,
@@ -69,6 +69,10 @@ export type MachineStartSnapshot = {
   readonly workZZeroEvidence?: WorkZZeroEvidence | null;
   readonly workZReferenceEpoch?: number;
   readonly wcoCache?: WorkCoordinateOffset | null;
+  // Last live GRBL Ov: field, cached across intermittent status frames.
+  // A known non-default value changes physical feed/RPM independently of the
+  // prepared G-code, so CNC Start requires the compiled 100/100/100 baseline.
+  readonly ovCache?: OverrideValues | null;
   // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
   readonly frameVerification?: FrameVerification | null;
   // ADR-094 — how the connected firmware exposes settings. Non-GRBL values
@@ -87,6 +91,7 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
   if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
     issues.push(CNC_REQUIRES_GRBL_MESSAGE);
   }
+  issues.push(...cncOverrideStartIssues(project, machine.ovCache));
   const workZeroIssue = cncWorkZeroStartIssue(
     project,
     machine.workZZeroEvidence,
@@ -94,6 +99,19 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
   );
   if (workZeroIssue !== null) issues.push(workZeroIssue);
   return issues;
+}
+
+function cncOverrideStartIssues(
+  project: Project,
+  overrides: OverrideValues | null | undefined,
+): ReadonlyArray<string> {
+  if (machineKindOf(project.machine) !== 'cnc' || overrides == null) return [];
+  if (overrides.feed === 100 && overrides.rapid === 100 && overrides.spindle === 100) return [];
+  return [
+    'CNC Start requires controller overrides at the compiled baseline: feed 100%, rapid 100%, ' +
+      `spindle 100%. Current live values are feed ${overrides.feed}%, rapid ${overrides.rapid}%, ` +
+      `spindle ${overrides.spindle}%. Reset each override to 100% before starting.`,
+  ];
 }
 
 export function prepareStartJob(
