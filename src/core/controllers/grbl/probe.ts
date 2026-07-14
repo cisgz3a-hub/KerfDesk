@@ -14,12 +14,15 @@
 //
 // Geometry model (PROVISIONAL, ADR-103): a rectangular corner plate whose
 // outer faces sit flush with the stock faces, wide enough that the plate
-// center is ~15 mm inside the probed corner. The operator starts the cycle
-// with the bit hovering over the plate center. All distances are editable
-// in the panel; these builders just turn them into G-code lines.
+// center offsets are measured from the probed corner. The operator starts the
+// cycle with the bit centered at those measured X/Y offsets. Static
+// cutter/plate geometry is proven before these builders emit any motion.
 //
 // Pure module: no IO, no store — returns the line list for the protocol
 // runner in ui/state/probe-actions.ts.
+
+import { validateCornerProbeGeometry } from './corner-probe-geometry';
+import type { CncToolKind } from '../../scene/machine';
 
 export type ProbeCorner = 'front-left' | 'front-right' | 'back-left' | 'back-right';
 
@@ -33,7 +36,12 @@ export type ZProbeParams = {
 
 export type CornerProbeParams = ZProbeParams & {
   readonly bitDiameterMm: number;
+  readonly toolKind: CncToolKind;
   readonly corner: ProbeCorner;
+  /** Starting cutter-center X distance from the stock corner. */
+  readonly plateCenterOffsetXmm: number;
+  /** Starting cutter-center Y distance from the stock corner. */
+  readonly plateCenterOffsetYmm: number;
   /** How far below the plate TOP the bit flank touches the side faces. */
   readonly sideDropMm: number;
   /** Sideways move past the plate face before descending to probe back. */
@@ -58,6 +66,10 @@ export const DEFAULT_Z_PROBE_PARAMS: ZProbeParams = {
 };
 export const DEFAULT_SIDE_DROP_MM = 6;
 export const DEFAULT_SIDE_CLEARANCE_MM = 35;
+export {
+  DEFAULT_PLATE_CENTER_OFFSET_X_MM,
+  DEFAULT_PLATE_CENTER_OFFSET_Y_MM,
+} from './corner-probe-geometry';
 
 // Back off this far after the fast seek, then re-touch slowly with a small
 // extra budget so the slow probe always reaches the surface.
@@ -69,12 +81,6 @@ const PLATE_TOP_CLEAR_MM = 5;
 const SIDE_RETREAT_MM = 4;
 // Lateral travel budget past the requested clearance for side probes.
 const SIDE_TRAVEL_MARGIN_MM = 5;
-// Where the plate center sits, measured from the probed corner.
-const PLATE_CENTER_MM = 15;
-// Final XY park just outside the zeroed corner.
-const FINAL_PARK_MM = 5;
-// Keep the flank contact height at least this far above the stock top.
-const MIN_FLANK_HEIGHT_MM = 1;
 
 function fmt(value: number): string {
   // -0.000 reads as a distinct coordinate in diffs; normalize it away.
@@ -131,9 +137,9 @@ function sideLegLines(
   dir: 1 | -1,
   params: CornerProbeParams,
   zTopMm: number,
+  flankHeightMm: number,
 ): ReadonlyArray<string> {
-  const flankZ = Math.max(MIN_FLANK_HEIGHT_MM, params.plateThicknessMm - params.sideDropMm);
-  const flankDrop = zTopMm - flankZ;
+  const flankDrop = zTopMm - flankHeightMm;
   const travel = params.sideClearanceMm + SIDE_TRAVEL_MARGIN_MM;
   return [
     'G91',
@@ -152,25 +158,27 @@ function sideLegLines(
  * outer faces, ending parked just outside the zeroed corner above the plate.
  */
 export function buildCornerProbeLines(params: CornerProbeParams): ReadonlyArray<string> {
+  const geometry = validateCornerProbeGeometry(params);
+  if (geometry.kind === 'invalid') return [];
   const { sx, sy } = cornerSigns(params.corner);
   const radius = params.bitDiameterMm / 2;
   const zTop = params.plateThicknessMm + PLATE_TOP_CLEAR_MM;
-  const xAfterCentering = sx * PLATE_CENTER_MM;
+  const xAfterCentering = sx * params.plateCenterOffsetXmm;
   const yAfterRetreat = -sy * (radius + SIDE_RETREAT_MM);
   return [
     'G54',
     ...zContactLines(params),
     `G0 Z${fmt(PLATE_TOP_CLEAR_MM)}`,
-    ...sideLegLines('X', sx, params, zTop),
+    ...sideLegLines('X', sx, params, zTop, geometry.flankHeightMm),
     // X is still uncommitted. From the known contact + retreat position,
     // this relative move places the bit over the plate center.
-    `G0 X${fmt(sx * (PLATE_CENTER_MM + radius + SIDE_RETREAT_MM))}`,
-    ...sideLegLines('Y', sy, params, zTop),
+    `G0 X${fmt(sx * (params.plateCenterOffsetXmm + radius + SIDE_RETREAT_MM))}`,
+    ...sideLegLines('Y', sy, params, zTop, geometry.flankHeightMm),
     'G90',
     // This is the only coordinate mutation in the corner cycle. At this
     // point all six probe contacts have succeeded and the current XYZ values
     // are derivable from their deterministic relative retreats/lifts.
     `G10 L20 P0 X${fmt(xAfterCentering)} Y${fmt(yAfterRetreat)} Z${fmt(zTop)}`,
-    `G0 X${fmt(-sx * FINAL_PARK_MM)} Y${fmt(-sy * FINAL_PARK_MM)}`,
+    `G0 X${fmt(-sx * geometry.finalParkMm)} Y${fmt(-sy * geometry.finalParkMm)}`,
   ];
 }

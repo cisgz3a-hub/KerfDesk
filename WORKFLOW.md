@@ -3329,17 +3329,22 @@ Until every box is checked on real hardware, the desktop installer stays
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 
-1. The operator chooses a Z or corner probe and enters positive, finite plate,
+1. Before an XYZ request reaches the controller, the operator enters the
+   measured plate-center X/Y offsets, side-contact drop, and side clearance.
+   KerfDesk accepts only a cylindrical end mill and rejects a cutter that cannot
+   remain over the plate, clear the side before descending, contact below the
+   plate top, or park clear of the stock. Rejection writes zero serial bytes.
+2. The operator chooses a Z or corner probe and enters positive, finite plate,
    feed, travel, retract, and geometry values. The UI sends typed probe geometry,
    not caller-authored G-code.
-2. Start is allowed only while connected at a current Idle report with spindle
+3. Start is allowed only while connected at a current Idle report with spindle
    speed proven zero and no job, motion, controller command, or probe active.
-3. KerfDesk reserves one exclusive transaction, invalidates affected setup
+4. KerfDesk reserves one exclusive transaction, invalidates affected setup
    evidence, sends `M5` and `M9`, expands the audited GRBL probe builder, and
    owns every terminal response before awaiting transport completion.
-4. A corner request leaves the previous WCS unchanged through all six contacts,
+5. A corner request leaves the previous WCS unchanged through all six contacts,
    then commits X, Y, and Z together in one `G10 L20 P0` block before parking.
-5. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
+6. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
    reports, and unchanged connection/transaction identity. The resulting work-Z
    evidence remains blocked for Start until the operator confirms plate removal.
 
@@ -3351,6 +3356,9 @@ Until every box is checked on real hardware, the desktop installer stays
 2. Any uncertain non-alarm failure sends soft reset and keeps the controller
    operation locked until a reboot banner and two subsequent Idle reports are
    observed. Missing proof remains locked until disconnect.
+3. Missing, over-precision, oversized, non-cylindrical, or unsafe XYZ
+   plate/cutter geometry refuses the cycle before even the spindle/coolant-off
+   commands are written and names the failed clearance.
 
 #### Edge — coordinate scope
 
