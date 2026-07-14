@@ -7980,3 +7980,32 @@ precise vector selection. Crossing output layers can be resolved locally without
 selecting every object of its color. This slice does not add global Tab/Shift+Tab object traversal or
 an object-tree panel; those remain optional discoverability enhancements rather than prerequisites
 for the reported workflow.
+
+---
+
+## ADR-197 - Let operators hide static canvas start markers without hiding live motion
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+The canvas motion overlay labels the planned frame and job entry points so operators can understand
+where motion begins. On dense artwork, the original 92%-opaque white label rectangles obscured too
+much geometry. Some operators also need an uncluttered canvas, but a master overlay switch would hide
+controller-reported head position, completed motion, and status information that remains valuable
+during a run.
+
+### Decision
+
+- Reduce the white `FRAME START` and `JOB START` label background opacity to 68%. Marker text, dots,
+  and the frame-direction arrow remain fully opaque safety red.
+- Add a pressed eye toggle immediately after Snap in the floating canvas controls. The default is on,
+  and the preference is stored locally across reloads.
+- Turning the toggle off hides only the two static start markers and frame-direction arrow. The
+  approach route, live controller head, confirmed-route trail, and status badge remain visible.
+
+### Consequences
+
+Operators can see artwork through the labels or remove the static markers entirely without weakening
+live machine feedback. The preference is UI-only: it does not alter the project, generated G-code,
+frame verification, job placement, or controller behavior.

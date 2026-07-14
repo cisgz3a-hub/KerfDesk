@@ -22,6 +22,7 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
+import { useUiStore } from '../state/ui-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 
 export function useCanvasMotionOverlay(
@@ -36,6 +37,7 @@ export function useCanvasMotionOverlay(
   const printAndCut = useExperimentalLaserFeatures((state) => state.features.printAndCut);
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
   const secondRegistration = usePrintCutSessionStore((state) => state.second);
+  const showStartMarkers = useUiStore((state) => state.showCanvasStartMarkers);
   const placement = useMemo(
     () => resolveJobPlacement(placementSettings, laser),
     [placementSettings, laser],
@@ -56,8 +58,8 @@ export function useCanvasMotionOverlay(
   useClearStaleTerminalRun(liveRun, idlePlan);
 
   if (previewMode) return null;
-  if (liveRun !== null) return { plan: liveRun.plan, run: liveRun };
-  return idlePlan === null ? null : { plan: idlePlan, run: null };
+  if (liveRun !== null) return { plan: liveRun.plan, run: liveRun, showStartMarkers };
+  return idlePlan === null ? null : { plan: idlePlan, run: null, showStartMarkers };
 }
 
 type IdlePlanInput = {

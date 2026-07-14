@@ -7,6 +7,7 @@ import type { Project } from '../../core/scene';
 import { transformedBBox } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
 import { computeView } from './view-transform';
 
@@ -52,6 +53,7 @@ export function ZoomControls(): JSX.Element {
       >
         #
       </button>
+      <StartMarkersToggle />
       <button
         type="button"
         onClick={() => zoomBy(1 / ZOOM_STEP)}
@@ -104,6 +106,23 @@ export function ZoomControls(): JSX.Element {
         ⊡
       </button>
     </div>
+  );
+}
+
+function StartMarkersToggle(): JSX.Element {
+  const visible = useUiStore((state) => state.showCanvasStartMarkers);
+  const setVisible = useUiStore((state) => state.setShowCanvasStartMarkers);
+  return (
+    <button
+      type="button"
+      onClick={() => setVisible(!visible)}
+      title="Show frame and job start markers"
+      aria-label="Show frame and job start markers"
+      aria-pressed={visible}
+      style={visible ? activeZoomBtnStyle : zoomBtnStyle}
+    >
+      <Icon name="eye" size={14} />
+    </button>
   );
 }
 

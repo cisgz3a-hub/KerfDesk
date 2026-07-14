@@ -12,6 +12,7 @@ import type { ViewTransform } from './view-transform';
 export type CanvasMotionOverlay = {
   readonly plan: CanvasMotionPlan;
   readonly run: LiveCanvasRun | null;
+  readonly showStartMarkers?: boolean;
 };
 
 const RED = '#dc2626';
@@ -25,8 +26,10 @@ export function drawCanvasMotionOverlay(
   const { plan, run } = overlay;
   if (run !== null) drawRoute(ctx, plan, run, view);
   drawApproach(ctx, plan, run, view);
-  drawFrameStart(ctx, plan, view);
-  if (plan.jobStart !== null) drawMarker(ctx, plan.jobStart, 'JOB START', view);
+  if (overlay.showStartMarkers !== false) {
+    drawFrameStart(ctx, plan, view);
+    if (plan.jobStart !== null) drawMarker(ctx, plan.jobStart, 'JOB START', view);
+  }
   if (
     plan.capability === 'realtime' &&
     run?.reportedHead !== null &&
@@ -184,7 +187,9 @@ function drawHead(
 function drawLabel(ctx: CanvasRenderingContext2D, x: number, y: number, label: string): void {
   ctx.font = '600 11px system-ui, sans-serif';
   const width = ctx.measureText(label).width + 10;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+  // Keep artwork visible beneath the marker while preserving enough contrast
+  // for the safety-red label to remain legible over dense toolpaths.
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
   ctx.fillRect(x - 4, y - 12, width, 17);
   ctx.fillStyle = RED;
   ctx.fillText(label, x, y);

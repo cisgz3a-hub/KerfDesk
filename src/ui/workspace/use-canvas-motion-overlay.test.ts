@@ -8,6 +8,7 @@ import { resolveJobPlacement } from '../job-placement';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
+import { useUiStore } from '../state/ui-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import { buildIdleCanvasMotionPlan, useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 
@@ -25,6 +26,7 @@ afterEach(async () => {
   root = null;
   host = null;
   observedOverlay = null;
+  useUiStore.getState().setShowCanvasStartMarkers(true);
 });
 
 describe('idle canvas motion plan', () => {
@@ -71,18 +73,29 @@ describe('idle canvas motion plan', () => {
       jobPlacement: { startFrom: 'absolute', anchor: 'front-left' },
     });
     useLaserStore.setState(initialLaserState());
+    useUiStore.getState().setShowCanvasStartMarkers(false);
     host = document.createElement('div');
     document.body.appendChild(host);
     await act(async () => {
       root = createRoot(host as HTMLDivElement);
       root.render(createElement(Harness, { project: decoded.project }));
-      await new Promise((resolve) => window.setTimeout(resolve, 50));
     });
+    await waitForPublishedOverlay();
     expect(observedOverlay?.plan.jobStart).not.toBeNull();
+    expect(observedOverlay?.showStartMarkers).toBe(false);
   });
 });
 
 function Harness(props: { readonly project: Parameters<typeof useCanvasMotionOverlay>[0] }) {
   observedOverlay = useCanvasMotionOverlay(props.project, false);
   return null;
+}
+
+async function waitForPublishedOverlay(): Promise<void> {
+  for (let attempt = 0; attempt < 50 && observedOverlay === null; attempt += 1) {
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+    });
+  }
+  expect(observedOverlay).not.toBeNull();
 }

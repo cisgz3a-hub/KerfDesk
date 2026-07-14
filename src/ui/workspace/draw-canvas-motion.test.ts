@@ -9,10 +9,12 @@ function recordingContext(): {
   readonly ctx: CanvasRenderingContext2D;
   readonly labels: string[];
   readonly dashes: number[][];
+  readonly fillStyles: string[];
   readonly strokeStyles: string[];
 } {
   const labels: string[] = [];
   const dashes: number[][] = [];
+  const fillStyles: string[] = [];
   const strokeStyles: string[] = [];
   const ctx = new Proxy(
     {},
@@ -24,12 +26,13 @@ function recordingContext(): {
         return () => undefined;
       },
       set(_target, prop, value) {
+        if (prop === 'fillStyle' && typeof value === 'string') fillStyles.push(value);
         if (prop === 'strokeStyle' && typeof value === 'string') strokeStyles.push(value);
         return true;
       },
     },
   ) as CanvasRenderingContext2D;
-  return { ctx, labels, dashes, strokeStyles };
+  return { ctx, labels, dashes, fillStyles, strokeStyles };
 }
 
 function plan(): CanvasMotionPlan {
@@ -72,6 +75,7 @@ describe('drawCanvasMotionOverlay', () => {
     );
     expect(recording.labels).toContain('FRAME START');
     expect(recording.labels).toContain('JOB START');
+    expect(recording.fillStyles).toContain('rgba(255, 255, 255, 0.68)');
     expect(recording.dashes).toContainEqual([5, 5]);
   });
 
@@ -98,5 +102,18 @@ describe('drawCanvasMotionOverlay', () => {
     expect(recording.strokeStyles).toContain('#dc2626');
     expect(recording.dashes).toContainEqual([]);
     expect(recording.dashes).toContainEqual([6, 4]);
+  });
+
+  it('hides only static start markers while retaining the approach route', () => {
+    const recording = recordingContext();
+    drawCanvasMotionOverlay(
+      recording.ctx,
+      { plan: plan(), run: null, showStartMarkers: false },
+      { scale: 1, offsetX: 0, offsetY: 0 },
+    );
+
+    expect(recording.labels).not.toContain('FRAME START');
+    expect(recording.labels).not.toContain('JOB START');
+    expect(recording.dashes).toContainEqual([5, 5]);
   });
 });
