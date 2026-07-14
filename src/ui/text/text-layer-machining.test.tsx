@@ -75,6 +75,24 @@ describe('text layer machining workflow', () => {
       const outputLayer = requireOutputLayer(host);
       expect(outputLayer.value).not.toBe('#ff0000');
       expect(host.textContent).toContain('V-carve');
+      const textColor = outputLayer.value;
+
+      await act(async () => requireButton(host, 'Edit').click());
+      const depth = requireInput(host, `Cut depth for ${textColor}`);
+      await act(async () => {
+        depth.value = '0.75';
+        Simulate.change(depth);
+      });
+      await act(async () => Simulate.blur(depth));
+      await act(async () => requireButton(host, 'Save').click());
+
+      expect(
+        useStore.getState().project.scene.objects.some((object) => object.kind === 'text'),
+      ).toBe(false);
+      expect(layerFor(useStore.getState().project, textColor)?.cnc).toMatchObject({
+        cutType: 'v-carve',
+        depthMm: 0.75,
+      });
 
       await enterAndSubmit(host, 'NAME');
 
@@ -88,15 +106,18 @@ describe('text layer machining workflow', () => {
       });
       expect(layerFor(project, text.color)?.cnc).toMatchObject({
         cutType: 'v-carve',
-        depthMm: 1,
+        depthMm: 0.75,
       });
 
       const loaded = roundTrip(project);
-      expect(layerFor(loaded, text.color)?.cnc).toMatchObject({ cutType: 'v-carve', depthMm: 1 });
+      expect(layerFor(loaded, text.color)?.cnc).toMatchObject({
+        cutType: 'v-carve',
+        depthMm: 0.75,
+      });
 
       const groups = cncGroups(project, machine);
       expect(groups.map((group) => group.cutType)).toEqual(['v-carve', 'profile-outside']);
-      expect(minimumZ(groups[0]?.passes ?? [])).toBeGreaterThanOrEqual(-1);
+      expect(minimumZ(groups[0]?.passes ?? [])).toBeGreaterThanOrEqual(-0.75);
       expect(minimumZ(groups[1]?.passes ?? [])).toBe(-machine.stock.thicknessMm);
     } finally {
       await act(async () => root.unmount());
@@ -159,6 +180,20 @@ function requireOutputLayer(host: HTMLElement): HTMLSelectElement {
   const select = host.querySelector('select[aria-label="Text output layer"]');
   if (!(select instanceof HTMLSelectElement)) throw new Error('Output layer missing');
   return select;
+}
+
+function requireInput(host: HTMLElement, ariaLabel: string): HTMLInputElement {
+  const input = host.querySelector(`input[aria-label="${ariaLabel}"]`);
+  if (!(input instanceof HTMLInputElement)) throw new Error(`${ariaLabel} input missing`);
+  return input;
+}
+
+function requireButton(host: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent?.trim() === label,
+  );
+  if (!(button instanceof HTMLButtonElement)) throw new Error(`${label} button missing`);
+  return button;
 }
 
 function requireCncMachine(project: Project): CncMachineConfig {

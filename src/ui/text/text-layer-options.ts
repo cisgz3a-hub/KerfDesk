@@ -1,4 +1,5 @@
 import {
+  createLayer,
   cutTypeLabel,
   DEFAULT_CNC_LAYER_SETTINGS,
   type Layer,
@@ -16,6 +17,7 @@ export type TextLayerNotice = {
 };
 
 export type TextLayerOption = {
+  readonly layer: Layer;
   readonly color: string;
   readonly label: string;
   readonly summary: string;
@@ -79,6 +81,7 @@ function existingLayerOption(
 ): TextLayerOption {
   if (machine?.kind !== 'cnc') {
     return {
+      layer,
       color: layer.color,
       label: `Layer ${index + 1}`,
       summary: `${laserModeLabel(layer.mode)} · ${formatNumber(layer.power)}% power · ${formatNumber(layer.speed)} mm/min`,
@@ -89,6 +92,7 @@ function existingLayerOption(
   const compatible = isTextCutTypeCompatible(fontKey, cnc.cutType);
   const reachesStock = cnc.depthMm >= machine.stock.thicknessMm;
   return {
+    layer,
     color: layer.color,
     label: `Layer ${index + 1}`,
     summary: `${cutTypeLabel(cnc.cutType)} · ${formatNumber(cnc.depthMm)} mm deep`,
@@ -116,8 +120,10 @@ function newLayerOption(
   machine: MachineConfig | undefined,
   fontKey: string,
 ): TextLayerOption {
+  const layer = createLayer({ id: color, color });
   if (machine?.kind !== 'cnc') {
     return {
+      layer,
       color,
       label: 'New text layer',
       summary: 'Line · 30% power · 1500 mm/min',
@@ -125,7 +131,12 @@ function newLayerOption(
     };
   }
   const cutType = defaultCncTextCutType(machine, fontKey);
+  const cncLayer = {
+    ...layer,
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType },
+  };
   return {
+    layer: cncLayer,
     color,
     label: 'New text layer',
     summary: `${cutTypeLabel(cutType)} · ${formatNumber(DEFAULT_CNC_LAYER_SETTINGS.depthMm)} mm deep`,
