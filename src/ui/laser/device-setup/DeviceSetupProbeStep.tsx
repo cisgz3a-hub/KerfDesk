@@ -7,6 +7,7 @@
 import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
 import { ProbeControls } from '../ProbeControls';
+import { ProbePlateRemovalNotice } from '../ProbePlateRemovalNotice';
 
 export function DeviceSetupProbeStep(): JSX.Element {
   const isCnc = useStore((s) => machineKindOf(s.project.machine) === 'cnc');
@@ -19,6 +20,7 @@ export function DeviceSetupProbeStep(): JSX.Element {
             controller at Idle), or click Next to skip and probe later from the CNC panel.
           </p>
           <ProbeControls />
+          <ProbePlateRemovalNotice />
         </>
       ) : (
         <p style={hintStyle}>Touch-plate probing applies to CNC machines. Click Next to skip.</p>
