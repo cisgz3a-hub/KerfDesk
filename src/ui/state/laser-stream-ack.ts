@@ -53,7 +53,9 @@ export function advanceStream(
       workZReferenceEpoch: state.workZReferenceEpoch + 1,
       toolChangeIdleSeen: false,
       pendingToolLabel: state.toolChangeLabels[0] ?? null,
+      pendingToolId: state.toolChangeToolIds[0] ?? null,
       toolChangeLabels: state.toolChangeLabels.slice(1),
+      toolChangeToolIds: state.toolChangeToolIds.slice(1),
     }));
   }
   if (s.status !== 'done' && stepped.state.status === 'done') {

@@ -50,6 +50,7 @@ afterEach(async () => {
   cleanup = null;
   useLaserStore.setState({
     pendingToolLabel: null,
+    pendingToolId: null,
     streamer: null,
     toolChangeIdleSeen: false,
     workZZeroEvidence: null,
@@ -76,7 +77,9 @@ describe('RunningControls tool-change (CNC-04)', () => {
     expect(host.textContent).toContain('Continue');
     expect(host.textContent).toContain('Stop');
     expect(host.textContent).toContain('re-zero Z on the stock top');
-    expect(host.textContent).toContain('Continue unlocks only after fresh Idle and Z zero');
+    expect(host.textContent).toContain(
+      'Continue unlocks only after fresh Idle and tool-matched Z zero',
+    );
     const continueButton = [...host.querySelectorAll('button')].find(
       (button) => button.textContent === 'Continue',
     );
@@ -110,7 +113,7 @@ describe('RunningControls tool-change (CNC-04)', () => {
   });
 
   it('names the bit in the prompt when the compiled label is known (R5)', async () => {
-    useLaserStore.setState({ pendingToolLabel: '6.35 mm end mill' });
+    useLaserStore.setState({ pendingToolLabel: '6.35 mm end mill', pendingToolId: 'em-6350' });
     const { host, root } = await renderRunningControls({
       isStreaming: false,
       isPaused: false,
@@ -122,6 +125,7 @@ describe('RunningControls tool-change (CNC-04)', () => {
     };
 
     expect(host.textContent).toContain('Load 6.35 mm end mill');
+    expect(host.textContent).toContain('select it as the Active bit');
     expect(host.textContent).not.toContain('Load the next bit');
   });
 

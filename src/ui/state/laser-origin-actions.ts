@@ -7,7 +7,8 @@
 // import — no runtime cycle.
 
 import { inferCurrentMachinePosition } from './infer-machine-position';
-import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
+import { useStore } from './store';
+import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { type ControllerLifecycleRefs } from './laser-interactive-command';
 import {
@@ -152,7 +153,11 @@ async function zeroZHere(
     'Zero work Z',
     (write) => zeroZHereAction(write, usesPrimaryWcs(get())),
     () => ({
-      workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', get().workZReferenceEpoch),
+      workZZeroEvidence: captureWorkZZeroEvidence(
+        'manual-zero',
+        get().workZReferenceEpoch,
+        selectedCncToolId(useStore.getState().project),
+      ),
     }),
   );
 }

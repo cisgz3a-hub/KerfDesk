@@ -24,6 +24,7 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+<<<<<<< HEAD
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
@@ -35,6 +36,26 @@
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
+=======
+| ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
+| ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
+| ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
+| ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
+| ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
+| ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
+| ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
+| ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
+| ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
+| ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
+| ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
+| ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
+| ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
+| ADR-152 | 2026-07-13 | Accepted | Offset pockets may use locally tangent native helical entries |
+| ADR-153 | 2026-07-13 | Accepted | Two-tool pocket rest machining uses bounded 2D stock subtraction |
+| ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
+| ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
+| ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
+>>>>>>> aed41269 (fix: bind CNC Z evidence to tool plan)
 
 ---
 
@@ -6452,6 +6473,7 @@ The rectify runs once per source/alignment change (memoized), not per zoom/pan r
 
 ### Consequences
 
+<<<<<<< HEAD
 Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.
 
 ---
@@ -6902,3 +6924,693 @@ validation, legacy defaults, output tests, and a new complexity bound.
 These tested capabilities are intentional product scope rather than undocumented exceptions. Their
 offline, bounded persistence contracts remain release gates; this decision does not authorize the
 larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems named above.
+=======
+Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.
+
+---
+
+## ADR-135 - Gate desktop auto-update on a trusted, code-signed channel
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+### Context
+
+ADR-024 allowed unsigned Windows builds to download an update from the pinned
+R2 feed and install it on quit. The feed's SHA-512 value proves only that the
+download matches `latest.yml`; both files come from the same origin. An attacker
+who can replace the feed can therefore publish a higher-version installer and a
+matching hash. With `autoDownload` and `autoInstallOnAppQuit` enabled, that code
+would be accepted without an independent publisher identity check.
+
+### Decision
+
+Desktop auto-update is fail-closed behind an explicit trust gate. The updater
+may run only when both conditions hold:
+
+1. Electron reports a packaged build through `app.isPackaged`.
+2. `IS_DESKTOP_UPDATE_CHANNEL_TRUSTED` is true because production installers
+   and update artifacts are code-signed by the same approved Windows publisher.
+
+Until signing is operational, the trust constant stays false. Packaged builds
+remain fully usable but perform no update check, download, or install. Operators
+update manually from the pinned KerfDesk download page. Enabling the constant
+requires a separate release change that configures signing in CI, fails closed
+when signing credentials are absent, and verifies a packaged update on Windows.
+
+Once trusted, ADR-024's burn-safe behavior remains: background download,
+install-on-natural-quit, and no `quitAndInstall()` call.
+
+### Consequences
+
+- An unsigned release-feed compromise cannot become a silent code-install path.
+- Unsigned builds do not notify about new versions; manual download is the safe
+  interim experience.
+- The R2 publishing workflow may continue producing artifacts, but clients do
+  not consume its update metadata until the signing gate is deliberately opened.
+- Code signing is now a functional prerequisite for automatic updates, not only
+  a SmartScreen/reputation improvement.
+
+---
+
+## ADR-136 - CNC interruption recovery rewinds to a retract-first safe boundary
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+### Context
+
+ADR-103/118 rebuilt modal state at the first unconfirmed line and emitted a CNC
+preamble that started the spindle while the bit could still be embedded, then
+rapid-retracted and plunged back to the recorded depth. A stopped spindle may
+not accelerate under cutting load. GRBL acknowledgements also prove parsing or
+planner admission, not physical execution, so an exact acknowledgement-line
+resume can skip accepted-but-unexecuted motion. Finally, the checkpoint kept
+progress but discarded the terminal safety reason after reload/reconnect.
+
+### Decision
+
+- CNC recovery treats the first unconfirmed line as an interruption vicinity,
+  scans backward to the previous pure `G0 Z<safe>` retract, and replays from
+  that semantic boundary. No safe boundary means no automatic resume.
+- Its preamble emits a controlled `G1 Z<safe> F<recovered plunge>` extraction
+  before any `M3`/`M4`, then starts the last active spindle mode and waits for
+  the configured dwell at clearance. The replayed boundary owns XY travel and
+  the plunge. Laser recovery keeps its beam-off position-first order.
+- The checkpoint optionally persists the terminal safety category, operator
+  message, and rejected line without a schema bump; existing schema-v3 records
+  remain readable.
+- A final `ok` advances progress but does not clear recovery. Clearing requires
+  the completed stream to be released while connected at physical `Idle`.
+
+### Consequences
+
+Router recovery deliberately recuts from the start of a cutting segment rather
+than trusting an arbitrary buffered line. This can mark already-cut material,
+but avoids both gaps and a spindle restart while embedded. The operator still
+must preserve work zero and pass all normal readiness checks. The behavior is
+unit/integration verified; real interruption and embedded-tool hardware tests
+remain unverified and must use the standing air-cut/scrap protocol first.
+
+## ADR-137 - Trace reliability: latest request wins and completed work is reusable (2026-07-11)
+
+**Status:** accepted.
+
+> **Numbering note.** ADR-136 (CNC retract-first interruption recovery) was the last used; **ADR-137** is the next free.
+
+### Context
+
+The trace dialog debounces preview state, but the shared worker client still queues every request. A CPU-bound worker cannot receive a cancellation message until its current synchronous trace returns, so rapid preset changes can put obsolete jobs ahead of the only result the user wants. Every queued request also starts its own fixed timeout. Clicking Trace then decodes and traces the same source again even when the current preview already contains the matching geometry. On large or supersampled images, this duplicate and queued work is a more credible failure source than the tracing quality itself.
+
+### Decision
+
+Make the tracing pipeline explicitly single-flight and latest-wins. Starting a new worker trace retires the worker that owns an unfinished request, rejects that request with a typed superseded error, and runs the new request on a fresh worker. Supersession is control flow, not a preview error and not a reason to retry inline. The timeout applies only to the active request. A ready preview carries the identity of the file, options, boundary, and boundary mode; commit may reuse its paths and bounds only while all of those inputs still match. Bounded resize-at-decode, transferable worker buffers, and backend-specific working-pixel budgets preserve this one-live-job contract while limiting large-image memory and compute.
+
+### Consequences
+
+- Rapid option changes can pay worker startup again, but never wait behind stale CPU work; old worker memory becomes reclaimable as soon as it is terminated.
+- The preview and commit paths share one completed result when their inputs match, removing the most common duplicate full trace.
+- Large images are bounded before allocation-heavy tracing, and Region Enhance cannot stack an inner 4x supersampling pass on top of its own work scale.
+- This is in-process cancellation, not cooperative cancellation inside the tracing algorithms. A backend that monopolizes the main thread remains out of scope, and worker termination latency remains browser-controlled.
+- Regression coverage proves superseded jobs cannot fall back inline, stale timers cannot retire the replacement worker, mismatched preview inputs cannot be reused at commit, and working-pixel budgets hold across representative image sizes.
+
+## ADR-138 - The primary toolbar is icon-first and never wraps
+The primary toolbar had fourteen text buttons and wrapped into a second row at
+compact desktop widths. That reduced canvas height, shifted the numeric toolbar
+and workspace during resize, and made the command surface visually dominant.
+Removing commands would improve density at the cost of discoverability.
+
+### Decision
+
+- Every toolbar command uses a pinned `lucide-static` icon. Familiar file,
+  import, export, Preview, and Shortcuts actions are icon-only at all widths.
+- Specialist commands retain icon-plus-label presentation above 1280 px and
+  switch to icon-only at 1280 px and below.
+- Icon-only buttons keep the complete command label as their accessible name
+  and retain the command registry's tooltip, shortcut, disabled reason, and
+  pressed state.
+- The toolbar is one non-wrapping row. Its command-group region may scroll
+  horizontally on unusually narrow windows; the brand and Shortcuts control
+  remain fixed outside that region, except the redundant brand wordmark hides
+  below 700 px to preserve every command before scrolling is needed.
+- Icons come from the already-approved `lucide-static` dependency. Imported SVG
+  strings are build assets, never project or user content.
+
+### Consequences
+
+The workspace no longer jumps between one-row and two-row chrome. Common
+desktop widths gain vertical space while specialist labels remain available
+where room permits. Operators on narrow windows may need to horizontally scroll
+the command group, but every command also remains available from the menus.
+
+## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The fixed 320 px Cuts/Layers rail and 300 px machine rail consume most of a
+1024 px workspace before the drawing tool strip. The canvas remains technically
+responsive but becomes too narrow for practical layout work. Neither rail had a
+visibility command, so operators could not trade inspector space for canvas
+space without resizing the whole application.
+
+The machine rail also owns the visible Stop control. Treating it like an
+ordinary hideable inspector during a stream would remove the primary pointer
+target for an emergency stop, even though the global keyboard shortcut remains.
+
+### Decision
+
+- Ephemeral UI state tracks Cuts/Layers and machine-panel visibility
+  independently. It is not project data and is not included in undo or `.lf2`.
+- Each expanded rail has a header collapse button. A collapsed rail remains as
+  a narrow named strip with an expand button, preserving location and
+  discoverability.
+- Checked commands in the Window menu mirror both visibility states.
+- Entering a viewport 700 px wide or narrower collapses both rails once. Users
+  may expand either rail while remaining compact; the default reapplies only on
+  the next transition into compact mode.
+- An active job makes the machine panel fail-visible regardless of its stored
+  preference. Its collapse button and Window command are disabled until the job
+  is no longer active, so the visible Stop control remains reachable.
+
+### Consequences
+
+Compact windows can recover 280 px per collapsed rail without hiding how to
+restore the panels. Ending a job restores the operator's prior machine-panel
+preference, so a panel that was collapsed before Start collapses again after the
+stream fully settles. Panel visibility remains session-only; persistence across
+launches can be added later if user testing shows that preference is valuable.
+At 700 px and below, the initial canvas no longer collapses to zero width.
+
+## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
+
+> **Numbering note.** ADR-137 through ADR-139 are accepted. **ADR-140** is allocated to this decision.
+
+Context. A profile cut removes the full wall across its depth passes, so the
+finished edge carries the roughing tool's deflection and chatter. Production CNC
+work leaves a small "stock to leave" allowance on roughing and removes it with a
+light finishing pass along the true contour for a cleaner wall.
+
+Decision. Optional per-layer `finishAllowanceMm` on CncLayerSettings, for
+profile-outside / profile-inside cuts only (0/absent = off, byte-identical).
+When > 0:
+- Roughing offsets the contour by tool-radius + allowance, staying that far
+  proud of the finished wall (profileToolpathPolylines gained an allowance arg).
+- One finishing pass at the true contour (tool-radius offset, allowance 0) at
+  full depth is appended after the roughing passes.
+- Holding tabs: the finishing pass runs through the SAME tab split the deepest
+  roughing pass uses, so tabs are preserved and the part stays attached.
+
+Scope. Profile cuts only. Pocket-wall finishing, profile-on-path, and relief
+(which already has its own H.8 finishing skim) are out of scope, documented in
+code, and covered by a test showing those cut types are unaffected.
+
+Consequences.
+- Determinism (#5): allowance 0/absent is byte-identical (tested).
+- HARDWARE-GATED / CLAIMED: the toolpath is unverified on a real machine.
+- RESIDUAL RISK - tab alignment: roughing and finishing tabs are placed by the
+  same perimeter-fraction logic on concentric contours, so they align for
+  typical convex profiles; on complex/concave geometry clipper's offset can pick
+  a different start vertex and misalign them, which could sever the part. Verify
+  with a test cut before trusting tabs + finish allowance together on intricate
+  parts.
+
+---
+
+## ADR-141 - The network-camera bridge is desktop and local-development only
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-140 records the CNC finish allowance; **ADR-141** is the next allocated decision number.
+
+### Context
+
+An exact hosted-origin allowlist still lets same-origin XSS drive the operator's
+loopback bridge and reach private-network cameras. A token delivered to browser
+JavaScript would not close that threat because the same XSS could reuse it.
+
+### Decision
+
+The bridge accepts browser requests only from `app://app` and HTTP loopback
+origins used by local development. Hosted origins are rejected before any
+discovery, probe, proxy, or ffmpeg work. Hosted builds retain USB cameras;
+network cameras require Desktop or local development.
+
+### Consequences
+
+A compromised hosted page can no longer use KerfDesk's bridge as a private
+network camera oracle. Desktop is the supported network-camera workflow.
+
+---
+
+## ADR-142 - Production desktop tags require a valid Windows signature
+
+**Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-141 records the network-camera bridge restriction; **ADR-142** is the next allocated decision number.
+
+### Context
+
+The release workflow could publish an unsigned Windows installer when signing
+secrets were absent.
+
+### Decision
+
+Tag builds fail before packaging unless `CSC_LINK` and `CSC_KEY_PASSWORD`
+exist. After packaging, `Get-AuthenticodeSignature` must report `Valid` before
+publication. Manual dispatch remains an unsigned, non-publishing dry run.
+
+### Consequences
+
+A Windows code-signing certificate is required for the next tagged release.
+Missing or invalid signing material fails closed. ADR-135's automatic-update
+trust constant remains a separate, deliberate release switch.
+
+---
+
+## ADR-143 - Disable executable CNC checkpoint and start-from-line recovery
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+ADR-136 improved one failure mode by rewinding CNC recovery to a retract-first
+boundary, but the app still could not prove that retract was safe. A GRBL `ok`
+means a line was accepted into controller/planner processing; it does not prove
+that the physical cut completed, that position survived the interruption, or
+that the cutter is clear. Automatically moving Z can therefore pull a stopped
+or broken tool through stock, clamps, or a shifted workpiece. No generic G-code
+preamble can infer tool engagement, retained work coordinates, workholding
+integrity, or the correct extraction direction.
+
+### Decision
+
+- Automatic CNC restart from both checkpoints and arbitrary G-code lines is
+  disabled. The core resume builder returns a stable policy error for every CNC
+  request before it parses or emits any motion.
+- The UI removes the executable CNC recovery controls and replaces them with a
+  supervised recovery message: inspect engagement, establish clearance with a
+  machine-specific procedure, re-home if position may be lost, verify WCS/Z
+  zero/tool/workholding, and start a newly reviewed recovery job.
+- CNC checkpoints remain visible as diagnostic evidence, including accepted-line
+  counts and the recorded interruption cause, until the operator dismisses them.
+  Their counts are labelled as controller acknowledgements, not completed motion.
+- Laser start-from-line and checkpoint recovery remain available with their
+  beam-off positioning rules. Ordinary live Feed Hold/Resume is unchanged; it
+  resumes the same controller session and is not crash/start-from-line recovery.
+
+### Consequences
+
+KerfDesk no longer offers one-click continuation for an interrupted router job.
+Operators may lose machining time and must create a deliberate recovery job,
+but the application will not guess physical cutter state from transport-level
+acknowledgements. A future CNC recovery feature requires machine-specific,
+hardware-validated state acquisition and a supervised recovery state machine;
+re-enabling the old retract-first preamble is not an acceptable shortcut.
+
+---
+
+## ADR-144 - Parametric shape edits rematerialize canonical geometry
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Rectangle, ellipse, polygon, and star objects retain their generating parameters, but those
+parameters were immutable after the initial canvas drag. The selected-object panel exposed only
+laser output overrides, despite calling itself Shape Properties, and disappeared entirely in CNC
+mode. Resizing could change the overall transform but could not change a rectangle corner radius,
+polygon side count, or star inset.
+
+### Decision
+
+- A single selected parametric shape exposes validated geometry fields in Shape Properties for
+  both laser and CNC projects. Multi-selection and polyline node editing keep their existing tools.
+- Each edit sanitizes the complete discriminated shape spec, then regenerates bounds,
+  compatibility polylines, and schema-v2 canonical curves through the established shape factories.
+- Rematerialization preserves object ID, transform, color, power scale, operation override,
+  provenance, stacking order, and group ownership.
+- One committed field edit creates one undo frame. Invalid or unchanged input creates none.
+
+### Consequences
+
+Parametric objects remain editable instead of becoming effectively baked after creation. Preview,
+save, laser compilation, and CNC compilation continue to consume the same materialized paths, so
+no downstream shape-specific branch is added. Width and radius values remain object-local geometry;
+the existing selection transform controls continue to own whole-object scale, rotation, and mirror.
+
+---
+
+## ADR-150 - Adopt bounded variable-data production as a Phase D extension
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Phase D originally scoped ordinary text in bundled fonts. The production workflow now also has
+typed serial, date/time, CSV, and cut-setting fields, while this branch adds bounded record and
+serial ranges, configurable step size, forward/reverse wrap, and reset. Leaving that capability
+outside PROJECT.md would make persistence and output behavior look accidental despite its bounded
+validators, deterministic tests, and explicit operator controls.
+
+### Decision
+
+- Adopt variable text and bounded sequence controls as a Phase D production extension.
+- Keep imported CSV normalized and embedded in the project; no network or database source is
+  introduced.
+- Advance values only after explicit operator action, successful export, or completed streaming.
+  Failed or stale output must not advance production state.
+- Clamp persisted ranges to the embedded dataset and require safe integers for serial arithmetic.
+- Barcode/QR fields, live databases, and automatic label imposition remain out of scope.
+
+### Consequences
+
+Variable production is now intentional product scope rather than an undocumented accretion.
+Projects remain offline and self-contained, and long runs have deterministic bounds and wrap
+semantics. The schema surface grows, so load validation and round-trip tests remain release gates.
+
+---
+
+## ADR-151 - Quick Nest uses bounded outline compaction with rectangular fallback
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Rectangle-only nesting wastes material around concave and irregular art. Exact outline compaction
+can reduce that waste, but its candidate search and polygon intersections run synchronously on the
+UI thread. An item-count limit alone does not bound dense outlines, and a large concave corpus can
+freeze the application before the operator can cancel.
+
+### Decision
+
+- Quick Nest may compact placements using sanitized closed object outlines after a conservative
+  rectangular nest establishes a valid seed.
+- Outline mode is limited to 32 items and a deterministic point-weighted work budget of 250,000
+  (`itemCount² × totalOutlinePoints`). Candidate count is independently capped.
+- Inputs outside either budget use the existing rectangular algorithm immediately. Invalid
+  polygons, Clipper failures, or a non-improving search also fall back to the rectangular result.
+- Every accepted outline placement is revalidated against the bed, padding, obstacles, and peer
+  geometry before it can update the scene.
+
+### Consequences
+
+Small and medium irregular jobs can save stock without changing the safe default for dense or large
+jobs. The synchronous algorithm now has an enforceable upper bound, while rectangular fallback
+preserves responsiveness and deterministic placement. Moving outline search to a worker remains a
+future optimization, not a prerequisite for safe use.
+
+---
+
+## ADR-152 - Offset pockets may use locally tangent native helical entries
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Straight plunges load the cutter poorly in pocket stock. Phase H.9 therefore deferred helical entry
+until a dedicated decision could define fit validation, controller motion, preview/tiling behavior,
+and refusal boundaries. The first candidate used one shared center helix for every offset ring,
+which repeatedly bored cleared air and fed laterally at full depth to each contour.
+
+### Decision
+
+- Offset-ring pockets may opt into a native G2/G3 helical entry with bounded minimum/maximum
+  diameter and ramp angle. Raster pockets, open paths, islands, and disconnected pockets refuse the
+  option instead of silently reverting to a plunge.
+- Every clearing ring receives a deterministic tangent entry whose helix ends exactly at that
+  ring's contour start. The circle is fit against the enclosing pocket boundary, so very small
+  inner rings can retain the configured minimum diameter without leaving the pocket.
+- The emitter retracts to safe Z and relocates before every ring. No shared-center re-boring and no
+  full-depth connector move are emitted between the helix and its contour.
+- Preview, estimates, origin transforms, tiling, persistence, and preflight treat the helix as a
+  first-class descending CNC pass.
+
+### Consequences
+
+Supported pockets enter stock gradually while preserving safe relocation discipline and exact
+contour joins. More arcs and retracts can increase output size and cycle time, but avoid ambiguous
+links through uncut material. Multi-pocket and island-aware planning remains deferred. The motion
+is software-verified and hardware-gated until the standing CNC air-cut and scrap protocol passes.
+
+---
+
+## ADR-153 - Two-tool pocket rest machining uses bounded 2D stock subtraction
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+A small end mill can reach pocket details that a larger rougher cannot, but clearing the entire
+pocket with the small tool wastes substantial time. Rest machining needs an explicit definition of
+remaining stock and tool-change order; calling ordinary offset rings "adaptive" would overstate the
+planner and hide failure cases.
+
+### Decision
+
+- A pocket layer may select one larger end mill to clear bulk material before its normal smaller
+  bit machines only the modeled remainder.
+- Remaining stock is computed in bounded 2D: inset legal rougher centers, dilate by the rougher
+  footprint, subtract that swept region, expand the remainder by the finishing radius, and intersect
+  it with the finishing tool's legal center region.
+- The larger-tool section runs first. The existing multi-tool contract inserts one manual M0 tool
+  change before the smaller rest section.
+- Missing tools, invalid diameter order, open contours, oversized roughers, geometry failures, and
+  combination with helical entry block preflight. No invalid request falls back to a full-pocket cut
+  with the small bit.
+- This feature is tool-diameter-based 2D rest machining, not in-process stock simulation or
+  constant-engagement adaptive clearing.
+
+### Consequences
+
+Large pockets can clear faster while retaining small-feature reach and island protection. The
+result depends on a deliberate manual tool change and correct Z touch-off. Software tests cover
+geometry, ordering, persistence, preview, and preflight; hardware remains CLAIMED until the standing
+two-tool air-cut and scrap protocol passes.
+
+---
+
+## ADR-154 - Adaptive pockets require verified constant-load ring sequences
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Ordinary pocket offsets can spend long segments at high cutter engagement and do not establish that
+the requested stock was actually cleared. Calling them adaptive without a bounded planner and an
+independent coverage check would overstate both performance and safety. A first implementation can
+support common closed pockets without claiming island-aware or full stock-simulation behavior.
+
+### Decision
+
+- End-mill pockets may opt into deterministic constant-load roughing sequences using an explicit
+  optimal load, defaulted to 10% and capped at 50% of tool diameter.
+- Planning is limited to sanitized closed, island-free regions. Open contours, islands, invalid
+  parameters, and geometry failures block preflight instead of falling back silently.
+- Each sequence uses a native locally fitted helical entry and conventional cleanup contours.
+- An independent bounded stock-removal verifier must confirm engagement and at least 98.5% coverage.
+  Jobs exceeding its 1,000,000-cell budget are refused rather than checked at reduced resolution.
+- This is bounded 2D adaptive clearing, not a medial-axis trochoidal planner or full in-process stock
+  simulation. Hardware status remains CLAIMED until the standing CNC air-cut and scrap test passes.
+
+### Consequences
+
+Supported pockets receive deterministic, software-verified roughing paths with explicit failure
+boundaries. Large pockets and island geometry can be rejected even when an ordinary pocket strategy
+would compile; that fail-closed behavior is intentional until a scalable, island-aware verifier is
+adopted. The planner, verifier, persistence, preflight, preview, and emitted arcs remain release-gated.
+
+---
+
+## ADR-155 - Straight inlays compile as one radius-matched linked pair
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Producing a usable straight-sided inlay requires more than duplicating an outline: the pocket and
+insert must share the same machinable corner geometry, apply a deliberate fit clearance, run in a
+safe order, and retain independent depths. Treating the two halves as unrelated layers would make
+fit and placement easy to desynchronize.
+
+### Decision
+
+- One closed source shape may compile into a linked female pocket and mirrored male insert using the
+  same end mill and one radius-compensated canonical contour.
+- Fit allowance is specified in millimetres per side and split symmetrically between pocket expansion
+  and insert contraction. The insert is placed to the right by a configurable positive spacing.
+- The female pocket runs before the male profile. Pocket and insert depths remain independent, and
+  the insert may use the standard holding-tab contract.
+- Open or unusable geometry, non-end-mill tools, invalid depths or clearances, and offsets that erase
+  either half block preflight instead of producing a partial pair.
+- This decision covers straight-sided inlays only. Tapered V-carve plugs require a separate model for
+  glue gap, surface clearance, and plug stock depth.
+
+### Consequences
+
+The two halves cannot drift in tool radius, allowance, ordering, or persisted settings. Mirroring
+creates a ready-to-cut pair but increases required stock width, which preview and bed checks must
+still validate. Software verification covers geometry, compilation, ordering, persistence, and
+preflight; hardware remains CLAIMED until the standing CNC air-cut and scrap protocol passes.
+
+---
+
+## ADR-156 - Manual CNC tabs use persisted normalized contour anchors
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Automatic tab spacing can place bridges on corners, visible faces, or difficult cleanup locations.
+Direct manipulation is useful only if the displayed handles, saved project, compensated toolpath,
+and emitted gaps all describe the same physical positions after ordinary object transforms.
+
+### Decision
+
+- A selected closed profile object may replace its automatic distribution with object-level anchors
+  identified by layer color, path index, polyline index, and normalized contour arc length.
+- Dragging projects the handle back onto an eligible source contour. Move, rotate, mirror, scale,
+  duplicate, save, and reload preserve the normalized anchors with the object.
+- Compilation projects each source anchor onto the matching compensated roughing and finishing
+  contours before splitting tab gaps. Objects without manual anchors continue using automatic tabs,
+  including other objects on the same layer.
+- Reset removes the manual anchors for that layer and restores automatic distribution. One drag is
+  one undoable interaction, and Escape restores the pre-drag project.
+- Manual positions apply to ordinary closed profile cuts. Generated inlay inserts, click-to-add or
+  delete, and triangular 3D tabs remain outside this decision.
+
+### Consequences
+
+Operators can move bridges away from weak or visible locations without losing them across project
+round trips or object transforms. Anchors depend on the referenced path topology; a future topology-
+changing editor must deliberately remap or invalidate them rather than guessing. Software tests
+cover persistence, mixed automatic/manual layers, compensated roughing and finishing paths, and
+interaction undo; hardware remains CLAIMED pending the standing CNC cut protocol.
+
+---
+
+## ADR-157 - Detected controller identity gates profile transport and output
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Machine profiles previously carried controller family, streaming mode, receive-window size, and
+G-code dialect as independently selectable fields. After firmware detection, those fields could
+describe different controller families, leaving a seemingly valid profile able to stream with a
+stale driver or emit an incompatible dialect.
+
+### Decision
+
+- One pure compatibility policy reconciles configured and detected controller family, streaming
+  mode, bounded receive window, and output dialect while reporting every correction.
+- Marlin and Smoothieware use one-line acknowledged streaming. Crossing back to a GRBL-family
+  controller restores character-counted streaming; compatible explicit GRBL choices remain intact.
+- A completed settings read may overlay controller-reported machine limits onto catalog defaults.
+  Before such a read, selecting a profile does not borrow stale limits from the current connection.
+- Once firmware is detected, profiles for another controller family remain visible but cannot be
+  applied. Start and Resume refuse if configured, active, and detected controller identities differ.
+- Simulator evidence does not upgrade a controller family to hardware-verified status. Existing
+  catalog confidence labels and the physical fault matrix remain authoritative.
+
+### Consequences
+
+Profile selection, connection diagnostics, persisted transport fields, output strategy, and Start
+readiness now share one controller contract. Operators may need to reconnect after changing profile
+families, and unsafe cross-family combinations fail visibly rather than being corrected only at
+stream time. The policy expands safety coverage without claiming a broader hardware ecosystem.
+
+---
+
+## ADR-171 - Work-Z readiness uses source-qualified, epoch-bound evidence
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The CNC stock-top contract was represented by one session Boolean. It recorded neither how Z0 was
+established nor which reference state it belonged to. A future invalidation omission could
+therefore let stale truth suppress the Start warning or unlock tool-change Continue. Persistent
+origin paths also emit `G92.1`, which clears a prior `G92 Z0` even when persistent XY authority
+remains valid.
+
+### Decision
+
+- Replace the Boolean with `WorkZZeroEvidence { source, referenceEpoch }`, where source distinguishes
+  a manual Zero Z from a fully settled probe transaction.
+- Maintain a dedicated `workZReferenceEpoch`. Normal motion and XY-only origin changes preserve it.
+  Reconnect, reset, alarm, home, tool changes, probe attempts, Z/tool/full-WCS console mutations,
+  motor release, and configuration changes advance it and clear the evidence.
+- Start advisories and tool-change Continue accept evidence only when its epoch equals the current
+  work-Z reference epoch.
+- Reset Origin and Set Persistent Origin invalidate Z evidence because their command sequences emit
+  `G92.1`. Multi-write actions apply that invalidation after the successful `G92.1` write, so a later
+  `G10` failure cannot leave stale evidence behind.
+
+### Consequences
+
+Known motion no longer causes unnecessary re-zeroing, while reference-changing operations cannot
+reuse an earlier bit-to-stock claim. The record still does not prove active tool identity, physical
+touch-plate removal, WCS number, clamp state, or spindle-at-speed; those require additional modeled
+evidence and hardware qualification.
+
+---
+
+## ADR-172 - Missing qualified work Z blocks CNC Start
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+KerfDesk's generated CNC programs define Z0 as the stock top, but Start treated
+missing work-Z evidence as an overridable warning. Continuing could therefore
+apply every programmed depth from an unknown datum. ADR-171 made the evidence
+source-qualified and reference-epoch-bound, so the host can now distinguish
+current setup evidence from missing or stale state without relying on XY origin.
+
+### Decision
+
+- Missing, stale, or absent work-Z evidence is an early CNC Start blocker.
+- Manual Zero Z and a fully settled probe are accepted only when their evidence
+  epoch matches the current work-Z reference epoch.
+- Set Origin remains XY-only and cannot satisfy the Z gate. Laser jobs retain
+  their existing Start behavior because they have no stock-top depth contract.
+- Other machine/project advisories remain warnings; this policy change is
+  limited to the datum required by the emitted CNC coordinates.
+
+### Consequences
+
+An operator must explicitly establish stock-top Z0 before every fresh CNC Start
+after a reference-invalidating event. This adds setup friction but removes a
+direct path to cutting at the wrong physical depth. It still does not prove
+tool identity, clamping, plate removal, or spindle-at-speed feedback.
+
+---
+
+## ADR-173 - Bind work-Z evidence to the compiled CNC tool plan
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+Epoch-bound evidence proved that Z0 was freshly established, but not which cutter was in the
+spindle. Z0 for a 3.175 mm end mill could therefore unlock a job whose first compiled section uses a
+different bit. The same ambiguity existed after M0: a freshly zeroed but wrong replacement cutter
+could unlock Continue. Comment labels improved operator guidance but were not stable identity.
+
+### Decision
+
+- Manual Zero Z and probe transactions snapshot the stable ID of the Active bit when the physical
+  reference operation begins. A project edit while probing cannot relabel the completed evidence.
+- The prepared CNC Job produces structured tool-plan metadata from its exact contiguous section
+  order. The metadata travels beside the stream; emitted G-code remains byte-identical.
+- CNC Start requires current Z evidence whose tool ID matches the first compiled section. Each M0
+  hold carries the next section's ID and Continue requires newly established evidence for that ID.
+- Legacy/imported streams without structured IDs retain their existing label-only behavior; native
+  KerfDesk CNC compilation always supplies the structured plan.
+
+### Consequences
+
+Changing the selected cutter or compiling a different first section can no longer reuse unrelated
+Z evidence. The host proves consistency between operator-selected tool identity, Z evidence, and
+the compiled plan; it still cannot physically sense the cutter, clamp, touch plate, or spindle.
+>>>>>>> aed41269 (fix: bind CNC Z evidence to tool plan)

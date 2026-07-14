@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -93,6 +95,7 @@ afterEach(async () => {
     controllerOperation: null,
     pendingUntrackedAcks: 0,
   });
+  useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
 

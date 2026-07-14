@@ -83,6 +83,7 @@ export async function runStartJobFlow(): Promise<void> {
       ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
+      ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
     });
     armVariableStreamAdvancement(project);
     // Checkpoint the run only once the stream is actually under way

@@ -18,7 +18,7 @@ const PAUSE_STREAM_SIDE_MESSAGE =
 // back to the generic prompt for a single-tool / imported / resume-tail job.
 function toolChangeMessage(bitLabel: string | null): string {
   const bit = bitLabel === null ? 'the next bit' : bitLabel;
-  return `Job paused for a tool change. Load ${bit} and re-zero Z on the stock top (jog, then Zero Z), then Continue to resume.`;
+  return `Job paused for a tool change. Load ${bit}, select it as the Active bit, and re-zero Z on the stock top (jog, then Zero Z), then Continue to resume.`;
 }
 
 export function RunningControls(props: {
@@ -85,7 +85,7 @@ export function RunningControls(props: {
         <span style={runningSafetyStyle}>
           {safetyMessage}{' '}
           {props.isToolChange
-            ? 'Continue unlocks only after fresh Idle and Z zero; it lifts to safe Z before spindle start.'
+            ? 'Continue unlocks only after fresh Idle and tool-matched Z zero; it lifts to safe Z before spindle start.'
             : ''}
         </span>
       </div>
