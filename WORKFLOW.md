@@ -923,13 +923,36 @@ The guided alternative to hunting through the Device Profile panel and the seven
 
 ---
 
-## Phase D flows — STUB
+## Phase D flows
 
 - F-D1. Add text object
 - F-D2. Edit text content
 - F-D3. Choose font
 - F-D4. Adjust character spacing / line height
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
+
+### F-D6. Add CNC single-line text
+
+#### Success
+1. Open Add Text and choose **Hershey Simplex (single-line)**.
+2. The preview and saved text contain open center strokes rather than inner and outer
+   glyph outlines. An `O` is one tool-following loop, not two concentric contours.
+3. A fresh CNC text layer defaults to **Engrave/on-path**, including when the active
+   tool is a V-bit. Existing outline fonts keep the normal V-carve default with a V-bit.
+4. Edit, bend, path placement, save/load, variable text, and G-code compilation reuse
+   the same materialized text-path flow as outline fonts.
+
+#### Error — unsupported character
+1. Roman Simplex covers printable ASCII. An unsupported character renders as `?` so
+   missing geometry is visible rather than silently omitted.
+
+#### Empty
+1. Blank or whitespace-only input remains blocked by the existing text-dialog guard.
+
+#### Edge — shared layer already configured for another CNC operation
+1. The font hint identifies single-line text as Engrave/on-path geometry. KerfDesk does
+   not rewrite an existing layer because doing so could change other objects on it; the
+   operator moves the text to an Engrave layer when needed.
 
 ---
 

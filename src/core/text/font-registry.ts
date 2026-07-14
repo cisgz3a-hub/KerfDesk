@@ -5,13 +5,13 @@
 // the registry; the keys themselves never change so a 3-year-old .lf2
 // still resolves.
 //
-// Phase D bundles four fonts across three style classes (sans for
-// prose, mono for technical labels, script for decorative). All are
-// MIT-compatible per ADR-017 and ADR-012:
+// Phase D bundles four outline fonts plus one CNC single-line font.
+// All are redistributable under ADR-017 and ADR-012/191:
 //   - Roboto Regular          Apache-2.0     sans
 //   - Inconsolata Regular     OFL-1.1        mono
 //   - Pacifico Regular        OFL-1.1        script (handwritten)
 //   - Dancing Script Regular  OFL-1.1        script (calligraphic)
+//   - Hershey Roman Simplex   public-domain data with acknowledgement terms
 //
 // File loading: the UI layer fetches the .ttf via a browser fetch()
 // to a known asset path. Pure-core stays binary-free; this module
@@ -26,29 +26,60 @@ export type KnownFontKey =
   | 'roboto-regular'
   | 'inconsolata-regular'
   | 'pacifico-regular'
-  | 'dancing-script-regular';
+  | 'dancing-script-regular'
+  | 'hershey-simplex';
 
-export type FontEntry = {
-  readonly key: KnownFontKey;
+type FontEntryBase = {
   readonly displayName: string;
   readonly license: string;
-  readonly styleClass: 'sans' | 'mono' | 'script';
+  readonly styleClass: 'sans' | 'mono' | 'script' | 'single-line';
 };
 
+export type FontEntry =
+  | (FontEntryBase & {
+      readonly key: Exclude<KnownFontKey, 'hershey-simplex'>;
+      readonly geometry: 'outline';
+    })
+  | (FontEntryBase & {
+      readonly key: Extract<KnownFontKey, 'hershey-simplex'>;
+      readonly geometry: 'single-line';
+    });
+
 export const FONT_REGISTRY: ReadonlyArray<FontEntry> = [
-  { key: 'roboto-regular', displayName: 'Roboto', license: 'Apache-2.0', styleClass: 'sans' },
+  {
+    key: 'roboto-regular',
+    displayName: 'Roboto',
+    license: 'Apache-2.0',
+    styleClass: 'sans',
+    geometry: 'outline',
+  },
   {
     key: 'inconsolata-regular',
     displayName: 'Inconsolata',
     license: 'OFL-1.1',
     styleClass: 'mono',
+    geometry: 'outline',
   },
-  { key: 'pacifico-regular', displayName: 'Pacifico', license: 'OFL-1.1', styleClass: 'script' },
+  {
+    key: 'pacifico-regular',
+    displayName: 'Pacifico',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
   {
     key: 'dancing-script-regular',
     displayName: 'Dancing Script',
     license: 'OFL-1.1',
     styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'hershey-simplex',
+    displayName: 'Hershey Simplex',
+    license: 'Hershey redistribution terms',
+    styleClass: 'single-line',
+    geometry: 'single-line',
   },
 ];
 

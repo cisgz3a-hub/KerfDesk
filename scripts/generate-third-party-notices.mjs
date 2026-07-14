@@ -33,6 +33,12 @@ const LICENSE_TEXTS = {
   'OFL-1.1': fs.readFileSync(path.join(root, 'scripts/license-texts/OFL-1.1.txt'), 'utf8'),
 };
 
+const HERSHEY_NOTICE = fs
+  .readFileSync(path.join(root, 'scripts/license-texts/Hershey.txt'), 'utf8')
+  .split(/\r?\n/)
+  .map((line) => line.trimEnd())
+  .join('\n');
+
 function fail(message) {
   process.stderr.write(`generate-third-party-notices: ${message}\n`);
   process.exit(1);
@@ -46,7 +52,7 @@ function fontNameEntry(font, key) {
 }
 
 function fontSections() {
-  return FONTS.map(({ file, name, spdx }) => {
+  const outlineFonts = FONTS.map(({ file, name, spdx }) => {
     const abs = path.join(root, file);
     if (!fs.existsSync(abs)) fail(`font file missing: ${file}`);
     const data = fs.readFileSync(abs);
@@ -65,6 +71,15 @@ function fontSections() {
       `Full license text: see the ${spdx} section at the end of this file.`,
     ].join('\n');
   });
+  return [
+    ...outlineFonts,
+    [
+      '--- Font: Hershey Roman Simplex (Hershey redistribution terms) ---',
+      'Created by Dr. A. V. Hershey at the U. S. National Bureau of Standards.',
+      'Distribution format created by James Hurt, Cognition, Inc.',
+      HERSHEY_NOTICE.trim(),
+    ].join('\n'),
+  ];
 }
 
 function findLicenseFile(depDir) {

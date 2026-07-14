@@ -33,7 +33,7 @@ domain under the Unlicense.
 
 ---
 
-## Bundled fonts (`src/ui/text/fonts/`, lazy-loaded from `dist/web/assets/*.ttf`)
+## Bundled fonts (`src/ui/text/fonts/` TTF assets and `src/core/text/` stroke data)
 
 Per PROJECT.md / ADR-017 these are MIT-*compatible* permissive font licenses
 (Apache-2.0 + SIL Open Font License 1.1) — **not** MIT. OFL-1.1 requires its
@@ -45,6 +45,7 @@ copyright notice and license to accompany the font in any distribution.
 | Inconsolata Regular | OFL-1.1 | Copyright The Inconsolata Project Authors (Raph Levien) |
 | Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
 | Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
+| Hershey Roman Simplex | Hershey redistribution terms | Dr. A. V. Hershey, U. S. National Bureau of Standards; distribution format by James Hurt, Cognition, Inc. |
 
 - **Apache-2.0** (Roboto): full text at https://www.apache.org/licenses/LICENSE-2.0 —
   the license and any `NOTICE` file must accompany the distribution.
@@ -52,6 +53,10 @@ copyright notice and license to accompany the font in any distribution.
   https://openfontlicense.org — the above copyright notice and this license must be
   bundled with the fonts; the fonts may be redistributed but not sold on their own,
   and the Reserved Font Names must not be reused for modified versions.
+- **Hershey Roman Simplex:** the vector data may be used commercially or otherwise
+  when the Hershey and Hurt acknowledgements accompany it, and converted data is not
+  distributed in the restricted U.S. NTIS format. The complete terms ship in
+  `scripts/license-texts/Hershey.txt` and the generated application notices.
 
 > Maintainer follow-up (recommended for belt-and-suspenders): verify the exact
 > copyright strings against each `.ttf`'s `name` table and, ideally, ship the
