@@ -34,6 +34,19 @@ afterEach(() => {
   resetStore();
 });
 
+describe('DeviceSettings disclosure', () => {
+  it('opens the Device Profile panel by default so the fields are visible on mount', async () => {
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      expect(details.open).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+});
+
 describe('DeviceSettings air assist command', () => {
   it('lets the operator choose the GRBL air assist command', async () => {
     const { host, unmount } = await renderDeviceSettings();
