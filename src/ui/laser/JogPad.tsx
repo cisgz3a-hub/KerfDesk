@@ -23,6 +23,7 @@ import {
 } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { useJogShortcuts } from './use-jog-shortcuts';
+import { useZeroZAction } from './use-zero-z-action';
 
 const FOCUS_FEED_MM_PER_MIN = 600;
 
@@ -39,7 +40,6 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
-  const zeroZHere = useLaserStore((s) => s.zeroZHere);
   const statusReport = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const feed = clampJogFeed(selectedFeed, maxFeed);
@@ -69,6 +69,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const cancelContinuousJog = useCallback((): void => {
     void cancelJog().catch(() => undefined);
   }, [cancelJog]);
+  const handleZeroZ = useZeroZAction();
 
   useJogPadShortcuts(disabled, focusReady, sendDirection, sendFocus);
 
@@ -104,7 +105,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         focusStep={focusStep}
         setFocusStep={setFocusStep}
         onJog={sendFocus}
-        onZeroZ={() => void zeroZHere()}
+        onZeroZ={handleZeroZ}
       />
     </div>
   );
