@@ -20,129 +20,51 @@ import {
   findLaserOnTravelIssues,
   findOutOfBoundsCoords,
 } from '../invariants';
-import type { CutSegment, FillSegment, Job } from '../job';
-
-const FUZZ_RUNS = 100;
-const BED_WIDTH = DEFAULT_DEVICE_PROFILE.bedWidth;
-const BED_HEIGHT = DEFAULT_DEVICE_PROFILE.bedHeight;
-
-const arbVec2InBed = fc.record({
-  x: fc.double({
-    min: 0,
-    max: BED_WIDTH,
-    noNaN: true,
-    noDefaultInfinity: true,
-  }),
-  y: fc.double({
-    min: 0,
-    max: BED_HEIGHT,
-    noNaN: true,
-    noDefaultInfinity: true,
-  }),
-});
-
-const arbSegment: fc.Arbitrary<CutSegment> = fc.record({
-  polyline: fc.array(arbVec2InBed, { minLength: 2, maxLength: 12 }),
-  closed: fc.boolean(),
-});
-
-const arbGroup = fc.record({
-  kind: fc.constant('cut' as const),
-  layerId: fc.string({ minLength: 1, maxLength: 4 }),
-  color: fc.constantFrom('#ff0000', '#00ff00', '#0000ff', '#000000'),
-  power: fc.double({ min: 0, max: 100, noNaN: true, noDefaultInfinity: true }),
-  speed: fc.double({
-    min: 1,
-    max: DEFAULT_DEVICE_PROFILE.maxFeed,
-    noNaN: true,
-    noDefaultInfinity: true,
-  }),
-  passes: fc.integer({ min: 1, max: 3 }),
-  airAssist: fc.boolean(),
-  segments: fc.array(arbSegment, { minLength: 0, maxLength: 4 }),
-});
-
-const arbJob: fc.Arbitrary<Job> = fc.record({
-  groups: fc.array(arbGroup, { minLength: 0, maxLength: 3 }),
-});
-
-// Fill arbitraries (audit 2026-06-03): the continuous-sweep emit path
-// (groupFillSweeps + buildSweep's float projection/sort + the S0-gap emitter)
-// must be exercised by the determinism + laser-off fuzz, which previously only
-// fed cut groups. Spans are placed on a small set of shared Y values so runs
-// collide into multi-span sweeps with interior gaps — the path that matters.
-const arbFillSpan: fc.Arbitrary<FillSegment> = fc
-  .record({
-    y: fc.constantFrom(10, 20, 30),
-    x0: fc.double({ min: 0, max: BED_WIDTH, noNaN: true, noDefaultInfinity: true }),
-    x1: fc.double({ min: 0, max: BED_WIDTH, noNaN: true, noDefaultInfinity: true }),
-  })
-  .map(({ y, x0, x1 }) => ({
-    polyline: [
-      { x: x0, y },
-      { x: x1, y },
-    ],
-    closed: false,
-    reverse: false,
-  }));
-
-const arbFillGroup = fc.record({
-  kind: fc.constant('fill' as const),
-  layerId: fc.string({ minLength: 1, maxLength: 4 }),
-  color: fc.constantFrom('#ff0000', '#00ff00', '#000000'),
-  power: fc.double({ min: 0, max: 100, noNaN: true, noDefaultInfinity: true }),
-  speed: fc.double({
-    min: 1,
-    max: DEFAULT_DEVICE_PROFILE.maxFeed,
-    noNaN: true,
-    noDefaultInfinity: true,
-  }),
-  passes: fc.integer({ min: 1, max: 3 }),
-  airAssist: fc.boolean(),
-  overscanMm: fc.double({ min: 0, max: 5, noNaN: true, noDefaultInfinity: true }),
-  segments: fc.array(arbFillSpan, { minLength: 0, maxLength: 8 }),
-});
-
-const arbMixedJob: fc.Arbitrary<Job> = fc.record({
-  groups: fc.array(fc.oneof(arbGroup, arbFillGroup), { minLength: 0, maxLength: 3 }),
-});
+import type { Job } from '../job';
+import {
+  arbLaserJob,
+  arbMixedLaserJob,
+  OUTPUT_BED_HEIGHT,
+  OUTPUT_BED_WIDTH,
+  OUTPUT_FUZZ_RUNS,
+} from './__fixtures__/laser-job-arbitraries';
 
 describe('grblStrategy property tests', () => {
   it('is deterministic across 100 fuzz seeds', async () => {
     const { grblStrategy } = await import('./grbl-strategy');
     fc.assert(
-      fc.property(arbJob, (job) => {
+      fc.property(arbLaserJob, (job) => {
         const a = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         const b = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         return a === b;
       }),
-      { numRuns: FUZZ_RUNS },
+      { numRuns: OUTPUT_FUZZ_RUNS },
     );
   });
 
   it('emits zero laser-on-travel issues across 100 random jobs', async () => {
     const { grblStrategy } = await import('./grbl-strategy');
     fc.assert(
-      fc.property(arbJob, (job) => {
+      fc.property(arbLaserJob, (job) => {
         const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         return findLaserOnTravelIssues(out).length === 0;
       }),
-      { numRuns: FUZZ_RUNS },
+      { numRuns: OUTPUT_FUZZ_RUNS },
     );
   });
 
   it('emits zero out-of-bed coords across 100 in-bounds random jobs', async () => {
     const { grblStrategy } = await import('./grbl-strategy');
     fc.assert(
-      fc.property(arbJob, (job) => {
+      fc.property(arbLaserJob, (job) => {
         const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         const issues = findOutOfBoundsCoords(out, {
-          width: BED_WIDTH,
-          height: BED_HEIGHT,
+          width: OUTPUT_BED_WIDTH,
+          height: OUTPUT_BED_HEIGHT,
         });
         return issues.length === 0;
       }),
-      { numRuns: FUZZ_RUNS },
+      { numRuns: OUTPUT_FUZZ_RUNS },
     );
   });
 
@@ -214,23 +136,23 @@ describe('grblStrategy property tests', () => {
   it('is deterministic across 100 fuzz seeds INCLUDING fill groups (continuous-sweep path)', async () => {
     const { grblStrategy } = await import('./grbl-strategy');
     fc.assert(
-      fc.property(arbMixedJob, (job) => {
+      fc.property(arbMixedLaserJob, (job) => {
         const a = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         const b = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         return a === b;
       }),
-      { numRuns: FUZZ_RUNS },
+      { numRuns: OUTPUT_FUZZ_RUNS },
     );
   });
 
   it('emits zero laser-on-travel issues across 100 random jobs WITH fill groups', async () => {
     const { grblStrategy } = await import('./grbl-strategy');
     fc.assert(
-      fc.property(arbMixedJob, (job) => {
+      fc.property(arbMixedLaserJob, (job) => {
         const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         return findLaserOnTravelIssues(out).length === 0;
       }),
-      { numRuns: FUZZ_RUNS },
+      { numRuns: OUTPUT_FUZZ_RUNS },
     );
   });
 });

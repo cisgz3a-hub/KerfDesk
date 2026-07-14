@@ -168,6 +168,47 @@ function mixedProject(): Project {
   });
 }
 
+function crossDialectVectorProject(
+  controllerKind: 'marlin' | 'smoothieware',
+  dialectId: 'marlin-fan' | 'grbl-dynamic',
+  maxPowerS: number,
+): Project {
+  const base = projectWith({
+    ...EMPTY_SCENE,
+    objects: [
+      lineObject({
+        id: `${controllerKind}-cut`,
+        color: '#ff0000',
+        points: [
+          { x: 10, y: 10 },
+          { x: 30, y: 20 },
+          { x: 50, y: 10 },
+        ],
+      }),
+      donutObject('#0000ff'),
+    ],
+    layers: [createLayer({ id: 'line-red', color: '#ff0000' }), fillLayer('#0000ff')],
+  });
+  return {
+    ...base,
+    device: {
+      ...base.device,
+      controllerKind,
+      streamingMode: 'ping-pong',
+      gcodeDialect: { dialectId },
+      maxPowerS,
+    },
+  };
+}
+
+function marlinFanProject(): Project {
+  return crossDialectVectorProject('marlin', 'marlin-fan', 255);
+}
+
+function smoothiewareProject(): Project {
+  return crossDialectVectorProject('smoothieware', 'grbl-dynamic', 1);
+}
+
 function curveProject(): Project {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <path d="M 10 50 C 10 20 50 20 50 50 A 20 20 0 0 1 90 50" stroke="#ff0000" fill="none"/>
@@ -201,6 +242,8 @@ const CORPUS: ReadonlyArray<{ readonly id: string; readonly project: () => Proje
   { id: 'mixed-line-fill-image', project: mixedProject },
   { id: 'curve-bearing-svg', project: curveProject },
   { id: 'rounded-rectangle-and-ellipse', project: roundedRectangleAndEllipseProject },
+  { id: 'marlin-fan-vector', project: marlinFanProject },
+  { id: 'smoothieware-vector', project: smoothiewareProject },
 ];
 
 describe('emitGcode production composition — fixture snapshots', () => {
