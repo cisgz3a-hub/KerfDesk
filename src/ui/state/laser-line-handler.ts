@@ -34,6 +34,11 @@ import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import { appendSystemNotice } from './laser-system-notice';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
+import { classifyTerminalResponseOwnership } from './controller-terminal-ownership';
+import {
+  controllerOwnershipLostNotice,
+  CONTROLLER_OWNERSHIP_LOST_MESSAGE,
+} from './laser-safety-notice';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
 
@@ -55,6 +60,7 @@ export function handleLine(
   }
   const ackOwner = settleUntrackedAck(set, state, cls.kind);
   const commandConsumed = consumeControllerCommandResponse(refs, cls, line);
+  if (interceptUnexpectedTerminalResponse(set, state, cls, line, commandConsumed)) return;
   // An arbiter-owned ALARM still has global machine meaning: invalidate
   // origins, cancel a held stream, and surface the lock. The command promise
   // already rejected above; continue into the shared alarm handler as well.
@@ -81,6 +87,53 @@ export function handleLine(
   if (cls.kind === 'ok' && ackOwner === 'stream') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
+}
+
+function interceptUnexpectedTerminalResponse(
+  set: SetFn,
+  state: LaserState,
+  cls: ReturnType<HandlerRefs['driver']['classifyLine']>,
+  line: string,
+  controllerCommandConsumed: boolean,
+): boolean {
+  const ownership = classifyTerminalResponseOwnership({
+    controllerKind: state.activeControllerKind,
+    responseKind: cls.kind,
+    streamInFlight: state.streamer?.inFlight.length ?? 0,
+    pendingUntrackedAcks: state.pendingUntrackedAcks,
+    pendingTransportWrites: state.pendingTransportWrites ?? 0,
+    controllerCommandConsumed,
+    autofocusBusy: state.autofocusBusy,
+  });
+  if (ownership !== 'unexpected') return false;
+  const kind = cls.kind === 'error' ? 'error' : 'ok';
+  const raw = line.trim();
+  set((current) => {
+    const firstObservation = current.unexpectedTerminalResponse == null;
+    return {
+      unexpectedTerminalResponse: current.unexpectedTerminalResponse ?? {
+        kind,
+        raw,
+        observedAt: Date.now(),
+      },
+      ...(firstObservation
+        ? {
+            trustedPositionEpoch: (current.trustedPositionEpoch ?? 0) + 1,
+            workZReferenceEpoch: current.workZReferenceEpoch + 1,
+            workZZeroEvidence: null,
+            frameVerification: null,
+          }
+        : {}),
+      ...(cls.kind === 'error' ? { lastError: cls.code } : {}),
+      lastWriteError: CONTROLLER_OWNERSHIP_LOST_MESSAGE,
+      safetyNotice: current.safetyNotice ?? controllerOwnershipLostNotice(),
+      log: pushLog(
+        current,
+        `[lf2] Unexpected controller ${kind} intercepted; no KerfDesk command owned it.`,
+      ),
+    };
+  });
+  return true;
 }
 
 function recordInboundLine(

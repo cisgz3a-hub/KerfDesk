@@ -938,3 +938,34 @@ proof exists.
 - **Use:** read-only upstream protocol research; no upstream code copied.
 - **Confidence:** high for grblHAL MPG field semantics. It covers MPG ownership
   only and does not establish a general multi-sender lease.
+
+---
+
+## GRBL-family terminal response ownership (2026-07-13, ADR-183)
+
+- **Stock GRBL terminal protocol:**
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c
+  and
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c
+  emit ordered, bare `ok`/`error` responses with no sender identity, command
+  nonce, or ownership lease.
+- **grblHAL multi-stream boundary:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L265-L273
+  and
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L328-L431
+  show that controller output can remain visible across input-stream changes;
+  receiving a terminal line is not proof KerfDesk owned the command.
+- **Internal ownership audit:** every KerfDesk newline write owes one ordered
+  terminal response except job-stream chunks, whose replies belong to stream
+  RX accounting. The previous autofocus private subscription and post-write
+  ack reservation created double-consumption and fast-response gaps.
+- **Decision impact:** pre-reserve non-stream acks, route autofocus through the
+  shared semantic owner, latch truly ownerless GRBL-family terminal replies,
+  invalidate CNC setup evidence once, and block Start until reconnect/setup.
+- **Boundary:** an external reply can coincide with a valid KerfDesk-owned
+  response window and be indistinguishable. The feature detects ownership
+  anomalies; it does not convert legacy GRBL into a multi-client protocol.
+- **Use:** read-only upstream source research plus local architecture audit; no
+  upstream code copied.
+- **Confidence:** high for the response-attribution limitation and local ledger
+  behavior; physical multi-transport fault injection remains required.

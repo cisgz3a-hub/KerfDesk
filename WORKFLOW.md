@@ -2741,6 +2741,35 @@ F-CNC19 tiling.
 3. `MPG:0` covers the grblHAL MPG stream only; WebUI, network, second serial,
    PLC, macro, and physical inputs remain under F-CNC42 and external interlocks.
 
+### F-CNC44. Detect unowned GRBL terminal responses - Phase H.12
+
+#### Success - every response has one KerfDesk owner
+1. Stream terminal replies consume an in-flight stream line; app command
+   replies consume a synchronously reserved non-stream ack and, where needed,
+   the shared semantic command request.
+2. Autofocus remains busy until its owned terminal `ok` and qualified Idle
+   completion arrive through the main line pump. Status still updates the live
+   store, including when both lines arrive in one serial read.
+
+#### Error - orphan `ok` or `error`
+1. On GRBL, grblHAL, or FluidNC, a terminal response with no stream line,
+   reserved app ack, transport write, or shared command owner is intercepted.
+2. It cannot advance the stream or trigger ordinary stream-error handling. The
+   first orphan is retained as session evidence, and trusted-position, work-Z,
+   Verified Frame, and prior CNC setup confirmation become stale exactly once.
+3. CNC Start refuses before its queue fence and names the recovery: stop every
+   competing sender, disconnect/reconnect, then repeat setup.
+
+#### Edge - persistence and protocol limits
+1. Dismissing the safety notice does not clear the orphan record. Alarm, Sleep,
+   and welcome/reset banners also do not restore ownership confidence.
+2. A disconnect or new connection clears the session record. A failed write
+   releases only the ack reservation it created; a late response after command
+   timeout remains attributable to that reservation.
+3. Marlin, Smoothieware, and Ruida are excluded until their terminal/queue
+   semantics receive a separate audit. Even on monitored families, this guard
+   detects anomalies but cannot prove which external sender produced a reply.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)
