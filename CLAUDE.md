@@ -30,6 +30,8 @@ These are behavioral norms for *how* to work in this repo. Unlike the coding rul
 
 5. **No invention.** Don't state an API, file, config value, or behavior you haven't verified in the current tree — read the code or run the command first. "I don't know" is fine; inventing is not. (Restated from "When you don't know — say so" because it is the rule most often violated here.)
 
+6. **End every response with a recommended action.** After any fix, audit, answer, or investigation, close with a line that starts with **Recommended action:** (or **Recommended fix:**) stating plainly the single best next step — not a menu of options. If the best next step is "nothing, ship as-is" or "no change needed," say exactly that. When a genuine either/or decision is the maintainer's to make, name your recommended option first and label it as recommended, then the alternative in one line. The maintainer should never have to ask "so what do you suggest?" — every message already answers it.
+
 ---
 
 ## Size limits — hard
