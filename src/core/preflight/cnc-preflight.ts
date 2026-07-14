@@ -38,6 +38,10 @@ import type { PreflightIssue, PreflightResult } from './preflight';
 
 export type CncPreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
+  readonly coordinateMode?: 'machine' | 'relative-origin';
+  // A Verified Origin's mandatory frame trace substitutes for the no-go-zone
+  // crossing check that can't run without a trusted offset (G9/G19/G20).
+  readonly originVerifiedByFrame?: boolean;
 };
 
 const MAX_REPORTED_ISSUES = 5;
@@ -224,6 +228,22 @@ function appendNoGoZoneIssues(
 ): void {
   const zones = project.device.noGoZones.filter((zone) => zone.enabled);
   if (zones.length === 0) return;
+  if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
+    // A hand-set (relative) origin has no trusted work→machine offset, so
+    // scanning work-coordinate G-code against the machine-frame zones with a zero
+    // offset is a wrong-frame check that can FALSE-PASS a job straight through a
+    // clamp (G20). A Verified Origin's mandatory frame trace proves clearance
+    // instead (ADR-053) and substitutes for the check; every other
+    // relative-origin start fails closed rather than trusting a fictional frame.
+    if (options.originVerifiedByFrame === true) return;
+    issues.push({
+      code: 'no-go-zone-collision',
+      message:
+        'No-go zones can’t be checked from a hand-set origin without homing. Frame the job in ' +
+        'Verified Origin mode to confirm clearance, or disable the zone.',
+    });
+    return;
+  }
   const collisionOptions =
     options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset };
   const collisions = findNoGoZoneCollisions(

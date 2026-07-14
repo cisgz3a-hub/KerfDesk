@@ -53,6 +53,37 @@ function squareObject(id: string, color: string, size: number): SceneObject {
   };
 }
 
+function projectWithCncZone(): Project {
+  const base = projectWithCnc();
+  return {
+    ...base,
+    device: {
+      ...base.device,
+      noGoZones: [
+        { id: 'clamp', name: 'Clamp', enabled: true, x: 20, y: 20, width: 20, height: 20 },
+      ],
+    },
+  };
+}
+
+describe('runCncPreflight no-go zones (G20)', () => {
+  it('blocks a relative-origin CNC start with an enabled zone instead of scanning a fictional frame', () => {
+    const result = runCncPreflight(projectWithCncZone(), config, GOOD_GCODE, {
+      coordinateMode: 'relative-origin',
+    });
+    const zoneIssue = result.issues.find((issue) => issue.code === 'no-go-zone-collision');
+    expect(zoneIssue?.message).toMatch(/Verified Origin/i);
+  });
+
+  it('lets a Verified Origin CNC start through — its frame trace substitutes for the check', () => {
+    const result = runCncPreflight(projectWithCncZone(), config, GOOD_GCODE, {
+      coordinateMode: 'relative-origin',
+      originVerifiedByFrame: true,
+    });
+    expect(result.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
+  });
+});
+
 describe('runCncPreflight', () => {
   it('accepts a machinable straight inlay pair', () => {
     const base = projectWithCnc({

@@ -85,6 +85,12 @@ export type PreflightOptions = {
   // Rotary (ADR-127): the Y limit is one object revolution, not the bed —
   // overrides the height used by the bounds checks when set.
   readonly boundsHeightOverrideMm?: number;
+  // The start is a Verified Origin whose mandatory Verified Frame physically
+  // traced the job bounds (ADR-053). That frame is the clearance proof a
+  // hand-set origin can't get from the (untrustable) machine position, so it
+  // substitutes for the no-go-zone crossing check that can't run without a
+  // trusted offset (G9/G19).
+  readonly originVerifiedByFrame?: boolean;
 };
 
 const MAX_BOUNDS_ISSUES = 5;
@@ -171,9 +177,18 @@ function appendNoGoZoneIssues(
   const zones = project.device.noGoZones.filter((zone) => zone.enabled);
   if (zones.length === 0) return;
   if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
+    // A hand-set (relative) origin has no trusted work→machine offset, so the
+    // job's work-coordinate path can't be mapped onto the machine-frame keep-out
+    // zones to check crossings. A Verified Origin proves clearance another way —
+    // its mandatory Verified Frame physically traces the job bounds (ADR-053) —
+    // so it substitutes for the zone check that can't run. Every other
+    // relative-origin start has no such proof and stays blocked (G9/G19).
+    if (options.originVerifiedByFrame === true) return;
     issues.push({
       code: 'no-go-zone-collision',
-      message: 'No-go zones require trusted machine position for relative-origin output.',
+      message:
+        'No-go zones can’t be checked from a hand-set origin without homing. Frame the job in ' +
+        'Verified Origin mode to confirm clearance, or disable the zone.',
     });
     return;
   }
