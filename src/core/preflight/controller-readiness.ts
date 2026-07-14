@@ -139,10 +139,15 @@ function cncReadiness(
       });
     }
   } else if (controller.laserModeEnabled) {
+    // $32=1 is the CORRECT setting for a laser, so this branch is exactly what a
+    // laser operator hits after flipping to CNC mode. Lead with the likely-laser
+    // remedy (return to Laser mode) before the router remedy ($32=0) — telling a
+    // laser owner to disable laser mode is dangerous (with $32=0 GRBL stops
+    // suppressing the beam during rapids/dwell). See docs/audits/2026-07-14-laser-cnc-mode-safety.md.
     errors.push({
       code: 'laser-mode-enabled',
       message:
-        'Controller reports $32=1 (laser mode). Set $32=0 for spindle work: laser mode cuts spindle power to zero during rapids, so plunges would start with the bit not at speed.',
+        'Controller reports $32=1 (laser mode). If this machine is a laser, switch back to Laser mode — do not disable laser mode to run a CNC job. For a spindle/router, set $32=0 for spindle work: laser mode cuts spindle power to zero during rapids, so plunges would start with the bit not at speed.',
     });
   }
   return { ok: errors.length === 0, errors, warnings };

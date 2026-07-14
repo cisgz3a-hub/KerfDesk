@@ -182,5 +182,18 @@ describe('runControllerReadiness', () => {
 
       expect(result.errors.map((e) => e.code)).not.toContain('laser-mode-disabled');
     });
+
+    // FINDING B (audit 2026-07-14, docs/audits/2026-07-14-laser-cnc-mode-safety.md):
+    // A laser-only machine correctly reports $32=1, so this is the exact branch a
+    // laser operator hits after flipping to CNC mode. Telling them only to "Set
+    // $32=0 for spindle work" is dangerous for a laser (with $32=0 GRBL stops
+    // suppressing the beam during rapids/dwell), so the message must recognise the
+    // likely-laser context and steer them back to Laser mode.
+    it('warns a likely-laser operator to return to Laser mode, not just to disable $32', () => {
+      const result = runControllerReadiness(cncProject, { ...routerOk, laserModeEnabled: true });
+      const message = result.errors.find((e) => e.code === 'laser-mode-enabled')?.message ?? '';
+
+      expect(message.toLowerCase()).toMatch(/switch (back )?to laser mode|if this is a laser/);
+    });
   });
 });
