@@ -4,6 +4,8 @@
 // the calibration draft pattern. Failures (private mode, quota) degrade to
 // "no preference" silently.
 
+import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
+
 const PREFERRED_CAMERA_KEY = 'laserforge.camera.preferredDeviceId.v1';
 
 export function loadPreferredCameraId(): string | null {
@@ -28,7 +30,11 @@ const RTSP_CAMERA_URL_KEY = 'laserforge.camera.rtspUrl.v1';
 
 export function loadRtspCameraUrl(): string | null {
   try {
-    return localStorage.getItem(RTSP_CAMERA_URL_KEY);
+    const stored = localStorage.getItem(RTSP_CAMERA_URL_KEY);
+    if (stored === null) return null;
+    const safe = rtspUrlWithoutCredentials(stored);
+    if (safe !== stored) localStorage.setItem(RTSP_CAMERA_URL_KEY, safe);
+    return safe;
   } catch {
     return null;
   }
@@ -36,10 +42,14 @@ export function loadRtspCameraUrl(): string | null {
 
 export function saveRtspCameraUrl(url: string): void {
   try {
-    localStorage.setItem(RTSP_CAMERA_URL_KEY, url);
+    localStorage.setItem(RTSP_CAMERA_URL_KEY, rtspUrlWithoutCredentials(url));
   } catch {
     // Storage unavailable: the URL simply won't survive reload.
   }
+}
+
+export function rtspUrlWithoutCredentials(raw: string): string {
+  return cameraSourceIdWithoutCredentials(raw);
 }
 
 // Compact vs large (monitoring) camera panel — a viewing preference, so

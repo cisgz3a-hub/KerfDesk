@@ -2,6 +2,7 @@ import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobStartMode } from '../
 import { controlHelp } from '../help/help-topics';
 import { type JobPlacementSettings } from '../job-placement';
 import { useStore } from '../state';
+import { useCameraStore } from '../state/camera-store';
 
 const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
   absolute: 'Absolute Coordinates',
@@ -31,6 +32,7 @@ export function JobPlacementControls(props: {
 }): JSX.Element {
   const placement = useStore((s) => s.jobPlacement);
   const setJobPlacement = useStore((s) => s.setJobPlacement);
+  const cameraPlacementActive = useCameraStore((s) => s.placementActive);
   const busy = props.disabled || props.streaming;
   return (
     <div style={placementStackStyle}>
@@ -40,8 +42,12 @@ export function JobPlacementControls(props: {
           <select
             aria-label="Start from"
             value={placement.startFrom}
-            disabled={busy}
-            title="Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin (no-homing machines: size-checked, then confirmed by framing)."
+            disabled={busy || cameraPlacementActive}
+            title={
+              cameraPlacementActive
+                ? 'Camera placement is aligned to the physical bed, so Absolute Coordinates is required. Exit camera placement in the Camera panel to use another origin mode.'
+                : 'Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin (no-homing machines: size-checked, then confirmed by framing).'
+            }
             onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
           >
             {Object.entries(START_FROM_LABELS).map(([value, label]) => (
@@ -53,6 +59,11 @@ export function JobPlacementControls(props: {
         </label>
         <AnchorPicker placement={placement} disabled={busy || placement.startFrom === 'absolute'} />
       </div>
+      {cameraPlacementActive ? (
+        <div role="status" style={cameraPlacementNoteStyle}>
+          Camera placement locks Absolute Coordinates so the job cannot shift away from the image.
+        </div>
+      ) : null}
       <OutputScopeControls placement={placement} disabled={busy} />
     </div>
   );
@@ -162,6 +173,10 @@ const scopeLabelStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 4,
+};
+const cameraPlacementNoteStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-warning-fg)',
 };
 const anchorGridStyle: React.CSSProperties = {
   display: 'grid',

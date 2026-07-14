@@ -317,14 +317,14 @@ phase; tracked here so they don't get lost.
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
 - **Text (Phase D):** `opentype.js` (MIT). Bundled MIT-compatible fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script OFL-1.1).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
-- **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property). E2E smoke (Playwright) is anticipated but not yet adopted (absent from devDependencies and CI).
+- **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
 - **Build:** Vite → web bundle; Vite + electron-builder → Windows `.exe` (unsigned in v1 — ADR-024 §5; code signing is secret-gated and a no-op until the certs exist).
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
   - `license-checker` in CI (license-compliance enforcement).
   - Prettier.
-- **CI:** GitHub Actions on `ubuntu-latest`. Lint, typecheck, license-check, unit, property, snapshot, web build, and the Electron main-process compile. PR blocked on red. NOTE: the Windows desktop `.exe` (`build:desktop`, electron-builder) and E2E smoke are NOT run in CI - desktop packaging + E2E/hardware verification are release-manual (S02-001/003).
+- **CI:** GitHub Actions on `ubuntu-latest`. The release/deploy gate runs lint, typecheck, license-check, unit, property, snapshot, web build, and Electron main-process compile. Playwright runs in a separate pull-request/manual browser-smoke workflow so browser provisioning cannot time out a production deploy (ADR-158). The Windows desktop `.exe` (`build:desktop`, electron-builder) and hardware verification remain release-manual (S02-001/003).
 - **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
 
 ---

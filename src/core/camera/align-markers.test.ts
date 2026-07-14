@@ -107,6 +107,10 @@ describe('solveMarkerAlignment', () => {
     const solved = solveMarkerAlignment(detection, LAYOUT);
     expect(solved.kind).toBe('ok');
     if (solved.kind !== 'ok') return;
+    // The independent origin-pair spacing check exposes the residual distortion
+    // that the four exact solve points cannot reveal themselves.
+    expect(solved.verificationErrorMm).toBeGreaterThan(2);
+    expect(solved.verificationErrorMm).toBeLessThan(3);
     // A raw-basis homography is exact at the four targets; residual lens
     // distortion bends the interior slightly — that is WHY the rectified flow
     // below exists. Assert the mild-lens interior error stays small.
@@ -135,6 +139,7 @@ describe('solveMarkerAlignment', () => {
     const solved = solveMarkerAlignment(detection, LAYOUT);
     expect(solved.kind).toBe('ok');
     if (solved.kind !== 'ok') return;
+    expect(solved.verificationErrorMm).toBeLessThan(0.8);
     // Probe positions across the bed: project through the TRUE fisheye
     // camera, undistort into the rectified basis, then map through H.
     const probes = [

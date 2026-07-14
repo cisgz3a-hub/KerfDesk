@@ -15,8 +15,9 @@ const BRIDGE_MISSING: CameraBridgeHealth = {
   reason: 'No camera bridge on this platform.',
 };
 
-export function CameraDiagnostics(): JSX.Element {
+export function CameraDiagnostics(props: { readonly bridgeAvailable?: boolean }): JSX.Element {
   const bridge = usePlatform().cameraBridge;
+  const bridgeAvailable = props.bridgeAvailable ?? true;
   const sourceState = useCameraStore((s) => s.sourceState);
   const [health, setHealth] = useState<CameraBridgeHealth | null>(null);
   const [captureResult, setCaptureResult] = useState<string | null>(null);
@@ -24,13 +25,14 @@ export function CameraDiagnostics(): JSX.Element {
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const result = bridge === undefined ? BRIDGE_MISSING : await bridge.health();
+      const result =
+        !bridgeAvailable || bridge === undefined ? BRIDGE_MISSING : await bridge.health();
       if (alive) setHealth(result);
     })();
     return () => {
       alive = false;
     };
-  }, [bridge]);
+  }, [bridge, bridgeAvailable]);
 
   const testCapture = async (): Promise<void> => {
     if (sourceState.kind !== 'live') return;
@@ -52,7 +54,11 @@ export function CameraDiagnostics(): JSX.Element {
         Diagnostics
       </summary>
       <div style={bodyStyle}>
-        <BridgeLine health={health} />
+        {bridgeAvailable ? (
+          <BridgeLine health={health} />
+        ) : (
+          <p style={noteStyle}>Network bridge: Desktop only. USB capture works directly.</p>
+        )}
         <p style={noteStyle}>
           Source:{' '}
           {sourceState.kind === 'live' ? sourceLabel(sourceState.source.kind) : sourceState.kind}

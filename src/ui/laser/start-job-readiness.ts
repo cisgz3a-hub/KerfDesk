@@ -36,6 +36,8 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import { detectMachineJobWarnings } from './machine-job-warnings';
+import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
+import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
@@ -91,6 +93,14 @@ export type MachineStartSnapshot = {
   readonly cncJobsSupported?: boolean;
   readonly activeControllerKind?: ControllerKind;
   readonly detectedControllerKind?: ControllerKind | null;
+  // Camera placement is a physical bed-coordinate contract. These optional
+  // fields keep non-camera callers backward-compatible while Start and Resume
+  // can enforce the same position proof as Frame.
+  readonly cameraPlacementActive?: boolean;
+  readonly cameraConfirmedPositionEpoch?: number | null;
+  readonly cameraPlacementGeometryIssue?: string | null;
+  readonly homingState?: HomingState;
+  readonly trustedPositionEpoch?: number;
 };
 
 // Machine-state blockers plus the ADR-098 dialect gate: CNC is GRBL-only —
@@ -153,8 +163,8 @@ export function prepareStartJob(
   resolvedJobOrigin?: JobOriginPlacement,
   allowRotaryRaster?: boolean,
 ): StartJobPreparation {
-  const machineIssues = findEarlyStartIssues(project, machine);
-  if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
+  const gateIssues = findStartGateIssues(project, machine, jobPlacement);
+  if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
   const placement = resolveStartPlacement(jobPlacement, machine, resolvedJobOrigin);
   if (!placement.ok) return { ok: false, messages: placement.messages };
@@ -210,8 +220,8 @@ export async function prepareStartJobSnapshot(
     readonly registration?: SimilarityTransform | null;
   },
 ): Promise<StartJobPreparation> {
-  const machineIssues = findEarlyStartIssues(project, machine);
-  if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
+  const gateIssues = findStartGateIssues(project, machine, jobPlacement);
+  if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
   const placement = resolveStartPlacement(jobPlacement, machine, undefined);
   if (!placement.ok) return { ok: false, messages: placement.messages };
@@ -422,4 +432,31 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
     issues.push(`Machine must be Idle before starting (currently ${machine.statusReport.state}).`);
   }
   return issues;
+}
+
+function findCameraPlacementIssue(
+  project: Project,
+  machine: MachineStartSnapshot,
+  jobPlacement: JobPlacementSettings,
+): string | null {
+  return cameraPlacementSafetyIssue({
+    active: machine.cameraPlacementActive === true,
+    startFrom: jobPlacement.startFrom,
+    homingEnabled: project.device.homing.enabled,
+    homingState: machine.homingState ?? 'unknown',
+    trustedPositionEpoch: machine.trustedPositionEpoch ?? 0,
+    confirmedPositionEpoch: machine.cameraConfirmedPositionEpoch ?? null,
+    geometryIssue: machine.cameraPlacementGeometryIssue ?? null,
+  });
+}
+
+function findStartGateIssues(
+  project: Project,
+  machine: MachineStartSnapshot,
+  jobPlacement: JobPlacementSettings,
+): ReadonlyArray<string> {
+  const machineIssues = findEarlyStartIssues(project, machine);
+  if (machineIssues.length > 0) return machineIssues;
+  const cameraIssue = findCameraPlacementIssue(project, machine, jobPlacement);
+  return cameraIssue === null ? [] : [cameraIssue];
 }

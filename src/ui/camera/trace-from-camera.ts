@@ -11,6 +11,10 @@ import {
   type CameraCalibration,
   type RgbaImage,
 } from '../../core/camera';
+import {
+  compensateAlignmentForSurfaceHeight,
+  type SurfaceHeightCompensationFailure,
+} from '../../core/camera/surface-height-compensation';
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { rgbaToPngDataUrl } from './png-encode';
 import { extractLumaBase64 } from '../trace/image-loader';
@@ -22,7 +26,8 @@ export type CameraTraceFailure =
   | 'no-alignment'
   | 'basis-mismatch'
   | 'warp-failed'
-  | 'encode-failed';
+  | 'encode-failed'
+  | SurfaceHeightCompensationFailure;
 
 export type CameraTraceResult =
   | { readonly kind: 'ok'; readonly source: RasterImage }
@@ -40,9 +45,16 @@ export function buildCameraTraceImage(args: {
   readonly calibration: CameraCalibration | undefined;
   readonly bedWidthMm: number;
   readonly bedHeightMm: number;
+  readonly surfaceHeightMm: number;
 }): CameraTraceResult {
   const { raw, alignment, calibration } = args;
   if (alignment === undefined) return { kind: 'failed', reason: 'no-alignment' };
+  const surface = compensateAlignmentForSurfaceHeight({
+    alignment,
+    calibration,
+    surfaceHeightMm: args.surfaceHeightMm,
+  });
+  if (!surface.ok) return { kind: 'failed', reason: surface.reason };
   const rectified = rectifyForAlignmentBasis(raw, alignment, calibration);
   if (rectified.kind === 'basis-mismatch') return { kind: 'failed', reason: 'basis-mismatch' };
   const warped = warpFrameToBed(rectified.frame, {
@@ -52,7 +64,11 @@ export function buildCameraTraceImage(args: {
     // Rescale the solved homography if this frame's resolution differs from the
     // one the alignment was clicked in — otherwise a later session's default
     // capture size mis-registers the trace by the resolution ratio (CAM-02).
-    homography: scaleAlignmentHomographyToFrame(alignment, raw.width, raw.height),
+    homography: scaleAlignmentHomographyToFrame(
+      { ...alignment, homography: surface.homography },
+      raw.width,
+      raw.height,
+    ),
   });
   if (warped.kind !== 'ok') return { kind: 'failed', reason: 'warp-failed' };
   const dataUrl = rgbaToPngDataUrl(warped.image);

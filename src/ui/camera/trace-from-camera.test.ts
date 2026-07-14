@@ -20,6 +20,7 @@ const RAW_ALIGNMENT: CameraAlignment = {
   frameHeight: 6,
   basis: 'raw',
   alignedAt: 0,
+  planeHeightMm: 0,
 };
 
 describe('buildCameraTraceImage', () => {
@@ -31,6 +32,7 @@ describe('buildCameraTraceImage', () => {
         calibration: undefined,
         bedWidthMm: 10,
         bedHeightMm: 10,
+        surfaceHeightMm: 0,
       }),
     ).toEqual({ kind: 'failed', reason: 'no-alignment' });
   });
@@ -43,6 +45,7 @@ describe('buildCameraTraceImage', () => {
         calibration: undefined,
         bedWidthMm: 10,
         bedHeightMm: 10,
+        surfaceHeightMm: 0,
       }),
     ).toEqual({ kind: 'failed', reason: 'basis-mismatch' });
   });
@@ -54,6 +57,7 @@ describe('buildCameraTraceImage', () => {
       calibration: undefined,
       bedWidthMm: 10,
       bedHeightMm: 10,
+      surfaceHeightMm: 0,
     });
     // jsdom cannot PNG-encode; in a real browser this is kind 'ok'.
     expect(result).toEqual({ kind: 'failed', reason: 'encode-failed' });

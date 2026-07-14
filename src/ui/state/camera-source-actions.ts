@@ -4,7 +4,7 @@
 // bridge-proxied machine camera).
 
 import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
-import type { ActiveCameraSource } from '../camera/frame-source';
+import { publicCameraSourceId, type ActiveCameraSource } from '../camera/frame-source';
 
 export type CameraSourceState =
   | { readonly kind: 'idle' }
@@ -190,6 +190,7 @@ function makeStartRtspSource(set: Set, get: Get): CameraSourceActions['startRtsp
           kind: 'machine-rtsp',
           previewUrl: probe.previewUrl,
           frameUrl: bridge.proxiedFrameUrl(url),
+          sourceId: publicCameraSourceId(url),
         },
       },
     });

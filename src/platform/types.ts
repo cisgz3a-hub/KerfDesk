@@ -79,6 +79,10 @@ export type CameraDevice = {
 export type CameraStream = {
   // The live MediaStream to attach to a <video> element for the overlay.
   readonly stream: MediaStream;
+  // Actual track identity/settings after getUserMedia resolves. Calibration
+  // binds to these values, not merely to the pre-permission picker choice.
+  readonly sourceId: string;
+  readonly resizeMode: 'none' | 'crop-and-scale' | 'unknown';
   // Stop every track and release the camera.
   readonly stop: () => void;
 };

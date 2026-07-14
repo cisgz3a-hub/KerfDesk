@@ -30,12 +30,16 @@ export type CameraAlignWizardStore = {
   // Engrave settings for the marker burn; editable in setup, clamped sane.
   readonly powerPercent: number;
   readonly speedMmPerMin: number;
+  // Height of the burned marker surface above the machine bed. A sheet used
+  // for alignment is itself a plane, so its thickness is part of calibration.
+  readonly planeHeightMm: number;
 
   readonly openWizard: () => void;
   readonly closeWizard: () => void;
   readonly toggleMinimized: () => void;
   readonly setPowerPercent: (value: number) => void;
   readonly setSpeedMmPerMin: (value: number) => void;
+  readonly setPlaneHeightMm: (value: number) => void;
   readonly setStep: (step: AlignWizardStep) => void;
 };
 
@@ -46,6 +50,7 @@ const MAX_SPEED_MM_PER_MIN = 20000;
 // Match the pattern generator's conservative engrave defaults.
 const DEFAULT_POWER_PERCENT = 35;
 const DEFAULT_SPEED_MM_PER_MIN = 3000;
+const MAX_PLANE_HEIGHT_MM = 500;
 
 const INITIAL_STEP: AlignWizardStep = { kind: 'setup', note: null };
 
@@ -55,6 +60,7 @@ export const useCameraAlignWizardStore = create<CameraAlignWizardStore>((set) =>
   step: INITIAL_STEP,
   powerPercent: DEFAULT_POWER_PERCENT,
   speedMmPerMin: DEFAULT_SPEED_MM_PER_MIN,
+  planeHeightMm: 0,
 
   openWizard: () => set({ open: true, minimized: false, step: INITIAL_STEP }),
   closeWizard: () => set({ open: false, minimized: false, step: INITIAL_STEP }),
@@ -63,6 +69,7 @@ export const useCameraAlignWizardStore = create<CameraAlignWizardStore>((set) =>
     set({ powerPercent: clamp(value, MIN_POWER_PERCENT, MAX_POWER_PERCENT) }),
   setSpeedMmPerMin: (value) =>
     set({ speedMmPerMin: clamp(value, MIN_SPEED_MM_PER_MIN, MAX_SPEED_MM_PER_MIN) }),
+  setPlaneHeightMm: (value) => set({ planeHeightMm: clamp(value, 0, MAX_PLANE_HEIGHT_MM) }),
   setStep: (step) => set({ step }),
 }));
 

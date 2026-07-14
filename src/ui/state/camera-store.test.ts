@@ -39,6 +39,10 @@ beforeEach(() => {
     overlayVisible: true,
     overlayOpacityPercent: 50,
     overlayStill: null,
+    overlayStillCapture: null,
+    surfaceHeightMm: 0,
+    placementActive: false,
+    confirmedPositionEpoch: null,
   });
 });
 
@@ -52,6 +56,28 @@ describe('camera-store', () => {
     expect(useCameraStore.getState().overlayOpacityPercent).toBe(0);
     useCameraStore.getState().setOverlayVisible(false);
     expect(useCameraStore.getState().overlayVisible).toBe(false);
+  });
+
+  it('stores a finite material surface height within the supported range', () => {
+    useCameraStore.getState().setSurfaceHeightMm(6.35);
+    expect(useCameraStore.getState().surfaceHeightMm).toBe(6.35);
+    useCameraStore.getState().setSurfaceHeightMm(-2);
+    expect(useCameraStore.getState().surfaceHeightMm).toBe(0);
+    useCameraStore.getState().setSurfaceHeightMm(Number.NaN);
+    expect(useCameraStore.getState().surfaceHeightMm).toBe(0);
+  });
+
+  it('latches camera placement until explicitly exited and binds manual position trust', () => {
+    useCameraStore.getState().activatePlacement();
+    useCameraStore.getState().confirmPositionEpoch(7);
+    useCameraStore.getState().setOverlayVisible(false);
+    expect(useCameraStore.getState().placementActive).toBe(true);
+    expect(useCameraStore.getState().confirmedPositionEpoch).toBe(7);
+
+    useCameraStore.getState().deactivatePlacement();
+    expect(useCameraStore.getState().placementActive).toBe(false);
+    expect(useCameraStore.getState().overlayVisible).toBe(false);
+    expect(useCameraStore.getState().confirmedPositionEpoch).toBeNull();
   });
 
   it('togglePanel flips the panel and closePanel always closes it', () => {
@@ -124,7 +150,12 @@ describe('camera-store', () => {
   it('goes live as a USB source and stopSource() releases the stream', async () => {
     const stop = vi.fn();
     // Only the shape webCamera produces is needed; cast the empty MediaStream.
-    const opened = { stream: {} as MediaStream, stop };
+    const opened = {
+      stream: {} as MediaStream,
+      sourceId: 'usb-test',
+      resizeMode: 'none' as const,
+      stop,
+    };
     await useCameraStore.getState().startUsbSource(mockCamera({ openStream: async () => opened }));
     expect(useCameraStore.getState().sourceState).toEqual({
       kind: 'live',
@@ -156,7 +187,12 @@ describe('camera-store', () => {
 
   it('releases an orphaned stream when superseded mid-open (no camera leak)', async () => {
     const stopA = vi.fn();
-    const streamA = { stream: {} as MediaStream, stop: stopA };
+    const streamA = {
+      stream: {} as MediaStream,
+      sourceId: 'usb-a',
+      resizeMode: 'none' as const,
+      stop: stopA,
+    };
     let resolveA!: (s: typeof streamA) => void;
     const pendingA = new Promise<typeof streamA>((resolve) => {
       resolveA = resolve;
@@ -164,7 +200,12 @@ describe('camera-store', () => {
     const cameraA = mockCamera({ openStream: () => pendingA });
 
     const stopB = vi.fn();
-    const streamB = { stream: {} as MediaStream, stop: stopB };
+    const streamB = {
+      stream: {} as MediaStream,
+      sourceId: 'usb-b',
+      resizeMode: 'none' as const,
+      stop: stopB,
+    };
     const cameraB = mockCamera({ openStream: async () => streamB });
 
     const startA = useCameraStore.getState().startUsbSource(cameraA); // hangs on pendingA
@@ -221,7 +262,12 @@ describe('camera-store', () => {
   it('activates the discovered machine camera as the live source', async () => {
     // Activating replaces a running USB stream (and releases it).
     const stop = vi.fn();
-    const opened = { stream: {} as MediaStream, stop };
+    const opened = {
+      stream: {} as MediaStream,
+      sourceId: 'usb-test',
+      resizeMode: 'none' as const,
+      stop,
+    };
     await useCameraStore.getState().startUsbSource(mockCamera({ openStream: async () => opened }));
     useCameraStore.setState({
       machineCamera: {
@@ -266,6 +312,7 @@ describe('camera-store', () => {
         frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(
           'rtsp://192.168.10.1:8554/',
         )}`,
+        sourceId: 'rtsp://192.168.10.1:8554/',
       },
     });
   });

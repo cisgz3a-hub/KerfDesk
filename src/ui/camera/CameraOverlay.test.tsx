@@ -19,6 +19,15 @@ const ALIGNMENT: CameraAlignment = {
   alignedAt: 0,
 };
 
+const USB_CAPTURE = {
+  version: 1 as const,
+  sourceKind: 'usb' as const,
+  sourceId: 'overhead-camera',
+  width: 1280,
+  height: 720,
+  resizeMode: 'none' as const,
+};
+
 let container: HTMLDivElement;
 let root: Root;
 let srcObjectValue: MediaStream | null = null;
@@ -49,7 +58,13 @@ describe('CameraOverlay', () => {
     const stream = {} as MediaStream;
     act(() => {
       root.render(
-        <CameraOverlay stream={stream} alignment={ALIGNMENT} view={VIEW} opacityPercent={60} />,
+        <CameraOverlay
+          stream={stream}
+          alignment={ALIGNMENT}
+          view={VIEW}
+          opacityPercent={60}
+          captureBinding={null}
+        />,
       );
     });
     const video = container.querySelector('video');
@@ -64,7 +79,13 @@ describe('CameraOverlay', () => {
     const stream = {} as MediaStream;
     act(() => {
       root.render(
-        <CameraOverlay stream={stream} alignment={ALIGNMENT} view={VIEW} opacityPercent={100} />,
+        <CameraOverlay
+          stream={stream}
+          alignment={ALIGNMENT}
+          view={VIEW}
+          opacityPercent={100}
+          captureBinding={null}
+        />,
       );
     });
     const video = container.querySelector('video')!;
@@ -85,12 +106,41 @@ describe('CameraOverlay', () => {
     const stream = {} as MediaStream;
     act(() => {
       root.render(
-        <CameraOverlay stream={stream} alignment={ALIGNMENT} view={VIEW} opacityPercent={100} />,
+        <CameraOverlay
+          stream={stream}
+          alignment={ALIGNMENT}
+          view={VIEW}
+          opacityPercent={100}
+          captureBinding={null}
+        />,
       );
     });
     expect(srcObjectValue).toBe(stream);
     act(() => root.unmount());
     expect(srcObjectValue).toBeNull();
     root = createRoot(container); // fresh root for afterEach teardown
+  });
+
+  it('replaces the video with a setup warning when live geometry no longer matches', () => {
+    const stream = {} as MediaStream;
+    act(() => {
+      root.render(
+        <CameraOverlay
+          stream={stream}
+          alignment={{ ...ALIGNMENT, capture: USB_CAPTURE }}
+          view={VIEW}
+          opacityPercent={100}
+          captureBinding={USB_CAPTURE}
+        />,
+      );
+    });
+    const video = container.querySelector('video')!;
+    Object.defineProperty(video, 'videoWidth', { configurable: true, value: 640 });
+    Object.defineProperty(video, 'videoHeight', { configurable: true, value: 480 });
+    act(() => {
+      video.dispatchEvent(new Event('loadedmetadata'));
+    });
+    expect(container.querySelector('video')).toBeNull();
+    expect(container.textContent).toContain('capture shape differs');
   });
 });

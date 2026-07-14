@@ -12,21 +12,32 @@ import {
   type JobBounds,
 } from '../../core/job';
 import { prepareOutputSnapshot, type PreparedOutput } from '../../io/gcode';
-import { resolveJobPlacement, trustedMotionOffsetForPreflight } from '../job-placement';
+import { trustedMotionOffsetForPreflight, type ResolvedJobPlacement } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
+import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
 
 export function useFrameAction(): () => void {
   const frame = useLaserStore((s) => s.frame);
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const homingState = useLaserStore((s) => s.homingState);
+  const trustedPositionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
-    void runFrameAction({ frame, statusReport, workOriginActive, wcoCache, pushToast });
+    void runFrameAction({
+      frame,
+      statusReport,
+      workOriginActive,
+      wcoCache,
+      homingState,
+      trustedPositionEpoch,
+      pushToast,
+    });
   };
 }
 
@@ -35,10 +46,17 @@ async function runFrameAction({
   statusReport,
   workOriginActive,
   wcoCache,
+  homingState,
+  trustedPositionEpoch,
   pushToast,
 }: Pick<
   ReturnType<typeof useLaserStore.getState>,
-  'frame' | 'statusReport' | 'workOriginActive' | 'wcoCache'
+  | 'frame'
+  | 'statusReport'
+  | 'workOriginActive'
+  | 'wcoCache'
+  | 'homingState'
+  | 'trustedPositionEpoch'
 > & {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
 }): Promise<void> {
@@ -47,10 +65,12 @@ async function runFrameAction({
   const app = useStore.getState();
   const { project, jobPlacement } = app;
   const outputScope = currentOutputScope(app);
-  const placement = resolveJobPlacement(jobPlacement, {
+  const placement = resolveCameraSafeFramePlacement(project, jobPlacement, {
     statusReport,
     workOriginActive,
     wcoCache,
+    homingState,
+    trustedPositionEpoch,
   });
   if (!placement.ok) {
     pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
@@ -106,7 +126,7 @@ function dispatchFrameIfSafe(
   pushToast: (message: string, variant: 'error') => void,
   bounds: JobBounds,
   motionBounds: JobBounds,
-  placement: Extract<ReturnType<typeof resolveJobPlacement>, { readonly ok: true }>,
+  placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
   project: ReturnType<typeof useStore.getState>['project'],
 ): void {
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);

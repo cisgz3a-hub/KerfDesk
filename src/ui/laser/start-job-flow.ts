@@ -39,43 +39,15 @@ import { renderVariableText } from '../text/render-variable-text';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { resumeConfirmation } from './resume-confirmation';
+import { useCameraStore } from '../state/camera-store';
+import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 
 export async function runStartJobFlow(): Promise<void> {
   const app = useStore.getState();
-  const { project, jobPlacement } = app;
+  const { project } = app;
   const laser = useLaserStore.getState();
-  const registration = currentPrintCutOutputRegistration(project);
-  const prepared = await prepareStartJobSnapshot(
-    project,
-    laser.controllerSettings,
-    {
-      statusReport: laser.statusReport,
-      alarmCode: laser.alarmCode,
-      hasActiveStreamer: isActiveJob(laser.streamer),
-      cncJobsSupported: laser.capabilities.cncJobs,
-      motionOperationActive: laser.motionOperation !== null,
-      controllerOperationActive: laser.controllerOperation !== null,
-      autofocusBusy: laser.autofocusBusy,
-      workOriginActive: laser.workOriginActive,
-      workZZeroEvidence: laser.workZZeroEvidence,
-      workZReferenceEpoch: laser.workZReferenceEpoch,
-      wcoCache: laser.wcoCache,
-      ovCache: laser.ovCache,
-      accessoryCache: laser.accessoryCache ?? null,
-      frameVerification: laser.frameVerification,
-      settingsCapability: laser.capabilities.settings,
-      activeControllerKind: laser.activeControllerKind,
-      detectedControllerKind: laser.detectedControllerKind,
-    },
-    jobPlacement,
-    currentOutputScope(app),
-    rotaryRasterAllowed(project),
-    {
-      clock: () => new Date(),
-      renderVariableText,
-      ...(registration === undefined ? {} : { registration }),
-    },
-  );
+  const camera = useCameraStore.getState();
+  const prepared = await prepareCurrentStartJob(app, laser, camera);
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start job:\n\n${lines}`);
@@ -119,6 +91,55 @@ export async function runStartJobFlow(): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
+}
+
+async function prepareCurrentStartJob(
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  camera: ReturnType<typeof useCameraStore.getState>,
+) {
+  const { project, jobPlacement } = app;
+  const registration = currentPrintCutOutputRegistration(project);
+  return prepareStartJobSnapshot(
+    project,
+    laser.controllerSettings,
+    {
+      statusReport: laser.statusReport,
+      alarmCode: laser.alarmCode,
+      hasActiveStreamer: isActiveJob(laser.streamer),
+      cncJobsSupported: laser.capabilities.cncJobs,
+      motionOperationActive: laser.motionOperation !== null,
+      controllerOperationActive: laser.controllerOperation !== null,
+      autofocusBusy: laser.autofocusBusy,
+      workOriginActive: laser.workOriginActive,
+      workZZeroEvidence: laser.workZZeroEvidence,
+      workZReferenceEpoch: laser.workZReferenceEpoch,
+      wcoCache: laser.wcoCache,
+      ovCache: laser.ovCache,
+      accessoryCache: laser.accessoryCache ?? null,
+      frameVerification: laser.frameVerification,
+      settingsCapability: laser.capabilities.settings,
+      activeControllerKind: laser.activeControllerKind,
+      detectedControllerKind: laser.detectedControllerKind,
+      cameraPlacementActive: camera.placementActive,
+      cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
+      cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
+        project.device.cameraAlignment,
+        project.device.cameraCalibration,
+        camera.surfaceHeightMm,
+      ),
+      homingState: laser.homingState,
+      trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
+    },
+    jobPlacement,
+    currentOutputScope(app),
+    rotaryRasterAllowed(project),
+    {
+      clock: () => new Date(),
+      renderVariableText,
+      ...(registration === undefined ? {} : { registration }),
+    },
+  );
 }
 
 function confirmCncSetup(
@@ -189,6 +210,7 @@ function prepareResume(overrides?: {
   const { project } = app;
   const outputScope = overrides?.outputScope ?? currentOutputScope(app);
   const laser = useLaserStore.getState();
+  const camera = useCameraStore.getState();
   const prepared = prepareStartJob(
     project,
     laser.controllerSettings,
@@ -209,6 +231,15 @@ function prepareResume(overrides?: {
       frameVerification: laser.frameVerification,
       activeControllerKind: laser.activeControllerKind,
       detectedControllerKind: laser.detectedControllerKind,
+      cameraPlacementActive: camera.placementActive,
+      cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
+      cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
+        project.device.cameraAlignment,
+        project.device.cameraCalibration,
+        camera.surfaceHeightMm,
+      ),
+      homingState: laser.homingState,
+      trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
     },
     app.jobPlacement,
     outputScope,

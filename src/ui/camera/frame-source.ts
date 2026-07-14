@@ -5,7 +5,11 @@
 // Machine sources capture by fetching the bridge's pixel-readable /frame.jpg
 // proxy; USB sources keep the existing offscreen-<video> grab.
 
-import type { RgbaImage } from '../../core/camera';
+import { type RgbaImage } from '../../core/camera';
+import {
+  cameraSourceIdWithoutCredentials,
+  type CameraCaptureBinding,
+} from '../../core/camera/camera-capture-binding';
 import { assertNever } from '../../core/scene';
 import type { CameraStream } from '../../platform/types';
 import { defaultFrameCaptureIo, type FrameCaptureIo } from './decode-jpeg';
@@ -20,7 +24,56 @@ export type ActiveCameraSource =
   | { readonly kind: 'machine-jpeg'; readonly frameUrl: string; readonly cameraUrl: string }
   // A machine RTSP camera — `previewUrl` is the bridge's continuous MJPEG for
   // display; `frameUrl` is the bridge's ffmpeg single-frame decode for stills.
-  | { readonly kind: 'machine-rtsp'; readonly frameUrl: string; readonly previewUrl: string };
+  | {
+      readonly kind: 'machine-rtsp';
+      readonly frameUrl: string;
+      readonly previewUrl: string;
+      readonly sourceId: string;
+    };
+
+export function cameraCaptureBindingForFrame(
+  source: ActiveCameraSource,
+  width: number,
+  height: number,
+): CameraCaptureBinding {
+  switch (source.kind) {
+    case 'usb':
+      return {
+        version: 1,
+        sourceKind: 'usb',
+        sourceId: source.stream.sourceId,
+        width,
+        height,
+        resizeMode: source.stream.resizeMode,
+      };
+    case 'machine-jpeg':
+      return networkCaptureBinding('machine-jpeg', source.cameraUrl, width, height);
+    case 'machine-rtsp':
+      return networkCaptureBinding('machine-rtsp', source.sourceId, width, height);
+    default:
+      return assertNever(source, 'camera source');
+  }
+}
+
+export function publicCameraSourceId(raw: string): string {
+  return cameraSourceIdWithoutCredentials(raw);
+}
+
+function networkCaptureBinding(
+  sourceKind: 'machine-jpeg' | 'machine-rtsp',
+  rawId: string,
+  width: number,
+  height: number,
+): CameraCaptureBinding {
+  return {
+    version: 1,
+    sourceKind,
+    sourceId: publicCameraSourceId(rawId),
+    width,
+    height,
+    resizeMode: 'unknown',
+  };
+}
 
 // Detection-tick cadence per source: USB video updates continuously (the 250ms
 // budget matches the detector cost); a snapshot camera only has a fresh frame

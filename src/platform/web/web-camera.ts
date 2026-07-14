@@ -44,7 +44,7 @@ async function listCameras(): Promise<ReadonlyArray<CameraDevice>> {
 async function openStream(deviceId?: string): Promise<CameraStream | null> {
   if (!isSupported()) return null;
   try {
-    return makeCameraStream(await requestStream(deviceId));
+    return makeCameraStream(await requestStream(deviceId), deviceId);
   } catch (err) {
     if (isPermissionDenied(err)) return null;
     // A stale or pre-permission-blank deviceId over-constrains getUserMedia
@@ -52,7 +52,7 @@ async function openStream(deviceId?: string): Promise<CameraStream | null> {
     // the first stream (before any grant) always has a blank deviceId.
     if (isOverconstrained(err) && deviceId !== undefined && deviceId !== '') {
       try {
-        return makeCameraStream(await requestStream(undefined));
+        return makeCameraStream(await requestStream(undefined), undefined);
       } catch (retryErr) {
         if (isPermissionDenied(retryErr)) return null;
         throw retryErr;
@@ -66,8 +66,15 @@ async function openStream(deviceId?: string): Promise<CameraStream | null> {
 // an empty id) means "no specific camera" -> request the default. `ideal`, not
 // `exact`, so an unavailable camera degrades to the default instead of throwing.
 function requestStream(deviceId?: string): Promise<MediaStream> {
-  const video: MediaTrackConstraints | boolean =
-    deviceId === undefined || deviceId === '' ? true : { deviceId: { ideal: deviceId } };
+  const preferredGeometry: MediaTrackConstraints = {
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 15, max: 30 },
+  };
+  const video: MediaTrackConstraints =
+    deviceId === undefined || deviceId === ''
+      ? preferredGeometry
+      : { ...preferredGeometry, deviceId: { ideal: deviceId } };
   return navigator.mediaDevices.getUserMedia({ video, audio: false });
 }
 
@@ -81,13 +88,26 @@ function isOverconstrained(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'OverconstrainedError';
 }
 
-function makeCameraStream(stream: MediaStream): CameraStream {
+function makeCameraStream(
+  stream: MediaStream,
+  requestedDeviceId: string | undefined,
+): CameraStream {
+  const settings = stream.getVideoTracks()[0]?.getSettings();
   return {
     stream,
+    sourceId: settings?.deviceId || requestedDeviceId || 'default-camera',
+    resizeMode: normalizeResizeMode(
+      (settings as (MediaTrackSettings & { readonly resizeMode?: string }) | undefined)?.resizeMode,
+    ),
     stop: () => {
       for (const track of stream.getTracks()) track.stop();
     },
   };
+}
+
+function normalizeResizeMode(value: string | undefined): CameraStream['resizeMode'] {
+  if (value === 'none' || value === 'crop-and-scale') return value;
+  return 'unknown';
 }
 
 /** Build the Falcon JPEG frame URL for a candidate host. */

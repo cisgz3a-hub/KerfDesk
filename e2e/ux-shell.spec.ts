@@ -200,7 +200,9 @@ async function unnamedVisibleControls(page: Page): Promise<readonly string[]> {
         element instanceof HTMLInputElement ||
         element instanceof HTMLSelectElement ||
         element instanceof HTMLTextAreaElement
-          ? [...element.labels].map((label) => label.textContent ?? '').join(' ')
+          ? Array.from(element.labels ?? [])
+              .map((label) => label.textContent ?? '')
+              .join(' ')
           : '';
       const name = [
         element.getAttribute('aria-label'),

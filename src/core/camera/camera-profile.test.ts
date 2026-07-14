@@ -148,6 +148,12 @@ describe('camera profile and alignment', () => {
       }),
     ).toBe(false);
     expect(isCameraProfile({ ...alignedCamera, source: { kind: 'browser' } })).toBe(true);
+    expect(
+      normalizeCameraProfile({
+        ...alignedCamera,
+        source: { kind: 'rtsp', url: 'rtsp://user:secret@192.168.10.1:8554/live?token=x' },
+      }).source,
+    ).toEqual({ kind: 'rtsp', url: 'rtsp://192.168.10.1:8554/live' });
   });
 });
 
