@@ -57,6 +57,29 @@ describe('cncGrblStrategy', () => {
     expect(gcode).toContain('G1 X10.000 Y10.000\nG1 Z-3.000 F300');
   });
 
+  it('repositions XY after a tool change even when the pass starts at the park XY (F23)', () => {
+    // Two tools → an M0 tool-change hold. Tool 2's first cut starts at exactly the
+    // park (0,0). During the hold the operator jogs XY to touch off the new bit,
+    // so the head is no longer at park — the emitter must NOT skip the repositioning
+    // G0 X0 Y0, or the bit plunges at the touch-off spot and drags to the start.
+    const gcode = cncGrblStrategy.emit(
+      {
+        groups: [
+          group({ toolId: 't1' }),
+          group({
+            toolId: 't2',
+            layerId: 'L2',
+            passes: [{ kind: 'contour', zMm: -1.5, polyline: squareLoop(0, 20), closed: true }],
+          }),
+        ],
+      },
+      dev,
+    );
+    const afterHold = gcode.slice(gcode.lastIndexOf('M0'));
+    expect(afterHold).toContain('G0 X0.000 Y0.000');
+    expect(afterHold.indexOf('G0 X0.000 Y0.000')).toBeLessThan(afterHold.indexOf('G1 Z-1.500'));
+  });
+
   it('ends with retract, spindle off, and XY park', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
     expect(gcode.endsWith('G0 Z3.810\nM5\nG0 X0.000 Y0.000\n')).toBe(true);
