@@ -14,14 +14,19 @@ import {
   type MachineConfig,
   type Scene,
 } from '../../core/scene';
+import { findFontEntry } from '../../core/text';
 
 export function applyCncTextDefaultsToNewLayer(
   scene: Scene,
   machine: MachineConfig | undefined,
   color: string,
+  fontKey: string,
 ): Scene {
   if (machine === undefined || machine.kind !== 'cnc') return scene;
-  const cutType = activeCncTool(machine).kind === 'v-bit' ? 'v-carve' : 'engrave';
+  const cutType =
+    findFontEntry(fontKey)?.geometry !== 'single-line' && activeCncTool(machine).kind === 'v-bit'
+      ? 'v-carve'
+      : 'engrave';
   return {
     ...scene,
     layers: scene.layers.map((layer) =>

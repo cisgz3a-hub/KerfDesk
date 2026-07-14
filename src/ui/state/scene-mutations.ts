@@ -511,7 +511,7 @@ export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult
   // (v-carve with a v-bit, on-path engrave otherwise) instead of the
   // letter-destroying profile-outside default.
   if (!hadLayer) {
-    scene = applyCncTextDefaultsToNewLayer(scene, s.project.machine, text.color);
+    scene = applyCncTextDefaultsToNewLayer(scene, s.project.machine, text.color, text.fontKey);
   }
   return {
     project: { ...s.project, scene },

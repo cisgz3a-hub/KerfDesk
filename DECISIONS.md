@@ -64,6 +64,7 @@
 | ADR-191 | 2026-07-14 | Accepted | CNC 3D result pane is drag-resizable with a persisted width |
 | ADR-192 | 2026-07-14 | Accepted | CNC frame retracts to safe Z, traces, then restores the pre-frame Z |
 | ADR-193 | 2026-07-14 | Accepted | No-homing placement defaults to guided relative positioning |
+| ADR-194 | 2026-07-14 | Accepted | Add native Hershey single-line CNC text without a runtime dependency |
 
 ---
 
@@ -7874,3 +7875,37 @@ the UI owns their order and never marks the position ready before controller ack
 fresh Idle report. Frame verification becomes consistently mandatory whenever a no-homing profile
 uses relative placement. Hardware validation remains required because OEM GRBL derivatives can vary
 in their `$SLP`, reset, and alarm behavior.
+
+---
+
+## ADR-194 - Add native Hershey single-line CNC text without a runtime dependency
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+Standard TTF/OTF glyphs describe filled outlines. Following those contours with an engraving bit
+produces the unwanted inner/outer-line result and cannot recover the authorial center stroke. True
+V-carving still needs those closed regions, while shallow labels and technical marks need open
+one-tool-pass geometry. The two uses must therefore remain explicit instead of treating every font
+as interchangeable geometry.
+
+### Decision
+
+- Bundle the original Hershey Roman Simplex vector data with its required Hershey/Hurt
+  acknowledgements and complete redistribution terms.
+- Parse the line-oriented JHF data in pure core and render it directly into open polylines plus
+  schema-v2 line curves. Add no runtime dependency and copy no GPL Hershey Text extension code.
+- Identify single-line behavior through the stable `hershey-simplex` font key; existing `TextObject`
+  persistence already stores extensible string font keys, so no schema field or migration is added.
+- Fresh CNC layers containing this font default to Engrave/on-path even with a V-bit. Existing layers
+  are never rewritten because their operation may intentionally govern other objects.
+- Preserve ordinary outline fonts for Fill, Pocket, and V-carve. Unsupported Simplex characters
+  render as `?` rather than silently disappearing.
+
+### Consequences
+
+KerfDesk can create editable CNC single-line labels natively while old projects and outline-font
+output stay unchanged. Roman Simplex initially covers printable ASCII only; broader stroke-font and
+Unicode coverage requires separately licensed font data and a later bounded decision. This decision
+does not change the existing offset-ladder V-carve algorithm.

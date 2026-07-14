@@ -15,7 +15,7 @@
 // selected fontKey is owned by the parent dialog.
 
 import { useEffect, useRef, useState } from 'react';
-import { FONT_REGISTRY, type KnownFontKey } from '../../core/text';
+import { FONT_REGISTRY, type FontEntry, type KnownFontKey } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
 
@@ -24,6 +24,12 @@ type Props = {
   readonly onChange: (next: string) => void;
   readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
 };
+
+type OutlineFontKey = Extract<FontEntry, { readonly geometry: 'outline' }>['key'];
+
+function isOutlineFontKey(key: KnownFontKey): key is OutlineFontKey {
+  return FONT_REGISTRY.find((font) => font.key === key)?.geometry === 'outline';
+}
 
 export function FontPicker(props: Props): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -51,7 +57,11 @@ export function FontPicker(props: Props): JSX.Element {
         aria-haspopup="listbox"
         aria-expanded={open}
         title="Open the font picker and choose the text typeface."
-        style={selected === undefined ? triggerBaseStyle : triggerStyleFor(selected.key)}
+        style={
+          selected === undefined || !isOutlineFontKey(selected.key)
+            ? triggerBaseStyle
+            : triggerStyleFor(selected.key)
+        }
       >
         {selectedEmbedded !== undefined ? (
           <>
@@ -137,6 +147,7 @@ function EmbeddedFontOptions(props: {
 function useFontCssRegistration(): void {
   useEffect(() => {
     for (const f of FONT_REGISTRY) {
+      if (!isOutlineFontKey(f.key)) continue;
       ensureFontCss(f.key).catch((err: unknown) => {
         console.warn(`FontPicker: failed to register ${f.key} CSS:`, err);
       });
@@ -171,7 +182,7 @@ function useOutsideClickToClose(
 // per-row font-family hop and layout. The regression this replaces:
 // rows hardcoded a white background with INHERITED text color, which
 // turned white-on-white the moment the dialog went dark (ADR-047).
-function triggerStyleFor(key: KnownFontKey): React.CSSProperties {
+function triggerStyleFor(key: OutlineFontKey): React.CSSProperties {
   return {
     ...triggerBaseStyle,
     fontFamily: cssFontFamilyStack(key),
@@ -181,7 +192,7 @@ function triggerStyleFor(key: KnownFontKey): React.CSSProperties {
 function optionStyleFor(key: KnownFontKey, selected: boolean): React.CSSProperties {
   return {
     ...optionBaseStyle,
-    fontFamily: cssFontFamilyStack(key),
+    ...(isOutlineFontKey(key) ? { fontFamily: cssFontFamilyStack(key) } : {}),
     fontWeight: selected ? 600 : 400,
     ...(selected ? { background: 'var(--lf-accent)', color: 'var(--lf-on-fill)' } : {}),
   };
@@ -197,7 +208,7 @@ function optionMetaStyle(selected: boolean): React.CSSProperties {
 
 // CSS font stack with a sensible per-class fallback so labels stay
 // readable while the real font is still loading.
-function cssFontFamilyStack(key: KnownFontKey): string {
+function cssFontFamilyStack(key: OutlineFontKey): string {
   const entry = FONT_REGISTRY.find((f) => f.key === key);
   const fallback = entry?.styleClass === 'mono' ? 'monospace' : 'system-ui, sans-serif';
   return `'${cssFamilyForFont(key)}', ${fallback}`;

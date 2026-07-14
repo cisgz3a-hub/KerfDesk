@@ -9,19 +9,21 @@
 // session. opentype.js parses ~5ms per typical TTF; the cache makes
 // repeated text edits feel instant.
 
-import { embeddedFontBuffer, findFontEntry, type KnownFontKey } from '../../core/text';
+import { embeddedFontBuffer, findFontEntry, type FontEntry } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import robotoUrl from './fonts/Roboto-Regular.ttf?url';
 import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
 import dancingScriptUrl from './fonts/DancingScript-Regular.ttf?url';
 
-const URL_BY_KEY: Readonly<Record<KnownFontKey, string>> = {
+const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
   'roboto-regular': robotoUrl,
   'inconsolata-regular': inconsolataUrl,
   'pacifico-regular': pacificoUrl,
   'dancing-script-regular': dancingScriptUrl,
 };
+
+type OutlineFontKey = Extract<FontEntry, { readonly geometry: 'outline' }>['key'];
 
 const cache = new Map<string, ArrayBuffer>();
 
@@ -39,6 +41,9 @@ export async function loadFont(
     const buffer = embeddedFontBuffer(embedded);
     cache.set(key, buffer);
     return buffer;
+  }
+  if (known.geometry !== 'outline') {
+    throw new Error(`Font "${key}" uses vector strokes and has no outline font file.`);
   }
   const url = URL_BY_KEY[known.key];
   const res = await fetch(url);
@@ -60,21 +65,21 @@ export function getCachedFont(key: string): ArrayBuffer | null {
 // is registered as a FontFace under this family so the picker (and
 // any other UI that wants to preview text) can use a regular CSS
 // `font-family` rather than rasterizing the glyphs by hand.
-export function cssFamilyForFont(key: KnownFontKey): string {
+export function cssFamilyForFont(key: OutlineFontKey): string {
   return `lf2-${key}`;
 }
 
 // Tracks which font keys have already been added to document.fonts.
 // FontFace.load() is idempotent but adding the same FontFace twice
 // would still leak — keep one entry per key.
-const cssRegistered = new Set<KnownFontKey>();
+const cssRegistered = new Set<OutlineFontKey>();
 
 // Register a bundled .ttf with the browser's font system so CSS
 // `font-family: lf2-<key>` works. Pulls from the same in-memory
 // cache as opentype-side loading so we never fetch a font twice.
 // Resolves once the FontFace is fully loaded and ready for layout;
 // rejects if the file can't be parsed as a font.
-export async function ensureFontCss(key: KnownFontKey): Promise<void> {
+export async function ensureFontCss(key: OutlineFontKey): Promise<void> {
   if (cssRegistered.has(key)) return;
   if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
     // Non-browser / test env — nothing to register. Calls become

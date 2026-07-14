@@ -12,7 +12,7 @@
 // lookup; we just split on '\n' for line breaks.
 
 import { useRef, useState } from 'react';
-import { bendTextRender, placeTextOnPath, textToPolylines } from '../../core/text';
+import { bendTextRender, placeTextOnPath } from '../../core/text';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
@@ -20,9 +20,10 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { loadFont } from './font-loader';
 import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
+import { FontUsageHint } from './FontUsageHint';
+import { renderTextGeometry } from './render-text-geometry';
 import { PathTextFields } from './PathTextFields';
 import { VariableTextFields } from './VariableTextFields';
 import {
@@ -106,9 +107,9 @@ async function commitText(
   }
   ctx.setSubmitting(true);
   try {
-    const buffer = await loadFont(v.fontKey, v.embeddedFonts);
-    const rawRendered = await textToPolylines({
-      fontBuffer: buffer,
+    const rawRendered = await renderTextGeometry({
+      fontKey: v.fontKey,
+      embeddedFonts: v.embeddedFonts,
       content: normalizedContent,
       sizeMm: safeValues.sizeMm,
       alignment: v.alignment,
@@ -172,6 +173,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           onChange={setFontKey}
         />
         <FontImportButton importFont={props.fields.importFont} />
+        <FontUsageHint fontKey={values.fontKey} />
       </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
@@ -212,11 +214,11 @@ function fieldsVariableTemplate(
 }
 
 function placeRenderedText(
-  rendered: Awaited<ReturnType<typeof textToPolylines>>,
+  rendered: Awaited<ReturnType<typeof renderTextGeometry>>,
   safeValues: TextDialogNumericValues,
   values: DialogValues,
 ): {
-  readonly rendered: Awaited<ReturnType<typeof textToPolylines>>;
+  readonly rendered: Awaited<ReturnType<typeof renderTextGeometry>>;
   readonly transform: typeof IDENTITY_TRANSFORM;
 } {
   if (values.pathText === undefined) {
