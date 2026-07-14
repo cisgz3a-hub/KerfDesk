@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { TextLayerEditor } from './TextLayerEditor';
 import type { TextLayerNotice, TextLayerOption } from './text-layer-options';
 
@@ -10,10 +11,21 @@ export function TextLayerField(props: {
   readonly onChange: (color: string) => void;
 }): JSX.Element {
   const [editorOpen, setEditorOpen] = useState(false);
-  const layer = useStore((s) => s.project.scene.layers.find((item) => item.color === props.value));
+  const layers = useStore((s) => s.project.scene.layers);
+  const commitLayerDraft = useStore((s) => s.commitLayerDraft);
+  const activeLayerColor = useUiStore((s) => s.activeLayerColor);
+  const setActiveLayerColor = useUiStore((s) => s.setActiveLayerColor);
   const selected = props.options.find((option) => option.color === props.value);
   const selectLayer = (color: string): void => {
     props.onChange(color);
+    setEditorOpen(false);
+  };
+  const saveLayer = (layer: TextLayerOption['layer']): void => {
+    commitLayerDraft(layer);
+    props.onChange(layer.color);
+    if (selected !== undefined && activeLayerColor === selected.color) {
+      setActiveLayerColor(layer.color);
+    }
     setEditorOpen(false);
   };
 
@@ -42,36 +54,56 @@ export function TextLayerField(props: {
               </option>
             ))}
           </select>
-          <button
-            type="button"
+          <LayerEditButton
+            isNew={selected?.isNew === true}
+            disabled={selected === undefined}
+            open={editorOpen}
             onClick={() => setEditorOpen((open) => !open)}
-            disabled={layer === undefined}
-            title={
-              layer === undefined
-                ? 'Add the text to create this layer before editing its operation.'
-                : 'Edit this layer here; changes also update the main Cuts / Layers panel.'
-            }
-            aria-expanded={editorOpen}
-            style={editButtonStyle}
-          >
-            Edit
-          </button>
+          />
         </span>
         {selected !== undefined ? (
           <span style={summaryStyle} title={`${selected.label}: ${selected.summary}`}>
             {selected.summary}
           </span>
         ) : null}
-        {editorOpen && layer !== undefined ? (
+        {editorOpen && selected !== undefined ? (
           <TextLayerEditor
-            layer={layer}
-            onColorChange={props.onChange}
-            onClose={() => setEditorOpen(false)}
+            layer={selected.layer}
+            isNew={selected.isNew}
+            reservedColors={layers
+              .filter((layer) => selected.isNew || layer.id !== selected.layer.id)
+              .map((layer) => layer.color)}
+            onSave={saveLayer}
+            onCancel={() => setEditorOpen(false)}
           />
         ) : null}
         {props.notice !== undefined ? <LayerNotice notice={props.notice} /> : null}
       </span>
     </div>
+  );
+}
+
+function LayerEditButton(props: {
+  readonly isNew: boolean;
+  readonly disabled: boolean;
+  readonly open: boolean;
+  readonly onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      title={
+        props.isNew
+          ? 'Configure this output before adding text to the canvas.'
+          : 'Edit this output, then Save to update the main Cuts / Layers panel.'
+      }
+      aria-expanded={props.open}
+      style={editButtonStyle}
+    >
+      Edit
+    </button>
   );
 }
 

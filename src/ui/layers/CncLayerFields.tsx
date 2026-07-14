@@ -26,7 +26,10 @@ import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 
-export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
+export function CncLayerFields(props: {
+  readonly layer: Layer;
+  readonly onSettingsChange?: (settings: CncLayerSettings) => void;
+}): JSX.Element {
   const { layer } = props;
   const setLayerParam = useStore((s) => s.setLayerParam);
   const maxFeed = useStore((s) => s.project.device.maxFeed);
@@ -38,9 +41,15 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;
   const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
   const isProfile = settings.cutType.startsWith('profile') || settings.cutType === 'inlay-pair';
+  const commitSettings = (next: CncLayerSettings): void => {
+    if (props.onSettingsChange !== undefined) {
+      props.onSettingsChange(next);
+      return;
+    }
+    setLayerParam(layer.id, { cnc: next });
+  };
   const commit = (patch: Partial<CncLayerSettings>): void =>
-    setLayerParam(layer.id, { cnc: { ...settings, ...patch } });
-  const commitSettings = (next: CncLayerSettings): void => setLayerParam(layer.id, { cnc: next });
+    commitSettings({ ...settings, ...patch });
 
   return (
     <>

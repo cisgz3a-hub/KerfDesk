@@ -48,6 +48,12 @@ describe('TextLayerField', () => {
         mode.value = 'fill';
         Simulate.change(mode);
       });
+      expect(requireSelect(host, 'Mode for #00ff00').value).toBe('fill');
+      expect(useStore.getState().project.scene.layers[0]).toMatchObject({
+        color: '#ff0000',
+        mode: 'line',
+      });
+      await act(async () => requireButton(host, 'Save').click());
 
       const state = useStore.getState();
       expect(state.project.scene.layers[0]).toMatchObject({ color: '#00ff00', mode: 'fill' });
@@ -56,7 +62,7 @@ describe('TextLayerField', () => {
       if (object?.kind !== 'imported-svg') throw new Error('expected imported svg');
       expect(object.paths[0]?.color).toBe('#00ff00');
       expect(requireSelect(host, 'Text output layer').value).toBe('#00ff00');
-      expect(host.textContent).toContain('Changes are shared with the main Cuts / Layers panel.');
+      expect(host.textContent).not.toContain('Layer settings');
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -73,9 +79,64 @@ describe('TextLayerField', () => {
         cutType.value = 'v-carve';
         Simulate.change(cutType);
       });
+      await act(async () => requireButton(host, 'Save').click());
 
       expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('v-carve');
-      expect(host.textContent).toContain('Changes are shared with the main Cuts / Layers panel.');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('saves a new output layer before any text is added to the canvas', async () => {
+    const { host, root } = await renderField('#000000');
+    try {
+      const edit = requireButton(host, 'Edit');
+      expect(edit.disabled).toBe(false);
+      await act(async () => edit.click());
+      expect(host.textContent).toContain('New layer settings');
+      expect(useStore.getState().project.scene.layers).toHaveLength(1);
+
+      await act(async () => {
+        const mode = requireSelect(host, 'Mode for #000000');
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+      const power = requireInput(host, 'Power for #000000');
+      await act(async () => {
+        power.value = '55';
+        Simulate.change(power);
+      });
+      await act(async () => {
+        Simulate.blur(power);
+      });
+      await act(async () => requireButton(host, 'Save').click());
+
+      const saved = useStore
+        .getState()
+        .project.scene.layers.find((layer) => layer.color === '#000000');
+      expect(saved).toMatchObject({ mode: 'fill', power: 55 });
+      expect(useStore.getState().project.scene.objects).toHaveLength(1);
+      expect(requireSelect(host, 'Text output layer').value).toBe('#000000');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('discards a new output draft when Cancel is pressed', async () => {
+    const { host, root } = await renderField('#000000');
+    try {
+      await act(async () => requireButton(host, 'Edit').click());
+      await act(async () => {
+        const mode = requireSelect(host, 'Mode for #000000');
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+      await act(async () => requireButton(host, 'Cancel').click());
+
+      expect(useStore.getState().project.scene.layers).toHaveLength(1);
+      expect(useStore.getState().project.scene.layers[0]?.color).toBe('#ff0000');
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -83,9 +144,9 @@ describe('TextLayerField', () => {
   });
 });
 
-function Harness(): JSX.Element {
+function Harness(props: { readonly initialColor: string }): JSX.Element {
   const project = useStore((s) => s.project);
-  const [color, setColor] = useState('#ff0000');
+  const [color, setColor] = useState(props.initialColor);
   return (
     <TextLayerField
       value={color}
@@ -95,11 +156,11 @@ function Harness(): JSX.Element {
   );
 }
 
-async function renderField() {
+async function renderField(initialColor = '#ff0000') {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
-  await act(async () => root.render(<Harness />));
+  await act(async () => root.render(<Harness initialColor={initialColor} />));
   return { host, root };
 }
 
