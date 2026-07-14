@@ -137,7 +137,7 @@ function fireControllerStateBlockMessage(state: LaserState): string | null {
 }
 
 function fireBusyBlockMessage(state: LaserState, ignorePendingAcks: boolean): string | null {
-  if (isActiveJob(state.streamer)) return 'A job is active. Stop it before using Fire.';
+  if (isActiveJob(state.streamer)) return 'A job is active. Request ABORT before using Fire.';
   if (state.motionOperation !== null) return 'Wait for the jog or frame operation to finish.';
   if (state.controllerOperation !== null) return 'Wait for the controller operation to finish.';
   if (state.autofocusBusy) return 'Wait for auto-focus to finish.';

@@ -9,7 +9,7 @@
 //     user agent + URL) and writes it to the clipboard. Falls back to a
 //     select-all textarea if the Clipboard API is unavailable (insecure
 //     context / older browsers) — never a native prompt: a blocking
-//     dialog here would freeze the ack pump and the Stop button if the
+//     dialog here would freeze the ack pump and the Abort button if the
 //     crash happened mid-job (H13, AUDIT-2026-06-10).
 //   * Try again → resets boundary state and re-renders children. If
 //     the underlying issue persists the boundary re-catches.
@@ -19,20 +19,21 @@
 // never sent automatically.
 
 import { Component, useState, type ReactNode } from 'react';
+import { SOFTWARE_ABORT_LABEL, SOFTWARE_ABORT_TITLE } from './software-abort-copy';
 
 // A generic emergency-stop hook the app root wires to the machine store. A render
-// crash swaps the whole App (and its Stop button + Ctrl+. listener) for the crash
+// crash swaps the whole App (and its Abort button + Ctrl+. listener) for the crash
 // screen, so without this a mid-job / mid-probe crash would leave NO software way
 // to halt motion (F60/F65). Kept domain-agnostic so this common boundary stays
 // decoupled from the laser store.
-export type EmergencyStop = {
+export type SoftwareAbort = {
   // Evaluated when the crash screen renders — was the machine actually moving?
   readonly isMotionLive: () => boolean;
-  // Kill motion (GRBL soft reset). Reads live state at call time.
+  // Request the controller-specific reset/de-energize path. Reads live state at call time.
   readonly trigger: () => void;
 };
 
-type Props = { readonly children: ReactNode; readonly emergencyStop?: EmergencyStop };
+type Props = { readonly children: ReactNode; readonly softwareAbort?: SoftwareAbort };
 type State =
   | { readonly kind: 'ok' }
   | { readonly kind: 'crashed'; readonly error: Error; readonly when: number };
@@ -61,7 +62,7 @@ export class ErrorBoundary extends Component<Props, State> {
           error={this.state.error}
           when={this.state.when}
           onRetry={this.handleRetry}
-          emergencyStop={this.props.emergencyStop}
+          softwareAbort={this.props.softwareAbort}
         />
       );
     }
@@ -73,15 +74,15 @@ function CrashScreen(props: {
   readonly error: Error;
   readonly when: number;
   readonly onRetry: () => void;
-  readonly emergencyStop: EmergencyStop | undefined;
+  readonly softwareAbort: SoftwareAbort | undefined;
 }): JSX.Element {
   const blob = buildDiagnostic(props.error, props.when);
   // Only offer the kill control if the machine was actually moving when the crash
   // hit — a soft reset when idle would needlessly void the work origin.
-  const showEmergencyStop = props.emergencyStop?.isMotionLive() === true;
+  const showSoftwareAbort = props.softwareAbort?.isMotionLive() === true;
   // 'manual' renders a select-all textarea instead of any native dialog. A
   // blocking window.prompt would suspend the renderer — fatal if the crash
-  // happened mid-job, when the ack pump and Stop must stay alive (H13).
+  // happened mid-job, when the ack pump and Abort must stay alive (H13).
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'manual'>('idle');
 
   const handleCopy = (): void => {
@@ -101,15 +102,15 @@ function CrashScreen(props: {
       <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
       <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
       <div style={actionsStyle}>
-        {showEmergencyStop && (
+        {showSoftwareAbort && (
           <button
             type="button"
             className="lf-btn lf-btn--danger"
-            style={estopStyle}
-            onClick={() => props.emergencyStop?.trigger()}
-            title="Emergency stop: soft-reset the controller and force the beam or spindle off. The interface crashed but the machine may still be moving."
+            style={abortStyle}
+            onClick={() => props.softwareAbort?.trigger()}
+            title={`${SOFTWARE_ABORT_TITLE} The interface crashed but the machine may still be moving.`}
           >
-            E-STOP
+            {SOFTWARE_ABORT_LABEL}
           </button>
         )}
         <button
@@ -157,7 +158,7 @@ function buildDiagnostic(err: Error, when: number): string {
   );
 }
 
-const estopStyle: React.CSSProperties = {
+const abortStyle: React.CSSProperties = {
   fontWeight: 800,
   letterSpacing: 0.5,
   paddingInline: 16,

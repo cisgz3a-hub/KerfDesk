@@ -243,7 +243,7 @@ describe('JobControls Frame action', () => {
 });
 
 describe('JobControls running safety copy', () => {
-  it('warns that Pause is feed hold only and Stop or physical E-stop is the unsafe-condition path', async () => {
+  it('warns that Pause is feed hold only and ABORT or physical E-stop is the unsafe-condition path', async () => {
     installProject();
     useLaserStore.setState({
       streamer: {
@@ -269,7 +269,7 @@ describe('JobControls running safety copy', () => {
       });
 
       expect(host.textContent).toContain(
-        'Pause is feed hold only. Use Stop or physical E-stop if unsafe.',
+        'Pause is feed hold only. Use ABORT or the physical E-stop if unsafe.',
       );
     } finally {
       if (root !== null) {
@@ -279,7 +279,7 @@ describe('JobControls running safety copy', () => {
     }
   });
 
-  it('keeps Stop visible after a controller error leaves the job in recovery', async () => {
+  it('keeps ABORT visible after a controller error leaves the job in recovery', async () => {
     installProject();
     useLaserStore.setState({
       streamer: {
@@ -305,7 +305,7 @@ describe('JobControls running safety copy', () => {
       });
 
       const buttons = [...host.querySelectorAll('button')].map((button) => button.textContent);
-      expect(buttons).toContain('Stop');
+      expect(buttons).toContain('ABORT');
       expect(buttons).not.toContain('Pause');
       expect(buttons).not.toContain('Resume');
       const buttonByText = (text: string): HTMLButtonElement => {
@@ -325,7 +325,7 @@ describe('JobControls running safety copy', () => {
     }
   });
 
-  it('keeps a Stop escape mounted after a job finishes but before GRBL confirms Idle', async () => {
+  it('keeps an ABORT escape mounted after a job finishes but before GRBL confirms Idle', async () => {
     installProject();
     useLaserStore.setState({
       streamer: {
@@ -351,7 +351,7 @@ describe('JobControls running safety copy', () => {
       });
 
       const buttons = [...host.querySelectorAll('button')].map((button) => button.textContent);
-      expect(buttons).toContain('Stop');
+      expect(buttons).toContain('ABORT');
       expect(buttons).not.toContain('Pause');
       expect(buttons).not.toContain('Resume');
       const buttonByText = (text: string): HTMLButtonElement => {

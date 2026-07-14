@@ -1,4 +1,4 @@
-// laser-job-actions — Start / Pause / Resume / Stop, extracted from
+// laser-job-actions — Start / Pause / Resume / Abort, extracted from
 // laser-store.ts when it hit the ADR-015 size cap. Same shape as the other
 // action modules (autofocus-action, origin-actions): a factory that receives
 // the store's set/get plus the connection-bound safe write. Type-only
@@ -55,9 +55,9 @@ type DriverFn = () => ControllerDriver;
 type StartSetupEpoch = CncControllerEpoch;
 
 const PAUSE_REQUIRES_LASER_MODE_MESSAGE =
-  'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.';
+  'Pause requires confirmed GRBL laser mode ($32=1). Request ABORT instead; feed hold can leave the laser on when $32=0 or unknown. Use the physical E-stop if unsafe.';
 const PAUSE_UNSUPPORTED_MESSAGE =
-  'This controller has no realtime feed hold. Pause is stream-side only: sending stops, but buffered motion finishes. Use Stop for an immediate halt.';
+  'This controller has no realtime feed hold. Pause is stream-side only: sending stops, but buffered motion finishes. Request ABORT, or use the physical E-stop if unsafe.';
 // GRBL acks in strict receive order: an ok still owed to a console/origin/
 // handshake write, mis-attributed to a fresh job stream, frees RX budget the
 // controller has not freed — the phantom refill can overflow the real buffer
@@ -374,7 +374,7 @@ async function runResumeJob(
       await safeWrite(toSend, 'resume');
     } catch (err) {
       // markErrored, not disconnect: 'disconnected' falls outside
-      // isActiveJob, which unmounts the Stop button and drops the
+      // isActiveJob, which unmounts the Abort button and drops the
       // soft-reset stop command while GRBL may still be executing
       // buffered lines on a live port. 'errored' keeps the recovery
       // controls mounted; step() sends nothing further either way.

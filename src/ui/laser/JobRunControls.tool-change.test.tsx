@@ -1,5 +1,5 @@
 // CNC-04 — RunningControls shows a Continue button and the re-zero instruction
-// while a job is held at an M0 tool change, and mounts Stop throughout.
+// while a job is held at an M0 tool change, and mounts ABORT throughout.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -58,7 +58,7 @@ afterEach(async () => {
 });
 
 describe('RunningControls tool-change (CNC-04)', () => {
-  it('shows Continue + the re-zero instruction and keeps Stop while held at a tool change', async () => {
+  it('shows Continue + the re-zero instruction and keeps ABORT while held at a tool change', async () => {
     useLaserStore.setState({
       streamer: readyToolChangeStreamer(),
       toolChangeIdleSeen: true,
@@ -75,7 +75,7 @@ describe('RunningControls tool-change (CNC-04)', () => {
     };
 
     expect(host.textContent).toContain('Continue');
-    expect(host.textContent).toContain('Stop');
+    expect(host.textContent).toContain('ABORT');
     expect(host.textContent).toContain('re-zero Z on the stock top');
     expect(host.textContent).toContain(
       'Continue unlocks only after fresh Idle and tool-matched Z zero',

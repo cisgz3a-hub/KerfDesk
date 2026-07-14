@@ -398,7 +398,7 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.messages).toContain(
-        'A job is already active. Stop or finish it before starting another.',
+        'A job is already active. Request ABORT or finish it before starting another.',
       );
     }
   });

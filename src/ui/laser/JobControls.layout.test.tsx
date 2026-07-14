@@ -49,7 +49,7 @@ describe('JobControls action hierarchy', () => {
     }
   });
 
-  it('places Pause and Stop before placement details during a job', async () => {
+  it('places Pause and ABORT before placement details during a job', async () => {
     useLaserStore.setState({
       streamer: {
         status: 'streaming',
@@ -67,7 +67,7 @@ describe('JobControls action hierarchy', () => {
     const view = await renderControls();
     try {
       expect(precedes(button(view.host, 'Pause'), startFrom(view.host))).toBe(true);
-      expect(precedes(button(view.host, 'Stop'), startFrom(view.host))).toBe(true);
+      expect(precedes(button(view.host, 'ABORT'), startFrom(view.host))).toBe(true);
     } finally {
       await view.unmount();
     }

@@ -8,7 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { isElectronRenderer } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
-import { ErrorBoundary, type EmergencyStop } from '../common/ErrorBoundary';
+import { ErrorBoundary, type SoftwareAbort } from '../common/ErrorBoundary';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
@@ -28,11 +28,11 @@ const adapter: PlatformAdapter = isElectronRenderer()
   ? { ...webAdapter, id: 'electron' }
   : webAdapter;
 
-// If a render crash unmounts the App (and its Stop button + Ctrl+. listener),
-// the crash screen still needs a way to halt live motion (F60/F65). Both
+// If a render crash unmounts the App (and its Abort button + Ctrl+. listener),
+// the crash screen still needs a way to request a controller abort (F60/F65). Both
 // closures read the store at call time, so they reflect the machine's real state
 // at the moment of the crash / click.
-const emergencyStop: EmergencyStop = {
+const softwareAbort: SoftwareAbort = {
   isMotionLive: () => {
     const s = useLaserStore.getState();
     return (
@@ -51,7 +51,7 @@ const emergencyStop: EmergencyStop = {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ErrorBoundary emergencyStop={emergencyStop}>
+    <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
         <App />
       </PlatformProvider>

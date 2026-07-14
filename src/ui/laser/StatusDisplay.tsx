@@ -58,7 +58,7 @@ const stateRowStyle: React.CSSProperties = { color: 'var(--lf-success-fg)' };
 const posRowStyle: React.CSSProperties = { color: 'var(--lf-text)' };
 const feedRowStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 // Default origin row is muted (it's the boring case). Custom origin gets
-// the same accent red as the Stop button so the operator notices that
+// the same accent red as the Abort button so the operator notices that
 // their next job won't run at machine zero — important when picking up a
 // previous workpiece or recovering after a power-cycle.
 const originDefaultStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };

@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe('PersistentJobStop', () => {
-  it('keeps a visible stop action mounted while a job is active', async () => {
+  it('keeps an honest software Abort action mounted while a job is active', async () => {
     const stopJob = vi.fn(async () => undefined);
     useLaserStore.setState({
       streamer: step(createStreamer('G1 X1 S100')).state,
@@ -34,7 +34,9 @@ describe('PersistentJobStop', () => {
     const { host, root } = await renderStop();
     try {
       const button = host.querySelector('button');
-      expect(button?.textContent).toBe('Stop job');
+      expect(button?.textContent).toBe('ABORT');
+      expect(button?.title).toContain('not a safety-rated stop');
+      expect(button?.title).not.toMatch(/force|guarantee/i);
       expect(button?.style.position).toBe('fixed');
       await act(async () => button?.click());
       expect(stopJob).toHaveBeenCalledOnce();

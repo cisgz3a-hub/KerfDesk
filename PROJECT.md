@@ -66,7 +66,7 @@ Acceptance: see `WORKFLOW.md` Phase A flows + `DECISIONS.md` Phase A acceptance 
 
 ### Phase B — v0.2 "Real MVP — streams to laser" [MVP]
 
-Match LightBurn's core loop. Adds WebSerial-based GRBL controller, Laser window, Device Profile UI, Home/Frame/Jog/Start/Pause/Stop, alarm handling, job progress.
+Match LightBurn's core loop. Adds WebSerial-based GRBL controller, Laser window, Device Profile UI, Home/Frame/Jog/Start/Pause/Abort, alarm handling, job progress.
 
 Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT) as protocol reference for GRBL streaming and alarm-code mapping. **Not adopted as a dependency** — too large for our needs; just a reference.
 
@@ -152,7 +152,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 (Integrated as Phase I: the CNC router track holds Phase H — ADR-104 records the numbering resolution.)
 
 Every controller family drives the whole app through the ControllerDriver seam
-(ADR-094): connect → identify → jog/frame → run/pause/resume/stop → recover, with
+(ADR-094): connect → identify → jog/frame → run/pause/resume/software-abort → recover, with
 output, streaming, console, settings, and UI capability-gated per firmware.
 Verified end-to-end against scripted firmware simulators
 (`src/__fixtures__/controllers/`) driving the REAL laser-store.
@@ -275,7 +275,7 @@ phase; tracked here so they don't get lost.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
 7. **Power scale honest** — `S` values match the device profile's max-power scale (`$30`). Property-tested.
 8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the trusted desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024/135) — it transmits no user data and no telemetry, is confined to that origin, and stays disabled until production code signing is operational. The web app and every CAM/preview/streaming path stay fully offline.
-9. **E-stop reachable always** — Stop button reachable from any window state during a job. No modal can block it.
+9. **Abort reachable always** — the software Abort / Controller Reset control is reachable from any window state during a job. No modal can block it. This command is not a safety-rated E-stop; dangerous conditions require the machine's physical E-stop or power isolation.
 
 ### Architectural (anti-shotgun-surgery)
 

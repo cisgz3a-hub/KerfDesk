@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe('JobSafetyControls', () => {
-  it('shows Pause + E-STOP while streaming and wires the store actions', async () => {
+  it('shows Pause + ABORT while streaming and wires the store actions', async () => {
     const pauseJob = vi.fn(async () => undefined);
     const stopJob = vi.fn(async () => undefined);
     useLaserStore.setState({ streamer: streamingStreamer(), pauseJob, stopJob });
@@ -52,7 +52,9 @@ describe('JobSafetyControls', () => {
       expect(buttonByText(host, 'Resume')).toBeUndefined();
       await act(async () => buttonByText(host, 'Pause')?.click());
       expect(pauseJob).toHaveBeenCalledOnce();
-      await act(async () => buttonByText(host, 'E-STOP')?.click());
+      const abort = buttonByText(host, 'ABORT');
+      expect(abort?.title).toContain('physical E-stop');
+      await act(async () => abort?.click());
       expect(stopJob).toHaveBeenCalledOnce();
     } finally {
       await act(async () => root.unmount());
@@ -81,15 +83,15 @@ describe('JobSafetyControls', () => {
     });
     const { host, root } = await renderControls();
     try {
-      // E-STOP stays reachable even when Resume is gated.
-      expect(buttonByText(host, 'E-STOP')).toBeDefined();
+      // The controller abort stays reachable even when Resume is gated.
+      expect(buttonByText(host, 'ABORT')).toBeDefined();
       expect(buttonByText(host, 'Resume')?.disabled).toBe(true);
     } finally {
       await act(async () => root.unmount());
     }
   });
 
-  it('shows E-STOP (no Pause/Resume) during an in-flight probe so a probe cycle can be killed (G41)', async () => {
+  it('shows ABORT (no Pause/Resume) during an in-flight probe (G41)', async () => {
     const stopJob = vi.fn(async () => undefined);
     useLaserStore.setState({
       streamer: null,
@@ -106,14 +108,14 @@ describe('JobSafetyControls', () => {
     try {
       expect(buttonByText(host, 'Pause')).toBeUndefined();
       expect(buttonByText(host, 'Resume')).toBeUndefined();
-      await act(async () => buttonByText(host, 'E-STOP')?.click());
+      await act(async () => buttonByText(host, 'ABORT')?.click());
       expect(stopJob).toHaveBeenCalledOnce();
     } finally {
       await act(async () => root.unmount());
     }
   });
 
-  it('shows E-STOP during a jog/frame motion operation (F63/F86)', async () => {
+  it('shows ABORT during a jog/frame motion operation (F63/F86)', async () => {
     useLaserStore.setState({
       streamer: null,
       motionOperation: {
@@ -126,7 +128,7 @@ describe('JobSafetyControls', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const { host, root } = await renderControls();
     try {
-      expect(buttonByText(host, 'E-STOP')).toBeDefined();
+      expect(buttonByText(host, 'ABORT')).toBeDefined();
     } finally {
       await act(async () => root.unmount());
     }

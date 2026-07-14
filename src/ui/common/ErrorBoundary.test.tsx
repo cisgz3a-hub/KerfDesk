@@ -80,17 +80,17 @@ describe('ErrorBoundary', () => {
     expect(container.textContent).toMatch(/no data leaves your machine/i);
   });
 
-  it('shows a working E-STOP in the crash screen when motion was live (F60/F65)', () => {
+  it('shows a working ABORT in the crash screen when motion was live (F60/F65)', () => {
     const trigger = vi.fn();
     act(() => {
       root.render(
-        <ErrorBoundary emergencyStop={{ isMotionLive: () => true, trigger }}>
+        <ErrorBoundary softwareAbort={{ isMotionLive: () => true, trigger }}>
           <Boom shouldThrow={true} />
         </ErrorBoundary>,
       );
     });
     const estop = Array.from(container.querySelectorAll('button')).find(
-      (b) => b.textContent === 'E-STOP',
+      (b) => b.textContent === 'ABORT',
     );
     expect(estop).toBeDefined();
     act(() => {
@@ -99,10 +99,10 @@ describe('ErrorBoundary', () => {
     expect(trigger).toHaveBeenCalledOnce();
   });
 
-  it('omits the crash-screen E-STOP when nothing was moving', () => {
+  it('omits the crash-screen ABORT when nothing was moving', () => {
     act(() => {
       root.render(
-        <ErrorBoundary emergencyStop={{ isMotionLive: () => false, trigger: vi.fn() }}>
+        <ErrorBoundary softwareAbort={{ isMotionLive: () => false, trigger: vi.fn() }}>
           <Boom shouldThrow={true} />
         </ErrorBoundary>,
       );
@@ -110,14 +110,14 @@ describe('ErrorBoundary', () => {
     const buttons = Array.from(container.querySelectorAll('button')).map(
       (b) => b.textContent ?? '',
     );
-    expect(buttons).not.toContain('E-STOP');
+    expect(buttons).not.toContain('ABORT');
     expect(buttons).toContain('Try again');
   });
 
   it('falls back to a manual-copy textarea instead of a blocking prompt (H13)', () => {
     // jsdom has no Clipboard API — exactly the insecure-context fallback
     // path. A native prompt here would suspend the renderer: if the crash
-    // happened mid-job it freezes the ack pump, the Stop button, and the
+    // happened mid-job it freezes the ack pump, the Abort button, and the
     // M22 keyboard stop. The fallback must be non-blocking.
     const promptSpy = vi.spyOn(window, 'prompt').mockImplementation(() => null);
     act(() => {

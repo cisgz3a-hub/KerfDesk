@@ -84,19 +84,28 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.querySelector('button')?.textContent).toBe('Review safe recovery');
   });
 
-  it('renders nothing without a checkpoint or without progress', () => {
-    render();
-    expect(host?.textContent).toBe('');
-
-    act(() => {
-      root?.unmount();
-    });
-    storedCheckpoint(0);
+  it('renders nothing without a checkpoint', () => {
     render();
     expect(host?.textContent).toBe('');
   });
 
-  it('retains CNC checkpoint evidence without offering executable recovery', () => {
+  it('retains recovery guidance when interruption happens before the first acknowledgement', () => {
+    storedCheckpoint(0, 'cnc');
+    render();
+    expect(host?.textContent).toContain('Interrupted router job');
+    expect(host?.textContent).toContain('0 of 4 G-code lines acknowledged');
+    expect(host?.textContent).toContain('Automatic CNC restart');
+    expect(host?.textContent).toContain('diagnostic evidence');
+    expect(host?.querySelector('button')?.textContent).toBe('Review recovery preview');
+  });
+
+  it('does not offer laser replay before any command was acknowledged', () => {
+    storedCheckpoint(0, 'laser');
+    render();
+    expect(host?.textContent).toBe('');
+  });
+
+  it('retains CNC evidence and offers only a preview review', () => {
     storedCheckpoint(2, 'cnc');
     render();
 
@@ -104,8 +113,24 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.textContent).toContain('acknowledgements do not prove');
     expect(host?.textContent).toContain('retained as diagnostic evidence');
     expect([...(host?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
+      'Review recovery preview',
       'Dismiss',
     ]);
+  });
+
+  it('opens a non-executable CNC recovery review wizard', () => {
+    storedCheckpoint(2, 'cnc');
+    render();
+
+    act(() => {
+      [...(host?.querySelectorAll('button') ?? [])]
+        .find((button) => button.textContent === 'Review recovery preview')
+        ?.click();
+    });
+
+    expect(host?.textContent).toContain('CNC recovery review — preview only');
+    expect(host?.textContent).toContain('cannot start the spindle');
+    expect(host?.querySelector('button')?.textContent).not.toMatch(/execute|start spindle/i);
   });
 
   it('shows the persisted interruption cause after reconnect or reload', () => {

@@ -151,7 +151,7 @@ function MachineRailHeading(props: {
       title={machineDisplayName(props.machineKind)}
       onCollapse={props.onCollapse}
       collapseDisabled={props.jobActive}
-      collapseDisabledReason="Machine controls stay visible while a job is active so Stop remains reachable."
+      collapseDisabledReason="Machine controls stay visible while a job is active so ABORT remains reachable."
     />
   );
 }

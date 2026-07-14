@@ -34,7 +34,7 @@ export function ConsolePanel(): JSX.Element {
   );
   const disconnected = connection.kind !== 'connected';
   const activeOperationReason =
-    (isActiveJob(streamer) && 'A job is active. Press Stop before sending console commands.') ||
+    (isActiveJob(streamer) && 'A job is active. Request ABORT before sending console commands.') ||
     (motionOperation !== null &&
       'A jog or frame operation is active. Wait for it to finish before sending console commands.') ||
     controllerOperationCommandBlockMessage(controllerOperation) ||

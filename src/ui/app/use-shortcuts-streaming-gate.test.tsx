@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 // H13 (AUDIT-2026-06-10): the dirty-discard prompt must never open while a
-// job is active — its backdrop would cover Pause/Stop with the beam live.
+// job is active — its backdrop would cover Pause/Abort with the beam live.
 // LU18 replaced the native confirm with the in-app Save / Don't Save /
 // Cancel dialog; the fail-closed policy carries over.
 describe('file shortcuts while a job is streaming (H13)', () => {

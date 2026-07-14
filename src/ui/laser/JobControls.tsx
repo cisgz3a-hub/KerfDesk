@@ -1,5 +1,5 @@
-// JobControls — Home + Start / Pause / Resume / Stop + progress bar.
-// F-B3 (Home), F-B6 (Start), F-B7 (Pause/Resume), F-B8 (Stop), F-B11 (Progress).
+// JobControls — Home + Start / Pause / Resume / Abort + progress bar.
+// F-B3 (Home), F-B6 (Start), F-B7 (Pause/Resume), F-B8 (Abort), F-B11 (Progress).
 
 import { progress } from '../../core/controllers/grbl';
 import { useStore } from '../state';
@@ -40,13 +40,13 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   const isStreaming = status === 'streaming';
   const isPaused = status === 'paused';
   const isToolChange = status === 'tool-change';
-  // 'done' and 'errored' both keep the recovery controls (chiefly Stop)
+  // 'done' and 'errored' both keep the recovery controls (chiefly Abort)
   // mounted. A finished job stays active (isActiveJob) until a later Idle status
   // clears the streamer — laser-store-helpers keeps 'done' busy so the user
   // can't jog into a head still physically finishing motion — and an errored job
-  // needs an explicit Stop. Mounting Stop through the 'done' window means a job
+  // needs an explicit Abort. Mounting Abort through the 'done' window means a job
   // whose Idle report is delayed or never arrives still has an in-app escape
-  // instead of forcing a disconnect/reconnect. 'tool-change' likewise keeps Stop
+  // instead of forcing a disconnect/reconnect. 'tool-change' likewise keeps Abort
   // (and the Continue control) mounted while the job holds at an M0.
   const jobNeedsRecovery =
     status !== undefined &&

@@ -82,7 +82,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
       family: machineDisplayName(machineKind),
       rows: [
         { keys: 'Ctrl+Enter', action: 'start job' },
-        { keys: 'Ctrl+.', action: 'stop job' },
+        { keys: 'Ctrl+.', action: 'abort job through the controller' },
       ],
     },
   ];

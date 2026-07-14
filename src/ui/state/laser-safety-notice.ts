@@ -1,7 +1,7 @@
 // laser-safety-notice — the operator-facing safety alert the laser store raises
 // when it CANNOT be sure the machine is in a safe state. Three cases (P0-B, P0-1):
 //
-//   - write-failed: a Stop / Pause / Resume / Disconnect command's serial write
+//   - write-failed: an Abort / Pause / Resume / Disconnect command's serial write
 //     threw. The controller may not have received it, so the machine may still
 //     be moving. Software cannot fix this — the operator must reach for the
 //     physical control.
@@ -91,7 +91,7 @@ export function controllerOwnershipLostNotice(): LaserSafetyNotice {
 // while lines are in flight.
 export const STREAM_STALLED_MESSAGE =
   'The controller has not acknowledged a command or reported fresh movement status for longer ' +
-  'than the watchdog window while a job is active. The stream may be stalled. Press Stop ' +
+  'than the watchdog window while a job is active. The stream may be stalled. Press ABORT ' +
   '(or physical E-stop if unsafe), then check the USB link before re-running.';
 
 export function streamStalledNotice(): LaserSafetyNotice {
@@ -149,7 +149,7 @@ export function frameHitLimitNotice(axisLabel: string | null): LaserSafetyNotice
 export function writeFailedMessage(action: LaserSafetyAction): string {
   if (action === 'stop') {
     return (
-      'Stop command was not written to the controller. Use physical E-stop or power ' +
+      'The software Abort command was not written to the controller. Use physical E-stop or power ' +
       'cutoff now if unsafe. The machine may still be running.'
     );
   }
@@ -168,7 +168,7 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
   if (action === 'stream') {
     return (
       'A mid-job send failed, so the stream was stopped. The machine may still be executing ' +
-      'buffered commands — press Stop; use physical E-stop or power cutoff now if unsafe.'
+      'buffered commands — press ABORT; use physical E-stop or power cutoff now if unsafe.'
     );
   }
   if (action === 'fire') {

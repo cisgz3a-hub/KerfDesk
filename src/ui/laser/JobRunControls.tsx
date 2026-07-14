@@ -1,5 +1,5 @@
 // JobRunControls — the in-flight operation controls JobControls mounts while
-// something is moving: Pause/Resume/Stop (+ real-time overrides, ADR-103 G3)
+// something is moving: Pause/Resume/Abort (+ real-time overrides, ADR-103 G3)
 // for a streaming job, cancel for jog/frame motion, and the passive label for
 // controller operations. Extracted from JobControls.tsx (file line cap).
 // Capability-aware per ADR-098: Marlin-class firmwares pause stream-side
@@ -11,10 +11,12 @@ import { toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
 import { cncPauseMessage, cncResumeBlockMessage } from '../state/cnc-pause-resume-policy';
 import { rowStyle, runningSafetyStyle, stopBtnStyle } from './JobControls.styles';
 import { OverrideControls } from './OverrideControls';
+import { SOFTWARE_ABORT_LABEL, SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 
-const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical E-stop if unsafe.';
+const PAUSE_HOLD_SAFETY_MESSAGE =
+  'Pause is feed hold only. Use ABORT or the physical E-stop if unsafe.';
 const PAUSE_STREAM_SIDE_MESSAGE =
-  'Pause stops sending; moves already buffered in the firmware finish first. Use Stop or physical E-stop if unsafe.';
+  'Pause stops sending; buffered firmware motion may finish. Use ABORT or the physical E-stop if unsafe.';
 
 // Name the bit at the hold when the compiled program identified it (R5); fall
 // back to the generic prompt for a single-tool / imported / resume-tail job.
@@ -85,9 +87,9 @@ export function RunningControls(props: {
           type="button"
           onClick={() => void stopJob().catch(() => undefined)}
           style={stopBtnStyle}
-          title="Halt the job and force the beam off (Ctrl+.)"
+          title={SOFTWARE_ABORT_TITLE}
         >
-          Stop
+          {SOFTWARE_ABORT_LABEL}
         </button>
         <span style={runningSafetyStyle}>
           {safetyMessage}{' '}
@@ -129,7 +131,7 @@ function resumeControlTitle(blockMessage: string | null, hasRealtimePause: boole
 
 // Overrides are only meaningful while the controller is consuming motion AND its
 // firmware speaks GRBL 1.1 realtime override bytes — mounted beside
-// Pause/Resume/Stop for streaming and paused jobs (ADR-103 G3), never for a
+// Pause/Resume/Abort for streaming and paused jobs (ADR-103 G3), never for a
 // controller without the capability (Marlin/Smoothieware/Ruida), whose line
 // buffer the bytes would corrupt (CTL-01). Exported for direct unit testing.
 export function shouldShowOverrides(

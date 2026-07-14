@@ -16,7 +16,7 @@ export const SAFETY_NOTICE_TEXT = [
   'EVERY JOB',
   ' - Verify the output first (preview, simulation, or an air run) before cutting.',
   " - Know your machine's PHYSICAL emergency stop — a lost USB command or full",
-  '   buffer means the machine can keep moving after you click Stop.',
+  '   buffer means the machine can keep moving after you click ABORT.',
   ' - Never leave a running machine unattended. Keep a fire extinguisher nearby.',
   '',
   'LASER',
