@@ -3,6 +3,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   createLayer,
   createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
@@ -21,7 +22,11 @@ import { resetStore } from '../state/test-helpers';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import {
+  CNC_SETUP_ATTESTATION_PROMPT,
+  cncSetupAttestationMatches,
+} from '../state/cnc-setup-attestation';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -78,6 +83,21 @@ function runnableProject() {
   };
 }
 
+function configureReadyCncStart(): void {
+  useStore.setState((state) => ({
+    project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+  }));
+  useLaserStore.setState({
+    controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
+    workZReferenceEpoch: 7,
+    workZZeroEvidence: {
+      source: 'manual-zero',
+      referenceEpoch: 7,
+      toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
+    },
+  });
+}
+
 describe('runStartJobFlow', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -99,6 +119,7 @@ describe('runStartJobFlow', () => {
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareAlert).mockClear();
+    vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -121,6 +142,32 @@ describe('runStartJobFlow', () => {
       machineKind: 'laser',
     });
     expect(jobAwareAlert).not.toHaveBeenCalled();
+    expect(jobAwareConfirm).not.toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
+  });
+
+  it('requires physical CNC setup confirmation and binds it to the compiled program', async () => {
+    configureReadyCncStart();
+
+    await runStartJobFlow();
+
+    expect(jobAwareConfirm).toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
+    const startJob = vi.mocked(useLaserStore.getState().startJob);
+    expect(startJob).toHaveBeenCalledTimes(1);
+    const gcode = startJob.mock.calls[0]?.[0];
+    const options = startJob.mock.calls[0]?.[1];
+    if (typeof gcode !== 'string') throw new Error('CNC Start did not compile G-code');
+    expect(options?.machineKind).toBe('cnc');
+    expect(cncSetupAttestationMatches(options?.cncSetupAttestation, gcode)).toBe(true);
+  });
+
+  it('does not stream a CNC program when physical setup confirmation is declined', async () => {
+    configureReadyCncStart();
+    vi.mocked(jobAwareConfirm).mockReturnValueOnce(true).mockReturnValueOnce(false);
+
+    await runStartJobFlow();
+
+    expect(jobAwareConfirm).toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
   });
 
   it('forces ping-pong when a legacy Marlin profile retained char-counted streaming', async () => {
