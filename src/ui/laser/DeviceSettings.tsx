@@ -32,14 +32,15 @@ export function DeviceSettings(): JSX.Element {
   // ($30/$31/$32), air assist, scanning offsets, autofocus command — hide on
   // a router. H.7 CNC machine profiles add the CNC counterparts.
   const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');
-  // Whole panel collapses to one row by default. <details> gives us the
-  // disclosure widget without any React state — the user's last-chosen
-  // open/closed status persists for the session (browser DOM owns it).
-  // Closed by default keeps the laser rail compact; opening it is an explicit
-  // operator choice. PlannerAdvanced has its own nested <details> for the
-  // power-user knobs — that nesting is intentional, not accidental.
+  // Open by default: this panel only appears on the Machine Setup → Overview
+  // tab, which the operator opens precisely to inspect or edit the profile, so
+  // the fields should be visible on arrival rather than one click away — the
+  // same directness LightBurn's Device Settings gives. <details> (not React
+  // state) still lets the operator collapse it; the browser DOM owns the toggle
+  // for the rest of the session. PlannerAdvanced has its own nested <details>
+  // for the power-user knobs — that nesting is intentional, not accidental.
   return (
-    <details style={panelStyle}>
+    <details open style={panelStyle}>
       <summary
         style={summaryStyle}
         title="Choose the local KerfDesk machine profile: bed size, origin, feed limits, power range, homing, focus, and air output. This does not write firmware settings."
