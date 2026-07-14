@@ -10,8 +10,13 @@
 // and a native dialog there would freeze the ack pump and Stop button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
+import type { StatusQueryCapability } from '../../core/controllers';
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
-import { profileSupportsCapability, streamingModeForController } from '../../core/devices';
+import {
+  profileSupportsCapability,
+  streamingModeForController,
+  type ControllerKind,
+} from '../../core/devices';
 import {
   createJobCheckpoint,
   fingerprintGcode,
@@ -41,6 +46,11 @@ import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { resumeConfirmation } from './resume-confirmation';
 import { useCameraStore } from '../state/camera-store';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
+import {
+  rebuildCanvasPlanForGcode,
+  reportedWorkPositionMm,
+  type CanvasMotionPlan,
+} from '../state/canvas-motion-plan';
 
 export async function runStartJobFlow(): Promise<void> {
   const app = useStore.getState();
@@ -70,6 +80,7 @@ export async function runStartJobFlow(): Promise<void> {
       machineKind,
       ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
       ...(cncSetupAttestation === undefined ? {} : { cncSetupAttestation }),
+      canvasPlan: prepared.canvasPlan,
     });
     armVariableStreamAdvancement(project);
     // Checkpoint the run only once the stream is actually under way
@@ -130,6 +141,11 @@ async function prepareCurrentStartJob(
       ),
       homingState: laser.homingState,
       trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
+      reportInches: laser.controllerSettings?.reportInches === true,
+      statusQuery: liveStatusQueryCapability(
+        laser.activeControllerKind,
+        laser.capabilities.statusQuery,
+      ),
     },
     jobPlacement,
     currentOutputScope(app),
@@ -161,7 +177,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
   }
   const prepared = prepareResume();
   if (prepared === null) return;
-  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine);
+  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine, prepared.canvasPlan);
 }
 
 // Resume the checkpointed interrupted job (ADR-118): re-compile the project,
@@ -193,7 +209,7 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
     return;
   }
   const fromLine = rawResumeLine(prepared.gcode, checkpoint.ackedLines);
-  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine);
+  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine, prepared.canvasPlan);
 }
 
 // Shared resume front half: readiness gate + re-compile. Same gate as a
@@ -205,7 +221,11 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
 function prepareResume(overrides?: {
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
-}): { readonly project: Project; readonly gcode: string } | null {
+}): {
+  readonly project: Project;
+  readonly gcode: string;
+  readonly canvasPlan: CanvasMotionPlan;
+} | null {
   const app = useStore.getState();
   const { project } = app;
   const outputScope = overrides?.outputScope ?? currentOutputScope(app);
@@ -240,6 +260,11 @@ function prepareResume(overrides?: {
       ),
       homingState: laser.homingState,
       trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
+      reportInches: laser.controllerSettings?.reportInches === true,
+      statusQuery: liveStatusQueryCapability(
+        laser.activeControllerKind,
+        laser.capabilities.statusQuery,
+      ),
     },
     app.jobPlacement,
     outputScope,
@@ -251,7 +276,7 @@ function prepareResume(overrides?: {
     jobAwareAlert(`Cannot resume job:\n\n${lines}`);
     return null;
   }
-  return { project, gcode: prepared.gcode };
+  return { project, gcode: prepared.gcode, canvasPlan: prepared.canvasPlan };
 }
 
 function rotaryRasterAllowed(project: Project): boolean {
@@ -268,6 +293,7 @@ async function streamResumeFromRawLine(
   project: Project,
   gcode: string,
   fromLine: number,
+  originalCanvasPlan: CanvasMotionPlan,
 ): Promise<void> {
   const machine = project.machine;
   const resume = buildResumeProgram(gcode, fromLine, {
@@ -289,6 +315,12 @@ async function streamResumeFromRawLine(
     writeJobCheckpoint(markResumeInFlight(checkpoint, new Date().toISOString()));
   }
   try {
+    const laser = useLaserStore.getState();
+    const resumeGcode = resume.lines.join('\n');
+    const initialPosition = reportedWorkPositionMm(
+      laser,
+      laser.controllerSettings?.reportInches === true,
+    );
     await useLaserStore.getState().startJob(resume.lines.join('\n'), {
       streamingMode: streamingModeForController(
         project.device.controllerKind,
@@ -296,6 +328,11 @@ async function streamResumeFromRawLine(
       ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
+      canvasPlan: rebuildCanvasPlanForGcode(
+        originalCanvasPlan,
+        resumeGcode,
+        initialPosition ?? undefined,
+      ),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -304,3 +341,12 @@ async function streamResumeFromRawLine(
 }
 
 const RESUME_PLUNGE_MM_PER_MIN = 300;
+
+function liveStatusQueryCapability(
+  controllerKind: ControllerKind,
+  configured: StatusQueryCapability,
+): StatusQueryCapability {
+  if (controllerKind === 'marlin') return 'queued-poll';
+  if (controllerKind === 'ruida') return 'none';
+  return configured;
+}

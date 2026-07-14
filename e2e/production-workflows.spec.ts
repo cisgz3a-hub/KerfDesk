@@ -474,6 +474,79 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await expect(page.getByRole('button', { name: 'Start job' })).toBeEnabled();
 });
 
+test('shows controller-reported canvas progress without treating acknowledgements as motion', async ({
+  page,
+  kerfdesk,
+}) => {
+  const probe = page.getByTestId('canvas-motion-probe');
+  await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
+  await connectAndHome(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  page.on('dialog', (dialog) => void dialog.accept());
+  const writesBefore = serialWrites(await kerfdesk.events()).length;
+  await page.getByRole('button', { name: 'Start job' }).click();
+  await expect(probe).toHaveAttribute('data-lifecycle', 'running');
+  const beforeAck = Number(await probe.getAttribute('data-confirmed-route-mm'));
+
+  await kerfdesk.acknowledgeSerial(4);
+  await expect
+    .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+    .toBe(beforeAck);
+
+  const programWrites = serialWrites(await kerfdesk.events()).slice(writesBefore);
+  const firstMove = /G0 X(-?\d+(?:\.\d+)?) Y(-?\d+(?:\.\d+)?)/.exec(programWrites);
+  expect(firstMove).not.toBeNull();
+  const targetX = Number(firstMove?.[1] ?? 0);
+  const targetY = Number(firstMove?.[2] ?? 0);
+  await kerfdesk.emitSerialLine(
+    `<Run|MPos:${(targetX / 2).toFixed(3)},${(targetY / 2).toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0>`,
+  );
+  await expect
+    .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+    .toBeGreaterThan(beforeAck);
+
+  await page.getByRole('button', { name: 'Pause' }).click();
+  const atPause = Number(await probe.getAttribute('data-confirmed-route-mm'));
+  await kerfdesk.emitSerialLine(
+    `<Hold:0|MPos:${targetX.toFixed(3)},${targetY.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:0,0>`,
+  );
+  await expect(probe).toHaveAttribute('data-lifecycle', 'paused');
+  expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBe(atPause);
+
+  await page.getByRole('button', { name: 'Resume' }).click();
+  await kerfdesk.emitSerialLine(
+    `<Run|MPos:${targetX.toFixed(3)},${targetY.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0>`,
+  );
+  await expect
+    .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+    .toBeGreaterThan(atPause);
+
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(probe).toHaveAttribute('data-lifecycle', 'stopped');
+  expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBeGreaterThanOrEqual(
+    atPause,
+  );
+});
+
+test('keeps the finished route and confirms it only after the stream settles Idle', async ({
+  page,
+  kerfdesk,
+}) => {
+  await connectAndHome(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  page.on('dialog', (dialog) => void dialog.accept());
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
+  await page.getByRole('button', { name: 'Start job' }).click();
+  const probe = page.getByTestId('canvas-motion-probe');
+  await expect(probe).toHaveAttribute('data-lifecycle', 'running');
+  await drainHeldSerialWrites(page, kerfdesk, baselineLines);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(probe).toHaveAttribute('data-lifecycle', 'finished');
+  await expect
+    .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+    .toBeGreaterThan(0);
+});
+
 test('preserves an interrupted laser checkpoint after a cable disconnect', async ({
   page,
   kerfdesk,
@@ -582,6 +655,29 @@ function serialWriteLineCount(events: readonly Readonly<Record<string, unknown>>
     .filter((event) => event['kind'] === 'serial-write')
     .map((event) => String(event['text']))
     .reduce((count, text) => count + [...text].filter((character) => character === '\n').length, 0);
+}
+
+async function drainHeldSerialWrites(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  baselineLines: number,
+): Promise<void> {
+  let acknowledged = 0;
+  let stablePasses = 0;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
+    const pending = written - acknowledged;
+    if (pending > 0) {
+      await kerfdesk.acknowledgeSerial(pending);
+      acknowledged += pending;
+      stablePasses = 0;
+    } else {
+      stablePasses += 1;
+      if (stablePasses >= 3) return;
+    }
+    await page.waitForTimeout(25);
+  }
+  throw new Error('Held serial writes did not drain.');
 }
 
 function frameWriteCount(events: readonly Readonly<Record<string, unknown>>[]): number {

@@ -127,6 +127,31 @@ describe('resolveJobPlacement', () => {
       preflightMotionOffset: { x: 120, y: 80 },
     });
   });
+
+  it('normalizes inch-reported MPos and WCO before resolving placement', () => {
+    const resolved = resolveJobPlacement(
+      { startFrom: 'current-position', anchor: 'front-left' },
+      {
+        statusReport: idleAtMachinePosition(2, 1.5),
+        workOriginActive: true,
+        wcoCache: { x: 1, y: 0.5, z: 0 },
+        reportInches: true,
+      },
+    );
+
+    expect(resolved).toMatchObject({
+      ok: true,
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'front-left',
+        currentPosition: { x: 25.4 },
+      },
+      preflightMotionOffset: { x: 25.4, y: 12.7 },
+    });
+    if (resolved.ok && resolved.jobOrigin?.startFrom === 'current-position') {
+      expect(resolved.jobOrigin.currentPosition.y).toBeCloseTo(25.4);
+    }
+  });
 });
 
 describe('verified-origin placement (ADR-053)', () => {

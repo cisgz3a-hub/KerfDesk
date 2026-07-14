@@ -21,6 +21,7 @@ import {
 import type { LaserState } from './laser-store';
 import type { SafeWriteFn, SetFn } from './laser-line-shared';
 import { hasCustomXyOrigin } from './origin-actions';
+import { liveCanvasStatusPatch } from './live-canvas-run';
 
 export function handleStatusLine(
   set: SetFn,
@@ -71,6 +72,7 @@ export function handleStatusLine(
     ...operationPatch,
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
+    ...liveCanvasStatusPatch(state, report, streamer),
   });
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
@@ -109,8 +111,23 @@ function handleInvalidatingStatus(
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
+    ...liveCanvasLifecyclePatchForInvalidation(state, alarm),
   });
   cancelControllerLifecycleRefs(refs, `Controller entered ${alarm ? 'Alarm' : 'Sleep'}.`);
+}
+
+function liveCanvasLifecyclePatchForInvalidation(
+  state: LaserState,
+  alarm: boolean,
+): Partial<Pick<LaserState, 'liveCanvasRun'>> {
+  const run = state.liveCanvasRun ?? null;
+  if (run === null || run.lifecycle === 'finished') return {};
+  return {
+    liveCanvasRun: {
+      ...run,
+      lifecycle: alarm ? 'errored' : 'disconnected',
+    },
+  };
 }
 
 function advanceWriteEpoch(refs: ControllerLifecycleRefs): void {

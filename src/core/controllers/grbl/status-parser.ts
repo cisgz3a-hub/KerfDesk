@@ -20,8 +20,9 @@
 // like `wcoCache`. A (active spindle/coolant accessories) is emitted only
 // alongside Ov and only while at least one accessory is active. Therefore an
 // Ov frame without A is a positive all-off observation; a frame with neither
-// field carries no new accessory evidence. Other fields (Bf, Ln) are still
-// not parsed.
+// field carries no new accessory evidence. Bf remains unparsed. Ln is optional
+// in GRBL builds; when present it is useful only as an additional route-match
+// bound and is never required for live progress.
 
 export type GrblState =
   | 'Idle'
@@ -63,6 +64,9 @@ export type StatusReport = {
   readonly wPos: { x: number; y: number; z: number } | null;
   readonly feed: number | null;
   readonly spindle: number | null;
+  /** Optional controller executing-line number from `Ln:`. Stock GRBL builds
+   * commonly omit it; consumers must never depend on it being present. */
+  readonly executingLineNumber?: number | null;
   /**
    * Active input pins from the `Pn:` field, or null when GRBL reports no pins
    * triggered (the field is omitted on the wire). Optional so hand-built test
@@ -148,6 +152,7 @@ export function parseStatusReport(line: string): StatusReport | null {
     wPos: pickAxisField(fields, 'WPos'),
     feed: pickFsValue(fields, 0),
     spindle: pickFsValue(fields, 1),
+    executingLineNumber: pickLineNumber(fields),
     wco: pickAxisField(fields, 'WCO'),
     pins: pickPins(fields),
     ov,
@@ -155,6 +160,17 @@ export function parseStatusReport(line: string): StatusReport | null {
     accessoryReportPresent,
     mpgActive: pickMpgActive(fields),
   };
+}
+
+function pickLineNumber(fields: ReadonlyArray<string>): number | null {
+  for (const field of fields) {
+    if (!field.startsWith('Ln:')) continue;
+    const body = field.slice('Ln:'.length);
+    if (!/^\d+$/.test(body)) return null;
+    const value = Number.parseInt(body, 10);
+    return Number.isInteger(value) && value >= 0 ? value : null;
+  }
+  return null;
 }
 
 function pickMpgActive(fields: ReadonlyArray<string>): boolean | null {

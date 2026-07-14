@@ -40,6 +40,9 @@ import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { useDragMove } from './use-workspace-drag';
 import { useWorkspaceWheelZoom } from './use-workspace-wheel';
 import { useJobEstimate } from '../laser/use-job-estimate';
+import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
+import { CanvasMotionBadge } from './canvas-motion-badge';
+import type { CanvasMotionOverlay } from './draw-canvas-motion';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -50,11 +53,11 @@ export function Workspace(): JSX.Element {
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
   const routePreviewLabel = useStore(selectRoutePreviewLabel);
-  const scrubberT = useUiStore((s) => s.scrubberT);
-  const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
+  const { scrubberT, showPreviewTravel } = useWorkspacePreviewState();
   const toolMode = useUiStore((s) => s.toolMode);
   const viewState = useViewState();
   const previewToolpath = usePreviewToolpath(project, previewMode);
+  const canvasMotionOverlay = useCanvasMotionOverlay(project, previewMode);
   const jobEstimate = useJobEstimate();
   usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
   const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
@@ -75,6 +78,7 @@ export function Workspace(): JSX.Element {
     showPreviewTravel,
     viewState,
     canvasSize,
+    canvasMotionOverlay,
   });
 
   const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
@@ -114,6 +118,7 @@ export function Workspace(): JSX.Element {
         cncRemovalGrid={cncRemovalGrid}
       />
       {previewMode && <PreviewScrubber />}
+      {!previewMode && <CanvasMotionBadge overlay={canvasMotionOverlay} />}
       {/* Bottom-right zoom controls — hidden during preview so the
           scrubber gets the whole bottom strip. */}
       {!previewMode && <ZoomControls />}
@@ -137,6 +142,15 @@ function useViewState(): {
 
 function selectRoutePreviewLabel(state: ReturnType<typeof useStore.getState>): string {
   return state.outputScopeSettings.cutSelectedGraphics ? 'Selected output' : 'Whole project';
+}
+
+function useWorkspacePreviewState(): {
+  readonly scrubberT: number;
+  readonly showPreviewTravel: boolean;
+} {
+  const scrubberT = useUiStore((state) => state.scrubberT);
+  const showPreviewTravel = useUiStore((state) => state.showPreviewTravel);
+  return useMemo(() => ({ scrubberT, showPreviewTravel }), [scrubberT, showPreviewTravel]);
 }
 
 function useDropPenDraftOnProjectReplace(project: Project): void {
@@ -228,6 +242,7 @@ function useWorkspaceDraw(args: {
   // Not read directly — the draw effect reads canvas.width/height — but a
   // bitmap resize clears the canvas, so the effect must re-run on it.
   readonly canvasSize: CanvasBitmapSize;
+  readonly canvasMotionOverlay: CanvasMotionOverlay | null;
 }): void {
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
   // preview. Identity changes each mouse-move, so it belongs in the deps below.
@@ -248,27 +263,17 @@ function useWorkspaceDraw(args: {
     if (canvas === null) return;
     const ctx = canvas.getContext('2d');
     if (ctx === null) return;
-    drawScene(ctx, canvas.width, canvas.height, args.project, {
-      selectedId: args.selectedObjectId,
-      showPathNodeHandles: args.showPathNodeHandles,
-      selectedPathNode: args.selectedPathNode,
-      selectedPathNodes: args.selectedPathNodes,
-      additionalSelectedIds: args.additionalSelectedIds,
-      preview: args.previewMode,
-      scrubberT: args.scrubberT,
-      previewShowTravel: args.showPreviewTravel,
-      view: args.viewState,
-      onRasterBitmapReady: requestRasterRedraw,
+    drawWorkspaceScene(ctx, canvas, args, {
+      requestRasterRedraw,
       displayPolylineCache,
-      ...(args.previewToolpath === null ? {} : { previewToolpath: args.previewToolpath }),
-      cncRemovalGrid: args.cncRemovalGrid,
-      ...(draftShape === null ? {} : { draft: draftShape }),
-      ...(penDraft === null ? {} : { penDraft }),
-      ...(selectionMarquee === null ? {} : { selectionMarquee }),
-      ...(measureDraft === null ? {} : { measureDraft }),
-      ...(snapGuides.length === 0 ? {} : { snapGuides }),
-      ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
+      draftShape,
+      penDraft,
+      selectionMarquee,
+      measureDraft,
+      snapGuides,
     });
+    // `args` is recreated by Workspace; its consumed fields are listed below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     args.ref,
     args.project,
@@ -288,12 +293,51 @@ function useWorkspaceDraw(args: {
     displayPolylineCache,
     args.previewToolpath,
     args.cncRemovalGrid,
+    args.canvasMotionOverlay,
     requestRasterRedraw,
     draftShape,
     penDraft,
     selectionMarquee,
     snapGuides,
   ]);
+}
+
+function drawWorkspaceScene(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  args: Parameters<typeof useWorkspaceDraw>[0],
+  state: {
+    readonly requestRasterRedraw: () => void;
+    readonly displayPolylineCache: DisplayPolylineCache;
+    readonly draftShape: ReturnType<typeof useUiStore.getState>['draftShape'];
+    readonly penDraft: ReturnType<typeof useUiStore.getState>['penDraft'];
+    readonly selectionMarquee: ReturnType<typeof useUiStore.getState>['selectionMarquee'];
+    readonly measureDraft: ReturnType<typeof useUiStore.getState>['measureDraft'];
+    readonly snapGuides: ReturnType<typeof useUiStore.getState>['snapGuides'];
+  },
+): void {
+  drawScene(ctx, canvas.width, canvas.height, args.project, {
+    selectedId: args.selectedObjectId,
+    showPathNodeHandles: args.showPathNodeHandles,
+    selectedPathNode: args.selectedPathNode,
+    selectedPathNodes: args.selectedPathNodes,
+    additionalSelectedIds: args.additionalSelectedIds,
+    preview: args.previewMode,
+    scrubberT: args.scrubberT,
+    previewShowTravel: args.showPreviewTravel,
+    view: args.viewState,
+    onRasterBitmapReady: state.requestRasterRedraw,
+    displayPolylineCache: state.displayPolylineCache,
+    ...(args.previewToolpath === null ? {} : { previewToolpath: args.previewToolpath }),
+    cncRemovalGrid: args.cncRemovalGrid,
+    ...(state.draftShape === null ? {} : { draft: state.draftShape }),
+    ...(state.penDraft === null ? {} : { penDraft: state.penDraft }),
+    ...(state.selectionMarquee === null ? {} : { selectionMarquee: state.selectionMarquee }),
+    ...(state.measureDraft === null ? {} : { measureDraft: state.measureDraft }),
+    ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),
+    ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
+    ...(args.canvasMotionOverlay === null ? {} : { canvasMotionOverlay: args.canvasMotionOverlay }),
+  });
 }
 
 function useDisplayPolylineCache(): DisplayPolylineCache {

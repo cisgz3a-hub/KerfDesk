@@ -8,6 +8,7 @@ import { writeFailedNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { hasUnsettledStreamAcks, toolChangeHoldEntryPatch } from './laser-store-helpers';
 import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+import { liveCanvasLifecyclePatch } from './live-canvas-run';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
 // receive order. While the streamer still has unsettled acks, the earliest
@@ -38,7 +39,10 @@ export function advanceStream(
   if (s === null) return;
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
-  set({ streamer: stepped.state });
+  set((state) => ({
+    streamer: stepped.state,
+    ...(stepped.state.status === 'errored' ? liveCanvasLifecyclePatch(state, 'errored') : {}),
+  }));
   // Entering a tool-change hold means a new bit is going in: the previous bit's
   // work Z0 no longer holds, so the operator must re-Zero-Z for the new tool
   // (the setup gate allows it during the hold). Invalidate so the no-work-zero
@@ -67,6 +71,7 @@ export function advanceStream(
       set((current) => ({
         streamer: current.streamer === null ? current.streamer : markErrored(current.streamer),
         safetyNotice: writeFailedNotice('stream'),
+        ...liveCanvasLifecyclePatch(current, 'errored'),
       }));
     });
   }

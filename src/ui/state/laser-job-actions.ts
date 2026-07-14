@@ -14,11 +14,9 @@ import {
   resume as resumeStreamer,
   step,
   wipeInFlight,
-  type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { extractToolChangeLabels } from '../../core/output';
-import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
   cncControllerEpochOf,
@@ -45,6 +43,8 @@ import {
   toolChangeHoldEntryPatch,
 } from './laser-store-helpers';
 import type { LaserState, StartJobOptions } from './laser-store';
+import { normalizeStartJobOptions } from './laser-job-options';
+import { liveCanvasLifecyclePatch, liveCanvasStartPatch } from './live-canvas-run';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -113,6 +113,7 @@ export function jobActions(
         const entersHoldNow = stepped.state.status === 'tool-change';
         set((state) => ({
           streamer: stepped.state,
+          ...liveCanvasStartPatch(options.canvasPlan),
           accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
           activeJobMachineKind: options.machineKind ?? 'laser',
           toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
@@ -125,7 +126,10 @@ export function jobActions(
         try {
           await safeWrite(stepped.toSend, 'start');
         } catch (err) {
-          set({ streamer: null });
+          set((state) => ({
+            streamer: null,
+            ...liveCanvasLifecyclePatch(state, 'errored'),
+          }));
           throw err;
         }
       } finally {
@@ -170,6 +174,7 @@ async function runStopJob(
         : softReset !== null
           ? wipeInFlight(cancelStreamer(state.streamer))
           : cancelStreamer(state.streamer),
+    ...liveCanvasLifecyclePatch(state, 'stopped'),
   }));
   if (softReset !== null) armResetCleanup(refs, safeWrite, driver().commands.stopLaserLines);
 }
@@ -325,7 +330,8 @@ async function runPauseJob(
   if (requiresLaserModeProof) assertPauseSafe(set, get);
   if (hold !== null) await safeWrite(hold, 'pause');
   const s = get().streamer;
-  if (s !== null) set({ streamer: pauseStreamer(s) });
+  if (s !== null)
+    set((state) => ({ streamer: pauseStreamer(s), ...liveCanvasLifecyclePatch(state, 'paused') }));
   if (hold === null) {
     get().pushSystemNotice(`[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`);
   }
@@ -361,7 +367,7 @@ async function runResumeJob(
     if (s.streamer === null) return s;
     const stepped = step(resumeStreamer(s.streamer));
     toSend = stepped.toSend;
-    return { streamer: stepped.state };
+    return { streamer: stepped.state, ...liveCanvasLifecyclePatch(s, 'running') };
   });
   if (toSend.length > 0) {
     try {
@@ -449,13 +455,6 @@ function originPatchAfterSoftReset(
     workOriginSource: 'none',
     workZZeroEvidence: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
-  };
-}
-
-function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {
-  return {
-    ...options,
-    rxBufferBytes: normalizeGrblRxBufferBytes(options.rxBufferBytes),
   };
 }
 
