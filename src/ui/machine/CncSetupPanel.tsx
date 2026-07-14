@@ -314,7 +314,17 @@ const rowStyle: React.CSSProperties = {
   minHeight: 28,
 };
 const labelStyle: React.CSSProperties = { width: 108, fontSize: 12, color: 'var(--lf-text-muted)' };
-const valueStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, flex: 1 };
+// min-width: 0 lets the value column shrink below its content's intrinsic
+// width — without it a long <select> option (e.g. a full bit name) forces the
+// column wider than the rail and the panel's overflow:hidden clips the box's
+// right edge instead of the select truncating in place.
+const valueStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  flex: 1,
+  minWidth: 0,
+};
 const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
 const inputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
