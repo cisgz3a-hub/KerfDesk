@@ -42,7 +42,7 @@ import { useWorkspaceWheelZoom } from './use-workspace-wheel';
 import { useJobEstimate } from '../laser/use-job-estimate';
 import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { CanvasMotionBadge } from './canvas-motion-badge';
-import type { CanvasMotionOverlay } from './draw-canvas-motion';
+import { useCanvasMotionLayer } from './use-canvas-motion-layer';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -78,7 +78,6 @@ export function Workspace(): JSX.Element {
     showPreviewTravel,
     viewState,
     canvasSize,
-    canvasMotionOverlay,
   });
 
   const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
@@ -87,18 +86,13 @@ export function Workspace(): JSX.Element {
   const dragOverlay = useUiStore((s) => s.dragOverlay);
   return (
     <>
-      <canvas
-        ref={ref}
-        width={canvasSize.width}
-        height={canvasSize.height}
-        onPointerDown={handlers.onPointerDown}
-        onPointerMove={handlers.onPointerMove}
-        onPointerUp={handlers.onPointerUp}
-        onPointerCancel={handlers.onPointerUp}
-        onDoubleClick={handleCanvasDoubleClick}
-        onContextMenu={suppressCanvasContextMenu}
-        style={canvasStyle}
-        aria-label={`${APP_DISPLAY_NAME} workspace`}
+      <WorkspaceCanvasLayers
+        baseRef={ref}
+        canvasSize={canvasSize}
+        handlers={handlers}
+        project={project}
+        viewState={viewState}
+        canvasMotionOverlay={canvasMotionOverlay}
       />
       {project.scene.objects.length === 0 && !dragOverlay && <EmptyHint />}
       {dragOverlay && <DragOverlay />}
@@ -122,6 +116,49 @@ export function Workspace(): JSX.Element {
       {/* Bottom-right zoom controls — hidden during preview so the
           scrubber gets the whole bottom strip. */}
       {!previewMode && <ZoomControls />}
+    </>
+  );
+}
+
+function WorkspaceCanvasLayers(props: {
+  readonly baseRef: React.MutableRefObject<HTMLCanvasElement | null>;
+  readonly canvasSize: CanvasBitmapSize;
+  readonly handlers: ReturnType<typeof useDragMove>['handlers'];
+  readonly project: Project;
+  readonly viewState: ReturnType<typeof useViewState>;
+  readonly canvasMotionOverlay: ReturnType<typeof useCanvasMotionOverlay>;
+}): JSX.Element {
+  const motionRef = useRef<HTMLCanvasElement | null>(null);
+  useCanvasMotionLayer({
+    ref: motionRef,
+    project: props.project,
+    viewState: props.viewState,
+    canvasSize: props.canvasSize,
+    overlay: props.canvasMotionOverlay,
+  });
+  return (
+    <>
+      <canvas
+        ref={props.baseRef}
+        width={props.canvasSize.width}
+        height={props.canvasSize.height}
+        onPointerDown={props.handlers.onPointerDown}
+        onPointerMove={props.handlers.onPointerMove}
+        onPointerUp={props.handlers.onPointerUp}
+        onPointerCancel={props.handlers.onPointerUp}
+        onDoubleClick={handleCanvasDoubleClick}
+        onContextMenu={suppressCanvasContextMenu}
+        style={canvasStyle}
+        aria-label={`${APP_DISPLAY_NAME} workspace`}
+      />
+      <canvas
+        ref={motionRef}
+        width={props.canvasSize.width}
+        height={props.canvasSize.height}
+        style={canvasMotionLayerStyle}
+        aria-hidden="true"
+        data-testid="canvas-motion-layer"
+      />
     </>
   );
 }
@@ -242,7 +279,6 @@ function useWorkspaceDraw(args: {
   // Not read directly — the draw effect reads canvas.width/height — but a
   // bitmap resize clears the canvas, so the effect must re-run on it.
   readonly canvasSize: CanvasBitmapSize;
-  readonly canvasMotionOverlay: CanvasMotionOverlay | null;
 }): void {
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
   // preview. Identity changes each mouse-move, so it belongs in the deps below.
@@ -293,7 +329,6 @@ function useWorkspaceDraw(args: {
     displayPolylineCache,
     args.previewToolpath,
     args.cncRemovalGrid,
-    args.canvasMotionOverlay,
     requestRasterRedraw,
     draftShape,
     penDraft,
@@ -336,7 +371,6 @@ function drawWorkspaceScene(
     ...(state.measureDraft === null ? {} : { measureDraft: state.measureDraft }),
     ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),
     ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
-    ...(args.canvasMotionOverlay === null ? {} : { canvasMotionOverlay: args.canvasMotionOverlay }),
   });
 }
 
@@ -400,4 +434,12 @@ const canvasStyle: React.CSSProperties = {
   // mobile pinch-zoom reach our wheel handler instead of zooming the
   // whole page or scrolling under our feet.
   touchAction: 'none',
+};
+
+const canvasMotionLayerStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  pointerEvents: 'none',
 };

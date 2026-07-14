@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
 import { startLiveCanvasRun, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { drawCanvasMotionOverlay } from './draw-canvas-motion';
+
+afterEach(() => vi.unstubAllGlobals());
 
 function recordingContext(): {
   readonly ctx: CanvasRenderingContext2D;
@@ -138,5 +140,47 @@ describe('drawCanvasMotionOverlay', () => {
     expect(recording.labels).not.toContain('FRAME START');
     expect(recording.labels).not.toContain('JOB START');
     expect(recording.dashes).toContainEqual([5, 5]);
+  });
+
+  it('caches the full route and only appends newly confirmed Path2D segments', () => {
+    class FakePath2D {
+      static lineToCalls = 0;
+      static moveToCalls = 0;
+      moveTo(): void {
+        FakePath2D.moveToCalls += 1;
+      }
+      lineTo(): void {
+        FakePath2D.lineToCalls += 1;
+      }
+    }
+    vi.stubGlobal('Path2D', FakePath2D);
+    const canvasPlan = plan();
+    const recording = recordingContext();
+    const halfway = canvasPlan.manifest.totalRouteMm / 2;
+    const run = {
+      ...startLiveCanvasRun(canvasPlan),
+      route: { confirmedRouteMm: halfway, candidates: [], uncertain: false },
+    };
+    const view = { scale: 1, offsetX: 0, offsetY: 0 };
+    drawCanvasMotionOverlay(recording.ctx, { plan: canvasPlan, run }, view);
+    const afterFirstDraw = FakePath2D.lineToCalls;
+    drawCanvasMotionOverlay(recording.ctx, { plan: canvasPlan, run }, view);
+    expect(FakePath2D.lineToCalls).toBe(afterFirstDraw);
+    drawCanvasMotionOverlay(
+      recording.ctx,
+      {
+        plan: canvasPlan,
+        run: {
+          ...run,
+          route: {
+            confirmedRouteMm: canvasPlan.manifest.totalRouteMm,
+            candidates: [],
+            uncertain: false,
+          },
+        },
+      },
+      view,
+    );
+    expect(FakePath2D.lineToCalls).toBeGreaterThan(afterFirstDraw);
   });
 });

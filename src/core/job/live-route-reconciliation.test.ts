@@ -14,6 +14,37 @@ describe('reconcileReportedPosition', () => {
     expect(INITIAL_ROUTE_RECONCILIATION.confirmedRouteMm).toBe(0);
   });
 
+  it('starts candidate scanning near confirmed progress instead of rescanning the route prefix', () => {
+    const longManifest = buildMotionManifest(
+      ['G21', 'G90', 'M3 S500', ...Array.from({ length: 2_000 }, (_, i) => `G1 X${i + 1}`)].join(
+        '\n',
+      ),
+      { machineKind: 'laser' },
+    );
+    const protectedPrefix = longManifest.blocks.map((block, index, blocks) =>
+      index < blocks.length - 20
+        ? new Proxy(block, {
+            get(target, property, receiver) {
+              if (property === 'points') throw new Error('confirmed route prefix was rescanned');
+              return Reflect.get(target, property, receiver);
+            },
+          })
+        : block,
+    );
+    const result = reconcileReportedPosition({
+      manifest: { ...longManifest, blocks: protectedPrefix },
+      previous: {
+        confirmedRouteMm: longManifest.totalRouteMm - 5,
+        candidates: [],
+        uncertain: false,
+      },
+      reportedPosition: { x: 1_998, y: 0, z: 0 },
+      acceptedSendableLines: 3_000,
+    });
+    expect(result.uncertain).toBe(false);
+    expect(result.confirmedRouteMm).toBeGreaterThanOrEqual(longManifest.totalRouteMm - 5);
+  });
+
   it('advances only from a reported position under the accepted-line ceiling', () => {
     const blocked = reconcileReportedPosition({
       manifest,

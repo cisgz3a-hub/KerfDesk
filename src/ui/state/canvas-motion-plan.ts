@@ -66,8 +66,17 @@ export type LiveCanvasRun = {
   readonly accuracyReason: string | null;
 };
 
-export function buildCanvasMotionPlan(args: {
-  readonly gcode: string;
+const retentionKeyCache = new WeakMap<Project, Map<string, string>>();
+
+const EMPTY_MOTION_MANIFEST: MotionManifest = {
+  blocks: [],
+  totalRouteMm: 0,
+  sendableLineCount: 0,
+  firstProcessPoint: null,
+  finalPoint: null,
+};
+
+type CanvasPlanBuildContext = {
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly machine: MachineStartSnapshot;
   readonly statusQuery?: StatusQueryCapability;
@@ -76,13 +85,38 @@ export function buildCanvasMotionPlan(args: {
   readonly relativeView?: boolean;
   readonly retentionKey?: string;
   readonly resumed?: boolean;
-}): CanvasMotionPlan {
+};
+
+export function buildCanvasMotionPlan(
+  args: CanvasPlanBuildContext & {
+    readonly gcode: string;
+  },
+): CanvasMotionPlan {
   const machineKind = machineKindOf(args.prepared.project.machine);
   const initial = reportedWorkPositionMm(args.machine, args.reportInches === true);
   const manifest = buildMotionManifest(args.gcode, {
     machineKind,
     ...(initial === null ? {} : { initialPosition: initial }),
   });
+  return assembleCanvasPlan(args, manifest, manifest.firstProcessPoint, initial, args.gcode);
+}
+
+export function buildCanvasMarkerPlan(args: CanvasPlanBuildContext): CanvasMotionPlan {
+  const initial = reportedWorkPositionMm(args.machine, args.reportInches === true);
+  const firstProcess = firstSurfaceProcessPoint(args.prepared);
+  const controllerStart =
+    firstProcess === null ? null : { x: firstProcess.x, y: firstProcess.y, z: 0 };
+  return assembleCanvasPlan(args, EMPTY_MOTION_MANIFEST, controllerStart, initial, '');
+}
+
+function assembleCanvasPlan(
+  args: CanvasPlanBuildContext,
+  manifest: MotionManifest,
+  controllerStart: MotionPoint | null,
+  initial: MotionPoint | null,
+  fingerprintSource: string,
+): CanvasMotionPlan {
+  const machineKind = machineKindOf(args.prepared.project.machine);
   const coordinateFrame = canvasCoordinateFrame(
     args.prepared,
     args.machine,
@@ -109,7 +143,6 @@ export function buildCanvasMotionPlan(args: {
           { x: bounds.minX, y: bounds.minY, z: 0 },
         ];
   const surfaceStart = rotary ? firstSurfaceProcessPoint(args.prepared) : null;
-  const controllerStart = manifest.firstProcessPoint;
   const jobStart =
     surfaceStart === null
       ? controllerStart === null
@@ -118,8 +151,8 @@ export function buildCanvasMotionPlan(args: {
       : mapRelativeSurfacePoint(surfaceStart, args.prepared);
   return {
     manifest,
-    fingerprint: fingerprintGcode(args.gcode),
-    retentionKey: args.retentionKey ?? JSON.stringify(fingerprintGcode(args.gcode)),
+    fingerprint: fingerprintGcode(fingerprintSource),
+    retentionKey: args.retentionKey ?? JSON.stringify(fingerprintGcode(fingerprintSource)),
     machineKind,
     device: args.prepared.project.device,
     coordinateFrame,
@@ -139,6 +172,14 @@ export function canvasPlanRetentionKey(
   placement: JobPlacementSettings,
   registration?: unknown,
 ): string {
+  const optionsKey = JSON.stringify({
+    outputScope,
+    placement,
+    hasRegistration: registration !== undefined,
+    registration: registration ?? null,
+  });
+  const cached = retentionKeyCache.get(project)?.get(optionsKey);
+  if (cached !== undefined) return cached;
   const serialized = JSON.stringify({
     scene: project.scene,
     machine: project.machine,
@@ -150,7 +191,11 @@ export function canvasPlanRetentionKey(
     ...(registration === undefined ? {} : { registration }),
   });
   const fingerprint = fingerprintGcode(serialized);
-  return `${fingerprint.fnv1a}:${fingerprint.chars}:${fingerprint.lines}`;
+  const key = `${fingerprint.fnv1a}:${fingerprint.chars}:${fingerprint.lines}`;
+  const byOptions = retentionKeyCache.get(project) ?? new Map<string, string>();
+  byOptions.set(optionsKey, key);
+  retentionKeyCache.set(project, byOptions);
+  return key;
 }
 
 export function startLiveCanvasRun(plan: CanvasMotionPlan): LiveCanvasRun {
@@ -269,7 +314,9 @@ function capabilityReason(capability: CanvasPlanCapability, rotary: boolean): st
 function firstSurfaceProcessPoint(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
 ): Vec2 | null {
-  const toolpath = buildToolpath(prepared.job);
+  const toolpath = buildToolpath(prepared.job, {
+    scanningOffsets: prepared.project.device.scanningOffsets,
+  });
   const step = toolpath.steps.find((candidate) => candidate.kind === 'cut');
   return step?.kind === 'cut' ? (step.polyline[0] ?? null) : null;
 }

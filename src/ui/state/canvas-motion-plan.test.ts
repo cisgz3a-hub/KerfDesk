@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toSceneCoords, type Origin } from '../../core/devices';
 import type { Job } from '../../core/job';
-import { createProject } from '../../core/scene';
+import { createProject, DEFAULT_OUTPUT_SCOPE, type Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import {
   buildCanvasMotionPlan,
+  buildCanvasMarkerPlan,
+  canvasPlanRetentionKey,
   mapControllerPointToScene,
   rebuildCanvasPlanForGcode,
   reportedWorkPositionMm,
@@ -32,6 +34,26 @@ const JOB: Job = {
     },
   ],
 };
+
+describe('canvasPlanRetentionKey', () => {
+  it('does not serialize the same immutable project more than once per option set', () => {
+    const source = createProject();
+    let sceneReads = 0;
+    const project = new Proxy(source, {
+      get(target, property, receiver) {
+        if (property === 'scene') sceneReads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    }) as Project;
+    const placement = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
+    const first = canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement);
+    const second = canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement);
+    expect(second).toBe(first);
+    expect(sceneReads).toBe(1);
+    canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement, null);
+    expect(sceneReads).toBe(2);
+  });
+});
 
 function prepared(controllerKind: 'grbl-v1.1' | 'marlin' | 'ruida' = 'grbl-v1.1') {
   const project = createProject({
@@ -121,6 +143,25 @@ describe('CanvasMotionPlan', () => {
     expect(ruida.capability).toBe('file-only');
     expect(ruida.framePerimeter).toEqual([]);
     expect(ruida.jobStart).toEqual({ x: 10, y: 20 });
+  });
+
+  it('derives idle markers from the prepared job without constructing a route manifest', () => {
+    const full = buildCanvasMotionPlan({
+      gcode: 'G21\nG90\nM3 S0\nG0 X10 Y20\nG1 X30 S500',
+      prepared: prepared(),
+      machine,
+      statusQuery: 'realtime-report',
+    });
+    const markers = buildCanvasMarkerPlan({
+      prepared: prepared(),
+      machine,
+      statusQuery: 'realtime-report',
+      retentionKey: 'idle-markers',
+    });
+    expect(markers.jobStart).toEqual(full.jobStart);
+    expect(markers.framePerimeter).toEqual(full.framePerimeter);
+    expect(markers.coordinateFrame).toEqual(full.coordinateFrame);
+    expect(markers.manifest.blocks).toEqual([]);
   });
 
   it('labels verified-origin plans as relative and keeps the marker artwork-relative', () => {
