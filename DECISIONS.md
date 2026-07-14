@@ -7428,3 +7428,43 @@ ownership lease. Stock GRBL still cannot exclude or identify other command
 paths. True multi-sender support requires a sole gateway or firmware lease plus
 machine-level selector/interlock enforcement; physical spindle-at-speed and VFD
 feedback remain separate evidence.
+
+---
+
+## ADR-182 - grblHAL MPG ownership is a latched CNC Start blocker
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+ADR-181 makes sole command ownership an operator contract because stock GRBL
+cannot identify input owners. grblHAL provides one narrower piece of explicit
+evidence: status field `MPG:1` reports that manual-pulse-generator mode has
+taken controller input ownership, and `MPG:0` reports its release. The field is
+intermittent, so a later status frame that omits it cannot prove ownership was
+returned. Starting a queue fence while a known MPG owner is active can also
+misattribute another sender's bare `ok` to KerfDesk.
+
+### Decision
+
+- Parse only exact `MPG:1` and `MPG:0` fields. Missing or malformed fields are
+  unknown, not inactive.
+- Latch explicit MPG evidence across ordinary status reports. Clear an active
+  latch only on explicit `MPG:0` or a new controller/transport session.
+- On the first transition to active, invalidate trusted position, work-Z, and
+  Verified Frame evidence. Repeated sparse/redundant reports do not churn the
+  epochs, and `MPG:0` does not restore the invalidated setup.
+- For CNC only, block a known active MPG owner before the Start queue fence.
+  Recheck the latch after the fresh live-status query and before arming job
+  bytes, so an acquisition observed during Start also fails closed.
+- Laser jobs and controllers that never report MPG retain existing behavior.
+  ADR-181's operator attestation remains required because `MPG:0` is not proof
+  that every network, serial, PLC, macro, or physical command path is inactive.
+
+### Consequences
+
+KerfDesk no longer sends CNC Start traffic after receiving explicit evidence
+that a grblHAL pendant/MPG owns input. The operator must return control and wait
+for `MPG:0`. This is one protocol-visible competing-owner signal, not a general
+ownership lease; unexpected-ack contamination is intentionally a separate
+decision because attribution false positives require a broader ledger audit.

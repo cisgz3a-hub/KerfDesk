@@ -225,3 +225,15 @@ describe('parseStatusReport A accessories (ADR-179)', () => {
     });
   });
 });
+
+describe('parseStatusReport grblHAL MPG ownership', () => {
+  it('parses explicit MPG acquisition and release evidence', () => {
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|MPG:1>')?.mpgActive).toBe(true);
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|MPG:0>')?.mpgActive).toBe(false);
+  });
+
+  it('keeps MPG ownership unknown when the intermittent field is absent or malformed', () => {
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000>')?.mpgActive).toBeNull();
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|MPG:x>')?.mpgActive).toBeNull();
+  });
+});

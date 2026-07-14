@@ -155,6 +155,10 @@ export type LaserState = {
   // GRBL A:. Optional only so older hand-built test states remain valid.
   // null/undefined means unknown, not known off.
   readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
+  // Explicit grblHAL MPG:1/0 ownership evidence. Latches across status frames
+  // that omit the intermittent field; null/undefined means never observed in
+  // this controller/transport session.
+  readonly mpgActive?: boolean | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
   // Qualified evidence for the CNC stock-top contract. Separate from

@@ -914,3 +914,27 @@ proof exists.
 - **Use:** read-only protocol/specification research; no upstream code copied.
 - **Confidence:** high that legacy GRBL cannot prove ownership. The attestation
   reduces operational ambiguity but does not replace a gateway or interlock.
+
+---
+
+## grblHAL MPG ownership telemetry (2026-07-13, ADR-182)
+
+- **Ownership transition:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L707-L762
+  switches input streams for MPG mode and disables the previous stream's
+  receive path while the manual source owns commands.
+- **Wire evidence:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/report.c#L1494-L1503
+  emits `MPG:1` and `MPG:0` status fields for acquisition/release.
+- **Broadcast caveat:**
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L265-L273
+  and
+  https://github.com/grblHAL/core/blob/09f8ba597abf54bc23da2bf2176065b84c94a4d2/stream.c#L328-L431
+  show that receiving controller output is not equivalent to owning its input.
+- **Decision impact:** parse and latch explicit MPG state, refuse known-active
+  MPG before the Start fence and after live refresh, and require explicit
+  release or session reset before CNC Start can proceed. First acquisition also
+  invalidates position/Z/frame evidence so a later release requires fresh setup.
+- **Use:** read-only upstream protocol research; no upstream code copied.
+- **Confidence:** high for grblHAL MPG field semantics. It covers MPG ownership
+  only and does not establish a general multi-sender lease.

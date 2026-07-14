@@ -39,6 +39,7 @@ export function handleStatusLine(
       wcoCache: null,
       ovCache: null,
       accessoryCache: null,
+      mpgActive: null,
       ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
@@ -65,6 +66,7 @@ export function handleStatusLine(
       wcoCache: null,
       ovCache: null,
       accessoryCache: null,
+      mpgActive: null,
       ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
@@ -98,6 +100,7 @@ export function handleStatusLine(
 
   set({
     ...statusPositionPatch(report, state.workOriginSource, state.accessoryCache),
+    ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
@@ -209,6 +212,30 @@ function statusPositionPatch(
     wcoCache: report.wco,
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(originSource) : 'none',
+  };
+}
+
+function mpgOwnershipPatch(
+  report: StatusReport,
+  state: LaserState,
+): Partial<
+  Pick<
+    LaserState,
+    | 'mpgActive'
+    | 'trustedPositionEpoch'
+    | 'workZReferenceEpoch'
+    | 'workZZeroEvidence'
+    | 'frameVerification'
+  >
+> {
+  if (report.mpgActive === null || report.mpgActive === undefined) return {};
+  if (!report.mpgActive || state.mpgActive === true) return { mpgActive: report.mpgActive };
+  return {
+    mpgActive: true,
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    workZZeroEvidence: null,
+    frameVerification: null,
   };
 }
 
