@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CORNER_PROBE_EXTERNAL_MARGIN_MM,
   DEFAULT_FINAL_PARK_MM,
+  FLOAT_TOLERANCE_MM,
   MIN_FLANK_HEIGHT_MM,
   validateCornerProbeGeometry,
 } from './corner-probe-geometry';
@@ -141,8 +142,14 @@ describe('validateCornerProbeGeometry', () => {
               radiusMm +
               CORNER_PROBE_EXTERNAL_MARGIN_MM,
           );
+          // `finalParkMm` is snapped onto the 0.001 mm G-code grid by the
+          // validator, so it can land one ULP below the raw (non-grid) minimum
+          // when that minimum is a floating-point representation of an on-grid
+          // value (e.g. a true 8.591 held as 8.591000000000001). Allow the
+          // validator's own float tolerance, which is far below the 0.001 mm
+          // emitted resolution so a real sub-cutter shortfall still fails.
           expect(result.finalParkMm).toBeGreaterThanOrEqual(
-            radiusMm + CORNER_PROBE_EXTERNAL_MARGIN_MM,
+            radiusMm + CORNER_PROBE_EXTERNAL_MARGIN_MM - FLOAT_TOLERANCE_MM,
           );
         },
       ),
@@ -182,6 +189,14 @@ function generatedValidGeometry(generated: GeneratedGeometry) {
   };
 }
 
+// Snaps up onto the 0.001 mm (one micron) grid the validator's thresholds sit
+// on. `Math.ceil(value * 1000) / 1000` can land one ULP *below* `value` — a
+// true 1.128 held as 1.1280000000000001 scales to 1128.0, ceils to 1128, and
+// divides back to 1.128 — which would push generated geometry a hair under a
+// threshold and get it rejected. Bump to the next micron whenever the naive
+// grid value is not >= value so the construction is always at or above target.
 function ceilMicron(value: number): number {
-  return Math.ceil(value * 1000) / 1000;
+  const microns = Math.ceil(value * 1000);
+  const snapped = microns / 1000;
+  return snapped >= value ? snapped : (microns + 1) / 1000;
 }

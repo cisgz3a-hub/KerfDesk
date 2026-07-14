@@ -7,7 +7,7 @@ export const DEFAULT_PLATE_CENTER_OFFSET_Y_MM = 15;
 export const MIN_FLANK_HEIGHT_MM = 1;
 export const MAX_CORNER_PROBE_DIMENSION_MM = 100;
 export const PROBE_GCODE_RESOLUTION_MM = 0.001;
-const FLOAT_TOLERANCE_MM = 1e-9;
+export const FLOAT_TOLERANCE_MM = 1e-9;
 
 export type CornerProbeGeometryInput = {
   readonly plateThicknessMm: number;
