@@ -1,4 +1,5 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
+import type { StatusQueryCapability } from '../../core/controllers';
 import { controllerProfilesAreCompatible, type ControllerKind } from '../../core/devices';
 import type { SimilarityTransform } from '../../core/registration';
 import {
@@ -29,7 +30,6 @@ import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import {
   DEFAULT_JOB_PLACEMENT,
-  resolveJobPlacement,
   trustedMotionOffsetForPreflight,
   type JobPlacementSettings,
   type ResolvedJobPlacement,
@@ -39,6 +39,13 @@ import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
 import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
+import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
+import {
+  controllerReportsInches,
+  okPreparation,
+  resolveStartPlacement,
+  withControllerReportUnits,
+} from './start-job-preparation';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -55,6 +62,7 @@ export type StartJobPreparation =
       readonly gcode: string;
       readonly warnings: ReadonlyArray<string>;
       readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
+      readonly canvasPlan: CanvasMotionPlan;
       // The RESOLVED origin this compile used (undefined = Absolute). The
       // checkpoint stores it so resume reproduces identical bytes (R1).
       readonly jobOrigin?: JobOriginPlacement;
@@ -101,6 +109,8 @@ export type MachineStartSnapshot = {
   readonly cameraPlacementGeometryIssue?: string | null;
   readonly homingState?: HomingState;
   readonly trustedPositionEpoch?: number;
+  readonly statusQuery?: StatusQueryCapability;
+  readonly reportInches?: boolean;
 };
 
 // Machine-state blockers plus the ADR-098 dialect gate: CNC is GRBL-only —
@@ -166,7 +176,11 @@ export function prepareStartJob(
   const gateIssues = findStartGateIssues(project, machine, jobPlacement);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
-  const placement = resolveStartPlacement(jobPlacement, machine, resolvedJobOrigin);
+  const placement = resolveStartPlacement(
+    jobPlacement,
+    withControllerReportUnits(machine, controllerSettings),
+    resolvedJobOrigin,
+  );
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
   const inspected = inspectPreparedStart(
@@ -209,7 +223,16 @@ export function prepareStartJob(
     controllerSettings,
     controller.warnings.map((i) => i.message),
   );
-  return okPreparation(gcode, warnings, placement.jobOrigin, toolPlan);
+  return okPreparation(
+    gcode,
+    warnings,
+    placement.jobOrigin,
+    toolPlan,
+    prepared,
+    machine,
+    controllerReportsInches(controllerSettings),
+    canvasPlanRetentionKey(project, outputScope, jobPlacement),
+  );
 }
 
 export async function prepareStartJobSnapshot(
@@ -228,7 +251,11 @@ export async function prepareStartJobSnapshot(
   const gateIssues = findStartGateIssues(project, machine, jobPlacement);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
-  const placement = resolveStartPlacement(jobPlacement, machine, undefined);
+  const placement = resolveStartPlacement(
+    jobPlacement,
+    withControllerReportUnits(machine, controllerSettings),
+    undefined,
+  );
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
 
@@ -273,7 +300,16 @@ export async function prepareStartJobSnapshot(
     controllerSettings,
     controller.warnings.map((issue) => issue.message),
   );
-  return okPreparation(gcode, warnings, placement.jobOrigin, toolPlan);
+  return okPreparation(
+    gcode,
+    warnings,
+    placement.jobOrigin,
+    toolPlan,
+    prepared,
+    machine,
+    controllerReportsInches(controllerSettings),
+    canvasPlanRetentionKey(project, outputScope, jobPlacement, options.registration),
+  );
 }
 
 function registrationOption(registration: SimilarityTransform | null | undefined): {
@@ -282,47 +318,12 @@ function registrationOption(registration: SimilarityTransform | null | undefined
   return registration === undefined ? {} : { registration };
 }
 
-function okPreparation(
-  gcode: string,
-  warnings: ReadonlyArray<string>,
-  jobOrigin: JobOriginPlacement | undefined,
-  toolPlan: ReadonlyArray<CncToolPlanEntry>,
-): StartJobPreparation {
-  return {
-    ok: true,
-    gcode,
-    warnings,
-    ...(jobOrigin === undefined ? {} : { jobOrigin }),
-    ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
-  };
-}
-
 // Resolve the origin for a Start or a resume. A fresh Start resolves the
 // operator's settings against the live machine. A resume passes the FROZEN
 // origin the original run compiled with: we still re-validate the live machine
 // through that origin's MODE (a vanished custom origin / unknown position still
 // refuses), but the frozen origin drives the compile so a 'current-position'
 // job reproduces its bytes instead of re-resolving to the post-crash head (R1).
-function resolveStartPlacement(
-  jobPlacement: JobPlacementSettings,
-  machine: MachineStartSnapshot,
-  resolvedJobOrigin: JobOriginPlacement | undefined,
-): ResolvedJobPlacement {
-  if (resolvedJobOrigin === undefined) return resolveJobPlacement(jobPlacement, machine);
-  const live = resolveJobPlacement(
-    { startFrom: resolvedJobOrigin.startFrom, anchor: resolvedJobOrigin.anchor },
-    machine,
-  );
-  if (!live.ok) return live;
-  return {
-    ok: true,
-    jobOrigin: resolvedJobOrigin,
-    ...(live.preflightMotionOffset === undefined
-      ? {}
-      : { preflightMotionOffset: live.preflightMotionOffset }),
-  };
-}
-
 // The Start-path warning list: controller-readiness warnings plus machine-kind
 // advisories. Qualified CNC work-Z is a non-overridable early machine gate.
 function collectStartWarnings(

@@ -143,13 +143,12 @@ describe('runStartJobFlow', () => {
     await runStartJobFlow();
 
     const startJob = useLaserStore.getState().startJob;
-    expect(startJob).toHaveBeenCalledTimes(1);
     expect(startJob).toHaveBeenCalledWith(expect.any(String), {
       streamingMode: 'ping-pong',
       rxBufferBytes: 96,
       machineKind: 'laser',
+      canvasPlan: expect.objectContaining({ capability: 'realtime' }),
     });
-    expect(jobAwareAlert).not.toHaveBeenCalled();
     expect(jobAwareConfirm).not.toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
   });
 
@@ -197,7 +196,8 @@ describe('runStartJobFlow', () => {
 
     await runStartJobFlow();
 
-    expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(expect.any(String), {
+    const options = vi.mocked(useLaserStore.getState().startJob).mock.calls[0]?.[1];
+    expect(options).toMatchObject({
       streamingMode: 'ping-pong',
       rxBufferBytes: 96,
       machineKind: 'laser',

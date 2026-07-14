@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { parseStatusReport } from './status-parser';
 
 describe('parseStatusReport — happy paths', () => {
+  it('parses optional executing line numbers without requiring them', () => {
+    expect(
+      parseStatusReport('<Run|MPos:1.000,2.000,0.000|FS:1000,0|Ln:42>')?.executingLineNumber,
+    ).toBe(42);
+    expect(
+      parseStatusReport('<Run|MPos:1.000,2.000,0.000|FS:1000,0>')?.executingLineNumber,
+    ).toBeNull();
+    expect(
+      parseStatusReport('<Run|MPos:1.000,2.000,0.000|FS:1000,0|Ln:42x>')?.executingLineNumber,
+    ).toBeNull();
+  });
+
   it('parses <Idle|MPos:0.000,0.000,0.000|FS:0,0>', () => {
     const r = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     expect(r?.state).toBe('Idle');

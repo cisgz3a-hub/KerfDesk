@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
-import { resolveJobPlacement } from '../job-placement';
+import { resolveJobPlacement, type JobPlacementSettings } from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-preview';
@@ -25,9 +25,6 @@ export function usePreviewToolpath(
 ): PreviewToolpath | null {
   const jobPlacement = useStore((s) => s.jobPlacement);
   const externalGcodePreview = useStore((s) => s.externalGcodePreview);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const workOriginActive = useLaserStore((s) => s.workOriginActive);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
   const positionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
   const firstRegistrationPoint = usePrintCutSessionStore((s) => s.first);
   const secondRegistrationPoint = usePrintCutSessionStore((s) => s.second);
@@ -40,10 +37,7 @@ export function usePreviewToolpath(
   // the resolved placement is byte-identical across polls, so the preview should
   // not rebuild. In current-position mode the origin tracks mPos, so the key
   // changes as the head moves (a legitimate rebuild).
-  const placement = useMemo(
-    () => resolveJobPlacement(jobPlacement, { statusReport, workOriginActive, wcoCache }),
-    [jobPlacement, statusReport, workOriginActive, wcoCache],
-  );
+  const placement = usePreviewPlacement(jobPlacement);
   const placementKey = useMemo(() => JSON.stringify(placement), [placement]);
   // The scheduled build reads the latest resolved placement via a ref so the
   // placement object itself need not be an effect dependency.
@@ -107,6 +101,18 @@ export function usePreviewToolpath(
   ]);
 
   return toolpath;
+}
+
+function usePreviewPlacement(jobPlacement: JobPlacementSettings) {
+  const statusReport = useLaserStore((state) => state.statusReport);
+  const workOriginActive = useLaserStore((state) => state.workOriginActive);
+  const wcoCache = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
+  return useMemo(
+    () =>
+      resolveJobPlacement(jobPlacement, { statusReport, workOriginActive, wcoCache, reportInches }),
+    [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches],
+  );
 }
 
 function hasVariableText(project: Project): boolean {

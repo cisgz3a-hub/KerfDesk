@@ -28,6 +28,7 @@ export function useFrameAction(): () => void {
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const homingState = useLaserStore((s) => s.homingState);
   const trustedPositionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
+  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
     void runFrameAction({
@@ -37,6 +38,7 @@ export function useFrameAction(): () => void {
       wcoCache,
       homingState,
       trustedPositionEpoch,
+      reportInches,
       pushToast,
     });
   };
@@ -49,6 +51,7 @@ async function runFrameAction({
   wcoCache,
   homingState,
   trustedPositionEpoch,
+  reportInches,
   pushToast,
 }: Pick<
   ReturnType<typeof useLaserStore.getState>,
@@ -60,6 +63,7 @@ async function runFrameAction({
   | 'trustedPositionEpoch'
 > & {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
+  readonly reportInches: boolean;
 }): Promise<void> {
   // Click-only consumer: read project/placement at call time instead of
   // subscribing; a render-per-mousemove for a button handler would be noisy.
@@ -72,6 +76,7 @@ async function runFrameAction({
     wcoCache,
     homingState,
     trustedPositionEpoch,
+    reportInches,
   });
   if (!placement.ok) {
     pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');

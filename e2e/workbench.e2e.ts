@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test as baseTest, type Page } from '@playwright/test';
+import { test as kerfDeskTest, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -15,78 +16,82 @@ const PNG_BASE64 = readFileSync(
   ),
 ).toString('base64');
 
-test('assembled workbench is keyboard navigable and canvas-first at 1024px', async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 768 });
-  await page.goto('/');
-  await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
-  await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
-  await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: 'Cuts / Layers panel' })).toBeVisible();
-  await expect(page.getByLabel('Laser controls')).toHaveCount(0);
+baseTest(
+  'assembled workbench is keyboard navigable and canvas-first at 1024px',
+  async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('/');
+    await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
+    await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Cuts / Layers panel' })).toBeVisible();
+    await expect(page.getByLabel('Laser controls')).toHaveCount(0);
 
-  const file = page.getByRole('menuitem', { name: 'File' });
-  await file.focus();
-  await file.press('ArrowRight');
-  const edit = page.getByRole('menuitem', { name: 'Edit' });
-  await expect(edit).toBeFocused();
-  await edit.press('ArrowRight');
-  const tools = page.getByRole('menuitem', { name: 'Tools' });
-  await expect(tools).toBeFocused();
-  await tools.press('ArrowDown');
-  await expect(page.getByRole('group', { name: 'Create & measure' })).toBeVisible();
-  await expect(page.getByRole('menuitemcheckbox', { name: 'Measure' })).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(tools).toBeFocused();
-});
+    const file = page.getByRole('menuitem', { name: 'File' });
+    await file.focus();
+    await file.press('ArrowRight');
+    const edit = page.getByRole('menuitem', { name: 'Edit' });
+    await expect(edit).toBeFocused();
+    await edit.press('ArrowRight');
+    const tools = page.getByRole('menuitem', { name: 'Tools' });
+    await expect(tools).toBeFocused();
+    await tools.press('ArrowDown');
+    await expect(page.getByRole('group', { name: 'Create & measure' })).toBeVisible();
+    await expect(page.getByRole('menuitemcheckbox', { name: 'Measure' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(tools).toBeFocused();
+  },
+);
 
-test('synthetic SVG import supports layer editing, Preview, Save, and machine switching', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1024, height: 768 });
-  await installFileSystemMocks(page);
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Import SVG...' }).click();
-  await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
-  await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
+baseTest(
+  'synthetic SVG import supports layer editing, Preview, Save, and machine switching',
+  async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await installFileSystemMocks(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Import SVG...' }).click();
+    await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
+    await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
 
-  await page.keyboard.press('Escape');
-  const layerMode = page.getByLabel('Mode for #ff0000');
-  await layerMode.selectOption('fill');
-  await expect(layerMode).toHaveValue('fill');
+    await page.keyboard.press('Escape');
+    const layerMode = page.getByLabel('Mode for #ff0000');
+    await layerMode.selectOption('fill');
+    await expect(layerMode).toHaveValue('fill');
 
-  const preview = page.getByRole('button', { name: 'Preview', exact: true });
-  await expect(preview).toBeEnabled();
-  await preview.click();
-  await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible();
-  await preview.click();
+    const preview = page.getByRole('button', { name: 'Preview', exact: true });
+    await expect(preview).toBeEnabled();
+    await preview.click();
+    await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible();
+    await preview.click();
 
-  // A fresh no-homing project intentionally defaults to Current Position,
-  // which cannot be exported offline without live head coordinates. This
-  // fixture is file-only, so deliberately choose Absolute before Save.
-  await page.getByRole('tab', { name: 'Machine' }).click();
-  await page.getByRole('button', { name: 'Expand Laser panel' }).click();
-  const startFrom = page.getByLabel('Start from');
-  await expect(startFrom).toHaveValue('current-position');
-  await startFrom.selectOption('absolute');
-  await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
+    // A fresh no-homing project intentionally defaults to Current Position,
+    // which cannot be exported offline without live head coordinates. This
+    // fixture is file-only, so deliberately choose Absolute before Save.
+    await page.getByRole('tab', { name: 'Machine' }).click();
+    await page.getByRole('button', { name: 'Expand Laser panel' }).click();
+    const startFrom = page.getByLabel('Start from');
+    await expect(startFrom).toHaveValue('current-position');
+    await startFrom.selectOption('absolute');
+    await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
 
-  await page.getByRole('button', { name: 'Save G-code...' }).click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
-    )
-    .toBe(true);
+    await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => Boolean((window as Window & { __e2eSaved?: string }).__e2eSaved)),
+      )
+      .toBe(true);
 
-  await page.getByRole('button', { name: 'CNC', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'CNC', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await page.getByRole('tab', { name: 'Machine' }).click();
-  await expect(page.getByLabel('Router controls')).toBeVisible();
-});
+    await page.getByRole('button', { name: 'CNC', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'CNC', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.getByRole('tab', { name: 'Machine' }).click();
+    await expect(page.getByLabel('Router controls')).toBeVisible();
+  },
+);
 
-test('synthetic bitmap reaches Trace preview and commits a traced object', async ({ page }) => {
+baseTest('synthetic bitmap reaches Trace preview and commits a traced object', async ({ page }) => {
   await installFileSystemMocks(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Import Image...' }).click();
@@ -101,7 +106,65 @@ test('synthetic bitmap reaches Trace preview and commits a traced object', async
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
 });
 
-test('an interrupted-job checkpoint surfaces recovery before normal work', async ({ page }) => {
+kerfDeskTest(
+  'controller positions, not acknowledgements, drive the live canvas trail',
+  async ({ page, kerfdesk }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open...' }).click();
+    const probe = page.getByTestId('canvas-motion-probe');
+    await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
+    await connectAndHome(page, kerfdesk);
+    await kerfdesk.setAutoAcknowledge(false);
+    page.on('dialog', (dialog) => void dialog.accept());
+    const baselineLines = serialWriteLineCount(await kerfdesk.events());
+    const writesBefore = serialWrites(await kerfdesk.events()).length;
+    await page.getByRole('button', { name: 'Start job' }).click();
+    await expect(probe).toHaveAttribute('data-lifecycle', 'running');
+    const initial = Number(await probe.getAttribute('data-confirmed-route-mm'));
+
+    const program = serialWrites(await kerfdesk.events()).slice(writesBefore);
+    const firstMove = /G0 X(-?\d+(?:\.\d+)?) Y(-?\d+(?:\.\d+)?)/.exec(program);
+    expect(firstMove).not.toBeNull();
+    const acceptedThroughFirstMove =
+      [...program.slice(0, firstMove?.index ?? 0)].filter((character) => character === '\n')
+        .length + 1;
+    await kerfdesk.acknowledgeSerial(acceptedThroughFirstMove);
+    await expect
+      .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+      .toBe(initial);
+
+    const x = Number(firstMove?.[1] ?? 0);
+    const y = Number(firstMove?.[2] ?? 0);
+    await kerfdesk.emitSerialLine(
+      `<Run|MPos:${(x / 2).toFixed(3)},${(y / 2).toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0>`,
+    );
+    await expect
+      .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+      .toBeGreaterThan(initial);
+
+    await page.getByRole('button', { name: 'Pause', exact: true }).first().click();
+    const atPause = Number(await probe.getAttribute('data-confirmed-route-mm'));
+    await kerfdesk.emitSerialLine(
+      `<Hold:0|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:0,0>`,
+    );
+    await expect(probe).toHaveAttribute('data-lifecycle', 'paused');
+    expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBe(atPause);
+    await page.getByRole('button', { name: 'Resume', exact: true }).first().click();
+    await kerfdesk.emitSerialLine(
+      `<Run|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0>`,
+    );
+    await expect
+      .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
+      .toBeGreaterThan(atPause);
+
+    await drainHeldSerialWrites(page, kerfdesk, baselineLines, acceptedThroughFirstMove);
+    await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    await expect(probe).toHaveAttribute('data-lifecycle', 'finished');
+    expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBeGreaterThan(atPause);
+  },
+);
+
+baseTest('an interrupted-job checkpoint surfaces recovery before normal work', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       'laserforge.job-checkpoint.v1',
@@ -166,4 +229,51 @@ async function installFileSystemMocks(page: Page): Promise<void> {
     },
     { svg: SVG, pngBase64: PNG_BASE64 },
   );
+}
+
+async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  await page.getByRole('button', { name: /^Connect/ }).click();
+  await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+}
+
+function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): string {
+  return events
+    .filter((event) => event['kind'] === 'serial-write')
+    .map((event) => String(event['text']))
+    .join('');
+}
+
+function serialWriteLineCount(events: readonly Readonly<Record<string, unknown>>[]): number {
+  return events
+    .filter((event) => event['kind'] === 'serial-write')
+    .map((event) => String(event['text']))
+    .reduce((count, text) => count + [...text].filter((character) => character === '\n').length, 0);
+}
+
+async function drainHeldSerialWrites(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  baselineLines: number,
+  alreadyAcknowledged: number,
+): Promise<void> {
+  let acknowledged = alreadyAcknowledged;
+  let stablePasses = 0;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
+    const pending = written - acknowledged;
+    if (pending > 0) {
+      await kerfdesk.acknowledgeSerial(pending);
+      acknowledged += pending;
+      stablePasses = 0;
+    } else {
+      stablePasses += 1;
+      if (stablePasses >= 3) return;
+    }
+    await page.waitForTimeout(25);
+  }
+  throw new Error('Held serial writes did not drain.');
 }

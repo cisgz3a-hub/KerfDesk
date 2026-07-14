@@ -9,7 +9,6 @@ import {
   type SettingsCollectorState,
   type StatusReport,
   type StreamerState,
-  type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import {
   grblDriver,
@@ -45,8 +44,8 @@ import type { OverrideValues, RealtimeOverrideByte } from '../../core/controller
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
-import type { CncToolPlanEntry } from './cnc-tool-plan';
-import type { CncSetupAttestation } from './cnc-setup-attestation';
+import type { LiveCanvasRun } from './canvas-motion-plan';
+import type { StartJobOptions } from './laser-job-options';
 import type { UnexpectedTerminalResponse } from './controller-terminal-contamination';
 import type {
   ControllerObservationStamp,
@@ -69,6 +68,7 @@ import {
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, type WorkCoordinateOffset } from './origin-actions';
+export type { StartJobOptions } from './laser-job-options';
 
 /** Connect-time controller selection. Omitted fields fall back to the GRBL
  *  driver and its default baud — the only behavior that existed pre-ADR-094. */
@@ -87,12 +87,6 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 
 // Streamer options plus the machine kind the job was compiled for, so pause
 // safety can distinguish laser ($32 proof required) from router (must not).
-export type StartJobOptions = CreateStreamerOptions & {
-  readonly machineKind?: MachineKind;
-  readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
-  readonly cncSetupAttestation?: CncSetupAttestation;
-};
-
 export type LaserState = {
   readonly connection: ConnectionState;
   readonly statusReport: StatusReport | null;
@@ -120,6 +114,9 @@ export type LaserState = {
   readonly motionOperation: LaserMotionOperation | null;
   readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
+  /** Controller-reported canvas truth for the active or most recently
+   * completed run. The started plan is immutable for the life of the run. */
+  readonly liveCanvasRun?: LiveCanvasRun | null;
   // Which machine kind the running job was compiled for. Pause safety
   // differs by kind: lasers need the $32=1 proof before feed hold (the beam
   // can stay on through a hold at $32=0); routers require $32=0 and hold is

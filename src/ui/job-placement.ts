@@ -2,6 +2,7 @@ import type { StatusReport } from '../core/controllers/grbl';
 import type { DeviceProfile } from '../core/devices';
 import type { JobOriginPlacement, JobPlacementSettings, JobStartMode } from '../core/job';
 import type { MotionBoundsOffset } from '../core/invariants';
+import { normalizeReportedMPosToMm } from '../core/controllers/grbl/machine-envelope';
 import { hasCustomXyOrigin, type WorkCoordinateOffset } from './state/origin-actions';
 
 export type { JobPlacementSettings };
@@ -37,6 +38,7 @@ export type MachinePlacementSnapshot = {
   readonly statusReport: StatusReport | null;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
+  readonly reportInches?: boolean;
 };
 
 export type ResolvedJobPlacement =
@@ -176,19 +178,26 @@ function currentWorkPosition(
   if (report === null) return null;
   const wco = knownWco(machine);
   if (report.wPos !== null) {
+    const work = normalizedAxis(report.wPos, machine.reportInches === true);
     const offset =
-      report.mPos !== null ? subtractAxis(report.mPos, report.wPos) : (wco ?? defaultWco(machine));
+      report.mPos !== null
+        ? subtractAxis(normalizedAxis(report.mPos, machine.reportInches === true), work)
+        : (wco ?? defaultWco(machine));
     if (offset === null) return null;
-    return { work: report.wPos, offset };
+    return { work, offset };
   }
   if (report.mPos === null) return null;
   const offset = wco ?? defaultWco(machine);
   if (offset === null) return null;
-  return { work: subtractAxis(report.mPos, offset), offset };
+  return {
+    work: subtractAxis(normalizedAxis(report.mPos, machine.reportInches === true), offset),
+    offset,
+  };
 }
 
 function knownWco(machine: MachinePlacementSnapshot): Axis3 | null {
-  return machine.wcoCache ?? machine.statusReport?.wco ?? null;
+  const raw = machine.wcoCache ?? machine.statusReport?.wco ?? null;
+  return raw === null ? null : normalizedAxis(raw, machine.reportInches === true);
 }
 
 function defaultWco(machine: MachinePlacementSnapshot): Axis3 | null {
@@ -205,6 +214,11 @@ function xyOffset(offset: Axis3): MotionBoundsOffset {
 
 function subtractAxis(a: Axis3, b: Axis3): Axis3 {
   return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+}
+
+function normalizedAxis(axis: Axis3, reportInches: boolean): Axis3 {
+  const [x, y, z] = normalizeReportedMPosToMm([axis.x, axis.y, axis.z], reportInches);
+  return { x, y, z };
 }
 
 function assertNeverStartMode(mode: never): never {

@@ -24,6 +24,7 @@ import {
   isActiveJob,
   pushLog,
 } from './laser-store-helpers';
+import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { appendSystemNotice } from './laser-system-notice';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
@@ -183,6 +184,7 @@ async function runDisconnect(
     lastWriteError: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
+    ...liveCanvasLifecyclePatch(state, 'disconnected'),
   }));
 }
 

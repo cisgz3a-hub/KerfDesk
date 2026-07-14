@@ -306,6 +306,7 @@ type InitialLaserState = Pick<
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
+  | 'liveCanvasRun'
   | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
   | 'pendingTransportWrites'
@@ -357,6 +358,7 @@ export function initialLaserState(): InitialLaserState {
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    liveCanvasRun: null,
     activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
@@ -429,6 +431,9 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
     streamer: stream,
+    ...(state.liveCanvasRun === null || state.liveCanvasRun === undefined
+      ? {}
+      : { liveCanvasRun: { ...state.liveCanvasRun, lifecycle: 'disconnected' as const } }),
     // Replies owed by the dead controller will never arrive.
     pendingUntrackedAcks: 0,
     ...(state.fireActive
