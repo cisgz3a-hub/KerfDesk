@@ -1,8 +1,9 @@
 // JogPad - directional jog grid. F-B5.
 //
-// Click or use an arrow key for one selected step. Holding a pointer arrow
-// starts a boundary-aware continuous jog; release, pointer loss, blur, and
-// unmount all route through the controller's jog-cancel command.
+// Click a jog arrow for one selected step. Holding a pointer arrow starts a
+// continuous jog; release, pointer loss, blur, and unmount all route through the
+// controller's jog-cancel command. Bare arrow keys nudge the selected canvas
+// object and no longer jog the machine (F104); Z-focus keys stay on the pad.
 
 import { useCallback, useMemo, useState } from 'react';
 import { jogAxisSignsForOrigin } from '../../core/devices';
@@ -15,12 +16,7 @@ import { JogArrowGrid } from './JogArrowGrid';
 import { JogPadAirAssist } from './JogPadAirAssist';
 import { JogSettingsRow } from './JogSettingsRow';
 import { MomentaryFireControl } from './MomentaryFireControl';
-import {
-  clampJogFeed,
-  stepJogVector,
-  type JogVector,
-  type PhysicalJogDirection,
-} from './jog-control-policy';
+import { clampJogFeed, type JogVector } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { useJogShortcuts } from './use-jog-shortcuts';
 
@@ -54,12 +50,6 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
     },
     [jog],
   );
-  const sendDirection = useCallback(
-    (direction: PhysicalJogDirection): void => {
-      sendVector(stepJogVector(direction, step, signs, feed));
-    },
-    [feed, sendVector, signs, step],
-  );
   const sendFocus = useCallback(
     (direction: 1 | -1): void => {
       void jog({ dz: direction * focusStep, feed: focusFeed }).catch(() => undefined);
@@ -70,7 +60,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
     void cancelJog().catch(() => undefined);
   }, [cancelJog]);
 
-  useJogPadShortcuts(disabled, focusReady, sendDirection, sendFocus);
+  useJogPadShortcuts(disabled, focusReady, sendFocus);
 
   return (
     <div style={containerStyle}>
@@ -113,10 +103,9 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 function useJogPadShortcuts(
   disabled: boolean,
   focusReady: boolean,
-  onJog: (direction: PhysicalJogDirection) => void,
   onFocusJog: (direction: 1 | -1) => void,
 ): void {
-  useJogShortcuts({ disabled, focusDisabled: disabled || !focusReady, onJog, onFocusJog });
+  useJogShortcuts({ focusDisabled: disabled || !focusReady, onFocusJog });
 }
 
 const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
