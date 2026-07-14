@@ -399,6 +399,9 @@ function emitJob(job: Job, device: DeviceProfile): string {
 }
 
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
+  if ((group.kind === 'cut' || group.kind === 'fill') && group.powerMode !== undefined) {
+    return laserModeWord(group.powerMode);
+  }
   if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
   if (group.kind === 'raster' || group.kind === 'cnc') return 'group-managed';
   return laserModeWord(dialect.cutPowerMode);

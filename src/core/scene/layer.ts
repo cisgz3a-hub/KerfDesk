@@ -16,9 +16,11 @@ export type LayerMode = 'line' | 'fill' | 'image';
 // adding an algorithm here also needs the matching dither.ts arm.
 export type LayerDitherAlgorithm = DitherAlgorithm;
 export type LayerFillStyle = 'scanline' | 'offset' | 'island';
+export type LayerPowerMode = 'constant' | 'dynamic';
 
 export type LayerOperationSettings = {
   readonly mode: LayerMode;
+  readonly powerMode?: LayerPowerMode | undefined;
   readonly minPower: number; // 0..100 percent; grayscale image floor
   readonly power: number; // 0..100 percent
   readonly speed: number; // mm/min; capped by device.maxFeed at compile time
@@ -100,6 +102,7 @@ export const LAYER_DEFAULTS = {
 
 const LAYER_OPERATION_SETTING_KEYS = [
   'mode',
+  'powerMode',
   'minPower',
   'power',
   'speed',
@@ -155,6 +158,7 @@ export function captureLayerOperationSettings(
 ): LayerOperationSettings {
   return {
     mode: layer.mode,
+    ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
     minPower: layer.minPower,
     power: layer.power,
     speed: layer.speed,

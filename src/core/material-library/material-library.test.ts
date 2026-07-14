@@ -23,6 +23,7 @@ describe('material library recipes', () => {
       id: 'layer-source',
       color: '#aabbcc',
       mode: 'fill',
+      powerMode: 'dynamic',
       minPower: 8,
       power: 46,
       speed: 1800,
@@ -52,6 +53,7 @@ describe('material library recipes', () => {
     expect(rawRecipe.output).toBeUndefined();
     expect(recipe).toMatchObject({
       mode: 'fill',
+      powerMode: 'dynamic',
       minPower: 8,
       power: 46,
       speed: 1800,

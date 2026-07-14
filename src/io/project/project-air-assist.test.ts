@@ -73,6 +73,27 @@ describe('project air assist persistence', () => {
     }
   });
 
+  it('round-trips supported vector power modes and rejects unknown values', () => {
+    const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
+    const scene = raw.scene as { layers: Array<Record<string, unknown>> };
+    const firstLayer = scene.layers[0];
+    if (firstLayer === undefined) throw new Error('expected project fixture layer');
+    firstLayer.powerMode = 'dynamic';
+
+    const accepted = deserializeProject(JSON.stringify(raw));
+    expect(accepted.kind).toBe('ok');
+    if (accepted.kind === 'ok') {
+      expect(accepted.project.scene.layers[0]?.powerMode).toBe('dynamic');
+    }
+
+    firstLayer.powerMode = 'turbo';
+    const rejected = deserializeProject(JSON.stringify(raw));
+    expect(rejected.kind).toBe('invalid');
+    if (rejected.kind === 'invalid') {
+      expect(rejected.reason).toMatch(/scene\.layers\[0\]\.powerMode/);
+    }
+  });
+
   it('rejects Auto Fastest as a persisted layer fill style', () => {
     const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
     const scene = raw.scene as { layers: Array<Record<string, unknown>> };

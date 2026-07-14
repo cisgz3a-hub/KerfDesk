@@ -30,6 +30,21 @@ export function CutSettingsCommonFields(props: {
         <NumberInput name="power" value={props.layer.power} min={0} max={100} label="power" />
         <span className="lf-field-unit">%</span>
       </Field>
+      {props.mode !== 'image' ? (
+        <Field label="Power mode">
+          <select
+            name="powerMode"
+            className="lf-select"
+            defaultValue={props.layer.powerMode ?? 'auto'}
+            aria-label="Cut settings power mode"
+            title="Auto uses the active controller profile. Constant emits M3; Dynamic emits M4 and scales power with speed on compatible laser firmware."
+          >
+            <option value="auto">Auto (device default)</option>
+            <option value="constant">Constant (M3)</option>
+            <option value="dynamic">Dynamic (M4)</option>
+          </select>
+        </Field>
+      ) : null}
       <Field label="Speed">
         <NumberInput name="speed" value={speedValue} min={1} label="speed" {...speedMax} />
         <span className="lf-field-unit">mm/min</span>

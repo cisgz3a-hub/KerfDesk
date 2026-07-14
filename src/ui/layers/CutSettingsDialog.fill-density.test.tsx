@@ -10,6 +10,43 @@ import { CutSettingsDialog } from './CutSettingsDialog';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('CutSettingsDialog fill density controls', () => {
+  it('offers Auto, Constant, and Dynamic power modes only for vector layers', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={lineLayer()}
+            onCancel={() => undefined}
+            onApply={() => undefined}
+          />,
+        );
+      });
+      const powerMode = host.querySelector('select[aria-label="Cut settings power mode"]');
+      if (!(powerMode instanceof HTMLSelectElement)) throw new Error('power mode select missing');
+      expect(powerMode.value).toBe('auto');
+      expect([...powerMode.options].map((option) => option.value)).toEqual([
+        'auto',
+        'constant',
+        'dynamic',
+      ]);
+
+      const mode = host.querySelector('select[aria-label="Cut settings mode"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('mode select missing');
+      await act(async () => {
+        mode.value = 'image';
+        Simulate.change(mode);
+      });
+      expect(host.querySelector('select[aria-label="Cut settings power mode"]')).toBeNull();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('shows only the backed field group for the selected mode', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

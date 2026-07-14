@@ -36,6 +36,7 @@ export type CutGroup = {
   readonly layerId: string;
   readonly color: string;
   readonly power: number; // 0..100 (percent)
+  readonly powerMode?: 'constant' | 'dynamic';
   readonly speed: number; // mm/min; already capped to device.maxFeed
   readonly passes: number; // integer ≥ 1
   readonly airAssist: boolean;

@@ -24,6 +24,7 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     requireString(layer, `${path}.id`),
     requireString(layer, `${path}.color`),
     requireLiteral(layer, `${path}.mode`, ['line', 'fill', 'image']),
+    optionalLiteral(layer, `${path}.powerMode`, ['constant', 'dynamic']),
     optionalPercent(layer, `${path}.minPower`),
     requirePercent(layer, `${path}.power`),
     requirePositiveNumber(layer, `${path}.speed`),

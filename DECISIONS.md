@@ -7704,3 +7704,35 @@ honestly with KerfDesk's profile bounds because position units, homing-frame ori
 firmware build options are not all qualified. XYZ corner probing remains non-production-qualified
 until that owned coordinate proof, the pre-G10 planner fence, TLO/G92 readback, and accessory
 coast-down safeguards land.
+---
+
+## ADR-189 - Make vector power mode explicit per layer without changing defaults
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+KerfDesk selected constant or dynamic laser power only from the active G-code dialect and operation
+kind. That provided sound defaults but no layer-level compatibility control. GRBL documents M4 as
+dynamic laser-power scaling when laser mode is enabled, while LightBurn exposes Constant Power as a
+per-layer alternative to its variable-power default. Users therefore expect to select M3 or M4 for
+an individual vector operation without changing every layer or editing exported G-code.
+
+### Decision
+
+- Add an optional `powerMode` setting with `constant` and `dynamic` values to vector layer settings,
+  job groups, material recipes, sublayers, clipboard settings, and project validation.
+- Present **Auto (device default)**, **Constant (M3)**, and **Dynamic (M4)** in Line and Fill Cut
+  Settings. Auto stores no override and preserves the existing dialect decision byte-for-byte.
+- Apply an explicit override only to cut/fill groups. Raster remains group-managed because its
+  emitter owns laser-off travel, scan power, and shutdown transitions.
+- Keep power mode modal across groups, emitting M5 before an M3-to-M4 change and changing mode before
+  the affected group's first burn command.
+- Reject unknown persisted values rather than guessing at a machine command.
+
+### Consequences
+
+Existing projects and Auto layers emit unchanged output. Advanced users can choose M3 for firmware
+compatibility or full-power vector cutting and M4 for speed-scaled engraving on compatible firmware.
+The selection persists with projects and materials, but it does not assert that every firmware build
+supports dynamic power; machine documentation and laser mode configuration remain authoritative.
