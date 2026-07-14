@@ -1,5 +1,8 @@
+import {
+  controllerCompatibleProfile,
+  type ControllerProfileCorrection,
+} from './controller-profile-compatibility';
 import type { DeviceProfile } from './device-profile';
-import { streamingModeForController } from './controller-streaming-mode';
 
 export type ProfileControllerFactMergeInput = {
   readonly profile: DeviceProfile;
@@ -10,7 +13,18 @@ export type ProfileControllerFactMergeInput = {
   readonly lastSettingsReadAt: number | null;
 };
 
+export type ProfileControllerFactMergeResult = {
+  readonly profile: DeviceProfile;
+  readonly corrections: ReadonlyArray<ControllerProfileCorrection>;
+};
+
 export function profileWithControllerFacts(args: ProfileControllerFactMergeInput): DeviceProfile {
+  return profileWithControllerFactsResult(args).profile;
+}
+
+export function profileWithControllerFactsResult(
+  args: ProfileControllerFactMergeInput,
+): ProfileControllerFactMergeResult {
   const controllerRead = args.lastSettingsReadAt !== null;
   const framingFeedMmPerMin = Math.max(
     args.current.framingFeedMmPerMin,
@@ -23,14 +37,12 @@ export function profileWithControllerFacts(args: ProfileControllerFactMergeInput
   };
   const controllerKind =
     args.detectedControllerKind ?? (controllerRead ? args.current.controllerKind : undefined);
-  const streamingMode = streamingModeForController(controllerKind, args.profile.streamingMode);
-  return {
+  const merged = {
     ...args.profile,
     ...machinePatch,
-    streamingMode,
     ...(controllerRead ? { framingFeedMmPerMin } : {}),
-    ...(controllerKind === undefined ? {} : { controllerKind }),
   };
+  return controllerCompatibleProfile(merged, controllerKind ?? merged.controllerKind);
 }
 
 function machineReportedProfilePatch(

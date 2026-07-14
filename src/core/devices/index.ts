@@ -27,6 +27,15 @@ export {
   resolveMarlinDialect,
 } from './gcode-dialects';
 export type {
+  ControllerProfileCompatibility,
+  ControllerProfileCorrection,
+  ControllerProfileCorrectionField,
+} from './controller-profile-compatibility';
+export {
+  controllerCompatibleProfile,
+  controllerProfilesAreCompatible,
+} from './controller-profile-compatibility';
+export type {
   ControllerKind,
   DeviceProfile,
   HomingConfig,
@@ -67,8 +76,14 @@ export type { ProfileConfidenceLabel } from './profile-confidence';
 export { profileConfidenceLabel } from './profile-confidence';
 export type { MachineBounds } from './machine-bounds';
 export { machineBoundsForDevice } from './machine-bounds';
-export type { ProfileControllerFactMergeInput } from './profile-application';
-export { profileWithControllerFacts } from './profile-application';
+export type {
+  ProfileControllerFactMergeInput,
+  ProfileControllerFactMergeResult,
+} from './profile-application';
+export {
+  profileWithControllerFacts,
+  profileWithControllerFactsResult,
+} from './profile-application';
 export { isStreamingModeCompatible, streamingModeForController } from './controller-streaming-mode';
 export type {
   MachineProfileSuggestion,

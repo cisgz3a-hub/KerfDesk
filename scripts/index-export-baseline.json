@@ -3,7 +3,7 @@
   "src/core/controllers/grbl/index.ts": 105,
   "src/core/camera/index.ts": 90,
   "src/core/job/index.ts": 88,
-  "src/core/devices/index.ts": 86,
+  "src/core/devices/index.ts": 93,
   "src/core/cnc/index.ts": 67,
   "src/core/trace/index.ts": 33,
   "src/core/raster/index.ts": 32,

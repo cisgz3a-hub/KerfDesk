@@ -6,6 +6,7 @@
 
 import type { Dispatch } from 'react';
 import {
+  controllerCompatibleProfile,
   profileWithControllerFacts,
   validateMachineProfile,
   type DeviceProfile,
@@ -110,11 +111,10 @@ export function initDeviceSetup(
     detected: safeDetected,
     detectedControllerKind,
     controllerRead,
-    draft: {
-      ...profile,
-      ...safeDetected,
-      ...(detectedControllerKind === null ? {} : { controllerKind: detectedControllerKind }),
-    },
+    draft: controllerCompatibleProfile(
+      { ...profile, ...safeDetected },
+      detectedControllerKind ?? profile.controllerKind,
+    ).profile,
     presetApplied: false,
   };
 }

@@ -119,6 +119,8 @@ async function prepareCurrentStartJob(
       accessoryCache: laser.accessoryCache ?? null,
       frameVerification: laser.frameVerification,
       settingsCapability: laser.capabilities.settings,
+      activeControllerKind: laser.activeControllerKind,
+      detectedControllerKind: laser.detectedControllerKind,
       cameraPlacementActive: camera.placementActive,
       cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
       cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
@@ -227,6 +229,8 @@ function prepareResume(overrides?: {
       ovCache: laser.ovCache,
       accessoryCache: laser.accessoryCache ?? null,
       frameVerification: laser.frameVerification,
+      activeControllerKind: laser.activeControllerKind,
+      detectedControllerKind: laser.detectedControllerKind,
       cameraPlacementActive: camera.placementActive,
       cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
       cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(

@@ -4,6 +4,7 @@
 // committed until Finish.
 
 import {
+  controllerProfilesAreCompatible,
   profileConfidenceLabel,
   suggestMachineProfiles,
   type MachineProfileSuggestion,
@@ -34,6 +35,13 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
           key={suggestion.profileId}
           suggestion={suggestion}
           active={state.draft.profileId === suggestion.profile.profileId}
+          controllerMismatch={
+            !controllerProfilesAreCompatible(
+              suggestion.profile.controllerKind,
+              state.detectedControllerKind ??
+                (state.controllerRead ? (state.draft.controllerKind ?? null) : null),
+            )
+          }
           onUse={() => {
             dispatch({ kind: 'apply-preset', profile: suggestion.profile });
             dispatch({ kind: 'go', step: 'confirm' });
@@ -47,6 +55,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
 function PresetCard(props: {
   readonly suggestion: MachineProfileSuggestion;
   readonly active: boolean;
+  readonly controllerMismatch: boolean;
   readonly onUse: () => void;
 }): JSX.Element {
   const profile = props.suggestion.profile;
@@ -78,13 +87,21 @@ function PresetCard(props: {
       </ul>
       <Button
         variant={props.active ? 'default' : 'primary'}
-        disabled={props.active}
+        disabled={props.active || props.controllerMismatch}
         onClick={props.onUse}
         title={
-          props.active ? 'This machine is selected.' : `Start from ${profile.name}'s defaults.`
+          props.active
+            ? 'This machine is selected.'
+            : props.controllerMismatch
+              ? 'This profile uses a different controller family than the connected firmware.'
+              : `Start from ${profile.name}'s defaults.`
         }
       >
-        {props.active ? 'Selected' : `Use ${profile.name}`}
+        {props.active
+          ? 'Selected'
+          : props.controllerMismatch
+            ? 'Firmware mismatch'
+            : `Use ${profile.name}`}
       </Button>
     </article>
   );
