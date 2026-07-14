@@ -9,6 +9,7 @@ import { TOOL_CHANGE_PLAN_MISMATCH_MESSAGE } from './laser-job-actions';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 import { TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE } from './laser-store-helpers';
+import { PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE } from './work-z-zero-evidence';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
@@ -168,15 +169,23 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     expect(useLaserStore.getState().lastWriteError).toContain('different bit');
     expect(useLaserStore.getState().lastWriteError).toContain('6.35 mm end mill');
 
-    // Simulate selecting/loading the planned cutter and then a successful Zero
-    // Z/probe. The first resumed command is the spindle-off safe-Z lift; M3 follows it.
+    // A successful probe for the planned cutter still cannot Continue while
+    // the conductive plate/lead remains in the work envelope.
     useLaserStore.setState({
       workZZeroEvidence: {
-        source: 'manual-zero',
+        source: 'probe',
         referenceEpoch: useLaserStore.getState().workZReferenceEpoch,
         toolId: 'em-6350',
+        probePlateRemoved: false,
       },
     });
+    await useLaserStore.getState().continueToolChange();
+    expect(writes.join('')).toBe('');
+    expect(useLaserStore.getState().lastWriteError).toBe(PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE);
+
+    // After explicit removal confirmation, the first resumed command is the
+    // spindle-off safe-Z lift; M3 follows it.
+    useLaserStore.getState().confirmProbePlateRemoved();
     await useLaserStore.getState().continueToolChange();
     const resumed = writes.join('');
     expect(resumed).toContain('G0 Z5');

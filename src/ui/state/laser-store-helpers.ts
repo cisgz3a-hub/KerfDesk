@@ -14,7 +14,11 @@ import { grblDriver, type ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { isWorkZZeroEvidenceCurrent } from './work-z-zero-evidence';
+import {
+  isWorkZZeroEvidenceCurrent,
+  probePlateRemovalRequired,
+  PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
+} from './work-z-zero-evidence';
 
 const LOG_MAX = 200;
 const TOOL_CHANGE_STATE_DEFAULTS = {
@@ -92,6 +96,9 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
   if (!isWorkZZeroEvidenceCurrent(state.workZZeroEvidence, state.workZReferenceEpoch)) {
     return TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;
+  }
+  if (probePlateRemovalRequired(state.workZZeroEvidence)) {
+    return PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE;
   }
   if (state.pendingToolId !== null && state.workZZeroEvidence?.toolId !== state.pendingToolId) {
     const expected = state.pendingToolLabel ?? state.pendingToolId;

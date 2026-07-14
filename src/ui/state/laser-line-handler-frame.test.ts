@@ -78,6 +78,7 @@ function makeLaserState(): LaserState {
     readMachineSettings: async () => undefined,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
+    confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
   };
 }
