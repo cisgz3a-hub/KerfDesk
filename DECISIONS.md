@@ -57,6 +57,7 @@
 | ADR-184 | 2026-07-13 | Accepted | Probe cycles are exclusive, typed, and settlement-qualified |
 | ADR-185 | 2026-07-13 | Accepted | Commit XYZ corner-probe offsets in one GRBL block |
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
+| ADR-187 | 2026-07-14 | Accepted | Validate every supported laser G-code dialect with one property corpus |
 
 ---
 
@@ -7627,3 +7628,37 @@ hardware validation for plate dimensions, corner signs, clearances, and repeatab
 This decision depends on the separate G54-selection and G94-feed-normalization changes. Until those
 land, `P0` can target a stale active WCS and probe feeds can inherit inverse-time mode. TLO/G92
 readback remains a separate fail-closed prerequisite before this workflow is production-qualified.
+
+---
+
+## ADR-187 - Validate every supported laser G-code dialect with one property corpus
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+GRBL output had broad property coverage for deterministic bytes, laser-off travel, bounds, and power
+scaling. Marlin and Smoothieware had focused examples and lifecycle simulators, but their materially
+different power encodings did not receive the same generated-job pressure. That left a validation
+asymmetry at the exact boundary where firmware interpretation differs.
+
+### Decision
+
+- Generate bounded cut and fill jobs from one shared fixture corpus for GRBL, Marlin inline power,
+  Marlin synchronous fan power, and Smoothieware.
+- Run 100 generated cases per property for determinism, laser-off travel, in-bed coordinates, and the
+  firmware-specific power scale.
+- Constrain Marlin fan output to documented `M106 S0..255` / `M107` semantics with no motion-line
+  power words, and Smoothieware output to its documented fractional `S0..1` range.
+- Route representative Marlin fan and Smoothieware projects through the exact Save/Start composition
+  and byte-pin the resulting programs beside the GRBL and CNC corpus.
+- Keep physical-machine confidence separate. Software and simulator evidence cannot relabel a
+  profile as hardware-verified.
+
+### Consequences
+
+A change to shared planning or to any supported laser dialect now crosses the same generated safety
+properties and creates reviewable snapshot churn at the production output boundary. The additional
+tests improve confidence without changing emitted machine behavior. Ruida remains an experimental,
+file-only encoder and is outside this G-code acceptance claim until independently decoded or tested
+on representative hardware.
