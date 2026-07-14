@@ -12,6 +12,7 @@
 // state is observable across calls.
 
 import {
+  idleCollector,
   markErrored,
   wipeInFlight,
   type GrblPins,
@@ -53,7 +54,7 @@ export function handleLine(
   const cls = refs.driver.classifyLine(line);
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
-  publishDetectedSettings(set, refs, cls);
+  publishDetectedSettings(set, get, refs, cls);
   const bannerRaw = bannerCandidateRaw(cls);
   if (bannerRaw !== null) {
     handleWelcomeLine(set, get, refs, safeWrite, bannerRaw);
@@ -120,6 +121,9 @@ function interceptUnexpectedTerminalResponse(
       ...(firstObservation
         ? {
             trustedPositionEpoch: (current.trustedPositionEpoch ?? 0) + 1,
+            statusObservation: null,
+            homingState: 'unknown',
+            homingProof: null,
             workZReferenceEpoch: current.workZReferenceEpoch + 1,
             workZZeroEvidence: null,
             frameVerification: null,
@@ -160,14 +164,20 @@ function recordInboundLine(
 
 function publishDetectedSettings(
   set: SetFn,
+  get: GetFn,
   refs: HandlerRefs,
   cls: ReturnType<HandlerRefs['driver']['classifyLine']>,
 ): void {
-  const detected = consumeSettingsResponse(refs, cls);
+  const state = get();
+  const detected = consumeSettingsResponse(refs, cls, state.controllerSessionEpoch);
   if (detected === null) return;
   set({
     detectedSettings: shouldShowDetectedSettingsReview(detected) ? detected.patch : null,
     controllerSettings: detected.controllerSettings,
+    controllerSettingsObservation: {
+      sessionEpoch: state.controllerSessionEpoch,
+      observedAt: Date.now(),
+    },
     grblSettingsRows: detected.settingsRows,
     lastSettingsReadAt: Date.now(),
   });
@@ -215,6 +225,8 @@ function handleWelcomeLine(
   if (detected === null) return;
   const state = get();
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
+  refs.settingsCollector = idleCollector();
+  refs.settingsCollectorSessionEpoch = null;
   observeControllerResetBoundary(refs);
   const probeRecovering =
     state.controllerOperation?.kind === 'probe' && state.controllerOperation.phase === 'recovering';
@@ -233,6 +245,13 @@ function handleWelcomeLine(
   set({
     detectedControllerKind: detected,
     statusReport: null,
+    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    statusObservation: null,
+    controllerSettings: null,
+    controllerSettingsObservation: null,
+    detectedSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
     alarmCode: null,
     wcoCache: null,
     ovCache: null,
@@ -245,6 +264,8 @@ function handleWelcomeLine(
     ...(probeRecovering ? {} : { controllerOperation: null, probeBusy: false }),
     fireActive: false,
     frameVerification: null,
+    homingState: 'unknown',
+    homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     ...mismatchLog,
     ...rebootDuringJobPatch(state),
@@ -318,6 +339,10 @@ function handleAlarmLine(
     controllerOperation: null,
     fireActive: false,
     frameVerification: null,
+    statusObservation: null,
+    homingState: 'unknown',
+    homingProof: null,
+    trustedPositionEpoch: (prev.trustedPositionEpoch ?? 0) + 1,
     // The alarmed controller discards its pending work; owed acks are gone.
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,

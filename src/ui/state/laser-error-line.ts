@@ -6,6 +6,7 @@ import { wipeInFlight, type StreamerState } from '../../core/controllers/grbl';
 import { armResetCleanup } from './laser-reset-cleanup';
 import { controllerErrorNotice, type ControllerErrorContext } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { advanceStream } from './laser-stream-ack';
 import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
@@ -104,6 +105,7 @@ function requestRealtimeStopAfterStreamError(
     })().catch(() => undefined);
     return;
   }
+  set((state) => invalidateControllerSessionEvidence(state));
   void safeWrite(softReset, 'stop', 'system')
     .then(() => {
       // The sent reset wiped the firmware's RX buffer: the errored stream's

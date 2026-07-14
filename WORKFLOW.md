@@ -3381,3 +3381,12 @@ Until every box is checked on real hardware, the desktop installer stays
 This software qualification does not prove physical plate geometry, probe
 wiring, spindle coast-down, or real-machine reset behavior. First hardware
 validation must be supervised without cutting load.
+
+#### Edge — controller-session coordinate truth
+
+1. Home settlement, status, and settings observations are stamped to the live
+   controller session and invalidated on reset, reconnect, alarm, or other
+   position-trust loss. A stale Idle or old serial callback is not Home proof.
+2. These stamps do not yet establish a safe probe envelope. Production XYZ
+   probing still requires an owned complete build/settings exchange and a fresh
+   direct MPos in the same session before any probe motion is permitted.

@@ -11,6 +11,7 @@ import {
 } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { pushLog } from './laser-store-helpers';
 
 type SetFn = (
@@ -30,7 +31,10 @@ export function controllerRecoveryActions(
       const softReset = driver().realtime.softReset;
       if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
       cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
-      set({ controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 } });
+      set((state) => ({
+        ...invalidateControllerSessionEvidence(state),
+        controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 },
+      }));
       try {
         await safeWrite(softReset, 'wake');
         set((state) => ({

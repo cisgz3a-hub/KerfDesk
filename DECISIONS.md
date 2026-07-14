@@ -59,6 +59,8 @@
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
 | ADR-187 | 2026-07-14 | Accepted | Validate every supported laser G-code dialect with one property corpus |
 | ADR-188 | 2026-07-14 | Accepted | Reject unproved XYZ corner-probe plate geometry before controller output |
+| ADR-189 | 2026-07-14 | Accepted | Bind controller observations and Home proof to controller sessions |
+| ADR-190 | 2026-07-14 | Accepted | Make vector power mode explicit per layer without changing defaults |
 
 ---
 
@@ -7706,7 +7708,7 @@ until that owned coordinate proof, the pre-G10 planner fence, TLO/G92 readback, 
 coast-down safeguards land.
 ---
 
-## ADR-189 - Make vector power mode explicit per layer without changing defaults
+## ADR-190 - Make vector power mode explicit per layer without changing defaults
 
 **Status:** Accepted | **Date:** 2026-07-14
 
@@ -7736,3 +7738,31 @@ Existing projects and Auto layers emit unchanged output. Advanced users can choo
 compatibility or full-power vector cutting and M4 for speed-scaled engraving on compatible firmware.
 The selection persists with projects and materials, but it does not assert that every firmware build
 supports dynamic power; machine documentation and laser mode configuration remain authoritative.
+
+---
+
+## ADR-189 - Bind controller observations and Home proof to controller sessions
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Decision
+
+Controller status and settings observations carry a controller-session epoch. Status also carries a
+monotonic receive sequence, observation time, and the current trusted-position epoch. A Home command
+can create proof only after its owned command, planner marker, and fresh Idle settlement all complete
+without changing the write, session, position, or operation identity. Reboot, alarm, Sleep, MPG
+takeover, unexpected terminal responses, disconnect, replacement connection, console mutation, and
+commanded soft reset invalidate the relevant evidence.
+
+GRBL `$10`, `$13`, and `$27` are retained in the settings snapshot. Pure modules strictly parse the
+reported stock-GRBL `[VER:]`/`[OPT:]` response, normalize inch-reported MPos, and derive the firmware
+machine-coordinate sign convention from maximum travel, `$23`, and `OPT:Z`. Unsupported build
+options and the documented `OPT:P` plus `OPT:Z` incompatibility fail closed.
+
+### Consequences
+
+An old port callback, stale Idle, or reset-era settings dump cannot silently become current Home or
+session evidence. This change sends no new controller commands and does not yet qualify machine
+coordinates or enable probing. The ordinary settings collector remains advisory; the later safety
+path must own `$I` and `$$`, reject duplicate/missing settings, require a fresh direct MPos, and consume
+the current Home proof before constructing a probe envelope.

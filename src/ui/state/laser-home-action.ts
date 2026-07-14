@@ -18,6 +18,11 @@ type SafeWriteFn = (
   action?: LaserSafetyAction,
   source?: TranscriptSource,
 ) => Promise<void>;
+type HomeEpochs = {
+  readonly session: number;
+  readonly write: number;
+  readonly position: number;
+};
 
 // GRBL acks $H only after the homing cycle physically completes — commonly
 // 10-60 s on real beds, so the default 8 s ack budget reports a spurious
@@ -49,10 +54,16 @@ export async function runHomeAction(
   driver: ControllerDriver,
 ): Promise<void> {
   const homeCommand = assertHomeReady(set, get, driver);
+  const expectedSessionEpoch = get().controllerSessionEpoch;
+  const expectedWriteEpoch = refs.writeEpoch ?? 0;
+  let expectedPositionEpoch = 0;
   set((state) => ({
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
-    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    homingProof: null,
+    statusReport: null,
+    statusObservation: null,
+    trustedPositionEpoch: (expectedPositionEpoch = (state.trustedPositionEpoch ?? 0) + 1),
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     wcoCache: null,
     workOriginActive:
@@ -67,58 +78,106 @@ export async function runHomeAction(
     frameVerification: null,
     log: pushLog(state, '[lf2] Homing started. Cleared origin and frame verification.'),
   }));
+  const epochs = {
+    session: expectedSessionEpoch,
+    write: expectedWriteEpoch,
+    position: expectedPositionEpoch,
+  };
   try {
-    await startControllerCommand(refs, safeWrite, {
-      kind: 'home',
-      label: 'home',
-      command: `${homeCommand}\n`,
-      action: 'home',
-      source: 'motion',
-      timeoutMs: HOME_COMMAND_TIMEOUT_MS,
-      timeoutMode: 'non-idle-status-activity',
-    });
-    set((state) =>
-      state.controllerOperation?.kind === 'home'
-        ? {
-            controllerOperation: { kind: 'home', phase: 'settling', idleReports: 0 },
-          }
-        : {},
-    );
-    await startControllerCommand(refs, safeWrite, {
-      kind: 'home',
-      label: 'home settle marker',
-      command: `${driver.commands.settleDwell}\n`,
-      action: 'home',
-      source: 'system',
-    });
-    set((state) =>
-      state.controllerOperation?.kind === 'home'
-        ? {
-            controllerOperation: { kind: 'home', phase: 'awaiting-idle', idleReports: 0 },
-          }
-        : {},
-    );
-    await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
-    set((state) =>
-      state.controllerOperation?.kind === 'home'
-        ? {
-            controllerOperation: null,
-            homingState: 'confirmed',
-            alarmCode: null,
-            log: pushLog(state, '[lf2] Homing confirmed after fresh Idle.'),
-          }
-        : { homingState: 'confirmed', alarmCode: null },
-    );
+    await executeHomeSequence(set, get, refs, safeWrite, driver, homeCommand, epochs);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    set((state) => ({
-      controllerOperation:
-        state.controllerOperation?.kind === 'home' ? null : state.controllerOperation,
+    recordHomeFailure(set, message, epochs);
+    throw err;
+  }
+}
+
+async function executeHomeSequence(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+  driver: ControllerDriver,
+  homeCommand: string,
+  epochs: HomeEpochs,
+): Promise<void> {
+  await startControllerCommand(refs, safeWrite, {
+    kind: 'home',
+    label: 'home',
+    command: `${homeCommand}\n`,
+    action: 'home',
+    source: 'motion',
+    timeoutMs: HOME_COMMAND_TIMEOUT_MS,
+    timeoutMode: 'non-idle-status-activity',
+  });
+  assertHomeCurrent(get(), refs, epochs);
+  set({ controllerOperation: { kind: 'home', phase: 'settling', idleReports: 0 } });
+  await startControllerCommand(refs, safeWrite, {
+    kind: 'home',
+    label: 'home settle marker',
+    command: `${driver.commands.settleDwell}\n`,
+    action: 'home',
+    source: 'system',
+  });
+  assertHomeCurrent(get(), refs, epochs);
+  set({ controllerOperation: { kind: 'home', phase: 'awaiting-idle', idleReports: 0 } });
+  await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
+  assertHomeCurrent(get(), refs, epochs);
+  confirmHome(set, get, epochs);
+}
+
+function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
+  const observation = get().statusObservation;
+  if (
+    get().statusReport?.state !== 'Idle' ||
+    observation === null ||
+    observation.sessionEpoch !== epochs.session ||
+    observation.positionEpoch !== epochs.position
+  )
+    throw new Error('Home finished without fresh session-bound Idle settlement evidence.');
+  set((state) => ({
+    controllerOperation: null,
+    homingState: 'confirmed',
+    homingProof: {
+      sessionEpoch: epochs.session,
+      positionEpoch: epochs.position,
+      confirmedStatusSequence: observation.sequence,
+    },
+    alarmCode: null,
+    log: pushLog(state, '[lf2] Homing confirmed after fresh Idle.'),
+  }));
+}
+
+function recordHomeFailure(set: SetFn, message: string, epochs: HomeEpochs): void {
+  set((state) => {
+    if (
+      state.controllerOperation?.kind !== 'home' ||
+      state.controllerSessionEpoch !== epochs.session ||
+      (state.trustedPositionEpoch ?? 0) !== epochs.position
+    )
+      return {};
+    return {
+      controllerOperation: null,
       homingState: 'unknown',
+      homingProof: null,
       lastWriteError: message,
       safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
       log: pushLog(state, `[lf2] Home failed: ${message}`),
-    }));
-    throw err;
+    };
+  });
+}
+
+function assertHomeCurrent(
+  state: LaserState,
+  refs: ControllerLifecycleRefs,
+  epochs: HomeEpochs,
+): void {
+  if (
+    state.controllerOperation?.kind !== 'home' ||
+    state.controllerSessionEpoch !== epochs.session ||
+    (refs.writeEpoch ?? 0) !== epochs.write ||
+    (state.trustedPositionEpoch ?? 0) !== epochs.position
+  ) {
+    throw new Error('Home evidence was invalidated before confirmation.');
   }
 }

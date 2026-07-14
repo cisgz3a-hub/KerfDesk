@@ -19,6 +19,7 @@ import {
   collectorOnResponse,
   type GrblSettingRow,
   idleCollector,
+  startCollecting,
   type SettingsCollectorState,
   type ControllerSettingsSnapshot,
 } from '../../core/controllers/grbl';
@@ -31,7 +32,13 @@ export type DetectedSettingsRefs = {
   // we mutate the same reference rather than passing it in/out of every
   // call so the line-dispatch path doesn't have to thread it manually.
   settingsCollector: SettingsCollectorState;
+  settingsCollectorSessionEpoch: number | null;
 };
+
+export function beginSettingsCollection(refs: DetectedSettingsRefs, sessionEpoch: number): void {
+  refs.settingsCollector = startCollecting();
+  refs.settingsCollectorSessionEpoch = sessionEpoch;
+}
 
 export type DetectedSettingsResult = {
   readonly patch: Partial<DeviceProfile>;
@@ -46,10 +53,17 @@ export type DetectedSettingsResult = {
 export function consumeSettingsResponse(
   refs: DetectedSettingsRefs,
   response: ControllerEvent,
+  sessionEpoch: number,
 ): DetectedSettingsResult | null {
+  if (refs.settingsCollectorSessionEpoch !== sessionEpoch) {
+    refs.settingsCollector = idleCollector();
+    refs.settingsCollectorSessionEpoch = null;
+    return null;
+  }
   const next = collectorOnResponse(refs.settingsCollector, response);
   if (next.kind === 'done') {
     refs.settingsCollector = idleCollector();
+    refs.settingsCollectorSessionEpoch = null;
     if (
       Object.keys(next.patch).length === 0 &&
       Object.keys(next.controllerSettings).length === 0 &&

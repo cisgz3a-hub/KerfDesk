@@ -1,10 +1,10 @@
 import {
   idleCollector,
-  startCollecting,
   type GrblSettingRow,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
+import { beginSettingsCollection } from './detected-settings-action';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -31,6 +31,7 @@ type SettingsWriteFn = (
 export type GrblSettingsActionRefs = ControllerLifecycleRefs & {
   driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
+  settingsCollectorSessionEpoch: number | null;
 };
 
 export function grblSettingsActions(
@@ -57,7 +58,7 @@ async function readMachineSettingsAction(
   }
   const blocked = machineSettingsReadBlockReason(get(), refs);
   if (blocked !== null) return blockRead(set, get, blocked);
-  refs.settingsCollector = startCollecting();
+  beginSettingsCollection(refs, get().controllerSessionEpoch);
   set({
     controllerOperation: {
       kind: 'interactive-command',
@@ -66,6 +67,7 @@ async function readMachineSettingsAction(
     },
     detectedSettings: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
@@ -131,7 +133,7 @@ async function writeAndVerifySetting(
     action: 'console',
     source: 'console',
   });
-  refs.settingsCollector = startCollecting();
+  beginSettingsCollection(refs, get().controllerSessionEpoch);
   set({
     controllerOperation: {
       kind: 'interactive-command',
@@ -140,6 +142,7 @@ async function writeAndVerifySetting(
     },
     detectedSettings: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
@@ -169,6 +172,7 @@ function failSettingsOperation(
   err: unknown,
 ): never {
   refs.settingsCollector = idleCollector();
+  refs.settingsCollectorSessionEpoch = null;
   clearInteractiveOperation(set);
   const message = err instanceof Error ? err.message : String(err);
   set({

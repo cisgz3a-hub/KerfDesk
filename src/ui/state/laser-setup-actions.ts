@@ -1,8 +1,5 @@
-import {
-  CMD_SETTINGS,
-  startCollecting,
-  type SettingsCollectorState,
-} from '../../core/controllers/grbl';
+import { CMD_SETTINGS, type SettingsCollectorState } from '../../core/controllers/grbl';
+import { beginSettingsCollection } from './detected-settings-action';
 import { machineKindOf } from '../../core/scene';
 import type { ControllerDriver } from '../../core/controllers';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
@@ -22,6 +19,7 @@ type WriteLine = (line: string) => Promise<void>;
 export type LaserSetupRefs = {
   driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
+  settingsCollectorSessionEpoch: number | null;
 };
 
 export function setupActions(
@@ -70,7 +68,7 @@ export function setupActions(
       for (const line of GRBL_LASER_SETUP_LINES) {
         await write(`${line}\n`);
       }
-      refs.settingsCollector = startCollecting();
+      beginSettingsCollection(refs, get().controllerSessionEpoch);
       await write(`${CMD_SETTINGS}\n`);
       set({
         log: pushLog(get(), '[lf2] Sent GRBL laser setup ($32=1, $30=1000, $130=400, $131=400).'),
