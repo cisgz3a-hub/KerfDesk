@@ -27,13 +27,19 @@ afterEach(async () => {
 });
 
 describe('NumericEditsBar', () => {
-  it('contains fixed-width fields with local horizontal scrolling', async () => {
+  it('scopes horizontal scrolling to the transform fields so the safety cluster stays pinned', async () => {
     const container = await render(<NumericEditsBar />);
     const toolbar = container.querySelector('section[aria-label="Numeric Edits Toolbar"]');
     expect(toolbar).toBeInstanceOf(HTMLElement);
-    expect((toolbar as HTMLElement).style.overflowX).toBe('auto');
     expect((toolbar as HTMLElement).style.minWidth).toBe('0');
     expect((toolbar as HTMLElement).style.maxWidth).toBe('100%');
+    // The scroll lives on the inner edits group, not the whole bar, so the
+    // job-safety cluster (E-STOP) rendered alongside it can never be scrolled
+    // out of reach on a narrow window.
+    const editsGroup = toolbar?.querySelector(':scope > div');
+    expect(editsGroup).toBeInstanceOf(HTMLElement);
+    expect((editsGroup as HTMLElement).style.overflowX).toBe('auto');
+    expect((editsGroup as HTMLElement).style.minWidth).toBe('0');
   });
 
   it('renders disabled numeric fields when nothing is selected', async () => {
