@@ -57,6 +57,16 @@ describe('Start controller compatibility gate', () => {
       expect(messages).not.toContain(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
     },
   );
+
+  it('removes the mismatch blocker after setup is saved and the matching driver reconnects', () => {
+    const result = prepareStartJob(projectFor('grblhal'), null, {
+      ...readyMachine,
+      activeControllerKind: 'grblhal',
+      detectedControllerKind: 'grblhal',
+    });
+
+    expect(result.ok ? [] : result.messages).not.toContain(CONTROLLER_PROFILE_MISMATCH_MESSAGE);
+  });
 });
 
 function projectFor(controllerKind: NonNullable<Project['device']['controllerKind']>): Project {

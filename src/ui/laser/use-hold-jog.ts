@@ -1,4 +1,10 @@
-import { useEffect, useRef, type MouseEventHandler, type PointerEventHandler } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type MouseEventHandler,
+  type PointerEventHandler,
+} from 'react';
 
 const HOLD_DELAY_MS = 250;
 
@@ -25,23 +31,28 @@ export function useHoldJog(args: {
   const pointerActiveRef = useRef(false);
   const holdActiveRef = useRef(false);
   const suppressClickRef = useRef(false);
+  const argsRef = useRef(args);
+  argsRef.current = args;
 
-  const clearTimer = (): void => {
+  const clearTimer = useCallback((): void => {
     if (timerRef.current !== null) clearTimeout(timerRef.current);
     timerRef.current = null;
-  };
-  const finishPointer = (runStep: boolean): void => {
-    if (!pointerActiveRef.current) return;
-    clearTimer();
-    pointerActiveRef.current = false;
-    suppressClickRef.current = true;
-    if (holdActiveRef.current) {
-      holdActiveRef.current = false;
-      args.onCancel();
-    } else if (runStep) {
-      args.onStep();
-    }
-  };
+  }, []);
+  const finishPointer = useCallback(
+    (runStep: boolean): void => {
+      if (!pointerActiveRef.current) return;
+      clearTimer();
+      pointerActiveRef.current = false;
+      suppressClickRef.current = true;
+      if (holdActiveRef.current) {
+        holdActiveRef.current = false;
+        argsRef.current.onCancel();
+      } else if (runStep) {
+        argsRef.current.onStep();
+      }
+    },
+    [clearTimer],
+  );
 
   useEffect(() => {
     const cancelForBlur = (): void => finishPointer(false);
@@ -50,7 +61,7 @@ export function useHoldJog(args: {
       window.removeEventListener('blur', cancelForBlur);
       finishPointer(false);
     };
-  });
+  }, [finishPointer]);
 
   return {
     onClick: () => {
@@ -70,7 +81,7 @@ export function useHoldJog(args: {
         timerRef.current = null;
         if (!pointerActiveRef.current) return;
         holdActiveRef.current = true;
-        args.onHold();
+        argsRef.current.onHold();
       }, HOLD_DELAY_MS);
     },
     onPointerUp: () => finishPointer(true),

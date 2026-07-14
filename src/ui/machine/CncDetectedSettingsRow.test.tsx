@@ -7,6 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
+import { DEFAULT_CNC_LAYER_SETTINGS, createLayer } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
@@ -76,6 +77,44 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
       expect(useStore.getState().project.device.bedHeight).toBe(610);
       expect(machine.stock.widthMm).toBe(400);
       expect(machine.stock.heightMm).toBe(400);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('applies a lower spindle ceiling and bed as one update, clamping layers and workspace', async () => {
+    const hot = {
+      ...createLayer({ id: 'hot', color: '#ff0000' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 12000 },
+    };
+    useStore.getState().setMachineKind('cnc');
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: { ...state.project.scene, layers: [hot] },
+      },
+    }));
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 10000, bedWidth: 300, bedHeight: 180 },
+    });
+    const { host, root } = await render();
+    try {
+      const button = host.querySelector('button');
+      if (button === null) throw new Error('Apply button missing');
+      await act(async () => button.click());
+
+      const state = useStore.getState();
+      const machine = state.project.machine;
+      if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
+      expect(machine.params.spindleMaxRpm).toBe(10000);
+      expect(state.project.scene.layers[0]?.cnc?.spindleRpm).toBe(10000);
+      expect(state.project.device).toMatchObject({ bedWidth: 300, bedHeight: 180 });
+      expect(state.project.workspace).toMatchObject({ width: 300, height: 180 });
+      expect(state.undoStack).toHaveLength(2); // machine-kind switch + one detected-settings apply
+
+      await act(async () => useStore.getState().undo());
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.spindleRpm).toBe(12000);
     } finally {
       await act(async () => root.unmount());
       host.remove();

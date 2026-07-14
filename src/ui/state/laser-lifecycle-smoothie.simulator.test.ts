@@ -11,6 +11,8 @@ import {
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -44,6 +46,7 @@ afterEach(async () => {
     frameVerification: null,
     homingState: 'unknown',
   });
+  resetStore();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -56,6 +59,7 @@ async function connectSmoothie(
   options: CreateSmoothieSimulatorOptions = {},
 ): Promise<SmoothieSimulator> {
   const sim = createSmoothieSimulator(options);
+  useStore.getState().updateDeviceProfile({ controllerKind: 'smoothieware' });
   await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'smoothieware' });
   await pump(20);
   return sim;

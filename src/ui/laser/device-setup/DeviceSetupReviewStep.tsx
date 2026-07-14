@@ -14,7 +14,7 @@ import {
 export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   // Score against the detected snapshot the draft was seeded from (state.detected),
   // not the live store, so the checklist always reflects what Finish will commit.
-  const readiness = computeSetupReadiness(state.draft, state.detected);
+  const readiness = computeSetupReadiness(state.draft, state.detected, state.machineKind);
   return (
     <section style={sectionStyle}>
       <p style={readiness.ready ? readyStyle : pendingStyle}>
@@ -62,6 +62,7 @@ export function editStepForChecklistItem(item: SetupChecklistItemId): DeviceSetu
       return 'identify';
     case 'bed':
     case 'power-scale':
+    case 'spindle':
       return 'confirm';
     case 'origin':
     case 'homing':

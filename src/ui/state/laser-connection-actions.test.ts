@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -23,6 +24,11 @@ beforeEach(() => {
 afterEach(() => {
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
+    detectedSettings: null,
+    detectedControllerKind: null,
+    controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
     lastWriteError: null,
     safetyNotice: null,
     log: [],
@@ -51,10 +57,24 @@ describe('connect port-picker failures', () => {
   });
 
   it('returns to disconnected when the picker is cancelled', async () => {
+    useLaserStore.setState({
+      detectedSettings: { bedWidth: 999, maxPowerS: 24000 },
+      detectedControllerKind: 'grblhal',
+      controllerSettings: { bedWidth: 999, maxPowerS: 24000 },
+      grblSettingsRows: settingsMapToRows(new Map([[30, '24000']])),
+      lastSettingsReadAt: 1,
+    });
     const adapter = adapterWithRequestPort(async () => null);
 
     await useLaserStore.getState().connect(adapter);
 
-    expect(useLaserStore.getState().connection).toEqual({ kind: 'disconnected' });
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      detectedSettings: null,
+      detectedControllerKind: null,
+      controllerSettings: null,
+      grblSettingsRows: [],
+      lastSettingsReadAt: null,
+    });
   });
 });

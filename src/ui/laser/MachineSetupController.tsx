@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { Button } from '../kit';
+import { CncDetectedSettingsRow } from '../machine/CncDetectedSettingsRow';
+import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -20,16 +22,22 @@ import {
 const COMMON_WRITE_IDS = new Set([30, 31, 32]);
 
 export function ControllerSettingsPanel(): JSX.Element {
+  const machine = useStore((s) => s.project.machine);
   return (
     <div style={stackStyle}>
       <GrblSetupSlot />
       <MachineSettingsPanel />
-      <DetectedSettingsBanner />
+      {machine?.kind === 'cnc' ? (
+        <CncDetectedSettingsRow machine={machine} />
+      ) : (
+        <DetectedSettingsBanner />
+      )}
     </div>
   );
 }
 
 function GrblSetupSlot(): JSX.Element | null {
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const connection = useLaserStore((s) => s.connection);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
@@ -37,7 +45,7 @@ function GrblSetupSlot(): JSX.Element | null {
   const streamer = useLaserStore((s) => s.streamer);
   const firmwareSetupPanel = useLaserStore((s) => s.capabilities.firmwareSetupPanel);
   // ADR-094: the $32/$30 setup sequence only exists on GRBL-dollar firmwares.
-  if (firmwareSetupPanel !== 'grbl-laser') return null;
+  if (machineKind === 'cnc' || firmwareSetupPanel !== 'grbl-laser') return null;
   const disabled =
     connection.kind !== 'connected' ||
     autofocusBusy ||

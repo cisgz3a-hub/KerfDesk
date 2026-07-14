@@ -10,11 +10,13 @@ import {
   type LaserSubProfile,
   type Origin,
 } from '../../../core/devices';
+import type { MachineKind } from '../../../core/scene';
 
 export type SetupChecklistItemId =
   | 'identity'
   | 'bed'
   | 'power-scale'
+  | 'spindle'
   | 'laser-head'
   | 'origin'
   | 'homing';
@@ -46,6 +48,7 @@ const ORIGIN_LABELS: Record<Origin, string> = {
 export function computeSetupReadiness(
   draft: DeviceProfile,
   detected: Partial<DeviceProfile> | null,
+  machineKind: MachineKind = 'laser',
 ): SetupReadiness {
   const patch = detected ?? {};
   // "The operator told us which machine this is" — picking any non-default
@@ -55,13 +58,32 @@ export function computeSetupReadiness(
   const items: ReadonlyArray<SetupChecklistItem> = [
     identityItem(draft),
     bedItem(draft, patch, pickedRealProfile),
-    powerScaleItem(draft, patch, pickedRealProfile),
-    laserHeadItem(draft),
+    ...(machineKind === 'cnc'
+      ? [spindleItem(patch, pickedRealProfile)]
+      : [powerScaleItem(draft, patch, pickedRealProfile), laserHeadItem(draft)]),
     originItem(draft),
     homingItem(draft),
   ];
   const ready = items.every((item) => !item.blocking || item.status === 'confirmed');
   return { items, ready };
+}
+
+function spindleItem(
+  patch: Partial<DeviceProfile>,
+  pickedRealProfile: boolean,
+): SetupChecklistItem {
+  const spindleMaxRpm = patch.maxPowerS;
+  const confirmed = pickedRealProfile || (spindleMaxRpm !== undefined && spindleMaxRpm > 0);
+  return {
+    id: 'spindle',
+    label: 'Spindle maximum ($30)',
+    status: confirmed ? 'confirmed' : 'needs-attention',
+    blocking: true,
+    detail:
+      spindleMaxRpm === undefined
+        ? 'Not reported. Confirm the spindle maximum in CNC Setup.'
+        : `${spindleMaxRpm} RPM`,
+  };
 }
 
 function identityItem(draft: DeviceProfile): SetupChecklistItem {

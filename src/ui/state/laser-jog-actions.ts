@@ -11,7 +11,12 @@ import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-pos
 import { runHomeAction } from './laser-home-action';
 import { markMotionOperationDispatched, startMotionOperation } from './laser-motion-operation';
 import { type LaserSafetyAction } from './laser-safety-notice';
-import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
+import {
+  assertAutofocusIdle,
+  controllerMotionTrustBlockMessage,
+  jogFrameCommandBlockMessage,
+  pushLog,
+} from './laser-store-helpers';
 import { useStore } from './store';
 import { isWorkZEvidenceFreshForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
@@ -39,6 +44,7 @@ export function jogActions(
 ): Pick<LaserState, 'home' | 'jog' | 'jogToMachinePosition' | 'cancelJog' | 'frame'> {
   return {
     home: async () => {
+      assertControllerMotionTrusted(set, get);
       await runHomeAction(set, get, refs, safeWrite, refs.driver);
     },
     jogToMachinePosition: async (x, y, feed) => {
@@ -160,7 +166,23 @@ async function retractToCncSafeZ(
 }
 
 function assertJogFrameReady(set: SetFn, get: GetFn): void {
-  const blockedMessage = jogFrameCommandBlockMessage(get());
+  const blockedMessage = jogFrameCommandBlockMessage(
+    get(),
+    useStore.getState().project.device.controllerKind,
+  );
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}
+
+function assertControllerMotionTrusted(set: SetFn, get: GetFn): void {
+  const blockedMessage = controllerMotionTrustBlockMessage(
+    get(),
+    useStore.getState().project.device.controllerKind,
+  );
   if (blockedMessage === null) return;
   set({
     lastWriteError: blockedMessage,

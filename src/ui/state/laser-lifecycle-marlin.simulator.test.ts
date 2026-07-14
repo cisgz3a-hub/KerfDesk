@@ -10,6 +10,8 @@ import {
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -43,6 +45,7 @@ afterEach(async () => {
     frameVerification: null,
     homingState: 'unknown',
   });
+  resetStore();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -53,6 +56,7 @@ async function pump(ms = 10): Promise<void> {
 
 async function connectMarlin(options: CreateMarlinSimulatorOptions = {}): Promise<MarlinSimulator> {
   const sim = createMarlinSimulator(options);
+  useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
   await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'marlin' });
   await pump(20); // `start` banner → handshake (no settings query on Marlin)
   return sim;

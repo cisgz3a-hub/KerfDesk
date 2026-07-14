@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -81,6 +83,7 @@ afterEach(async () => {
     frameVerification: null,
     homingState: 'unknown',
   });
+  resetStore();
   vi.restoreAllMocks();
 });
 
@@ -213,6 +216,7 @@ describe('untracked-ack start guard', () => {
 // ack early and the last stop-cleanup ok phantom-advances the next job.
 describe('stop-path ack attribution', () => {
   async function connectMarlinWith(connection: FakeConnection): Promise<void> {
+    useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
     await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'marlin' });
     connection.emitLine('start');
     await flush();

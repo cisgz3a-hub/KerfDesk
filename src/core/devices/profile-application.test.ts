@@ -67,4 +67,41 @@ describe('profileWithControllerFactsResult', () => {
     expect(result.profile.rxBufferBytes).toBe(64);
     expect(result.corrections).toEqual([]);
   });
+
+  it('does not copy laser-only controller facts into a CNC device profile', () => {
+    const selected: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      maxPowerS: 1000,
+      minPowerS: 0,
+      laserModeEnabled: false,
+    };
+    const cncFacts = {
+      profile: selected,
+      current: {
+        ...DEFAULT_DEVICE_PROFILE,
+        maxPowerS: 12000,
+        minPowerS: 40,
+        laserModeEnabled: true,
+      },
+      detectedSettings: {
+        maxPowerS: 24000,
+        minPowerS: 80,
+        laserModeEnabled: true,
+      },
+      controllerSettings: {
+        maxPowerS: 18000,
+        minPowerS: 60,
+        laserModeEnabled: true,
+      },
+      detectedControllerKind: 'grblhal' as const,
+      lastSettingsReadAt: 1,
+      machineKind: 'cnc' as const,
+    };
+
+    const result = profileWithControllerFactsResult(cncFacts);
+
+    expect(result.profile.maxPowerS).toBe(selected.maxPowerS);
+    expect(result.profile.minPowerS).toBe(selected.minPowerS);
+    expect(result.profile.laserModeEnabled).toBe(selected.laserModeEnabled);
+  });
 });

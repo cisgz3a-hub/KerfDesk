@@ -42,6 +42,9 @@ type SafeWriteFn = (
 // 250 ms tick; idle machines only emit a status query every 4th tick.
 const STATUS_POLL_MS = 250;
 const IDLE_POLL_DIVISOR = 4;
+const PASSIVE_STARTUP_WAIT_MS = 250;
+const ACTIVE_HANDSHAKE_WAIT_MS = 1750;
+const LATE_BANNER_SETTLE_MS = 300;
 
 export function connectionActions(
   set: SetFn,
@@ -59,27 +62,7 @@ export function connectionActions(
       refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
       refs.nextTranscriptId = 1;
       refs.driver = selectControllerDriver(options.controllerKind);
-      set((state) => ({
-        connection: { kind: 'connecting' },
-        controllerSessionEpoch: state.controllerSessionEpoch + 1,
-        statusObservation: null,
-        controllerSettings: null,
-        controllerSettingsObservation: null,
-        homingProof: null,
-        controllerOperation: null,
-        probeBusy: false,
-        log: [],
-        transcript: [],
-        homingState: 'unknown',
-        trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-        workZReferenceEpoch: state.workZReferenceEpoch + 1,
-        workZZeroEvidence: null,
-        capabilities: refs.driver.capabilities,
-        activeControllerKind: refs.driver.kind,
-        detectedControllerKind: null,
-        mpgActive: null,
-        unexpectedTerminalResponse: null,
-      }));
+      set((state) => connectingStatePatch(state, refs));
       try {
         // Inside the try: requestPort throws on browsers without Web Serial
         // (TypeError) and on Chromium policy/concurrency errors. Thrown
@@ -106,7 +89,6 @@ export function connectionActions(
           teardown(refs);
           set(buildPortClosePatch);
         });
-        startStatusPolling(set, get, refs, safeWrite);
         set({
           connection: { kind: 'connected' },
           alarmCode: null,
@@ -121,7 +103,11 @@ export function connectionActions(
           pendingTransportWrites: 0,
           unexpectedTerminalResponse: null,
         });
-        void runHandshake(set, get, refs, safeWrite, baudRate).catch(() => undefined);
+        void runHandshake(set, get, refs, safeWrite, baudRate)
+          .catch(() => undefined)
+          .finally(() => {
+            if (refs.connection === conn) startStatusPolling(set, get, refs, safeWrite);
+          });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         set({ connection: { kind: 'failed', error: message } });
@@ -129,6 +115,33 @@ export function connectionActions(
     },
     disconnect: () => runDisconnect(set, get, refs, safeWrite, false),
     forgetDevice: () => runDisconnect(set, get, refs, safeWrite, true),
+  };
+}
+
+function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserState> {
+  return {
+    connection: { kind: 'connecting' },
+    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    statusObservation: null,
+    detectedSettings: null,
+    controllerSettings: null,
+    controllerSettingsObservation: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
+    homingProof: null,
+    controllerOperation: null,
+    probeBusy: false,
+    log: [],
+    transcript: [],
+    homingState: 'unknown',
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    workZZeroEvidence: null,
+    capabilities: refs.driver.capabilities,
+    activeControllerKind: refs.driver.kind,
+    detectedControllerKind: null,
+    mpgActive: null,
+    unexpectedTerminalResponse: null,
   };
 }
 
@@ -164,6 +177,8 @@ async function runDisconnect(
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
+    detectedSettings: null,
+    detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
     grblSettingsRows: [],
@@ -193,28 +208,27 @@ async function runDisconnect(
   }));
 }
 
-// Wait up to 2 s after connect for ANY controller line; when one arrives,
-// harvest the settings dump (if this firmware has one). Event-driven via the
-// onLineArrived one-shot rather than polling (R-L2 audit finding).
+// Establish a quiet startup boundary before sending the queued settings query.
+// A status poll used to trigger `$$` immediately; a delayed welcome banner could
+// then reset the ack ledger before the query's `ok`, falsely reporting that
+// reply as unowned on the next jog. Wait briefly for a passive banner, use only
+// a realtime status probe when needed, and give a non-banner first line one
+// final settle window before any ack-producing command is sent.
 async function runHandshake(
   set: SetFn,
   get: GetFn,
-  refs: HandlerRefs,
+  refs: LiveRefs,
   safeWrite: (line: string) => Promise<void>,
   baudRate: number,
 ): Promise<void> {
-  const HANDSHAKE_TIMEOUT_MS = 2000;
-  const gotLine = await new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => {
-      refs.onLineArrived = null;
-      resolve(false);
-    }, HANDSHAKE_TIMEOUT_MS);
-    refs.onLineArrived = (): void => {
-      clearTimeout(timer);
-      refs.onLineArrived = null;
-      resolve(true);
-    };
-  });
+  const startingWriteEpoch = refs.writeEpoch ?? 0;
+  let gotLine = await waitForNextControllerLine(refs, PASSIVE_STARTUP_WAIT_MS);
+  if (!gotLine) {
+    const realtimeQuery = refs.driver.realtime.statusQuery;
+    const nextLine = waitForNextControllerLine(refs, ACTIVE_HANDSHAKE_WAIT_MS);
+    if (realtimeQuery !== null) await safeWrite(realtimeQuery);
+    gotLine = await nextLine;
+  }
 
   if (!gotLine) {
     const driver = refs.driver;
@@ -227,6 +241,10 @@ async function runHandshake(
     );
     return;
   }
+  if ((refs.writeEpoch ?? 0) === startingWriteEpoch) {
+    await new Promise<void>((resolve) => setTimeout(resolve, LATE_BANNER_SETTLE_MS));
+  }
+  if (refs.connection === null) return;
   const settingsQuery = refs.driver.commands.settingsQuery;
   if (settingsQuery === null) {
     set({ log: pushLog(get(), '[lf2] Connected.') });
@@ -242,6 +260,20 @@ async function runHandshake(
   });
   beginSettingsCollection(refs, get().controllerSessionEpoch);
   await safeWrite(`${settingsQuery}\n`);
+}
+
+function waitForNextControllerLine(refs: HandlerRefs, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      refs.onLineArrived = null;
+      resolve(false);
+    }, timeoutMs);
+    refs.onLineArrived = (): void => {
+      clearTimeout(timer);
+      refs.onLineArrived = null;
+      resolve(true);
+    };
+  });
 }
 
 function teardown(refs: LiveRefs): void {
@@ -287,11 +319,16 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     // ok would resolve the wrong request). A 'done' stream with nothing in
     // flight DOES poll — the post-job settle needs Idle reports to finish.
     if (queuedQuery === null) return;
-    if (hasUnsettledStreamAcks(s.streamer)) return;
-    if (refs.controllerCommand !== null) return;
-    if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
+    if (!canSendQueuedStatusQuery(s, refs, pollTick)) return;
     void safeWrite(`${queuedQuery}\n`).catch(() => undefined);
   }, STATUS_POLL_MS);
+}
+
+function canSendQueuedStatusQuery(state: LaserState, refs: LiveRefs, pollTick: number): boolean {
+  if (hasUnsettledStreamAcks(state.streamer)) return false;
+  if (state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0) return false;
+  if (refs.controllerCommand !== null) return false;
+  return shouldFastPoll(state) || pollTick % IDLE_POLL_DIVISOR === 0;
 }
 
 function shouldFastPoll(state: LaserState): boolean {

@@ -129,6 +129,36 @@ describe('laser-store motion operation disconnect safety', () => {
 });
 
 describe('laser-store motion operation lifecycle', () => {
+  it('does not write another jog after terminal ownership is lost', async () => {
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    useLaserStore.setState({
+      unexpectedTerminalResponse: { kind: 'ok', raw: 'ok', observedAt: 1 },
+    });
+    write.mockClear();
+
+    await expect(useLaserStore.getState().jog({ dx: 10, feed: 1000 })).rejects.toThrow(
+      /no KerfDesk command owns/i,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('does not write a jog until a detected firmware mismatch is applied and reconnected', async () => {
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    useLaserStore.setState({ detectedControllerKind: 'grblhal' });
+    write.mockClear();
+
+    await expect(useLaserStore.getState().jog({ dx: 10, feed: 1000 })).rejects.toThrow(
+      /does not match the active machine profile/i,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('keeps Jog busy until GRBL reports motion and returns to Idle', async () => {
     const write = vi.fn(async () => undefined);
     const connection = makeConnection(write);

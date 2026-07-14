@@ -3,6 +3,7 @@ import {
   type ControllerProfileCorrection,
 } from './controller-profile-compatibility';
 import type { DeviceProfile } from './device-profile';
+import type { MachineKind } from '../scene';
 
 export type ProfileControllerFactMergeInput = {
   readonly profile: DeviceProfile;
@@ -11,6 +12,7 @@ export type ProfileControllerFactMergeInput = {
   readonly controllerSettings: Partial<DeviceProfile> | null;
   readonly detectedControllerKind: DeviceProfile['controllerKind'] | null;
   readonly lastSettingsReadAt: number | null;
+  readonly machineKind?: MachineKind;
 };
 
 export type ProfileControllerFactMergeResult = {
@@ -31,9 +33,11 @@ export function profileWithControllerFactsResult(
     args.profile.framingFeedMmPerMin,
   );
   const machinePatch = {
-    ...(controllerRead ? machineReportedProfilePatch(args.current) : {}),
-    ...(controllerRead ? machineReportedProfilePatch(args.controllerSettings) : {}),
-    ...(controllerRead ? machineReportedProfilePatch(args.detectedSettings) : {}),
+    ...(controllerRead ? machineReportedProfilePatch(args.current, args.machineKind) : {}),
+    ...(controllerRead
+      ? machineReportedProfilePatch(args.controllerSettings, args.machineKind)
+      : {}),
+    ...(controllerRead ? machineReportedProfilePatch(args.detectedSettings, args.machineKind) : {}),
   };
   const controllerKind =
     args.detectedControllerKind ?? (controllerRead ? args.current.controllerKind : undefined);
@@ -47,19 +51,30 @@ export function profileWithControllerFactsResult(
 
 function machineReportedProfilePatch(
   source: Partial<DeviceProfile> | null,
+  machineKind: MachineKind = 'laser',
 ): Partial<DeviceProfile> {
   if (source === null) return {};
   return {
     ...(source.bedWidth === undefined ? {} : { bedWidth: source.bedWidth }),
     ...(source.bedHeight === undefined ? {} : { bedHeight: source.bedHeight }),
     ...(source.maxFeed === undefined ? {} : { maxFeed: source.maxFeed }),
-    ...(source.maxPowerS === undefined ? {} : { maxPowerS: source.maxPowerS }),
-    ...(source.minPowerS === undefined ? {} : { minPowerS: source.minPowerS }),
-    ...(source.laserModeEnabled === undefined ? {} : { laserModeEnabled: source.laserModeEnabled }),
+    ...laserReportedProfilePatch(source, machineKind),
     ...(source.accelMmPerSec2 === undefined ? {} : { accelMmPerSec2: source.accelMmPerSec2 }),
     ...(source.junctionDeviationMm === undefined
       ? {}
       : { junctionDeviationMm: source.junctionDeviationMm }),
     ...(source.zTravelMm === undefined ? {} : { zTravelMm: source.zTravelMm }),
+  };
+}
+
+function laserReportedProfilePatch(
+  source: Partial<DeviceProfile>,
+  machineKind: MachineKind,
+): Partial<DeviceProfile> {
+  if (machineKind === 'cnc') return {};
+  return {
+    ...(source.maxPowerS === undefined ? {} : { maxPowerS: source.maxPowerS }),
+    ...(source.minPowerS === undefined ? {} : { minPowerS: source.minPowerS }),
+    ...(source.laserModeEnabled === undefined ? {} : { laserModeEnabled: source.laserModeEnabled }),
   };
 }

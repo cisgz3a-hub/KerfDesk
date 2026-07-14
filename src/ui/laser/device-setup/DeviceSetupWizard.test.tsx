@@ -70,6 +70,7 @@ afterEach(() => {
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     detectedSettings: null,
+    detectedControllerKind: null,
     statusReport: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,

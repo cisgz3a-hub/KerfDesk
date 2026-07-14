@@ -1,10 +1,14 @@
 import {
+  controllerCompatibleProfile,
   suggestMachineProfiles,
   profileConfidenceLabel,
   profileWithControllerFactsResult,
   controllerProfilesAreCompatible,
+  type ControllerKind,
+  type DeviceProfile,
   type MachineProfileSuggestion,
 } from '../../core/devices';
+import { machineKindOf } from '../../core/scene';
 import { Button } from '../kit';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -62,13 +66,32 @@ export function OverviewPanel(): JSX.Element {
           </dd>
         </dl>
         {mismatch ? (
-          <p role="alert" style={warningStyle}>
+          <div role="alert" style={warningStyle}>
             Controller mismatch. Apply the detected firmware profile, then disconnect and reconnect.
-          </p>
+            <DetectedFirmwareApplyButton device={device} controllerKind={detectedControllerKind} />
+          </div>
         ) : null}
       </section>
       <DeviceSettings />
     </div>
+  );
+}
+
+function DetectedFirmwareApplyButton(props: {
+  readonly device: DeviceProfile;
+  readonly controllerKind: ControllerKind | null;
+}): JSX.Element | null {
+  const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
+  const controllerKind = props.controllerKind;
+  if (controllerKind === null) return null;
+  return (
+    <Button
+      onClick={() =>
+        replaceDeviceProfile(controllerCompatibleProfile(props.device, controllerKind).profile)
+      }
+    >
+      Apply detected firmware
+    </Button>
   );
 }
 
@@ -99,6 +122,7 @@ function CatalogCard({
 }): JSX.Element {
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const current = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const detectedSettings = useLaserStore((s) => s.detectedSettings);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
@@ -107,22 +131,24 @@ function CatalogCard({
   const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
   const activeId = useStore((s) => s.project.device.profileId);
   const profile = suggestion.profile;
-  const active = activeId === profile.profileId;
   const knownControllerKind =
     detectedControllerKind ??
     (connectionKind === 'connected' && lastSettingsReadAt !== null ? activeControllerKind : null);
-  const controllerMismatch = !controllerProfilesAreCompatible(
-    profile.controllerKind,
-    knownControllerKind,
-  );
   const application = profileWithControllerFactsResult({
     profile,
     current,
     detectedSettings,
     controllerSettings,
-    detectedControllerKind,
+    detectedControllerKind: knownControllerKind,
     lastSettingsReadAt,
+    machineKind,
   });
+  const active =
+    activeId === profile.profileId && runtimeProfileMatches(current, application.profile);
+  const controllerMismatch = !controllerProfilesAreCompatible(
+    application.profile.controllerKind,
+    knownControllerKind,
+  );
   const applyProfile = (): void => {
     replaceDeviceProfile(application.profile);
   };
@@ -164,6 +190,15 @@ function CatalogCard({
         onApply={applyProfile}
       />
     </article>
+  );
+}
+
+function runtimeProfileMatches(current: DeviceProfile, next: DeviceProfile): boolean {
+  return (
+    current.controllerKind === next.controllerKind &&
+    current.streamingMode === next.streamingMode &&
+    current.rxBufferBytes === next.rxBufferBytes &&
+    current.gcodeDialect.dialectId === next.gcodeDialect.dialectId
   );
 }
 

@@ -3,8 +3,10 @@ import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../../core/device
 import { deviceProfileSignature, shouldPromptDeviceSetup } from './device-setup-nudge';
 
 describe('deviceProfileSignature', () => {
-  it('keys on profile id and bed dimensions', () => {
-    expect(deviceProfileSignature(DEFAULT_DEVICE_PROFILE)).toBe('generic-grbl-400x400:400x400');
+  it('keys on profile id, bed dimensions, and controller kind', () => {
+    expect(deviceProfileSignature(DEFAULT_DEVICE_PROFILE)).toBe(
+      'generic-grbl-400x400:400x400:grbl-v1.1',
+    );
   });
 
   it('changes when the bed changes', () => {
@@ -18,7 +20,13 @@ describe('deviceProfileSignature', () => {
     const { profileId: _omit, ...rest } = DEFAULT_DEVICE_PROFILE;
     void _omit;
     const named: DeviceProfile = { ...rest, name: 'Bench Laser' };
-    expect(deviceProfileSignature(named)).toBe('Bench Laser:400x400');
+    expect(deviceProfileSignature(named)).toBe('Bench Laser:400x400:grbl-v1.1');
+  });
+
+  it('changes when the controller kind changes', () => {
+    expect(
+      deviceProfileSignature({ ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grblhal' }),
+    ).not.toBe(deviceProfileSignature(DEFAULT_DEVICE_PROFILE));
   });
 });
 

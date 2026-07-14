@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { profileWithControllerFacts, type DeviceProfile } from '../../core/devices';
+import { machineKindOf } from '../../core/scene';
 import {
   MACHINE_PROFILE_FORMAT,
   MACHINE_PROFILE_SCHEMA_VERSION,
@@ -32,6 +33,7 @@ type ImportReview =
 export function ImportExportPanel(): JSX.Element {
   const platform = usePlatform();
   const device = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const detectedSettings = useLaserStore((s) => s.detectedSettings);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
@@ -97,6 +99,7 @@ export function ImportExportPanel(): JSX.Element {
                 controllerSettings,
                 detectedControllerKind,
                 lastSettingsReadAt,
+                machineKind,
               }),
             );
             setReview(null);
