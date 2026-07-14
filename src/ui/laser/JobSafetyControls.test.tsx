@@ -32,7 +32,13 @@ function buttonByText(host: HTMLElement, text: string): HTMLButtonElement | unde
 }
 
 afterEach(() => {
-  useLaserStore.setState({ streamer: null, activeJobMachineKind: null, ...realActions });
+  useLaserStore.setState({
+    streamer: null,
+    controllerOperation: null,
+    motionOperation: null,
+    activeJobMachineKind: null,
+    ...realActions,
+  });
   document.body.innerHTML = '';
 });
 
@@ -83,8 +89,51 @@ describe('JobSafetyControls', () => {
     }
   });
 
-  it('renders nothing when no job is active', async () => {
-    useLaserStore.setState({ streamer: null });
+  it('shows E-STOP (no Pause/Resume) during an in-flight probe so a probe cycle can be killed (G41)', async () => {
+    const stopJob = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      streamer: null,
+      controllerOperation: {
+        kind: 'probe',
+        phase: 'sequence',
+        idleReports: 0,
+        transactionId: 1,
+        affectsXy: true,
+      },
+      stopJob,
+    });
+    const { host, root } = await renderControls();
+    try {
+      expect(buttonByText(host, 'Pause')).toBeUndefined();
+      expect(buttonByText(host, 'Resume')).toBeUndefined();
+      await act(async () => buttonByText(host, 'E-STOP')?.click());
+      expect(stopJob).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('shows E-STOP during a jog/frame motion operation (F63/F86)', async () => {
+    useLaserStore.setState({
+      streamer: null,
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: false,
+        pendingLines: [],
+      },
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, root } = await renderControls();
+    try {
+      expect(buttonByText(host, 'E-STOP')).toBeDefined();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('renders nothing when nothing is moving', async () => {
+    useLaserStore.setState({ streamer: null, controllerOperation: null, motionOperation: null });
     const { host, root } = await renderControls();
     try {
       expect(host.querySelector('button')).toBeNull();

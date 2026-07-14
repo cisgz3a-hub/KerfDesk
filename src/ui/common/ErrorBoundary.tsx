@@ -20,7 +20,19 @@
 
 import { Component, useState, type ReactNode } from 'react';
 
-type Props = { readonly children: ReactNode };
+// A generic emergency-stop hook the app root wires to the machine store. A render
+// crash swaps the whole App (and its Stop button + Ctrl+. listener) for the crash
+// screen, so without this a mid-job / mid-probe crash would leave NO software way
+// to halt motion (F60/F65). Kept domain-agnostic so this common boundary stays
+// decoupled from the laser store.
+export type EmergencyStop = {
+  // Evaluated when the crash screen renders — was the machine actually moving?
+  readonly isMotionLive: () => boolean;
+  // Kill motion (GRBL soft reset). Reads live state at call time.
+  readonly trigger: () => void;
+};
+
+type Props = { readonly children: ReactNode; readonly emergencyStop?: EmergencyStop };
 type State =
   | { readonly kind: 'ok' }
   | { readonly kind: 'crashed'; readonly error: Error; readonly when: number };
@@ -45,7 +57,12 @@ export class ErrorBoundary extends Component<Props, State> {
   override render(): ReactNode {
     if (this.state.kind === 'crashed') {
       return (
-        <CrashScreen error={this.state.error} when={this.state.when} onRetry={this.handleRetry} />
+        <CrashScreen
+          error={this.state.error}
+          when={this.state.when}
+          onRetry={this.handleRetry}
+          emergencyStop={this.props.emergencyStop}
+        />
       );
     }
     return this.props.children;
@@ -56,8 +73,12 @@ function CrashScreen(props: {
   readonly error: Error;
   readonly when: number;
   readonly onRetry: () => void;
+  readonly emergencyStop: EmergencyStop | undefined;
 }): JSX.Element {
   const blob = buildDiagnostic(props.error, props.when);
+  // Only offer the kill control if the machine was actually moving when the crash
+  // hit — a soft reset when idle would needlessly void the work origin.
+  const showEmergencyStop = props.emergencyStop?.isMotionLive() === true;
   // 'manual' renders a select-all textarea instead of any native dialog. A
   // blocking window.prompt would suspend the renderer — fatal if the crash
   // happened mid-job, when the ack pump and Stop must stay alive (H13).
@@ -80,6 +101,17 @@ function CrashScreen(props: {
       <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
       <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
       <div style={actionsStyle}>
+        {showEmergencyStop && (
+          <button
+            type="button"
+            className="lf-btn lf-btn--danger"
+            style={estopStyle}
+            onClick={() => props.emergencyStop?.trigger()}
+            title="Emergency stop: soft-reset the controller and force the beam or spindle off. The interface crashed but the machine may still be moving."
+          >
+            E-STOP
+          </button>
+        )}
         <button
           type="button"
           onClick={handleCopy}
@@ -125,6 +157,11 @@ function buildDiagnostic(err: Error, when: number): string {
   );
 }
 
+const estopStyle: React.CSSProperties = {
+  fontWeight: 800,
+  letterSpacing: 0.5,
+  paddingInline: 16,
+};
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   inset: 0,

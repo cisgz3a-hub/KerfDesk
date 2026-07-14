@@ -8,7 +8,9 @@ import { createRoot } from 'react-dom/client';
 import { isElectronRenderer } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
-import { ErrorBoundary } from '../common/ErrorBoundary';
+import { ErrorBoundary, type EmergencyStop } from '../common/ErrorBoundary';
+import { isActiveJob } from '../state/laser-store-helpers';
+import { useLaserStore } from '../state/laser-store';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
 import '../theme/tokens.css';
@@ -26,9 +28,30 @@ const adapter: PlatformAdapter = isElectronRenderer()
   ? { ...webAdapter, id: 'electron' }
   : webAdapter;
 
+// If a render crash unmounts the App (and its Stop button + Ctrl+. listener),
+// the crash screen still needs a way to halt live motion (F60/F65). Both
+// closures read the store at call time, so they reflect the machine's real state
+// at the moment of the crash / click.
+const emergencyStop: EmergencyStop = {
+  isMotionLive: () => {
+    const s = useLaserStore.getState();
+    return (
+      isActiveJob(s.streamer) ||
+      s.controllerOperation !== null ||
+      s.motionOperation !== null ||
+      s.fireActive
+    );
+  },
+  trigger: () =>
+    void useLaserStore
+      .getState()
+      .stopJob()
+      .catch(() => undefined),
+};
+
 createRoot(rootElement).render(
   <StrictMode>
-    <ErrorBoundary>
+    <ErrorBoundary emergencyStop={emergencyStop}>
       <PlatformProvider adapter={adapter}>
         <App />
       </PlatformProvider>

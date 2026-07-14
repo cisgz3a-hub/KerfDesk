@@ -1,9 +1,14 @@
 // JobSafetyControls — prominent Pause / Resume / Emergency-Stop cluster pinned
-// to the top Numeric Edits bar while a job is active, so the operator can hold
-// or kill motion without hunting through the machine rail for the Stop button.
-// Wires the same store actions as the in-rail RunningControls (pauseJob /
-// resumeJob / stopJob); E-STOP is a GRBL soft reset (Ctrl-X) that also forces
-// the beam or spindle off. Renders nothing unless a job is active.
+// to the top Numeric Edits bar during ANY live machine motion, so the operator
+// can hold or kill it without hunting through the machine rail (which can be
+// collapsed, F12-hidden, or unmounted by a tab switch). E-STOP is a GRBL soft
+// reset (Ctrl-X) that aborts the job, probe, home, jog, or frame and forces the
+// beam/spindle off — the one control that must always be reachable. Pause/Resume
+// only apply to a streaming job. Renders nothing when nothing is moving.
+//
+// This covers not just streaming jobs but an in-flight probe/home
+// (controllerOperation) and jog/frame (motionOperation) — a probe cycle
+// previously had no software stop at all (G41/F63/F86).
 
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -17,11 +22,17 @@ const RESUME_TITLE = 'Release the feed hold and continue the job.';
 
 export function JobSafetyControls(): JSX.Element | null {
   const streamer = useLaserStore((s) => s.streamer);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
+  const motionOperation = useLaserStore((s) => s.motionOperation);
   const pauseJob = useLaserStore((s) => s.pauseJob);
   const resumeJob = useLaserStore((s) => s.resumeJob);
   const stopJob = useLaserStore((s) => s.stopJob);
   const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
-  if (!isActiveJob(streamer)) return null;
+  // Any live motion — a streaming/held job, a probe/home controller operation,
+  // or a jog/frame — must expose the E-STOP here.
+  const liveMotion =
+    isActiveJob(streamer) || controllerOperation !== null || motionOperation !== null;
+  if (!liveMotion) return null;
   // Resume honours the same CNC recovery gate as the in-rail control: a router
   // job that lost proof the spindle kept turning must not silently resume.
   const resumeBlockMessage = cncResumeBlockMessage(activeJobMachineKind);
