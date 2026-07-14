@@ -5,8 +5,10 @@
 // Capability-aware per ADR-098: Marlin-class firmwares pause stream-side
 // (no realtime feed hold) and may lack jog cancel — the copy says so.
 
+import type { MachineKind } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
 import { toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
+import { cncPauseMessage, cncResumeBlockMessage } from '../state/cnc-pause-resume-policy';
 import { rowStyle, runningSafetyStyle, stopBtnStyle } from './JobControls.styles';
 import { OverrideControls } from './OverrideControls';
 
@@ -33,9 +35,17 @@ export function RunningControls(props: {
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const pendingToolLabel = useLaserStore((s) => s.pendingToolLabel);
+  const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
-  const pauseMessage = hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;
-  const safetyMessage = props.isToolChange ? toolChangeMessage(pendingToolLabel) : pauseMessage;
+  const resumeBlockMessage = cncResumeBlockMessage(activeJobMachineKind);
+  const pauseMessage = pauseControlMessage(activeJobMachineKind, hasRealtimePause);
+  const safetyMessage = runningSafetyMessage({
+    isToolChange: props.isToolChange,
+    isPaused: props.isPaused,
+    pendingToolLabel,
+    pauseMessage,
+    resumeBlockMessage,
+  });
   return (
     <>
       <div style={rowStyle}>
@@ -52,11 +62,8 @@ export function RunningControls(props: {
           <button
             type="button"
             onClick={() => void resumeJob().catch(() => undefined)}
-            title={
-              hasRealtimePause
-                ? 'Release the feed hold and continue the job'
-                : 'Continue sending the remaining job lines'
-            }
+            disabled={resumeBlockMessage !== null}
+            title={resumeControlTitle(resumeBlockMessage, hasRealtimePause)}
           >
             Resume
           </button>
@@ -92,6 +99,32 @@ export function RunningControls(props: {
       {shouldShowOverrides(props.isStreaming, props.isPaused, hasOverrides) && <OverrideControls />}
     </>
   );
+}
+
+function pauseControlMessage(machineKind: MachineKind | null, hasRealtimePause: boolean): string {
+  return (
+    cncPauseMessage(machineKind) ??
+    (hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE)
+  );
+}
+
+function runningSafetyMessage(options: {
+  readonly isToolChange: boolean;
+  readonly isPaused: boolean;
+  readonly pendingToolLabel: string | null;
+  readonly pauseMessage: string;
+  readonly resumeBlockMessage: string | null;
+}): string {
+  if (options.isToolChange) return toolChangeMessage(options.pendingToolLabel);
+  if (options.isPaused && options.resumeBlockMessage !== null) return options.resumeBlockMessage;
+  return options.pauseMessage;
+}
+
+function resumeControlTitle(blockMessage: string | null, hasRealtimePause: boolean): string {
+  if (blockMessage !== null) return blockMessage;
+  return hasRealtimePause
+    ? 'Release the feed hold and continue the job'
+    : 'Continue sending the remaining job lines';
 }
 
 // Overrides are only meaningful while the controller is consuming motion AND its

@@ -7339,3 +7339,53 @@ second serial/network sender, PLC, or firmware macro can mutate state after any 
 no transaction that atomically couples a status report to the following job bytes. Those concurrent
 external mutations remain outside KerfDesk's single-sender contract and require a controller/VFD
 interlock or machine-specific supervisory protocol.
+
+---
+
+## ADR-180 - Generic same-session CNC Resume is manual-recovery-only
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+KerfDesk already refuses CNC checkpoint and start-from-line recovery, but its
+ordinary Pause/Resume path still treated a router like a laser stream: Pause
+sent GRBL realtime feed hold (`!`), then Resume immediately sent cycle start
+(`~`) and refilled the stream. GRBL normally keeps a spindle commanded during
+feed hold, but KerfDesk did not prove that the controller reached a settled
+hold or that the spindle remained running. A safety-door transition,
+spindle-stop override, VFD fault, pendant, WebUI, PLC, or other sender can stop
+the cutter while it remains engaged. Blind cycle start can then feed a
+stationary cutter.
+
+An `A:`/`FS:` status snapshot is not enough to repair the generic path. It
+reports controller-commanded state at one instant, not uninterrupted physical
+rotation, VFD health, coolant flow, or exclusive ownership. A newline queue
+fence is also invalid during a paused stream because outstanding job lines and
+terminal responses already own that ordered channel.
+
+### Decision
+
+- Pause remains available for CNC and sends the controller's realtime hold.
+  Its copy now warns that continuation requires Stop and supervised recovery.
+- Generic CNC Resume is disabled in the UI and independently rejected in the
+  store before `~` or any stream refill. The paused streamer remains intact so
+  Stop stays available.
+- KerfDesk does not auto-start/orient the spindle or guess a retract direction
+  while cutter engagement is unknown. The operator must inspect and clear the
+  cutter using a machine-specific procedure, then run a newly reviewed job.
+- Laser/non-CNC same-session Resume is unchanged.
+- A future CNC opt-in requires an explicit machine-profile policy, exclusive
+  control of every mutating path, controller-visible safety/VFD faults, and an
+  ack-neutral realtime-status arbiter. It must prove stable settled Hold state
+  and unchanged session/setup/spindle evidence before sending cycle start. No
+  current profile is silently opted in.
+
+### Consequences
+
+An operator can still stop feed promptly with Pause, but cannot continue a
+generic router job with one click. This trades machining time for a fail-closed
+engagement boundary and removes the stationary-cutter failure described by the
+maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
+remain a separate, fault-injected implementation rather than an inference from
+legacy GRBL telemetry.

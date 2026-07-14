@@ -667,13 +667,19 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Exempt — CNC / router jobs
 1. A CNC (router) job pauses with `!` without the `$32` proof: feed hold with a spinning spindle is standard sender behavior, and a router runs `$32=0`. Demanding the laser proof would block CNC pause outright.
+2. The pause warning states that generic CNC continuation is not available; Pause is a controlled halt that routes to Stop and supervised manual recovery.
 
 #### Degraded — controller with no realtime hold (e.g. Marlin)
 1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console notes `This controller has no realtime feed hold. Pause is stream-side only… Use Stop for an immediate halt.`
 
-#### Success — resume
+#### Success — laser / non-CNC resume
 1. User clicks **Resume**. App writes real-time `~`.
 2. Streamer resumes; more bytes flow.
+
+#### Blocked — generic CNC resume
+1. The CNC **Resume** button remains visible but disabled, while **Stop** remains available.
+2. The store independently refuses CNC Resume before writing `~` or refilling the stream because a GRBL status snapshot cannot prove that the physical spindle stayed turning while the cutter may be engaged.
+3. The operator must Stop, inspect and clear the cutter using a machine-specific procedure, and start a newly reviewed recovery job.
 
 ### F-B8. Stop
 
@@ -2613,8 +2619,8 @@ F-CNC19 tiling.
    spindle (`A:C`), flood (`A:F`), and mist (`A:M`) into a cache that survives
    status frames where the intermittent field is absent.
 2. An `Ov:` report without `A:` is the protocol-backed all-off observation.
-   CNC Start and CNC resume proceed past this gate only when that fresh cache
-   contains no active accessory; other readiness gates still apply.
+   CNC Start proceeds past this gate only when that fresh cache contains no
+   active accessory; generic CNC Resume is disabled by F-CNC41.
 3. When a CNC controller is otherwise idle but reports an active accessory,
    the job panel names every active channel and offers **Stop spindle & coolant**.
    After the operator confirms the cutter is clear of material and stopping is
@@ -2659,6 +2665,32 @@ F-CNC19 tiling.
    job. GRBL cannot atomically bind a status observation to the next program
    bytes, so pendant, WebUI, PLC, macro, or second-sender mutations after the
    observation require an external interlock or machine-specific protocol.
+
+### F-CNC41. Refuse generic same-session CNC Resume - Phase H.11
+
+#### Success - controlled pause
+1. **Pause** still sends realtime feed hold and immediately stops refilling the
+   controller stream. It remains useful as the first controlled response when
+   continuing motion would be unsafe.
+2. The paused UI keeps **Stop** available and explains that this CNC job cannot
+   be resumed automatically.
+
+#### Error - cutter may be engaged and spindle continuity is unproven
+1. **Resume** is disabled for a CNC job. A direct/stale caller is also rejected
+   by the store before the realtime cycle-start byte or any queued job bytes are
+   written.
+2. The job remains paused so the operator can Stop and follow a machine-specific
+   manual recovery procedure. KerfDesk never attempts `M3`, spindle orientation,
+   or a generic Z retract while cutter engagement is unknown.
+
+#### Edge - future machine-specific continuation
+1. `A:` and `FS:` prove controller-commanded state at one instant, not physical
+   RPM, uninterrupted rotation, VFD health, coolant flow, or exclusive command
+   ownership. Legacy GRBL therefore cannot satisfy the generic proof.
+2. A future opt-in requires a machine-profile policy, exclusive control of all
+   mutating paths, controller-visible safety/VFD faults, and an ack-neutral
+   realtime-status arbiter that proves stable `Hold:0` continuity before `~`.
+   This flow does not silently opt any current profile into that contract.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 
