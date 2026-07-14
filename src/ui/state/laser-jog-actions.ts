@@ -52,6 +52,11 @@ export function jogActions(
       // Already there (within a step GRBL would round to zero): nothing to do,
       // and an all-zero jog would be rejected as a no-axis command.
       if (Math.abs(dx) < JOG_TO_POINT_EPSILON_MM && Math.abs(dy) < JOG_TO_POINT_EPSILON_MM) return;
+      // CNC: lift Z to the configured safe height before the XY traverse so the
+      // bit does not drag across stock/clamps on the way to work zero — the same
+      // retract frame() applies. A Z lift is always safe, so it precedes the jog
+      // gate. Laser projects have no Z retract seam and keep the flat move (F105).
+      await retractToCncSafeZ(refs, safeWrite, feed);
       await get().jog({ dx, dy, feed });
     },
     jog: async (params) => {
@@ -107,6 +112,23 @@ export function jogActions(
       }
     },
   };
+}
+
+// Emit the driver's Z-safe retract for a CNC project before an XY traverse, so a
+// return-to-zero (or any point move) lifts the bit clear of stock/clamps. Mirrors
+// the retract prefix frame() uses; laser projects and drivers without a jog-based
+// Z retract return undefined and skip it (F105).
+async function retractToCncSafeZ(
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  feed: number,
+): Promise<void> {
+  const machine = useStore.getState().project.machine;
+  const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
+  if (safeZMm === undefined) return;
+  const retractLine = refs.driver.commands.buildFrameRetract?.(safeZMm, feed);
+  if (retractLine === undefined) return;
+  await safeWrite(retractLine, 'frame');
 }
 
 function assertJogFrameReady(set: SetFn, get: GetFn): void {
