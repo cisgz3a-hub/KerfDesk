@@ -311,15 +311,15 @@ describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
     }
   });
 
-  it('the Through cut button sets depth to the stock thickness', async () => {
+  it('the stock-thickness button sets exact measured stock depth without hidden overcut', async () => {
     const layer = profileLayer();
     installProject(layer, false); // default CNC stock thickness = 6.35 mm
     const { host, root } = await render(layer);
     try {
       const button = [...host.querySelectorAll('button')].find((b) =>
-        b.textContent?.startsWith('Through cut'),
+        b.textContent?.startsWith('Set to stock thickness'),
       );
-      if (button === undefined) throw new Error('Through cut button missing');
+      if (button === undefined) throw new Error('Stock-thickness button missing');
       await act(async () => button.click());
       expect(useStore.getState().project.scene.layers[0]?.cnc?.depthMm).toBeCloseTo(6.35, 5);
     } finally {

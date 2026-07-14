@@ -59,10 +59,10 @@ export function CncMaterialRow(props: {
           value={settings.materialKey ?? CUSTOM}
           onChange={(e) => onChange(e.target.value)}
           aria-label={`Material for ${layer.color}`}
-          title="Pick a material to auto-fill safe feed, plunge, and depth-per-pass for the layer's bit. Choose Custom to set them by hand."
+          title="Pick a material to calculate starting feed, plunge, and depth-per-pass values for the layer's bit. Choose Manual to set them by hand."
           style={selectStyle}
         >
-          <option value={CUSTOM}>Custom (manual feeds)</option>
+          <option value={CUSTOM}>Manual — verify feeds</option>
           {CHIPLOAD_MATERIALS.map((material) => (
             <option key={material.value} value={material.value}>
               {material.label}
@@ -70,12 +70,11 @@ export function CncMaterialRow(props: {
           ))}
         </select>
       </Row>
-      {settings.materialKey !== undefined ? (
-        <p style={hintStyle}>
-          Feeds auto-filled for {tool.name}. Tune them below, or open the Feeds calculator for flute
-          count and RPM.
-        </p>
-      ) : null}
+      <p style={hintStyle}>
+        {settings.materialKey !== undefined
+          ? `Starting values calculated for ${tool.name}. Tune below, or use the Feeds calculator for flute count and RPM.`
+          : 'Manual values are active. Verify them for this bit, stock, and machine before cutting.'}
+      </p>
     </>
   );
 }

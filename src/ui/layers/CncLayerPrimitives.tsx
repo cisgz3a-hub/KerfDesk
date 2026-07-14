@@ -12,7 +12,7 @@ export function Row(props: {
 }): JSX.Element {
   return (
     <div style={rowStyle}>
-      <span style={labelStyle}>{props.label}</span>
+      {props.label.length > 0 ? <span style={labelStyle}>{props.label}</span> : null}
       <div style={valueStyle}>{props.children}</div>
     </div>
   );
@@ -59,20 +59,23 @@ export function NumberField(props: {
 
 export const rowStyle: React.CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 8,
   minHeight: 28,
 };
 export const labelStyle: React.CSSProperties = {
-  width: 96,
+  flex: '0 0 96px',
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };
 export const valueStyle: React.CSSProperties = {
   display: 'flex',
+  flex: '1 1 140px',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 4,
-  flex: 1,
+  minWidth: 0,
 };
 export const selectStyle: React.CSSProperties = {
   flex: 1,
@@ -80,5 +83,9 @@ export const selectStyle: React.CSSProperties = {
   fontSize: 12,
   padding: '2px 4px',
 };
-export const inputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
+export const inputStyle: React.CSSProperties = {
+  width: 80,
+  boxSizing: 'border-box',
+  padding: '2px 6px',
+};
 export const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
