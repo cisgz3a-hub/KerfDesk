@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   addLayer,
   addObject,
@@ -46,6 +47,36 @@ describe('emitGcode', () => {
     expect(preflight.ok).toBe(true);
     expect(gcode).toContain('G21');
     expect(gcode).toContain('G1');
+  });
+
+  it('skips the no-go-zone gate for a no-homing Current Position start — its frame proves clearance (audit follow-up to G9/G19)', () => {
+    // A no-homing Current Position / User Origin start is gated on a Verified
+    // Frame just like Verified Origin, so its frame proves zone clearance too —
+    // it must not be refused by the "no trusted offset" zone block. The burn
+    // stays clear of the clamp zone, so any no-go issue can only come from that
+    // over-block.
+    const base = createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { enabled: false, direction: 'front-left' },
+      noGoZones: [
+        { id: 'clamp', name: 'Left clamp', enabled: true, x: 20, y: 20, width: 20, height: 20 },
+      ],
+    });
+    const project = {
+      ...base,
+      scene: addLayer(
+        addObject(base.scene, sampleObject),
+        createLayer({ id: 'L1', color: '#ff0000' }),
+      ),
+    };
+    const { preflight } = emitGcode(project, {
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'front-left',
+        currentPosition: { x: 0, y: 0 },
+      },
+    });
+    expect(preflight.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
   });
 
   it('prepends a provenance header only when metadata is passed (P0-A)', () => {
