@@ -13,10 +13,14 @@ import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 export function StatusDisplay(): JSX.Element {
   const report = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const workOriginActive = useLaserStore((s) => s.workOriginActive);
   if (report === null) return <div style={dimStyle}>State: —</div>;
   const pos = report.mPos ?? report.wPos;
   const label = report.subState === null ? report.state : `${report.state}:${report.subState}`;
-  const customOrigin = hasCustomOrigin(wcoCache);
+  // workOriginActive covers a deliberately-set origin whose offset happens to be
+  // zero (hand-set at machine 0,0 on a no-homing machine) — hasCustomOrigin(wco)
+  // alone would render that as "machine 0,0" and read as if Set origin failed.
+  const customOrigin = workOriginActive || hasCustomOrigin(wcoCache);
   return (
     <div style={panelStyle}>
       <div style={stateRowStyle}>
