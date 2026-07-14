@@ -43,7 +43,6 @@ import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
 import { drawCncTabAnchors } from './cnc-tab-editor';
-import { drawCanvasMotionOverlay, type CanvasMotionOverlay } from './draw-canvas-motion';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
   drawLargeSceneNotice,
@@ -85,7 +84,6 @@ export type DrawOpts = {
   readonly measureDraft?: MeasureDraft;
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
   readonly cncTabLayerColor?: string;
-  readonly canvasMotionOverlay?: CanvasMotionOverlay;
 };
 
 export function drawScene(
@@ -138,9 +136,6 @@ export function drawScene(
     );
     // ADR-124: label the captured-board / jig outline with its measured size.
     drawRegistrationBoxDimensions(ctx, project, view);
-    if (opts.canvasMotionOverlay !== undefined) {
-      drawCanvasMotionOverlay(ctx, opts.canvasMotionOverlay, view);
-    }
     drawLiveWorkspaceOverlays(ctx, project, opts, view);
   }
   if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);

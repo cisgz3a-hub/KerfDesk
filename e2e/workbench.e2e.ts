@@ -120,6 +120,7 @@ kerfDeskTest(
     const writesBefore = serialWrites(await kerfdesk.events()).length;
     await page.getByRole('button', { name: 'Start job' }).click();
     await expect(probe).toHaveAttribute('data-lifecycle', 'running');
+    const pixelsBeforeStatus = await canvasPixels(page);
     const initial = Number(await probe.getAttribute('data-confirmed-route-mm'));
 
     const program = serialWrites(await kerfdesk.events()).slice(writesBefore);
@@ -141,6 +142,9 @@ kerfDeskTest(
     await expect
       .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
       .toBeGreaterThan(initial);
+    const pixelsAfterStatus = await canvasPixels(page);
+    expect(pixelsAfterStatus.motion).not.toBe(pixelsBeforeStatus.motion);
+    expect(pixelsAfterStatus.design).toBe(pixelsBeforeStatus.design);
 
     await page.getByRole('button', { name: 'Pause', exact: true }).first().click();
     const atPause = Number(await probe.getAttribute('data-confirmed-route-mm'));
@@ -238,6 +242,22 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+}
+
+interface CanvasPixels {
+  readonly design: string;
+  readonly motion: string;
+}
+
+async function canvasPixels(page: Page): Promise<CanvasPixels> {
+  const design = page.locator('canvas[aria-label*="workspace"]');
+  const motion = page.getByTestId('canvas-motion-layer');
+  await expect(design).toHaveCount(1);
+  await expect(motion).toHaveCount(1);
+  return {
+    design: await design.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL()),
+    motion: await motion.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL()),
+  };
 }
 
 function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): string {

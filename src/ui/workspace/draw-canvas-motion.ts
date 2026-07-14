@@ -1,4 +1,3 @@
-import type { MotionBlock, MotionPoint } from '../../core/job/motion-manifest';
 /* eslint-disable no-restricted-syntax -- controller motion is scene data drawn
  * into the always-light canvas; fixed colors keep the safety trail unambiguous. */
 import type { Vec2 } from '../../core/scene';
@@ -8,6 +7,7 @@ import {
   type LiveCanvasRun,
 } from '../state/canvas-motion-plan';
 import type { ViewTransform } from './view-transform';
+import { drawCanvasMotionRoute } from './draw-canvas-motion-route';
 
 export type CanvasMotionOverlay = {
   readonly plan: CanvasMotionPlan;
@@ -26,7 +26,7 @@ export function drawCanvasMotionOverlay(
   view: ViewTransform,
 ): void {
   const { plan, run } = overlay;
-  if (run !== null) drawRoute(ctx, plan, run, view);
+  if (run !== null) drawCanvasMotionRoute(ctx, plan, run, view, PLANNED, RED);
   drawApproach(ctx, plan, run, view);
   if (overlay.showStartMarkers !== false) drawStartMarkers(ctx, plan, view);
   if (
@@ -45,71 +45,6 @@ function drawStartMarkers(
 ): void {
   drawFrameStart(ctx, plan, view);
   if (plan.jobStart !== null) drawMarker(ctx, plan.jobStart, 'JOB START', view);
-}
-
-function drawRoute(
-  ctx: CanvasRenderingContext2D,
-  plan: CanvasMotionPlan,
-  run: LiveCanvasRun,
-  view: ViewTransform,
-): void {
-  if (plan.capability === 'file-only' || plan.capability === 'unavailable') return;
-  for (const block of plan.manifest.blocks) {
-    drawBlock(ctx, block, block.points, PLANNED, false, view, plan);
-    if (block.routeStartMm >= run.route.confirmedRouteMm) continue;
-    const points = confirmedBlockPoints(block, run.route.confirmedRouteMm);
-    drawBlock(ctx, block, points, RED, true, view, plan);
-  }
-}
-
-function drawBlock(
-  ctx: CanvasRenderingContext2D,
-  block: MotionBlock,
-  points: ReadonlyArray<MotionPoint>,
-  color: string,
-  completed: boolean,
-  view: ViewTransform,
-  plan: CanvasMotionPlan,
-): void {
-  if (block.kind === 'plunge' || points.length < 2) return;
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = completed ? (block.kind === 'process' ? 2.4 : 1.5) : 1.2;
-  ctx.setLineDash(completed && block.kind !== 'process' ? [6, 4] : []);
-  ctx.beginPath();
-  points.forEach((point, index) => {
-    const canvas = sceneToCanvas(mapControllerPointToScene(point, plan), view);
-    if (index === 0) ctx.moveTo(canvas.x, canvas.y);
-    else ctx.lineTo(canvas.x, canvas.y);
-  });
-  ctx.stroke();
-  ctx.restore();
-}
-
-function confirmedBlockPoints(
-  block: MotionBlock,
-  confirmedRouteMm: number,
-): ReadonlyArray<MotionPoint> {
-  if (confirmedRouteMm >= block.routeEndMm) return block.points;
-  const targetMm = confirmedRouteMm - block.routeStartMm;
-  const points: MotionPoint[] = [];
-  let walked = 0;
-  for (let index = 1; index < block.points.length; index += 1) {
-    const from = block.points[index - 1];
-    const to = block.points[index];
-    if (from === undefined || to === undefined) continue;
-    if (points.length === 0) points.push(from);
-    const length = distance(from, to);
-    if (walked + length <= targetMm) {
-      points.push(to);
-      walked += length;
-      continue;
-    }
-    const t = length <= Number.EPSILON ? 0 : (targetMm - walked) / length;
-    points.push(interpolate(from, to, Math.max(0, Math.min(1, t))));
-    break;
-  }
-  return points;
 }
 
 function drawApproach(
@@ -220,16 +155,4 @@ function drawLabel(
 
 function sceneToCanvas(point: Vec2, view: ViewTransform): Vec2 {
   return { x: view.offsetX + point.x * view.scale, y: view.offsetY + point.y * view.scale };
-}
-
-function distance(a: MotionPoint, b: MotionPoint): number {
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-}
-
-function interpolate(a: MotionPoint, b: MotionPoint, t: number): MotionPoint {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t,
-  };
 }

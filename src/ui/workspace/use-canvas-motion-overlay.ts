@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StatusQueryCapability } from '../../core/controllers';
-import { profileSupportsCapability } from '../../core/devices';
 import type { OutputScope, Project } from '../../core/scene';
-import { emitPreparedGcode, prepareOutputSnapshot } from '../../io/gcode';
+import { prepareOutputSnapshot } from '../../io/gcode';
 import {
   resolveJobPlacement,
   type JobPlacementSettings,
@@ -12,7 +11,7 @@ import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { renderVariableText } from '../text/render-variable-text';
 import { useOutputScope } from '../state';
 import {
-  buildCanvasMotionPlan,
+  buildCanvasMarkerPlan,
   canvasPlanRetentionKey,
   type CanvasMotionPlan,
   type LiveCanvasRun,
@@ -30,9 +29,14 @@ export function useCanvasMotionOverlay(
   previewMode: boolean,
 ): CanvasMotionOverlay | null {
   const placementSettings = useStore((state) => state.jobPlacement);
+  const interactionActive = useStore((state) => state.pendingUndo !== null);
   const outputScope = useOutputScope();
   const liveRun = useLaserStore((state) => state.liveCanvasRun ?? null);
-  const laser = useLaserStore(canvasMachineSnapshot);
+  const machineRevision = useLaserStore(canvasMachineRevision);
+  const laser = useMemo(
+    () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
+    [machineRevision],
+  );
   const rotaryRaster = useExperimentalLaserFeatures((state) => state.features.rotaryRaster);
   const printAndCut = useExperimentalLaserFeatures((state) => state.features.printAndCut);
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
@@ -42,7 +46,10 @@ export function useCanvasMotionOverlay(
     () => resolveJobPlacement(placementSettings, laser),
     [placementSettings, laser],
   );
-  const registrationKey = JSON.stringify([printAndCut, firstRegistration, secondRegistration]);
+  const registrationKey = useMemo(
+    () => JSON.stringify([printAndCut, firstRegistration, secondRegistration]),
+    [firstRegistration, printAndCut, secondRegistration],
+  );
   const idlePlan = useIdleCanvasMotionPlan({
     project,
     previewMode,
@@ -52,6 +59,8 @@ export function useCanvasMotionOverlay(
     placement,
     rotaryRaster,
     registrationKey,
+    machineRevision,
+    interactionActive,
     laser,
   });
 
@@ -71,35 +80,45 @@ type IdlePlanInput = {
   readonly placement: ResolvedJobPlacement;
   readonly rotaryRaster: boolean;
   readonly registrationKey: string;
+  readonly machineRevision: string;
+  readonly interactionActive: boolean;
   readonly laser: ReturnType<typeof canvasMachineSnapshot>;
 };
 
+type IdlePlanState = {
+  readonly plan: CanvasMotionPlan;
+  readonly project: Project;
+  readonly outputScope: OutputScope;
+  readonly placementSettings: JobPlacementSettings;
+  readonly rotaryRaster: boolean;
+  readonly registrationKey: string;
+  readonly machineRevision: string;
+};
+
+export const IDLE_CANVAS_PLAN_DELAY_MS = 200;
+
 function useIdleCanvasMotionPlan(input: IdlePlanInput): CanvasMotionPlan | null {
-  const [idlePlan, setIdlePlan] = useState<CanvasMotionPlan | null>(null);
-  const placementKey = useMemo(() => JSON.stringify(input.placement), [input.placement]);
-  const registration = currentPrintCutOutputRegistration(input.project);
-  const planKey = canvasPlanRetentionKey(
-    input.project,
-    input.outputScope,
-    input.placementSettings,
-    registration,
-  );
-  const machineKey = JSON.stringify(input.laser);
-  const placementRef = useRef(input.placement);
+  const [idleState, setIdleState] = useState<IdlePlanState | null>(null);
+  const requestRef = useRef(0);
   const inputRef = useRef(input);
-  placementRef.current = input.placement;
   inputRef.current = input;
   useEffect(() => {
-    if (shouldHideIdlePlan(inputRef.current)) {
-      setIdlePlan(null);
+    const requestInput = inputRef.current;
+    const request = ++requestRef.current;
+    if (shouldClearIdlePlan(requestInput)) {
+      setIdleState(null);
+      return;
+    }
+    if (shouldDeferIdlePlan(requestInput)) {
       return;
     }
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void buildIdleCanvasMotionPlan(inputRef.current, placementRef.current).then((plan) => {
-        if (!cancelled) setIdlePlan(plan);
+      void buildIdleCanvasMotionPlan(requestInput, requestInput.placement).then((plan) => {
+        if (cancelled || request !== requestRef.current) return;
+        setIdleState(plan === null ? null : idlePlanState(plan, requestInput));
       });
-    }, 0);
+    }, IDLE_CANVAS_PLAN_DELAY_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -107,13 +126,24 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): CanvasMotionPlan | null 
   }, [
     input.previewMode,
     input.liveRun?.lifecycle,
-    planKey,
-    placementKey,
+    input.project,
+    input.outputScope,
+    input.placementSettings,
+    input.placement,
     input.rotaryRaster,
     input.registrationKey,
-    machineKey,
+    input.machineRevision,
+    input.interactionActive,
+    input.laser,
   ]);
-  return idlePlan;
+  if (
+    input.previewMode ||
+    input.interactionActive ||
+    isActiveCanvasLifecycleOrNull(input.liveRun)
+  ) {
+    return null;
+  }
+  return idleStateMatches(idleState, input) ? idleState.plan : null;
 }
 
 export async function buildIdleCanvasMotionPlan(
@@ -136,15 +166,7 @@ export async function buildIdleCanvasMotionPlan(
     outputScope: input.outputScope,
   });
   if (!prepared.ok) return null;
-  const emitted = emitPreparedGcode(prepared, {
-    ...(jobOrigin === undefined ? {} : { jobOrigin }),
-    outputScope: input.outputScope,
-    allowRotaryRaster:
-      input.rotaryRaster && profileSupportsCapability(input.project.device, 'rotary'),
-  });
-  if (!emitted.preflight.ok || emitted.gcode.length === 0) return null;
-  return buildCanvasMotionPlan({
-    gcode: emitted.gcode,
+  return buildCanvasMarkerPlan({
     prepared,
     machine: input.laser,
     statusQuery: statusQueryFor(input.project, input.laser),
@@ -155,17 +177,52 @@ export async function buildIdleCanvasMotionPlan(
   });
 }
 
-function shouldHideIdlePlan(input: IdlePlanInput): boolean {
+function shouldClearIdlePlan(input: IdlePlanInput): boolean {
+  return input.previewMode || input.project.scene.objects.length === 0;
+}
+
+function shouldDeferIdlePlan(input: IdlePlanInput): boolean {
   return (
-    input.previewMode ||
-    input.project.scene.objects.length === 0 ||
-    (input.liveRun !== null && isActiveCanvasLifecycle(input.liveRun))
+    input.interactionActive ||
+    isActiveCanvasLifecycleOrNull(input.liveRun) ||
+    (input.laser.statusReport !== null && input.laser.statusReport.state !== 'Idle')
   );
 }
 
 function isActiveCanvasLifecycle(run: LiveCanvasRun): boolean {
   return (
     run.lifecycle === 'running' || run.lifecycle === 'paused' || run.lifecycle === 'tool-change'
+  );
+}
+
+function isActiveCanvasLifecycleOrNull(run: LiveCanvasRun | null): boolean {
+  return run !== null && isActiveCanvasLifecycle(run);
+}
+
+function idlePlanState(plan: CanvasMotionPlan, input: IdlePlanInput): IdlePlanState {
+  return {
+    plan,
+    project: input.project,
+    outputScope: input.outputScope,
+    placementSettings: input.placementSettings,
+    rotaryRaster: input.rotaryRaster,
+    registrationKey: input.registrationKey,
+    machineRevision: input.machineRevision,
+  };
+}
+
+function idleStateMatches(
+  state: IdlePlanState | null,
+  input: IdlePlanInput,
+): state is IdlePlanState {
+  return (
+    state !== null &&
+    state.project === input.project &&
+    state.outputScope === input.outputScope &&
+    state.placementSettings === input.placementSettings &&
+    state.rotaryRaster === input.rotaryRaster &&
+    state.registrationKey === input.registrationKey &&
+    state.machineRevision === input.machineRevision
   );
 }
 
@@ -180,7 +237,10 @@ function useClearStaleTerminalRun(
   }, [idlePlan, liveRun]);
 }
 
-function canvasMachineSnapshot(state: ReturnType<typeof useLaserStore.getState>) {
+function canvasMachineSnapshot(
+  state: ReturnType<typeof useLaserStore.getState>,
+  canvasRevision = '',
+) {
   return {
     connection: state.connection,
     statusReport: state.statusReport,
@@ -192,7 +252,34 @@ function canvasMachineSnapshot(state: ReturnType<typeof useLaserStore.getState>)
     wcoCache: state.wcoCache,
     trustedPositionEpoch: state.trustedPositionEpoch ?? 0,
     statusQuery: state.capabilities.statusQuery,
+    ...(canvasRevision === '' ? {} : { canvasRevision }),
   };
+}
+
+function canvasMachineRevision(state: ReturnType<typeof useLaserStore.getState>): string {
+  const report = state.statusReport;
+  const position =
+    report === null
+      ? 'unknown'
+      : report.state === 'Idle'
+        ? `idle:${axisKey(report.mPos)}:${axisKey(report.wPos)}:${axisKey(report.wco)}`
+        : `busy:${report.state}`;
+  return [
+    state.connection.kind,
+    state.capabilities.statusQuery,
+    state.controllerSettings?.reportInches === true ? 'in' : 'mm',
+    state.workOriginActive ? 'origin' : 'machine',
+    String(state.trustedPositionEpoch ?? 0),
+    axisKey(state.wcoCache),
+    position,
+  ].join('|');
+}
+
+function axisKey(
+  axis: { readonly x: number; readonly y: number; readonly z: number } | null,
+): string {
+  if (axis === null) return '-';
+  return `${axis.x.toFixed(3)},${axis.y.toFixed(3)},${axis.z.toFixed(3)}`;
 }
 
 function statusQueryFor(

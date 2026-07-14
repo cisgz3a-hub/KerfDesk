@@ -26,6 +26,7 @@ export type RouteReconciliationInput = {
 const DEFAULT_TOLERANCE_MM = 1.5;
 const BACKTRACK_ALLOWANCE_MM = 0.2;
 const MAX_CANDIDATES = 64;
+const lineNumberPresenceCache = new WeakMap<MotionManifest, boolean>();
 
 export const INITIAL_ROUTE_RECONCILIATION: RouteReconciliationState = {
   confirmedRouteMm: 0,
@@ -39,10 +40,15 @@ export function reconcileReportedPosition(
   const tolerance = input.toleranceMm ?? DEFAULT_TOLERANCE_MM;
   const candidates: RouteCandidate[] = [];
   const lineCeiling = acceptedLineCeiling(input);
-  const hasProgramLineNumbers = input.manifest.blocks.some(
-    (block) => block.programLineNumber !== null,
+  const hasProgramLineNumbers = manifestHasProgramLineNumbers(input.manifest);
+  const startIndex = firstForwardBlockIndex(
+    input.manifest.blocks,
+    input.previous.confirmedRouteMm - BACKTRACK_ALLOWANCE_MM,
   );
-  for (const [blockIndex, block] of input.manifest.blocks.entries()) {
+  for (let blockIndex = startIndex; blockIndex < input.manifest.blocks.length; blockIndex += 1) {
+    const block = input.manifest.blocks[blockIndex];
+    if (block === undefined) continue;
+    if (block.sendableLineIndex > lineCeiling) break;
     if (!blockMayBeExecuting(block, lineCeiling, hasProgramLineNumbers, input)) continue;
     collectBlockCandidates(
       block,
@@ -61,6 +67,26 @@ export function reconcileReportedPosition(
     candidates: feasible,
     uncertain: false,
   };
+}
+
+function manifestHasProgramLineNumbers(manifest: MotionManifest): boolean {
+  const cached = lineNumberPresenceCache.get(manifest);
+  if (cached !== undefined) return cached;
+  const present = manifest.blocks.some((block) => block.programLineNumber !== null);
+  lineNumberPresenceCache.set(manifest, present);
+  return present;
+}
+
+function firstForwardBlockIndex(blocks: MotionManifest['blocks'], routeFloorMm: number): number {
+  let low = 0;
+  let high = blocks.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    const block = blocks[middle];
+    if (block !== undefined && block.routeEndMm >= routeFloorMm) high = middle;
+    else low = middle + 1;
+  }
+  return low;
 }
 
 function blockMayBeExecuting(
