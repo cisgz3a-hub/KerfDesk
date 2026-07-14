@@ -63,7 +63,7 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     const out = emit({ groups: [fill(5)] });
     // Preamble arms constant M3, then the fill flips to dynamic M4 (M5 clears
     // the constant mode first, mirroring emit-raster) before any burn.
-    expect(out).toContain('G21\nG90\nM3 S0\nM5\nM4 S0\n; fill layer');
+    expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\nM5\nM4 S0\n; fill layer');
     // The burn G1 comes AFTER the M4 flip — so it runs under dynamic power.
     expect(out.indexOf('G1 X20.000 Y5.000')).toBeGreaterThan(out.indexOf('M4 S0'));
     // No constant-power burn: there is no M3 with positive S anywhere.
@@ -88,7 +88,7 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
   it('leaves a cut-only job byte-identical — never emits M4', () => {
     const out = emit({ groups: [cut()] });
     expect(out).not.toContain('M4');
-    expect(out).toContain('G21\nG90\nM3 S0\n; layer cut');
+    expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut');
   });
 
   it('honors explicit vector overrides and switches before each affected group', () => {

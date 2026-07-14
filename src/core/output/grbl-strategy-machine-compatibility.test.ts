@@ -136,6 +136,8 @@ describe('grblStrategy machine compatibility dialects', () => {
       [
         'G21',
         'G90',
+        'G54',
+        'G94',
         'M3 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
@@ -156,6 +158,8 @@ describe('grblStrategy machine compatibility dialects', () => {
       [
         'G21',
         'G90',
+        'G54',
+        'G94',
         'M3 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
@@ -197,7 +201,7 @@ describe('grblStrategy machine compatibility dialects', () => {
       NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
     );
 
-    expect(out).toContain('G21\nG90\nM3 S0\n; layer cut4040');
+    expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut4040');
     expect(out).not.toMatch(/^M4\b/m);
     expect(out).toContain(
       ['; pass 2 of 2', 'M3 S0', 'G1 X0.000 Y0.000 F800 S0', 'G1 X5.000 Y0.000 F1200 S600'].join(

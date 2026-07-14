@@ -3,6 +3,8 @@
 exports[`emitGcode with distinct per-layer settings > byte-pins the three-mode, three-settings program 1`] = `
 "G21
 G90
+G54
+G94
 M3 S0
 ; layer cut-red color #ff0000 power 60% speed 1200 mm/min passes 2
 ; pass 1 of 2

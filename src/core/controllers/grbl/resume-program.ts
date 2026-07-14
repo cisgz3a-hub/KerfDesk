@@ -137,7 +137,18 @@ function applyMWord(state: ModalState, value: number): void {
 }
 
 function buildPreamble(state: ModalState): ReadonlyArray<string> {
-  return ['; KerfDesk resume preamble', state.units, 'G90', ...laserResumeBody(state)];
+  // Pin the WCS and feed mode before re-positioning, exactly as the job preamble
+  // does (grbl-strategy.ts): a resume re-executes from a mid-program line, and a
+  // stale modal G55-G59 would send the re-entry move — and the rest of the job —
+  // to the wrong frame, while a stale G93 would misread every feed (F10/F41/F50).
+  return [
+    '; KerfDesk resume preamble',
+    state.units,
+    'G90',
+    'G54',
+    'G94',
+    ...laserResumeBody(state),
+  ];
 }
 
 // Laser re-entry: position FIRST with the beam off (no spindle word emitted yet),

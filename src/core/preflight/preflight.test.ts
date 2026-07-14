@@ -98,7 +98,8 @@ describe('runPreflight no-go zone invariant', () => {
     expect(result.ok).toBe(false);
     expect(result.issues).toContainEqual({
       code: 'no-go-zone-collision',
-      message: 'Line 7: motion crosses no-go zone "Front clamp".',
+      // G21/G90/G54/G94/M3 + 2 layer comments = 7 preamble lines before the cut.
+      message: 'Line 9: motion crosses no-go zone "Front clamp".',
     });
   });
 
