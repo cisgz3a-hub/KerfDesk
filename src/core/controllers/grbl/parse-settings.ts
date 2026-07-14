@@ -51,6 +51,9 @@ export type ControllerSettingsSnapshot = Partial<
   readonly hardLimitsEnabled?: boolean;
   readonly homingEnabled?: boolean;
   readonly homingDirectionMask?: number;
+  readonly statusReportMask?: number;
+  readonly reportInches?: boolean;
+  readonly homingPullOffMm?: number;
   readonly zMaxFeed?: number;
   readonly zAccelMmPerSec2?: number;
   // Per-axis max rates ($110/$111). `maxFeed` (a DeviceProfile key) keeps the
@@ -150,6 +153,9 @@ export function settingsMapToControllerSettings(
   const hardLimitsEnabled = parseBooleanSetting(map, 21);
   const homingEnabled = parseBooleanSetting(map, 22);
   const homingDirectionMask = parseNonNegativeInteger(map.get(23));
+  const statusReportMask = parseNonNegativeInteger(map.get(10));
+  const reportInches = parseBooleanSetting(map, 13);
+  const homingPullOffMm = parseNonNegativeNumber(map.get(27));
   const zMaxFeed = parsePositiveNumber(map.get(112));
   const zAccelMmPerSec2 = parsePositiveNumber(map.get(122));
   const maxFeedX = parsePositiveNumber(map.get(110));
@@ -160,6 +166,9 @@ export function settingsMapToControllerSettings(
     ...(hardLimitsEnabled === undefined ? {} : { hardLimitsEnabled }),
     ...(homingEnabled === undefined ? {} : { homingEnabled }),
     ...(homingDirectionMask === undefined ? {} : { homingDirectionMask }),
+    ...(statusReportMask === undefined ? {} : { statusReportMask }),
+    ...(reportInches === undefined ? {} : { reportInches }),
+    ...(homingPullOffMm === undefined ? {} : { homingPullOffMm }),
     ...(zMaxFeed === undefined ? {} : { zMaxFeed }),
     ...(zAccelMmPerSec2 === undefined ? {} : { zAccelMmPerSec2 }),
     ...(maxFeedX === undefined ? {} : { maxFeedX }),
@@ -177,6 +186,11 @@ function parseBooleanSetting(map: ReadonlyMap<number, string>, id: number): bool
 function parsePositiveNumber(value: string | undefined): number | undefined {
   const parsed = parseFiniteNumber(value);
   return parsed !== null && parsed > 0 ? parsed : undefined;
+}
+
+function parseNonNegativeNumber(value: string | undefined): number | undefined {
+  const parsed = parseFiniteNumber(value);
+  return parsed !== null && parsed >= 0 ? parsed : undefined;
 }
 
 function parseNonNegativeInteger(value: string | undefined): number | undefined {

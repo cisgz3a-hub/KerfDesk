@@ -10,6 +10,7 @@ import { describeProbeResult, type ProbeResult } from './probe-actions';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -124,6 +125,7 @@ async function recoverUncertainProbe(
   if (softReset === null) return;
   const resetEpoch = refs.writeEpoch ?? 0;
   const resetBoundary = waitForControllerResetBoundary(refs, resetEpoch);
+  set((state) => invalidateControllerSessionEvidence(state));
   try {
     try {
       await safeWrite(softReset, 'probe', 'system');

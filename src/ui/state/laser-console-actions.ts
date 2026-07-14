@@ -1,5 +1,6 @@
-import { startCollecting, type SettingsCollectorState } from '../../core/controllers/grbl';
+import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
+import { beginSettingsCollection } from './detected-settings-action';
 import type { ConsoleStateEffect } from '../../core/controllers/console-state-effect';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
@@ -32,6 +33,7 @@ export type ConsoleCommandOptions = {
 export type ConsoleActionRefs = {
   driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
+  settingsCollectorSessionEpoch: number | null;
   nextTranscriptId: number;
 };
 
@@ -64,10 +66,11 @@ export function consoleActions(
       const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
       if (idleBlocked !== null) return block(set, get, refs, idleBlocked);
       if (prepared.command.kind === 'settings-query') {
-        refs.settingsCollector = startCollecting();
+        beginSettingsCollection(refs, get().controllerSessionEpoch);
         set({
           detectedSettings: null,
           controllerSettings: null,
+          controllerSettingsObservation: null,
           grblSettingsRows: [],
           lastSettingsReadAt: null,
         });
@@ -130,6 +133,8 @@ function consoleStateEffectPatch(
     // physically completed. Require a fresh controller report before another
     // setup/job action can trust Idle or position.
     statusReport: null,
+    statusObservation: null,
+    homingProof: null,
     ...(commandChangesAccessories(command)
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),
@@ -179,6 +184,7 @@ function consoleStateEffectPatch(
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
         detectedSettings: null,
         controllerSettings: null,
+        controllerSettingsObservation: null,
         grblSettingsRows: [],
         lastSettingsReadAt: null,
       };

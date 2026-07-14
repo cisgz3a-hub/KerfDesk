@@ -16,6 +16,7 @@ export type HandlerRefs = ControllerLifecycleRefs &
     // from here so this pipeline stays firmware-neutral (ADR-094).
     driver: ControllerDriver;
     settingsCollector: SettingsCollectorState;
+    settingsCollectorSessionEpoch: number | null;
     // One-shot callback fired by handleLine the next time any line arrives.
     // runHandshake sets it before awaiting; handleLine clears it after
     // calling. Lets the handshake be event-driven instead of busy-polling

@@ -4,9 +4,10 @@
 // profile's baud rate. Type-only LaserState/LiveRefs imports — no runtime
 // cycle (same pattern as the sibling action modules).
 
-import { idleCollector, startCollecting } from '../../core/controllers/grbl';
+import { idleCollector } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
 import { cancelControllerLifecycleRefs } from './laser-interactive-command';
+import { beginSettingsCollection } from './detected-settings-action';
 import { handleLine, type HandlerRefs } from './laser-line-handler';
 import { cancelResetCleanup } from './laser-reset-cleanup';
 import {
@@ -49,11 +50,21 @@ export function connectionActions(
 ): Pick<LaserState, 'connect' | 'disconnect'> {
   return {
     connect: async (adapter, options = {}) => {
+      const previousConnection = refs.connection;
+      if (previousConnection !== null) {
+        teardown(refs);
+        await previousConnection.close().catch(() => undefined);
+      }
       refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
       refs.nextTranscriptId = 1;
       refs.driver = selectControllerDriver(options.controllerKind);
       set((state) => ({
         connection: { kind: 'connecting' },
+        controllerSessionEpoch: state.controllerSessionEpoch + 1,
+        statusObservation: null,
+        controllerSettings: null,
+        controllerSettingsObservation: null,
+        homingProof: null,
         controllerOperation: null,
         probeBusy: false,
         log: [],
@@ -85,8 +96,12 @@ export function connectionActions(
         // source metadata to its writes (post-error stop escalation, frame
         // dispatch, job refills) — a bare (out) => safeWrite(out) wrapper
         // silently drops both.
-        refs.unsubscribeLine = conn.onLine((line) => handleLine(set, get, refs, safeWrite, line));
+        refs.unsubscribeLine = conn.onLine((line) => {
+          if (refs.connection !== conn) return;
+          handleLine(set, get, refs, safeWrite, line);
+        });
         refs.unsubscribeClose = conn.onClose(() => {
+          if (refs.connection !== conn) return;
           teardown(refs);
           set(buildPortClosePatch);
         });
@@ -141,7 +156,10 @@ async function runDisconnect(
   set((state) => ({
     connection: { kind: 'disconnected' },
     statusReport: null,
+    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    statusObservation: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     streamer: null,
@@ -159,6 +177,7 @@ async function runDisconnect(
     controllerOperation: null,
     probeBusy: false,
     homingState: 'unknown',
+    homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     lastWriteError: null,
@@ -210,10 +229,11 @@ async function runHandshake(
     log: pushLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
     detectedSettings: null,
     controllerSettings: null,
+    controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
-  refs.settingsCollector = startCollecting();
+  beginSettingsCollection(refs, get().controllerSessionEpoch);
   await safeWrite(`${settingsQuery}\n`);
 }
 
@@ -229,6 +249,7 @@ function teardown(refs: LiveRefs): void {
   refs.unsubscribeClose = null;
   refs.pollHandle = null;
   refs.settingsCollector = idleCollector();
+  refs.settingsCollectorSessionEpoch = null;
   refs.onLineArrived = null;
   refs.nextTranscriptId = 1;
   refs.stallProbe = null;

@@ -32,52 +32,8 @@ export function handleStatusLine(
   const state = get();
   const operation = state.motionOperation;
   const streamer = state.streamer;
-  if (report.state === 'Alarm') {
-    advanceWriteEpoch(refs);
-    set({
-      statusReport: report,
-      wcoCache: null,
-      ovCache: null,
-      accessoryCache: null,
-      mpgActive: null,
-      ...originUnknownAfterControllerReset(get()),
-      motionOperation: null,
-      controllerOperation: null,
-      fireActive: false,
-      frameVerification: null,
-      homingState: 'unknown',
-      trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-      pendingUntrackedAcks: 0,
-      pendingTransportWrites: 0,
-      // A status-only Alarm (the ALARM:N line may have been consumed by a
-      // pending command) must still terminate an active stream — a paused
-      // stream would otherwise keep Resume mounted against a locked
-      // controller.
-      ...cancelActiveStreamerPatch(streamer),
-    });
-    cancelControllerLifecycleRefs(refs, 'Controller entered Alarm.');
-    return;
-  }
-  if (report.state === 'Sleep') {
-    advanceWriteEpoch(refs);
-    set({
-      statusReport: report,
-      alarmCode: null,
-      wcoCache: null,
-      ovCache: null,
-      accessoryCache: null,
-      mpgActive: null,
-      ...originUnknownAfterControllerReset(get()),
-      motionOperation: null,
-      controllerOperation: null,
-      fireActive: false,
-      frameVerification: null,
-      homingState: 'unknown',
-      trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-      pendingUntrackedAcks: 0,
-      pendingTransportWrites: 0,
-    });
-    cancelControllerLifecycleRefs(refs, 'Controller entered Sleep.');
+  if (isInvalidatingStatusState(report.state)) {
+    handleInvalidatingStatus(set, refs, state, report, streamer);
     return;
   }
   const observedOperation = observeMotionStatus(operation, report.state);
@@ -98,8 +54,19 @@ export function handleStatusLine(
   const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, state.controllerOperation, report);
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
 
+  const positionInvalidated = report.mpgActive === true && state.mpgActive !== true;
+  const nextSequence = state.statusSequence + 1;
   set({
     ...statusPositionPatch(report, state.workOriginSource, state.accessoryCache),
+    statusSequence: nextSequence,
+    statusObservation: positionInvalidated
+      ? null
+      : {
+          sessionEpoch: state.controllerSessionEpoch,
+          positionEpoch: state.trustedPositionEpoch ?? 0,
+          sequence: nextSequence,
+          observedAt: Date.now(),
+        },
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...completedStreamerPatch,
@@ -108,6 +75,42 @@ export function handleStatusLine(
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+function isInvalidatingStatusState(state: string): boolean {
+  return state === 'Alarm' || state === 'Sleep';
+}
+
+function handleInvalidatingStatus(
+  set: SetFn,
+  refs: ControllerLifecycleRefs,
+  state: LaserState,
+  report: StatusReport,
+  streamer: StreamerState | null,
+): void {
+  const alarm = report.state === 'Alarm';
+  advanceWriteEpoch(refs);
+  set({
+    statusReport: report,
+    statusSequence: state.statusSequence + 1,
+    statusObservation: null,
+    ...(alarm ? cancelActiveStreamerPatch(streamer) : { alarmCode: null }),
+    wcoCache: null,
+    ovCache: null,
+    accessoryCache: null,
+    mpgActive: null,
+    ...originUnknownAfterControllerReset(state),
+    motionOperation: null,
+    controllerOperation: null,
+    fireActive: false,
+    frameVerification: null,
+    homingState: 'unknown',
+    homingProof: null,
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
+  });
+  cancelControllerLifecycleRefs(refs, `Controller entered ${alarm ? 'Alarm' : 'Sleep'}.`);
 }
 
 function advanceWriteEpoch(refs: ControllerLifecycleRefs): void {
@@ -226,6 +229,9 @@ function mpgOwnershipPatch(
     | 'workZReferenceEpoch'
     | 'workZZeroEvidence'
     | 'frameVerification'
+    | 'statusObservation'
+    | 'homingState'
+    | 'homingProof'
   >
 > {
   if (report.mpgActive === null || report.mpgActive === undefined) return {};
@@ -233,6 +239,9 @@ function mpgOwnershipPatch(
   return {
     mpgActive: true,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    statusObservation: null,
+    homingState: 'unknown',
+    homingProof: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
     frameVerification: null,

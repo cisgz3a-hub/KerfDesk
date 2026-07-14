@@ -1046,3 +1046,22 @@ proof exists.
   option, and a reset can invalidate position trust. A later owned qualification
   must establish units, homing-frame identity, fresh MPos, and axis bounds before
   XYZ probing is production-qualified.
+
+## GRBL controller-session truth foundation — 2026-07-14 (ADR-189)
+
+- Stock GRBL `$13=1` converts reported coordinate values to inches while
+  `$130-$132` remain millimetre settings. Treating both as one unit can produce
+  a 25.4x envelope error.
+- `$22=1` enables homing but does not prove the current controller session was
+  homed; `$X` can unlock to Idle without Home. Home evidence must therefore be
+  created by an owned full Home transaction and bound to the current session.
+- The welcome banner occurs on reset boundaries that discard volatile proof.
+  Late line/close callbacks from a replaced serial connection must not mutate
+  the current connection.
+- Stock GRBL normally uses negative machine space on every axis. With
+  `HOMING_FORCE_SET_ORIGIN` (`OPT:Z`), each `$23` bit determines whether that
+  axis extends positive or negative from zero. Profile bed coordinates are not
+  a substitute for this firmware frame.
+- This slice adds parsers, math, observation stamps, and invalidation only. It
+  deliberately does not send `$I`, `$$`, `$H`, or a new status query and does
+  not make corner probing machine-envelope-qualified.
