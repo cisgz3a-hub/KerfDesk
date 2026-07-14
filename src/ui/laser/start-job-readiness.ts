@@ -35,7 +35,7 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import { detectMachineJobWarnings } from './machine-job-warnings';
-import { cncWorkZeroAdvisory } from './cnc-start-advisories';
+import { cncWorkZeroStartIssue } from './cnc-start-advisories';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -87,6 +87,12 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
   if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
     issues.push(CNC_REQUIRES_GRBL_MESSAGE);
   }
+  const workZeroIssue = cncWorkZeroStartIssue(
+    project,
+    machine.workZZeroEvidence,
+    machine.workZReferenceEpoch,
+  );
+  if (workZeroIssue !== null) issues.push(workZeroIssue);
   return issues;
 }
 
@@ -140,7 +146,6 @@ export function prepareStartJob(
     project,
     controllerSettings,
     controller.warnings.map((i) => i.message),
-    machine,
   );
   return okPreparation(gcode, warnings, placement.jobOrigin);
 }
@@ -200,7 +205,6 @@ export async function prepareStartJobSnapshot(
     project,
     controllerSettings,
     controller.warnings.map((issue) => issue.message),
-    machine,
   );
   return okPreparation(gcode, warnings, placement.jobOrigin);
 }
@@ -245,26 +249,14 @@ function resolveStartPlacement(
   };
 }
 
-// The Start-path warning list: controller-readiness warnings, the machine-kind
-// advisory set, plus the CNC work-zero advisory (Start-only — it depends on
-// live machine state, so it cannot live in detectMachineJobWarnings, which the
-// Save path also uses).
+// The Start-path warning list: controller-readiness warnings plus machine-kind
+// advisories. Qualified CNC work-Z is a non-overridable early machine gate.
 function collectStartWarnings(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null,
   controllerWarnings: ReadonlyArray<string>,
-  machine: MachineStartSnapshot,
 ): string[] {
-  const workZeroAdvisory = cncWorkZeroAdvisory(
-    project,
-    machine.workZZeroEvidence,
-    machine.workZReferenceEpoch,
-  );
-  return [
-    ...controllerWarnings,
-    ...detectMachineJobWarnings(project, controllerSettings),
-    ...(workZeroAdvisory === null ? [] : [workZeroAdvisory]),
-  ];
+  return [...controllerWarnings, ...detectMachineJobWarnings(project, controllerSettings)];
 }
 
 function readinessMode(machine: MachineStartSnapshot): ReadinessSettingsCapability {

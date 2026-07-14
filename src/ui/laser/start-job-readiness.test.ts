@@ -15,7 +15,7 @@ import {
 } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { CNC_REQUIRES_GRBL_MESSAGE, prepareStartJob } from './start-job-readiness';
-import { CNC_NO_WORK_ZERO_ADVISORY } from './cnc-start-advisories';
+import { CNC_NO_WORK_ZERO_START_MESSAGE } from './cnc-start-advisories';
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -417,21 +417,27 @@ describe('prepareStartJob', () => {
     }
   });
 
-  // CNC-05: the work-zero advisory is a Start-path warning driven by live
-  // machine state (workOriginActive), so it is asserted through prepareStartJob.
+  // CNC-05: the stock-top contract is a Start blocker driven by qualified live
+  // machine evidence, so it is asserted through prepareStartJob.
   const cncProject = (): Project => ({ ...runnableProject(), machine: DEFAULT_CNC_MACHINE_CONFIG });
   const cncReadyController = { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false };
 
-  it('advises to set a work zero when a CNC job starts with no active origin', () => {
-    // Proves the advisory is wired into prepareStartJob's Start-path warnings.
-    // The workOriginActive-true / laser branches are unit-tested directly in
-    // cnc-start-advisories.test.ts (asserting the negative here would also drag
-    // in the unrelated absolute-placement custom-origin gate).
+  it('blocks a CNC Start with no current work-Z evidence', () => {
     const result = prepareStartJob(cncProject(), cncReadyController, readyMachine);
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.warnings).toContain(CNC_NO_WORK_ZERO_ADVISORY);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages).toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
     }
+  });
+
+  it('allows a CNC Start with current qualified work-Z evidence', () => {
+    const result = prepareStartJob(cncProject(), cncReadyController, {
+      ...readyMachine,
+      workZReferenceEpoch: 7,
+      workZZeroEvidence: { source: 'probe', referenceEpoch: 7 },
+    });
+
+    expect(result.ok).toBe(true);
   });
 });
