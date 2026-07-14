@@ -12,6 +12,11 @@ export type HoldJogHandlers = {
 
 export function useHoldJog(args: {
   readonly disabled: boolean;
+  // When false, the press-and-hold continuous jog is not armed: the controller
+  // cannot cancel an in-flight jog (no realtime jog-cancel byte), so a
+  // boundary-length continuous move would be physically unstoppable on release
+  // (F101). The arrow degrades to a single step per press.
+  readonly holdEnabled: boolean;
   readonly onStep: () => void;
   readonly onHold: () => void;
   readonly onCancel: () => void;
@@ -60,6 +65,7 @@ export function useHoldJog(args: {
       pointerActiveRef.current = true;
       holdActiveRef.current = false;
       event.currentTarget.setPointerCapture?.(event.pointerId);
+      if (!args.holdEnabled) return;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         if (!pointerActiveRef.current) return;

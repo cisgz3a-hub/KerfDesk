@@ -30,6 +30,10 @@ export function JogArrowGrid(props: {
   readonly signs: JogAxisSigns;
   readonly position: Vec2 | null;
   readonly bed: { readonly width: number; readonly height: number };
+  // Continuous (press-and-hold) jog is only offered when the controller can
+  // cancel an in-flight jog; otherwise the boundary-length move cannot be
+  // stopped on release (F101).
+  readonly continuousJogSupported: boolean;
   readonly onJog: (vector: JogVector) => void;
   readonly onCancel: () => void;
 }): JSX.Element {
@@ -58,6 +62,7 @@ function JogArrowButton(
   const label = jogVectorLabel(stepVector, props.stepMm);
   const handlers = useHoldJog({
     disabled: props.disabled,
+    holdEnabled: props.continuousJogSupported,
     onStep: () => props.onJog(stepVector),
     onHold: () => {
       const vector = continuousJogVector(
@@ -77,7 +82,7 @@ function JogArrowButton(
       disabled={props.disabled}
       style={btnStyle}
       aria-label={label}
-      title={`${label}. Hold for continuous jog.`}
+      title={props.continuousJogSupported ? `${label}. Hold for continuous jog.` : label}
       {...handlers}
     >
       {props.glyph}
