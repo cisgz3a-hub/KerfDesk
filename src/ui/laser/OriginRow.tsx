@@ -115,7 +115,7 @@ type OriginHandlerDeps = {
   readonly resetOrigin: () => Promise<void>;
   readonly releaseMotors: () => Promise<void>;
   readonly setJobPlacement: (placement: { readonly startFrom: 'user-origin' }) => void;
-  readonly pushToast: (message: string, variant: 'success') => void;
+  readonly pushToast: (message: string, variant: 'success' | 'error') => void;
 };
 
 // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
@@ -129,16 +129,24 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
 } {
   return {
     onSet: () => {
-      void deps.setOrigin().then(() => {
-        deps.setJobPlacement({ startFrom: 'user-origin' });
-        deps.pushToast('Origin set to current head position (G92).', 'success');
-      });
+      void deps
+        .setOrigin()
+        .then(() => {
+          deps.setJobPlacement({ startFrom: 'user-origin' });
+          deps.pushToast('Origin set to current head position (G92).', 'success');
+        })
+        .catch((error: unknown) =>
+          deps.pushToast(originActionErrorMessage('Set origin', error), 'error'),
+        );
     },
     onReset: () => {
       void deps
         .resetOrigin()
         .then(() =>
           deps.pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
+        )
+        .catch((error: unknown) =>
+          deps.pushToast(originActionErrorMessage('Reset origin', error), 'error'),
         );
     },
     onRelease: () => {
@@ -150,9 +158,31 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
             'Motors released ($SLP). Move the head by hand, then Wake and Set origin again.',
             'success',
           ),
-        );
+        )
+        .catch((error: unknown) => deps.pushToast(releaseMotorsErrorMessage(error), 'error'));
     },
   };
+}
+
+// The origin store actions reject on a controller error / block, but these UI
+// handlers shipped their .then() chains without a .catch(), so any rejection
+// escaped as an unhandled promise rejection. Catch it and surface a toast.
+function originActionErrorMessage(action: string, error: unknown): string {
+  return `${action} failed: ${error instanceof Error ? error.message : String(error)}`;
+}
+
+// $SLP (Release motors) is unsupported on grblHAL builds compiled without the
+// sleep feature — the controller answers error:3 "Unsupported $ command". Point
+// the operator at the stepper idle delay ($1) instead of a raw firmware error.
+function releaseMotorsErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/error:\s*3\b|unsupported/i.test(raw)) {
+    return (
+      'This controller does not support $SLP (sleep) — release the steppers by lowering the ' +
+      'stepper idle delay ($1) in the Console, then set $1=255 to re-lock before cutting.'
+    );
+  }
+  return `Release motors failed: ${raw}`;
 }
 
 function GoToWorkZeroButton(props: {
@@ -202,14 +232,22 @@ function AdvancedOriginControls(props: {
   const pushToast = useToastStore((s) => s.pushToast);
   const onSetPersistent = (): void => {
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
-    void setPersistentOrigin().then(() => {
-      setJobPlacement({ startFrom: 'user-origin' });
-      pushToast('Persistent G54 origin set to current head position.', 'success');
-    });
+    void setPersistentOrigin()
+      .then(() => {
+        setJobPlacement({ startFrom: 'user-origin' });
+        pushToast('Persistent G54 origin set to current head position.', 'success');
+      })
+      .catch((error: unknown) =>
+        pushToast(originActionErrorMessage('Set persistent origin', error), 'error'),
+      );
   };
   const onClearPersistent = (): void => {
     if (!jobAwareConfirm(CLEAR_PERSISTENT_ORIGIN_CONFIRM)) return;
-    void clearPersistentOrigin().then(() => pushToast('Persistent G54 origin cleared.', 'success'));
+    void clearPersistentOrigin()
+      .then(() => pushToast('Persistent G54 origin cleared.', 'success'))
+      .catch((error: unknown) =>
+        pushToast(originActionErrorMessage('Clear persistent origin', error), 'error'),
+      );
   };
   const persistentDisabled = props.busy || !props.persistentOriginReady;
   const setTitle = props.persistentOriginReady

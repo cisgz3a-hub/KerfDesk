@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
 import { OriginRow } from './OriginRow';
 import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
 import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
@@ -181,6 +182,86 @@ describe('OriginRow persistent origin controls', () => {
     try {
       root = await renderOriginRow(host);
       expect(buttonByText(host, 'Go to work zero').disabled).toBe(true);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
+
+describe('OriginRow release-motors failures', () => {
+  async function clickReleaseAndSettle(host: HTMLElement): Promise<void> {
+    await act(async () => {
+      buttonByText(host, 'Release motors').dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      );
+      // The handler's .then()/.catch() resolve across a few microtasks.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('points at the stepper idle delay when the controller rejects $SLP (grblHAL error:3)', async () => {
+    const releaseMotors = vi.fn(async () => {
+      throw new Error('error:3');
+    });
+    useLaserStore.setState({
+      statusReport: statusReport('Idle'),
+      releaseMotors,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 10, y: 20, z: 0 },
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const pushToast = vi
+      .spyOn(useToastStore.getState(), 'pushToast')
+      .mockImplementation(() => undefined);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      await clickReleaseAndSettle(host);
+
+      expect(releaseMotors).toHaveBeenCalledTimes(1);
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.stringContaining('does not support $SLP'),
+        'error',
+      );
+      expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('$1'), 'error');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('surfaces a generic failure toast (not an unhandled rejection) for other release errors', async () => {
+    const releaseMotors = vi.fn(async () => {
+      throw new Error('Connect to the controller before changing origin.');
+    });
+    useLaserStore.setState({
+      statusReport: statusReport('Idle'),
+      releaseMotors,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 10, y: 20, z: 0 },
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const pushToast = vi
+      .spyOn(useToastStore.getState(), 'pushToast')
+      .mockImplementation(() => undefined);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      await clickReleaseAndSettle(host);
+
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.stringContaining('Release motors failed'),
+        'error',
+      );
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
