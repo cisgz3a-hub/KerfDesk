@@ -75,7 +75,7 @@ describe('drawCanvasMotionOverlay', () => {
     );
     expect(recording.labels).toContain('FRAME START');
     expect(recording.labels).toContain('JOB START');
-    expect(recording.fillStyles).toContain('rgba(255, 255, 255, 0.68)');
+    expect(recording.fillStyles).toContain('rgba(255, 255, 255, 0.2)');
     expect(recording.dashes).toContainEqual([5, 5]);
   });
 

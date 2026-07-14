@@ -189,7 +189,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, x: number, y: number, label: s
   const width = ctx.measureText(label).width + 10;
   // Keep artwork visible beneath the marker while preserving enough contrast
   // for the safety-red label to remain legible over dense toolpaths.
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
   ctx.fillRect(x - 4, y - 12, width, 17);
   ctx.fillStyle = RED;
   ctx.fillText(label, x, y);

@@ -637,7 +637,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 6. When framing from a verified origin, a successful pass records frame verification for the Start-job preflight.
 
 #### Canvas start markers
-1. The canvas shows `FRAME START` and `JOB START` markers by default. Their translucent label
+1. The canvas shows `FRAME START` and `JOB START` markers by default. Their 20%-opaque label
    backgrounds keep artwork visible underneath while the red marker text and direction arrow remain
    fully opaque.
 2. The eye toggle immediately after **Snap** in the bottom-right canvas controls hides or restores
