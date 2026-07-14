@@ -13,7 +13,6 @@
 
 import { useRef, useState } from 'react';
 import { bendTextRender, placeTextOnPath } from '../../core/text';
-import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
 import { Button, Dialog, DialogActions } from '../kit';
@@ -25,6 +24,7 @@ import { FontPicker } from './FontPicker';
 import { FontUsageHint } from './FontUsageHint';
 import { renderTextGeometry } from './render-text-geometry';
 import { PathTextFields } from './PathTextFields';
+import { TextLayerField } from './TextLayerField';
 import { VariableTextFields } from './VariableTextFields';
 import {
   sanitizeTextDialogNumericValues,
@@ -56,12 +56,20 @@ function DialogForm(props: {
   const upsert = useStore((s) => s.upsertTextObject);
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const activeLayerColor = useUiStore((s) => s.activeLayerColor);
+  const setActiveLayerColor = useUiStore((s) => s.setActiveLayerColor);
   const pushToast = useToastStore((s) => s.pushToast);
-  const fields = useTextDialogFields(state, project, selectedObjectId);
+  const fields = useTextDialogFields(state, project, selectedObjectId, activeLayerColor);
   const [submitting, setSubmitting] = useState(false);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
-    void commitText(state, fields.values, { upsert, close, pushToast, setSubmitting });
+    void commitText(state, fields.values, {
+      upsert,
+      close,
+      pushToast,
+      setSubmitting,
+      setActiveLayerColor,
+    });
   };
   // kit Dialog owns the a11y wiring (Escape closes, Tab cycles, focus
   // returns to the opener) and the aria-label.
@@ -75,6 +83,7 @@ function DialogForm(props: {
           fields.values.content.trim() !== '' &&
           fields.fontAvailable &&
           fields.pathAvailable &&
+          fields.layerCompatible &&
           !submitting
         }
         submitting={submitting}
@@ -92,6 +101,7 @@ async function commitText(
     readonly close: () => void;
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly setSubmitting: (v: boolean) => void;
+    readonly setActiveLayerColor: (color: string | null) => void;
   },
 ): Promise<void> {
   const normalizedContent = normalizeTextContent(v.content);
@@ -115,7 +125,7 @@ async function commitText(
       alignment: v.alignment,
       lineHeight: safeValues.lineHeight,
       letterSpacing: safeValues.letterSpacing,
-      color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
+      color: v.color,
     });
     const placed = placeRenderedText(rawRendered, safeValues, v);
     const obj: TextObject = {
@@ -128,7 +138,7 @@ async function commitText(
       lineHeight: safeValues.lineHeight,
       letterSpacing: safeValues.letterSpacing,
       bendDeg: v.pathText === undefined ? safeValues.bendDeg : 0,
-      color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
+      color: v.color,
       ...(v.pathText === undefined ? {} : { pathText: v.pathText }),
       ...(variable.template === undefined ? {} : { variableTemplate: variable.template }),
       bounds: placed.rendered.bounds,
@@ -136,6 +146,7 @@ async function commitText(
       paths: placed.rendered.paths,
     };
     ctx.upsert(obj, v.importedFont);
+    ctx.setActiveLayerColor(v.color);
     ctx.close();
   } catch (err) {
     ctx.pushToast(
@@ -178,6 +189,12 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
       </Field>
+      <TextLayerField
+        value={values.color}
+        options={props.fields.layerOptions}
+        {...(props.fields.layerNotice === undefined ? {} : { notice: props.fields.layerNotice })}
+        onChange={props.fields.setColor}
+      />
       <TextDialogNumericFields
         values={values}
         setSizeMm={setSizeMm}

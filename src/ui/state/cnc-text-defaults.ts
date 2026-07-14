@@ -8,13 +8,8 @@
 // PROVISIONAL interpretation: the H.6 roadmap line "CNC text defaults" is
 // otherwise unspecified in canon — flagged for maintainer review.
 
-import {
-  activeCncTool,
-  DEFAULT_CNC_LAYER_SETTINGS,
-  type MachineConfig,
-  type Scene,
-} from '../../core/scene';
-import { findFontEntry } from '../../core/text';
+import { DEFAULT_CNC_LAYER_SETTINGS, type MachineConfig, type Scene } from '../../core/scene';
+import { defaultCncTextCutType } from '../common/text-layer-policy';
 
 export function applyCncTextDefaultsToNewLayer(
   scene: Scene,
@@ -23,10 +18,7 @@ export function applyCncTextDefaultsToNewLayer(
   fontKey: string,
 ): Scene {
   if (machine === undefined || machine.kind !== 'cnc') return scene;
-  const cutType =
-    findFontEntry(fontKey)?.geometry !== 'single-line' && activeCncTool(machine).kind === 'v-bit'
-      ? 'v-carve'
-      : 'engrave';
+  const cutType = defaultCncTextCutType(machine, fontKey);
   return {
     ...scene,
     layers: scene.layers.map((layer) =>
