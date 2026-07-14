@@ -19,6 +19,7 @@ import { JobPlacementControls } from './JobPlacementControls';
 import { OriginRow } from './OriginRow';
 import { ControllerOperationControls, MotionControls, RunningControls } from './JobRunControls';
 import { OverrideControls } from './OverrideControls';
+import { AccessoryResetControls } from './AccessoryResetControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 import { StartFromLineControl } from './StartFromLineControl';
@@ -53,12 +54,21 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const ovCache = useLaserStore((s) => s.ovCache);
+  const accessoryCache = useLaserStore((s) => s.accessoryCache ?? null);
+  const controllerState = useLaserStore((s) => s.statusReport?.state ?? null);
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
   return (
     <div style={containerStyle}>
       <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
+      <AccessoryResetControls
+        accessories={accessoryCache}
+        controlsBusy={controlsBusy}
+        controllerState={controllerState}
+        disabled={disabled}
+        machineKind={machineKind}
+      />
       {showIdleOverrideReset && <OverrideControls />}
       {motionOperation !== null && <MotionControls operationKind={motionOperation.kind} />}
       {controllerOperation !== null && (

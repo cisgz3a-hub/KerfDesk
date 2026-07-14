@@ -15,13 +15,49 @@ import { useLaserStore } from './laser-store';
 import { TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE } from './laser-store-helpers';
 import { PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE } from './work-z-zero-evidence';
 
-type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
+type FakeConnection = SerialConnection & {
+  readonly emitLine: (line: string) => void;
+  readonly releaseBlockedWrite: () => void;
+};
 
-function makeConnection(writes: string[]): FakeConnection {
+type LiveStatusMode =
+  | 'off'
+  | 'active'
+  | 'override'
+  | 'encoder-fault'
+  | 'reboot'
+  | 'fence-error'
+  | 'transport-backpressure';
+
+function makeConnection(writes: string[], statusMode: LiveStatusMode = 'off'): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
-  return {
+  let releaseBlockedWrite: (() => void) | null = null;
+  const connection: FakeConnection = {
     write: async (data) => {
       writes.push(data);
+      if (statusMode === 'transport-backpressure' && data === '$G\n') {
+        await new Promise<void>((resolve) => {
+          releaseBlockedWrite = resolve;
+        });
+      }
+      if (data === 'G4 P0.01\n') {
+        const response =
+          statusMode === 'reboot' ? 'Grbl 1.1f' : statusMode === 'fence-error' ? 'error:20' : 'ok';
+        setTimeout(() => connection.emitLine(response), 0);
+      }
+      if (data === '?') {
+        const suffix =
+          statusMode === 'active'
+            ? '|Ov:100,100,100|A:S'
+            : statusMode === 'override'
+              ? '|Ov:110,100,100'
+              : statusMode === 'encoder-fault'
+                ? '|Ov:100,100,100|A:E'
+                : '|Ov:100,100,100';
+        setTimeout(() => {
+          connection.emitLine(`<Idle|MPos:0.000,0.000,0.000|FS:0,0${suffix}>`);
+        }, 0);
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -32,7 +68,12 @@ function makeConnection(writes: string[]): FakeConnection {
     emitLine: (line) => {
       for (const handler of lineHandlers) handler(line);
     },
+    releaseBlockedWrite: () => {
+      releaseBlockedWrite?.();
+      releaseBlockedWrite = null;
+    },
   };
+  return connection;
 }
 
 function makeAdapter(connection: SerialConnection): PlatformAdapter {
@@ -56,7 +97,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   connection.emitLine('Grbl 1.1f');
   await flush();
   connection.emitLine('ok');
-  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
   await flush();
 }
 
@@ -96,6 +137,138 @@ afterEach(async () => {
 });
 
 describe('CNC tool-change activation (CNC-01..03)', () => {
+  it('rechecks live accessory evidence at the store boundary before arming', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes, 'active'));
+    writes.length = 0;
+
+    // The older snapshot says off, but the post-confirmation live reports say
+    // spindle on. No program byte may be armed from the stale snapshot.
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      }),
+    ).rejects.toThrow(/clockwise spindle/i);
+
+    expect(writes).toContain('G4 P0.01\n');
+    expect(writes).toContain('?');
+    expect(writes.join('')).not.toContain('G1 X1 Y1');
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('rechecks live overrides at the store boundary before arming', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes, 'override'));
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      }),
+    ).rejects.toThrow(/feed 110%/i);
+
+    expect(writes).toContain('G4 P0.01\n');
+    expect(writes).toContain('?');
+    expect(writes.join('')).not.toContain('G1 X1 Y1');
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('blocks a fresh grblHAL spindle encoder fault before arming', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes, 'encoder-fault'));
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      }),
+    ).rejects.toThrow(/spindle encoder fault/i);
+
+    expect(writes).toEqual(['G4 P0.01\n', '?']);
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('reserves the arming window against concurrent console accessory commands', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+    writes.length = 0;
+
+    const starting = useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+    });
+    expect(useLaserStore.getState().controllerOperation?.kind).toBe('start-arming');
+    await expect(useLaserStore.getState().sendConsoleCommand('M8')).rejects.toThrow(
+      /controller operation/i,
+    );
+    await starting;
+
+    expect(writes).not.toContain('M8\n');
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+  });
+
+  it('cancels arming when a reboot banner invalidates volatile setup', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes, 'reboot'));
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      }),
+    ).rejects.toThrow(/controller rebooted/i);
+
+    expect(writes).toEqual(['G4 P0.01\n']);
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('requires a positive ok from the queued Start fence', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes, 'fence-error'));
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+        machineKind: 'cnc',
+        cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+      }),
+    ).rejects.toThrow(/error:20/i);
+
+    expect(writes).toEqual(['G4 P0.01\n']);
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('waits for a pre-reservation transport write before installing the fence', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes, 'transport-backpressure');
+    await connectWith(connection);
+    writes.length = 0;
+
+    const priorCommand = useLaserStore.getState().sendConsoleCommand('$G');
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    const starting = useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncSetupAttestation: createCncSetupAttestation(CNC_MULTI_TOOL),
+    });
+    await flush();
+    expect(writes).toEqual(['$G\n']);
+
+    connection.releaseBlockedWrite();
+    await priorCommand;
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    connection.emitLine('ok');
+    await starting;
+
+    expect(writes).toContain('G4 P0.01\n');
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+  });
+
   it('refuses a direct CNC stream without exact-program setup confirmation', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes));

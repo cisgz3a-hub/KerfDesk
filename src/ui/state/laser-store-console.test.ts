@@ -77,6 +77,7 @@ afterEach(async () => {
     detectedSettings: null,
     controllerSettings: null,
     wcoCache: null,
+    accessoryCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,
@@ -192,6 +193,27 @@ describe('laser-store console commands', () => {
       statusReport: null,
       trustedPositionEpoch: 8,
     });
+  });
+
+  it('invalidates a known all-off cache after an accessory-mutating console command', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+    expect(useLaserStore.getState().accessoryCache).toEqual({
+      spindleCw: false,
+      spindleCcw: false,
+      flood: false,
+      mist: false,
+    });
+
+    await useLaserStore.getState().sendConsoleCommand('M3 S12000');
+    expect(useLaserStore.getState().accessoryCache).toBeNull();
+
+    // GRBL may return an ordinary Idle frame before its intermittent Ov:/A:
+    // report. That frame must not resurrect the stale all-off observation.
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,12000>');
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+    expect(useLaserStore.getState().accessoryCache).toBeNull();
   });
 
   it('invalidates only XY setup truth for an XY-only console origin command', async () => {

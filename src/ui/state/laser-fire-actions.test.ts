@@ -31,6 +31,12 @@ function readyState(): LaserState {
     probeBusy: false,
     pendingUntrackedAcks: 0,
     fireActive: false,
+    accessoryCache: {
+      spindleCw: false,
+      spindleCcw: false,
+      flood: false,
+      mist: false,
+    },
   };
 }
 
@@ -78,6 +84,7 @@ describe('momentary low-power Fire action', () => {
     await test.setFireActive(true, 50);
     expect(test.write).toHaveBeenCalledWith('M3 S20\n', 'fire', 'console');
     expect(test.get().fireActive).toBe(true);
+    expect(test.get().accessoryCache).toBeNull();
 
     await test.setFireActive(false);
     expect(test.write).toHaveBeenLastCalledWith('M5\n', 'fire', 'console');

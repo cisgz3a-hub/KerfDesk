@@ -2606,6 +2606,60 @@ F-CNC19 tiling.
    between reports remain outside the single-sender contract.
 2. Laser Start is unchanged by this CNC-only gate.
 
+### F-CNC40. Neutralize live spindle and coolant state before CNC Start - Phase H.11
+
+#### Success
+1. GRBL accessory reports decode clockwise spindle (`A:S`), counter-clockwise
+   spindle (`A:C`), flood (`A:F`), and mist (`A:M`) into a cache that survives
+   status frames where the intermittent field is absent.
+2. An `Ov:` report without `A:` is the protocol-backed all-off observation.
+   CNC Start and CNC resume proceed past this gate only when that fresh cache
+   contains no active accessory; other readiness gates still apply.
+3. When a CNC controller is otherwise idle but reports an active accessory,
+   the job panel names every active channel and offers **Stop spindle & coolant**.
+   After the operator confirms the cutter is clear of material and stopping is
+   safe, the action sends one guarded `M5 M9` block and waits for fresh status
+   before Start can become eligible.
+
+#### Error - Idle controller still has an accessory active
+1. CNC Start blocks even though motion state is `Idle`, names the live spindle
+   direction and/or coolant channels, and requires `M5`/`M9` plus a fresh
+   all-off status report.
+2. A sparse status frame with neither `A:` nor `Ov:` does not erase a previously
+   active observation.
+3. Arming any job stream invalidates the previous observation, so a partial
+   initial/refill write failure cannot reuse stale all-off state on retry.
+4. After the CNC setup confirmation closes, Start discards the older cache and
+   first reserves the app's controller write path, drains earlier app acks, and
+   waits for the ack from a queued dwell marker. It then requests a fresh
+   `Ov:`/`A:` observation and rechecks connection, Alarm, Idle, override,
+   accessory, setup-epoch, reservation, and zero-pending-ack state immediately
+   before arming the stream.
+5. A controller reboot during that window cancels Start and invalidates volatile
+   origin, work-Z, position, override, and accessory evidence.
+6. A transport write is reserved before the port promise yields. Start waits for
+   both transport and ack ledgers; reset/reconnect epochs reject late old-session
+   completions, and the queued fence must end in positive `ok` rather than
+   `error`, `ALARM`, timeout, or reboot.
+
+#### Edge - reported state is not physical sensor proof
+1. `A:` is GRBL's controller-commanded accessory state. It does not prove
+   measured RPM, coolant flow, relay position, or external VFD state.
+2. Before either `A:` or `Ov:` has been observed, or after an app command that
+   can mutate accessories, the cache is unknown and CNC Start fails closed
+   until a fresh report arrives. Firmware that omits those reports cannot run
+   CNC jobs with this gate. Laser Start remains unchanged.
+3. grblHAL `SP1:`/`SPn:` secondary-spindle telemetry hard-blocks CNC Start and
+   suppresses the generic `M5 M9` action. Multi-spindle selection and recovery
+   require a dedicated machine-specific model.
+4. grblHAL `A:E` spindle-encoder faults and `A:T` pending firmware tool changes
+   hard-block Start and stay latched across ordinary Ov-only frames until an
+   explicit A report or reset proves the exceptional state changed.
+5. KerfDesk must be the controller's only command owner during Start and the
+   job. GRBL cannot atomically bind a status observation to the next program
+   bytes, so pendant, WebUI, PLC, macro, or second-sender mutations after the
+   observation require an external interlock or machine-specific protocol.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

@@ -14,9 +14,10 @@ import {
 } from './laser-store-helpers';
 
 export type SafeWriteRefs = {
-  readonly connection: SerialConnection | null;
+  connection: SerialConnection | null;
   readonly driver: ControllerDriver;
   nextTranscriptId: number;
+  writeEpoch?: number;
 };
 
 export type SafeWrite = (
@@ -64,32 +65,68 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       });
       throw new Error(message);
     }
+    const writeSource =
+      source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
+    const owedAcks = owedTerminalAcks(line, writeSource);
+    const writeEpoch = refs.writeEpoch ?? 0;
+    // Reserve transport ownership synchronously, before the first await. On
+    // success the same atomic patch transfers it into the ack ledger, so Start
+    // can never observe both counters at zero between those phases.
+    set((state) => ({
+      pendingTransportWrites: (state.pendingTransportWrites ?? 0) + 1,
+    }));
     try {
-      const writeSource =
-        source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
       await conn.write(line);
-      const owedAcks = owedTerminalAcks(line, writeSource);
-      set((s) => ({
-        transcript: appendTranscript(
-          s.transcript,
-          outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, writeSource),
-        ),
-        ...(owedAcks > 0 ? { pendingUntrackedAcks: s.pendingUntrackedAcks + owedAcks } : {}),
-      }));
+      assertCurrentWriteEpoch(refs, writeEpoch);
+      commitSuccessfulWrite(set, refs, line, writeSource, owedAcks);
     } catch (err) {
-      const message = serialWriteErrorMessage(err);
-      set({
-        lastWriteError: message,
-        log: pushLog(
-          get(),
-          `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
-        ),
-        ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
-      });
-      console.error('Serial write failed:', err);
-      throw err instanceof Error ? err : new Error(message);
+      recordWriteFailure(set, refs, writeEpoch, err, action);
+      throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+function assertCurrentWriteEpoch(refs: SafeWriteRefs, expected: number): void {
+  if ((refs.writeEpoch ?? 0) === expected) return;
+  throw new Error('Serial session changed before the write completed. Command result is invalid.');
+}
+
+function commitSuccessfulWrite(
+  set: SetFn,
+  refs: SafeWriteRefs,
+  line: string,
+  source: TranscriptSource,
+  owedAcks: number,
+): void {
+  set((state) => ({
+    pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+    transcript: appendTranscript(
+      state.transcript,
+      outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, source),
+    ),
+    ...(owedAcks > 0 ? { pendingUntrackedAcks: state.pendingUntrackedAcks + owedAcks } : {}),
+  }));
+}
+
+function recordWriteFailure(
+  set: SetFn,
+  refs: SafeWriteRefs,
+  expectedEpoch: number,
+  err: unknown,
+  action: LaserSafetyAction | undefined,
+): void {
+  if ((refs.writeEpoch ?? 0) !== expectedEpoch) return;
+  const message = serialWriteErrorMessage(err);
+  set((state) => ({
+    pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+    lastWriteError: message,
+    log: pushLog(
+      state,
+      `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
+    ),
+    ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
+  }));
+  console.error('Serial write failed:', err);
 }
 
 // Every queued (newline-terminated) LINE earns exactly one terminal

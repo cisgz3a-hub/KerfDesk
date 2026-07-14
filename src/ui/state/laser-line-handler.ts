@@ -48,6 +48,11 @@ export function handleLine(
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   publishDetectedSettings(set, refs, cls);
+  const bannerRaw = bannerCandidateRaw(cls);
+  if (bannerRaw !== null) {
+    handleWelcomeLine(set, get, refs, safeWrite, bannerRaw);
+    return;
+  }
   const ackOwner = settleUntrackedAck(set, state, cls.kind);
   const commandConsumed = consumeControllerCommandResponse(refs, cls, line);
   // An arbiter-owned ALARM still has global machine meaning: invalidate
@@ -64,11 +69,6 @@ export function handleLine(
   }
   if (cls.kind === 'error') {
     handleErrorLine(set, get, refs, safeWrite, cls.code, cls.raw, ackOwner);
-    return;
-  }
-  const bannerRaw = bannerCandidateRaw(cls);
-  if (bannerRaw !== null) {
-    handleWelcomeLine(set, get, refs, safeWrite, bannerRaw);
     return;
   }
   // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
@@ -160,6 +160,7 @@ function handleWelcomeLine(
   const detected = detectControllerFromBanner(raw);
   if (detected === null) return;
   const state = get();
+  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   const mismatchLog =
     detected === refs.driver.kind
       ? {}
@@ -172,10 +173,23 @@ function handleWelcomeLine(
   // session will never arrive.
   set({
     detectedControllerKind: detected,
+    statusReport: null,
+    alarmCode: null,
+    wcoCache: null,
+    ovCache: null,
     pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
+    accessoryCache: null,
+    ...originUnknownAfterControllerReset(state),
+    motionOperation: null,
+    controllerOperation: null,
+    fireActive: false,
+    frameVerification: null,
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     ...mismatchLog,
     ...rebootDuringJobPatch(state),
   });
+  cancelControllerLifecycleRefs(refs, 'Controller rebooted.');
   // Beam-off cleanup deferred by a commanded reset (Stop, auto-stop) goes
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and
@@ -219,6 +233,7 @@ function handleAlarmLine(
   safeWrite: SafeWriteFn,
   code: number,
 ): void {
+  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   // A hard-limit alarm that fires while a Verified Frame is tracing means the
   // job box runs past the travel from this origin — name the limit so the
   // operator knows which way to move (ADR-053 P3). The alarm also clears the
@@ -231,6 +246,7 @@ function handleAlarmLine(
   set({
     alarmCode: code,
     wcoCache: null,
+    accessoryCache: null,
     ...originUnknownAfterControllerReset(prev),
     motionOperation: null,
     controllerOperation: null,
@@ -238,6 +254,7 @@ function handleAlarmLine(
     frameVerification: null,
     // The alarmed controller discards its pending work; owed acks are gone.
     pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
     ...frameLimitPatch,
   });
   cancelControllerLifecycleRefs(refs, `ALARM:${code}`);

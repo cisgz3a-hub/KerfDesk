@@ -23,6 +23,10 @@ export type LaserControllerOperation =
       readonly kind: 'recovery';
       readonly phase: 'reset' | 'awaiting-idle';
       readonly idleReports: number;
+    }
+  | {
+      readonly kind: 'start-arming';
+      readonly phase: 'queue-fence' | 'live-status';
     };
 
 export const CONTROLLER_OPERATION_ACTIVE_MESSAGE =
@@ -42,8 +46,7 @@ export function describeControllerOperation(operation: LaserControllerOperation 
     return 'Waiting for fresh Idle after Home';
   }
   if (operation.kind === 'post-job-settle') {
-    if (operation.phase === 'dwell') return 'Settling after job';
-    return 'Waiting for stable Idle after job';
+    return describePostJobSettle(operation.phase);
   }
   if (operation.kind === 'probe') {
     if (operation.phase === 'sequence') return 'Probing';
@@ -53,5 +56,18 @@ export function describeControllerOperation(operation: LaserControllerOperation 
   if (operation.kind === 'recovery') {
     return operation.phase === 'reset' ? 'Recovering controller' : 'Waiting for Idle after reset';
   }
+  if (operation.kind === 'start-arming') {
+    return describeStartArming(operation.phase);
+  }
   return operation.label;
+}
+
+function describePostJobSettle(phase: 'dwell' | 'awaiting-idle'): string {
+  return phase === 'dwell' ? 'Settling after job' : 'Waiting for stable Idle after job';
+}
+
+function describeStartArming(phase: 'queue-fence' | 'live-status'): string {
+  return phase === 'queue-fence'
+    ? 'Fencing controller queue before Start'
+    : 'Verifying live controller state before Start';
 }

@@ -1,6 +1,7 @@
 import { cappedFirePowerS, profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
 import { useExperimentalLaserFeatures } from './experimental-laser-features';
+import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { isActiveJob, pushLog } from './laser-store-helpers';
@@ -42,7 +43,10 @@ async function deactivateFire(
 ): Promise<void> {
   runtime.requestToken += 1;
   const shouldWriteOff = runtime.activationPending || get().fireActive;
-  set({ fireActive: false });
+  set((state) => ({
+    fireActive: false,
+    accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+  }));
   if (shouldWriteOff) await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console');
 }
 
@@ -71,7 +75,10 @@ async function activateFire(
   if (powerS <= 0) rejectFireActivation(set, get, 'Fire power must resolve to a positive S value.');
 
   runtime.activationPending = true;
-  set({ fireActive: true });
+  set((state) => ({
+    fireActive: true,
+    accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+  }));
   try {
     await safeWrite(`M3 S${powerS}\n`, 'fire', 'console');
     if (token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null) {

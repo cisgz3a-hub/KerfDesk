@@ -18,11 +18,15 @@ export type ControllerCommandKind =
   | 'post-job-settle'
   | 'probe'
   | 'interactive-command'
-  | 'recovery';
+  | 'recovery'
+  | 'start-arming';
 
 export type ControllerLifecycleRefs = {
   controllerCommand: ControllerCommandRequest | null;
   controllerIdleWait: ControllerIdleWaitRequest | null;
+  // Serial-session/reset generation. Late transport promises from an older
+  // epoch must not mutate the current write/ack ledgers.
+  writeEpoch?: number;
 };
 
 type ControllerCommandRequest = {
@@ -244,6 +248,6 @@ function updateOperationIdleReports(
 ): Partial<LaserState> {
   const operation = state.controllerOperation;
   if (operation === null || operation.kind !== kind) return {};
-  if (operation.kind === 'interactive-command') return {};
+  if (operation.kind === 'interactive-command' || operation.kind === 'start-arming') return {};
   return { controllerOperation: { ...operation, idleReports } };
 }

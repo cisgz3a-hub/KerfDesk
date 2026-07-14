@@ -87,9 +87,18 @@ describe('laser store air assist safety cleanup', () => {
     await connectWith(connection);
 
     write.mockClear();
+    useLaserStore.setState({
+      accessoryCache: {
+        spindleCw: false,
+        spindleCcw: false,
+        flood: false,
+        mist: false,
+      },
+    });
     await useLaserStore.getState().setAirAssistEnabled(true);
     expect(write).toHaveBeenCalledWith('M8\n');
     expect(useLaserStore.getState().airAssistOn).toBe(true);
+    expect(useLaserStore.getState().accessoryCache).toBeNull();
 
     connection.emitLine('ok');
     await flushConnect();

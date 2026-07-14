@@ -1,6 +1,7 @@
 import { startCollecting, type SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ConsoleStateEffect } from '../../core/controllers/console-state-effect';
+import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -71,6 +72,13 @@ export function consoleActions(
           lastSettingsReadAt: null,
         });
       }
+      if (commandChangesAccessories(prepared.command.normalized)) {
+        // Invalidate before the async write yields so Start cannot race a
+        // just-sent M3/M4/M5/M7/M8/M9 while the prior all-off cache remains.
+        set((state) => ({
+          accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+        }));
+      }
       await write(prepared.command.wire, actionForConsoleCommand(prepared.command.kind), 'console');
       const stateEffect = prepared.command.stateEffect;
       if (stateEffect !== 'read-only') {
@@ -122,6 +130,9 @@ function consoleStateEffectPatch(
     // physically completed. Require a fresh controller report before another
     // setup/job action can trust Idle or position.
     statusReport: null,
+    ...(commandChangesAccessories(command)
+      ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
+      : {}),
     frameVerification: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     log: pushLog(
@@ -172,6 +183,15 @@ function consoleStateEffectPatch(
         lastSettingsReadAt: null,
       };
   }
+}
+
+function commandChangesAccessories(command: string): boolean {
+  const uncommented =
+    command
+      .replace(/\([^)]*\)/g, ' ')
+      .split(';', 1)[0]
+      ?.toUpperCase() ?? '';
+  return /M0?[345789](?=$|[^0-9.])/.test(uncommented);
 }
 
 function unknownCoordinatePatch(): Partial<LaserState> {

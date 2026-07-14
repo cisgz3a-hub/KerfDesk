@@ -100,7 +100,7 @@ describe('ProbePanel', () => {
       });
       expect(probe).toHaveBeenCalledTimes(1);
       const lines = probe.mock.calls[0]?.[0] ?? [];
-      expect(lines[0]).toBe('G54');
+      expect(lines.slice(0, 2)).toEqual(['G54', 'G21']);
       expect(lines.some((line: string) => line.startsWith('G38.2 Z-'))).toBe(true);
       expect(lines.some((line: string) => line.startsWith('G10 L20 P0 Z'))).toBe(true);
     } finally {

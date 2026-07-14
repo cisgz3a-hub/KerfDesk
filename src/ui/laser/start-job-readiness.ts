@@ -26,6 +26,7 @@ import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
 import { cncToolPlan, type CncToolPlanEntry } from '../state/cnc-tool-plan';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
+import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveJobPlacement,
@@ -73,6 +74,10 @@ export type MachineStartSnapshot = {
   // A known non-default value changes physical feed/RPM independently of the
   // prepared G-code, so CNC Start requires the compiled 100/100/100 baseline.
   readonly ovCache?: OverrideValues | null;
+  // Last live GRBL A: observation. This is controller-commanded state, not
+  // physical spindle/coolant sensor proof. Known active accessories block CNC
+  // Start; null/undefined remains unknown rather than being invented as off.
+  readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
   // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
   readonly frameVerification?: FrameVerification | null;
   // ADR-094 — how the connected firmware exposes settings. Non-GRBL values
@@ -92,6 +97,7 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
     issues.push(CNC_REQUIRES_GRBL_MESSAGE);
   }
   issues.push(...cncOverrideStartIssues(project, machine.ovCache));
+  issues.push(...cncAccessoryStartIssues(project, machine.accessoryCache));
   const workZeroIssue = cncWorkZeroStartIssue(
     project,
     machine.workZZeroEvidence,
@@ -101,17 +107,20 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
   return issues;
 }
 
+function cncAccessoryStartIssues(
+  project: Project,
+  accessories: NonNullable<StatusReport['accessories']> | null | undefined,
+): ReadonlyArray<string> {
+  const issue = cncAccessoryStartIssue(machineKindOf(project.machine), accessories);
+  return issue === null ? [] : [issue];
+}
+
 function cncOverrideStartIssues(
   project: Project,
   overrides: OverrideValues | null | undefined,
 ): ReadonlyArray<string> {
-  if (machineKindOf(project.machine) !== 'cnc' || overrides == null) return [];
-  if (overrides.feed === 100 && overrides.rapid === 100 && overrides.spindle === 100) return [];
-  return [
-    'CNC Start requires controller overrides at the compiled baseline: feed 100%, rapid 100%, ' +
-      `spindle 100%. Current live values are feed ${overrides.feed}%, rapid ${overrides.rapid}%, ` +
-      `spindle ${overrides.spindle}%. Reset each override to 100% before starting.`,
-  ];
+  const issue = cncOverrideStartIssue(machineKindOf(project.machine), overrides);
+  return issue === null ? [] : [issue];
 }
 
 export function prepareStartJob(
