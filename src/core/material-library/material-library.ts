@@ -2,6 +2,7 @@ import { DITHER_ALGORITHMS, type DitherAlgorithm, type Layer, type LayerMode } f
 
 export type MaterialRecipe = {
   readonly mode: LayerMode;
+  readonly powerMode?: NonNullable<Layer['powerMode']> | undefined;
   readonly minPower: number;
   readonly power: number;
   readonly speed: number;
@@ -27,6 +28,7 @@ export type MaterialRecipe = {
 
 export const MATERIAL_RECIPE_FIELDS = [
   'mode',
+  'powerMode',
   'minPower',
   'power',
   'speed',
@@ -59,6 +61,7 @@ const MIN_SPACING = 0.001;
 export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
   return {
     mode: layer.mode,
+    powerMode: layer.powerMode,
     minPower: layer.minPower,
     power: layer.power,
     speed: layer.speed,
@@ -99,6 +102,7 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
 
   return {
     mode: recipe.mode,
+    ...(isLayerPowerMode(recipe.powerMode) ? { powerMode: recipe.powerMode } : {}),
     minPower: clampFinite(recipe.minPower, 0, power),
     power,
     speed: Math.max(1, finiteOr(recipe.speed, 1)),
@@ -139,12 +143,20 @@ function isLayerMode(value: unknown): value is LayerMode {
   return LAYER_MODES.some((mode) => mode === value);
 }
 
+function isLayerPowerMode(value: unknown): value is NonNullable<Layer['powerMode']> {
+  return value === 'constant' || value === 'dynamic';
+}
+
 function isDitherAlgorithm(value: unknown): value is DitherAlgorithm {
   return DITHER_ALGORITHMS.some((algorithm) => algorithm === value);
 }
 
 function hasRecipeModes(value: Record<string, unknown>): boolean {
-  return isLayerMode(value.mode) && isDitherAlgorithm(value.ditherAlgorithm);
+  return (
+    isLayerMode(value.mode) &&
+    (value.powerMode === undefined || isLayerPowerMode(value.powerMode)) &&
+    isDitherAlgorithm(value.ditherAlgorithm)
+  );
 }
 
 function hasRecipeNumbers(value: Record<string, unknown>): boolean {

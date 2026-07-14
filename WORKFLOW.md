@@ -226,10 +226,21 @@ Identical to F-A3 except:
 
 #### Default values for a new Layer
 - Power: 30 %
+- Power mode: Auto (uses the active controller profile's vector default)
 - Speed: 1500 mm/min
 - Passes: 1
 - Visible: on
 - Output: on
+
+#### Success - choose vector power mode
+1. Open Cut Settings for a Line or Fill layer.
+2. Choose **Auto**, **Constant (M3)**, or **Dynamic (M4)**.
+3. Auto preserves the active controller profile's cut/fill mode. Constant and Dynamic override that
+   mode for this layer only.
+4. The output state machine changes mode before the layer's first burn move and avoids redundant
+   mode words between adjacent layers with the same selection.
+5. Image mode does not show this control because raster emission owns its power mode and laser-off
+   travel transitions independently.
 
 #### Success — edit power value
 1. Click input, type new value (or use stepper).

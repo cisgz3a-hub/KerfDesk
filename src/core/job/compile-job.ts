@@ -195,6 +195,7 @@ function commonGroupFields(
     layerId: layer.id,
     color: layer.color,
     power: effectiveObjectPowerPercent(layer, powerSource),
+    ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
     speed: Math.min(layer.speed, device.maxFeed),
     passes: Math.max(1, Math.floor(layer.passes)),
     airAssist: layer.airAssist,

@@ -20,6 +20,7 @@ export function validateLayerOperationSettings(value: unknown, path: string): st
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([
     requireLiteral(value, `${path}.mode`, ['line', 'fill', 'image']),
+    optionalLiteral(value, `${path}.powerMode`, ['constant', 'dynamic']),
     optionalPercent(value, `${path}.minPower`),
     requirePercent(value, `${path}.power`),
     requirePositiveNumber(value, `${path}.speed`),

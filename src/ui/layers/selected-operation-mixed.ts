@@ -4,6 +4,7 @@ export type MixedOperationFields = Partial<Record<keyof LayerOperationSettings, 
 
 const OPERATION_SETTING_KEYS = [
   'mode',
+  'powerMode',
   'minPower',
   'power',
   'speed',

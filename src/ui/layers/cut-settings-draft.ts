@@ -31,6 +31,7 @@ export function readCutSettingsPatch(
   const fillSettings = readFillSettingsPatch(data, layer, mode);
   return {
     mode,
+    ...readPowerModePatch(data, layer, mode),
     power,
     minPower:
       mode === 'image'
@@ -171,6 +172,23 @@ function positiveFiniteLimit(value: number | undefined): number | null {
 function parseMode(value: string): LayerMode {
   if (value === 'fill' || value === 'image') return value;
   return 'line';
+}
+
+function readPowerMode(
+  data: FormData,
+  fallback: NonNullable<Layer['powerMode']> | undefined,
+): NonNullable<Layer['powerMode']> | undefined {
+  if (!data.has('powerMode')) return fallback;
+  const value = String(data.get('powerMode'));
+  return value === 'constant' || value === 'dynamic' ? value : undefined;
+}
+
+function readPowerModePatch(
+  data: FormData,
+  layer: Layer,
+  mode: LayerMode,
+): Pick<LayerPatch, 'powerMode'> {
+  return { powerMode: mode === 'image' ? layer.powerMode : readPowerMode(data, layer.powerMode) };
 }
 
 function parseFillStyle(value: string): Layer['fillStyle'] {

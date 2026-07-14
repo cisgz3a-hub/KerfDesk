@@ -283,6 +283,7 @@ function removeDeletedIdsFromSelection(
 
 const LAYER_SETTING_KEYS = [
   'mode',
+  'powerMode',
   'minPower',
   'power',
   'speed',
@@ -313,6 +314,7 @@ const LAYER_SETTING_KEYS = [
 function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
   return {
     mode: layer.mode,
+    ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
     minPower: layer.minPower,
     power: layer.power,
     speed: layer.speed,

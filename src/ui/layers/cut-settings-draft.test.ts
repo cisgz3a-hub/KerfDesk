@@ -60,6 +60,22 @@ describe('cut settings draft helpers', () => {
     expect(patch.airAssist).toBe(true);
   });
 
+  it('reads vector power mode and clears an override when Auto is selected', () => {
+    expect(
+      readCutSettingsPatch(formData({ mode: 'line', powerMode: 'dynamic' }), lineLayer()).powerMode,
+    ).toBe('dynamic');
+    expect(
+      readCutSettingsPatch(
+        formData({ mode: 'fill', powerMode: 'auto' }),
+        fillLayer({ powerMode: 'constant' }),
+      ).powerMode,
+    ).toBeUndefined();
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image' }), imageLayer({ powerMode: 'constant' }))
+        .powerMode,
+    ).toBe('constant');
+  });
+
   it('clamps speed to the supplied active-device max feed', () => {
     const layer = lineLayer({ speed: 1500 });
     const patch = readCutSettingsPatch(formData({ mode: 'line', speed: '9000' }), layer, {

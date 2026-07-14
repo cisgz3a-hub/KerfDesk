@@ -90,4 +90,20 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     expect(out).not.toContain('M4');
     expect(out).toContain('G21\nG90\nM3 S0\n; layer cut');
   });
+
+  it('honors explicit vector overrides and switches before each affected group', () => {
+    const dynamicCut: CutGroup = { ...cut(), layerId: 'dynamic-cut', powerMode: 'dynamic' };
+    const constantFill: FillGroup = {
+      ...fill(5),
+      layerId: 'constant-fill',
+      powerMode: 'constant',
+    };
+    const out = emit({ groups: [dynamicCut, constantFill] });
+
+    expect(out).toContain('M5\nM4 S0\n; layer dynamic-cut');
+    expect(out).toContain('M3 S0\n; fill layer constant-fill');
+    expect(out.indexOf('M4 S0')).toBeLessThan(out.indexOf('; layer dynamic-cut'));
+    expect(out.lastIndexOf('M3 S0')).toBeLessThan(out.indexOf('; fill layer constant-fill'));
+    expect(findLaserOnTravelIssues(out)).toEqual([]);
+  });
 });
