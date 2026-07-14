@@ -17,6 +17,10 @@ import type {
 import type { TextAlignment } from '../../core/text';
 import type { MeasureDraft } from '../workspace/measure-tool';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
+import {
+  readCanvasStartMarkersVisible,
+  writeCanvasStartMarkersVisible,
+} from './canvas-motion-preferences';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 16;
@@ -120,6 +124,8 @@ export type UiState = {
   readonly setScrubberT: (next: number) => void;
   readonly showPreviewTravel: boolean;
   readonly setShowPreviewTravel: (next: boolean) => void;
+  readonly showCanvasStartMarkers: boolean;
+  readonly setShowCanvasStartMarkers: (next: boolean) => void;
   readonly previewPlaying: boolean;
   readonly setPreviewPlaying: (next: boolean) => void;
   readonly previewPlaybackSpeed: PreviewPlaybackSpeed;
@@ -316,6 +322,11 @@ export const useUiStore = create<UiState>((set) => ({
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
   showPreviewTravel: true,
   setShowPreviewTravel: (next) => set({ showPreviewTravel: next }),
+  showCanvasStartMarkers: readCanvasStartMarkersVisible(),
+  setShowCanvasStartMarkers: (next) => {
+    writeCanvasStartMarkersVisible(next);
+    set({ showCanvasStartMarkers: next });
+  },
   previewPlaying: false,
   setPreviewPlaying: (next) => set({ previewPlaying: next }),
   previewPlaybackSpeed: 'normal',

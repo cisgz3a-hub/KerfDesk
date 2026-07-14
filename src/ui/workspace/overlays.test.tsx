@@ -23,7 +23,9 @@ async function render(node: JSX.Element): Promise<HTMLDivElement> {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   useUiStore.getState().setSnapSettings(DEFAULT_SNAP_SETTINGS);
+  useUiStore.getState().setShowCanvasStartMarkers(true);
 });
 
 afterEach(async () => {
@@ -46,5 +48,26 @@ describe('ZoomControls snap toggle', () => {
 
     expect(useUiStore.getState().snapSettings.enabled).toBe(false);
     expect(snap?.getAttribute('aria-pressed')).toBe('false');
+  });
+});
+
+describe('ZoomControls start marker toggle', () => {
+  it('sits after Snap, defaults on, and persists the hidden state', async () => {
+    const h = await render(<ZoomControls />);
+    const snap = h.querySelector('button[aria-label="Toggle snapping"]');
+    const markers = h.querySelector('button[aria-label="Show frame and job start markers"]');
+    const zoomOut = h.querySelector('button[aria-label="Zoom out"]');
+
+    expect(snap?.nextElementSibling).toBe(markers);
+    expect(markers?.nextElementSibling).toBe(zoomOut);
+    expect(markers?.getAttribute('aria-pressed')).toBe('true');
+
+    await act(async () => {
+      markers?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(useUiStore.getState().showCanvasStartMarkers).toBe(false);
+    expect(markers?.getAttribute('aria-pressed')).toBe('false');
+    expect(localStorage.getItem('laserforge.canvas-start-markers.v1')).toBe('0');
   });
 });

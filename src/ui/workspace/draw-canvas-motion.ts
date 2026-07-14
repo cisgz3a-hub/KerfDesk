@@ -12,10 +12,13 @@ import type { ViewTransform } from './view-transform';
 export type CanvasMotionOverlay = {
   readonly plan: CanvasMotionPlan;
   readonly run: LiveCanvasRun | null;
+  readonly showStartMarkers?: boolean;
 };
 
 const RED = '#dc2626';
 const PLANNED = 'rgba(71, 85, 105, 0.28)';
+const START_LABEL_TEXT_OPACITY = 0.5;
+const START_LABEL_BACKGROUND_OPACITY = 0.2;
 
 export function drawCanvasMotionOverlay(
   ctx: CanvasRenderingContext2D,
@@ -25,8 +28,7 @@ export function drawCanvasMotionOverlay(
   const { plan, run } = overlay;
   if (run !== null) drawRoute(ctx, plan, run, view);
   drawApproach(ctx, plan, run, view);
-  drawFrameStart(ctx, plan, view);
-  if (plan.jobStart !== null) drawMarker(ctx, plan.jobStart, 'JOB START', view);
+  if (overlay.showStartMarkers !== false) drawStartMarkers(ctx, plan, view);
   if (
     plan.capability === 'realtime' &&
     run?.reportedHead !== null &&
@@ -34,6 +36,15 @@ export function drawCanvasMotionOverlay(
   ) {
     drawHead(ctx, mapControllerPointToScene(run.reportedHead, plan), run, view);
   }
+}
+
+function drawStartMarkers(
+  ctx: CanvasRenderingContext2D,
+  plan: CanvasMotionPlan,
+  view: ViewTransform,
+): void {
+  drawFrameStart(ctx, plan, view);
+  if (plan.jobStart !== null) drawMarker(ctx, plan.jobStart, 'JOB START', view);
 }
 
 function drawRoute(
@@ -160,7 +171,14 @@ function drawMarker(
   ctx.beginPath();
   ctx.arc(at.x, at.y, 4, 0, Math.PI * 2);
   ctx.fill();
-  drawLabel(ctx, at.x + 8, at.y - 8, label);
+  drawLabel(
+    ctx,
+    at.x + 8,
+    at.y - 8,
+    label,
+    START_LABEL_BACKGROUND_OPACITY,
+    START_LABEL_TEXT_OPACITY,
+  );
   ctx.restore();
 }
 
@@ -181,13 +199,23 @@ function drawHead(
   ctx.restore();
 }
 
-function drawLabel(ctx: CanvasRenderingContext2D, x: number, y: number, label: string): void {
+function drawLabel(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  label: string,
+  backgroundAlpha = 0.92,
+  textAlpha = 1,
+): void {
   ctx.font = '600 11px system-ui, sans-serif';
   const width = ctx.measureText(label).width + 10;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+  ctx.fillStyle = `rgba(255, 255, 255, ${backgroundAlpha})`;
   ctx.fillRect(x - 4, y - 12, width, 17);
+  ctx.save();
+  ctx.globalAlpha *= textAlpha;
   ctx.fillStyle = RED;
   ctx.fillText(label, x, y);
+  ctx.restore();
 }
 
 function sceneToCanvas(point: Vec2, view: ViewTransform): Vec2 {
