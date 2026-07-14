@@ -207,7 +207,14 @@ function statusPositionPatch(
           },
         };
   if (report.wco === null) return { statusReport: report, ...ovPatch, ...accessoryPatch };
-  const active = hasCustomXyOrigin(report.wco);
+  // A non-trivial WCO always means a custom origin. A zero WCO is ambiguous: on a
+  // no-homing machine the operator sets the origin right after Release/Wake, when
+  // GRBL sits at machine 0,0, so the resulting G92 offset is exactly zero. That
+  // is a deliberate origin, not the absence of one — a routine zero-WCO frame
+  // must NOT demote it. An actual reset/alarm/clear drops workOriginSource to
+  // 'none' first (originUnknownAfterControllerReset / clearedOriginPatch), so
+  // keying on the source here cannot revive a stale origin.
+  const active = hasCustomXyOrigin(report.wco) || originSource !== 'none';
   return {
     statusReport: report,
     ...ovPatch,

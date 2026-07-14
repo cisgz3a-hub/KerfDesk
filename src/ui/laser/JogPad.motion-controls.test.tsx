@@ -95,29 +95,17 @@ describe('JogPad motion controls', () => {
     await unmount();
   });
 
-  it('maps arrow keys to the selected physical jog direction', async () => {
+  it('does not jog the machine on bare arrow keys — they nudge the canvas object (F104)', async () => {
     const jog = vi.fn(async () => undefined);
     useLaserStore.setState({ jog });
     useStore.getState().updateDeviceProfile({ origin: 'rear-left', maxFeed: 6000 });
     const { unmount } = await renderJogPad();
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
-    });
-    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 });
-    await unmount();
-  });
-
-  it('does not jog from an arrow key while editing a field', async () => {
-    const jog = vi.fn(async () => undefined);
-    useLaserStore.setState({ jog });
-    const { unmount } = await renderJogPad();
-    const input = document.createElement('input');
-    document.body.appendChild(input);
-    await act(async () => {
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      }
     });
     expect(jog).not.toHaveBeenCalled();
-    input.remove();
     await unmount();
   });
 

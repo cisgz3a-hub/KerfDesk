@@ -189,6 +189,43 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
   });
 
+  it('keeps a hand-set origin active when its offset is zero (machine 0,0 after Wake)', async () => {
+    // No-homing workflow: Release motors -> hand-move -> Wake leaves GRBL at
+    // machine 0,0, so Set origin here (G92 X0 Y0) yields a WCO of exactly zero.
+    // That is a deliberate origin; a routine zero-WCO status frame must not clear
+    // it (the reported "set origin after release motors doesn't work").
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+
+    const action = useLaserStore.getState().setOriginHere();
+    await flush();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    await action;
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().workOriginSource).toBe('g92');
+
+    // A later routine status frame still carrying the zero WCO must not demote it.
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().workOriginSource).toBe('g92');
+  });
+
+  it('does not treat a zero WCO as a custom origin when none was set', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    // Fresh connection, no origin action: a zero WCO stays "machine 0,0".
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().workOriginActive).toBe(false);
+    expect(useLaserStore.getState().workOriginSource).toBe('none');
+  });
+
   it('preserves a known Z offset when Set Origin changes X/Y only', async () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
