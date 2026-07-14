@@ -62,6 +62,7 @@
 | ADR-189 | 2026-07-14 | Accepted | Bind controller observations and Home proof to controller sessions |
 | ADR-190 | 2026-07-14 | Accepted | Make vector power mode explicit per layer without changing defaults |
 | ADR-191 | 2026-07-14 | Accepted | CNC 3D result pane is drag-resizable with a persisted width |
+| ADR-192 | 2026-07-14 | Accepted | CNC frame retracts to safe Z, traces, then restores the pre-frame Z |
 
 ---
 
@@ -7788,3 +7789,42 @@ The operator recovers horizontal room for the adjacent fixed columns (Cuts/Layer
 narrowing the pane, which was clipping their content off the right edge on smaller windows. Pane width
 is session-durable UI state, not project data, so it is not in undo or `.lf2`. The pane still collapses
 to a 44 px strip via its existing toggle; the resize handle is hidden while collapsed.
+
+## ADR-192 - CNC frame retracts to safe Z, traces, then restores the pre-frame Z
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Decision
+
+Framing a CNC job emits, in order: a safe-Z retract (`$J=G90 G21 Z<safeZ>`), the five-leg
+XY perimeter, then a restore jog back to the bit's pre-frame work Z. Before this, CNC
+framing retracted to safe Z and left the bit parked there — so after an operator set Z0 at
+the stock top and pressed Frame, the bit hung at the clearance height with no way back
+except a manual jog or a second Zero Z. Pressed at that parked height, Zero Z silently moved
+Z0 upward (the air-cut trap addressed in ADR-adjacent probe/Zero-Z work). Frame is a
+non-destructive preview, so it must leave the machine at the Z it found.
+
+The retract and restore are gated on a current work-Z zero (`isWorkZZeroEvidenceCurrent`).
+The retract targets the WORK frame, so without an established Z0 that height is an arbitrary
+physical position and the jog could drive the bit into the stock; a frame with no current Z
+evidence therefore falls back to an XY-only perimeter — the historical laser-mode behavior,
+no worse than framing before the CNC retract existed. When the pre-frame Z is unknown (no
+live position) or already equals safe Z, the restore jog is omitted.
+
+Line assembly lives in `ui/state/cnc-frame-lines.ts` (`buildCncFrameMotion`), which only
+ORDERS lines produced by the driver seam — the XY perimeter and the absolute-Z jog builder
+(`buildFrameRetract`, reused for both the retract and the restore) — so ADR-094's "no
+protocol bytes outside the driver" boundary holds. The shared work-Z reader
+(`currentWorkZMm`) moved to `ui/state/infer-machine-position.ts` as the Z-only dual of
+`inferCurrentMachinePosition`, shared with the Zero-Z overwrite guard.
+
+### Consequences
+
+- Fixes the reported "frame lifts the bit even after a Zero Z": the bit returns to its
+  pre-frame height (Z0 when it was touching the stock) instead of parking at safe Z.
+- The previously unconditional CNC retract (a blind work-frame Z jog with no Z0) is gone;
+  framing without current Z evidence is XY-only.
+- A normal CNC frame gains one queued `$J=` restore line; laser framing is byte-identical.
+- WORKFLOW.md F-B4 gains a CNC framing subsection describing retract → trace → restore.
+- Not hardware-verified — proven by unit tests over the assembled line list, not by a
+  probe→frame on a physical router.

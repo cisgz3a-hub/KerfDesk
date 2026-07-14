@@ -6,12 +6,14 @@
 // LiveRefs import — no runtime cycle.
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
-import { inferCurrentMachinePosition } from './infer-machine-position';
+import { buildCncFrameMotion } from './cnc-frame-lines';
+import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { runHomeAction } from './laser-home-action';
 import { markMotionOperationDispatched, startMotionOperation } from './laser-motion-operation';
 import { type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
+import { isWorkZZeroEvidenceCurrent } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -87,18 +89,7 @@ export function jogActions(
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
-      // CNC projects retract to the configured safe height before the XY
-      // perimeter trace (the bit would otherwise drag through stock). The retract
-      // bytes come from the driver seam (ADR-094 — this file must not hardcode
-      // protocol bytes); a driver without a jog-based Z retract returns undefined
-      // and we skip the prefix. Laser projects keep the driver's Z-silent perimeter.
-      const machine = useStore.getState().project.machine;
-      const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
-      const frameLines = refs.driver.commands.buildFrameLines(bounds, feed);
-      const retractLine =
-        safeZMm === undefined ? undefined : refs.driver.commands.buildFrameRetract?.(safeZMm, feed);
-      const [firstLine, ...pendingLines] =
-        retractLine === undefined ? frameLines : [retractLine, ...frameLines];
+      const [firstLine, ...pendingLines] = buildFrameDispatchLines(refs, get, bounds, feed);
       if (firstLine === undefined) return;
       set({ motionOperation: startMotionOperation('frame', pendingLines) });
       try {
@@ -112,6 +103,35 @@ export function jogActions(
       }
     },
   };
+}
+
+// Ordered frame line list for dispatch. Laser projects trace the driver's
+// Z-silent XY perimeter; CNC projects wrap it with a safe-Z retract (the bit
+// would otherwise drag through stock) and a restore back to the pre-frame Z so
+// the bit does not end parked at safe height (ADR-192). The retract/restore is
+// gated on a current work-Z zero; buildCncFrameMotion orders driver-produced
+// lines only (ADR-094 — no protocol bytes are hardcoded here).
+function buildFrameDispatchLines(
+  refs: LiveRefs,
+  get: GetFn,
+  bounds: Parameters<LaserState['frame']>[0],
+  feed: number,
+): ReadonlyArray<string> {
+  const perimeter = refs.driver.commands.buildFrameLines(bounds, feed);
+  const machine = useStore.getState().project.machine;
+  if (machine?.kind !== 'cnc') return perimeter;
+  const state = get();
+  return buildCncFrameMotion({
+    perimeter,
+    safeZMm: machine.params.safeZMm,
+    preFrameWorkZMm: currentWorkZMm(state.statusReport, state.wcoCache),
+    hasCurrentWorkZEvidence: isWorkZZeroEvidenceCurrent(
+      state.workZZeroEvidence,
+      state.workZReferenceEpoch,
+    ),
+    buildRetract: refs.driver.commands.buildFrameRetract,
+    feed,
+  });
 }
 
 // Emit the driver's Z-safe retract for a CNC project before an XY traverse, so a

@@ -175,28 +175,55 @@ describe('laser-store motion operation lifecycle', () => {
     expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
   });
 
-  it('retracts to the CNC safe height before dispatching the XY Frame legs', async () => {
+  it('retracts to safe Z, then queues a restore to the pre-frame Z, when work Z is set (CNC)', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
     });
     await connectWith(connection);
-    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     useStore.getState().setMachineKind('cnc');
+    // A current work-Z zero plus a WPos-bearing Idle so the pre-frame Z is known.
+    useLaserStore.setState({
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 1 },
+      workZReferenceEpoch: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|FS:0,0>');
     writes.length = 0;
 
     await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
 
-    // Default CNC safe Z is 3.81 mm above stock top; the retract must
-    // complete before any XY leg so the bit is clear of the material.
+    // Default CNC safe Z is 3.81 mm above stock top; the retract must complete
+    // before any XY leg so the bit is clear of the material.
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual(['$J=G90 G21 Z3.810 F1000\n']);
+    // The queued tail ends with a restore back to the pre-frame Z (Z0) so the
+    // bit does not stay parked at safe height (ADR-192).
+    const pending = (
+      useLaserStore.getState() as {
+        readonly motionOperation: { readonly pendingLines: ReadonlyArray<string> } | null;
+      }
+    ).motionOperation?.pendingLines;
+    expect(pending?.[pending.length - 1]).toBe('$J=G90 G21 Z0.000 F1000\n');
+  });
 
-    connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
-    connection.emitLine('<Idle|MPos:0.000,0.000,3.810|FS:0,0>');
-    await Promise.resolve();
+  it('frames XY-only with no Z retract when no work-Z zero is set (CNC)', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useStore.getState().setMachineKind('cnc');
+    useLaserStore.setState({
+      workZZeroEvidence: null,
+      workZReferenceEpoch: 0,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    writes.length = 0;
 
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
+
+    // Without a work-Z zero the work-frame retract could target an arbitrary
+    // physical height, so framing is XY-only (ADR-192): the first line is an XY leg.
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
-      '$J=G90 G21 Z3.810 F1000\n',
       '$J=G90 G21 X0.000 Y0.000 F1000\n',
     ]);
   });
