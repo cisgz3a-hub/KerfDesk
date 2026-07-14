@@ -22,19 +22,6 @@ const LIVE_STATUS_TIMEOUT_MESSAGE =
   'CNC Start could not obtain a fresh GRBL Ov:/A: live-state report. Check controller status reporting and try again.';
 const MPG_ACTIVE_START_MESSAGE =
   'CNC Start is blocked while grblHAL reports MPG mode active. Return command control from the pendant/MPG to KerfDesk, wait for an MPG:0 report, then re-check setup.';
-const CONTROLLER_OWNERSHIP_START_MESSAGE =
-  'CNC Start is blocked because KerfDesk received an unowned controller reply. Stop every other sender, disconnect and reconnect, then repeat CNC setup before starting.';
-
-export function assertCncControllerOwnershipClean(
-  set: SetFn,
-  get: GetFn,
-  machineKind: MachineKind,
-): void {
-  if (machineKind === 'cnc' && get().unexpectedTerminalResponse != null) {
-    rejectCncStart(set, get, CONTROLLER_OWNERSHIP_START_MESSAGE);
-  }
-}
-
 export function assertCncMpgInactive(set: SetFn, get: GetFn, machineKind: MachineKind): void {
   if (machineKind === 'cnc' && get().mpgActive === true) {
     rejectCncStart(set, get, MPG_ACTIVE_START_MESSAGE);
@@ -86,7 +73,6 @@ export function assertCncLiveStartReady(
   acknowledgedOverrides?: ReducedOverrideAcknowledgement,
 ): void {
   if (machineKind !== 'cnc') return;
-  assertCncControllerOwnershipClean(set, get, machineKind);
   assertCncMpgInactive(set, get, machineKind);
   const state = get();
   if (state.connection.kind !== 'connected') {

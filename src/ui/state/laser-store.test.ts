@@ -107,7 +107,6 @@ afterEach(async () => {
     log: [],
     detectedSettings: null,
     controllerSettings: null,
-    unexpectedTerminalResponse: null,
     wcoCache: null,
     workOriginActive: false,
   });

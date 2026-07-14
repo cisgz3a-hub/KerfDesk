@@ -166,7 +166,7 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
-  it('overlays a preset with detection that arrives after the wizard opened', async () => {
+  it('keeps a selected preset exact when detection arrives after the wizard opened', async () => {
     const { host, unmount } = await renderWizard();
     try {
       // Opened with no detection; the controller reports a 363×273 bed afterwards.
@@ -182,7 +182,7 @@ describe('DeviceSetupWizard', () => {
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       // Detected 363 must win over the preset's nominal 400.
-      expect(bed.value).toBe('363');
+      expect(bed.value).toBe('400');
     } finally {
       await unmount();
     }
@@ -211,7 +211,7 @@ describe('DeviceSetupWizard', () => {
       await act(async () => button(host, 'Next').click()); // connect -> identify
       const firstCard = host.querySelector('article');
       expect(firstCard?.textContent).toContain('Creality Falcon A1 Pro');
-      expect(firstCard?.textContent).toContain('Suggested match');
+      expect(firstCard?.textContent).toContain('Possible match');
       expect(firstCard?.textContent).toContain('Detected grblHAL firmware.');
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
       await advanceUntil(host, 'Finish setup');
@@ -252,7 +252,7 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
-  it('keeps the last detected values through a re-read null window', async () => {
+  it('does not overlay a prior detection when a preset is picked during a re-read', async () => {
     const { host, unmount } = await renderWizard();
     try {
       await act(async () => {
@@ -274,7 +274,7 @@ describe('DeviceSetupWizard', () => {
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
-      expect(bed.value).toBe('363');
+      expect(bed.value).toBe('400');
     } finally {
       await unmount();
     }

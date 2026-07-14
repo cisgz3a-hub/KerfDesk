@@ -1,7 +1,7 @@
 // DeviceSetupWizard — the connect-time guided setup surface (ADR-092). A
-// manually-launched, multi-step Dialog that seeds a draft DeviceProfile from
-// the active profile + the controller's $$ readback, walks the operator
-// through confirming it, and commits via replaceDeviceProfile only on Finish.
+// manually-launched, multi-step Dialog that keeps an exact profile draft plus
+// a separate controller $$ observation, walks the operator through confirming
+// explicit changes, and commits only on Finish.
 // The step logic is the pure reducer in device-setup-flow.ts; this file is the
 // shell + footer navigation.
 
@@ -154,7 +154,9 @@ function commitDeviceSetup(
     replaceDeviceProfile(state.draft);
     return;
   }
-  const detectedApply = computeCncDetectedApply(state.detected, machine, state.draft);
+  const detectedApply = state.detectedAccepted
+    ? computeCncDetectedApply(state.detected, machine, state.draft)
+    : null;
   applyCncMachineSetup({
     deviceProfile: state.draft,
     ...(detectedApply === null

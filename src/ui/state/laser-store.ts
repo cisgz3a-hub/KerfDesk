@@ -42,7 +42,7 @@ import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
-import type { UnexpectedTerminalResponse } from './controller-terminal-contamination';
+import type { StartJobOptions } from './laser-job-options';
 import type {
   ControllerObservationStamp,
   HomingProof,
@@ -161,11 +161,6 @@ export type LaserState = LaserStoreActions & {
   // that omit the intermittent field; null/undefined means never observed in
   // this controller/transport session.
   readonly mpgActive?: boolean | null;
-  // First unowned GRBL-family ok/error observed in this serial session. This
-  // is persistent safety state: dismissing the notice cannot make controller
-  // command ownership trustworthy again. Only a disconnect/new connection
-  // clears it.
-  readonly unexpectedTerminalResponse?: UnexpectedTerminalResponse | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
   // Qualified evidence for the CNC stock-top contract. Separate from

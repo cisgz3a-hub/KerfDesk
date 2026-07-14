@@ -101,7 +101,6 @@ export function connectionActions(
           homingState: 'unknown',
           pendingUntrackedAcks: 0,
           pendingTransportWrites: 0,
-          unexpectedTerminalResponse: null,
         });
         void runHandshake(set, get, refs, safeWrite, baudRate)
           .catch(() => undefined)
@@ -141,7 +140,6 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     activeControllerKind: refs.driver.kind,
     detectedControllerKind: null,
     mpgActive: null,
-    unexpectedTerminalResponse: null,
   };
 }
 
@@ -189,7 +187,6 @@ async function runDisconnect(
     wcoCache: null,
     accessoryCache: null,
     mpgActive: null,
-    unexpectedTerminalResponse: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroEvidence: null,

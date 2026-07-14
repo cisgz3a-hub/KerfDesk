@@ -45,10 +45,6 @@ function suggestionFor(
     return { profileId, profile, entry, confidence: 'manual-only', reasons, warnings };
   }
 
-  if (profile.profileId === 'creality-falcon-a1-pro-grblhal' && falconFactsMatch(facts)) {
-    return { profileId, profile, entry, confidence: 'suggested', reasons, warnings };
-  }
-
   if (detectedKind !== null && profileKind === detectedKind) {
     return { profileId, profile, entry, confidence: 'possible', reasons, warnings };
   }
@@ -71,19 +67,6 @@ function profileReasons(
     reasons.push(`Controller reports S range ${facts.minPowerS}-${facts.maxPowerS}.`);
   }
   return reasons;
-}
-
-function falconFactsMatch(facts: Partial<DeviceProfile>): boolean {
-  return (
-    approxEqual(facts.bedWidth, 400) &&
-    approxEqual(facts.bedHeight, 400) &&
-    facts.minPowerS === 0 &&
-    facts.maxPowerS === 1000
-  );
-}
-
-function approxEqual(value: number | undefined, expected: number): boolean {
-  return typeof value === 'number' && Math.abs(value - expected) <= 5;
 }
 
 function normalizedControllerKind(kind: ControllerKind | undefined): ControllerKind {

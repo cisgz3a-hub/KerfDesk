@@ -39,10 +39,10 @@ describe('initDeviceSetup', () => {
     expect(state.presetApplied).toBe(false);
   });
 
-  it('overlays the detected patch onto the draft but leaves the baseline untouched', () => {
+  it('keeps detected values informational until the operator accepts them', () => {
     const state = open({ bedWidth: 600, maxPowerS: 255 });
-    expect(state.draft.bedWidth).toBe(600);
-    expect(state.draft.maxPowerS).toBe(255);
+    expect(state.draft).toEqual(PROFILE);
+    expect(state.detected).toEqual({ bedWidth: 600, maxPowerS: 255 });
     expect(state.baseline.bedWidth).toBe(PROFILE.bedWidth);
   });
 });
@@ -101,19 +101,20 @@ describe('deviceSetupReducer draft edits', () => {
     expect(accepted.draft.name).toBe('My Laser');
   });
 
-  it('applies a preset but keeps controller-detected values layered on top', () => {
+  it('applies a preset exactly without layering detected values on top', () => {
     const preset = nonDefaultPreset();
     const before = open({ maxPowerS: 255 });
     const state = deviceSetupReducer(before, { kind: 'apply-preset', profile: preset });
     expect(state.presetApplied).toBe(true);
     expect(state.draft.profileId).toBe(preset.profileId);
-    expect(state.draft.maxPowerS).toBe(255);
+    expect(state.draft).toEqual(preset);
+    expect(state.detectedAccepted).toBe(false);
     // the input state is not mutated (draft-and-commit immutability)
     expect(before.presetApplied).toBe(false);
     expect(before.draft.profileId).toBe(PROFILE.profileId);
   });
 
-  it('applies a preset but preserves detected controller identity and current frame feed', () => {
+  it('keeps detected controller identity separate from the chosen preset', () => {
     const preset = nonDefaultPreset();
     const before = initDeviceSetup(
       {
@@ -128,10 +129,8 @@ describe('deviceSetupReducer draft edits', () => {
 
     const state = deviceSetupReducer(before, { kind: 'apply-preset', profile: preset });
 
-    expect(state.draft.profileId).toBe(preset.profileId);
-    expect(state.draft.controllerKind).toBe('grblhal');
-    expect(state.draft.framingFeedMmPerMin).toBe(10000);
-    expect(state.draft.maxFeed).toBe(10000);
+    expect(state.draft).toEqual(preset);
+    expect(state.detectedControllerKind).toBe('grblhal');
   });
 
   it('choosing the Falcon profile restores fast framing over a stale low frame feed', () => {
@@ -195,7 +194,7 @@ describe('deviceSetupReducer detected-updated', () => {
     expect(state.detected).toEqual({ bedWidth: 363, bedHeight: 273 });
   });
 
-  it('keeps the detected bed when a preset is picked after detection arrives', () => {
+  it('keeps the preset exact when detection arrives before it is picked', () => {
     // Wizard opened before $$ completed → empty snapshot (the reported repro).
     let state = initDeviceSetup(PROFILE, null);
     expect(state.detected).toEqual({});
@@ -206,12 +205,11 @@ describe('deviceSetupReducer detected-updated', () => {
     // A 400×400 catalog preset must not clobber the detected bed.
     const preset = nonDefaultPreset();
     state = deviceSetupReducer(state, { kind: 'apply-preset', profile: preset });
-    expect(state.draft.profileId).toBe(preset.profileId);
-    expect(state.draft.bedWidth).toBe(363);
-    expect(state.draft.bedHeight).toBe(273);
+    expect(state.draft).toEqual(preset);
+    expect(state.detected).toEqual({ bedWidth: 363, bedHeight: 273 });
   });
 
-  it('normalizes the draft when the detected controller kind arrives after the wizard opens', () => {
+  it('does not rewrite the draft when detected controller identity arrives', () => {
     const marlinProfile: DeviceProfile = {
       ...PROFILE,
       controllerKind: 'marlin',
@@ -227,11 +225,8 @@ describe('deviceSetupReducer detected-updated', () => {
       controllerRead: true,
     });
 
-    expect(state.draft).toMatchObject({
-      controllerKind: 'grblhal',
-      streamingMode: 'char-counted',
-      gcodeDialect: { dialectId: 'grbl-dynamic' },
-    });
+    expect(state.draft).toEqual(marlinProfile);
+    expect(state.detectedControllerKind).toBe('grblhal');
   });
 
   it('clears the detected controller kind when the live fact is explicitly null', () => {

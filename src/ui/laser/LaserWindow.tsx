@@ -3,7 +3,6 @@
 
 import { describeAlarm } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
-import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
 import { CollapsedRail, RailPanelHeading } from '../common';
@@ -60,7 +59,7 @@ export function LaserWindow(): JSX.Element {
   // every ack pops the stream head, so the 120-byte RX accounting drifts and
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
-  const jogBlocked = useJogBlocked(controllerKind);
+  const jogBlocked = useJogBlocked();
   const controllerIdle = statusReport?.state === 'Idle';
   const controllerSleep = statusReport?.state === 'Sleep';
   const showAlarmBanner = !controllerSleep && hasAlarmRecovery(alarmCode, statusReport?.state);
@@ -128,11 +127,9 @@ function confirmForgetDevice(): void {
     .catch(() => undefined);
 }
 
-function useJogBlocked(controllerKind: ControllerKind | undefined): boolean {
+function useJogBlocked(): boolean {
   const jobBlocked = useLaserStore((s) => setupBlockingJobCommandBlockMessage(s) !== null);
-  const controllerBlocked = useLaserStore(
-    (s) => jogFrameCommandBlockMessage(s, controllerKind) !== null,
-  );
+  const controllerBlocked = useLaserStore((s) => jogFrameCommandBlockMessage(s) !== null);
   return jobBlocked || controllerBlocked;
 }
 

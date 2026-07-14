@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, profileCatalogEntryById } from '../../core/devices';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../platform/types';
 import {
   EMPTY_SCENE,
@@ -114,7 +114,7 @@ describe('MachineSetupDialog', () => {
     }
   });
 
-  it('keeps controller-tuned motion settings when applying a catalog profile after auto-detect', async () => {
+  it('applies the selected catalog profile exactly after controller detection', async () => {
     useStore.getState().updateDeviceProfile({
       maxFeed: 10000,
       framingFeedMmPerMin: 10000,
@@ -142,17 +142,13 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Profile Catalog').click());
       const firstCard = host.querySelector('article');
       expect(firstCard?.textContent).toContain('Creality Falcon A1 Pro');
-      expect(firstCard?.textContent).toContain('Suggested match');
+      expect(firstCard?.textContent).toContain('Possible match');
       expect(firstCard?.textContent).toContain('Detected grblHAL firmware.');
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
-      expect(useStore.getState().project.device).toMatchObject({
-        profileId: 'creality-falcon-a1-pro-grblhal',
-        controllerKind: 'grblhal',
-        maxFeed: 10000,
-        framingFeedMmPerMin: 10000,
-        accelMmPerSec2: 2500,
-      });
+      const falcon = profileCatalogEntryById('creality-falcon-a1-pro-grblhal')?.profile;
+      if (falcon === undefined) throw new Error('Falcon profile missing');
+      expect(useStore.getState().project.device).toEqual(falcon);
     } finally {
       await unmount();
     }

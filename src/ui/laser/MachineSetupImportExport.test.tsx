@@ -144,7 +144,7 @@ describe('Machine Setup import/export panel', () => {
     }
   });
 
-  it('preserves controller-read facts when applying an imported profile while connected', async () => {
+  it('applies an imported profile exactly while connected', async () => {
     useStore.getState().updateDeviceProfile({
       controllerKind: 'grbl-v1.1',
       maxFeed: 10000,
@@ -188,10 +188,10 @@ describe('Machine Setup import/export panel', () => {
 
       expect(useStore.getState().project.device).toMatchObject({
         name: 'Imported wrong-controller profile',
-        controllerKind: 'grblhal',
-        bedWidth: 400,
-        maxFeed: 10000,
-        framingFeedMmPerMin: 10000,
+        controllerKind: 'marlin',
+        bedWidth: 500,
+        maxFeed: 3000,
+        framingFeedMmPerMin: 3000,
       });
     } finally {
       await unmount();

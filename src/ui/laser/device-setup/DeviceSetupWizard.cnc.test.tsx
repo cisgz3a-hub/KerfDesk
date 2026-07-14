@@ -31,9 +31,10 @@ afterEach(() => {
 });
 
 describe('DeviceSetupWizard router commit', () => {
-  it('stores detected firmware, spindle RPM, and bed in the correct models', async () => {
+  it('applies accepted settings without replacing the user-selected firmware profile', async () => {
     useStore.getState().setMachineKind('cnc');
     const originalMaxPowerS = useStore.getState().project.device.maxPowerS;
+    const originalControllerKind = useStore.getState().project.device.controllerKind;
     useLaserStore.setState({
       connection: { kind: 'connected' },
       detectedControllerKind: 'grblhal',
@@ -55,11 +56,11 @@ describe('DeviceSetupWizard router commit', () => {
       const machine = state.project.machine;
       if (machine?.kind !== 'cnc') throw new Error('expected CNC machine');
       expect(state.project.device).toMatchObject({
-        controllerKind: 'grblhal',
         bedWidth: 750,
         bedHeight: 610,
         maxPowerS: originalMaxPowerS,
       });
+      expect(state.project.device.controllerKind).toBe(originalControllerKind);
       expect(machine.params.spindleMaxRpm).toBe(24000);
       expect(state.project.workspace).toMatchObject({ width: 750, height: 610 });
     } finally {
