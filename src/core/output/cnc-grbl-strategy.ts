@@ -216,8 +216,15 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm:
   lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${group.toolName ?? 'next tool'}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
-  // The operator physically moved Z during the pause (touch-off leaves the
-  // new bit at the stock top), so the tracked height is no longer real.
+  // The operator physically moves the head during the pause: jogging XY over the
+  // stock to touch off the new bit, and Z down onto the stock top. None of those
+  // positions are the emitter's tracked park/height any more, so void all three.
+  // Voiding X/Y forces the next pass to emit its repositioning G0 X Y even when
+  // that pass happens to start at the park XY — otherwise the alreadyAtStartXy
+  // shortcut would skip it and the spinning bit would plunge at the touch-off
+  // location and drag to the start (F23).
+  head.x = null;
+  head.y = null;
   head.z = null;
   appendSpindleStart(lines, head, safeZMm, group.spindleRpm, group.spindleSpinupSec);
 }
