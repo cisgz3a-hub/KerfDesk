@@ -10,6 +10,7 @@ import {
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { JobSafetyControls } from '../laser/JobSafetyControls';
 
 const FIELD_STEP_MM = 0.1;
 const ROTATION_STEP_DEG = 1;
@@ -33,8 +34,15 @@ export function NumericEditsBar(): JSX.Element {
   const model = useNumericEditModel();
   return (
     <section aria-label="Numeric Edits Toolbar" style={barStyle}>
-      <AnchorGrid active={model.anchor} disabled={!model.hasSelection} onChange={model.setAnchor} />
-      <NumericFields model={model} />
+      <div style={editsGroupStyle}>
+        <AnchorGrid
+          active={model.anchor}
+          disabled={!model.hasSelection}
+          onChange={model.setAnchor}
+        />
+        <NumericFields model={model} />
+      </div>
+      <JobSafetyControls />
     </section>
   );
 }
@@ -294,13 +302,23 @@ const barStyle: React.CSSProperties = {
   minWidth: 0,
   maxWidth: '100%',
   boxSizing: 'border-box',
-  overflowX: 'auto',
-  overflowY: 'hidden',
   gap: 8,
   padding: '4px 12px',
   background: 'var(--lf-bg-1)',
   borderBottom: '1px solid var(--lf-border)',
   fontSize: 12,
+};
+// Only the transform controls scroll horizontally; the job-safety cluster is a
+// non-scrolling sibling so the E-STOP button can never be pushed out of reach
+// when the fields overflow a narrow window.
+const editsGroupStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  minWidth: 0,
+  flex: '1 1 auto',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  gap: 8,
 };
 const anchorGridStyle: React.CSSProperties = {
   display: 'grid',
