@@ -73,13 +73,24 @@ function hasControlledLaserOffTravel(dialect: GrblGcodeDialect): boolean {
 }
 
 function preamble(dialect: GrblGcodeDialect): string {
+  // G54 + G94 pin the modal WCS and feed mode the same way the CNC preamble
+  // does (cnc-grbl-strategy.ts): GRBL's active G54-G59 selection and G93/G94
+  // feed mode are modal and can be left changed by a console command or a $N
+  // startup block (re-run after every soft reset, including the app's own Stop).
+  // Without pinning them a laser job runs in whatever WCS was left active — the
+  // burn lands displaced by a stale G55-G59 offset (F41/F50) — or interprets
+  // every feed under a stale G93 inverse-time mode (F10).
+  //
   // M3 S0: enable spindle/laser at power 0. Subsequent G1 with S>0 fires the
   // laser without needing another M3. Without M3 in the preamble, GRBL
   // controllers that aren't in laser mode ($32=0) won't fire the diode even
   // when G1 carries S>0 — the move happens but the beam stays off. M3 S0 is
   // safe (no power) and primes the controller for any subsequent S-driven
   // cutting move.
-  return ['G21', 'G90', `${laserModeWord(dialect.cutPowerMode)} S0`].join(LINE_END) + LINE_END;
+  return (
+    ['G21', 'G90', 'G54', 'G94', `${laserModeWord(dialect.cutPowerMode)} S0`].join(LINE_END) +
+    LINE_END
+  );
 }
 
 function postamble(laserAlreadyOff: boolean, dialect: GrblGcodeDialect): string {

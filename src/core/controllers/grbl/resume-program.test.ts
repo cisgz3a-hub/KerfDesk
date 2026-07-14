@@ -46,6 +46,10 @@ describe('buildResumeProgram', () => {
     expect(armIndex).toBeGreaterThan(moveIndex);
     expect(preamble.some((line) => line.startsWith('G4'))).toBe(false);
     expect(preamble.some((line) => /\bZ-?\d/.test(line))).toBe(false);
+    // WCS + feed mode are pinned before the re-entry move (F10/F41/F50).
+    expect(preamble).toContain('G54');
+    expect(preamble).toContain('G94');
+    expect(preamble.indexOf('G54')).toBeLessThan(moveIndex);
     expect(result.fromLine).toBe(6);
     expect(result.lines[result.preambleCount]).toBe('G1 X20 Y20');
   });

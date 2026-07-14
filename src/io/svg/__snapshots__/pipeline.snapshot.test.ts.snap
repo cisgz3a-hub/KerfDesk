@@ -3,6 +3,8 @@
 exports[`Phase A pipeline — fixture snapshots > closed-polygon produces stable G-code 1`] = `
 "G21
 G90
+G54
+G94
 M3 S0
 ; layer L1 color #008000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
@@ -20,6 +22,8 @@ G0 X0.000 Y0.000 S0
 exports[`Phase A pipeline — fixture snapshots > multi-shape produces stable G-code 1`] = `
 "G21
 G90
+G54
+G94
 M3 S0
 ; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
@@ -47,6 +51,8 @@ G0 X0.000 Y0.000 S0
 exports[`Phase A pipeline — fixture snapshots > rectangle-single-color produces stable G-code 1`] = `
 "G21
 G90
+G54
+G94
 M3 S0
 ; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
@@ -63,6 +69,8 @@ G0 X0.000 Y0.000 S0
 exports[`Phase A pipeline — fixture snapshots > two-color-paths produces stable G-code 1`] = `
 "G21
 G90
+G54
+G94
 M3 S0
 ; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
@@ -80,6 +88,8 @@ G0 X0.000 Y0.000 S0
 exports[`Phase A pipeline — fixture snapshots > zigzag produces stable G-code 1`] = `
 "G21
 G90
+G54
+G94
 M3 S0
 ; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1

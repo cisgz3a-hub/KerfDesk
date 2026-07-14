@@ -13,7 +13,9 @@ function emit(job: Job): string {
 describe('grblStrategy preamble/postamble', () => {
   it('emits G21, G90, M3 S0 preamble and M5 + park postamble around an empty job', () => {
     const out = emit(EMPTY_JOB);
-    expect(out).toBe(['G21', 'G90', 'M3 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'));
+    expect(out).toBe(
+      ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'),
+    );
   });
 });
 
@@ -47,6 +49,8 @@ describe('grblStrategy single-segment job', () => {
       [
         'G21',
         'G90',
+        'G54',
+        'G94',
         'M3 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
