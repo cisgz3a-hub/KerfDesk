@@ -40,8 +40,11 @@ describe('Cloudflare production deploy gate', () => {
     expect(workflow).toContain(pagesApiProject);
     expect(packageJson.scripts['deploy:web']).toContain(pagesApiProject);
     expect(packageJson.scripts['deploy:web:preview']).toContain(pagesApiProject);
-    expect(repoFile('README.md')).toContain(liveReleaseUrl);
-    expect(repoFile('README.md')).toContain(pagesFallbackUrl);
+    // The canonical + fallback URLs are documented next to the deploy target in
+    // the workflow itself — the durable source of truth — rather than the README,
+    // which is a temporary placeholder while the repo is public (801e3838).
+    expect(workflow).toContain(liveReleaseUrl);
+    expect(workflow).toContain(pagesFallbackUrl);
   });
 
   it('only permits manual production deploys from the main branch', () => {
