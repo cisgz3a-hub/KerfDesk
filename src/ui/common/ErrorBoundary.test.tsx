@@ -80,6 +80,40 @@ describe('ErrorBoundary', () => {
     expect(container.textContent).toMatch(/no data leaves your machine/i);
   });
 
+  it('shows a working E-STOP in the crash screen when motion was live (F60/F65)', () => {
+    const trigger = vi.fn();
+    act(() => {
+      root.render(
+        <ErrorBoundary emergencyStop={{ isMotionLive: () => true, trigger }}>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    const estop = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'E-STOP',
+    );
+    expect(estop).toBeDefined();
+    act(() => {
+      estop?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(trigger).toHaveBeenCalledOnce();
+  });
+
+  it('omits the crash-screen E-STOP when nothing was moving', () => {
+    act(() => {
+      root.render(
+        <ErrorBoundary emergencyStop={{ isMotionLive: () => false, trigger: vi.fn() }}>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    const buttons = Array.from(container.querySelectorAll('button')).map(
+      (b) => b.textContent ?? '',
+    );
+    expect(buttons).not.toContain('E-STOP');
+    expect(buttons).toContain('Try again');
+  });
+
   it('falls back to a manual-copy textarea instead of a blocking prompt (H13)', () => {
     // jsdom has no Clipboard API — exactly the insecure-context fallback
     // path. A native prompt here would suspend the renderer: if the crash
