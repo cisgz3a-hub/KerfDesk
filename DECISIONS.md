@@ -7389,3 +7389,42 @@ engagement boundary and removes the stationary-cutter failure described by the
 maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
+
+---
+
+## ADR-181 - CNC Start requires epoch-bound exclusive-access attestation
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+GRBL terminal responses are bare `ok`/`error` lines with no sender identity,
+session nonce, or command ID. Status reports describe global controller state,
+not who caused it. A queue fence and fresh Idle/accessory snapshot therefore
+have meaning only while KerfDesk is the sole mutating sender. A pendant/MPG,
+controller WebUI, network or second serial sender, PLC command path, macro, or
+SD/file job can change motion, offsets, spindle, coolant, or overrides before
+the first job bytes without producing evidence KerfDesk can attribute.
+
+### Decision
+
+- The existing per-Start CNC physical-setup confirmation also requires the
+  operator to affirm that KerfDesk is the only command owner. The prompt names
+  common alternate paths and explicitly preserves emergency-stop, safety-door,
+  and feed-hold circuits.
+- The attestation is bound to the exact G-code fingerprint and to the current
+  composite controller/setup epoch: trusted-position and work-Z-reference
+  generations. Reconnect, reset/banner, alarm/sleep, homing, origin/probe
+  changes, tool changes, and other trust invalidations make it stale.
+- The store revalidates the attestation before the Start queue fence. Missing,
+  incomplete, wrong-program, or stale evidence writes no controller byte.
+- The existing Start reservation continues to require the same epochs through
+  the queue fence and fresh live-readiness observations.
+
+### Consequences
+
+This is a fail-closed operator declaration, not protocol proof or a hardware
+ownership lease. Stock GRBL still cannot exclude or identify other command
+paths. True multi-sender support requires a sole gateway or firmware lease plus
+machine-level selector/interlock enforcement; physical spindle-at-speed and VFD
+feedback remain separate evidence.
