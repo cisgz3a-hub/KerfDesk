@@ -884,20 +884,21 @@ run that finishes cleanly clears it.
 
 ### F-C7. Device Setup wizard (connect-time)
 
-The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092), or from the cross-link **Machine Setup → Overview → Run guided setup** (same wizard, same draft-commit; still never auto-opens). The Laser-panel button carries primary emphasis only while the connected machine has not been set up yet (the FU-4 nudge state); once setup is recorded it renders with normal weight. Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
+The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092), or from the cross-link **Machine Setup → Overview → Run guided setup** (same wizard, same draft-commit; still never auto-opens). The Laser-panel button carries primary emphasis only while the connected machine has not been set up yet (the FU-4 nudge state); once setup is recorded it renders with normal weight. Edits a draft `DeviceProfile` and commits only on **Finish**. Laser setup uses six relevant steps: Connect & read → Identify machine → Confirm detected settings → Homing & options → Sync to controller → Review & finish. CNC setup inserts an optional **Set work zero (probe)** step before controller sync. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
 
 #### Success — connected machine answers `$$`
 1. Operator clicks **Set up device** while connected.
 2. Step 1 confirms the connection is live and reads `$$` (or reuses the connect-time read).
-3. Steps 2–4 open with the draft prefilled from the controller's reported settings; the operator picks/confirms the machine, confirms bed/power/feed, and sets the origin corner, homing, and air-assist wiring that `$$` cannot report.
-4. (Optional) Step 5 lists settings where the draft differs from the controller and offers a guarded per-setting write (confirm → write → auto re-read + verify).
-5. Step 6 shows a "ready to cut" checklist; **Finish** commits the draft to the device profile via `replaceDeviceProfile`. Cancel at any point discards the draft.
+3. Selecting a catalog machine advances directly to confirmation. The draft is prefilled from controller-reported settings; the operator confirms bed/power/feed, then sets the origin corner, homing, and air-assist wiring that `$$` cannot report.
+4. CNC projects may optionally probe work zero; laser projects do not show that irrelevant step.
+5. The optional Sync step lists settings where the draft differs from the controller and offers a guarded per-setting write (confirm → write → auto re-read + verify).
+6. Review shows a "ready to cut" checklist. Every row has a direct **Edit** action that returns to the relevant setup step. **Finish** commits the draft via `replaceDeviceProfile`; Cancel at any point discards it.
 
 #### Error — `$$` times out (silent or non-GRBL controller)
 1. Step 1 reports no settings were read; the wizard continues in manual-entry mode (nothing is blocked) so the operator can still set the profile by hand.
 
 #### Empty — default profile, nothing detected
-1. The draft is the generic 400×400 default; the readiness checklist flags every safety item (bed, origin, power scale, homing, identity) as needing attention until the operator confirms it.
+1. The draft is the generic 400×400 default. Work area and power scale are blocking until confirmed by detection, a catalog profile, or an explicit edit. Identity, laser-head metadata, origin, and homing remain visible review rows without blocking a deliberate custom profile.
 
 #### Edge — opened while disconnected
 1. The wizard runs as a plain profile editor; the Connect and Sync-to-controller steps are gated with a "connect to use this" note. Finish still commits the profile.

@@ -10,7 +10,7 @@ import {
   validateMachineProfile,
   type DeviceProfile,
 } from '../../../core/devices';
-import { assertNever } from '../../../core/scene';
+import { assertNever, type MachineKind } from '../../../core/scene';
 
 // The flow is Connect -> Identify -> Confirm -> Safety -> Probe -> Sync
 // (firmware) -> Review. Each step is a tagged value; the switches below use
@@ -36,8 +36,22 @@ export const DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
   'review',
 ];
 
+const LASER_DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
+  'connect',
+  'identify',
+  'confirm',
+  'safety',
+  'firmware',
+  'review',
+];
+
+export function deviceSetupStepOrder(machineKind: MachineKind): ReadonlyArray<DeviceSetupStep> {
+  return machineKind === 'cnc' ? DEVICE_SETUP_STEP_ORDER : LASER_DEVICE_SETUP_STEP_ORDER;
+}
+
 export type DeviceSetupState = {
   readonly step: DeviceSetupStep;
+  readonly machineKind: MachineKind;
   // The profile as the wizard opened: lets Finish diff against it and lets
   // Cancel mean "discard" (the draft is never written until Finish).
   readonly baseline: DeviceProfile;
@@ -70,6 +84,7 @@ export type DeviceSetupAction =
 export type DeviceSetupDetectedFacts = {
   readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
   readonly controllerRead?: boolean;
+  readonly machineKind?: MachineKind;
 };
 
 // Shared props for the wizard step components: the current flow state plus the
@@ -90,6 +105,7 @@ export function initDeviceSetup(
   const detectedControllerKind = facts.detectedControllerKind ?? null;
   return {
     step: 'connect',
+    machineKind: facts.machineKind ?? 'laser',
     baseline: profile,
     detected: safeDetected,
     detectedControllerKind,
@@ -109,11 +125,13 @@ export function deviceSetupReducer(
 ): DeviceSetupState {
   switch (action.kind) {
     case 'next':
-      return { ...state, step: adjacentStep(state.step, 1) };
+      return { ...state, step: adjacentStep(state, 1) };
     case 'back':
-      return { ...state, step: adjacentStep(state.step, -1) };
+      return { ...state, step: adjacentStep(state, -1) };
     case 'go':
-      return { ...state, step: action.step };
+      return deviceSetupStepOrder(state.machineKind).includes(action.step)
+        ? { ...state, step: action.step }
+        : state;
     case 'edit':
     case 'accept-detected':
       return { ...state, draft: { ...state.draft, ...action.patch } };
@@ -186,16 +204,19 @@ export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
   }
 }
 
-export function isFirstDeviceSetupStep(step: DeviceSetupStep): boolean {
-  return step === DEVICE_SETUP_STEP_ORDER[0];
+export function isFirstDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
+  return step === deviceSetupStepOrder(machineKind)[0];
 }
 
-export function isLastDeviceSetupStep(step: DeviceSetupStep): boolean {
-  return step === DEVICE_SETUP_STEP_ORDER[DEVICE_SETUP_STEP_ORDER.length - 1];
+export function isLastDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
+  const order = deviceSetupStepOrder(machineKind);
+  return step === order[order.length - 1];
 }
 
-function adjacentStep(step: DeviceSetupStep, delta: number): DeviceSetupStep {
-  const index = DEVICE_SETUP_STEP_ORDER.indexOf(step);
-  const clamped = Math.min(DEVICE_SETUP_STEP_ORDER.length - 1, Math.max(0, index + delta));
-  return DEVICE_SETUP_STEP_ORDER[clamped] ?? step;
+function adjacentStep(state: DeviceSetupState, delta: number): DeviceSetupStep {
+  const order = deviceSetupStepOrder(state.machineKind);
+  const index = order.indexOf(state.step);
+  if (index < 0) return order[0] ?? state.step;
+  const clamped = Math.min(order.length - 1, Math.max(0, index + delta));
+  return order[clamped] ?? state.step;
 }

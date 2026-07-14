@@ -53,6 +53,7 @@
 | ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Accepted | Block controller-reported active spindle/coolant before CNC Start |
+| ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
 
 ---
 
@@ -7513,3 +7514,31 @@ detector is intentionally conservative: a reply observed while KerfDesk owns a
 different valid command can still be misattributed because the firmware has no
 client identity. This is anomaly detection, not an exclusive lease; production
 multi-sender machines still require a sole gateway or machine interlock.
+
+---
+
+## ADR-186 - Keep guided device setup machine-relevant and directly repairable
+
+**Status:** Accepted | **Date:** 2026-07-14
+
+### Context
+
+The guided setup reducer was safe and draft-only, but every project traversed the same seven-step
+order. Laser users therefore reached a CNC touch-plate page whose only action was to skip it. Picking
+a catalog profile required another Next click, and the final readiness checklist identified problems
+without returning the operator to the field that could resolve them.
+
+### Decision
+
+The pure setup state machine owns a machine-specific visible step order. Laser setup omits CNC
+probing; CNC setup retains it. Choosing a catalog profile applies it to the draft and advances to the
+confirmation editor in the same interaction. Every readiness row exposes a direct edit action mapped
+to identity, confirmation, or homing/options without bypassing validation or committing early.
+
+### Consequences
+
+- Laser setup contains six relevant steps; CNC setup contains seven.
+- Draft-only editing, Cancel semantics, controller facts, and Finish readiness gates are unchanged.
+- Hidden machine-irrelevant steps cannot be reached through reducer navigation.
+- Every dialog size is viewport-bounded so the wizard footer remains reachable on compact screens.
+- Reducer, component, and compact Chromium workflow tests pin both machine paths.
