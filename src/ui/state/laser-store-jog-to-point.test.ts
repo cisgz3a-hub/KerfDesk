@@ -104,6 +104,43 @@ describe('jogToMachinePosition', () => {
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual([]);
   });
 
+  it('lifts Z to the CNC safe height before the XY traverse, then jogs (F105)', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useStore.getState().setMachineKind('cnc');
+    const machine = useStore.getState().project.machine;
+    const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : 0;
+    connection.emitLine('<Idle|MPos:50.000,30.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await useLaserStore.getState().jogToMachinePosition(120, 80, 1000);
+
+    // The safe-Z retract is queued before the XY move so the bit clears stock.
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      `$J=G90 G21 Z${safeZMm.toFixed(3)} F1000\n`,
+      '$J=G91 G21 X70.000 Y50.000 F1000\n',
+    ]);
+  });
+
+  it('does not add a Z retract for a laser project', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:50.000,30.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await useLaserStore.getState().jogToMachinePosition(120, 80, 1000);
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G91 G21 X70.000 Y50.000 F1000\n',
+    ]);
+  });
+
   it('errors without a live machine position', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
