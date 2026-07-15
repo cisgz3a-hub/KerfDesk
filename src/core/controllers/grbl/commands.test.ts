@@ -8,6 +8,7 @@ import {
   RT_HOLD,
   RT_JOG_CANCEL,
   RT_RESUME,
+  RT_SAFETY_DOOR,
   RT_SOFT_RESET,
   RT_STATUS,
 } from './commands';
@@ -17,6 +18,7 @@ describe('GRBL real-time command bytes', () => {
     expect(RT_STATUS).toBe('?');
     expect(RT_RESUME).toBe('~');
     expect(RT_HOLD).toBe('!');
+    expect(RT_SAFETY_DOOR).toBe('\x84');
     expect(RT_SOFT_RESET).toBe('\x18');
     expect(RT_JOG_CANCEL).toBe('\x85');
   });

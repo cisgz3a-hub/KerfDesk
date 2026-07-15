@@ -53,6 +53,7 @@ export const marlinDriver: ControllerDriver = {
   realtime: {
     statusQuery: null,
     hold: null,
+    safetyDoor: null,
     resume: null,
     softReset: null,
     jogCancel: null,

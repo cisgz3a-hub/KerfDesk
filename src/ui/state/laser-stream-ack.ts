@@ -2,13 +2,13 @@
 // Split from laser-line-handler when the untracked-ack attribution pushed
 // that file past the 400-line cap.
 
-import { markErrored, onAck, step, type StreamerState } from '../../core/controllers/grbl';
+import { onAck, step, type StreamerState } from '../../core/controllers/grbl';
 import { beginPostJobSettle } from './laser-post-job-settle';
-import { writeFailedNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { hasUnsettledStreamAcks, toolChangeHoldEntryPatch } from './laser-store-helpers';
 import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
 // receive order. While the streamer still has unsettled acks, the earliest
@@ -72,18 +72,10 @@ export function advanceStream(
     // "hide job stream" filter keeps hiding them. No action — the catch
     // below owns the failure notice.
     void safeWrite(stepped.toSend, undefined, 'job').catch(() => {
-      // markErrored, not disconnect: 'disconnected' falls outside
-      // isActiveJob, which unmounts the Stop button and drops the
-      // soft-reset stop command while GRBL may still be executing
-      // buffered lines on a live port (same R-H2 rationale as
-      // runResumeJob). A genuine port loss follows up via onClose, which
-      // owns the disconnect wording. Functional set: acks can land
-      // between dispatch and rejection, so no snapshot rollback.
-      set((current) => ({
-        streamer: current.streamer === null ? current.streamer : markErrored(current.streamer),
-        safetyNotice: writeFailedNotice('stream'),
-        ...liveCanvasLifecyclePatch(current, 'errored'),
-      }));
+      // The shared helper freezes from the current store snapshot, then owns
+      // reset/quarantine. Acks or onClose can land between dispatch and
+      // rejection, so it never rolls back or resurrects terminal ownership.
+      containActiveStreamWriteFailure(set, refs, safeWrite, 'stream');
     });
   }
 }

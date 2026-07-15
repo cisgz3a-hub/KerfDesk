@@ -173,14 +173,17 @@ describe('webSerial wire encoding (M12)', () => {
     return ref.open({ baudRate: 115200 });
   }
 
-  it('sends realtime bytes above 0x7F as exactly one wire byte', async () => {
+  it.each([
+    ['Safety Door', '\x84', 0x84],
+    ['jog cancel', '\x85', 0x85],
+  ])('sends %s as exactly one wire byte', async (_label, command, expected) => {
     const port = new MockPort();
     const conn = await openConn(port);
 
-    await conn.write('\x85');
+    await conn.write(command);
 
     const written = port.writer.write.mock.calls[0]?.[0];
-    expect(Array.from(written ?? [])).toEqual([0x85]);
+    expect(Array.from(written ?? [])).toEqual([expected]);
   });
 
   it('keeps ASCII lines byte-identical to UTF-8', async () => {

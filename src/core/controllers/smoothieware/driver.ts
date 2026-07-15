@@ -49,6 +49,7 @@ export const smoothiewareDriver: ControllerDriver = {
   realtime: {
     statusQuery: RT_STATUS,
     hold: RT_HOLD,
+    safetyDoor: null,
     resume: RT_RESUME,
     softReset: RT_SOFT_RESET,
     jogCancel: null,

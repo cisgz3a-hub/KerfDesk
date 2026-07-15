@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RT_JOG_CANCEL } from '../../core/controllers/grbl';
+import { RT_JOG_CANCEL, RT_SOFT_RESET } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
@@ -99,7 +99,7 @@ afterEach(async () => {
 });
 
 describe('laser-store motion operation disconnect safety', () => {
-  it('sends jog cancel before disconnecting an active Frame operation', async () => {
+  it('resets and de-energizes before disconnecting an active Frame operation', async () => {
     const close = vi.fn(async () => undefined);
     const write = vi.fn(async () => undefined);
     const connection = makeConnection(write, close);
@@ -107,9 +107,18 @@ describe('laser-store motion operation disconnect safety', () => {
     setMotionOperation({ kind: 'frame', sawControllerBusy: true, dispatchComplete: true });
 
     write.mockClear();
-    await useLaserStore.getState().disconnect();
+    const disconnect = useLaserStore.getState().disconnect();
+    await flush();
 
-    expect(write).toHaveBeenCalledWith(RT_JOG_CANCEL);
+    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
+    expect(write).not.toHaveBeenCalledWith('M5\n');
+    expect(close).not.toHaveBeenCalled();
+
+    connection.emitLine('Grbl 1.1f');
+    await disconnect;
+
+    expect(write).toHaveBeenCalledWith('M5\n');
+    expect(write).toHaveBeenCalledWith('M9\n');
     expect(close).toHaveBeenCalledTimes(1);
     expect(getMotionOperation()).toBeNull();
   });

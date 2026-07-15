@@ -77,8 +77,9 @@ export type LaserSafetyNotice =
 // while lines are in flight.
 export const STREAM_STALLED_MESSAGE =
   'The controller has not acknowledged a command or reported fresh movement status for longer ' +
-  'than the watchdog window while a job is active. The stream may be stalled. Press ABORT ' +
-  '(or physical E-stop if unsafe), then check the USB link before re-running.';
+  'than the active-link watchdog window. KerfDesk froze the stream and requested a controller ' +
+  'soft reset while the link was still present. Use the physical E-stop or power cutoff if the ' +
+  'machine did not stop, then check the USB link before re-running.';
 
 export function streamStalledNotice(): LaserSafetyNotice {
   return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };

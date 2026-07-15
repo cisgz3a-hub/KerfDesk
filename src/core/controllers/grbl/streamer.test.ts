@@ -283,6 +283,18 @@ describe('pause / resume / cancel', () => {
     expect(step(s).toSend.length).toBeGreaterThan(0);
   });
 
+  it('pauses an acknowledged tail that is still executing and returns to done on resume', () => {
+    let state = step(createStreamer('G1 X1\nG1 X2')).state;
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.status).toBe('done');
+
+    const paused = pause(state);
+
+    expect(paused.status).toBe('paused');
+    expect(resume(paused).status).toBe('done');
+  });
+
   it('cancel empties the queue and sets status', () => {
     const s = cancel(createStreamer('G21\nG90'));
     expect(s.queued).toHaveLength(0);

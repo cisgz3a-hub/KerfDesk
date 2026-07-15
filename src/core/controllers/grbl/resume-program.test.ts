@@ -2,6 +2,7 @@
 // (ADR-103 G7, ADR-141).
 
 import { describe, expect, it } from 'vitest';
+import { findLaserOnTravelIssues } from '../../invariants';
 import {
   buildResumeProgram,
   CNC_AUTOMATIC_RECOVERY_DISABLED_REASON,
@@ -33,17 +34,22 @@ describe('buildResumeProgram', () => {
     expect(CNC_AUTOMATIC_RECOVERY_DISABLED_REASON).toMatch(/cutter is clear/i);
   });
 
-  it('positions the head before arming the laser on a Z-free resume', () => {
+  it('hard-offs before a Z-free re-entry and restores power on the first burn move', () => {
     const laser =
       'G21\nG90\nM3 S0\nG0 X10 Y10 S0\nG1 X20 Y10 F1500 S300\nG1 X20 Y20\nG1 X10 Y20\nM5';
     const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
     if (result.kind !== 'ok') throw new Error(result.reason);
     const preamble = result.lines.slice(0, result.preambleCount);
+    const hardOffIndex = preamble.indexOf('M5');
     const moveIndex = preamble.findIndex((line) => line.startsWith('G0 X'));
     const armIndex = preamble.findIndex((line) => line.startsWith('M3 S'));
 
+    expect(hardOffIndex).toBeGreaterThanOrEqual(0);
+    expect(hardOffIndex).toBeLessThan(moveIndex);
     expect(moveIndex).toBeGreaterThanOrEqual(0);
+    expect(preamble[moveIndex]).toBe('G0 X20 Y10 S0');
     expect(armIndex).toBeGreaterThan(moveIndex);
+    expect(preamble[armIndex]).toBe('M3 S0');
     expect(preamble.some((line) => line.startsWith('G4'))).toBe(false);
     expect(preamble.some((line) => /\bZ-?\d/.test(line))).toBe(false);
     // WCS + feed mode are pinned before the re-entry move (F10/F41/F50).
@@ -51,7 +57,81 @@ describe('buildResumeProgram', () => {
     expect(preamble).toContain('G94');
     expect(preamble.indexOf('G54')).toBeLessThan(moveIndex);
     expect(result.fromLine).toBe(6);
-    expect(result.lines[result.preambleCount]).toBe('G1 X20 Y20');
+    expect(result.lines[result.preambleCount]).toBe('G1 X20 Y20 S300');
+    expect(findLaserOnTravelIssues(result.lines.join('\n'))).toEqual([]);
+  });
+
+  it('restores dynamic M4 power only on the first resumed burn move', () => {
+    const laser = 'G21\nG90\nM4 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F1500 S300\nG1 X20 Y0\nM5';
+    const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+
+    expect(preamble).toContain('M5');
+    expect(preamble).toContain('G0 X10 Y0 S0');
+    expect(preamble).toContain('M4 S0');
+    expect(preamble).not.toContain('M4 S300');
+    expect(result.lines[result.preambleCount]).toBe('G1 X20 Y0 S300');
+  });
+
+  it('moves every stationary positive arm onto its following burn motion', () => {
+    const laser = [
+      'G21',
+      'G90',
+      'M3 S0',
+      'G0 X0 Y0 S0',
+      'G1 X1 Y0 F1000 S200',
+      'M5',
+      'M4 S400',
+      'G0 X2 Y0 S400',
+      'G1 X3 Y0',
+      'M3 S500',
+      'G1 X4 Y0',
+      'M5',
+    ].join('\n');
+    const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const tail = result.lines.slice(result.preambleCount);
+
+    expect(tail).toEqual([
+      'M5',
+      'M4 S0',
+      'G0 X2 Y0 S0',
+      'G1 X3 Y0 S400',
+      'M3 S0',
+      'G1 X4 Y0 S500',
+      'M5',
+    ]);
+  });
+
+  it('does not restore stale power after an explicit S0 motion', () => {
+    const laser =
+      'G21\nG90\nM3 S0\nG0 X0 Y0 S0\nG1 X1 Y0 F1000 S200\nG1 X2 Y0 S0\nG1 X3 Y0\nG1 X4 Y0 S200\nM5';
+    const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+
+    expect(result.lines.slice(result.preambleCount)).toEqual([
+      'G1 X2 Y0 S0',
+      'G1 X3 Y0',
+      'G1 X4 Y0 S200',
+      'M5',
+    ]);
+  });
+
+  it('does not mistake a coordinate-setting line for resumed burn motion', () => {
+    const laser = 'G21\nG90\nM3 S0\nG0 X0 Y0 S0\nG1 X1 Y0 F1000 S200\nG92 X0\nG1 X2 Y0\nM5';
+    const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+
+    expect(result.lines.slice(result.preambleCount)).toEqual(['G92 X0', 'G1 X2 Y0 S200', 'M5']);
+  });
+
+  it('restores power on a full-circle arc with no repeated X/Y endpoint', () => {
+    const laser = 'G21\nG90\nM4 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F1000 S200\nG2 I-5 J0\nM5';
+    const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+
+    expect(result.lines[result.preambleCount]).toBe('G2 I-5 J0 S200');
   });
 
   it('refuses out-of-range lines, G91 programs, and empty tails for laser recovery', () => {
@@ -88,6 +168,7 @@ describe('buildResumeProgram', () => {
     const result = buildResumeProgram(withComments, 6, LASER_OPTIONS);
     if (result.kind !== 'ok') throw new Error(result.reason);
 
-    expect(result.lines.slice(0, result.preambleCount)).toContain('M3 S5000');
+    expect(result.lines.slice(0, result.preambleCount)).toContain('M3 S0');
+    expect(result.lines[result.preambleCount]).toBe('G1 X2 S5000');
   });
 });

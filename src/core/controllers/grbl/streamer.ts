@@ -320,7 +320,12 @@ function ackStatusWithoutLine(state: StreamerState, kind: AckKind): StreamerStat
 }
 
 export function pause(state: StreamerState): StreamerState {
-  if (state.status !== 'streaming' && state.status !== 'idle') return state;
+  // `done` means every line was accepted, not that GRBL finished executing
+  // planner motion. The UI keeps that tail active until a later Idle report,
+  // so it must remain pausable while the controller still reports Run.
+  if (state.status !== 'streaming' && state.status !== 'idle' && state.status !== 'done') {
+    return state;
+  }
   return { ...state, status: 'paused' };
 }
 

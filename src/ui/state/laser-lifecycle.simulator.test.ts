@@ -23,6 +23,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   useLaserStore.setState({ autofocusBusy: false });
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
@@ -144,17 +145,21 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(useLaserStore.getState().safetyNotice).toBeNull();
   });
 
-  it('pauses mid-stream with ! and resumes with ~ to completion', async () => {
+  it('pauses mid-stream with Safety Door and resumes with ~ to completion', async () => {
     const sim = await connectIdle();
     await useLaserStore.getState().startJob(jobLines(40, 1));
-    await useLaserStore.getState().pauseJob();
-    expect(sim.outbound()).toContain('!');
+    const pausing = useLaserStore.getState().pauseJob();
+    await pump(5);
+    await pausing;
+    expect(sim.outbound()).toContain('\x84');
     await pump(50);
     const paused = useLaserStore.getState().streamer;
     expect(paused?.status).toBe('paused');
     expect(paused?.completed).toBeGreaterThan(0);
     expect(paused?.completed).toBeLessThan(40);
-    await useLaserStore.getState().resumeJob();
+    const resuming = useLaserStore.getState().resumeJob();
+    await pump(5);
+    await resuming;
     expect(sim.outbound()).toContain('~');
     await pump(5000);
     expect(useLaserStore.getState().streamer).toBeNull();

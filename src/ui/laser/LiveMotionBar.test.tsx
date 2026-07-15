@@ -50,6 +50,7 @@ afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
     streamer: null,
+    statusReport: null,
     controllerOperation: null,
     motionOperation: null,
     activeJobMachineKind: null,
@@ -98,6 +99,32 @@ describe('LiveMotionBar', () => {
       await act(async () => abortButton?.click());
       expect(pauseJob).toHaveBeenCalledOnce();
       expect(stopJob).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('keeps Pause available after every line is acknowledged while the machine still runs', async () => {
+    const pauseJob = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      streamer: { ...streamingStreamer(), status: 'done', inFlight: [] },
+      statusReport: {
+        state: 'Run',
+        subState: null,
+        mPos: { x: 2, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 1_000,
+        spindle: 100,
+      },
+      pauseJob,
+    });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      const pauseButton = buttonByText(host, 'Pause');
+      expect(pauseButton).toBeDefined();
+      await act(async () => pauseButton?.click());
+      expect(pauseJob).toHaveBeenCalledOnce();
     } finally {
       await act(async () => root.unmount());
     }

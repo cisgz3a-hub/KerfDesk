@@ -19,6 +19,7 @@ import {
   RT_HOLD,
   RT_JOG_CANCEL,
   RT_RESUME,
+  RT_SAFETY_DOOR,
   RT_SOFT_RESET,
   RT_STATUS,
 } from './commands';
@@ -59,6 +60,7 @@ export const grblDriver: ControllerDriver = {
   realtime: {
     statusQuery: RT_STATUS,
     hold: RT_HOLD,
+    safetyDoor: RT_SAFETY_DOOR,
     resume: RT_RESUME,
     softReset: RT_SOFT_RESET,
     jogCancel: RT_JOG_CANCEL,
