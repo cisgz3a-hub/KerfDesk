@@ -8136,9 +8136,10 @@ clearance, retained coordinates, or unchanged workholding.
 
 ### Consequences
 
-Current controllers remain manual-recovery-only. KerfDesk may add incident evidence, semantic
-toolpath identity, preview, and refusal-policy foundations without enabling machine motion. A
-stationary or possibly broken embedded tool always routes to inspection and supervised extraction.
+The first implementation kept current controllers manual-recovery-only while adding incident
+evidence, semantic toolpath identity, preview, and refusal-policy foundations without machine
+motion. A stationary or possibly broken embedded tool always routes to inspection and supervised
+extraction.
 Simulator evidence cannot enable a machine profile; controller-specific fault injection and physical
 air-cut/scrap validation are required.
 
@@ -8146,10 +8147,9 @@ The first software foundation assigns stable identities to individual native con
 binds their validated line sidecar into the SHA-256 recovery package, and provides pure contour
 review geometry. The package constructor rebuilds the canonical manifest from the exact Job before
 hashing. Review geometry requires a straight, same-direction tangent runway into the uncertainty
-segment; preceding distance across a corner cannot claim acceleration room. Every successful policy
-or geometry result carries `executable: false`; it emits no G-code and has no controller execution
-path. Opaque proof strings remain review evidence only until a controller-specific producer binds
-freshness, session, package, WCS, tool inspection, and hardware-profile identity.
+segment; preceding distance across a corner cannot claim acceleration room. At this foundation
+stage, every successful policy or geometry result carried `executable: false`; it emitted no G-code
+and had no controller execution path. Opaque proof strings remained review evidence only.
 
 The first UI review is intentionally split into an evidence audit and a hypothetical geometry
 preview. Existing checkpoints contain acknowledged-line diagnostics but no emitter-owned semantic
@@ -8158,6 +8158,42 @@ hardware-qualified runway profile. The wizard reports those proofs as missing an
 physical cut position from acknowledgement count. It may draw an operator-selected native contour
 segment using explicitly illustrative acceleration assumptions, but its result carries
 `executable: false`; the dialog exposes no stream, spindle, G-code, or controller action.
+
+### 2026-07-15 supervised new-job amendment
+
+Generic CNC Resume, checkpoint line replay, and arbitrary start-from-line remain disabled. A
+retained first-attempt checkpoint may now launch a different operation: a supervised generator for a
+new native KerfDesk recovery job after the cutter has been physically cleared. This is not an
+automatic resume and it never maps acknowledgement count to cut completion.
+
+The operator must explicitly select the first uncertain native contour segment and separately
+confirm a physically stopped spindle, clear cutter, re-homed/requalified position, verified G54 XY/
+WCS and Z zero, intact installed tool, unchanged secure workholding, completed machining before the
+selection, and the entire displayed tangent runway clear. The operator must also enter the record
+for the machine-specific air-cut or scrap test that qualified the runway profile. Missing or blank
+evidence fails closed; an invalid machine acceleration value cannot fall back to a permissive
+default.
+
+The generated job is limited to single-tool native constant-depth contour passes with a straight,
+same-direction lead-in. It replays the selected uncertainty segment and remainder, then retains every
+later pass and operation in source order. The first segment, cornered or short runway, mixed output,
+multi-tool work, and imported/path3d/arc/helical motion remain unsupported. Its emitted order is
+safe-Z retract, spindle start and configured dwell, rapid to the confirmed-clear runway start, feed
+plunge, tangent re-entry, and remaining work.
+
+Immediately before streaming, KerfDesk recompiles the original output scope and resolved origin,
+requires the checkpoint fingerprint to match, and creates a SHA-256 package over the exact source
+and recovery bytes, semantic plan, runway profile, operator review, completed-prefix proof, and
+cleared-runway proof. The ordinary CNC Idle/alarm/controller compatibility/work-zero/override/
+accessory/bounds/no-go checks and exact-program setup attestation run again. These software gates do
+not sense the physical setup or make the host Abort an E-stop; the operator must supervise re-entry
+with the physical E-stop reachable.
+
+Once recovery streaming is attempted, the original checkpoint is marked in-flight. If that recovery
+is interrupted, KerfDesk refuses to reuse the original checkpoint because it no longer describes
+current work; the operator must inspect and requalify the machine and create a separately reviewed
+new job. Possible cutter engagement still has no desktop-controlled escape path and always remains
+manual intervention.
 
 ---
 

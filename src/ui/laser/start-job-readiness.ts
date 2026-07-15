@@ -8,7 +8,11 @@ import {
   framePreflight,
   type JobOriginPlacement,
 } from '../../core/job';
-import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
+import type {
+  ControllerSettingsSnapshot,
+  PreflightOptions,
+  ReadinessSettingsCapability,
+} from '../../core/preflight';
 import { runControllerReadiness } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -62,6 +66,10 @@ export type StartJobPreparation =
       readonly warnings: ReadonlyArray<string>;
       readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
       readonly canvasPlan: CanvasMotionPlan;
+      /** Exact compiled/placed Job used for this G-code. Recovery may only
+       * derive a smaller semantic Job from this already-gated source. */
+      readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
+      readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
       // The RESOLVED origin this compile used (undefined = Absolute). The
       // checkpoint stores it so resume reproduces identical bytes (R1).
       readonly jobOrigin?: JobOriginPlacement;
@@ -220,6 +228,7 @@ export function prepareStartJob(
     toolPlan,
     prepared,
     machine,
+    motionOffset,
     controllerReportsInches(controllerSettings),
     canvasPlanRetentionKey(project, outputScope, jobPlacement),
   );
@@ -296,6 +305,7 @@ export async function prepareStartJobSnapshot(
     toolPlan,
     prepared,
     machine,
+    motionOffset,
     controllerReportsInches(controllerSettings),
     canvasPlanRetentionKey(project, outputScope, jobPlacement, options.registration),
   );

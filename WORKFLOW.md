@@ -873,17 +873,25 @@ run that finishes cleanly clears it.
 4. For laser jobs, **Review safe recovery** re-compiles the project, verifies
    the fingerprint, and maps the acknowledged count to the first unconfirmed
    raw line.
-5. For router jobs, no executable recovery action is offered. The checkpoint
-   remains diagnostic evidence and the banner directs the operator through a
-   supervised, machine-specific clearance/re-home/WCS/Z-zero/tool/workholding
-   review before creating a new recovery job.
-6. The checkpoint records the terminal safety reason when one is available
+5. For router jobs, the acknowledged count remains diagnostic only. A retained
+   checkpoint may open **Review supervised recovery**, where the operator—not
+   the count—selects the first uncertain native contour segment. Execution is
+   available only after the cutter is clear, the spindle is stopped, position/
+   WCS/Z zero and tool/workholding are requalified, all earlier machining and
+   the displayed tangent runway are confirmed, and a machine-specific air-cut
+   or scrap-test qualification record is entered.
+6. The router flow recompiles the exact checkpointed source, generates a new
+   recovery job, SHA-256 binds the source/recovery bytes, semantic segment,
+   runway profile, and review proofs, then repeats the ordinary CNC Start and
+   setup-attestation gates before streaming. It never streams the old program
+   from an acknowledged line.
+7. The checkpoint records the terminal safety reason when one is available
    (disconnect, controller error/rejected line, reboot, write failure, or
    cancellation) and shows it after reload/reconnect.
-7. The checkpoint clears only after the controller reports connected,
+8. The checkpoint clears only after the controller reports connected,
    physical Idle; the final GRBL `ok` alone is not physical completion.
-8. A CNC checkpoint with zero acknowledgements still shows the diagnostic review and manual-recovery
-   guidance; it never implies that no physical motion occurred.
+9. A CNC checkpoint with zero acknowledgements still shows the diagnostic review; it never implies
+   that no physical motion occurred.
 
 #### Error — project changed since the run
 1. Fingerprint mismatch → alert explains the project no longer produces
@@ -899,7 +907,14 @@ run that finishes cleanly clears it.
 #### Edge — controller lost power too
 1. Acknowledged lines may include a buffer's worth GRBL never executed; the
    banner says so. Laser recovery can replay from an earlier line. CNC recovery
-   never converts that transport-level count into automatic machine motion.
+   never converts that transport-level count into a cut position or automatic
+   machine motion.
+
+#### Edge — recovery job is itself interrupted
+1. The original CNC checkpoint is marked once the generated recovery starts.
+   If that attempt is interrupted, its old progress no longer describes the
+   work and **Review supervised recovery** is removed. The operator must inspect
+   and requalify the machine and create a separately reviewed new job.
 
 #### Edge — deliberate software Abort
 1. Abort keeps the checkpoint (an aborted job still requires recovery review);
@@ -2491,30 +2506,70 @@ F-CNC19 tiling.
 1. Reflex (inside-L) corners and hole rings (islands of remaining
    material) are never relieved.
 
-### F-CNC27. Supervised CNC interruption recovery — Phase H.11 (ADR-141)
+### F-CNC27. Supervised CNC interruption recovery — Phase H.11 (ADR-200)
 
 #### Success
-1. CNC Job controls show an always-visible "Automatic CNC recovery disabled"
-   notice instead of a G-code line input or Resume button.
-2. The notice directs the operator to inspect cutter engagement, establish
-   clearance with the machine-specific procedure, re-home if position may be
-   lost, verify WCS/Z zero/tool/workholding, and start a newly reviewed job.
-3. Laser jobs retain Start from line: modal state is reconstructed and the head
+1. CNC Job controls show a collapsed **CNC interruption recovery** explanation
+   instead of a raw G-code line input. Generic checkpoint resume and arbitrary
+   start-from-line remain blocked in both UI and core.
+2. After an interrupted CNC job, the retained checkpoint offers **Review
+   supervised recovery** only for a first recovery attempt. Controller
+   acknowledgements are displayed as diagnostics and never select geometry.
+3. The wizard requires an explicit first-uncertain native contour segment; no
+   segment is preselected. It previews the uncertainty segment, remaining path,
+   and same-direction tangent runway. The first segment, a cornered lead-in, or
+   insufficient cleared distance is refused.
+4. The executable v1 runway profile uses at least 5 mm, the lower of configured
+   acceleration and 100 mm/s², plus a 2 mm margin. Invalid acceleration fails
+   closed. The operator must identify the machine-specific air-cut or scrap-test
+   record that qualified this profile.
+5. Physical review separately confirms: cutter clear; spindle stopped; position
+   re-homed/requalified with G54 XY/WCS and Z zero verified; installed tool intact;
+   stock/workholding unchanged; all machining before the selected segment known
+   complete; and the entire displayed runway physically clear.
+6. Start recompiles the original scope and resolved origin and requires its
+   fingerprint to match the checkpoint. A SHA-256 package binds the exact source
+   and generated recovery G-code, semantic plan, runway profile, operator review,
+   cleared-runway proof, and completed-prefix proof.
+7. The new job keeps the uncertainty remainder, every later pass in that
+   operation, and every later operation. Its machine order is safe-Z retract →
+   spindle start and dwell → rapid to the confirmed-clear runway start → feed
+   plunge → tangent re-entry and remaining work.
+8. Immediately before streaming, the ordinary Idle/alarm/controller/profile/
+   work-zero/override/accessory/bounds/no-go gates and exact-program CNC setup
+   attestation run again. The operator must supervise re-entry with the physical
+   E-stop reachable.
+9. Laser jobs retain Start from line: modal state is reconstructed and the head
    positions with the beam off before arming.
 
 #### Error — impossible resumes
 1. Every CNC call into the core resume builder is refused before parsing or
    emitting motion, even if a hidden/stale UI or future caller bypasses the
-   visible control. Laser recovery still refuses out-of-range lines, programs
+   visible control. The supervised path is a newly compiled Job, not a relaxation
+   of that refusal. Laser recovery still refuses out-of-range lines, programs
    using G91 before the resume point, and empty tails.
+2. Recovery refuses a changed project/fingerprint, non-CNC or mixed output,
+   multi-tool job, imported/3D/arc/helical pass, missing qualification or physical
+   confirmation, invalid motion/profile, missing straight runway, failed
+   preflight, stale checkpoint, or any ordinary Start blocker.
+3. If the cutter may still be embedded, spindle state is not physically known,
+   or position/tool/workholding cannot be requalified, the wizard cannot command
+   an escape. Use the machine manufacturer's manual procedure and physical E-stop
+   or power isolation where required.
 
 #### Empty
-1. The CNC information panel has no executable control. Laser Start from line
-   is disabled while disconnected or any job/motion is active.
+1. Without a retained first-attempt CNC checkpoint, only the collapsed guidance
+   is shown. Laser Start from line is disabled while disconnected or any
+   job/motion is active.
 
 #### Edge — laser jobs
 1. Programs with no Z words never receive Z commands in the preamble —
    a laser resume re-fires at the recorded XY without touching Z.
+
+#### Edge — interrupted recovery attempt
+1. Once a generated CNC recovery has started, the original checkpoint is marked
+   in-flight. If that run fails or the app crashes, the same checkpoint cannot
+   generate another recovery because it no longer represents current work.
 
 ### F-CNC28. Watch the live 3D result while designing — ADR-105 G9
 

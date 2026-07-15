@@ -1,6 +1,6 @@
 import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { JobOriginPlacement } from '../../core/job';
-import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { ControllerSettingsSnapshot, PreflightOptions } from '../../core/preflight';
 import type { PreparedOutput } from '../../io/gcode';
 import {
   resolveJobPlacement,
@@ -44,6 +44,7 @@ export function okPreparation(
   toolPlan: ReadonlyArray<CncToolPlanEntry>,
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
   machine: MachineStartSnapshot,
+  preflightMotionOffset: PreflightOptions['motionOffset'],
   reportInches: boolean,
   retentionKey: string,
 ): StartJobPreparation {
@@ -51,6 +52,8 @@ export function okPreparation(
     ok: true,
     gcode,
     warnings,
+    prepared,
+    ...(preflightMotionOffset === undefined ? {} : { preflightMotionOffset }),
     canvasPlan: buildCanvasMotionPlan({
       gcode,
       prepared,

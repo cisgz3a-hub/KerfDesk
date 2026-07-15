@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { CncGroup, Job } from '../job';
 import { buildCncRecoveryEventManifest } from './cnc-recovery-manifest';
-import type { CncRecoveryPackageInput } from './cnc-recovery-package';
+import type { CncContourRunwayPlan, CncRunwayProfile } from './cnc-contour-runway';
+import type {
+  CncRecoveryPackageInput,
+  CncSupervisedRecoveryPackageInput,
+} from './cnc-recovery-package';
 import {
   cncRecoveryPackageIdentitiesEqual,
   createCncRecoveryPackageIdentity,
+  createCncSupervisedRecoveryPackageIdentity,
 } from './cnc-recovery-package';
 const group: CncGroup = {
   kind: 'cnc',
@@ -105,5 +110,88 @@ describe('createCncRecoveryPackageIdentity', () => {
     await expect(
       createCncRecoveryPackageIdentity({ ...input, manifest: forgedManifest }),
     ).resolves.toEqual({ kind: 'error', reason: 'invalid-manifest' });
+  });
+});
+
+const supervisedPlan: CncContourRunwayPlan = {
+  kind: 'review-plan',
+  executable: false,
+  eventId: 'cnc-op-1/pass-1/cut-3',
+  operationId: 'cnc-op-1',
+  passId: 'cnc-op-1/pass-1',
+  requiredRunwayMm: 12,
+  availableClearedMm: 20,
+  runwayPolyline: [
+    { x: 8, y: 0 },
+    { x: 20, y: 0 },
+  ],
+  recoveryPolyline: [
+    { x: 8, y: 0 },
+    { x: 20, y: 0 },
+    { x: 30, y: 0 },
+  ],
+  uncertaintyStartPointIndex: 1,
+  source: { groupIndex: 0, passIndex: 0, segmentIndex: 2 },
+  motion: {
+    cutZMm: -2,
+    safeZMm: 5,
+    feedMmPerMin: 600,
+    plungeMmPerMin: 180,
+    spindleRpm: 12_000,
+    spindleSpinupSec: 3,
+    coolant: 'off',
+    toolKey: 'tool-1',
+  },
+};
+const supervisedProfile: CncRunwayProfile = {
+  qualificationId: 'air-cut-2026-07-15',
+  minRunwayMm: 5,
+  accelerationMmPerSec2: 100,
+  safetyMarginMm: 2,
+};
+const supervisedInput: CncSupervisedRecoveryPackageInput = {
+  sourceGcode: 'G21\nG90\nG54\nM3 S12000\n',
+  recoveryGcode: 'G21\nG90\nG54\nG0 Z5\nM3 S12000\n',
+  plan: supervisedPlan,
+  profile: supervisedProfile,
+  reviewId: 'review-8',
+  clearedPathProofId: 'review-8/cleared-through-cut-2',
+  completedPrefixProofId: 'review-8/complete-before-cut-3',
+};
+
+async function supervisedIdentity(value: CncSupervisedRecoveryPackageInput): Promise<string> {
+  const result = await createCncSupervisedRecoveryPackageIdentity(value);
+  expect(result.kind).toBe('ok');
+  return result.kind === 'ok' ? result.identity.digest : '';
+}
+
+describe('createCncSupervisedRecoveryPackageIdentity', () => {
+  it('binds the original program, generated recovery program, semantic plan, and qualification', async () => {
+    const first = await supervisedIdentity(supervisedInput);
+    const second = await supervisedIdentity(supervisedInput);
+    expect(first).toBe(second);
+    expect(first).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it('changes when any execution-critical recovery field changes', async () => {
+    const original = await supervisedIdentity(supervisedInput);
+    const mutations: ReadonlyArray<CncSupervisedRecoveryPackageInput> = [
+      { ...supervisedInput, sourceGcode: `${supervisedInput.sourceGcode}; changed` },
+      { ...supervisedInput, recoveryGcode: `${supervisedInput.recoveryGcode}; changed` },
+      {
+        ...supervisedInput,
+        plan: { ...supervisedPlan, eventId: 'cnc-op-1/pass-1/cut-4' },
+      },
+      {
+        ...supervisedInput,
+        profile: { ...supervisedProfile, qualificationId: 'different-air-cut' },
+      },
+      { ...supervisedInput, reviewId: 'different-review' },
+      { ...supervisedInput, clearedPathProofId: 'different-review' },
+      { ...supervisedInput, completedPrefixProofId: 'different-prefix-proof' },
+    ];
+    for (const mutation of mutations) {
+      expect(await supervisedIdentity(mutation)).not.toBe(original);
+    }
   });
 });

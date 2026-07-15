@@ -70,8 +70,8 @@ describe('JobControls machine gating (ADR-101 §5)', () => {
       expect(labels).toContain('Start job');
       expect(labels).not.toContain('Resume from line');
       expect(host.querySelector('input[aria-label="Resume from G-code line"]')).toBeNull();
-      expect(host.textContent).toContain('Automatic CNC recovery disabled');
-      expect(host.textContent).toContain('acknowledgements do not prove');
+      expect(host.textContent).toContain('CNC interruption recovery');
+      expect(host.textContent).not.toContain('Automatic CNC recovery disabled');
     } finally {
       await unmount();
     }

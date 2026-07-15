@@ -15,7 +15,7 @@ export function CncRecoveryRunwayPreview({
       <svg
         data-testid="cnc-recovery-runway-preview"
         role="img"
-        aria-label="Hypothetical CNC recovery runway and uncertainty segment"
+        aria-label="Proposed CNC recovery runway and uncertainty segment"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         style={svgStyle}
       >
@@ -51,7 +51,7 @@ export function CncRecoveryRunwayPreview({
         />
       </svg>
       <div style={legendStyle}>
-        <Legend color="var(--lf-warning)" label="Hypothetical acceleration runway" />
+        <Legend color="var(--lf-warning)" label="Proposed confirmed-clear runway" />
         <Legend color="var(--lf-danger)" label="Selected uncertainty segment" />
         <Legend color="var(--lf-text-muted)" label="Remaining contour" dashed />
       </div>

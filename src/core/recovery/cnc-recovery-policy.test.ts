@@ -19,6 +19,7 @@ const completeReviewEvidence: CncRecoveryEvidence = {
   workholding: { kind: 'confirmed-unchanged' },
   recoveryPackage: { kind: 'exact-match', digest: PACKAGE_DIGEST },
   controller: controllerReviewEvidence,
+  operatorReview: { kind: 'missing' },
 };
 
 describe('assessCncRecovery', () => {
@@ -55,7 +56,7 @@ describe('assessCncRecovery', () => {
     expect(assessCncRecovery(mismatched).kind).toBe('manual-intervention-required');
   });
 
-  it('reports a supervised recovery review candidate only after the cutter is clear', () => {
+  it('authorizes only a new supervised recovery job after the cutter is clear and setup is requalified', () => {
     const result = assessCncRecovery({
       ...completeReviewEvidence,
       incident: { kind: 'interruption' },
@@ -63,12 +64,63 @@ describe('assessCncRecovery', () => {
       spindle: { kind: 'stopped' },
       position: { kind: 'requalified' },
       controller: { kind: 'manual-only' },
+      operatorReview: {
+        kind: 'complete',
+        reviewId: 'review-8',
+        clearedPathProofId: 'cleared-through-cut-2',
+        completedPrefixProofId: 'complete-before-cut-3',
+        runwayQualificationId: 'air-cut-2026-07-15',
+      },
     });
     expect(result).toEqual({
-      kind: 'supervised-recovery-review-candidate',
-      executable: false,
+      kind: 'supervised-recovery-authorized',
+      executable: true,
       recoveryPackageDigest: PACKAGE_DIGEST,
       toolInspectionId: 'inspection-2',
+      reviewId: 'review-8',
+      clearedPathProofId: 'cleared-through-cut-2',
+      completedPrefixProofId: 'complete-before-cut-3',
+      runwayQualificationId: 'air-cut-2026-07-15',
+    });
+  });
+
+  it('does not authorize clear-cutter recovery without the complete operator review', () => {
+    const result = assessCncRecovery({
+      ...completeReviewEvidence,
+      cutter: { kind: 'clear' },
+      spindle: { kind: 'stopped' },
+      position: { kind: 'requalified' },
+      controller: { kind: 'manual-only' },
+    });
+    expect(result).toEqual({
+      kind: 'requalification-required',
+      reasons: [
+        'operator-review-missing',
+        'cleared-path-unproved',
+        'completed-prefix-unproved',
+        'runway-profile-unqualified',
+      ],
+    });
+  });
+
+  it('requires fresh requalification instead of trusting a retained session for a new job', () => {
+    const result = assessCncRecovery({
+      ...completeReviewEvidence,
+      cutter: { kind: 'clear' },
+      spindle: { kind: 'stopped' },
+      position: { kind: 'retained', controllerSessionId: 'session-4' },
+      controller: { kind: 'manual-only' },
+      operatorReview: {
+        kind: 'complete',
+        reviewId: 'review-8',
+        clearedPathProofId: 'cleared-through-cut-2',
+        completedPrefixProofId: 'complete-before-cut-3',
+        runwayQualificationId: 'air-cut-2026-07-15',
+      },
+    });
+    expect(result).toEqual({
+      kind: 'requalification-required',
+      reasons: ['position-unproved'],
     });
   });
 
@@ -76,12 +128,41 @@ describe('assessCncRecovery', () => {
     const result = assessCncRecovery({
       ...completeReviewEvidence,
       cutter: { kind: 'clear' },
+      spindle: { kind: 'stopped' },
       toolCondition: { kind: 'unknown-or-damaged' },
       position: { kind: 'requalified' },
+      operatorReview: {
+        kind: 'complete',
+        reviewId: 'review-8',
+        clearedPathProofId: 'cleared-through-cut-2',
+        completedPrefixProofId: 'complete-before-cut-3',
+        runwayQualificationId: 'air-cut-2026-07-15',
+      },
     });
     expect(result).toEqual({
       kind: 'requalification-required',
       reasons: ['tool-condition-unproved'],
+    });
+  });
+
+  it('refuses a new recovery job unless the spindle is confirmed stopped', () => {
+    const result = assessCncRecovery({
+      ...completeReviewEvidence,
+      cutter: { kind: 'clear' },
+      spindle: { kind: 'unknown' },
+      position: { kind: 'requalified' },
+      controller: { kind: 'manual-only' },
+      operatorReview: {
+        kind: 'complete',
+        reviewId: 'review-8',
+        clearedPathProofId: 'cleared-through-cut-2',
+        completedPrefixProofId: 'complete-before-cut-3',
+        runwayQualificationId: 'air-cut-2026-07-15',
+      },
+    });
+    expect(result).toEqual({
+      kind: 'requalification-required',
+      reasons: ['spindle-stop-unproved'],
     });
   });
 

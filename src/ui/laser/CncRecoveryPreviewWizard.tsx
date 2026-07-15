@@ -2,15 +2,31 @@ import { useMemo, useState } from 'react';
 import type { JobCheckpoint } from '../../core/recovery';
 import { Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
+import {
+  CncRecoveryQualificationStep,
+  isCncRecoveryReviewComplete,
+  type CncRecoveryReviewDraft,
+} from './CncRecoveryQualificationStep';
 import { CncRecoveryRunwayPreview } from './CncRecoveryRunwayPreview';
+import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
 import {
   buildCncRecoveryPreviewModel,
-  CNC_RECOVERY_PREVIEW_PARAMETERS,
   type CncRecoveryEvidenceCheck,
+  type CncRecoveryPreviewModel,
 } from './cnc-recovery-preview-model';
 
-type WizardStep = 'evidence' | 'geometry' | 'decision';
-const STEPS: ReadonlyArray<WizardStep> = ['evidence', 'geometry', 'decision'];
+type WizardStep = 'evidence' | 'geometry' | 'qualification' | 'decision';
+const STEPS: ReadonlyArray<WizardStep> = ['evidence', 'geometry', 'qualification', 'decision'];
+const EMPTY_REVIEW: CncRecoveryReviewDraft = {
+  qualificationId: '',
+  cutterClear: false,
+  spindleStopped: false,
+  positionRequalified: false,
+  toolInspected: false,
+  workholdingConfirmed: false,
+  priorWorkConfirmed: false,
+  clearedPathConfirmed: false,
+};
 
 export function CncRecoveryPreviewWizard(props: {
   readonly checkpoint: JobCheckpoint;
@@ -18,18 +34,34 @@ export function CncRecoveryPreviewWizard(props: {
 }): JSX.Element {
   const project = useStore((state) => state.project);
   const [step, setStep] = useState<WizardStep>('evidence');
-  const [requestedEventId, setRequestedEventId] = useState<string>();
+  const [requestedEventId, setRequestedEventId] = useState('');
+  const [review, setReview] = useState<CncRecoveryReviewDraft>(EMPTY_REVIEW);
+  const [starting, setStarting] = useState(false);
   const model = useMemo(
-    () => buildCncRecoveryPreviewModel(project, props.checkpoint, requestedEventId),
+    () =>
+      buildCncRecoveryPreviewModel(
+        project,
+        props.checkpoint,
+        requestedEventId === '' ? undefined : requestedEventId,
+      ),
     [project, props.checkpoint, requestedEventId],
   );
   const stepIndex = STEPS.indexOf(step);
+  const reviewComplete = isCncRecoveryReviewComplete(review);
+  const canStart = model.canExecute && reviewComplete && !starting;
+  const startRecovery = async (): Promise<void> => {
+    if (!canStart || model.selectedEventId === null) return;
+    setStarting(true);
+    const started = await runCncSupervisedRecoveryFlow(props.checkpoint, {
+      ...review,
+      uncertaintyEventId: model.selectedEventId,
+    });
+    if (started) props.onClose();
+    else setStarting(false);
+  };
   return (
-    <Dialog title="CNC recovery review — preview only" size="lg" onClose={props.onClose}>
-      <div style={warningStyle} role="alert">
-        This wizard cannot start the spindle, emit recovery G-code, or move the machine. Use the
-        physical E-stop or power isolation if the machine is unsafe.
-      </div>
+    <Dialog title="Supervised CNC recovery" size="lg" onClose={props.onClose}>
+      <RecoverySafetyWarning />
       <p style={stepLabelStyle}>
         Step {stepIndex + 1} of {STEPS.length}: {stepTitle(step)}
       </p>
@@ -37,31 +69,82 @@ export function CncRecoveryPreviewWizard(props: {
       {step === 'geometry' ? (
         <GeometryStep model={model} onSelectEvent={setRequestedEventId} />
       ) : null}
-      {step === 'decision' ? <DecisionStep unavailableReason={model.unavailableReason} /> : null}
-      <DialogActions>
-        <button type="button" onClick={props.onClose} title="Close the recovery preview.">
-          Close
-        </button>
-        {stepIndex > 0 ? (
-          <button
-            type="button"
-            onClick={() => setStep(STEPS[stepIndex - 1] ?? 'evidence')}
-            title="Return to the previous review step."
-          >
-            Back
-          </button>
-        ) : null}
-        {stepIndex < STEPS.length - 1 ? (
-          <button
-            type="button"
-            onClick={() => setStep(STEPS[stepIndex + 1] ?? 'decision')}
-            title="Continue to the next preview-only review step."
-          >
-            Next: {stepIndex === 0 ? 'Geometry' : 'Safety decision'}
-          </button>
-        ) : null}
-      </DialogActions>
+      {step === 'qualification' ? (
+        <CncRecoveryQualificationStep review={review} onChange={setReview} />
+      ) : null}
+      {step === 'decision' ? (
+        <DecisionStep model={model} qualificationId={review.qualificationId} />
+      ) : null}
+      <RecoveryWizardActions
+        step={step}
+        stepIndex={stepIndex}
+        model={model}
+        reviewComplete={reviewComplete}
+        canStart={canStart}
+        starting={starting}
+        onClose={props.onClose}
+        onStep={setStep}
+        onStart={() => void startRecovery()}
+      />
     </Dialog>
+  );
+}
+
+function RecoveryWizardActions(props: {
+  readonly step: WizardStep;
+  readonly stepIndex: number;
+  readonly model: CncRecoveryPreviewModel;
+  readonly reviewComplete: boolean;
+  readonly canStart: boolean;
+  readonly starting: boolean;
+  readonly onClose: () => void;
+  readonly onStep: (step: WizardStep) => void;
+  readonly onStart: () => void;
+}): JSX.Element {
+  return (
+    <DialogActions>
+      <button type="button" onClick={props.onClose} title="Close without moving the machine.">
+        Close
+      </button>
+      {props.stepIndex > 0 ? (
+        <button
+          type="button"
+          onClick={() => props.onStep(STEPS[props.stepIndex - 1] ?? 'evidence')}
+          title="Return to the previous recovery review step."
+        >
+          Back
+        </button>
+      ) : null}
+      {props.stepIndex < STEPS.length - 1 ? (
+        <button
+          type="button"
+          disabled={nextDisabled(props.step, props.model, props.reviewComplete)}
+          onClick={() => props.onStep(STEPS[props.stepIndex + 1] ?? 'decision')}
+          title="Continue after completing every requirement on this recovery review step."
+        >
+          Next: {nextStepLabel(props.step)}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!props.canStart}
+          onClick={props.onStart}
+          title="Run the ordinary CNC Start gates again, then stream the newly generated recovery job."
+        >
+          {props.starting ? 'Starting recovery…' : 'Start supervised recovery'}
+        </button>
+      )}
+    </DialogActions>
+  );
+}
+
+function RecoverySafetyWarning(): JSX.Element {
+  return (
+    <div style={warningStyle} role="alert">
+      This flow can move the machine only after physical clearance and requalification. If the
+      cutter is embedded or the machine is unsafe, use the physical E-stop or power isolation and
+      recover it manually first.
+    </div>
   );
 }
 
@@ -73,8 +156,8 @@ function EvidenceStep({
   return (
     <div>
       <p style={bodyStyle}>
-        Acknowledged lines are transport diagnostics. Automatic recovery would additionally require
-        every missing proof below from trusted machine-side sources.
+        Acknowledged lines remain transport diagnostics. This flow never turns that count into a cut
+        position; you explicitly select the first uncertain native contour segment in the next step.
       </p>
       <ul style={checkListStyle}>
         {checks.map((check) => (
@@ -93,25 +176,26 @@ function EvidenceStep({
 }
 
 function GeometryStep(props: {
-  readonly model: ReturnType<typeof buildCncRecoveryPreviewModel>;
+  readonly model: CncRecoveryPreviewModel;
   readonly onSelectEvent: (eventId: string) => void;
 }): JSX.Element {
   const { model } = props;
   return (
     <div>
       <p style={bodyStyle}>
-        Select a hypothetical uncertainty segment. This assumes earlier contour segments were
-        cleared; it does not claim that the machine actually cut them.
+        Select the first segment whose completed cut is uncertain. The displayed lead-in may be used
+        only after you physically confirm that its preceding tangent is already clear.
       </p>
       {model.events.length > 0 ? (
         <label style={fieldStyle}>
-          Hypothetical uncertainty segment
+          First uncertain contour segment
           <select
-            aria-label="Hypothetical uncertainty segment"
-            title="Choose a contour segment to visualize as a hypothetical uncertainty point."
+            aria-label="First uncertain CNC contour segment"
+            title="Choose the first native contour segment whose completed cut is uncertain."
             value={model.selectedEventId ?? ''}
             onChange={(event) => props.onSelectEvent(event.currentTarget.value)}
           >
+            <option value="">Select a segment…</option>
             {model.events.map((event) => (
               <option key={event.id} value={event.id}>
                 {event.label}
@@ -121,10 +205,10 @@ function GeometryStep(props: {
         </label>
       ) : null}
       <p style={assumptionStyle}>
-        Illustrative assumptions: {CNC_RECOVERY_PREVIEW_PARAMETERS.minRunwayMm} mm minimum runway,{' '}
-        {CNC_RECOVERY_PREVIEW_PARAMETERS.accelerationMmPerSec2} mm/s² acceleration, and{' '}
-        {CNC_RECOVERY_PREVIEW_PARAMETERS.safetyMarginMm} mm safety margin. These values are not a
-        qualified machine profile.
+        Recovery profile: {model.parameters.minRunwayMm} mm minimum runway,{' '}
+        {model.parameters.accelerationMmPerSec2} mm/s² conservative acceleration, and{' '}
+        {model.parameters.safetyMarginMm} mm margin. Execution requires a machine-specific air-cut
+        or scrap-test qualification record.
       </p>
       {model.unavailableReason !== null ? (
         <div style={refusalStyle}>{model.unavailableReason}</div>
@@ -140,38 +224,61 @@ function GeometryStep(props: {
         </>
       ) : null}
       {model.geometry?.kind === 'error' ? (
-        <div style={refusalStyle}>Preview refused: {model.geometry.reason}.</div>
+        <div style={refusalStyle}>Recovery refused: {model.geometry.reason}.</div>
       ) : null}
     </div>
   );
 }
 
-function DecisionStep({
-  unavailableReason,
-}: {
-  readonly unavailableReason: string | null;
+function DecisionStep(props: {
+  readonly model: CncRecoveryPreviewModel;
+  readonly qualificationId: string;
 }): JSX.Element {
+  const geometry = props.model.geometry;
   return (
     <div>
-      <h3 style={decisionTitleStyle}>Manual recovery remains required</h3>
+      <h3 style={decisionTitleStyle}>A new recovery job will be generated</h3>
       <p style={bodyStyle}>
-        The preview is explanatory geometry, not permission to move. KerfDesk has no live recovery
-        command, no generated recovery program, and no path from this dialog to the controller.
+        KerfDesk will recompile and fingerprint the original project again, bind the selected
+        semantic segment and qualification into a SHA-256 package, then run the normal CNC Start
+        gates. The new job retracts to safe Z, starts and dwells the spindle, enters at the
+        confirmed-clear runway, and continues the selected pass plus all later work. Everything
+        before the selected segment is omitted and must be known complete.
       </p>
-      {unavailableReason === null ? null : <div style={refusalStyle}>{unavailableReason}</div>}
-      <ul style={bodyStyle}>
-        <li>Inspect the cutter, spindle, stock, fixture, and coordinates.</li>
-        <li>Clear an embedded or damaged tool using the machine manufacturer’s procedure.</li>
-        <li>Start only a separately reviewed new job after requalification.</li>
-      </ul>
+      {geometry?.kind === 'preview' ? (
+        <ul style={bodyStyle}>
+          <li>Selected event: {geometry.eventId}</li>
+          <li>Required confirmed-clear runway: {formatMm(geometry.requiredRunwayMm)}</li>
+          <li>Qualification record: {props.qualificationId.trim()}</li>
+        </ul>
+      ) : (
+        <div style={refusalStyle}>No executable recovery geometry is selected.</div>
+      )}
     </div>
   );
 }
 
+function nextDisabled(
+  step: WizardStep,
+  model: CncRecoveryPreviewModel,
+  reviewComplete: boolean,
+): boolean {
+  if (step === 'geometry') return !model.canExecute;
+  if (step === 'qualification') return !reviewComplete;
+  return false;
+}
+
 function stepTitle(step: WizardStep): string {
   if (step === 'evidence') return 'Evidence audit';
-  if (step === 'geometry') return 'Hypothetical runway geometry';
-  return 'Safety decision';
+  if (step === 'geometry') return 'Select uncertainty and runway';
+  if (step === 'qualification') return 'Physical requalification';
+  return 'Final recovery-job review';
+}
+
+function nextStepLabel(step: WizardStep): string {
+  if (step === 'evidence') return 'Geometry';
+  if (step === 'geometry') return 'Physical checks';
+  return 'Final review';
 }
 
 function statusLabel(status: CncRecoveryEvidenceCheck['status']): string {
@@ -182,10 +289,9 @@ function statusLabel(status: CncRecoveryEvidenceCheck['status']): string {
 }
 
 function statusStyle(status: CncRecoveryEvidenceCheck['status']): React.CSSProperties {
-  const safe = status === 'matched';
   return {
     minWidth: 78,
-    color: safe ? 'var(--lf-success)' : 'var(--lf-warning)',
+    color: status === 'matched' ? 'var(--lf-success)' : 'var(--lf-warning)',
     fontSize: 10,
     fontWeight: 800,
     letterSpacing: '0.04em',
@@ -221,11 +327,10 @@ const detailStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSi
 const fieldStyle: React.CSSProperties = { display: 'grid', gap: 5, fontSize: 12, fontWeight: 650 };
 const assumptionStyle: React.CSSProperties = { ...bodyStyle, fontSize: 11 };
 const refusalStyle: React.CSSProperties = {
-  borderLeft: '3px solid var(--lf-warning)',
-  background: 'var(--lf-bg-2)',
-  padding: '8px 10px',
-  marginBlock: 10,
+  borderLeft: '3px solid var(--lf-danger)',
+  padding: '7px 9px',
+  color: 'var(--lf-danger)',
   fontSize: 12,
 };
-const metricsStyle: React.CSSProperties = { ...bodyStyle, fontSize: 11, marginBottom: 0 };
-const decisionTitleStyle: React.CSSProperties = { color: 'var(--lf-warning)', fontSize: 16 };
+const metricsStyle: React.CSSProperties = { ...bodyStyle, fontFamily: 'monospace', fontSize: 11 };
+const decisionTitleStyle: React.CSSProperties = { fontSize: 14, marginBlock: '0 8px' };

@@ -73,13 +73,23 @@ function matchingCheckpoint(project: Project) {
 }
 
 describe('buildCncRecoveryPreviewModel', () => {
-  it('shows hypothetical geometry while keeping execution impossible', () => {
+  it('requires an explicit semantic segment selection before preparing supervised execution', () => {
     const project = cncProject();
-    const model = buildCncRecoveryPreviewModel(project, matchingCheckpoint(project));
-    expect(model.canExecute).toBe(false);
+    const checkpoint = matchingCheckpoint(project);
+    const unselected = buildCncRecoveryPreviewModel(project, checkpoint);
+    expect(unselected.canExecute).toBe(false);
+    expect(unselected.geometry).toBeNull();
+    expect(unselected.events.length).toBeGreaterThan(0);
+
+    const model = buildCncRecoveryPreviewModel(project, checkpoint, 'cnc-op-1/pass-1/cut-2');
+    expect(model.canExecute).toBe(true);
     expect(model.unavailableReason).toBeNull();
-    expect(model.events.length).toBeGreaterThan(0);
     expect(model.geometry).toMatchObject({ kind: 'preview', executable: false });
+    expect(model.parameters).toEqual({
+      minRunwayMm: 5,
+      accelerationMmPerSec2: 100,
+      safetyMarginMm: 2,
+    });
     expect(model.checks).toContainEqual(
       expect.objectContaining({ id: 'program-identity', status: 'matched' }),
     );
@@ -117,6 +127,20 @@ describe('buildCncRecoveryPreviewModel', () => {
       canExecute: false,
       geometry: null,
       unavailableReason: expect.stringContaining('original CNC project'),
+    });
+  });
+
+  it('fails closed instead of inventing an acceleration for an invalid device profile', () => {
+    const validProject = cncProject();
+    const invalidProject = {
+      ...validProject,
+      device: { ...validProject.device, accelMmPerSec2: 0 },
+    };
+    const model = buildCncRecoveryPreviewModel(invalidProject, matchingCheckpoint(validProject));
+    expect(model).toMatchObject({
+      canExecute: false,
+      geometry: null,
+      unavailableReason: expect.stringContaining('acceleration setting is invalid'),
     });
   });
 });

@@ -27,6 +27,16 @@ export type CncControllerRecoveryEvidence =
       readonly exclusiveOwnerProofId: string;
     };
 
+export type CncOperatorRecoveryReviewEvidence =
+  | { readonly kind: 'missing' }
+  | {
+      readonly kind: 'complete';
+      readonly reviewId: string;
+      readonly clearedPathProofId: string;
+      readonly completedPrefixProofId: string;
+      readonly runwayQualificationId: string;
+    };
+
 export type CncRecoveryEvidence = {
   readonly incident: { readonly kind: 'controlled-hold' } | { readonly kind: 'interruption' };
   readonly cutter: CncCutterEvidence;
@@ -40,18 +50,24 @@ export type CncRecoveryEvidence = {
     | { readonly kind: 'exact-match'; readonly digest: string }
     | { readonly kind: 'missing-or-mismatch' };
   readonly controller: CncControllerRecoveryEvidence;
+  readonly operatorReview: CncOperatorRecoveryReviewEvidence;
 };
 
 export type CncRecoveryRefusalReason =
   | 'tool-engagement-unproved'
   | 'tool-condition-unproved'
   | 'physical-spindle-unproved'
+  | 'spindle-stop-unproved'
   | 'incident-not-controlled-hold'
   | 'position-unproved'
   | 'workholding-unproved'
   | 'controller-review-evidence-missing'
   | 'controller-session-mismatch'
-  | 'package-mismatch';
+  | 'package-mismatch'
+  | 'operator-review-missing'
+  | 'cleared-path-unproved'
+  | 'completed-prefix-unproved'
+  | 'runway-profile-unqualified';
 
 export type CncRecoveryDecision =
   | {
@@ -72,15 +88,23 @@ export type CncRecoveryDecision =
       readonly toolInspectionId: string;
     }
   | {
-      readonly kind: 'supervised-recovery-review-candidate';
-      readonly executable: false;
+      readonly kind: 'supervised-recovery-authorized';
+      readonly executable: true;
       readonly recoveryPackageDigest: string;
       readonly toolInspectionId: string;
+      readonly reviewId: string;
+      readonly clearedPathProofId: string;
+      readonly completedPrefixProofId: string;
+      readonly runwayQualificationId: string;
     };
 
 const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 
-/** Classifies evidence for review only; no result authorizes machine execution. */
+/**
+ * Classifies recovery evidence. Possible cutter engagement can only produce a
+ * non-executable review candidate. The clear-cutter path authorizes only a new
+ * job after requalification and a complete operator review.
+ */
 export function assessCncRecovery(evidence: CncRecoveryEvidence): CncRecoveryDecision {
   if (evidence.cutter.kind !== 'clear') return assessPossibleEngagement(evidence);
   return assessClearCutterRecovery(evidence);
@@ -151,23 +175,49 @@ function isRefusalReason(
 function assessClearCutterRecovery(evidence: CncRecoveryEvidence): CncRecoveryDecision {
   const reasons: CncRecoveryRefusalReason[] = [];
   if (toolConditionReason(evidence) !== null) reasons.push('tool-condition-unproved');
-  if (
-    evidence.position.kind === 'unknown' ||
-    (evidence.position.kind === 'retained' && !hasProofValue(evidence.position.controllerSessionId))
-  ) {
-    reasons.push('position-unproved');
-  }
+  if (evidence.spindle.kind !== 'stopped') reasons.push('spindle-stop-unproved');
+  // A new recovery job is never allowed to inherit a pre-interruption session.
+  // The operator must re-establish the machine/WCS/Z relationship first.
+  if (evidence.position.kind !== 'requalified') reasons.push('position-unproved');
   if (evidence.workholding.kind !== 'confirmed-unchanged') reasons.push('workholding-unproved');
   if (!hasExactPackage(evidence)) reasons.push('package-mismatch');
+  reasons.push(...operatorReviewReasons(evidence.operatorReview));
   if (reasons.length > 0 || evidence.recoveryPackage.kind !== 'exact-match') {
     return { kind: 'requalification-required', reasons };
   }
+  const review = evidence.operatorReview;
+  if (review.kind !== 'complete') {
+    return { kind: 'requalification-required', reasons: ['operator-review-missing'] };
+  }
   return {
-    kind: 'supervised-recovery-review-candidate',
-    executable: false,
+    kind: 'supervised-recovery-authorized',
+    executable: true,
     recoveryPackageDigest: evidence.recoveryPackage.digest,
     toolInspectionId: inspectedToolId(evidence.toolCondition),
+    reviewId: review.reviewId,
+    clearedPathProofId: review.clearedPathProofId,
+    completedPrefixProofId: review.completedPrefixProofId,
+    runwayQualificationId: review.runwayQualificationId,
   };
+}
+
+function operatorReviewReasons(
+  review: CncOperatorRecoveryReviewEvidence,
+): ReadonlyArray<CncRecoveryRefusalReason> {
+  if (review.kind === 'missing') {
+    return [
+      'operator-review-missing',
+      'cleared-path-unproved',
+      'completed-prefix-unproved',
+      'runway-profile-unqualified',
+    ];
+  }
+  const reasons: CncRecoveryRefusalReason[] = [];
+  if (!hasProofValue(review.reviewId)) reasons.push('operator-review-missing');
+  if (!hasProofValue(review.clearedPathProofId)) reasons.push('cleared-path-unproved');
+  if (!hasProofValue(review.completedPrefixProofId)) reasons.push('completed-prefix-unproved');
+  if (!hasProofValue(review.runwayQualificationId)) reasons.push('runway-profile-unqualified');
+  return reasons;
 }
 
 function hasControllerReviewEvidence(

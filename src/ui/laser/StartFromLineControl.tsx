@@ -1,8 +1,7 @@
-// StartFromLineControl — laser start-from-line recovery plus the visible CNC
-// policy block (ADR-103 G7, ADR-141).
+// StartFromLineControl — laser start-from-line recovery plus CNC guidance to
+// checkpoint-bound supervised recovery (ADR-103 H1, ADR-200).
 
 import { useState } from 'react';
-import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import { runStartFromLineFlow } from './start-job-flow';
 
 const MIN_LINE = 1;
@@ -17,10 +16,20 @@ export function StartFromLineControl(props: {
   const blocked = props.disabled || props.busy;
   if (props.machineKind === 'cnc') {
     return (
-      <div style={cncBlockedStyle} role="status" aria-label="Automatic CNC recovery disabled">
-        <strong>Automatic CNC recovery disabled</strong>
-        <p style={hintStyle}>{CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}</p>
-      </div>
+      <details style={boxStyle}>
+        <summary
+          style={summaryStyle}
+          title="Explain why line-number restart stays blocked and where supervised CNC recovery appears."
+        >
+          CNC interruption recovery
+        </summary>
+        <p style={hintStyle}>
+          Automatic line-number restart remains blocked because acknowledgements do not prove cut
+          completion. After an interrupted native contour job, use the retained checkpoint&apos;s{' '}
+          <strong>Review supervised recovery</strong> action to select the uncertainty point,
+          physically requalify the machine, and generate a new recovery job.
+        </p>
+      </details>
     );
   }
   return (
@@ -67,11 +76,6 @@ const boxStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 4,
   padding: '4px 6px',
-};
-const cncBlockedStyle: React.CSSProperties = {
-  ...boxStyle,
-  borderLeft: '3px solid var(--lf-warning)',
-  fontSize: 12,
 };
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6, margin: '6px 0' };
