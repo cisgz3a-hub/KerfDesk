@@ -142,6 +142,18 @@ describe('webSerial connection cleanup', () => {
     expect(port.forget).toHaveBeenCalledTimes(1);
   });
 
+  it('can revoke a picker-granted permission before the port is opened', async () => {
+    const port = installMockSerial(new MockPort());
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+
+    await ref.forget?.();
+
+    expect(port.open).not.toHaveBeenCalled();
+    expect(port.close).not.toHaveBeenCalled();
+    expect(port.forget).toHaveBeenCalledTimes(1);
+  });
+
   it('can revoke permission after a prior normal close', async () => {
     const port = installMockSerial(new MockPort());
     const ref = await webSerial.requestPort();

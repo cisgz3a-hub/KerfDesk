@@ -10,6 +10,13 @@ import type { LaserModeStartEvidence } from './laser-mode-start-evidence';
 export type StartJobOptions = CreateStreamerOptions & {
   /** Stable ownership for persistence; unrelated runs must never share progress. */
   readonly runId?: RunId;
+  /**
+   * Synchronous final ownership gate. The store invokes this after every
+   * asynchronous Start-boundary check and immediately before it creates the
+   * streamer. It must throw when the caller's prepared inputs are no longer
+   * current.
+   */
+  readonly assertFinalStartAuthorized?: () => void;
   readonly machineKind?: MachineKind;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncSetupAttestation?: CncSetupAttestation;

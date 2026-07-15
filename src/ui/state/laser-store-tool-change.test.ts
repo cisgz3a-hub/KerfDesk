@@ -12,6 +12,7 @@ import {
   type CncSetupAttestation,
 } from './cnc-setup-attestation';
 import { TOOL_CHANGE_PLAN_MISMATCH_MESSAGE } from './laser-job-actions';
+import { useCameraStore } from './camera-store';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 import { TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE } from './laser-store-helpers';
@@ -139,6 +140,7 @@ afterEach(async () => {
     statusReport: null,
     streamer: null,
   });
+  useCameraStore.setState({ surfaceHeightMm: 0 });
   useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
@@ -308,6 +310,32 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
 
     expect(writes).toEqual([]);
     expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('runs final caller authorization after the async boundary and before streamer state or writes', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+    writes.length = 0;
+    useCameraStore.setState({ surfaceHeightMm: 0 });
+    const assertFinalStartAuthorized = vi.fn(() => {
+      if (useCameraStore.getState().surfaceHeightMm !== 0) {
+        throw new Error('Camera setup changed during Start arming.');
+      }
+    });
+
+    const starting = useLaserStore.getState().startJob('G1 X1 S100\n', {
+      runId: 'async-boundary-run',
+      machineKind: 'laser',
+      assertFinalStartAuthorized,
+    });
+    // Queue the camera mutation inside the async Start-arming boundary.
+    queueMicrotask(() => useCameraStore.setState({ surfaceHeightMm: 2 }));
+
+    await expect(starting).rejects.toThrow('Camera setup changed during Start arming.');
+    expect(assertFinalStartAuthorized).toHaveBeenCalledOnce();
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().activeRunId).toBeNull();
+    expect(writes).toEqual([]);
   });
 
   it('refuses a structured tool plan that cannot align with every M0 boundary', async () => {

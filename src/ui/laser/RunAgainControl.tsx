@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import type { SimilarityTransform } from '../../core/registration';
-import { currentOutputScope, useStore } from '../state';
-import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
+import { useStore } from '../state';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
@@ -12,7 +10,10 @@ import {
 } from '../state/recovery';
 import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
+import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import { runCompletedJobAgainFlow } from './start-job-flow';
+
+export { currentReplayExecutionSignature } from './start-job-execution-tracking';
 
 type Props = {
   readonly disabled: boolean;
@@ -68,17 +69,5 @@ export function RunAgainControl(props: Props): JSX.Element | null {
     >
       {starting ? 'Checking completed job…' : 'Run same job again from start'}
     </button>
-  );
-}
-
-export function currentReplayExecutionSignature(
-  app: ReturnType<typeof useStore.getState>,
-  registration?: SimilarityTransform | null,
-): string {
-  return canvasPlanRetentionKey(
-    app.project,
-    currentOutputScope(app),
-    app.jobPlacement,
-    registration,
   );
 }

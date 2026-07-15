@@ -36,13 +36,14 @@ import {
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
-import type { LaserSafetyAction } from './laser-safety-notice';
+import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
   hasPendingControllerWrite,
   startPendingControllerMessage,
 } from './laser-start-queue-fence';
 import {
   assertAutofocusIdle,
+  isActiveJob,
   pushLog,
   setupCommandBlockMessage,
   toolChangeContinueBlockMessage,
@@ -116,6 +117,11 @@ async function runStartJob(
   set({ controllerOperation: { kind: 'start-arming', phase: 'queue-fence' } });
   try {
     await prepareStartBoundary(context, gcode, options, setupEpoch);
+    // prepareStartBoundary intentionally awaits queue/controller evidence. App
+    // and camera state are outside the controller reservation and can change
+    // during those awaits, so the owner gets one last synchronous refusal
+    // point before streamer/activeRun state or the first program write exists.
+    options.assertFinalStartAuthorized?.();
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
     const entersHoldNow = stepped.state.status === 'tool-change';
     set((state) => ({
@@ -189,7 +195,7 @@ async function prepareStartBoundary(
 }
 
 async function runStopJob(context: JobActionContext): Promise<void> {
-  const { set, refs, safeWrite, driver } = context;
+  const { set, get, refs, safeWrite, driver } = context;
   const transitionCancellationMessage =
     'Pause or Resume was cancelled because the operator requested Abort.';
   cancelPauseResumeTransition(refs, transitionCancellationMessage);
@@ -216,6 +222,14 @@ async function runStopJob(context: JobActionContext): Promise<void> {
     }
   }
   if (softReset === null) {
+    // Marlin-style controllers have no realtime planner reset. M5/M107 are
+    // queued behind motion already accepted by firmware, so cancelling the
+    // host streamer is not proof that the physical machine stopped. Preserve
+    // an explicit operator warning before the first await; a transport failure
+    // may replace it with the stronger write-failed notice.
+    if (isActiveJob(get().streamer)) {
+      set({ safetyNotice: disconnectStopUnconfirmedNotice() });
+    }
     try {
       for (const line of driver().commands.stopLaserLines) await safeWrite(`${line}\n`, 'stop');
     } catch {

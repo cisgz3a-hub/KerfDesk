@@ -22,7 +22,7 @@ import { machineKindOf, type MachineKind } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint } from '../state/job-checkpoint-storage';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
 import {
   createRunId,
@@ -49,11 +49,25 @@ import {
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
 import {
+  captureStartExternalEnvironment,
+  type StartExternalEnvironment,
+} from './start-job-external-environment';
+import {
   activateAcceptedFreshRun,
   completedReceiptIsCurrent,
   replayCompilationMatches,
   stageFreshExecutionArtifact,
 } from './start-job-execution-tracking';
+import {
+  currentLaserForAuthorizedStartNow,
+  type CurrentStartAuthorizationArgs,
+  type StartAuthorizationRefusal,
+} from './start-job-authorization';
+import {
+  reportBlockedStart,
+  reportStartAuthorizationRefusal,
+  startAuthorizationRefusalMessage,
+} from './start-job-authorization-reporting';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import {
   captureLaserModeStartSnapshot,
@@ -99,7 +113,13 @@ async function runStartJobFlowWithCheckpoint(
   const { project } = app;
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
-  const prepared = await prepareCurrentStartJob(app, laser, camera);
+  const externalEnvironment = captureStartExternalEnvironment(project, camera);
+  const prepared = await prepareCurrentStartJob(
+    app,
+    laser,
+    camera,
+    externalEnvironment.rotaryRasterAllowed,
+  );
   if (!prepared.ok) {
     useStartBlockerStore.getState().report(prepared.messages);
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -134,6 +154,8 @@ async function runStartJobFlowWithCheckpoint(
     preparedAgainst: laser,
     checkpointToReplace,
     completedReceipt,
+    expectedExecutionSignature: prepared.canvasPlan.retentionKey,
+    externalEnvironment,
     repository,
   });
   if (currentLaser === null) return;
@@ -145,6 +167,9 @@ async function runStartJobFlowWithCheckpoint(
     machineKind,
     laserModeStartEvidence,
     cncSetupAttestation,
+    checkpointToReplace,
+    completedReceipt,
+    externalEnvironment,
     repository,
   });
 }
@@ -153,71 +178,24 @@ async function currentLaserForAuthorizedStart(args: {
   readonly preparedAgainst: ReturnType<typeof useLaserStore.getState>;
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
+  readonly expectedExecutionSignature: string;
+  readonly externalEnvironment: StartExternalEnvironment;
   readonly repository: RecoveryRepository;
 }): Promise<ReturnType<typeof useLaserStore.getState> | null> {
-  // Preparation and operator dialogs are asynchronous. Re-check every owner
-  // immediately before startJob performs the first controller write.
-  const checkpointIssue = checkpointStartIssue(args.checkpointToReplace);
-  if (checkpointIssue !== null) {
-    reportBlockedStart(checkpointIssue);
-    return null;
-  }
   if (
     args.completedReceipt !== null &&
     !(await completedReceiptIsCurrent(args.completedReceipt, args.repository))
   ) {
     return null;
   }
-  const current = useLaserStore.getState();
-  if (blockUnqualifiedStart(current)) return null;
-  if (startPreparationStillCurrent(args.preparedAgainst, current)) return current;
-  reportBlockedStart(
-    'Controller or machine setup changed while Start was being prepared. Review the current setup and press Start again.',
+  const authorization = currentLaserForAuthorizedStartNow(args);
+  if (authorization.ok) return authorization.laser;
+  await reportStartAuthorizationRefusal(
+    authorization.refusal,
+    args.completedReceipt,
+    args.repository,
   );
   return null;
-}
-
-function startPreparationStillCurrent(
-  preparedAgainst: ReturnType<typeof useLaserStore.getState>,
-  current: ReturnType<typeof useLaserStore.getState>,
-): boolean {
-  return (
-    current.controllerSessionEpoch === preparedAgainst.controllerSessionEpoch &&
-    current.controllerSettings === preparedAgainst.controllerSettings &&
-    current.controllerSettingsObservation === preparedAgainst.controllerSettingsObservation &&
-    sameStartStatus(current.statusReport, preparedAgainst.statusReport) &&
-    current.trustedPositionEpoch === preparedAgainst.trustedPositionEpoch &&
-    current.workZReferenceEpoch === preparedAgainst.workZReferenceEpoch &&
-    current.workZZeroEvidence === preparedAgainst.workZZeroEvidence
-  );
-}
-
-function sameStartStatus(
-  current: ReturnType<typeof useLaserStore.getState>['statusReport'],
-  preparedAgainst: ReturnType<typeof useLaserStore.getState>['statusReport'],
-): boolean {
-  if (current === null || preparedAgainst === null) return current === preparedAgainst;
-  return (
-    current.state === preparedAgainst.state &&
-    current.subState === preparedAgainst.subState &&
-    sameAxes(current.mPos, preparedAgainst.mPos) &&
-    sameAxes(current.wPos, preparedAgainst.wPos) &&
-    sameAxes(current.wco, preparedAgainst.wco)
-  );
-}
-
-function sameAxes(
-  current: { readonly x: number; readonly y: number; readonly z: number } | null,
-  preparedAgainst: { readonly x: number; readonly y: number; readonly z: number } | null,
-): boolean {
-  return (
-    current === preparedAgainst ||
-    (current !== null &&
-      preparedAgainst !== null &&
-      current.x === preparedAgainst.x &&
-      current.y === preparedAgainst.y &&
-      current.z === preparedAgainst.z)
-  );
 }
 
 function blockUnqualifiedStart(laser: ReturnType<typeof useLaserStore.getState>): boolean {
@@ -230,7 +208,7 @@ function blockUnqualifiedStart(laser: ReturnType<typeof useLaserStore.getState>)
   return true;
 }
 
-async function streamPreparedStart(args: {
+type PreparedStartArgs = {
   readonly app: ReturnType<typeof useStore.getState>;
   readonly project: ReturnType<typeof useStore.getState>['project'];
   readonly laser: ReturnType<typeof useLaserStore.getState>;
@@ -238,8 +216,13 @@ async function streamPreparedStart(args: {
   readonly machineKind: MachineKind;
   readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
+  readonly checkpointToReplace: JobCheckpoint | null;
+  readonly completedReceipt: LastCompletedReceipt | null;
+  readonly externalEnvironment: StartExternalEnvironment;
   readonly repository: RecoveryRepository;
-}): Promise<void> {
+};
+
+async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
   const runId = createRunId();
   const staged = await stageFreshExecutionArtifact({
     runId,
@@ -248,39 +231,97 @@ async function streamPreparedStart(args: {
     laser: args.laser,
     repository: args.repository,
   });
+  if (
+    args.completedReceipt !== null &&
+    !(await completedReceiptIsCurrent(args.completedReceipt, args.repository))
+  ) {
+    if (staged) await args.repository.discardStagedRun(runId);
+    return;
+  }
+  const authorizationArgs = {
+    preparedAgainst: args.laser,
+    checkpointToReplace: args.checkpointToReplace,
+    completedReceipt: args.completedReceipt,
+    expectedExecutionSignature: args.prepared.canvasPlan.retentionKey,
+    externalEnvironment: args.externalEnvironment,
+    repository: args.repository,
+  } as const;
+  const authorization = currentLaserForAuthorizedStartNow(authorizationArgs);
+  if (!authorization.ok) {
+    if (staged) await args.repository.discardStagedRun(runId);
+    await reportStartAuthorizationRefusal(
+      authorization.refusal,
+      args.completedReceipt,
+      args.repository,
+    );
+    return;
+  }
+  let boundaryRefusal: StartAuthorizationRefusal | null = null;
+  const assertFinalStartAuthorized = finalStartAssertion(authorizationArgs, (refusal) => {
+    boundaryRefusal = refusal;
+  });
   try {
-    await args.laser.startJob(args.prepared.gcode, {
-      runId,
-      streamingMode: streamingModeForController(
-        args.project.device.controllerKind,
-        args.project.device.streamingMode,
-      ),
-      rxBufferBytes: args.project.device.rxBufferBytes,
-      machineKind: args.machineKind,
-      ...(args.laserModeStartEvidence === undefined
-        ? {}
-        : { laserModeStartEvidence: args.laserModeStartEvidence }),
-      ...(args.prepared.cncToolPlan === undefined
-        ? {}
-        : { cncToolPlan: args.prepared.cncToolPlan }),
-      ...(args.cncSetupAttestation === undefined
-        ? {}
-        : { cncSetupAttestation: args.cncSetupAttestation }),
-      canvasPlan: args.prepared.canvasPlan,
-    });
+    // Calling an async function runs synchronously until its first await. The
+    // store repeats this gate after its own final await, immediately before it
+    // creates the streamer; no app/camera/controller mutation can slip through
+    // either side of the Start boundary without a refusal.
+    await authorization.laser.startJob(
+      args.prepared.gcode,
+      preparedStartOptions(args, runId, assertFinalStartAuthorized),
+    );
     armVariableStreamAdvancement(args.project);
     await activateAcceptedFreshRun(runId, staged, args.repository);
   } catch (err) {
     if (staged) await args.repository.discardStagedRun(runId);
+    if (boundaryRefusal !== null) {
+      await reportStartAuthorizationRefusal(
+        boundaryRefusal,
+        args.completedReceipt,
+        args.repository,
+      );
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
 }
 
-function reportBlockedStart(message: string): void {
-  useStartBlockerStore.getState().report([message]);
-  jobAwareAlert(`Cannot start job:\n\n${message}`);
+function preparedStartOptions(
+  args: PreparedStartArgs,
+  runId: ReturnType<typeof createRunId>,
+  assertFinalStartAuthorized: () => void,
+): StartJobOptions {
+  return {
+    runId,
+    assertFinalStartAuthorized,
+    streamingMode: streamingModeForController(
+      args.project.device.controllerKind,
+      args.project.device.streamingMode,
+    ),
+    rxBufferBytes: args.project.device.rxBufferBytes,
+    machineKind: args.machineKind,
+    ...(args.laserModeStartEvidence === undefined
+      ? {}
+      : { laserModeStartEvidence: args.laserModeStartEvidence }),
+    ...(args.prepared.cncToolPlan === undefined ? {} : { cncToolPlan: args.prepared.cncToolPlan }),
+    ...(args.cncSetupAttestation === undefined
+      ? {}
+      : { cncSetupAttestation: args.cncSetupAttestation }),
+    canvasPlan: args.prepared.canvasPlan,
+  };
+}
+
+function finalStartAssertion(
+  args: CurrentStartAuthorizationArgs,
+  onRefusal: (refusal: StartAuthorizationRefusal) => void,
+): () => void {
+  return () => {
+    const authorization = currentLaserForAuthorizedStartNow(args);
+    if (authorization.ok) return;
+    onRefusal(authorization.refusal);
+    throw new Error(startAuthorizationRefusalMessage(authorization.refusal));
+  };
 }
 
 function confirmCncSetup(

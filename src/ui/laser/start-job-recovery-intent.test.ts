@@ -11,9 +11,11 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { useCameraStore } from '../state/camera-store';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository } from '../state/recovery';
 import {
@@ -79,6 +81,19 @@ function startSpy() {
   return vi.mocked(useLaserStore.getState().startJob);
 }
 
+function pauseNextArtifactStage(repository: RecoveryRepository) {
+  const originalStage = repository.stageArtifact.bind(repository);
+  let release = (): void => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const stage = vi.spyOn(repository, 'stageArtifact').mockImplementationOnce(async (artifact) => {
+    await gate;
+    return originalStage(artifact);
+  });
+  return { stage, release };
+}
+
 async function makeInterruptedRun(repository: RecoveryRepository) {
   await runStartJobFlow(repository);
   const active = repository.getSnapshot().activeRun;
@@ -138,6 +153,12 @@ beforeEach(() => {
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
     startJob: vi.fn(async () => undefined),
   });
+  useCameraStore.setState({
+    placementActive: false,
+    confirmedPositionEpoch: null,
+    surfaceHeightMm: 0,
+  });
+  useExperimentalLaserFeatures.getState().resetFeatures();
   vi.mocked(jobAwareAlert).mockClear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
 });
@@ -149,6 +170,75 @@ afterEach(() => {
 });
 
 describe('interrupted laser job intent separation', () => {
+  it.each([
+    [
+      'controller origin',
+      () =>
+        useLaserStore.setState({
+          workOriginActive: true,
+          workOriginSource: 'g92',
+          wcoCache: { x: 4, y: 5, z: 0 },
+        }),
+    ],
+    [
+      'current output scope',
+      () => useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true }),
+    ],
+    [
+      'camera placement trust',
+      () =>
+        useCameraStore.setState({
+          placementActive: true,
+          confirmedPositionEpoch: CONTROLLER_EPOCH,
+          surfaceHeightMm: 2,
+        }),
+    ],
+    [
+      'resolved rotary-raster policy',
+      () => useExperimentalLaserFeatures.getState().setFeature('rotaryRaster', true),
+    ],
+  ])('refuses Start when %s changes during artifact staging', async (_label, change) => {
+    const repository = recoveryHarness();
+    const paused = pauseNextArtifactStage(repository);
+    const discard = vi.spyOn(repository, 'discardStagedRun');
+
+    const start = runStartJobFlow(repository);
+    await vi.waitFor(() => expect(paused.stage).toHaveBeenCalledOnce());
+    change();
+    paused.release();
+    await start;
+
+    expect(startSpy()).not.toHaveBeenCalled();
+    expect(discard).toHaveBeenCalledOnce();
+    expect(repository.getSnapshot().activeRun).toBeNull();
+  });
+
+  it('rechecks external inputs inside startJob after its asynchronous arming boundary', async () => {
+    const repository = recoveryHarness();
+    const discard = vi.spyOn(repository, 'discardStagedRun');
+    const firstProgramWrites: string[] = [];
+    const boundaryStart = vi.fn(async (gcode: string, options?: StartJobOptions) => {
+      await Promise.resolve();
+      useCameraStore.setState({ surfaceHeightMm: 2 });
+      options?.assertFinalStartAuthorized?.();
+      // This is the point where the real store would create its streamer and
+      // issue the first program write if final authorization did not throw.
+      firstProgramWrites.push(gcode);
+      useLaserStore.setState({ activeRunId: options?.runId ?? null });
+    });
+    useLaserStore.setState({ startJob: boundaryStart });
+
+    await runStartJobFlow(repository);
+
+    expect(boundaryStart).toHaveBeenCalledOnce();
+    expect(firstProgramWrites).toEqual([]);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().activeRunId).toBeNull();
+    expect(discard).toHaveBeenCalledOnce();
+    expect(repository.getSnapshot().activeRun).toBeNull();
+    expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('camera setup'));
+  });
+
   it('preserves an older recovery capsule when a new ordinary Start is rejected', async () => {
     const repository = recoveryHarness();
     const interrupted = await makeInterruptedRun(repository);

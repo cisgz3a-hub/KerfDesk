@@ -186,6 +186,97 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });
 
+  it('retains a physical-safety warning when Forget cannot confirm an active stop', async () => {
+    const sim = await connectMarlinIdle({ responseDelayMs: 100 });
+    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+
+    await useLaserStore.getState().forgetDevice?.();
+
+    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M107\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      controllerQualification: { kind: 'disconnected' },
+      streamer: null,
+      activeRunId: null,
+      safetyNotice: { kind: 'disconnect-stop-unconfirmed' },
+    });
+  });
+
+  it('prioritizes the unconfirmed physical stop over an older notice on Disconnect', async () => {
+    const sim = await connectMarlinIdle({ responseDelayMs: 100, motionMs: 500 });
+    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    useLaserStore.setState({
+      safetyNotice: {
+        kind: 'controller-reboot',
+        message: 'An older session notice.',
+      },
+    });
+
+    await useLaserStore.getState().disconnect();
+
+    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M107\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      safetyNotice: { kind: 'disconnect-stop-unconfirmed' },
+    });
+  });
+
+  it('does not erase an ambiguous Fire write when live Forget cannot prove a stop', async () => {
+    const sim = await connectMarlinIdle();
+    useLaserStore.setState({
+      fireActive: false,
+      safetyNotice: {
+        kind: 'write-failed',
+        action: 'fire',
+        message: 'Fire command receipt is unknown.',
+      },
+    });
+
+    await useLaserStore.getState().forgetDevice?.();
+
+    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M107\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      safetyNotice: { kind: 'disconnect-stop-unconfirmed' },
+    });
+  });
+
+  it('does not lose the unconfirmed physical stop across Abort then immediate Forget', async () => {
+    const sim = await connectMarlinIdle({ responseDelayMs: 100, motionMs: 500 });
+    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+
+    await useLaserStore.getState().stopJob();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: { status: 'cancelled' },
+      safetyNotice: { kind: 'disconnect-stop-unconfirmed' },
+    });
+
+    await useLaserStore.getState().forgetDevice?.();
+
+    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M107\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      streamer: null,
+      safetyNotice: { kind: 'disconnect-stop-unconfirmed' },
+    });
+  });
+
+  it('keeps an idle Marlin Forget clean', async () => {
+    await connectMarlinIdle();
+
+    await useLaserStore.getState().forgetDevice?.();
+
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      streamer: null,
+      safetyNotice: null,
+    });
+  });
+
   it('treats a text Error: as terminal, fires beam-off cleanup, auto-releases at Idle', async () => {
     const sim = await connectMarlinIdle({
       rejectLines: [{ pattern: /X13\b/, error: 'Unknown command' }],
@@ -201,13 +292,84 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
   });
 
-  it('sends console M115 and logs the firmware identity', async () => {
+  it('owns console M115 without treating its firmware identity as a reboot', async () => {
     const sim = await connectMarlinIdle();
+    const connected = useLaserStore.getState();
+    const workZZeroEvidence = {
+      source: 'manual-zero' as const,
+      referenceEpoch: connected.workZReferenceEpoch,
+    };
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroEvidence,
+    });
+    const before = useLaserStore.getState();
+
     const send = useLaserStore.getState().sendConsoleCommand('M115');
     await pump(50);
     await send;
+
     expect(sim.outbound()).toContain('M115\n');
-    expect(useLaserStore.getState().log.some((l) => l.includes('FIRMWARE_NAME:Marlin'))).toBe(true);
+    const after = useLaserStore.getState();
+    expect(after.log.some((l) => l.includes('FIRMWARE_NAME:Marlin'))).toBe(true);
+    expect(after.controllerSessionEpoch).toBe(before.controllerSessionEpoch);
+    expect(after.controllerQualification).toEqual(before.controllerQualification);
+    expect(after.workOriginActive).toBe(true);
+    expect(after.workOriginSource).toBe('g92');
+    expect(after.workZReferenceEpoch).toBe(before.workZReferenceEpoch);
+    expect(after.workZZeroEvidence).toEqual(workZZeroEvidence);
+  });
+
+  it('does not let a prior console acknowledgement resolve M115 ownership', async () => {
+    const sim = await connectMarlinIdle();
+    const epoch = useLaserStore.getState().controllerSessionEpoch;
+
+    await useLaserStore.getState().sendConsoleCommand('M114');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    await expect(useLaserStore.getState().sendConsoleCommand('M115')).rejects.toThrow(
+      /previous controller write and acknowledgement/i,
+    );
+    expect(sim.outbound().filter((line) => line === 'M115\n')).toHaveLength(0);
+
+    await pump(50);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().controllerSessionEpoch).toBe(epoch);
+
+    const retry = useLaserStore.getState().sendConsoleCommand('M115');
+    await pump(50);
+    await retry;
+    expect(sim.outbound().filter((line) => line === 'M115\n')).toHaveLength(1);
+    expect(useLaserStore.getState().controllerSessionEpoch).toBe(epoch);
+  });
+
+  it('still treats an unsolicited Marlin start banner as a reboot boundary', async () => {
+    const sim = await connectMarlinIdle();
+    const connected = useLaserStore.getState();
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: connected.workZReferenceEpoch,
+      },
+    });
+    const before = useLaserStore.getState();
+
+    sim.port.emitLine('start');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerSessionEpoch: before.controllerSessionEpoch + 1,
+      controllerQualification: {
+        kind: 'qualifying',
+        epoch: before.controllerSessionEpoch + 1,
+        phase: 'reset-cleanup',
+      },
+      workOriginActive: false,
+      workOriginSource: 'none',
+      workZZeroEvidence: null,
+    });
   });
 
   it('blocks console M500 (persistent write) with a reason', async () => {

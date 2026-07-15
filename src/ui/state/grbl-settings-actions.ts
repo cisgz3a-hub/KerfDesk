@@ -16,6 +16,7 @@ import {
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
   FIRE_ACTIVE_COMMAND_MESSAGE,
@@ -261,6 +262,9 @@ function machineSettingsReadBlockReason(
   if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
   if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
   if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
+  if (hasPendingControllerWrite(state)) {
+    return 'Wait for the previous controller write and acknowledgement before reading machine settings.';
+  }
   if (state.statusReport?.state !== 'Idle') {
     return 'Controller must report Idle before reading machine settings.';
   }

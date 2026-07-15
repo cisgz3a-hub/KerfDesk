@@ -24,6 +24,7 @@ type CommandWriteFn = (
 export type ControllerCommandKind =
   | 'autofocus'
   | 'connection-handshake'
+  | 'controller-identity'
   | 'home'
   | 'post-job-settle'
   | 'probe'
@@ -192,6 +193,16 @@ export function consumeControllerCommandResponse(
   }
   request.responses.push(rawLine.trim());
   return true;
+}
+
+export function consumeOwnedControllerIdentityResponse(
+  refs: ControllerLifecycleRefs,
+  response: ControllerEvent,
+  rawLine: string,
+): boolean {
+  if (refs.controllerCommand?.kind !== 'controller-identity') return false;
+  if (response.kind !== 'welcome' || !/FIRMWARE_NAME:/i.test(rawLine)) return false;
+  return consumeControllerCommandResponse(refs, response, rawLine);
 }
 
 function observeCompositeCommandStatus(

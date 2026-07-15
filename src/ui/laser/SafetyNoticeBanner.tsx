@@ -13,6 +13,7 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'write-failed': 'Controller write failed',
   'disconnect-during-job': 'Connection lost mid-job',
   'disconnect-during-fire': 'Connection lost during Fire',
+  'disconnect-stop-unconfirmed': 'Controller stop not confirmed',
   'controller-error': 'Controller rejected a command',
   'stream-stalled': 'Controller stream stalled',
   'controller-reboot': 'Controller rebooted mid-job',

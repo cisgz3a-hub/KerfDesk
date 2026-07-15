@@ -9,7 +9,9 @@ import {
 } from '../../core/controllers/console-state-effect';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
   FIRE_ACTIVE_COMMAND_MESSAGE,
@@ -36,7 +38,7 @@ export type ConsoleCommandOptions = {
   readonly confirmed?: boolean;
 };
 
-export type ConsoleActionRefs = {
+export type ConsoleActionRefs = ControllerLifecycleRefs & {
   driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
   settingsCollectorSessionEpoch: number | null;
@@ -57,6 +59,8 @@ export function consoleActions(
       if (settingWriteBlocked !== null) return block(set, get, refs, settingWriteBlocked);
       const blocked = consoleCommandBlockReason(get(), prepared.command, false);
       if (blocked !== null) return block(set, get, refs, blocked);
+      const ownershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
+      if (ownershipBlocked !== null) return block(set, get, refs, ownershipBlocked);
       if (prepared.command.requiresConfirmation && options.confirmed !== true) {
         return block(set, get, refs, 'This persistent setting write needs confirmation.');
       }
@@ -79,7 +83,7 @@ export function consoleActions(
           accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
         }));
       }
-      await write(prepared.command.wire, actionForConsoleCommand(prepared.command.kind), 'console');
+      await writeConsoleCommand(refs, write, prepared.command);
       const stateEffect = prepared.command.stateEffect;
       if (stateEffect !== 'read-only') {
         set((state) => consoleStateEffectPatch(state, stateEffect, prepared.command.normalized));
@@ -87,6 +91,50 @@ export function consoleActions(
     },
     clearTranscript: () => set({ transcript: [] }),
   };
+}
+
+function writeConsoleCommand(
+  refs: ConsoleActionRefs,
+  write: ConsoleWriteFn,
+  command: {
+    readonly kind: string;
+    readonly normalized: string;
+    readonly wire: string;
+  },
+): Promise<unknown> {
+  if (isOwnedControllerIdentityCommand(refs, command)) {
+    return startControllerCommand(
+      refs,
+      (line, action, source) => write(line, action, source ?? 'console'),
+      {
+        kind: 'controller-identity',
+        label: 'Read controller firmware identity',
+        command: command.wire,
+        action: actionForConsoleCommand(command.kind),
+        source: 'console',
+      },
+    );
+  }
+  return write(command.wire, actionForConsoleCommand(command.kind), 'console');
+}
+
+function isOwnedControllerIdentityCommand(
+  refs: Pick<ConsoleActionRefs, 'driver'>,
+  command: { readonly normalized: string },
+): boolean {
+  return refs.driver.kind === 'marlin' && command.normalized.trim().toUpperCase() === 'M115';
+}
+
+function consoleOwnershipBlockReason(
+  state: LaserState,
+  refs: ConsoleActionRefs,
+  command: { readonly normalized: string },
+): string | null {
+  if (refs.controllerCommand !== null) return 'Wait for the current controller command to finish.';
+  if (isOwnedControllerIdentityCommand(refs, command) && hasPendingControllerWrite(state)) {
+    return 'Wait for the previous controller write and acknowledgement before reading controller firmware identity.';
+  }
+  return null;
 }
 
 function consoleSettingWriteBlockReason(

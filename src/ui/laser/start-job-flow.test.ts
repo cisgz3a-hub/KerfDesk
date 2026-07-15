@@ -417,7 +417,7 @@ describe('completed-job replay', () => {
     expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
   });
 
-  it('invalidates replay when the current canvas no longer compiles to the receipt', async () => {
+  it('invalidates replay when the current canvas changes during async compilation', async () => {
     const { repository } = recoveryHarness();
     await runStartJobFlow(repository);
     const first = repository.getSnapshot().activeRun;
@@ -425,6 +425,9 @@ describe('completed-job replay', () => {
     await repository.completeRun(first.runId);
     const receipt = repository.getSnapshot().lastCompletedReceipt;
     if (receipt === null) throw new Error('Expected a completed receipt.');
+    startSpy().mockClear();
+
+    const replay = runCompletedJobAgainFlow(receipt, repository);
     useStore.setState((state) => ({
       project: {
         ...state.project,
@@ -438,9 +441,7 @@ describe('completed-job replay', () => {
         },
       },
     }));
-    startSpy().mockClear();
-
-    await runCompletedJobAgainFlow(receipt, repository);
+    await replay;
 
     expect(startSpy()).not.toHaveBeenCalled();
     expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();

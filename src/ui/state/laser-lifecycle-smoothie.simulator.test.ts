@@ -150,6 +150,28 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(sim.state().isHalted).toBe(false);
   });
 
+  it('uses the available reset before Forget clears an ambiguous physical write', async () => {
+    const sim = await connectSmoothieIdle();
+    useLaserStore.setState({
+      fireActive: false,
+      safetyNotice: {
+        kind: 'write-failed',
+        action: 'fire',
+        message: 'Fire command receipt is unknown.',
+      },
+    });
+
+    await useLaserStore.getState().forgetDevice?.();
+
+    expect(sim.outbound()).toContain('\x18');
+    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M9\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      safetyNotice: null,
+    });
+  });
+
   it('treats a text error as terminal for the stream', async () => {
     const sim = await connectSmoothieIdle({
       rejectLines: [{ pattern: /X13\b/, error: 'Unknown g code' }],

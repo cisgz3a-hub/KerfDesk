@@ -1,5 +1,5 @@
 import type { StatusQueryCapability } from '../../core/controllers';
-import { profileSupportsCapability, type ControllerKind } from '../../core/devices';
+import type { ControllerKind } from '../../core/devices';
 import type { JobOriginPlacement, JobPlacementSettings } from '../../core/job';
 import type { PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
@@ -8,7 +8,6 @@ import { currentOutputScope, useStore } from '../state';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import { useCameraStore } from '../state/camera-store';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -21,6 +20,7 @@ import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
 import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-binding';
+import { resolveRotaryRasterAllowed } from './start-job-external-environment';
 
 export type PreparedRecoverySource = {
   readonly project: Project;
@@ -38,6 +38,7 @@ export async function prepareCurrentStartJob(
   app: ReturnType<typeof useStore.getState>,
   laser: ReturnType<typeof useLaserStore.getState>,
   camera: ReturnType<typeof useCameraStore.getState>,
+  allowRotaryRaster = resolveRotaryRasterAllowed(app.project),
 ) {
   const { project, jobPlacement } = app;
   const registration = currentPrintCutOutputRegistration(project);
@@ -47,7 +48,7 @@ export async function prepareCurrentStartJob(
     machineSnapshot(project, laser, camera),
     jobPlacement,
     currentOutputScope(app),
-    rotaryRasterAllowed(project),
+    allowRotaryRaster,
     {
       clock: () => new Date(),
       renderVariableText,
@@ -137,7 +138,7 @@ function prepareRecoveryProjectSource(
     jobPlacement,
     outputScope,
     resolvedJobOrigin,
-    rotaryRasterAllowed(project),
+    resolveRotaryRasterAllowed(project),
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
@@ -205,13 +206,6 @@ function jobPlacementForArchivedArtifact(artifact: ExecutionArtifactV1): JobPlac
     startFrom: artifact.jobOrigin?.startFrom ?? 'absolute',
     anchor: artifact.jobOrigin?.anchor ?? 'front-left',
   };
-}
-
-function rotaryRasterAllowed(project: Project): boolean {
-  return (
-    useExperimentalLaserFeatures.getState().features.rotaryRaster &&
-    profileSupportsCapability(project.device, 'rotary')
-  );
 }
 
 function liveStatusQueryCapability(
