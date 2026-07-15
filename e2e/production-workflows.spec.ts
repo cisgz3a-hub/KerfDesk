@@ -240,6 +240,7 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
       text: '<LightBurnLibrary><Material Name="Birch"><Entry Thickness="3" Desc="Clean cut"><CutSetting Type="Cut" Speed="8" MaxPower="75" MinPower="5" NumPasses="2" AirAssist="1" /></Entry></Material></LightBurnLibrary>',
     },
   ]);
+  await page.getByRole('tab', { name: 'Materials' }).click();
   await page.getByRole('button', { name: 'Open saved libraries' }).click();
   await page.getByRole('button', { name: 'Import LightBurn CLB' }).click();
   await expect(page.getByText('birch', { exact: false }).first()).toBeVisible();

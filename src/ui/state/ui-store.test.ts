@@ -10,6 +10,7 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
   beforeEach(() => {
     useUiStore.getState().setRailPanelVisible('layers', true);
     useUiStore.getState().setRailPanelVisible('machine', true);
+    useUiStore.getState().setCutsLayersView('layers');
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setPenDraft(null);
     useUiStore.getState().setSelectionMarquee(null);
@@ -35,6 +36,11 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
       layers: false,
       machine: false,
     });
+  });
+
+  it('tracks the selected Cuts / Layers view outside the panel component', () => {
+    useUiStore.getState().setCutsLayersView('materials');
+    expect(useUiStore.getState().cutsLayersView).toBe('materials');
   });
 
   it('setToolMode clears the pen draft when switching to a non-pen draw tool', () => {

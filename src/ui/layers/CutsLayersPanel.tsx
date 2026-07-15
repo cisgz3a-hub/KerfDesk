@@ -15,7 +15,7 @@ import { CollapsedRail, RailPanelHeading } from '../common';
 import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
-import { useUiStore } from '../state/ui-store';
+import { type CutsLayersView, useUiStore } from '../state/ui-store';
 import { AddLayerControls } from './AddLayerControls';
 import { CncAdvancedToggle } from './CncAdvancedToggle';
 import { LayerRow } from './LayerRow';
@@ -28,14 +28,14 @@ import { SelectedReliefProperties } from './SelectedReliefProperties';
 export function CutsLayersPanel(): JSX.Element {
   const panelVisible = useUiStore((s) => s.railPanelVisibility.layers);
   const togglePanel = useUiStore((s) => s.toggleRailPanel);
+  const requestedView = useUiStore((s) => s.cutsLayersView);
+  const setView = useUiStore((s) => s.setCutsLayersView);
   const layers = useStore((s) => s.project.scene.layers);
   const machineKind = useStore((s) => machineKindOf(s.project.machine));
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const hasSelection = selectedObjectId !== null || additionalSelectedIds.size > 0;
   // The Material Library stores laser presets (power/speed); it hides in CNC
   // mode where those numbers have no meaning.
   const showMaterialLibrary = machineKind === 'laser';
+  const activeView = showMaterialLibrary ? requestedView : 'layers';
   if (!panelVisible) {
     return (
       <CollapsedRail
@@ -49,6 +49,73 @@ export function CutsLayersPanel(): JSX.Element {
     <aside aria-label="Cuts / Layers panel" className="lf-rail" style={panelStyle}>
       <RailPanelHeading title="Cuts / Layers" onCollapse={() => togglePanel('layers')} />
       <MachineModeToggle />
+      {showMaterialLibrary ? <ViewTabs active={activeView} onSelect={setView} /> : null}
+      {showMaterialLibrary ? (
+        <div
+          id={`cuts-layers-${activeView}-panel`}
+          role="tabpanel"
+          aria-labelledby={`cuts-layers-${activeView}-tab`}
+          style={viewContentStyle}
+        >
+          {activeView === 'materials' ? <MaterialLibraryPanel /> : <LayersView layers={layers} />}
+        </div>
+      ) : (
+        <LayersView layers={layers} />
+      )}
+    </aside>
+  );
+}
+
+function ViewTabs(props: {
+  readonly active: CutsLayersView;
+  readonly onSelect: (view: CutsLayersView) => void;
+}): JSX.Element {
+  return (
+    <div role="tablist" aria-label="Cuts and materials" style={viewTabsStyle}>
+      <ViewTab
+        view="layers"
+        label="Layers"
+        selected={props.active === 'layers'}
+        onSelect={props.onSelect}
+      />
+      <ViewTab
+        view="materials"
+        label="Materials"
+        selected={props.active === 'materials'}
+        onSelect={props.onSelect}
+      />
+    </div>
+  );
+}
+
+function ViewTab(props: {
+  readonly view: CutsLayersView;
+  readonly label: string;
+  readonly selected: boolean;
+  readonly onSelect: (view: CutsLayersView) => void;
+}): JSX.Element {
+  return (
+    <button
+      id={`cuts-layers-${props.view}-tab`}
+      type="button"
+      role="tab"
+      aria-controls={`cuts-layers-${props.view}-panel`}
+      aria-selected={props.selected}
+      title={`Show ${props.label.toLowerCase()}`}
+      className={props.selected ? 'lf-btn lf-btn--primary' : 'lf-btn lf-btn--ghost'}
+      style={viewTabStyle}
+      onClick={() => props.onSelect(props.view)}
+    >
+      {props.label}
+    </button>
+  );
+}
+
+function LayersView(props: {
+  readonly layers: ReturnType<typeof useStore.getState>['project']['scene']['layers'];
+}): JSX.Element {
+  return (
+    <>
       <CncSetupPanel />
       <AddLayerControls />
       <SelectedObjectProperties />
@@ -56,28 +123,8 @@ export function CutsLayersPanel(): JSX.Element {
       <DogboneRow />
       <SelectedReliefProperties />
       <CncAdvancedToggle />
-      {hasSelection ? (
-        <>
-          {showMaterialLibrary ? (
-            <CollapsedPanel label="Material Library" ariaLabel="Material Library section">
-              <MaterialLibraryPanel />
-            </CollapsedPanel>
-          ) : null}
-          <CollapsedPanel
-            label="Layers"
-            ariaLabel="Layer management section"
-            defaultOpen={LAYERS_SECTION_DEFAULT_OPEN}
-          >
-            <LayerList layers={layers} />
-          </CollapsedPanel>
-        </>
-      ) : (
-        <>
-          {showMaterialLibrary ? <MaterialLibraryPanel /> : null}
-          <LayerList layers={layers} />
-        </>
-      )}
-    </aside>
+      <LayerList layers={props.layers} />
+    </>
   );
 }
 
@@ -101,26 +148,6 @@ function LayerList(props: {
   );
 }
 
-function CollapsedPanel(props: {
-  readonly label: string;
-  readonly ariaLabel: string;
-  readonly defaultOpen?: boolean;
-  readonly children: React.ReactNode;
-}): JSX.Element {
-  return (
-    <details
-      aria-label={props.ariaLabel}
-      style={collapsedPanelStyle}
-      {...(props.defaultOpen === true ? { open: true } : {})}
-    >
-      <summary style={summaryStyle} title={`Show ${props.label}`}>
-        {props.label}
-      </summary>
-      <div style={collapsedContentStyle}>{props.children}</div>
-    </details>
-  );
-}
-
 // Surface chrome (background, border, scrollbars, text color) comes from
 // .lf-rail; this constant keeps only the rail's layout.
 const panelStyle: React.CSSProperties = {
@@ -132,24 +159,20 @@ const panelStyle: React.CSSProperties = {
   height: '100%',
   boxSizing: 'border-box',
 };
-// LightBurn keeps the Cuts/Layers list always visible, so default the Layers
-// disclosure open — selecting an object never hides the layer rows. Material
-// Library stays collapsed by default. (Persisting a manual toggle across
-// selections would need useUiStore — an optional follow-up, LAY-02.)
-const LAYERS_SECTION_DEFAULT_OPEN = true;
-
+// Layers remains the default working page; reusable preset management is a
+// sibling page so an empty library cannot push the active job controls down.
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyle: 'italic' };
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
-const collapsedPanelStyle: React.CSSProperties = {
-  borderTop: '1px solid var(--lf-border)',
-  marginTop: 12,
-  paddingTop: 8,
+const viewTabsStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 4,
+  margin: '10px 0',
+  paddingBottom: 10,
+  borderBottom: '1px solid var(--lf-border)',
 };
-const summaryStyle: React.CSSProperties = {
-  cursor: 'pointer',
-  fontWeight: 700,
-  color: 'var(--lf-text)',
+const viewTabStyle: React.CSSProperties = {
+  minWidth: 0,
+  minHeight: 32,
 };
-const collapsedContentStyle: React.CSSProperties = {
-  marginTop: 8,
-};
+const viewContentStyle: React.CSSProperties = { minHeight: 0 };
