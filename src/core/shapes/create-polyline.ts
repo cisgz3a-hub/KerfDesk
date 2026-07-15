@@ -76,7 +76,9 @@ function materializeDrawingCurve(
   polyline: Polyline,
   fairingMode: DrawingFairingMode,
 ): CurveSubpath {
-  if (fairingMode === 'round') return roundPolylineCurve(polyline);
+  if (fairingMode === 'round') {
+    return roundPolylineCurve(polyline, drawingFitTolerance(polyline.points));
+  }
   return fairLineCurvePath(polylineToCurveSubpath(polyline), {
     fitToleranceUnits: drawingFitTolerance(polyline.points),
   });

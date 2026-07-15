@@ -4,10 +4,12 @@ import {
   createLayer,
   createProject,
   polylineToCurveSubpath,
+  type PathSegment,
   type Project,
   type ShapeObject,
   type Vec2,
 } from '../../core/scene';
+import { fitLegacyCentripetalCubics } from '../../core/trace/centerline/curve-cubics';
 import { upgradeProjectPolylineFairing } from './polyline-fairing-upgrade';
 
 describe('upgradeProjectPolylineFairing', () => {
@@ -75,6 +77,44 @@ describe('upgradeProjectPolylineFairing', () => {
         transform: previous.transform,
       }).paths,
     );
+    expect(upgraded.paths).not.toEqual(previous.paths);
+  });
+
+  it('refits drawings produced by the PR #194 per-chord adapter', () => {
+    const points = alternatingBends();
+    const current = createPolyline({
+      id: 'previous-round-adapter',
+      color: '#000000',
+      spec: { points, closed: false },
+    });
+    const cubics = fitLegacyCentripetalCubics(points, false);
+    const previous: ShapeObject = {
+      ...current,
+      paths: [
+        {
+          ...current.paths[0]!,
+          curves: [
+            {
+              start: cubics[0]!.p0,
+              closed: false,
+              segments: cubics.map<PathSegment>((cubic) => ({
+                kind: 'cubic',
+                control1: cubic.p1,
+                control2: cubic.p2,
+                to: cubic.p3,
+              })),
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = upgradeProjectPolylineFairing(projectWith(previous));
+    const upgraded = result.project.scene.objects[0];
+
+    expect(result.upgradedCount).toBe(1);
+    if (upgraded?.kind !== 'shape') throw new Error('Expected an upgraded shape.');
+    expect(upgraded.paths).toEqual(current.paths);
     expect(upgraded.paths).not.toEqual(previous.paths);
   });
 });

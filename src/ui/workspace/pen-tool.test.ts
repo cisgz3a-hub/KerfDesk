@@ -205,7 +205,7 @@ describe('finishPen', () => {
 
     const curve = drawShape.mock.calls[0]?.[0]?.paths[0]?.curves?.[0];
     expect(curve?.segments.every((segment: PathSegment) => segment.kind === 'cubic')).toBe(true);
-    expect(curve?.segments).toHaveLength(vertices.length - 1);
+    expect(curve?.segments.length).toBeLessThan(vertices.length - 1);
   });
 });
 
