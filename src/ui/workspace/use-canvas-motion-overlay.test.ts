@@ -118,7 +118,7 @@ describe('idle canvas motion plan', () => {
     expect(harnessRenders - beforeMotion).toBeLessThanOrEqual(1);
   });
 
-  it('defers marker rebuilding until a canvas transform interaction settles', async () => {
+  it('keeps the previous markers visible until a transformed plan is ready', async () => {
     const decoded = deserializeProject(readFileSync('e2e/fixtures/project-basic.lf2', 'utf8'));
     if (decoded.kind !== 'ok') throw new Error(`Fixture failed to load: ${decoded.kind}`);
     useStore.setState({
@@ -131,9 +131,11 @@ describe('idle canvas motion plan', () => {
     await act(async () => {
       root = createRoot(host as HTMLDivElement);
       root.render(createElement(StoreHarness));
-      await new Promise((resolve) => window.setTimeout(resolve, IDLE_CANVAS_PLAN_DELAY_MS + 50));
     });
+    await waitForPublishedOverlay();
     expect(observedOverlay?.plan.jobStart).not.toBeNull();
+    const initialPlan = observedOverlay?.plan;
+    expect(initialPlan).toBeDefined();
     await act(async () => {
       useStore.getState().beginInteraction();
       useStore.getState().setObjectTransform('e2e-square', {
@@ -146,17 +148,22 @@ describe('idle canvas motion plan', () => {
         mirrorY: false,
       });
     });
-    expect(observedOverlay).toBeNull();
+    expect(observedOverlay?.plan).toBe(initialPlan);
     const rendersWhileDragging = harnessRenders;
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, IDLE_CANVAS_PLAN_DELAY_MS + 50));
     });
     expect(harnessRenders).toBe(rendersWhileDragging);
+    expect(observedOverlay?.plan).toBe(initialPlan);
     await act(async () => {
       useStore.getState().endInteraction();
+    });
+    expect(observedOverlay?.plan).toBe(initialPlan);
+    await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, IDLE_CANVAS_PLAN_DELAY_MS + 50));
     });
     expect(observedOverlay?.plan.jobStart).not.toBeNull();
+    expect(observedOverlay?.plan).not.toBe(initialPlan);
   });
 });
 

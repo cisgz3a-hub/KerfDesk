@@ -85,6 +85,23 @@ describe('live canvas status reconciliation', () => {
     ).liveCanvasRun;
     expect(paused?.lifecycle).toBe('paused');
     expect(paused?.route.confirmedRouteMm).toBeCloseTo(5);
+    expect(paused?.reportedHead).toEqual(advanced.reportedHead);
+  });
+
+  it('keeps the displayed head at the last reconciled point for an off-route sample', () => {
+    const current = state();
+    const advanced = liveCanvasStatusPatch(current, report(5), acceptedStreamer()).liveCanvasRun;
+    if (advanced == null) throw new Error('Expected a live canvas run patch.');
+
+    const outlier = liveCanvasStatusPatch(
+      { ...current, liveCanvasRun: advanced },
+      report(500),
+      acceptedStreamer(),
+    ).liveCanvasRun;
+
+    expect(outlier?.route.uncertain).toBe(true);
+    expect(outlier?.reportedHead).toEqual(advanced.reportedHead);
+    expect(outlier?.accuracyReason).toContain('Route match uncertain');
   });
 
   it('confirms the full Marlin route only after done plus Idle', () => {

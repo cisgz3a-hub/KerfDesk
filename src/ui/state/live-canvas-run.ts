@@ -51,7 +51,7 @@ function updatedRun(
     };
   }
   if (!mayReconcile(run, streamer, report, state)) {
-    return unreconciledRun(state, run, report, lifecycle, reportedHead);
+    return unreconciledRun(state, run, report, lifecycle);
   }
   if (reportedHead === null) {
     return {
@@ -71,7 +71,10 @@ function updatedRun(
   });
   return {
     ...run,
-    reportedHead,
+    // Keep the dot at the last route-reconciled position. The raw controller
+    // sample is still represented by the uncertainty badge, but an off-route
+    // or mixed-frame coordinate must not visually teleport the head.
+    reportedHead: route.uncertain ? run.reportedHead : reportedHead,
     route,
     lifecycle,
     controllerState: report.state,
@@ -84,14 +87,15 @@ function unreconciledRun(
   run: LiveCanvasRun,
   report: StatusReport,
   lifecycle: LiveCanvasLifecycle,
-  reportedHead: LiveCanvasRun['reportedHead'],
 ): LiveCanvasRun {
   const positionReferenceChanged =
     run.plan.capability === 'realtime' &&
     run.plan.positionEpoch !== (state.trustedPositionEpoch ?? 0);
   return {
     ...run,
-    reportedHead,
+    // Pause, tool-change, probe/setup motion, and unavailable reconciliation
+    // all freeze the displayed job head at its last trusted job position.
+    reportedHead: run.reportedHead,
     lifecycle,
     controllerState: report.state,
     accuracyReason: positionReferenceChanged

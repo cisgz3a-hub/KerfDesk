@@ -100,6 +100,24 @@ describe('CanvasMotionPlan', () => {
     ).toEqual({ x: 25.4, y: 12.7, z: 0 });
   });
 
+  it('uses the WCO from the same status frame before an older cached offset', () => {
+    expect(
+      reportedWorkPositionMm(
+        {
+          statusReport: {
+            ...machine.statusReport,
+            mPos: { x: 12, y: 9, z: 0 },
+            wPos: null,
+            wco: { x: 2, y: 4, z: 0 },
+          },
+          workOriginActive: true,
+          wcoCache: { x: 100, y: 80, z: 0 },
+        },
+        false,
+      ),
+    ).toEqual({ x: 10, y: 5, z: 0 });
+  });
+
   it.each<Origin>(['front-left', 'front-right', 'rear-left', 'rear-right', 'center'])(
     'maps controller coordinates through the %s device origin',
     (origin) => {

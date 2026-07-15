@@ -261,7 +261,10 @@ export function reportedWorkPositionMm(
   if (report.wPos !== null) return normalized(report.wPos, reportInches);
   if (report.mPos === null) return null;
   const mPos = normalized(report.mPos, reportInches);
-  const wcoRaw = machine.wcoCache ?? report.wco;
+  // WCO belongs to the same controller sample as MPos, so prefer it over the
+  // intermittent cache. Mixing a fresh MPos with an older cached WCO can move
+  // the canvas head by the entire work offset for a single frame.
+  const wcoRaw = report.wco ?? machine.wcoCache ?? null;
   if (wcoRaw === null && machine.workOriginActive === true) return null;
   const wco = wcoRaw === null ? { x: 0, y: 0, z: 0 } : normalized(wcoRaw, reportInches);
   return { x: mPos.x - wco.x, y: mPos.y - wco.y, z: mPos.z - wco.z };
@@ -276,7 +279,7 @@ function canvasCoordinateFrame(
 ): CanvasMotionPlan['coordinateFrame'] {
   // A missing physical WCO is exactly the Verified-Origin contract: retain a
   // truthful artwork-relative view and label that the bed position is unknown.
-  const wcoRaw = machine.wcoCache ?? machine.statusReport?.wco ?? null;
+  const wcoRaw = machine.statusReport?.wco ?? machine.wcoCache ?? null;
   if (
     relativeView ||
     jobOrigin?.startFrom === 'verified-origin' ||

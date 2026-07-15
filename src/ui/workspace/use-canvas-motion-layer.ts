@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import type { Project } from '../../core/scene';
 import { drawCanvasMotionOverlay, type CanvasMotionOverlay } from './draw-canvas-motion';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
@@ -11,7 +11,7 @@ export function useCanvasMotionLayer(args: {
   readonly canvasSize: CanvasBitmapSize;
   readonly overlay: CanvasMotionOverlay | null;
 }): void {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = args.ref.current;
     if (canvas === null) return;
     const ctx = canvas.getContext('2d');
