@@ -4,21 +4,25 @@ const CENTRIPETAL_ALPHA = 0.5;
 const NEAR_POINT_EPSILON = 1e-9;
 const MAX_HANDLE_TO_CHORD_RATIO = 1 / 3;
 
-export type CentripetalCubic = {
+export type LegacyCentripetalCubic = {
   readonly p0: Vec2;
   readonly p1: Vec2;
   readonly p2: Vec2;
   readonly p3: Vec2;
 };
 
-/** Materialize the tracer's centripetal Catmull-Rom chain as bounded cubics. */
-export function fitCentripetalCubics(
+/**
+ * Reproduce the PR #194 per-chord adapter so stored drawings from that release
+ * can be identified and migrated. New drawing geometry must use the tracer's
+ * least-squares fitter in `trace/fit-cubics.ts` instead.
+ */
+export function fitLegacyCentripetalCubics(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
-): CentripetalCubic[] {
+): LegacyCentripetalCubic[] {
   if (points.length < (closed ? 3 : 2)) return [];
   const segmentCount = closed ? points.length : points.length - 1;
-  const cubics: CentripetalCubic[] = [];
+  const cubics: LegacyCentripetalCubic[] = [];
   for (let index = 0; index < segmentCount; index += 1) {
     const p1 = pointAt(points, index, closed);
     const p2 = pointAt(points, index + 1, closed);

@@ -1,5 +1,13 @@
 import { createPolyline } from '../../core/shapes';
-import type { Project, SceneObject, ShapeObject } from '../../core/scene';
+import type {
+  CurveSubpath,
+  PathSegment,
+  Project,
+  SceneObject,
+  ShapeObject,
+  Vec2,
+} from '../../core/scene';
+import { fitLegacyCentripetalCubics } from '../../core/trace/centerline/curve-cubics';
 
 export type PolylineFairingUpgrade = {
   readonly project: Project;
@@ -30,7 +38,13 @@ function upgradePolylineObject(object: SceneObject): SceneObject {
     transform: object.transform,
     fairingMode: 'corner-preserving',
   });
-  if (hasAuthoredCurve(object) && !hasSameCurves(object, legacy)) return object;
+  if (
+    hasAuthoredCurve(object) &&
+    !hasSameCurves(object, legacy) &&
+    !hasLegacyRoundAdapterCurve(object, object.spec.points, object.spec.closed)
+  ) {
+    return object;
+  }
   const rematerialized = createPolyline({
     id: object.id,
     color: object.color,
@@ -54,4 +68,43 @@ function hasSameCurves(left: ShapeObject, right: ShapeObject): boolean {
     const other = right.paths[index];
     return other !== undefined && JSON.stringify(path.curves) === JSON.stringify(other.curves);
   });
+}
+
+function hasLegacyRoundAdapterCurve(
+  object: ShapeObject,
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+): boolean {
+  const pointCount = points.length;
+  const minimumPoints = closed ? 5 : 4;
+  if (pointCount < minimumPoints) return false;
+  const curve = legacyRoundAdapterCurve(points, closed);
+  return JSON.stringify(object.paths[0]?.curves) === JSON.stringify([curve]);
+}
+
+function legacyRoundAdapterCurve(points: ReadonlyArray<Vec2>, closed: boolean): CurveSubpath {
+  const unique = points.filter((point, index) => {
+    const previous = points[index - 1];
+    return previous === undefined || Math.hypot(point.x - previous.x, point.y - previous.y) >= 1e-9;
+  });
+  const first = unique[0];
+  const last = unique.at(-1);
+  const source =
+    closed &&
+    first !== undefined &&
+    last !== undefined &&
+    Math.hypot(last.x - first.x, last.y - first.y) < 1e-9
+      ? unique.slice(0, -1)
+      : unique;
+  const cubics = fitLegacyCentripetalCubics(source, closed);
+  return {
+    start: cubics[0]?.p0 ?? source[0] ?? { x: 0, y: 0 },
+    closed,
+    segments: cubics.map<PathSegment>((cubic) => ({
+      kind: 'cubic',
+      control1: cubic.p1,
+      control2: cubic.p2,
+      to: cubic.p3,
+    })),
+  };
 }
