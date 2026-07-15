@@ -16,9 +16,11 @@ describe('commonConsoleStateEffect', () => {
     }
   });
 
-  it('treats ordinary motion/modal commands as machine-state changes', () => {
+  it('separates motion from accessory-only and non-positional commands', () => {
     expect(commonConsoleStateEffect('G0 X10 Y10')).toBe('machine-state');
-    expect(commonConsoleStateEffect('M3 S12000')).toBe('machine-state');
+    expect(commonConsoleStateEffect('M3 S12000')).toBe('accessories');
+    expect(commonConsoleStateEffect('M5 M9')).toBe('accessories');
+    expect(commonConsoleStateEffect('G4 P1')).toBe('non-positional');
   });
 
   it('ignores command-looking text inside comments', () => {

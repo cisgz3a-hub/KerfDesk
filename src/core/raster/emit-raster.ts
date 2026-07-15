@@ -76,7 +76,6 @@ export type EmitRasterInput = {
   readonly scanOffsetMm?: number;
   readonly bidirectional?: boolean;
   readonly laserModeCommand?: 'M3' | 'M4';
-  readonly controlledLaserOffTravelFeedMmPerMin?: number;
   readonly modalFeedrate?: boolean;
   readonly emitSOnEveryBurnMove?: boolean;
   // Optional comment fields written above the data for the operator
@@ -221,7 +220,7 @@ function emitSpanSweep(
   const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
   const rowShiftX = reverse ? -(input.scanOffsetMm ?? 0) : 0;
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
-  lines.push(formatLaserOffTravel(startX + rowShiftX, worldY, input));
+  lines.push(formatLaserOffTravel(startX + rowShiftX, worldY));
   let prevS = -1;
   let shouldEmitFeed = emitFeed;
   const pushRun = (x: number, s: number): void => {
@@ -252,11 +251,7 @@ function emitSpanSweep(
   return lines.join(LINE_END);
 }
 
-function formatLaserOffTravel(x: number, y: number, input: EmitRasterInput): string {
-  const controlledFeed = input.controlledLaserOffTravelFeedMmPerMin;
-  if (typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0) {
-    return `G1 X${fmt(x)} Y${fmt(y)} F${Math.round(controlledFeed)} S0`;
-  }
+function formatLaserOffTravel(x: number, y: number): string {
   return `G0 X${fmt(x)} Y${fmt(y)} S0`;
 }
 
@@ -482,13 +477,6 @@ function validate(input: EmitRasterInput): void {
   }
   if (!Number.isFinite(input.scanOffsetMm ?? 0)) {
     throw new Error('emitRasterGroup: scanOffsetMm must be finite');
-  }
-  assertValidControlledTravelFeed(input.controlledLaserOffTravelFeedMmPerMin);
-}
-
-function assertValidControlledTravelFeed(feed: number | undefined): void {
-  if (feed !== undefined && !isPositiveFinite(feed)) {
-    throw new Error('emitRasterGroup: controlledLaserOffTravelFeedMmPerMin must be > 0');
   }
 }
 

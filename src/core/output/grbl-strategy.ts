@@ -21,7 +21,6 @@ import {
 } from '../devices';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
-import { isSensitiveIslandFillPolicy } from '../job/island-fill-motion';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
@@ -45,16 +44,8 @@ function laserModeWord(mode: GrblPowerMode): 'M3' | 'M4' {
 }
 
 function travelLine(x: number, y: number, dialect: GrblGcodeDialect): string {
-  const controlledFeed = dialect.controlledLaserOffTravelFeedMmPerMin;
-  if (typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0) {
-    return `G1 X${fmt(x)} Y${fmt(y)} F${Math.round(controlledFeed)} S0`;
-  }
   const base = `G0 X${fmt(x)} Y${fmt(y)}`;
   return dialect.requiresS0OnRapid ? `${base} S0` : base;
-}
-
-function laserOffFeedLine(x: number, y: number, feed: number): string {
-  return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0`;
 }
 
 function roundedPositiveFeed(speed: number, context: string): number {
@@ -63,13 +54,6 @@ function roundedPositiveFeed(speed: number, context: string): number {
     throw new Error(`${context}: speed must be finite and > 0`);
   }
   return feed;
-}
-
-function hasControlledLaserOffTravel(dialect: GrblGcodeDialect): boolean {
-  const controlledFeed = dialect.controlledLaserOffTravelFeedMmPerMin;
-  return (
-    typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0
-  );
 }
 
 function preamble(dialect: GrblGcodeDialect): string {
@@ -203,8 +187,7 @@ function emitOffsetFillGroup(
 // the laser off (reusing the 1a/1b lead geometry + short-run skip), then keep a
 // single G1 chain: each ink span burns at S{s}, each interior gap crosses
 // at S0 so the head never stops over a hole. Sensitive Island Fill runways on
-// controlled-travel dialects also enter/exit at burn feed with S0. G-code
-// S is modal, so every span re-asserts its value — a missed S0 would fire the
+// G-code S is modal, so every span re-asserts its value — a missed S0 would fire the
 // beam across a hole, so the per-segment S sequence is asserted exhaustively in
 // the tests.
 function emitFillSweep(
@@ -229,26 +212,13 @@ function emitFillSweep(
   );
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return '';
-  const feedMatchedRunway =
-    overscan > 0 &&
-    fillStyle === 'island' &&
-    isSensitiveIslandFillPolicy(islandMotionPolicy) &&
-    hasControlledLaserOffTravel(dialect);
   const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, dialect)];
   if (overscan > 0) {
-    lines.push(
-      feedMatchedRunway
-        ? laserOffFeedLine(run.burnStart.x, run.burnStart.y, feed)
-        : travelLine(run.burnStart.x, run.burnStart.y, dialect),
-    );
+    lines.push(travelLine(run.burnStart.x, run.burnStart.y, dialect));
   }
   for (const line of sweepSpanLines(spans, s, feed, dialect)) lines.push(line);
   if (overscan > 0) {
-    lines.push(
-      feedMatchedRunway
-        ? laserOffFeedLine(run.leadEnd.x, run.leadEnd.y, feed)
-        : travelLine(run.leadEnd.x, run.leadEnd.y, dialect),
-    );
+    lines.push(travelLine(run.leadEnd.x, run.leadEnd.y, dialect));
   }
   return lines.join(LINE_END);
 }
@@ -325,9 +295,6 @@ function emitRasterGroupHere(
     scanOffsetMm: offsetForSpeed(device.scanningOffsets, feed),
     ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
     laserModeCommand: laserModeWord(dialect.rasterPowerMode),
-    ...(dialect.controlledLaserOffTravelFeedMmPerMin !== undefined
-      ? { controlledLaserOffTravelFeedMmPerMin: dialect.controlledLaserOffTravelFeedMmPerMin }
-      : {}),
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     layerId: group.layerId,

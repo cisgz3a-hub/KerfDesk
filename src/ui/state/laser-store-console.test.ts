@@ -296,7 +296,7 @@ describe('laser-store console commands', () => {
     });
   });
 
-  it('requires confirmation and Idle state for setting writes', async () => {
+  it('requires confirmation and Idle state while preserving position for non-positional settings', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -343,11 +343,11 @@ describe('laser-store console commands', () => {
       detectedSettings: null,
       grblSettingsRows: [],
       lastSettingsReadAt: null,
-      workOriginActive: false,
-      workOriginSource: 'none',
-      workZZeroEvidence: null,
-      wcoCache: null,
-      homingState: 'unknown',
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroEvidence: currentWorkZEvidence(),
+      wcoCache: { x: 1, y: 2, z: 3 },
+      homingState: 'confirmed',
       statusReport: null,
     });
   });

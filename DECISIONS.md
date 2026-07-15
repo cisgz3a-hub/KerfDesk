@@ -78,6 +78,7 @@
 | ADR-205 | 2026-07-15 | Accepted | Machine Setup is one controller-first atomic workflow |
 | ADR-206 | 2026-07-15 | Accepted | Require explicit maintainer permission for every new guard |
 | ADR-207 | 2026-07-15 | Accepted | One top live-motion bar owns run controls |
+| ADR-208 | 2026-07-15 | Accepted | Remove obstructive 4040 and advisory machine policies |
 
 ---
 
@@ -8424,6 +8425,46 @@ The maintainer owns every new capability-versus-refusal tradeoff. Guard proposal
 and reviewable before code exists, and an approval cannot silently spread to other workflows.
 Existing machine-safety behavior is not removed or weakened by this policy; it governs additions
 and expansions from this decision forward.
+
+---
+
+## ADR-208 - Remove obstructive 4040 and advisory machine policies
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+The Neotronics 4040 dialect rewrote every laser-off rapid as a fixed 800 mm/min feed and blocked
+zero-overscan Island Fill at preflight. Start also turned every controller warning into a modal
+confirmation, while the Console discarded position, homing, origin, frame, and Work-Z evidence
+after commands that could not change those facts. These policies delayed or refused valid work,
+especially on GRBL 4040 machines that intentionally run without homing.
+
+The maintainer explicitly directed that these audited policies be removed while retaining the
+idle/alarm check, active-job exclusion, laser-on-travel detection, non-finite-coordinate checks,
+CNC plunged-rapid checks, active spindle/coolant detection, probe-plate removal, and first-tool /
+Work-Z matching.
+
+### Decision
+
+- Remove the controlled laser-off travel capability from the dialect and emitter APIs. All laser
+  dialects use ordinary `G0` travel with explicit `S0` where the dialect requires it; Island Fill
+  overscan runways use the same rapid travel.
+- Remove the machine-profile zero-overscan Island Fill preflight refusal. Fine-detail heat analysis,
+  its non-blocking warning, and the one-click Scanline recovery action remain available.
+- Display Start readiness warnings as non-blocking warning toasts. They do not add a second
+  acknowledgement before a valid laser or CNC job can proceed.
+- Classify Console effects by what a command can change. Accessory-only commands, dwell, and
+  non-positional setting writes still invalidate their own stale observations, but preserve homing,
+  frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
+  and axis-calibration commands retain the corresponding invalidation.
+
+### Consequences
+
+GRBL 4040 jobs are no longer slowed by a hidden profile rewrite or stopped for choosing zero
+overscan. Informational warnings stay visible without becoming permission prompts, and harmless
+Console maintenance no longer forces setup repetition. The explicitly retained safety checks above
+remain unchanged; this decision removes only the four audited policies named here.
 
 ---
 

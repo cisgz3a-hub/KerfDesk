@@ -55,6 +55,7 @@ import {
 } from '../state/canvas-motion-plan';
 import { useStartBlockerStore } from './start-blocker-store';
 import { reducedOverrideAcknowledgement } from '../state/cnc-accessory-readiness';
+import { useToastStore } from '../state/toast-store';
 
 export async function runStartJobFlow(): Promise<void> {
   useStartBlockerStore.getState().clear();
@@ -70,8 +71,7 @@ export async function runStartJobFlow(): Promise<void> {
     return;
   }
   if (prepared.warnings.length > 0) {
-    const lines = prepared.warnings.map((message) => `• ${message}`).join('\n');
-    if (!jobAwareConfirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
+    useToastStore.getState().pushToast(prepared.warnings.join('\n'), 'warning');
   }
   const machineKind = machineKindOf(project.machine);
   const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
@@ -173,11 +173,16 @@ function confirmCncSetup(
   overrides: OverrideValues | null,
 ): CncSetupAttestation | null | undefined {
   if (machineKind !== 'cnc') return undefined;
-  if (!jobAwareConfirm(CNC_SETUP_ATTESTATION_PROMPT)) return null;
+  const overrideAcknowledgement = reducedOverrideAcknowledgement(overrides);
+  const prompt =
+    overrideAcknowledgement === undefined
+      ? CNC_SETUP_ATTESTATION_PROMPT
+      : `${CNC_SETUP_ATTESTATION_PROMPT}\n\nConfirm these exact reduced controller overrides: feed ${overrideAcknowledgement.feed}%, rapid ${overrideAcknowledgement.rapid}%, spindle ${overrideAcknowledgement.spindle}%.`;
+  if (!jobAwareConfirm(prompt)) return null;
   return createCncSetupAttestation(
     gcode,
     cncControllerEpochOf(useLaserStore.getState()),
-    reducedOverrideAcknowledgement(overrides),
+    overrideAcknowledgement,
   );
 }
 

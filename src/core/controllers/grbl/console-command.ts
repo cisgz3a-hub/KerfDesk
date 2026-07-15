@@ -37,6 +37,9 @@ const BLOCKED_PERSISTENT_REASON =
 const SETTING_WRITE_RE = /^\$\d+=\S.*$/;
 const STARTUP_WRITE_RE = /^\$N\d*=/i;
 const BUILD_INFO_WRITE_RE = /^\$I=/i;
+const POSITION_AFFECTING_SETTING_IDS: ReadonlyArray<number> = [
+  2, 3, 20, 22, 23, 100, 101, 102, 130, 131, 132,
+];
 
 export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   const normalized = input.trim();
@@ -61,12 +64,27 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
     return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
   }
   if (SETTING_WRITE_RE.test(normalized)) {
-    return ok('setting-write', normalized, `${normalized}\n`, true, true, true, 'configuration');
+    return ok(
+      'setting-write',
+      normalized,
+      `${normalized}\n`,
+      true,
+      true,
+      true,
+      settingWriteStateEffect(normalized),
+    );
   }
   const stateEffect = /^\$H(?:[XYZABC])?$/i.test(normalized)
     ? 'reference'
     : commonConsoleStateEffect(normalized);
   return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
+}
+
+function settingWriteStateEffect(normalized: string): ConsoleStateEffect {
+  const settingId = Number(/^\$(\d+)=/.exec(normalized)?.[1]);
+  return POSITION_AFFECTING_SETTING_IDS.includes(settingId)
+    ? 'configuration'
+    : 'configuration-nonpositional';
 }
 
 function ok(
