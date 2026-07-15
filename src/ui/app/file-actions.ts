@@ -16,7 +16,9 @@ import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ImportOutcome } from '../state/store';
+import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
+import { repairedMachineCapabilityMessage } from '../machine/machine-capability-messages';
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveJobPlacement,
@@ -290,8 +292,8 @@ export async function handleSaveProject(
 
 export type OpenProjectCtx = {
   readonly platform: PlatformAdapter;
-  readonly setProject: (p: Project) => void;
-  readonly markLoaded: (filename: string) => void;
+  readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
+  readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -333,8 +335,8 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   }
   const result = deserializeProject(text);
   if (result.kind === 'ok') {
-    ctx.setProject(result.project);
-    ctx.markLoaded(file.name);
+    const loadResult = ctx.setProject(result.project);
+    markCapabilityAwareLoad(ctx, file.name, loadResult);
     // Opening a real .lf2 makes any autosaved snapshot stale.
     clearAutosave();
     if (result.migratedFrom !== undefined) {
@@ -342,6 +344,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     } else {
       ctx.pushToast(`Opened ${file.name}`, 'success');
     }
+    reportMachineCapabilityRepair(loadResult, ctx.pushToast);
     return;
   }
   if (result.kind === 'schema-too-new') {
@@ -359,8 +362,8 @@ function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: str
     ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
     return;
   }
-  ctx.setProject(result.project);
-  ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'));
+  const loadResult = ctx.setProject(result.project);
+  markCapabilityAwareLoad(ctx, fileName.replace(/\.lbrn2?$/i, '.lf2'), loadResult);
   clearAutosave();
   const unsupported = result.report.unsupportedShapeTypes.length;
   const warnings = result.report.warnings.length;
@@ -368,6 +371,24 @@ function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: str
     `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${unsupported + warnings === 0 ? '' : `, ${unsupported + warnings} warning(s)`}. Save as .lf2 to keep changes.`,
     unsupported + warnings === 0 ? 'success' : 'warning',
   );
+  reportMachineCapabilityRepair(loadResult, ctx.pushToast);
+}
+
+function reportMachineCapabilityRepair(
+  result: ProjectMachineCapabilityLoadResult,
+  pushToast: OpenProjectCtx['pushToast'],
+): void {
+  if (result.kind !== 'capability-repaired') return;
+  pushToast(repairedMachineCapabilityMessage(result.activeKind, result.preservedCnc), 'warning');
+}
+
+function markCapabilityAwareLoad(
+  ctx: OpenProjectCtx,
+  filename: string,
+  result: ProjectMachineCapabilityLoadResult,
+): void {
+  if (result.kind === 'capability-repaired') ctx.markLoaded(filename, { dirty: true });
+  else ctx.markLoaded(filename);
 }
 
 function errMsg(err: unknown): string {

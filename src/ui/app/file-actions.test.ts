@@ -149,7 +149,7 @@ describe('file actions contextual failure handling', () => {
     await expect(
       handleOpenProject({
         platform: mockPlatform({ open: () => reject('picker failed') }),
-        setProject: vi.fn(),
+        setProject: vi.fn(() => ({ kind: 'loaded' as const })),
         markLoaded: vi.fn(),
         pushToast: toast.pushToast,
       }),
@@ -168,7 +168,7 @@ describe('file actions contextual failure handling', () => {
         platform: mockPlatform({
           open: async () => [{ name: 'broken.lf2', text: () => reject('read revoked') }],
         }),
-        setProject: vi.fn(),
+        setProject: vi.fn(() => ({ kind: 'loaded' as const })),
         markLoaded: vi.fn(),
         pushToast: toast.pushToast,
       }),
@@ -362,7 +362,7 @@ describe('file actions contextual failure handling', () => {
     await handleImportSvg(platform, () => ({ kind: 'added' }), toast.pushToast);
     await handleOpenProject({
       platform,
-      setProject: vi.fn(),
+      setProject: vi.fn(() => ({ kind: 'loaded' as const })),
       markLoaded: vi.fn(),
       pushToast: toast.pushToast,
     });

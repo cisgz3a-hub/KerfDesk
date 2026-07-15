@@ -6,7 +6,7 @@ const RECT_PROJECT = `<LightBurnProject><Shape Type="Rect" CutIndex="0" W="10" H
 
 describe('LightBurn project open migration', () => {
   it('loads read-only source into an lf2 target and reports migration evidence', async () => {
-    const setProject = vi.fn();
+    const setProject = vi.fn(() => ({ kind: 'loaded' as const }));
     const markLoaded = vi.fn();
     const pushToast = vi.fn();
     const platform: PlatformAdapter = {

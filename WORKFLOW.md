@@ -963,6 +963,23 @@ Setup** button; old `MachineSetupDialog` callers resolve to the same flow rather
 live-edit tab dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` draft until **Save
 machine setup**, which commits the complete configuration as one undoable project change.
 
+Machine capability is an enforced physical-output contract (ADR-210), not descriptive metadata:
+
+- **Laser only** keeps Laser active and makes CNC unavailable. **CNC only** keeps CNC active and
+  makes Laser unavailable. **Laser + CNC** allows either active mode.
+- The unavailable Laser/CNC segment stays visible and keyboard-focusable, but is visibly muted and
+  carries `aria-disabled="true"`. Activating it shows the capability-specific explanation and the
+  **Machine Setup** recovery path; it does not change the project, history, or dirty state.
+- **New Project** starts in the sole supported mode for a single-output profile. A hybrid or legacy
+  profile keeps the operator's active mode while resetting job-specific configuration.
+- Opening or restoring a contradictory project switches it to the sole supported mode before any
+  mode-specific UI or output path can use it. Displaced CNC setup is retained for recovery, the
+  project remains dirty until explicitly saved, and a warning explains the repair.
+- Profiles with neither output capability are legacy-compatible and continue to allow both modes
+  until their next Machine Setup save records an explicit choice.
+- The final atomic setup action independently refuses a profile/machine mismatch, so another caller
+  cannot persist a single-output capability beside the opposite active mode.
+
 The seven steps are always visible and always ordered:
 
 1. **Machine & controller** — choose Laser/CNC, controller family, baud, output dialect, streaming,

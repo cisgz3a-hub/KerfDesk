@@ -20,6 +20,7 @@ import {
 } from '../../core/scene';
 import type { CncMachinePreset } from '../../core/cnc';
 import type { DeviceProfile } from '../../core/devices';
+import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import { jobPlacementAfterDeviceChange, type JobPlacementSettings } from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
@@ -37,6 +38,12 @@ type MachineState = {
 };
 
 type MachineSet = (fn: (state: MachineState) => Partial<MachineState>) => void;
+type MachineGet = () => MachineState;
+
+export type MachineKindSelectionResult =
+  | { readonly kind: 'selected'; readonly machineKind: MachineKind }
+  | { readonly kind: 'unchanged'; readonly machineKind: MachineKind }
+  | { readonly kind: 'blocked-by-capability'; readonly requestedKind: MachineKind };
 
 export type CncMachinePatch = {
   readonly toolId?: string;
@@ -55,7 +62,7 @@ export type CncMachineSetupPatch = {
 };
 
 export type MachineActions = {
-  readonly setMachineKind: (kind: MachineKind) => void;
+  readonly setMachineKind: (kind: MachineKind) => MachineKindSelectionResult;
   readonly updateCncMachine: (patch: CncMachinePatch) => void;
   // ADR-112: set (or clear, when null) the project stock material and auto-fill
   // every layer's feeds from it. One undoable step.
@@ -79,34 +86,19 @@ export function cncMachineWithCustomTools(
   return { ...machine, tools: [...machine.tools, ...missing] };
 }
 
-export function machineActions(set: MachineSet): MachineActions {
+export function machineActions(set: MachineSet, get: MachineGet): MachineActions {
   return {
-    setMachineKind: (kind) =>
-      set((state) => {
-        const current = state.project.machine;
-        const currentKind = current?.kind ?? 'laser';
-        if (currentKind === kind) return {};
-        const cachedBase = state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
-        const cncBase =
-          state.cachedCncMachine === null && state.project.device.cncSubProfile !== undefined
-            ? { ...cachedBase, params: { ...state.project.device.cncSubProfile } }
-            : cachedBase;
-        const machine =
-          kind === 'laser'
-            ? LASER_MACHINE_CONFIG
-            : cncMachineWithCustomTools(cncBase, state.cncLibrary.customTools);
-        const device =
-          current?.kind === 'cnc'
-            ? { ...state.project.device, cncSubProfile: { ...current.params } }
-            : state.project.device;
-        return {
-          project: { ...state.project, device, machine },
-          cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
-          undoStack: pushUndo(state.project, state.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+    setMachineKind: (kind) => {
+      const state = get();
+      if (!deviceSupportsMachineKind(state.project.device, kind)) {
+        return { kind: 'blocked-by-capability', requestedKind: kind };
+      }
+      if ((state.project.machine?.kind ?? 'laser') === kind) {
+        return { kind: 'unchanged', machineKind: kind };
+      }
+      set((current) => machineKindStatePatch(current, kind));
+      return { kind: 'selected', machineKind: kind };
+    },
     updateCncMachine: (patch) =>
       set((state) => {
         const current = state.project.machine;
@@ -162,6 +154,30 @@ export function machineActions(set: MachineSet): MachineActions {
         });
       }),
     applyCncMachineSetup: (patch) => set((state) => cncMachineSetupStatePatch(state, patch)),
+  };
+}
+
+function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<MachineState> {
+  const current = state.project.machine;
+  const cachedBase = state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
+  const cncBase =
+    state.cachedCncMachine === null && state.project.device.cncSubProfile !== undefined
+      ? { ...cachedBase, params: { ...state.project.device.cncSubProfile } }
+      : cachedBase;
+  const machine =
+    kind === 'laser'
+      ? LASER_MACHINE_CONFIG
+      : cncMachineWithCustomTools(cncBase, state.cncLibrary.customTools);
+  const device =
+    current?.kind === 'cnc'
+      ? { ...state.project.device, cncSubProfile: { ...current.params } }
+      : state.project.device;
+  return {
+    project: { ...state.project, device, machine },
+    cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 

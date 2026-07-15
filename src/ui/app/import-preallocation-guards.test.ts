@@ -62,7 +62,7 @@ type Run = (platform: PlatformAdapter, pushToast: ReturnType<typeof vi.fn>) => P
 const handleProject: Run = async (platform, pushToast) => {
   await handleOpenProject({
     platform,
-    setProject: vi.fn(),
+    setProject: vi.fn(() => ({ kind: 'loaded' as const })),
     markLoaded: vi.fn(),
     pushToast,
   });

@@ -19,6 +19,7 @@ import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import type { ImportOutcome } from '../state/store';
+import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
 import {
   handleImportSvg,
@@ -38,7 +39,7 @@ export type FileCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
-  readonly setProject: (p: Project) => void;
+  readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
   readonly newProject: () => void;
   readonly savedName: string | null;
   readonly jobPlacement: JobPlacementSettings;
@@ -47,7 +48,7 @@ export type FileCtx = {
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly lastSaveTarget: SaveTarget | null;
   readonly markSaved: (target: SaveTarget) => void;
-  readonly markLoaded: (filename: string) => void;
+  readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
   // F-A13 dirty-check. Resolves false to abort destructive actions (New /

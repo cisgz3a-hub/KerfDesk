@@ -10,6 +10,10 @@ export function DeviceSetupMachineCapability({
     <div style={capabilityStackStyle}>
       <fieldset style={fieldsetStyle}>
         <legend>Machine capability</legend>
+        <p style={mutedStyle}>
+          This controls which workspace modes are available. Choose Laser + CNC only for a machine
+          with interchangeable toolheads.
+        </p>
         <MachineCapabilityRadio
           label="Laser only — beam power, air assist, raster, and focus settings"
           checked={state.machineKinds.length === 1 && state.machineKinds[0] === 'laser'}

@@ -9,6 +9,7 @@ import { Button, Dialog, DialogActions } from '../../kit';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
+import { blockedMachineModeMessage } from '../../machine/machine-capability-messages';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
@@ -123,7 +124,10 @@ function useMachineSetupSave(
   };
   const saveAndSync = async (): Promise<void> => {
     const profile = machineSetupProfile(state);
-    replaceMachineSetup(profile, state.draftMachine, state.cncDraft);
+    const replacement = replaceMachineSetup(profile, state.draftMachine, state.cncDraft);
+    if (replacement.kind === 'blocked-by-capability') {
+      throw new Error(blockedMachineModeMessage(replacement.requestedKind));
+    }
     props.onConfigured?.(profile);
     try {
       for (const write of writes) await writeGrblSetting(write.id, write.desired);

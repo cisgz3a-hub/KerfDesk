@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../../core/devices';
+import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
@@ -19,6 +20,10 @@ import { cncMachineWithCustomTools, sceneWithSpindleCeiling } from './machine-ac
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
 ) => void;
+
+export type MachineSetupReplacementResult =
+  | { readonly kind: 'applied' }
+  | { readonly kind: 'blocked-by-capability'; readonly requestedKind: MachineConfig['kind'] };
 
 export function sceneActions(
   set: Setter,
@@ -101,7 +106,13 @@ function replaceMachineSetupAction(set: Setter): Pick<AppState, 'replaceMachineS
       profile: DeviceProfile,
       machine: MachineConfig,
       retainedMachine?: MachineConfig,
-    ) => set((s) => replacementMachineSetupState(s, profile, machine, retainedMachine)),
+    ) => {
+      if (!deviceSupportsMachineKind(profile, machine.kind)) {
+        return { kind: 'blocked-by-capability', requestedKind: machine.kind };
+      }
+      set((s) => replacementMachineSetupState(s, profile, machine, retainedMachine));
+      return { kind: 'applied' };
+    },
   };
 }
 
@@ -344,7 +355,8 @@ export function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | '
   return {
     markSaved: (target) =>
       set({ dirty: false, savedName: target.displayName, lastSaveTarget: target }),
-    markLoaded: (filename) => set({ dirty: false, savedName: filename, lastSaveTarget: null }),
+    markLoaded: (filename, options) =>
+      set({ dirty: options?.dirty ?? false, savedName: filename, lastSaveTarget: null }),
   };
 }
 
