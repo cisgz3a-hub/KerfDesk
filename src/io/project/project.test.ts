@@ -56,7 +56,8 @@ describe('serializeProject', () => {
 
 describe('deserializeProject', () => {
   it('roundtrips a populated project', () => {
-    const original = aProject();
+    const base = aProject();
+    const original = { ...base, scene: { ...base.scene, artworkOrder: ['O1'] } };
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
@@ -64,6 +65,7 @@ describe('deserializeProject', () => {
       expect(result.project.scene.objects[0]).toMatchObject({
         paths: [{ curves: [{ segments: [{ kind: 'line' }] }] }],
       });
+      expect(result.project.scene.artworkOrder).toEqual(['O1']);
     }
   });
 

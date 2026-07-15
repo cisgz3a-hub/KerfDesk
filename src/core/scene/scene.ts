@@ -8,6 +8,10 @@ export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
   readonly groups?: ReadonlyArray<SceneGroup>;
+  // Machine-output priority, intentionally separate from `objects` so changing
+  // run order never changes canvas stacking or hit-testing. Missing entries
+  // (legacy projects and newly inserted artwork) follow `objects` order.
+  readonly artworkOrder?: ReadonlyArray<string>;
 };
 
 export type SceneGroup = {
@@ -18,14 +22,26 @@ export type SceneGroup = {
 
 export type LayerMoveDirection = 'up' | 'down';
 
-export const EMPTY_SCENE: Scene = { objects: [], layers: [], groups: [] };
+export const EMPTY_SCENE: Scene = { objects: [], layers: [], groups: [], artworkOrder: [] };
 
 export function addObject(scene: Scene, object: SceneObject): Scene {
-  return { ...scene, objects: [...scene.objects, object] };
+  return {
+    ...scene,
+    objects: [...scene.objects, object],
+    ...(scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: [...scene.artworkOrder, object.id] }),
+  };
 }
 
 export function removeObject(scene: Scene, objectId: string): Scene {
-  return { ...scene, objects: scene.objects.filter((o) => o.id !== objectId) };
+  return {
+    ...scene,
+    objects: scene.objects.filter((o) => o.id !== objectId),
+    ...(scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: scene.artworkOrder.filter((id) => id !== objectId) }),
+  };
 }
 
 // In-place replace by id — preserves array order so the object's

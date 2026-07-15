@@ -106,7 +106,7 @@ describe('compileJob', () => {
       }),
     ];
     const job = compileJob({ objects, layers }, dev);
-    expect(job.groups.map((g) => g.layerId)).toEqual(['L1', 'L2']);
+    expect(job.groups.map((group) => group.layerId)).toEqual(['L1', 'L2']);
   });
 
   it('caps speed at device.maxFeed (WORKFLOW.md F-A7 defense-in-depth)', () => {

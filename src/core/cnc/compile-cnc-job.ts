@@ -9,6 +9,7 @@
 // Pure and deterministic: no clock, random input, or I/O.
 
 import { type DeviceProfile } from '../devices';
+import { artworkOperationRuns } from '../artwork-order';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   assertNever,
@@ -47,15 +48,17 @@ import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-ma
 export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMachineConfig): Job {
   const clearingGroups: CncGroup[] = [];
   const profileGroups: CncGroup[] = [];
-  for (const layer of scene.layers) {
-    if (!layer.output) continue;
+  const sourceObjects = scene.objects;
+  for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     // H.5/H.8: relief objects rough (and optionally finish, with their own
     // bit) as clearing groups — neither ever frees a part.
     clearingGroups.push(
-      ...compileReliefGroupsForLayer(scene.objects, layer, settings, device, config),
+      ...compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config).map((group) =>
+        tagArtworkGroup(group, priorityObjectId),
+      ),
     );
-    const contours = collectLayerContours(scene.objects, layer, device);
+    const contours = collectLayerContours(sourceObjects, layer, device);
     const polylines = contours.map((contour) => contour.polyline);
     if (polylines.length === 0) continue;
     const inlayGroups = compileStraightInlayGroups(
@@ -66,26 +69,30 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
         cncGroupForPasses(layer, groupSettings, tool, passes, device, config),
     );
     if (inlayGroups !== null) {
-      clearingGroups.push(inlayGroups.female);
-      profileGroups.push(inlayGroups.male);
+      clearingGroups.push(tagArtworkGroup(inlayGroups.female, priorityObjectId));
+      profileGroups.push(tagArtworkGroup(inlayGroups.male, priorityObjectId));
       continue;
     }
     // H.7 two-stage v-carve clearance runs before the v-bit ladder.
     const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
-    if (clearance !== null) clearingGroups.push(clearance);
+    if (clearance !== null) clearingGroups.push(tagArtworkGroup(clearance, priorityObjectId));
     const roughing = restPocketRoughingGroupForLayer(layer, settings, polylines, device, config);
-    if (roughing !== null) clearingGroups.push(roughing);
+    if (roughing !== null) clearingGroups.push(tagArtworkGroup(roughing, priorityObjectId));
     const group = cncGroupForLayer(layer, settings, polylines, device, config, contours);
     if (group === null) continue;
     if (isProfileCutType(settings.cutType)) {
-      profileGroups.push(group);
+      profileGroups.push(tagArtworkGroup(group, priorityObjectId));
     } else {
-      clearingGroups.push(group);
+      clearingGroups.push(tagArtworkGroup(group, priorityObjectId));
     }
   }
   // H.7 multi-tool: contiguous per-bit sections (one change per bit),
   // profile-carrying sections last so freed parts are never re-machined.
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
+}
+
+function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
+  return { ...group, sourceObjectId };
 }
 
 export { collectLayerPolylines } from './collect-cnc-contours';

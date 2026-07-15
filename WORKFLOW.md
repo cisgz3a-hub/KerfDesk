@@ -236,7 +236,10 @@ Identical to F-A3 except:
   artwork's named operation and its laser or CNC fields. The inspector never duplicates the same
   detailed settings in a second card below it.
 - A compact ordered operation list follows the inspector. Each row shows automatic colour, name,
-  process summary, visibility, output, and order controls. Row order is generated output order.
+  process summary, visibility, output, and order controls. Operation row order decides the processes
+  inside an artwork; artwork run priority is the top-level machine sequence.
+- The inspector shows the selected artwork's persisted run position and **First**, **Earlier**,
+  **Later**, and **Last** controls. This order is independent of canvas stacking.
 - When one selected artwork uses an operation shared by others, the inspector says `Affects N
   artworks` and offers **Make unique**. This clones the operation and rebinds only the selection.
 - When selected artworks use different operations, the inspector says `Multiple operations` and
@@ -244,6 +247,9 @@ Identical to F-A3 except:
   or changing geometry.
 - **Add operation** binds a second ordinary operation to the selected artwork. It appears in the
   same ordered list and can be renamed, reordered, shown/hidden, or output-enabled like any other.
+- Artwork intentionally sharing one operation compiles as one machining unit so fill holes,
+  overlaps, Island Fill clustering, pockets, and inlays retain compound-geometry semantics. Use
+  **Make unique** before ordering one member independently.
 
 #### Default values for a new Layer
 - Power: 30 %
@@ -277,8 +283,18 @@ Identical to F-A3 except:
 #### Success - reorder a layer
 1. Click a layer's up or down order control.
 2. The row moves one position in the Cuts/Layers list.
-3. Generated output processes layers in that new list order.
+3. Generated output processes operations in that order inside each artwork run.
 4. Undo restores the previous layer order.
+
+#### Success - choose which artwork runs first
+1. Select one artwork, or select several artworks to move them together.
+2. Click **First**, **Earlier**, **Later**, or **Last** in the selection inspector.
+3. The displayed position updates without changing canvas stacking, selection geometry, operation
+   settings, or automatic colours.
+4. Laser output follows that artwork order exactly. CNC uses the same priority inside its mandatory
+   safe sections: clearing stays before profiles and multi-tool work stays in contiguous tool
+   sections.
+5. Undo restores the previous machine priority.
 
 #### Success — toggle visibility off
 1. Click eye icon.
@@ -473,7 +489,7 @@ If all applicable checks pass, the save/start proceeds.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v3 stores canonical curve subpaths plus explicit artwork-to-operation bindings. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations (ADR-159, ADR-210).
+> **Current note:** project schema v3 stores canonical curve subpaths plus explicit artwork-to-operation bindings. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations (ADR-159, ADR-211).
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -1857,6 +1873,8 @@ F-CNC19 tiling.
    group (enabled, height, width, count).
 3. Preview and time estimate update to the compiled CNC job (pockets and
    engraves first, then profiles inner-before-outer).
+4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
+   ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
 
 #### Error — depth exceeds stock
 1. Preflight (F-CNC3) reports depth > stock thickness + 1 mm; the save/start

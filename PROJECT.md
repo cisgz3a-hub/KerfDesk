@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.4 — named artwork operations (ADR-210); MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.4 — named artwork operations (ADR-211); MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -361,6 +361,7 @@ Project
       raster-image
       shape
       name, operationIds[]
+    artworkOrder: string[] (machine priority; independent of canvas stacking)
     layers: Layer[]
       id, color, name
       mode: 'line' | 'fill' | 'image'
@@ -374,7 +375,7 @@ Project
 `SceneObject` is an extensible discriminated union (ADR-014) and now covers
 imported SVG paths, editable text, traced vector output, raster-image engrave
 sources, and generated shapes. Explicit operation IDs bind whole artwork, or
-individual imported paths where needed, to named process operations (ADR-210).
+individual imported paths where needed, to named process operations (ADR-211).
 Geometry color remains artwork appearance and a schema-v2 migration fallback;
 it is not the operation identity. Internal `Layer` names remain during the staged
 migration, but these records represent ordered laser or CNC operations.

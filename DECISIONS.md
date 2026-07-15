@@ -8670,6 +8670,13 @@ be inferred from matching source colors.
    only in this change; it does not add a new blocking guard under ADR-206.
 7. The always-visible Sub-layers editor is retired. **Add operation** creates another ordinary,
    named, reorderable operation bound to the selected artwork.
+8. `Scene.artworkOrder` persists machine priority independently of `Scene.objects`, so choosing
+   what runs first never changes canvas stacking or hit-testing. Missing IDs fall back
+   deterministically to object order for legacy projects and newly inserted artwork.
+9. Artwork priority is the top-level Laser sequence; operation order decides processes inside each
+   artwork. Artwork intentionally sharing one operation remains one compound machining unit so fill
+   holes/overlaps and CNC pocket/inlay geometry stay correct. CNC honors artwork priority only inside
+   its existing safety schedule: clearing precedes profiles and tool sections stay contiguous.
 
 ### Divergence from LightBurn
 
@@ -8683,8 +8690,10 @@ language, while the binding is explicit and inspectable.
 Operation sharing becomes intentional. Recoloring artwork cannot silently change machining
 settings, and CNC gains the same per-artwork behavior as laser. Schema v3 projects are not written
 by older builds, so serialization, migration, compiler selection, canvas visibility, undo, and
-round-trip tests all cover the new binding. Internal `Layer` type names may remain temporarily to
-keep the migration small; user-facing copy says Artwork and Operation.
+round-trip tests all cover the new binding. Operators can move one selection or a stable
+multi-selection first/earlier/later/last without changing visual stacking. Internal `Layer` type
+names may remain temporarily to keep the migration small; user-facing copy says Artwork and
+Operation.
 
 ### Verification
 
@@ -8692,5 +8701,8 @@ keep the migration small; user-facing copy says Artwork and Operation.
   both laser and CNC mode.
 - Share one operation across a multi-selection, edit it once, and prove both outputs update.
 - Make one member unique and prove subsequent edits do not affect the other member.
+- Reorder independent artwork, prove Laser and same-phase CNC group order changes, and prove canvas
+  stacking does not. Share one operation and prove it stays one compound machining unit.
+- Reverse operation priority and run path optimization; prove neither can cross artwork priority.
 - Open a schema-v2 fixture containing color layers, an object override, and a sub-layer; prove the
   migrated schema-v3 output is equivalent and survives save/open.

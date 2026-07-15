@@ -26,6 +26,7 @@ export function compileRasterGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  sceneObjects: ReadonlyArray<SceneObject> = objects,
 ): RasterGroup[] {
   const groups: RasterGroup[] = [];
   for (const obj of objects) {
@@ -33,7 +34,7 @@ export function compileRasterGroupsForLayer(
     if (obj.role === 'trace-source') continue;
     const effectiveLayer = layerWithObjectOverride(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
-    groups.push(compileRasterGroup(obj, effectiveLayer, device, objects));
+    groups.push(compileRasterGroup(obj, effectiveLayer, device, sceneObjects));
   }
   return groups;
 }

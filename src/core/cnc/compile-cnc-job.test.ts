@@ -66,6 +66,36 @@ function onlyGroup(scene: Scene): CncGroup {
 }
 
 describe('compileCncJob', () => {
+  it('honors artwork priority inside the same CNC safety section', () => {
+    const firstLayer = cncLayer('first-op', '#2563eb', {
+      cutType: 'engrave',
+      depthMm: 1,
+      depthPerPassMm: 1,
+    });
+    const secondLayer = cncLayer('second-op', '#dc2626', {
+      cutType: 'engrave',
+      depthMm: 1,
+      depthPerPassMm: 1,
+    });
+    const first = { ...squareObject('first', '#ff0000', 10, 20), operationIds: ['first-op'] };
+    const second = { ...squareObject('second', '#ff0000', 10, 60), operationIds: ['second-op'] };
+
+    const job = compileCncJob(
+      {
+        objects: [first, second],
+        layers: [firstLayer, secondLayer],
+        artworkOrder: ['second', 'first'],
+      },
+      dev,
+      config,
+    );
+
+    expect(job.groups.map((group) => [group.sourceObjectId, group.layerId])).toEqual([
+      ['second', 'second-op'],
+      ['first', 'first-op'],
+    ]);
+  });
+
   it('compiles an opted-in offset pocket with native helical contour passes', () => {
     const scene = sceneWith(
       [
