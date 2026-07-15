@@ -12,13 +12,8 @@ import {
 } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import { useStore } from '../state';
-import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
-import {
-  createExecutionArtifact,
-  type ExecutionArtifactV1,
-  type LegacyFingerprintOnlyArtifactV1,
-} from '../state/recovery/execution-artifact';
-import type { RecoveryCapsule } from '../state/recovery/recovery-model';
+import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
+import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
 import {
   buildCncRecoveryPreviewModel,
   buildLegacyFingerprintOnlyCncRecoveryPreviewModel,
@@ -136,6 +131,30 @@ describe('buildCncRecoveryPreviewModel', () => {
     );
   });
 
+  it('refuses altered prepared semantics even when their replacement manifest matches', () => {
+    const capsule = exactCapsule(cncProject(20));
+    const altered = exactCapsule(cncProject(30)).artifact;
+    const broken: ExactCapsule = {
+      ...capsule,
+      artifact: {
+        ...capsule.artifact,
+        prepared: altered.prepared,
+        cncRecoveryManifest: altered.cncRecoveryManifest,
+      },
+    };
+
+    const model = buildCncRecoveryPreviewModel(broken, SELECTED_EVENT);
+
+    expect(model).toMatchObject({
+      canExecute: false,
+      geometry: null,
+      unavailableReason: expect.stringContaining('sealed exact G-code'),
+    });
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'semantic-line-map', status: 'mismatch' }),
+    );
+  });
+
   it('uses archived device acceleration and fails closed when it is invalid', () => {
     const project = cncProject();
     const capsule = exactCapsule({
@@ -159,7 +178,9 @@ describe('buildCncRecoveryPreviewModel', () => {
   });
 });
 
-type ExactCapsule = RecoveryCapsule & { readonly artifact: ExecutionArtifactV1 };
+type ExactCapsule = RecoveryCapsule & {
+  readonly artifact: Extract<RecoveryCapsule['artifact'], { readonly kind: 'exact-execution' }>;
+};
 
 function cncProject(segmentLength = 20): Project {
   const color = '#ff0000';
@@ -213,7 +234,12 @@ function exactCapsule(project: Project): ExactCapsule {
     gcode: emitted.gcode,
     prepared,
     outputScope: DEFAULT_OUTPUT_SCOPE,
-    canvasPlan: { retentionKey: 'archived-cnc-signature' } as CanvasMotionPlan,
+    canvasPlan: buildCanvasMotionPlan({
+      gcode: emitted.gcode,
+      prepared,
+      machine: { statusReport: null, alarmCode: null, hasActiveStreamer: false },
+      retentionKey: 'archived-cnc-signature',
+    }),
     controllerSettings: null,
     createdAtIso: NOW,
   });
@@ -247,7 +273,7 @@ function matchingCheckpoint(project: Project): JobCheckpoint {
 }
 
 function legacyCapsule(checkpoint: JobCheckpoint): RecoveryCapsule {
-  const artifact: LegacyFingerprintOnlyArtifactV1 = {
+  const artifact = {
     schemaVersion: 1,
     kind: 'legacy-fingerprint-only',
     runId: 'legacy-cnc',
@@ -258,7 +284,7 @@ function legacyCapsule(checkpoint: JobCheckpoint): RecoveryCapsule {
     machineKind: checkpoint.machineKind,
     outputScope: checkpoint.outputScope,
     ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
-  };
+  } satisfies Extract<RecoveryCapsule['artifact'], { readonly kind: 'legacy-fingerprint-only' }>;
   return {
     runId: artifact.runId,
     artifactKind: artifact.kind,

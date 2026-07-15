@@ -17,7 +17,8 @@ import {
 import { cncSupervisedRecoveryRunwayProfile } from '../../core/recovery/cnc-supervised-recovery-job';
 import type { Project } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
-import type { RecoveryCapsule } from '../state/recovery/recovery-model';
+import type { RecoveryCapsule } from '../state/recovery';
+import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-binding';
 
 export type CncRecoveryEvidenceCheck = {
   readonly id: string;
@@ -104,12 +105,14 @@ function buildCapsulePreview(
   }
   const parameters = recoveryParameters(artifact.prepared.project);
   const identityMatches = exactIdentityMatches(capsule);
+  const preparedProgramMatches = recoveryArtifactPreparedProgramMatches(artifact);
   const manifest = artifact.cncRecoveryManifest;
   const manifestMatches =
     manifest !== undefined && manifestMatchesJob(artifact.prepared.job, manifest);
   const checks = exactEvidenceChecks(
     capsule,
     identityMatches,
+    preparedProgramMatches,
     manifest !== undefined,
     manifestMatches,
   );
@@ -127,6 +130,13 @@ function buildCapsulePreview(
     return unavailable(
       checks,
       'The saved execution artifact failed its run identity check.',
+      parameters,
+    );
+  }
+  if (!preparedProgramMatches) {
+    return unavailable(
+      checks,
+      'The archived prepared job does not reproduce the sealed exact G-code.',
       parameters,
     );
   }
@@ -225,15 +235,22 @@ function buildSemanticPreview(
 function exactEvidenceChecks(
   capsule: RecoveryCapsule,
   identityMatches: boolean,
+  preparedProgramMatches: boolean,
   manifestPresent: boolean,
   manifestMatches: boolean,
 ): ReadonlyArray<CncRecoveryEvidenceCheck> {
-  const manifestStatus = !manifestPresent ? 'missing' : manifestMatches ? 'matched' : 'mismatch';
-  const manifestDescription = manifestMatches
-    ? 'The emitter-owned semantic job and recovery manifest are sealed together in the capsule.'
-    : manifestPresent
-      ? 'The archived manifest does not match the archived prepared semantic job.'
-      : 'The exact capsule has no CNC recovery manifest.';
+  const manifestStatus = !manifestPresent
+    ? 'missing'
+    : preparedProgramMatches && manifestMatches
+      ? 'matched'
+      : 'mismatch';
+  const manifestDescription = !manifestPresent
+    ? 'The exact capsule has no CNC recovery manifest.'
+    : !preparedProgramMatches
+      ? 'The archived prepared job does not reproduce the sealed exact G-code.'
+      : manifestMatches
+        ? 'The emitter-owned semantic job and recovery manifest are sealed together in the capsule.'
+        : 'The archived manifest does not match the archived prepared semantic job.';
   return [
     evidence(
       'program-identity',

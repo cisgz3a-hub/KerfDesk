@@ -231,12 +231,18 @@ export function activateClaimedRecoveryMutation(
     readonly acceptedAtIso: string;
   },
 ): SlotMutation<boolean> {
+  if (args.artifactGeneration !== slots.generation) return unchanged(slots, false);
+  // Recovery transmission can settle before the post-write activation
+  // continuation runs, or another window can finish the same claimed
+  // activation first. Never resurrect that already-owned target run.
+  if (slotsReferenceRun(slots, args.artifact.runId)) {
+    return unchanged(slots, true);
+  }
   const capsule = slots.recoveryCapsule;
   if (
     capsule?.runId !== args.sourceRunId ||
     capsule.revision !== args.sourceRevision ||
-    capsule.claim?.attemptId !== args.attemptId ||
-    args.artifactGeneration !== slots.generation
+    capsule.claim?.attemptId !== args.attemptId
   ) {
     return unchanged(slots, false);
   }
@@ -290,6 +296,14 @@ export function promoteStaleActiveRunMutation(
 
 function unchanged<T>(slots: PersistedRecoverySlots, value: T): SlotMutation<T> {
   return { slots, value };
+}
+
+function slotsReferenceRun(slots: PersistedRecoverySlots, runId: RunId): boolean {
+  return (
+    slots.activeRun?.runId === runId ||
+    slots.recoveryCapsule?.runId === runId ||
+    slots.lastCompletedReceipt?.runId === runId
+  );
 }
 
 function clampProgress(value: number, maximum: number): number {

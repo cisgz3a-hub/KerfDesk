@@ -12,6 +12,7 @@ import {
   type RecoveryRepository,
 } from '../state/recovery';
 import type { PreparedRecoverySource } from './start-job-source';
+import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 
 export type CncRecoveryStreamPlan = {
   readonly source: PreparedRecoverySource;
@@ -43,7 +44,15 @@ export async function streamCncRecoveryProgram(
 ): Promise<boolean> {
   const laser = useLaserStore.getState();
   const recoveryRunId = createRunId();
-  const staged = await stageRecoveryAttempt(planned, claimedCapsule, recoveryRunId, repository);
+  const canvasPlan = recoveryCanvasPlan(planned, laser);
+  const staged = await stageRecoveryAttempt(
+    planned,
+    claimedCapsule,
+    recoveryRunId,
+    canvasPlan,
+    laser,
+    repository,
+  );
   if (!staged) return false;
 
   try {
@@ -57,7 +66,7 @@ export async function streamCncRecoveryProgram(
       machineKind: 'cnc',
       cncSetupAttestation,
       ...toolPlanOption(planned.recovery),
-      canvasPlan: recoveryCanvasPlan(planned),
+      canvasPlan,
     });
   } catch (error) {
     await resolveFailedRecoveryAttempt(claimedCapsule, recoveryRunId, error, repository);
@@ -83,9 +92,10 @@ async function stageRecoveryAttempt(
   planned: CncRecoveryStreamPlan,
   claimedCapsule: RecoveryCapsule,
   recoveryRunId: string,
+  canvasPlan: ReturnType<typeof recoveryCanvasPlan>,
+  laser: ReturnType<typeof useLaserStore.getState>,
   repository: RecoveryRepository,
 ): Promise<boolean> {
-  const laser = useLaserStore.getState();
   const toolPlan = cncToolPlan(planned.recovery.job);
   const staged = await repository.stageArtifact(
     createExecutionArtifact({
@@ -94,27 +104,33 @@ async function stageRecoveryAttempt(
       prepared: { ...planned.source.prepared, job: planned.recovery.job },
       outputScope: claimedCapsule.artifact.outputScope,
       ...(planned.source.jobOrigin === undefined ? {} : { jobOrigin: planned.source.jobOrigin }),
-      canvasPlan: recoveryCanvasPlan(planned),
+      canvasPlan,
       ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
       controllerSettings: laser.controllerSettings,
       controllerObservation: controllerObservation(laser),
       createdAtIso: new Date().toISOString(),
     }),
   );
-  if (staged.ok) return true;
+  if (staged.ok && staged.value === recoveryRunId) return true;
 
-  await repository.releaseRecoveryClaim(
-    claimedCapsule.runId,
-    claimedCapsule.claim?.attemptId ?? '',
-  );
+  const cleanup = await cleanupRejectedRecoveryAttempt({
+    repository,
+    sourceRunId: claimedCapsule.runId,
+    attemptId: claimedCapsule.claim?.attemptId ?? '',
+    stagedRunId: recoveryRunId,
+  });
   jobAwareAlert(
-    'Cannot start CNC recovery:\n\nThe recovery attempt could not be stored safely. The saved job remains retryable and no controller command was sent.',
+    cleanup.claimReleased
+      ? 'Cannot start CNC recovery:\n\nThe recovery attempt could not be stored safely. The saved job remains retryable and no controller command was sent.'
+      : 'Cannot start CNC recovery:\n\nNo controller command was sent, but the recovery-storage claim could not be released. Reload after recovery storage is available; do not assume this capsule is retryable yet.',
   );
   return false;
 }
 
-function recoveryCanvasPlan(planned: CncRecoveryStreamPlan) {
-  const laser = useLaserStore.getState();
+function recoveryCanvasPlan(
+  planned: CncRecoveryStreamPlan,
+  laser: ReturnType<typeof useLaserStore.getState>,
+) {
   const initialPosition = reportedWorkPositionMm(
     laser,
     laser.controllerSettings?.reportInches === true,
@@ -154,9 +170,17 @@ async function resolveFailedRecoveryAttempt(
   const attemptId = claimedCapsule.claim?.attemptId ?? '';
   const message = error instanceof Error ? error.message : String(error);
   if (state.streamer === null || state.activeRunId !== recoveryRunId) {
-    await repository.releaseRecoveryClaim(claimedCapsule.runId, attemptId);
-    await repository.discardStagedRun(recoveryRunId);
-    jobAwareAlert(`Could not start CNC recovery:\n\n${message}`);
+    const cleanup = await cleanupRejectedRecoveryAttempt({
+      repository,
+      sourceRunId: claimedCapsule.runId,
+      attemptId,
+      stagedRunId: recoveryRunId,
+    });
+    jobAwareAlert(
+      cleanup.claimReleased
+        ? `Could not start CNC recovery:\n\n${message}`
+        : `Could not start CNC recovery:\n\n${message}\n\nNo controller command was accepted, but the recovery-storage claim could not be released. Reload after recovery storage is available.`,
+    );
     return;
   }
 

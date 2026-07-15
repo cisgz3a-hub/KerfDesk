@@ -22,7 +22,9 @@ export async function hydrateRecoverySnapshot(
     loaded: true,
     generation: slots.generation,
     activeRun:
-      slots.activeRun !== null && isExecutionArtifact(activeArtifact)
+      slots.activeRun !== null &&
+      isExecutionArtifact(activeArtifact) &&
+      progressMatchesArtifact(slots.activeRun, activeArtifact)
         ? { ...slots.activeRun, artifact: activeArtifact }
         : null,
     recoveryCapsule: hydratedRecoveryCapsule(slots, recoveryArtifact),
@@ -66,7 +68,16 @@ function hydratedRecoveryCapsule(
 ): RecoveryRepositorySnapshot['recoveryCapsule'] {
   const capsule = slots.recoveryCapsule;
   if (capsule === null || !isRecoveryArtifact(artifact)) return null;
-  return artifact.kind === capsule.artifactKind ? { ...capsule, artifact } : null;
+  return artifact.kind === capsule.artifactKind && progressMatchesArtifact(capsule, artifact)
+    ? { ...capsule, artifact }
+    : null;
+}
+
+function progressMatchesArtifact(
+  progress: { readonly sendableLines: number },
+  artifact: RecoveryArtifactV1,
+): boolean {
+  return progress.sendableLines === artifact.sendableLines;
 }
 
 function artifactFor(

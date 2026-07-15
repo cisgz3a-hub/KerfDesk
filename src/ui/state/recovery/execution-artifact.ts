@@ -60,6 +60,9 @@ export type ExecutionArtifactV1 = {
   readonly jobOrigin?: JobOriginPlacement;
   readonly executionSignature: string;
   readonly prepared: PreparedExecutionOutput;
+  /** Ordered, deterministic resume transforms applied after emitting `prepared`.
+   * Absent for ordinary starts and CNC recovery jobs. */
+  readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
   readonly canvasPlan: CanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncRecoveryManifest?: CncRecoveryEventManifest | undefined;
@@ -85,6 +88,7 @@ export function createExecutionArtifact(args: {
   readonly runId: RunId;
   readonly gcode: string;
   readonly prepared: PreparedExecutionOutput;
+  readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
   readonly canvasPlan: CanvasMotionPlan;
@@ -116,6 +120,7 @@ export function createExecutionArtifact(args: {
     ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
     executionSignature: args.canvasPlan.retentionKey,
     prepared: args.prepared,
+    ...(args.laserResumeChain === undefined ? {} : { laserResumeChain: args.laserResumeChain }),
     canvasPlan: args.canvasPlan,
     ...(args.cncToolPlan === undefined ? {} : { cncToolPlan: args.cncToolPlan }),
     ...(cncRecoveryManifest === undefined ? {} : { cncRecoveryManifest }),
@@ -140,10 +145,24 @@ export function isRunId(value: unknown): value is RunId {
 export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV1 {
   if (!isRecord(value)) return false;
   if (!hasExecutionHeader(value) || !hasExecutionPayload(value)) return false;
+  if (!hasValidLaserResumeChain(value)) return false;
   const gcode = value['gcode'];
   const expected = fingerprintGcode(gcode);
   if (!fingerprintsMatch(value['fingerprint'], expected)) return false;
   return value['sendableLines'] === countSendableLines(gcode);
+}
+
+function hasValidLaserResumeChain(value: Record<string, unknown>): boolean {
+  const chain = value['laserResumeChain'];
+  if (chain === undefined) return true;
+  if (value['machineKind'] !== 'laser' || !Array.isArray(chain)) return false;
+  return chain.every(
+    (step) =>
+      isRecord(step) &&
+      typeof step['fromLine'] === 'number' &&
+      Number.isInteger(step['fromLine']) &&
+      step['fromLine'] >= 1,
+  );
 }
 
 export function isLegacyFingerprintArtifact(
@@ -158,7 +177,8 @@ export function isLegacyFingerprintArtifact(
     typeof value['migratedAtIso'] === 'string' &&
     isFingerprint(value['fingerprint']) &&
     isNonNegativeInteger(value['sendableLines']) &&
-    (value['machineKind'] === 'laser' || value['machineKind'] === 'cnc')
+    (value['machineKind'] === 'laser' || value['machineKind'] === 'cnc') &&
+    isOutputScope(value['outputScope'])
   );
 }
 
@@ -197,7 +217,18 @@ function hasExecutionPayload(value: Record<string, unknown>): boolean {
     isRecord(value['controller']) &&
     isRecord(value['canvasPlan']) &&
     isRecord(value['archivedControllerObservation']) &&
+    isOutputScope(value['outputScope']) &&
     typeof value['executionSignature'] === 'string'
+  );
+}
+
+function isOutputScope(value: unknown): value is OutputScope {
+  return (
+    isRecord(value) &&
+    typeof value['cutSelectedGraphics'] === 'boolean' &&
+    typeof value['useSelectionOrigin'] === 'boolean' &&
+    Array.isArray(value['selectedObjectIds']) &&
+    value['selectedObjectIds'].every((id) => typeof id === 'string')
   );
 }
 

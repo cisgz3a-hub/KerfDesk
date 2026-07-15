@@ -24,8 +24,10 @@ import {
   RecoveryRepository,
   type RecoveryCapsule,
 } from '../state/recovery';
-import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
-import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+} from '../state/recovery/testing';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
@@ -216,6 +218,7 @@ describe('runCncSupervisedRecoveryFlow', () => {
     expect(recoveryGcode).toContain('M3 S12000');
     expect(recoveryGcode).toContain('G0 X25.000 Y390.000');
     expect(recoveryGcode).toContain('G1 X50.000 Y390.000');
+    expect(recoveryGcode).toMatchSnapshot();
     expect(repo.getSnapshot().recoveryCapsule).toBeNull();
     expect(repo.getSnapshot().activeRun?.runId).not.toBe(capsule.runId);
     const options = startJob.mock.calls[0]?.[1] as
@@ -282,6 +285,36 @@ describe('runCncSupervisedRecoveryFlow', () => {
     expect(startJob).toHaveBeenCalledTimes(2);
     expect(repo.getSnapshot().recoveryCapsule).toBeNull();
     expect(repo.getSnapshot().activeRun?.runId).not.toBe(capsule.runId);
+  });
+
+  it('releases the claim even when rejected-attempt artifact cleanup fails', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    useLaserStore.setState({ startJob: vi.fn(async () => Promise.reject(new Error('refused'))) });
+    vi.spyOn(repo, 'discardStagedRun').mockResolvedValue({
+      ok: false,
+      error: 'storage-unavailable',
+    });
+
+    const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
+
+    expect(started).toBe(false);
+    expect(repo.getSnapshot().recoveryCapsule).toMatchObject({ runId: capsule.runId });
+    expect(repo.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
+  });
+
+  it('treats an unexpected successful staging value as a pre-acceptance failure', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    vi.spyOn(repo, 'stageArtifact').mockResolvedValue({ ok: true, value: false as never });
+
+    const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
+
+    expect(started).toBe(false);
+    expect(startJob).not.toHaveBeenCalled();
+    expect(repo.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
   });
 
   it('refuses a stale capsule after another window has claimed its revision', async () => {

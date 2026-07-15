@@ -10,8 +10,10 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
-import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
-import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+} from '../state/recovery/testing';
 import { currentReplayExecutionSignature, RunAgainControl } from './RunAgainControl';
 
 (

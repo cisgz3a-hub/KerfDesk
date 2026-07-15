@@ -6,58 +6,149 @@ import { cancelResetCleanup } from './laser-reset-cleanup';
 import type { LiveRefs } from './laser-store';
 
 type CloseRequest = {
-  forget: boolean;
-  promise: Promise<void> | null;
+  forgetRequested: boolean;
+  closePromise: Promise<void> | null;
+  forgetPromise: Promise<void> | null;
 };
 
-const closeRequests = new WeakMap<SerialConnection, CloseRequest>();
-const intentionalDisconnects = new WeakSet<SerialConnection>();
+export type IntentionalDisconnectRequest = {
+  forgetRequested: boolean;
+  operation: Promise<void> | null;
+};
 
-/** Claim final state ownership for the first explicit Disconnect on a port. */
-export function claimIntentionalDisconnect(connection: SerialConnection): boolean {
-  if (intentionalDisconnects.has(connection)) return false;
-  intentionalDisconnects.add(connection);
-  return true;
+export type ConnectionTeardownOwnershipRefs = {
+  readonly closeRequests: WeakMap<SerialConnection, CloseRequest>;
+  readonly intentionalDisconnects: WeakMap<SerialConnection, IntentionalDisconnectRequest>;
+};
+
+/** Own the complete stop + close + state-finalization transaction for one port.
+ * Later Disconnect callers only join; Forget callers additionally upgrade the
+ * shared close intent without entering the stop transaction themselves. */
+export function runIntentionalDisconnectOnce(
+  refs: ConnectionTeardownOwnershipRefs,
+  connection: SerialConnection,
+  forgetDevice: boolean,
+  owner: (request: IntentionalDisconnectRequest) => Promise<void>,
+  finalizeJoinedForget?: () => Promise<void>,
+): Promise<void> {
+  let request = refs.intentionalDisconnects.get(connection);
+  if (request === undefined) {
+    request = { forgetRequested: forgetDevice, operation: null };
+    refs.intentionalDisconnects.set(connection, request);
+  } else if (forgetDevice) {
+    request.forgetRequested = true;
+  }
+  if (forgetDevice) requestConnectionForget(refs, connection);
+  let operation: Promise<void>;
+  if (request.operation === null) {
+    request.operation = Promise.resolve().then(() => owner(request));
+    operation = request.operation;
+  } else {
+    operation = forgetDevice
+      ? joinIntentionalDisconnectAndForget(refs, connection, request.operation)
+      : request.operation;
+  }
+  return forgetDevice && finalizeJoinedForget !== undefined
+    ? finalizeForgetAfterOperation(operation, finalizeJoinedForget)
+    : operation;
 }
 
-export function isIntentionalDisconnectClaimed(connection: SerialConnection): boolean {
-  return intentionalDisconnects.has(connection);
+export function isIntentionalDisconnectClaimed(
+  refs: ConnectionTeardownOwnershipRefs,
+  connection: SerialConnection,
+): boolean {
+  return refs.intentionalDisconnects.has(connection);
 }
 
 /** Join every closer for one port, while allowing a concurrent Forget to win. */
 export function closeConnectionOnce(
+  refs: ConnectionTeardownOwnershipRefs,
   connection: SerialConnection,
   forgetDevice = false,
 ): Promise<void> {
-  let request = closeRequests.get(connection);
-  if (request === undefined) {
-    request = { forget: forgetDevice, promise: null };
-    closeRequests.set(connection, request);
-  } else if (forgetDevice) {
-    request.forget = true;
-  }
-  if (request.promise !== null) return request.promise;
-  request.promise = Promise.resolve().then(async () => {
-    if (request?.forget === true && connection.forget !== undefined) {
-      await connection.forget();
+  const request = closeRequestFor(refs, connection);
+  if (forgetDevice) request.forgetRequested = true;
+  request.closePromise ??= Promise.resolve().then(async () => {
+    if (request.forgetRequested && connection.forget !== undefined) {
+      await forgetConnectionOnce(request, connection);
       return;
     }
-    try {
-      await connection.close();
-    } finally {
-      // A concurrent Forget can upgrade the request while close() is pending.
-      // Re-check after closing so browser permission is still revoked exactly once.
-      if (request?.forget === true && connection.forget !== undefined) {
-        await connection.forget();
-      }
-    }
+    await connection.close();
   });
-  return request.promise;
+  // This continuation is intentional even when closePromise has already
+  // settled: a late Forget still has to revoke permission, exactly once.
+  return request.closePromise.then(
+    () => (request.forgetRequested ? forgetConnectionOnce(request, connection) : undefined),
+    async (closeError: unknown) => {
+      if (request.forgetRequested) await forgetConnectionOnce(request, connection);
+      throw closeError;
+    },
+  );
 }
 
 /** True once any concurrent closer has upgraded this port close to Forget. */
-export function connectionForgetRequested(connection: SerialConnection): boolean {
-  return closeRequests.get(connection)?.forget === true;
+export function connectionForgetRequested(
+  refs: ConnectionTeardownOwnershipRefs,
+  connection: SerialConnection,
+): boolean {
+  return closeRequestFor(refs, connection).forgetRequested;
+}
+
+function closeRequestFor(
+  refs: ConnectionTeardownOwnershipRefs,
+  connection: SerialConnection,
+): CloseRequest {
+  const existing = refs.closeRequests.get(connection);
+  if (existing !== undefined) return existing;
+  const request: CloseRequest = {
+    forgetRequested: false,
+    closePromise: null,
+    forgetPromise: null,
+  };
+  refs.closeRequests.set(connection, request);
+  return request;
+}
+
+function requestConnectionForget(
+  refs: ConnectionTeardownOwnershipRefs,
+  connection: SerialConnection,
+): void {
+  closeRequestFor(refs, connection).forgetRequested = true;
+}
+
+function forgetConnectionOnce(request: CloseRequest, connection: SerialConnection): Promise<void> {
+  if (connection.forget === undefined) return Promise.resolve();
+  request.forgetPromise ??= connection.forget();
+  return request.forgetPromise;
+}
+
+async function joinIntentionalDisconnectAndForget(
+  refs: ConnectionTeardownOwnershipRefs,
+  connection: SerialConnection,
+  operation: Promise<void>,
+): Promise<void> {
+  let operationError: unknown = null;
+  try {
+    await operation;
+  } catch (error) {
+    operationError = error;
+  }
+  await closeConnectionOnce(refs, connection, true);
+  if (operationError !== null) throw operationError;
+}
+
+async function finalizeForgetAfterOperation(
+  operation: Promise<void>,
+  finalize: () => Promise<void>,
+): Promise<void> {
+  let operationError: unknown = null;
+  try {
+    await operation;
+  } catch (error) {
+    operationError = error;
+  }
+  await finalize();
+  if (operationError !== null) throw operationError;
 }
 
 /** Resolve the startup raw-line wait without letting it qualify as a real line. */
@@ -67,8 +158,18 @@ export function cancelRawControllerLineWait(refs: LiveRefs): void {
   pending?.();
 }
 
+/** Invalidate every session owner while keeping the closing port addressable.
+ * A concurrent Forget must still be able to join the in-flight close request. */
+export function quarantineConnectionRefs(refs: LiveRefs): void {
+  clearConnectionSessionRefs(refs, true);
+}
+
 /** Invalidate and release every host-side owner of the current serial session. */
 export function teardownConnectionRefs(refs: LiveRefs): void {
+  clearConnectionSessionRefs(refs, false);
+}
+
+function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean): void {
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   cancelRawControllerLineWait(refs);
   cancelControllerLifecycleRefs(refs);
@@ -77,7 +178,7 @@ export function teardownConnectionRefs(refs: LiveRefs): void {
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();
   if (refs.pollHandle !== null) clearInterval(refs.pollHandle);
-  refs.connection = null;
+  if (!preserveConnection) refs.connection = null;
   refs.unsubscribeLine = null;
   refs.unsubscribeClose = null;
   refs.pollHandle = null;

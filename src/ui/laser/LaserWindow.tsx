@@ -28,6 +28,7 @@ import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useStartBlockerStore } from './start-blocker-store';
 import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
+import { useToastStore } from '../state/toast-store';
 
 export function LaserWindow(): JSX.Element {
   const [machineSetupRequest, setMachineSetupRequest] = useState<DeviceSetupOpenRequest>();
@@ -115,10 +116,18 @@ function confirmForgetController(): void {
   ) {
     return;
   }
-  void (async () => {
+  void forgetControllerAndClearStartBlockers();
+}
+
+export async function forgetControllerAndClearStartBlockers(): Promise<void> {
+  try {
     await useLaserStore.getState().forgetDevice?.();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    useToastStore.getState().pushToast(`Forget Controller could not finish: ${message}`, 'error');
+  } finally {
     useStartBlockerStore.getState().clear();
-  })().catch(() => undefined);
+  }
 }
 
 function useJogBlocked(): boolean {

@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`runCncSupervisedRecoveryFlow > streams a sealed exact artifact without reading or mutating the open project 1`] = `
+"G21
+G90
+G54
+G94
+G0 Z3.810
+M3 S12000
+G4 P3.000
+; cnc layer red profile-outside tool 3.175 mm feed 1000 plunge 300 spindle 12000 rpm passes 1
+G0 X25.000 Y390.000
+G1 Z-1.000 F300
+G1 X30.000 Y390.000 F1000
+G1 X50.000 Y390.000
+G1 X70.000 Y390.000
+G0 Z3.810
+M5
+G0 X0.000 Y0.000
+"
+`;

@@ -32,11 +32,34 @@ const LATE_BANNER_SETTLE_MS = 300;
 
 type HandshakeEpochGuard = {
   expectedWriteEpoch: number;
+  expectedSessionEpoch: number;
   sawWelcomeBoundary: boolean;
   acceptControllerLineEpoch: () => boolean;
 };
 
 type ControllerResponse = 'line' | 'timeout' | 'stale';
+
+export function controllerHandshakeOwnership(
+  get: GetFn,
+  refs: LiveRefs,
+  connection: NonNullable<LiveRefs['connection']>,
+) {
+  let qualificationEpoch = get().controllerSessionEpoch;
+  let writeEpoch = refs.writeEpoch ?? 0;
+  return {
+    get qualificationEpoch(): number {
+      return qualificationEpoch;
+    },
+    adopt: (epoch: number): void => {
+      qualificationEpoch = epoch;
+      writeEpoch = refs.writeEpoch ?? 0;
+    },
+    isCurrent: (): boolean =>
+      refs.connection === connection &&
+      (refs.writeEpoch ?? 0) === writeEpoch &&
+      get().controllerSessionEpoch === qualificationEpoch,
+  };
+}
 
 export async function runControllerHandshake(
   set: SetFn,
@@ -44,14 +67,15 @@ export async function runControllerHandshake(
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
   baudRate: number,
+  onQualificationEpoch: (epoch: number) => void,
 ): Promise<void> {
   const connection = refs.connection;
   if (connection === null) return;
-  const guard = createHandshakeEpochGuard(get, refs, connection);
+  const guard = createHandshakeEpochGuard(get, refs, connection, onQualificationEpoch);
   const response = await awaitControllerResponse(refs, safeWrite, guard);
   if (response === 'stale') return;
   if (response === 'timeout') {
-    reportMissingControllerResponse(set, get, refs, baudRate);
+    reportMissingControllerResponse(set, get, refs, baudRate, guard.expectedSessionEpoch);
     return;
   }
   await settleAfterControllerLine(guard.sawWelcomeBoundary);
@@ -65,9 +89,11 @@ function createHandshakeEpochGuard(
   get: GetFn,
   refs: LiveRefs,
   connection: NonNullable<LiveRefs['connection']>,
+  onQualificationEpoch: (epoch: number) => void,
 ): HandshakeEpochGuard {
   const guard: HandshakeEpochGuard = {
     expectedWriteEpoch: refs.writeEpoch ?? 0,
+    expectedSessionEpoch: get().controllerSessionEpoch,
     sawWelcomeBoundary: false,
     acceptControllerLineEpoch: () => false,
   };
@@ -78,11 +104,14 @@ function createHandshakeEpochGuard(
     // The first welcome banner is the expected reset boundary for a new port.
     // Adopt only that one epoch; later reset boundaries invalidate the await.
     if (
+      !guard.sawWelcomeBoundary &&
       currentWriteEpoch === guard.expectedWriteEpoch + 1 &&
       get().detectedControllerKind !== null
     ) {
       guard.expectedWriteEpoch = currentWriteEpoch;
+      guard.expectedSessionEpoch = get().controllerSessionEpoch;
       guard.sawWelcomeBoundary = true;
+      onQualificationEpoch(guard.expectedSessionEpoch);
       return true;
     }
     return false;
@@ -114,6 +143,7 @@ function reportMissingControllerResponse(
   get: GetFn,
   refs: LiveRefs,
   baudRate: number,
+  expectedEpoch: number,
 ): void {
   const driver = refs.driver;
   set(
@@ -123,7 +153,6 @@ function reportMissingControllerResponse(
       `[lf2] No controller response within 2 s. Check baud rate (${baudRate}) and that the device is ${driver.label}.`,
     ),
   );
-  const expectedEpoch = get().controllerSessionEpoch;
   set((state) =>
     failedControllerQualificationPatch(
       state,
@@ -142,7 +171,7 @@ async function qualifyConnectedController(
   guard: HandshakeEpochGuard,
 ): Promise<void> {
   const settingsQuery = refs.driver.commands.settingsQuery;
-  const qualificationEpoch = get().controllerSessionEpoch;
+  const qualificationEpoch = guard.expectedSessionEpoch;
   if (settingsQuery === null) {
     set({
       controllerQualification: qualifiedController(qualificationEpoch, 'not-required'),

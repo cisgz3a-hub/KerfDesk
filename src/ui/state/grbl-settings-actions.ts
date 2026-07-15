@@ -98,9 +98,9 @@ async function readMachineSettingsAction(
       source: 'console',
     });
     finishSettingsQualification(set, get, refs, qualificationEpoch);
-    clearInteractiveOperation(set);
+    clearInteractiveOperation(set, qualificationEpoch);
   } catch (err) {
-    failSettingsOperation(set, get, refs, 'read', err);
+    failSettingsOperation(set, refs, qualificationEpoch, 'read', err);
   }
 }
 
@@ -127,6 +127,7 @@ async function writeGrblSettingAction(
     value,
   );
   if (blocked !== null) return blockWrite(set, get, blocked);
+  const qualificationEpoch = get().controllerSessionEpoch;
   const trimmed = value.trim();
   set({
     controllerOperation: {
@@ -136,10 +137,10 @@ async function writeGrblSettingAction(
     },
   });
   try {
-    await writeAndVerifySetting(set, get, refs, write, id, trimmed);
-    clearInteractiveOperation(set);
+    await writeAndVerifySetting(set, get, refs, write, qualificationEpoch, id, trimmed);
+    clearInteractiveOperation(set, qualificationEpoch);
   } catch (err) {
-    failSettingsOperation(set, get, refs, 'write', err);
+    failSettingsOperation(set, refs, qualificationEpoch, 'write', err);
   }
 }
 
@@ -148,6 +149,7 @@ async function writeAndVerifySetting(
   get: GetFn,
   refs: GrblSettingsActionRefs,
   write: SettingsWriteFn,
+  qualificationEpoch: number,
   id: number,
   trimmed: string,
 ): Promise<void> {
@@ -158,7 +160,9 @@ async function writeAndVerifySetting(
     action: 'console',
     source: 'console',
   });
-  const qualificationEpoch = get().controllerSessionEpoch;
+  if (get().controllerSessionEpoch !== qualificationEpoch) {
+    throw new Error('Controller session changed while writing the machine setting.');
+  }
   beginSettingsCollection(refs, qualificationEpoch);
   set({
     controllerOperation: {
@@ -180,6 +184,9 @@ async function writeAndVerifySetting(
     action: 'console',
     source: 'console',
   });
+  if (get().controllerSessionEpoch !== qualificationEpoch) {
+    throw new Error('Controller session changed while verifying the machine setting.');
+  }
   finishSettingsQualification(set, get, refs, qualificationEpoch);
   if (!settingWasVerified(get, id, trimmed)) {
     throw new Error(`Controller did not report $${id}=${trimmed} after re-read.`);
@@ -194,20 +201,28 @@ function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {
 
 function failSettingsOperation(
   set: SetFn,
-  get: GetFn,
   refs: GrblSettingsActionRefs,
+  expectedEpoch: number,
   operation: 'read' | 'write',
   err: unknown,
 ): never {
-  refs.settingsCollector = idleCollector();
-  refs.settingsCollectorSessionEpoch = null;
-  clearInteractiveOperation(set);
+  if (refs.settingsCollectorSessionEpoch === expectedEpoch) {
+    refs.settingsCollector = idleCollector();
+    refs.settingsCollectorSessionEpoch = null;
+  }
   const message = err instanceof Error ? err.message : String(err);
-  set({
-    ...failedControllerQualificationPatch(get(), get().controllerSessionEpoch, message),
-    lastWriteError: message,
-    log: pushLog(get(), `[lf2] Machine settings ${operation} failed: ${message}`),
-  });
+  set((state) =>
+    state.controllerSessionEpoch === expectedEpoch
+      ? {
+          ...failedControllerQualificationPatch(state, expectedEpoch, message),
+          ...(state.controllerOperation?.kind === 'interactive-command'
+            ? { controllerOperation: null }
+            : {}),
+          lastWriteError: message,
+          log: pushLog(state, `[lf2] Machine settings ${operation} failed: ${message}`),
+        }
+      : {},
+  );
   throw err instanceof Error ? err : new Error(message);
 }
 
@@ -218,14 +233,17 @@ function finishSettingsQualification(
   expectedEpoch: number,
 ): void {
   const state = get();
+  if (state.controllerSessionEpoch !== expectedEpoch) return;
   if (
     state.controllerQualification.kind === 'qualified' &&
     state.controllerQualification.epoch === expectedEpoch
   ) {
     return;
   }
-  refs.settingsCollector = idleCollector();
-  refs.settingsCollectorSessionEpoch = null;
+  if (refs.settingsCollectorSessionEpoch === expectedEpoch) {
+    refs.settingsCollector = idleCollector();
+    refs.settingsCollectorSessionEpoch = null;
+  }
   set((current) =>
     failedControllerQualificationPatch(
       current,
@@ -312,8 +330,11 @@ function blockWrite(set: SetFn, get: GetFn, reason: string): never {
   throw new Error(reason);
 }
 
-function clearInteractiveOperation(set: SetFn): void {
+function clearInteractiveOperation(set: SetFn, expectedEpoch: number): void {
   set((state) =>
-    state.controllerOperation?.kind === 'interactive-command' ? { controllerOperation: null } : {},
+    state.controllerSessionEpoch === expectedEpoch &&
+    state.controllerOperation?.kind === 'interactive-command'
+      ? { controllerOperation: null }
+      : {},
   );
 }
