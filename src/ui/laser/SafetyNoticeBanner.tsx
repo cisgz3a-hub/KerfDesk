@@ -7,22 +7,24 @@
 // clears it — it is deliberately not auto-hidden.
 
 import { useLaserStore } from '../state/laser-store';
+import type { LaserSafetyNotice } from '../state/laser-safety-notice';
+
+const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
+  'write-failed': 'Controller write failed',
+  'disconnect-during-job': 'Connection lost mid-job',
+  'disconnect-during-fire': 'Connection lost during Fire',
+  'controller-error': 'Controller rejected a command',
+  'stream-stalled': 'Controller stream stalled',
+  'controller-reboot': 'Controller rebooted mid-job',
+  'frame-limit': 'Frame hit a machine limit',
+};
 
 export function SafetyNoticeBanner(): JSX.Element | null {
   const notice = useLaserStore((s) => s.safetyNotice);
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   const wakeController = useLaserStore((s) => s.wakeController);
   if (notice === null) return null;
-  const title =
-    notice.kind === 'disconnect-during-job'
-      ? 'Connection lost mid-job'
-      : notice.kind === 'disconnect-during-fire'
-        ? 'Connection lost during Fire'
-        : notice.kind === 'controller-error'
-          ? 'Controller rejected a command'
-          : notice.kind === 'controller-reboot'
-            ? 'Controller rebooted mid-job'
-            : 'Command may not have sent';
+  const title = SAFETY_NOTICE_TITLES[notice.kind];
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
