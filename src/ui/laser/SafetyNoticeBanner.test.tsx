@@ -61,4 +61,23 @@ describe('SafetyNoticeBanner', () => {
       host.remove();
     }
   });
+
+  it('uses a specific write-failure title instead of the removed generic guard copy', async () => {
+    useLaserStore.setState({
+      safetyNotice: {
+        kind: 'write-failed',
+        action: 'jog',
+        message: 'Jog write failed.',
+      },
+    });
+    const { host, root } = await renderBanner();
+    try {
+      const alert = host.querySelector('[role="alert"]');
+      expect(alert?.textContent).toContain('Controller write failed');
+      expect(alert?.textContent).not.toContain('Command may not have sent');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
