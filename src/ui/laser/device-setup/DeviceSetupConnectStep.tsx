@@ -31,6 +31,7 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const detected = useLaserStore((s) => s.detectedSettings);
   const connect = useLaserStore((s) => s.connect);
@@ -76,6 +77,7 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
   return {
     activeControllerKind,
     connection,
+    controllerOperation,
     controllerKind,
     detected,
     detectedControllerKind,
@@ -186,7 +188,7 @@ function ConnectionActions(props: {
       <div style={actionsStyle}>
         <Button
           onClick={() => void model.readController()}
-          disabled={model.mismatch}
+          disabled={model.mismatch || model.controllerOperation !== null}
           {...helpProps('control:laser.device-setup.reread')}
         >
           Run read-only checks
