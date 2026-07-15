@@ -74,23 +74,27 @@ describe('serial connection epoch guards', () => {
   it('does not restart Marlin polling after Forget cancels the startup handshake', async () => {
     vi.useFakeTimers();
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
-    const writes: string[] = [];
-    const connection = makeConnection(writes);
+    try {
+      const writes: string[] = [];
+      const connection = makeConnection(writes);
 
-    await useLaserStore.getState().connect(adapterFor(connection), { controllerKind: 'marlin' });
-    const forgetDevice = useLaserStore.getState().forgetDevice;
-    if (forgetDevice === undefined) throw new Error('Forget Controller action is unavailable.');
-    await forgetDevice();
-    await vi.advanceTimersByTimeAsync(1_500);
+      await useLaserStore.getState().connect(adapterFor(connection), { controllerKind: 'marlin' });
+      const forgetDevice = useLaserStore.getState().forgetDevice;
+      if (forgetDevice === undefined) throw new Error('Forget Controller action is unavailable.');
+      await forgetDevice();
+      await vi.advanceTimersByTimeAsync(1_500);
 
-    expect(writes).not.toContain('M114\n');
-    expect(setIntervalSpy).not.toHaveBeenCalled();
-    expect(useLaserStore.getState()).toMatchObject({
-      connection: { kind: 'disconnected' },
-      lastWriteError: null,
-      log: [],
-    });
-    setIntervalSpy.mockRestore();
+      expect(writes).not.toContain('M114\n');
+      expect(setIntervalSpy).not.toHaveBeenCalled();
+      expect(useLaserStore.getState()).toMatchObject({
+        connection: { kind: 'disconnected' },
+        lastWriteError: null,
+        log: [],
+      });
+    } finally {
+      setIntervalSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it('keeps Start blocked until the reconnect settings query receives its terminal acknowledgement', async () => {
