@@ -61,6 +61,7 @@ export type DeviceSetupState = {
   readonly detected: Partial<DeviceProfile>;
   readonly detectedControllerKind: ControllerKind | null;
   readonly controllerRead: boolean;
+  readonly detectedApplied: boolean;
   readonly draft: DeviceProfile;
   readonly draftMachine: MachineConfig;
   // Retain CNC values when the operator briefly switches Laser -> CNC -> Laser.
@@ -130,6 +131,7 @@ export function initDeviceSetup(
     detected: detected ?? {},
     detectedControllerKind: facts.detectedControllerKind ?? null,
     controllerRead,
+    detectedApplied: false,
     draft: profile,
     draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
     cncDraft,
@@ -287,13 +289,14 @@ function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>):
     state.draft.controllerKind,
   ).profile;
   if (state.machineKind !== 'cnc' || !positive(patch.maxPowerS ?? 0)) {
-    return invalidateFirmwarePlan(state, { draft });
+    return invalidateFirmwarePlan(state, { draft, detectedApplied: true });
   }
   const cncDraft: CncMachineConfig = {
     ...state.cncDraft,
     params: { ...state.cncDraft.params, spindleMaxRpm: patch.maxPowerS ?? 0 },
   };
-  return invalidateFirmwarePlan(state, { draft, draftMachine: cncDraft, cncDraft });
+  const accepted = { draft, draftMachine: cncDraft, cncDraft, detectedApplied: true };
+  return invalidateFirmwarePlan(state, accepted);
 }
 
 function profilePatchForMachineKind(
@@ -358,6 +361,7 @@ function updateDetectedFacts(
   }
   return invalidateFirmwarePlan(state, {
     detected: action.detected ?? state.detected,
+    detectedApplied: false,
     detectedControllerKind:
       action.detectedControllerKind === undefined
         ? state.detectedControllerKind

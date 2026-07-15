@@ -2,7 +2,6 @@
 // controller's read-only identity/settings commands. No firmware writes occur
 // here.
 
-import { useState } from 'react';
 import { selectControllerDriver } from '../../../core/controllers';
 import { assertNever } from '../../../core/scene';
 import { usePlatform } from '../../app/platform-context';
@@ -163,12 +162,10 @@ function ConnectionActions(props: {
   readonly dispatch: DeviceSetupStepProps['dispatch'];
 }): JSX.Element {
   const { model } = props;
-  const [appliedDetected, setAppliedDetected] = useState<typeof model.detected>(null);
   const acceptDetected = (): void => {
     const detected = model.detected;
     if (detected === null) return;
     props.dispatch({ kind: 'accept-detected', patch: detected });
-    setAppliedDetected(detected);
   };
   if (model.connection.kind !== 'connected') {
     return (
@@ -188,10 +185,7 @@ function ConnectionActions(props: {
     <>
       <div style={actionsStyle}>
         <Button
-          onClick={() => {
-            setAppliedDetected(null);
-            void model.readController();
-          }}
+          onClick={() => void model.readController()}
           disabled={model.mismatch}
           {...helpProps('control:laser.device-setup.reread')}
         >
@@ -207,7 +201,7 @@ function ConnectionActions(props: {
           </Button>
         ) : null}
       </div>
-      {model.detected !== null && appliedDetected === model.detected ? (
+      {model.state.detectedApplied ? (
         <p role="status" aria-live="polite" aria-atomic="true" style={confirmationStyle}>
           Detected values applied to this setup draft. Nothing is saved until you complete the final
           Save step.

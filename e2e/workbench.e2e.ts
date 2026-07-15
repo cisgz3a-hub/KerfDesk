@@ -213,6 +213,7 @@ kerfDeskTest(
       .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeRead))
       .toContain('$$\n');
     expect(serialWrites(await kerfdesk.events()).slice(beforeRead)).not.toMatch(/\$\d+=/);
+    await expect(dialog).toContainText('Bed width: 350.000 mm');
 
     await dialog.getByRole('button', { name: 'Use detected values', exact: true }).click();
     await expect(dialog.getByRole('status')).toContainText(
