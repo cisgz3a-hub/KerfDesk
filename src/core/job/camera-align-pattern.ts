@@ -41,7 +41,12 @@ const MARKER_HATCH_SPACING_MM = 0.2;
 export function generateCameraAlignPattern(options: CameraAlignPatternOptions): CameraAlignPattern {
   const layout = alignMarkerLayout(options.bedWidthMm, options.bedHeightMm);
   const layer: Layer = {
-    ...createLayer({ id: 'camera-align-markers', color: MARKER_LAYER_COLOR, mode: 'fill' }),
+    ...createLayer({
+      id: 'camera-align-markers',
+      name: 'Camera alignment markers',
+      color: MARKER_LAYER_COLOR,
+      mode: 'fill',
+    }),
     speed: options.speed ?? DEFAULT_SPEED_MM_MIN,
     power: options.power ?? DEFAULT_POWER_PERCENT,
     hatchSpacingMm: MARKER_HATCH_SPACING_MM,
@@ -49,7 +54,7 @@ export function generateCameraAlignPattern(options: CameraAlignPatternOptions): 
     fillBidirectional: true,
   };
   const objects = patchCenters(layout).flatMap((center, index) =>
-    patchSquares(center, layout.patchSquareMm, index),
+    patchSquares(center, layout.patchSquareMm, index, layer.id),
   );
   return { scene: { objects, layers: [layer] }, layer, objects, layout };
 }
@@ -63,7 +68,12 @@ function patchCenters(layout: AlignMarkerLayout): Vec2[] {
 
 // The two burned squares of a 2×2 checker patch: the (−,−) and (+,+) cells.
 // Their shared corner at `center` is the X-corner.
-function patchSquares(center: Vec2, squareMm: number, patchIndex: number): ImportedSvg[] {
+function patchSquares(
+  center: Vec2,
+  squareMm: number,
+  patchIndex: number,
+  operationId: string,
+): ImportedSvg[] {
   const cells: ReadonlyArray<readonly [number, number]> = [
     [-1, -1],
     [0, 0],
@@ -72,6 +82,7 @@ function patchSquares(center: Vec2, squareMm: number, patchIndex: number): Impor
     kind: 'imported-svg',
     id: `camera-align-marker-${patchIndex}-${cellIndex}`,
     source: 'camera-align-pattern',
+    operationIds: [operationId],
     bounds: { minX: 0, minY: 0, maxX: squareMm, maxY: squareMm },
     transform: {
       ...IDENTITY_TRANSFORM,

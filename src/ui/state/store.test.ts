@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createProject,
   IDENTITY_TRANSFORM,
+  operationIdsForObject,
   PROJECT_SCHEMA_VERSION,
   type ImportedSvg,
   type RasterImage,
@@ -30,6 +31,12 @@ function rasterObj(id: string): RasterImage {
   };
 }
 
+function operationIdsFor(objectId: string): ReadonlyArray<string> {
+  const { objects, layers } = useStore.getState().project.scene;
+  const object = objects.find((candidate) => candidate.id === objectId);
+  return object === undefined ? [] : operationIdsForObject(object, layers);
+}
+
 describe('useStore', () => {
   beforeEach(() => {
     reset();
@@ -48,11 +55,12 @@ describe('useStore', () => {
     expect(outcome.kind).toBe('added');
   });
 
-  it('importSvgObject adds the object and auto-creates layers per unique color', () => {
+  it('importSvgObject creates path operations with automatic presentation colors', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     const { scene } = useStore.getState().project;
     expect(scene.objects).toHaveLength(1);
-    expect(scene.layers.map((l) => l.color)).toEqual(['#ff0000', '#0000ff']);
+    expect(scene.layers.map((operation) => operation.color)).toEqual(['#2563eb', '#dc2626']);
+    expect(operationIdsFor('O1')).toEqual(scene.layers.map((operation) => operation.id));
   });
 
   it('importSvgObject auto-selects the new object (F-A3 step 5)', () => {
@@ -73,12 +81,13 @@ describe('useStore', () => {
     expect(c.transform.y - a.transform.y).toBeCloseTo(20);
   });
 
-  it("doesn't double-create a layer when a second object reuses a color", () => {
+  it('keeps operations independent when a second artwork reuses a source color', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#ff0000', '#0000ff']));
     const { scene } = useStore.getState().project;
     expect(scene.objects).toHaveLength(2);
-    expect(scene.layers).toHaveLength(2); // red + blue, not three rows
+    expect(scene.layers).toHaveLength(3);
+    expect(new Set(operationIdsFor('O1'))).not.toEqual(new Set(operationIdsFor('O2')));
   });
 
   it('removeSceneObject deletes the object and clears matching selection', () => {
@@ -100,49 +109,48 @@ describe('useStore', () => {
     expect(useStore.getState().project.scene.layers).toHaveLength(0);
   });
 
-  it('removeSceneObject keeps layers still used by other objects', () => {
-    // Two objects share '#ff0000'. Deleting one must NOT drop the
-    // red layer; the other object still uses it.
+  it('removeSceneObject keeps every operation owned by the remaining artwork', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#ff0000', '#00ff00']));
-    expect(useStore.getState().project.scene.layers).toHaveLength(2);
+    const remainingOperationIds = operationIdsFor('O2');
+    expect(useStore.getState().project.scene.layers).toHaveLength(3);
     useStore.getState().removeSceneObject('O1');
-    const layerColors = useStore
-      .getState()
-      .project.scene.layers.map((l) => l.color)
-      .sort();
-    // Red stays (O2 uses it), green stays (O2 uses it). Two layers total.
-    expect(layerColors).toEqual(['#00ff00', '#ff0000']);
+    expect(useStore.getState().project.scene.layers.map((operation) => operation.id)).toEqual(
+      remainingOperationIds,
+    );
   });
 
   // duplicateSelection tests live in duplicate.test.ts.
 
   it('setLayerParam patches the matching layer', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { power: 75 });
+    const [operationId] = operationIdsFor('O1');
+    if (operationId === undefined) throw new Error('operation missing');
+    useStore.getState().setLayerParam(operationId, { power: 75 });
     expect(useStore.getState().project.scene.layers[0]?.power).toBe(75);
   });
 
   it('moveLayer updates layer order and is undoable', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff', '#00ff00']));
+    const operationIds = operationIdsFor('O1');
+    const [first, second, third] = operationIds;
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error('expected three operations');
+    }
     useStore.setState({ dirty: false });
 
-    useStore.getState().moveLayer('#00ff00', 'up');
+    useStore.getState().moveLayer(third, 'up');
 
     expect(useStore.getState().project.scene.layers.map((layer) => layer.id)).toEqual([
-      '#ff0000',
-      '#00ff00',
-      '#0000ff',
+      first,
+      third,
+      second,
     ]);
     expect(useStore.getState().dirty).toBe(true);
     expect(useStore.getState().undoStack).toHaveLength(2);
 
     useStore.getState().undo();
-    expect(useStore.getState().project.scene.layers.map((layer) => layer.id)).toEqual([
-      '#ff0000',
-      '#0000ff',
-      '#00ff00',
-    ]);
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.id)).toEqual(operationIds);
   });
 
   it('setRasterImageAdjustments patches a raster image and pushes undo', () => {
@@ -261,23 +269,31 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
 
   it('re-import preserves layer settings for surviving colors', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { power: 85, speed: 1234, passes: 3 });
+    const [operationId] = operationIdsFor('O1');
+    if (operationId === undefined) throw new Error('operation missing');
+    useStore.getState().setLayerParam(operationId, { power: 85, speed: 1234, passes: 3 });
     const replacement: ImportedSvg = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
     useStore.getState().importSvgObject(replacement);
-    const red = useStore.getState().project.scene.layers.find((l) => l.color === '#ff0000');
-    expect(red?.power).toBe(85);
-    expect(red?.speed).toBe(1234);
-    expect(red?.passes).toBe(3);
+    const operation = useStore
+      .getState()
+      .project.scene.layers.find((candidate) => candidate.id === operationId);
+    expect(operation?.power).toBe(85);
+    expect(operation?.speed).toBe(1234);
+    expect(operation?.passes).toBe(3);
   });
 
   it('re-import adds layers for genuinely new colors', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const [existingOperationId] = operationIdsFor('O1');
     const replacement: ImportedSvg = {
       ...svgObj('new', ['#ff0000', '#00ff00']),
       source: 'O1.svg',
     };
     const outcome = useStore.getState().importSvgObject(replacement);
-    expect(useStore.getState().project.scene.layers.map((l) => l.color)).toContain('#00ff00');
+    const operationIds = operationIdsFor('O1');
+    expect(operationIds).toHaveLength(2);
+    expect(operationIds).toContain(existingOperationId);
+    expect(useStore.getState().project.scene.layers).toHaveLength(2);
     if (outcome.kind === 'replaced') {
       expect(outcome.added).toBe(1);
       expect(outcome.kept).toBe(1);

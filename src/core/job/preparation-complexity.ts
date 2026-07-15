@@ -9,6 +9,7 @@ import {
   flattenColoredPathCurves,
   isClosedEnough,
   outputOperationLayers,
+  pathUsesOperation,
   type ColoredPath,
   type Layer,
   type Scene,
@@ -35,7 +36,7 @@ export function countOutputVectorSegments(scene: Scene): number {
     for (const obj of scene.objects) {
       if (effectiveLayer(layer, obj).mode === 'image') continue;
       for (const path of vectorPaths(obj)) {
-        if (path.color !== layer.color) continue;
+        if (!pathUsesOperation(obj, path, layer)) continue;
         count += countPathSegments(path);
       }
     }
@@ -51,7 +52,7 @@ export function countEstimatedFillSegments(scene: Scene): number {
       const operation = effectiveLayer(layer, obj);
       if (transform === null || operation.mode !== 'fill') continue;
       for (const path of vectorPaths(obj)) {
-        if (path.color !== layer.color) continue;
+        if (!pathUsesOperation(obj, path, layer)) continue;
         count += countPathEstimatedHatches(path, transform, operation);
         if (count > PREPARATION_COMPILED_SEGMENT_BUDGET) return count;
       }

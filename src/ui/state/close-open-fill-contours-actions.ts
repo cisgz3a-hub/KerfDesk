@@ -1,6 +1,8 @@
 import {
   assertNever,
+  pathUsesOperation,
   type ColoredPath,
+  type Layer,
   type Project,
   type SceneObject,
   type ShapeObject,
@@ -53,13 +55,13 @@ function closeOpenFillContoursMutation(
   if (tolerance === null) return {};
   const selectedIds = selectedIdsForState(state);
   if (selectedIds.size === 0) return {};
-  const fillLayerColors = outputFillLayerColors(state.project);
-  if (fillLayerColors.size === 0) return {};
+  const fillOperations = outputFillOperations(state.project);
+  if (fillOperations.length === 0) return {};
 
   let changed = false;
   const objects = state.project.scene.objects.map((object) => {
     if (!selectedIds.has(object.id) || object.locked === true) return object;
-    const next = closeObjectFillContours(object, fillLayerColors, tolerance);
+    const next = closeObjectFillContours(object, fillOperations, tolerance);
     if (next !== object) changed = true;
     return next;
   });
@@ -78,18 +80,24 @@ function closeOpenFillContoursMutation(
 
 function closeObjectFillContours(
   object: SceneObject,
-  fillLayerColors: ReadonlySet<string>,
+  fillOperations: ReadonlyArray<Layer>,
   toleranceMm: number,
 ): SceneObject {
   switch (object.kind) {
     case 'imported-svg':
     case 'text':
     case 'traced-image': {
-      const paths = closeFillPaths(object.paths, fillLayerColors, object.transform, toleranceMm);
+      const paths = closeFillPaths(
+        object,
+        object.paths,
+        fillOperations,
+        object.transform,
+        toleranceMm,
+      );
       return paths === object.paths ? object : { ...object, paths };
     }
     case 'shape':
-      return closeShapeFillContours(object, fillLayerColors, toleranceMm);
+      return closeShapeFillContours(object, fillOperations, toleranceMm);
     case 'raster-image':
     case 'relief':
       return object;
@@ -100,10 +108,10 @@ function closeObjectFillContours(
 
 function closeShapeFillContours(
   object: ShapeObject,
-  fillLayerColors: ReadonlySet<string>,
+  fillOperations: ReadonlyArray<Layer>,
   toleranceMm: number,
 ): ShapeObject {
-  const paths = closeFillPaths(object.paths, fillLayerColors, object.transform, toleranceMm);
+  const paths = closeFillPaths(object, object.paths, fillOperations, object.transform, toleranceMm);
   if (paths === object.paths) return object;
   return {
     ...object,
@@ -113,14 +121,16 @@ function closeShapeFillContours(
 }
 
 function closeFillPaths(
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
   paths: ReadonlyArray<ColoredPath>,
-  fillLayerColors: ReadonlySet<string>,
+  fillOperations: ReadonlyArray<Layer>,
   transform: Transform,
   toleranceMm: number,
 ): ReadonlyArray<ColoredPath> {
   let changed = false;
   const nextPaths = paths.map((path) => {
-    if (!fillLayerColors.has(path.color)) return path;
+    if (!fillOperations.some((operation) => pathUsesOperation(object, path, operation)))
+      return path;
     let pathChanged = false;
     const polylines = path.polylines.map((polyline) => {
       if (!isCloseableOpenFillPolyline(polyline, transform, toleranceMm)) return polyline;
@@ -146,10 +156,6 @@ function selectedIdsForState(state: CloseOpenFillContoursState): ReadonlySet<str
   ]);
 }
 
-function outputFillLayerColors(project: Project): ReadonlySet<string> {
-  return new Set(
-    project.scene.layers
-      .filter((layer) => layer.output && layer.mode === 'fill')
-      .map((layer) => layer.color),
-  );
+function outputFillOperations(project: Project): ReadonlyArray<Layer> {
+  return project.scene.layers.filter((operation) => operation.output && operation.mode === 'fill');
 }

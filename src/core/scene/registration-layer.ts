@@ -9,6 +9,7 @@
 
 import { combinedBBox, type AABB } from './hit-test';
 import { createLayer, type Layer } from './layer';
+import { sceneObjectUsesOperation } from './operation-binding';
 import type { Scene } from './scene';
 import type { SceneObject, ShapeObject } from './scene-object';
 
@@ -28,6 +29,7 @@ export function createRegistrationLayer(): Layer {
   // defaults; the operator tunes them for a light scribe on their material.
   return createLayer({
     id: REGISTRATION_LAYER_ID,
+    name: 'Registration jig',
     color: REGISTRATION_LAYER_COLOR,
     mode: 'line',
   });
@@ -42,7 +44,11 @@ export function isRegistrationLayer(layer: Layer): boolean {
 // collision is cosmetic only. The box is movable/unlocked, so this does NOT key on
 // the locked flag.
 export function isRegistrationBox(object: SceneObject): boolean {
-  return object.kind === 'shape' && object.color === REGISTRATION_LAYER_COLOR;
+  return (
+    object.kind === 'shape' &&
+    (object.operationIds?.includes(REGISTRATION_LAYER_ID) === true ||
+      (object.operationIds === undefined && object.color === REGISTRATION_LAYER_COLOR))
+  );
 }
 
 export function findRegistrationLayer(scene: Scene): Layer | null {
@@ -56,7 +62,8 @@ export function findRegistrationBoxes(scene: Scene): ReadonlyArray<ShapeObject> 
   const layer = findRegistrationLayer(scene);
   if (layer === null) return [];
   return scene.objects.filter(
-    (object): object is ShapeObject => object.kind === 'shape' && object.color === layer.color,
+    (object): object is ShapeObject =>
+      object.kind === 'shape' && sceneObjectUsesOperation(object, layer),
   );
 }
 
@@ -68,38 +75,30 @@ export function findRegistrationBoxBounds(scene: Scene): AABB | null {
 }
 
 export function hasRegistrationArtwork(scene: Scene): boolean {
-  const artworkColors = artworkLayerColors(scene, false);
-  if (artworkColors.size === 0) return false;
+  const operations = artworkOperations(scene, false);
+  if (operations.length === 0) return false;
   return scene.objects.some(
     (object) =>
       !isRegistrationBox(object) &&
-      objectLayerColors(object).some((color) => artworkColors.has(color)),
+      operations.some((operation) => sceneObjectUsesOperation(object, operation)),
   );
 }
 
 function hasOutputRegistrationArtwork(scene: Scene): boolean {
-  const outputArtworkColors = artworkLayerColors(scene, true);
-  if (outputArtworkColors.size === 0) return false;
+  const operations = artworkOperations(scene, true);
+  if (operations.length === 0) return false;
   return scene.objects.some(
     (object) =>
       !isRegistrationBox(object) &&
-      objectLayerColors(object).some((color) => outputArtworkColors.has(color)),
+      operations.some((operation) => sceneObjectUsesOperation(object, operation)),
   );
 }
 
-function artworkLayerColors(scene: Scene, outputOnly: boolean): ReadonlySet<string> {
-  return new Set(
-    scene.layers
-      .filter(
-        (layer) => layer.id !== REGISTRATION_LAYER_ID && (!outputOnly || layer.output === true),
-      )
-      .map((layer) => layer.color),
+function artworkOperations(scene: Scene, outputOnly: boolean): ReadonlyArray<Layer> {
+  return scene.layers.filter(
+    (operation) =>
+      operation.id !== REGISTRATION_LAYER_ID && (!outputOnly || operation.output === true),
   );
-}
-
-function objectLayerColors(object: SceneObject): ReadonlyArray<string> {
-  if (object.kind === 'raster-image' || object.kind === 'relief') return [object.color];
-  return object.paths.flatMap((path) => (path.polylines.length === 0 ? [] : [path.color]));
 }
 
 // Which run the next Start will burn, derived from the registration layer's output

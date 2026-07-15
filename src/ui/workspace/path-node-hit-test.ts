@@ -24,7 +24,9 @@ export function hitPathNode(
   selectedNodes: ReadonlyArray<PathNodeRef> = [],
 ): PathNodeRef | null {
   const radiusMm = Math.max(0, PATH_NODE_HIT_RADIUS_PX * pxToMm);
-  const layerByColor = new Map(scene.layers.map((layer) => [layer.color, layer]));
+  const layerByColor = new Map(
+    scene.layers.flatMap((layer) => [[layer.id, layer] as const, [layer.color, layer] as const]),
+  );
   for (let objectIndex = scene.objects.length - 1; objectIndex >= 0; objectIndex -= 1) {
     const object = scene.objects[objectIndex];
     if (object === undefined || !isEditablePathObject(object)) continue;
@@ -47,7 +49,12 @@ function hitObjectPathNode(
   for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
     const path = object.paths[pathIndex];
     if (path === undefined) continue;
-    if (layerByColor.get(path.color)?.visible === false) continue;
+    const operationIds = path.operationIds ?? object.operationIds;
+    const visible =
+      operationIds === undefined
+        ? layerByColor.get(path.color)?.visible !== false
+        : operationIds.some((id) => layerByColor.get(id)?.visible !== false);
+    if (!visible) continue;
     const hit = hitPathNodes(object, path, pathIndex, point, maxDistanceSq, selectedNodes);
     if (hit === null) continue;
     if (best !== null && hit.distanceSq >= best.distanceSq) continue;

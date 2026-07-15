@@ -1,5 +1,5 @@
 import type { DeviceProfile } from '../devices';
-import type { Layer, SceneObject } from '../scene';
+import { sceneObjectUsesOperation, type Layer, type SceneObject } from '../scene';
 import type { HatchFillRule } from './fill-hatching';
 
 export function fillRuleForLayer(objects: ReadonlyArray<SceneObject>, layer: Layer): HatchFillRule {
@@ -7,7 +7,7 @@ export function fillRuleForLayer(objects: ReadonlyArray<SceneObject>, layer: Lay
 }
 
 function textObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
-  return obj.kind === 'text' && obj.paths.some((path) => path.color === layer.color);
+  return obj.kind === 'text' && sceneObjectUsesOperation(obj, layer);
 }
 
 export function layerFillCacheKey(

@@ -20,13 +20,15 @@ describe('migrateToCurrent', () => {
     const registry: Readonly<Record<number, Migrator>> = {
       0: (raw) => ({ ...raw, addedAtV0: true }),
       1: (raw) => ({ ...raw, addedAtV1: true }),
+      2: (raw) => ({ ...raw, addedAtV2: true }),
     };
     const result = migrateToCurrent({ schemaVersion: 0 }, 0, registry);
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.steps).toEqual([0, 1]);
+      expect(result.steps).toEqual([0, 1, 2]);
       expect(result.raw['addedAtV0']).toBe(true);
       expect(result.raw['addedAtV1']).toBe(true);
+      expect(result.raw['addedAtV2']).toBe(true);
       expect(result.raw['schemaVersion']).toBe(PROJECT_SCHEMA_VERSION);
     }
   });
@@ -60,9 +62,9 @@ describe('migrateToCurrent', () => {
     );
     expect(result).toMatchObject({
       kind: 'ok',
-      steps: [1],
+      steps: [1, 2],
       raw: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         scene: {
           objects: [
             {
@@ -82,5 +84,62 @@ describe('migrateToCurrent', () => {
         },
       },
     });
+  });
+
+  it('migrates v2 colors, object overrides, and sub-layers to explicit operations', () => {
+    const result = migrateToCurrent(
+      {
+        schemaVersion: 2,
+        scene: {
+          layers: [
+            {
+              id: 'black',
+              color: '#000000',
+              mode: 'line',
+              visible: true,
+              output: true,
+              subLayers: [
+                {
+                  id: 'sub-1',
+                  label: 'Outline after fill',
+                  enabled: true,
+                  settings: { mode: 'fill', power: 20 },
+                },
+              ],
+            },
+          ],
+          objects: [
+            {
+              kind: 'imported-svg',
+              id: 'johann',
+              source: 'Johann.svg',
+              operationOverride: { power: 55 },
+              paths: [{ color: '#000000', polylines: [] }],
+            },
+          ],
+        },
+      },
+      2,
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const scene = result.raw['scene'] as {
+      layers: Array<Record<string, unknown>>;
+      objects: Array<Record<string, unknown>>;
+    };
+    expect(scene.layers.map((layer) => layer['name'])).toEqual([
+      'Operation 1',
+      'Johann - Operation 1',
+      'Outline after fill',
+      'Johann - Outline after fill',
+    ]);
+    expect(scene.layers.filter((layer) => layer['power'] === 55)).toHaveLength(2);
+    expect(scene.layers.every((layer) => Array.isArray(layer['subLayers']))).toBe(true);
+    expect(scene.objects[0]?.['operationOverride']).toBeUndefined();
+    const paths = scene.objects[0]?.['paths'] as Array<Record<string, unknown>>;
+    expect(paths[0]?.['operationIds']).toEqual([
+      'black:artwork-johann',
+      'black:sub-1:artwork-johann',
+    ]);
   });
 });

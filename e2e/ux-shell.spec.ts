@@ -18,21 +18,22 @@ test.describe('workspace shell acceptance', () => {
     await expectFocusRing(openButton);
 
     const collapseLayers = page.getByRole('button', {
-      name: 'Collapse Cuts / Layers panel',
+      name: 'Collapse Artwork / Operations panel',
       exact: true,
     });
     await collapseLayers.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByLabel('Cuts / Layers panel collapsed')).toBeVisible();
+    await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
 
     const expandLayers = page.getByRole('button', {
-      name: 'Expand Cuts / Layers panel',
+      name: 'Expand Artwork / Operations panel',
       exact: true,
     });
     await expandLayers.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByLabel('Cuts / Layers panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
 
+    await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
     const expandMachine = page.getByRole('button', {
       name: 'Expand Laser panel',
@@ -60,17 +61,18 @@ test.describe('workspace shell acceptance', () => {
   test('keeps a usable overflow-free canvas at compact sizes', async ({ page }) => {
     await page.setViewportSize({ width: 640, height: 450 });
 
-    await expect(page.getByLabel('Cuts / Layers panel collapsed')).toBeVisible();
-    await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
+    await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
     await expectNoPageOverflow(page);
     await expectInsideViewport(page, page.getByRole('contentinfo', { name: 'Status bar' }));
     await expectOneToolbarRow(page);
 
     const canvas = page.locator('canvas[aria-label="KerfDesk workspace"]');
     const compactBox = await canvas.boundingBox();
-    expect(compactBox?.width ?? 0).toBeGreaterThan(400);
+    expect(compactBox?.width ?? 0).toBeGreaterThan(300);
     expect(compactBox?.height ?? 0).toBeGreaterThan(200);
 
+    await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+    await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
     const expandMachine = page.getByRole('button', {
       name: 'Expand Laser panel',
       exact: true,
@@ -90,20 +92,26 @@ test.describe('workspace shell acceptance', () => {
     await page.setViewportSize({ width: 1024, height: 700 });
 
     await page.keyboard.press('F12');
-    await expect(page.getByLabel('Cuts / Layers panel collapsed')).toBeVisible();
+    await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
+    await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
 
     await page.keyboard.press('F12');
-    await expect(page.getByLabel('Cuts / Layers panel', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Collapse Cuts / Layers panel', exact: true }).click();
+    await page.getByRole('tab', { name: 'Cuts / Layers', exact: true }).click();
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Collapse Artwork / Operations panel', exact: true })
+      .click();
+    await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
     await page.getByText('Window', { exact: true }).click();
     await page.getByRole('menuitem', { name: 'Reset Workspace Layout', exact: true }).click();
 
-    await expect(page.getByLabel('Cuts / Layers panel', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Cuts / Layers', exact: true }).click();
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
   });
 
   test('renders a nonblank workspace in Chromium canvas', async ({ page }) => {

@@ -8,13 +8,11 @@ import {
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
-const LAYER_ID = '#ff0000';
+const SOURCE_COLOR = '#ff0000';
 const PRESET_ID = 'birch-refresh';
 
 function targetLayer() {
-  const layer = useStore
-    .getState()
-    .project.scene.layers.find((candidate) => candidate.id === LAYER_ID);
+  const layer = useStore.getState().project.scene.layers[0];
   if (layer === undefined) throw new Error('expected target layer');
   return layer;
 }
@@ -42,10 +40,10 @@ describe('linked material snapshots', () => {
   beforeEach(() => resetStore());
 
   it('does not nest the previous material binding when refreshed', () => {
-    useStore.getState().importSvgObject(svgObj('O1', [LAYER_ID]));
+    useStore.getState().importSvgObject(svgObj('O1', [SOURCE_COLOR]));
     useStore.getState().setMaterialLibrary(library());
-    expect(useStore.getState().linkMaterialPresetToLayer(LAYER_ID, PRESET_ID)).toBe(true);
-    expect(useStore.getState().refreshLinkedMaterialLayer(LAYER_ID)).toBe(true);
+    expect(useStore.getState().linkMaterialPresetToLayer(targetLayer().id, PRESET_ID)).toBe(true);
+    expect(useStore.getState().refreshLinkedMaterialLayer(targetLayer().id)).toBe(true);
 
     expect(targetLayer().materialBinding?.lastResolved).not.toHaveProperty('materialBinding');
   });

@@ -14,6 +14,8 @@ import {
   assertNever,
   isClosedEnough,
   outputOperationLayers,
+  pathUsesOperation,
+  sceneObjectUsesOperation,
   type Layer,
   type Project,
   type Scene,
@@ -141,9 +143,10 @@ export function runPreflight(
 // empty (reliefs are CNC-only geometry) — name that instead of reporting an
 // internal error.
 function emptyOutputIssue(project: Project, outputLayers: ReadonlyArray<Layer>): PreflightIssue {
-  const outputColors = new Set(outputLayers.map((layer) => layer.color));
   const hasOutputRelief = project.scene.objects.some(
-    (object) => object.kind === 'relief' && outputColors.has(object.color),
+    (object) =>
+      object.kind === 'relief' &&
+      outputLayers.some((layer) => sceneObjectUsesOperation(object, layer)),
   );
   if (hasOutputRelief) {
     return {
@@ -306,7 +309,7 @@ function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {
     case 'shape':
       return obj.paths.some(
         (path) =>
-          path.color === layer.color &&
+          pathUsesOperation(obj, path, layer) &&
           path.polylines.some((polyline) => !isClosedEnough(polyline)),
       );
     case 'raster-image':
@@ -322,13 +325,11 @@ function appendUnsupportedRasterTransformIssues(
   outputLayers: ReadonlyArray<Layer>,
   issues: PreflightIssue[],
 ): void {
-  const outputImageColors = new Set(
-    outputLayers.filter((l) => l.mode === 'image').map((l) => l.color),
-  );
+  const outputImageLayers = outputLayers.filter((layer) => layer.mode === 'image');
   for (const obj of scene.objects) {
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
-    if (!outputImageColors.has(obj.color)) continue;
+    if (!outputImageLayers.some((layer) => sceneObjectUsesOperation(obj, layer))) continue;
     // Mirror is supported: compile-job's orientRasterLumaForMachine XORs the
     // object's mirror flags into the machine orientation flip (M35; pinned by
     // compile-job.test.ts column-mirror test). Only rotation remains
@@ -401,10 +402,12 @@ function boundsWithHeightOverride(
 
 function maxOutputOverscanMm(scene: Scene): number {
   const outputLayers = scene.layers.flatMap(outputOperationLayers);
-  const imageColors = new Set(outputLayers.filter((l) => l.mode === 'image').map((l) => l.color));
+  const imageLayers = outputLayers.filter((layer) => layer.mode === 'image');
   const hasImageOutput = scene.objects.some(
     (obj) =>
-      obj.kind === 'raster-image' && obj.role !== 'trace-source' && imageColors.has(obj.color),
+      obj.kind === 'raster-image' &&
+      obj.role !== 'trace-source' &&
+      imageLayers.some((layer) => sceneObjectUsesOperation(obj, layer)),
   );
   const imageOverscan = hasImageOutput ? DEFAULT_OVERSCAN_MM : 0;
   const fillOverscan = Math.max(

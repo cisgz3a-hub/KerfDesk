@@ -154,6 +154,8 @@ function validateSceneGroupObjectId(value: unknown, path: string): string | null
 
 function validateSceneObject(obj: unknown, path: string): string | null {
   if (!isObject(obj)) return `missing or invalid \`${path}\``;
+  const operationIdsError = validateOperationIds(obj['operationIds'], `${path}.operationIds`);
+  if (operationIdsError !== null) return operationIdsError;
   const tabAnchorError = validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`);
   if (tabAnchorError !== null) return tabAnchorError;
   const kind = obj['kind'];
@@ -393,9 +395,18 @@ function validateColoredPath(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([
     requireString(value, `${path}.color`),
+    validateOperationIds(value['operationIds'], `${path}.operationIds`),
     validatePolylines(value['polylines'], `${path}.polylines`),
     validateCurveSubpaths(value['curves'], `${path}.curves`),
   ]);
+}
+
+function validateOperationIds(value: unknown, path: string): string | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
+  return validateArray(value, path, (id, idPath) =>
+    typeof id === 'string' && id.length > 0 ? null : `missing or invalid \`${idPath}\``,
+  );
 }
 
 function validatePolylines(value: unknown, path: string): string | null {

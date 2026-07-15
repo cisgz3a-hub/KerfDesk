@@ -4,18 +4,16 @@
 // Non-blocking: vector artwork on those layers still cuts, and the operator
 // may keep bitmaps as visual reference.
 
-import type { Project } from '../../core/scene';
+import { sceneObjectUsesOperation, type Project } from '../../core/scene';
 
 export function detectCncRasterWarnings(project: Project): ReadonlyArray<string> {
   if (project.machine?.kind !== 'cnc') return [];
-  const outputColors = new Set(
-    project.scene.layers.filter((layer) => layer.output).map((layer) => layer.color),
-  );
+  const outputOperations = project.scene.layers.filter((layer) => layer.output);
   const droppedCount = project.scene.objects.filter(
     (object) =>
       object.kind === 'raster-image' &&
       object.role !== 'trace-source' &&
-      outputColors.has(object.color),
+      outputOperations.some((operation) => sceneObjectUsesOperation(object, operation)),
   ).length;
   if (droppedCount === 0) return [];
   const noun = droppedCount === 1 ? 'raster image' : 'raster images';

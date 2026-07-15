@@ -9,6 +9,7 @@
 // gap.
 
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene';
+import { migrateV2OperationBindings } from './migrate-v2-operation-bindings';
 
 export type RawProject = Record<string, unknown>;
 export type Migrator = (raw: RawProject) => RawProject;
@@ -21,6 +22,7 @@ export type MigrationResult =
 // Phase A ships empty. Phase D/E will add the first entries here.
 const MIGRATORS: Readonly<Record<number, Migrator>> = {
   1: migrateV1ToV2,
+  2: migrateV2OperationBindings,
 };
 
 function migrateV1ToV2(raw: RawProject): RawProject {

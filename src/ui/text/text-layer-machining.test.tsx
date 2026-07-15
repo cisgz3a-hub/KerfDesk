@@ -41,7 +41,9 @@ import { compileCncJob } from '../../core/cnc';
 import type { CncGroup, CncPass } from '../../core/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
+  primaryOperationForObject,
   type CncMachineConfig,
+  type Layer,
   type Project,
   type TextObject,
 } from '../../core/scene';
@@ -72,53 +74,49 @@ describe('text layer machining workflow', () => {
     const { host, root } = await renderDialog();
 
     try {
-      const outputLayer = requireOutputLayer(host);
-      expect(outputLayer.value).not.toBe('#ff0000');
-      expect(host.textContent).toContain('V-carve');
-      const textColor = outputLayer.value;
-
-      await act(async () => requireButton(host, 'Edit').click());
-      const depth = requireInput(host, `Cut depth for ${textColor}`);
-      await act(async () => {
-        depth.value = '0.75';
-        Simulate.change(depth);
-      });
-      await act(async () => Simulate.blur(depth));
-      await act(async () => requireButton(host, 'Save').click());
-
-      expect(
-        useStore.getState().project.scene.objects.some((object) => object.kind === 'text'),
-      ).toBe(false);
-      expect(layerFor(useStore.getState().project, textColor)?.cnc).toMatchObject({
-        cutType: 'v-carve',
-        depthMm: 0.75,
-      });
+      expect(host.textContent).not.toContain('Output layer');
+      expect(host.querySelector('select[aria-label="Text output layer"]')).toBeNull();
 
       await enterAndSubmit(host, 'NAME');
 
-      const project = useStore.getState().project;
+      let project = useStore.getState().project;
       const text = requireText(project);
-      expect(text.color).not.toBe('#ff0000');
+      const box = project.scene.objects.find((object) => object.id === 'box');
+      if (box === undefined) throw new Error('Box artwork missing');
+      const boxOperation = requireOperation(project, box);
+      const textOperation = requireOperation(project, text);
+      expect(textOperation.id).not.toBe(boxOperation.id);
       expect(text.paths.every((path) => path.color === text.color)).toBe(true);
-      expect(layerFor(project, '#ff0000')?.cnc).toMatchObject({
+      expect(boxOperation.cnc).toMatchObject({
         cutType: 'profile-outside',
         depthMm: machine.stock.thicknessMm,
       });
-      expect(layerFor(project, text.color)?.cnc).toMatchObject({
+      expect(textOperation.cnc).toMatchObject({ cutType: 'v-carve' });
+
+      useStore.getState().setLayerParam(textOperation.id, {
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...textOperation.cnc, depthMm: 0.75 },
+      });
+      project = useStore.getState().project;
+      expect(
+        project.scene.layers.find((operation) => operation.id === textOperation.id)?.cnc,
+      ).toMatchObject({
         cutType: 'v-carve',
         depthMm: 0.75,
       });
 
       const loaded = roundTrip(project);
-      expect(layerFor(loaded, text.color)?.cnc).toMatchObject({
+      expect(
+        loaded.scene.layers.find((operation) => operation.id === textOperation.id)?.cnc,
+      ).toMatchObject({
         cutType: 'v-carve',
         depthMm: 0.75,
       });
 
       const groups = cncGroups(project, machine);
-      expect(groups.map((group) => group.cutType)).toEqual(['v-carve', 'profile-outside']);
-      expect(minimumZ(groups[0]?.passes ?? [])).toBeGreaterThanOrEqual(-0.75);
-      expect(minimumZ(groups[1]?.passes ?? [])).toBe(-machine.stock.thicknessMm);
+      const vCarve = groups.find((group) => group.cutType === 'v-carve');
+      const profile = groups.find((group) => group.cutType === 'profile-outside');
+      expect(minimumZ(vCarve?.passes ?? [])).toBeGreaterThanOrEqual(-0.75);
+      expect(minimumZ(profile?.passes ?? [])).toBe(-machine.stock.thicknessMm);
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -138,9 +136,10 @@ function arrangeThroughCutBox(): CncMachineConfig {
   );
   const project = useStore.getState().project;
   const machine = requireCncMachine(project);
-  const boxLayer = layerFor(project, '#ff0000');
-  if (boxLayer === undefined) throw new Error('Box layer missing');
-  useStore.getState().setLayerParam(boxLayer.id, {
+  const box = project.scene.objects.find((object) => object.id === 'box');
+  if (box === undefined) throw new Error('Box artwork missing');
+  const boxOperation = requireOperation(project, box);
+  useStore.getState().setLayerParam(boxOperation.id, {
     cnc: {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       cutType: 'profile-outside',
@@ -176,26 +175,6 @@ async function enterAndSubmit(host: HTMLElement, content: string): Promise<void>
   });
 }
 
-function requireOutputLayer(host: HTMLElement): HTMLSelectElement {
-  const select = host.querySelector('select[aria-label="Text output layer"]');
-  if (!(select instanceof HTMLSelectElement)) throw new Error('Output layer missing');
-  return select;
-}
-
-function requireInput(host: HTMLElement, ariaLabel: string): HTMLInputElement {
-  const input = host.querySelector(`input[aria-label="${ariaLabel}"]`);
-  if (!(input instanceof HTMLInputElement)) throw new Error(`${ariaLabel} input missing`);
-  return input;
-}
-
-function requireButton(host: HTMLElement, label: string): HTMLButtonElement {
-  const button = [...host.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent?.trim() === label,
-  );
-  if (!(button instanceof HTMLButtonElement)) throw new Error(`${label} button missing`);
-  return button;
-}
-
 function requireCncMachine(project: Project): CncMachineConfig {
   if (project.machine?.kind !== 'cnc') throw new Error('CNC machine missing');
   return project.machine;
@@ -207,8 +186,10 @@ function requireText(project: Project): TextObject {
   return text;
 }
 
-function layerFor(project: Project, color: string) {
-  return project.scene.layers.find((layer) => layer.color === color);
+function requireOperation(project: Project, object: Project['scene']['objects'][number]): Layer {
+  const operation = primaryOperationForObject(object, project.scene.layers);
+  if (operation === null) throw new Error(`Operation missing for ${object.id}`);
+  return operation;
 }
 
 function roundTrip(project: Project): Project {

@@ -10,11 +10,12 @@ import {
   applyTransform,
   assertNever,
   outputOperationLayers,
+  pathUsesOperation,
+  sceneObjectUsesOperation,
   type ColoredPath,
   type Layer,
   type Scene,
   type SceneObject,
-  type Transform,
   type Vec2,
 } from '../scene';
 import type { JobOriginPlacement } from './job-origin';
@@ -33,8 +34,8 @@ export function computeFrameBounds(
   device: DeviceProfile,
   options: ComputeFrameBoundsOptions = {},
 ): JobBounds | null {
-  const output = outputLayerModesByColor(scene.layers);
-  if (output.size === 0) return null;
+  const output = scene.layers.flatMap(outputOperationLayers);
+  if (output.length === 0) return null;
 
   const bounds: MutableBounds = emptyBounds();
   let any = false;
@@ -54,27 +55,10 @@ export function computeFrameBounds(
     : offsetJobBounds(unplaced, jobOriginOffsetForBounds(unplaced, options.jobOrigin));
 }
 
-function outputLayerModesByColor(
-  layers: ReadonlyArray<Layer>,
-): ReadonlyMap<string, ReadonlySet<Layer['mode']>> {
-  const modesByColor = new Map<string, Set<Layer['mode']>>();
-  for (const layer of layers) {
-    for (const operationLayer of outputOperationLayers(layer)) {
-      let modes = modesByColor.get(operationLayer.color);
-      if (modes === undefined) {
-        modes = new Set<Layer['mode']>();
-        modesByColor.set(operationLayer.color, modes);
-      }
-      modes.add(operationLayer.mode);
-    }
-  }
-  return modesByColor;
-}
-
 function extendBoundsForObject(
   bounds: MutableBounds,
   object: SceneObject,
-  output: ReadonlyMap<string, ReadonlySet<Layer['mode']>>,
+  output: ReadonlyArray<Layer>,
   device: DeviceProfile,
 ): boolean {
   switch (object.kind) {
@@ -82,10 +66,14 @@ function extendBoundsForObject(
     case 'text':
     case 'traced-image':
     case 'shape':
-      return extendBoundsForVectorPaths(bounds, object.paths, object.transform, output, device);
+      return extendBoundsForVectorPaths(bounds, object, output, device);
     case 'raster-image': {
       if (object.role === 'trace-source') return false;
-      if (!output.get(object.color)?.has('image')) return false;
+      if (
+        !output.some((layer) => layer.mode === 'image' && sceneObjectUsesOperation(object, layer))
+      ) {
+        return false;
+      }
       return extendBounds(bounds, rasterBoundsInMachineCoords(object, device));
     }
     case 'relief':
@@ -99,18 +87,19 @@ function extendBoundsForObject(
 
 function extendBoundsForVectorPaths(
   bounds: MutableBounds,
-  paths: ReadonlyArray<ColoredPath>,
-  transform: Transform,
-  output: ReadonlyMap<string, ReadonlySet<Layer['mode']>>,
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
+  output: ReadonlyArray<Layer>,
   device: DeviceProfile,
 ): boolean {
   let any = false;
-  for (const path of paths) {
-    const modes = output.get(path.color);
-    if (modes === undefined || (!modes.has('line') && !modes.has('fill'))) continue;
+  for (const path of object.paths) {
+    const emits = output.some(
+      (layer) => layer.mode !== 'image' && pathUsesOperation(object, path, layer),
+    );
+    if (!emits) continue;
     for (const polyline of path.polylines) {
       for (const point of polyline.points) {
-        extendPoint(bounds, toMachineCoords(applyTransform(point, transform), device));
+        extendPoint(bounds, toMachineCoords(applyTransform(point, object.transform), device));
         any = true;
       }
     }

@@ -1,5 +1,11 @@
 import type { PlatformAdapter } from '../../platform/types';
-import type { Layer, Project, RasterImage, SceneObject } from '../../core/scene';
+import {
+  primaryOperationForObject,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+} from '../../core/scene';
 import { evaluateRasterBudget } from '../../core/raster';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
@@ -72,7 +78,7 @@ function selectedRaster(project: Project, selectedObjectId: string | null): Rast
 }
 
 function layerForRaster(project: Project, image: RasterImage): Layer | null {
-  return project.scene.layers.find((layer) => layer.color === image.color) ?? null;
+  return primaryOperationForObject(image, project.scene.layers);
 }
 
 function imageMaskObjectFor(project: Project, image: RasterImage): SceneObject | null {

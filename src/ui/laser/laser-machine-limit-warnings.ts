@@ -12,7 +12,7 @@
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
-import { sceneObjectUsesLayerColor, type Layer, type Project } from '../../core/scene';
+import { sceneObjectUsesOperation, type Layer, type Project } from '../../core/scene';
 
 // A profile within float-noise / rounding of the reported travel must not nag.
 const BED_TRAVEL_TOLERANCE_MM = 1;
@@ -103,7 +103,7 @@ function objectOverrideSpeedsOnOutputLayers(
   for (const object of project.scene.objects) {
     const override = object.operationOverride?.speed;
     if (override === undefined) continue;
-    if (outputLayers.some((layer) => sceneObjectUsesLayerColor(object, layer.color))) {
+    if (outputLayers.some((layer) => sceneObjectUsesOperation(object, layer))) {
       speeds.push(override);
     }
   }

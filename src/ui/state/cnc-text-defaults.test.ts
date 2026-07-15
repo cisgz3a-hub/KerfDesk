@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
+import { IDENTITY_TRANSFORM, primaryOperationForObject, type TextObject } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -38,8 +38,11 @@ function textObject(overrides: Partial<TextObject> = {}): TextObject {
 }
 
 function textLayerCutType(): string | undefined {
-  const layer = useStore.getState().project.scene.layers.find((l) => l.color === TEXT_COLOR);
-  return layer?.cnc?.cutType;
+  const scene = useStore.getState().project.scene;
+  const text = scene.objects.find((object) => object.kind === 'text');
+  return text === undefined
+    ? undefined
+    : primaryOperationForObject(text, scene.layers)?.cnc?.cutType;
 }
 
 beforeEach(() => {
@@ -79,11 +82,21 @@ describe('CNC text defaults (H.6c)', () => {
     expect(textLayerCutType()).toBeUndefined();
   });
 
+  it('seeds a text-only operation when a laser project switches to CNC', () => {
+    useStore.getState().upsertTextObject(textObject());
+
+    useStore.getState().setMachineKind('cnc');
+
+    expect(textLayerCutType()).toBe('engrave');
+  });
+
   it('never rewrites a layer the operator already configured', () => {
     useStore.getState().setMachineKind('cnc');
     useStore.getState().upsertTextObject(textObject());
     // Operator retunes the layer to a pocket...
-    const layer = useStore.getState().project.scene.layers.find((l) => l.color === TEXT_COLOR);
+    const scene = useStore.getState().project.scene;
+    const text = scene.objects.find((object) => object.kind === 'text');
+    const layer = text === undefined ? null : primaryOperationForObject(text, scene.layers);
     if (layer?.cnc === undefined) throw new Error('text layer with CNC settings missing');
     useStore.getState().setLayerParam(layer.id, {
       cnc: { ...layer.cnc, cutType: 'pocket' },

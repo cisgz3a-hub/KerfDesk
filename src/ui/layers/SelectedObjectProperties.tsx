@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { useStore } from '../state';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
-import { SelectedObjectOperationSettings } from './SelectedObjectOperationSettings';
+import { SelectedOperationInspector } from './SelectedOperationInspector';
 import {
   isParametricShapeObject,
   SelectedShapeGeometryFields,
@@ -23,20 +23,18 @@ export function SelectedObjectProperties(): JSX.Element | null {
     [objects, selectedObjectId, additionalSelectedIds],
   );
   if (selectedObjects.length === 0) return null;
-  // CAM overrides are laser-only; parametric geometry is shared by laser and CNC.
   const parametricShape = singleParametricShape(selectedObjects);
-  if (isCncMachine && parametricShape === null) return null;
   return (
     <section aria-label="Selected object properties" style={sectionStyle}>
-      <h3 style={headingStyle}>Shape Properties</h3>
+      <h3 style={headingStyle}>
+        {selectedObjects.length === 1
+          ? 'Selected artwork'
+          : `${selectedObjects.length} artworks selected`}
+      </h3>
       {parametricShape === null ? null : <SelectedShapeGeometryFields object={parametricShape} />}
-      {isCncMachine ? null : (
-        <>
-          <PowerScaleInput objects={selectedObjects} />
-          <SelectedObjectOperationSettings objects={selectedObjects} />
-          <SelectedImageAdjustments />
-        </>
-      )}
+      {isCncMachine ? null : <PowerScaleInput objects={selectedObjects} />}
+      <SelectedOperationInspector objects={selectedObjects} />
+      {isCncMachine ? null : <SelectedImageAdjustments />}
     </section>
   );
 }

@@ -55,10 +55,18 @@ export function importLightBurnProject(
     root,
     geometry.objects.flatMap((object) => object.paths.map((path) => path.color)),
   );
+  const operationIdByColor = new Map(layers.map((operation) => [operation.color, operation.id]));
+  const objects = geometry.objects.map((object) => ({
+    ...object,
+    paths: object.paths.map((path) => {
+      const operationId = operationIdByColor.get(path.color);
+      return operationId === undefined ? path : { ...path, operationIds: [operationId] };
+    }),
+  }));
   const base = createProject();
   const project: Project = {
     ...base,
-    scene: { ...base.scene, objects: geometry.objects, layers },
+    scene: { ...base.scene, objects, layers },
   };
   return {
     ok: true,
@@ -86,7 +94,11 @@ function importedLayers(root: Element, usedColors: ReadonlyArray<string>): Layer
   return colors.map((color) => {
     const index = findColorIndex(color);
     const setting = settings.get(index);
-    const base = createLayer({ id: color, color });
+    const importedName = setting === undefined ? '' : textField(setting, ['name', 'label']).trim();
+    const name =
+      importedName ||
+      (index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`);
+    const base = createLayer({ id: color, name, color });
     if (setting === undefined) return base;
     const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
     const power = numericField(setting, ['maxpower', 'power']);

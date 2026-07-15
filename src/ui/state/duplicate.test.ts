@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { operationIdsForObject } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -24,6 +25,9 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     expect(clone.transform.y).toBeCloseTo(before.transform.y, 5);
     // New clone becomes the selection.
     expect(useStore.getState().selectedObjectId).toBe(clone.id);
+    const layers = useStore.getState().project.scene.layers;
+    expect(operationIdsForObject(before, layers)).not.toEqual(operationIdsForObject(clone, layers));
+    expect(layers).toHaveLength(2);
   });
 
   it('on multi-select clones every selected object', () => {
@@ -47,5 +51,20 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     const before = useStore.getState().project.scene.objects.length;
     useStore.getState().duplicateSelection();
     expect(useStore.getState().project.scene.objects).toHaveLength(before);
+  });
+
+  it('copies every added operation without sharing settings with the source', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().addOperationForSelection();
+
+    useStore.getState().duplicateSelection();
+
+    const { objects, layers } = useStore.getState().project.scene;
+    const sourceIds = operationIdsForObject(objects[0]!, layers);
+    const cloneIds = operationIdsForObject(objects[1]!, layers);
+    expect(sourceIds).toHaveLength(2);
+    expect(cloneIds).toHaveLength(2);
+    expect(cloneIds.some((id) => sourceIds.includes(id))).toBe(false);
+    expect(layers).toHaveLength(4);
   });
 });

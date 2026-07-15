@@ -1,8 +1,11 @@
 import {
   addLayer,
-  assignObjectToLayer,
+  artworkOperationName,
   assertNever,
-  createLayer,
+  bindSceneObjectToOperations,
+  createArtworkOperation,
+  operationIdsForObject,
+  sceneObjectUsesOperation,
   updateLayer,
   type Project,
   type Scene,
@@ -46,12 +49,12 @@ function fillSelectionMutation(
 ): FillSelectionMutation | EmptyFillSelectionMutation {
   const selectedIds = selectedVectorObjectIds(state);
   if (selectedIds.size === 0) return {};
-  const selectedColors = colorsUsedBySelectedVectors(state.project.scene, selectedIds);
-  const targetColor = unsharedSelectedColor(state.project.scene, selectedIds, selectedColors);
+  const sharedOperationId = soleOperationUsedBySelection(state.project.scene, selectedIds);
   const scene =
-    targetColor === null
-      ? isolateSelectionToNewFillLayer(state, selectedIds)
-      : ensureFillLayer(state.project.scene, targetColor, state.layerDefaults);
+    sharedOperationId !== null &&
+    !unselectedObjectUsesOperation(state.project.scene, selectedIds, sharedOperationId)
+      ? ensureOperationIsFill(state.project.scene, sharedOperationId)
+      : isolateSelectionToNewFillOperation(state, selectedIds);
   if (scene === state.project.scene) return {};
   return {
     project: { ...state.project, scene },
@@ -61,24 +64,31 @@ function fillSelectionMutation(
   };
 }
 
-function isolateSelectionToNewFillLayer(
+function isolateSelectionToNewFillOperation(
   state: FillSelectionState,
   selectedIds: ReadonlySet<string>,
 ): Scene {
-  const color = nextFillLayerColor(state.project.scene);
-  let scene = ensureFillLayer(state.project.scene, color, state.layerDefaults);
-  for (const id of selectedIds) scene = assignObjectToLayer(scene, id, color);
-  return pruneOrphanLayers(scene);
+  const first = state.project.scene.objects.find((object) => selectedIds.has(object.id));
+  if (first === undefined) return state.project.scene;
+  const created = createArtworkOperation(state.project.scene, first, {
+    mode: 'fill',
+    name: selectedIds.size === 1 ? `${artworkOperationName(first)} Fill` : 'Selection Fill',
+  });
+  const defaults = defaultSettingsForColor(state.layerDefaults, created.operation.color);
+  const operation = {
+    ...applyLayerDefaultSettings(created.operation, defaults),
+    mode: 'fill' as const,
+  };
+  const objects = state.project.scene.objects.map((object) =>
+    selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [operation.id]) : object,
+  );
+  return pruneOrphanLayers(addLayer({ ...state.project.scene, objects }, operation));
 }
 
-function ensureFillLayer(scene: Scene, color: string, layerDefaults: LayerDefaultsState): Scene {
-  const existing = scene.layers.find((layer) => layer.color === color);
-  if (existing !== undefined) {
-    return existing.mode === 'fill' ? scene : updateLayer(scene, existing.id, { mode: 'fill' });
-  }
-  const defaults = defaultSettingsForColor(layerDefaults, color);
-  const layer = applyLayerDefaultSettings(createLayer({ id: color, color }), defaults);
-  return addLayer(scene, { ...layer, mode: 'fill' });
+function ensureOperationIsFill(scene: Scene, operationId: string): Scene {
+  const operation = scene.layers.find((candidate) => candidate.id === operationId);
+  if (operation === undefined || operation.mode === 'fill') return scene;
+  return updateLayer(scene, operation.id, { mode: 'fill' });
 }
 
 function selectedVectorObjectIds(state: FillSelectionState): ReadonlySet<string> {
@@ -93,52 +103,29 @@ function selectedVectorObjectIds(state: FillSelectionState): ReadonlySet<string>
   );
 }
 
-function colorsUsedBySelectedVectors(
+function soleOperationUsedBySelection(
   scene: Scene,
   selectedIds: ReadonlySet<string>,
-): ReadonlySet<string> {
-  const colors = new Set<string>();
-  for (const object of scene.objects) {
-    if (!selectedIds.has(object.id) || !isVectorObject(object)) continue;
-    for (const path of object.paths) colors.add(path.color);
-  }
-  return colors;
-}
-
-function unsharedSelectedColor(
-  scene: Scene,
-  selectedIds: ReadonlySet<string>,
-  selectedColors: ReadonlySet<string>,
 ): string | null {
-  if (selectedColors.size !== 1) return null;
-  const [color] = [...selectedColors];
-  if (color === undefined) return null;
-  return unselectedObjectUsesColor(scene, selectedIds, color) ? null : color;
+  const operationIds = new Set<string>();
+  for (const object of scene.objects) {
+    if (!selectedIds.has(object.id)) continue;
+    for (const id of operationIdsForObject(object, scene.layers)) operationIds.add(id);
+  }
+  if (operationIds.size !== 1) return null;
+  return [...operationIds][0] ?? null;
 }
 
-function unselectedObjectUsesColor(
+function unselectedObjectUsesOperation(
   scene: Scene,
   selectedIds: ReadonlySet<string>,
-  color: string,
+  operationId: string,
 ): boolean {
+  const operation = scene.layers.find((candidate) => candidate.id === operationId);
+  if (operation === undefined) return false;
   return scene.objects.some(
-    (object) => !selectedIds.has(object.id) && objectUsesLayerColor(object, color),
+    (object) => !selectedIds.has(object.id) && sceneObjectUsesOperation(object, operation),
   );
-}
-
-function objectUsesLayerColor(object: SceneObject, color: string): boolean {
-  switch (object.kind) {
-    case 'imported-svg':
-    case 'text':
-    case 'traced-image':
-    case 'shape':
-      return object.paths.some((path) => path.color === color);
-    case 'raster-image':
-    case 'relief':
-      return object.color === color;
-    default:
-      return assertNever(object, 'SceneObject');
-  }
 }
 
 function isVectorObject(
@@ -157,50 +144,3 @@ function isVectorObject(
       return assertNever(object, 'SceneObject');
   }
 }
-
-function nextFillLayerColor(scene: Scene): string {
-  const used = usedColors(scene);
-  for (const color of PREFERRED_FILL_LAYER_COLORS) {
-    if (!used.has(color)) return color;
-  }
-  for (let n = LOWEST_GENERATED_COLOR; n <= MAX_RGB_COLOR; n += 1) {
-    const color = `#${n.toString(16).padStart(HEX_COLOR_DIGITS, '0')}`;
-    if (!used.has(color)) return color;
-  }
-  return PREFERRED_FILL_LAYER_COLORS[0];
-}
-
-function usedColors(scene: Scene): ReadonlySet<string> {
-  const colors = new Set(scene.layers.map((layer) => layer.color));
-  for (const object of scene.objects) {
-    switch (object.kind) {
-      case 'imported-svg':
-      case 'text':
-      case 'traced-image':
-      case 'shape':
-        for (const path of object.paths) colors.add(path.color);
-        break;
-      case 'raster-image':
-      case 'relief':
-        colors.add(object.color);
-        break;
-      default:
-        assertNever(object, 'SceneObject');
-    }
-  }
-  return colors;
-}
-
-/* eslint-disable no-restricted-syntax -- scene DATA colors: generated layer color keys, not UI chrome (ADR-047). */
-const PREFERRED_FILL_LAYER_COLORS = [
-  '#0066ff',
-  '#ff8800',
-  '#00aa55',
-  '#cc33ff',
-  '#ff3366',
-  '#555555',
-] as const;
-/* eslint-enable no-restricted-syntax */
-const LOWEST_GENERATED_COLOR = 1;
-const MAX_RGB_COLOR = 0xffffff;
-const HEX_COLOR_DIGITS = 6;

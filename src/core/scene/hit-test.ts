@@ -22,7 +22,9 @@ export type HitTestObjectResult =
 const NO_HIT: HitTestObjectResult = { kind: 'none' };
 
 export function hitTest(scene: Scene, point: Vec2): string | null {
-  const layerByColor = new Map(scene.layers.map((layer) => [layer.color, layer]));
+  const layerByColor = new Map(
+    scene.layers.flatMap((layer) => [[layer.id, layer] as const, [layer.color, layer] as const]),
+  );
   let bestLineInterior: { readonly id: string; readonly area: number } | null = null;
 
   // Topmost first: later-added objects render on top so direct hits win first.
@@ -64,7 +66,7 @@ function hitVectorObject(
   let hasPolyline = false;
   let lineInteriorArea: number | null = null;
   for (const path of paths) {
-    const layer = layerByColor.get(path.color);
+    const layer = operationForPath(obj, path, layerByColor);
     if (layer?.visible === false) continue;
     const mode = effectiveLayerMode(obj, layer);
     for (const polyline of hitTestPolylines(path)) {
@@ -80,6 +82,20 @@ function hitVectorObject(
   }
   if (!hasPolyline && pointInObjectBBox(point, obj)) return { kind: 'primary' };
   return lineInteriorArea === null ? NO_HIT : { kind: 'line-interior', area: lineInteriorArea };
+}
+
+function operationForPath(
+  object: SceneObject,
+  path: ColoredPath,
+  lookup: ReadonlyMap<string, Layer>,
+): Layer | undefined {
+  const ids = path.operationIds ?? object.operationIds;
+  if (ids === undefined) return lookup.get(path.color);
+  for (const id of ids) {
+    const operation = lookup.get(id);
+    if (operation !== undefined) return operation;
+  }
+  return undefined;
 }
 
 function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {

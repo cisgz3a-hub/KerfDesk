@@ -16,7 +16,6 @@ import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { type CutsLayersView, useUiStore } from '../state/ui-store';
-import { AddLayerControls } from './AddLayerControls';
 import { CncAdvancedToggle } from './CncAdvancedToggle';
 import { LayerRow } from './LayerRow';
 import { DogboneRow } from './DogboneRow';
@@ -39,15 +38,15 @@ export function CutsLayersPanel(): JSX.Element {
   if (!panelVisible) {
     return (
       <CollapsedRail
-        title="Cuts / Layers"
-        ariaLabel="Cuts / Layers panel collapsed"
+        title="Artwork / Operations"
+        ariaLabel="Artwork / Operations panel collapsed"
         onExpand={() => togglePanel('layers')}
       />
     );
   }
   return (
-    <aside aria-label="Cuts / Layers panel" className="lf-rail" style={panelStyle}>
-      <RailPanelHeading title="Cuts / Layers" onCollapse={() => togglePanel('layers')} />
+    <aside aria-label="Artwork / Operations panel" className="lf-rail" style={panelStyle}>
+      <RailPanelHeading title="Artwork / Operations" onCollapse={() => togglePanel('layers')} />
       <MachineModeToggle />
       {showMaterialLibrary ? <ViewTabs active={activeView} onSelect={setView} /> : null}
       {showMaterialLibrary ? (
@@ -74,7 +73,7 @@ function ViewTabs(props: {
     <div role="tablist" aria-label="Cuts and materials" style={viewTabsStyle}>
       <ViewTab
         view="layers"
-        label="Layers"
+        label="Operations"
         selected={props.active === 'layers'}
         onSelect={props.onSelect}
       />
@@ -116,9 +115,8 @@ function LayersView(props: {
 }): JSX.Element {
   return (
     <>
-      <CncSetupPanel />
-      <AddLayerControls />
       <SelectedObjectProperties />
+      <CncSetupPanel />
       <OffsetPathsRow />
       <DogboneRow />
       <SelectedReliefProperties />
@@ -133,7 +131,7 @@ function LayerList(props: {
 }): JSX.Element {
   const { layers } = props;
   return layers.length === 0 ? (
-    <p style={hintStyle}>Import a design to populate layers.</p>
+    <p style={hintStyle}>Import or draw artwork to create its first operation.</p>
   ) : (
     <div style={listStyle}>
       {layers.map((layer, index) => (

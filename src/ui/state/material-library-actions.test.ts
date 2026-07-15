@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
+import { primaryOperationForObject } from '../../core/scene';
 import {
   MATERIAL_LIBRARY_FORMAT,
   MATERIAL_LIBRARY_SCHEMA_VERSION,
@@ -60,11 +61,11 @@ function library(entries: ReadonlyArray<MaterialPreset> = []): MaterialLibraryDo
 }
 
 function targetLayer() {
-  const layer = useStore
-    .getState()
-    .project.scene.layers.find((candidate) => candidate.id === '#ff0000');
-  if (layer === undefined) throw new Error('expected red layer');
-  return layer;
+  const scene = useStore.getState().project.scene;
+  const object = scene.objects.find((candidate) => candidate.id === 'O1');
+  const operation = object === undefined ? null : primaryOperationForObject(object, scene.layers);
+  if (operation === null) throw new Error('expected artwork operation');
+  return operation;
 }
 
 describe('material library store actions', () => {
@@ -123,12 +124,12 @@ describe('material library store actions', () => {
     useStore.getState().setMaterialLibrary(library([preset()]));
     useStore.setState({ dirty: false, materialLibraryDirty: false, undoStack: [], redoStack: [] });
 
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
-      true,
-    );
+    expect(
+      useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut'),
+    ).toBe(true);
     expect(captureMaterialRecipe(targetLayer())).toEqual(recipe());
 
-    useStore.getState().setLayerParam('#ff0000', { power: 12 });
+    useStore.getState().setLayerParam(targetLayer().id, { power: 12 });
 
     expect(useStore.getState().materialLibrary?.entries[0]?.recipe.power).toBe(44);
   });
@@ -145,7 +146,9 @@ describe('material library store actions', () => {
     // Before LAY-01 this returned false ("Preset was not applied") because the
     // store re-blocked cross-machine reuse, contradicting ADR-045. (The
     // matched-but-'unsupported' safety block is covered separately below.)
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'other-machine')).toBe(true);
+    expect(useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'other-machine')).toBe(
+      true,
+    );
     expect(captureMaterialRecipe(targetLayer()).power).toBe(77);
   });
 
@@ -155,7 +158,7 @@ describe('material library store actions', () => {
     useStore.getState().setMaterialLibrary(library([preset()]));
     useStore.setState({ dirty: false, materialLibraryDirty: false, undoStack: [], redoStack: [] });
 
-    useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut');
+    useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut');
 
     expect(useStore.getState().dirty).toBe(true);
     expect(useStore.getState().materialLibraryDirty).toBe(false);
@@ -169,14 +172,17 @@ describe('material library store actions', () => {
 
   it('assignMaterialPresetToLayer preserves id, color, visible, and output', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { visible: false, output: false });
+    const identity = {
+      id: targetLayer().id,
+      color: targetLayer().color,
+    };
+    useStore.getState().setLayerParam(targetLayer().id, { visible: false, output: false });
     useStore.getState().setMaterialLibrary(library([preset()]));
 
-    useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut');
+    useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut');
 
     expect(targetLayer()).toMatchObject({
-      id: '#ff0000',
-      color: '#ff0000',
+      ...identity,
       visible: false,
       output: false,
     });
@@ -187,9 +193,9 @@ describe('material library store actions', () => {
     useStore.getState().setMaterialLibrary(library([preset()]));
     useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
 
-    expect(useStore.getState().linkMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
-      true,
-    );
+    expect(
+      useStore.getState().linkMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut'),
+    ).toBe(true);
     expect(targetLayer().materialBinding).toMatchObject({
       libraryId: 'shop-library',
       presetId: 'birch-3mm-clean-cut',
@@ -199,7 +205,7 @@ describe('material library store actions', () => {
     useStore.getState().setMaterialLibrary(null);
     expect(targetLayer().power).toBe(44);
     expect(targetLayer().materialBinding?.lastResolved.power).toBe(44);
-    expect(useStore.getState().refreshLinkedMaterialLayer('#ff0000')).toBe(false);
+    expect(useStore.getState().refreshLinkedMaterialLayer(targetLayer().id)).toBe(false);
   });
 
   // (The old "blocks recipes for incompatible device profiles" test was removed:
@@ -220,9 +226,9 @@ describe('material library store actions', () => {
     );
     useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
 
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
-      false,
-    );
+    expect(
+      useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut'),
+    ).toBe(false);
     expect(captureMaterialRecipe(targetLayer())).toEqual(originalRecipe);
     expect(useStore.getState().dirty).toBe(false);
     expect(useStore.getState().undoStack).toHaveLength(0);
@@ -234,19 +240,19 @@ describe('material library store actions', () => {
     useStore.getState().setMaterialLibrary(library([matching]));
     useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
 
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'missing-preset')).toBe(
-      false,
-    );
+    expect(
+      useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'missing-preset'),
+    ).toBe(false);
     expect(
       useStore.getState().assignMaterialPresetToLayer('missing-layer', 'birch-3mm-clean-cut'),
     ).toBe(false);
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
-      false,
-    );
+    expect(
+      useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut'),
+    ).toBe(false);
     useStore.getState().setMaterialLibrary(null);
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
-      false,
-    );
+    expect(
+      useStore.getState().assignMaterialPresetToLayer(targetLayer().id, 'birch-3mm-clean-cut'),
+    ).toBe(false);
 
     expect(useStore.getState().dirty).toBe(false);
     expect(useStore.getState().undoStack).toHaveLength(0);

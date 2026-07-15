@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { calculateFeeds } from '../../core/cnc';
+import { primaryOperationForObject } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -25,28 +26,35 @@ beforeEach(() => {
 });
 afterEach(() => resetStore());
 
-function feedOf(color: string): number | undefined {
+function feedOfColor(color: string): number | undefined {
   return useStore.getState().project.scene.layers.find((l) => l.color === color)?.cnc?.feedMmPerMin;
+}
+
+function feedOfArtwork(objectId: string): number | undefined {
+  const scene = useStore.getState().project.scene;
+  const object = scene.objects.find((candidate) => candidate.id === objectId);
+  if (object === undefined) return undefined;
+  return primaryOperationForObject(object, scene.layers)?.cnc?.feedMmPerMin;
 }
 
 describe('CNC project-material seeding (ADR-112)', () => {
   it('seeds a manually added layer from the project material', () => {
     useStore.getState().applyCncStockMaterial('hardwood');
     useStore.getState().createManualLayer('#00aa00');
-    expect(feedOf('#00aa00')).toBe(HARDWOOD_FEED);
+    expect(feedOfColor('#00aa00')).toBe(HARDWOOD_FEED);
   });
 
   it('seeds fresh layers created by an SVG import', () => {
     useStore.getState().applyCncStockMaterial('hardwood');
     useStore.getState().importSvgObject(svgObj('logo', ['#112233']));
-    expect(feedOf('#112233')).toBe(HARDWOOD_FEED);
+    expect(feedOfArtwork('logo')).toBe(HARDWOOD_FEED);
   });
 
   it('adds no seeded cnc block when no project material is set', () => {
     useStore.getState().createManualLayer('#00aa00');
     // No material ⇒ no seeding ⇒ no cnc block; feeds fall back to
     // DEFAULT_CNC_LAYER_SETTINGS at read/compile time, byte-identical to before.
-    expect(feedOf('#00aa00')).toBeUndefined();
+    expect(feedOfColor('#00aa00')).toBeUndefined();
   });
 
   it('does not seed in laser mode', () => {
@@ -54,6 +62,6 @@ describe('CNC project-material seeding (ADR-112)', () => {
     // no-op there), so imported layers keep laser defaults — sanity check.
     useStore.getState().setMachineKind('laser');
     useStore.getState().importSvgObject(svgObj('logo', ['#112233']));
-    expect(feedOf('#112233')).toBeUndefined(); // laser layers have no cnc block seeded
+    expect(feedOfArtwork('logo')).toBeUndefined(); // laser operations have no cnc block seeded
   });
 });

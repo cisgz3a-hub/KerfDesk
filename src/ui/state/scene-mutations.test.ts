@@ -9,6 +9,7 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  operationIdsForObject,
   type Project,
   type RasterImage,
   type Scene,
@@ -24,6 +25,13 @@ import {
 
 function blankScene(): Scene {
   return { objects: [], layers: [] };
+}
+
+function operationForObject(project: Project, objectId: string) {
+  const object = project.scene.objects.find((candidate) => candidate.id === objectId);
+  if (object === undefined) return undefined;
+  const [operationId] = operationIdsForObject(object, project.scene.layers);
+  return project.scene.layers.find((operation) => operation.id === operationId);
 }
 
 function rasterImage(color: string): RasterImage {
@@ -337,17 +345,17 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(result.selectedObjectId).toBe('trace1');
   });
 
-  it('ensures a fill layer for the trace color', () => {
+  it('creates a fill operation for the trace artwork', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', tracedVector());
-    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
+    expect(operationForObject(result.project, 'trace1')?.mode).toBe('fill');
   });
 
   it.each([
     ['Scanline', 'scanline' as const],
     ['Follow Shape', 'offset' as const],
     ['Island Fill', 'island' as const],
-  ])('keeps existing same-color layers unchanged for %s object overrides', (_label, fillStyle) => {
+  ])('moves a %s trace override into its independent operation', (_label, fillStyle) => {
     const project = projectWithSource();
     const withLineLayer: Project = {
       ...project,
@@ -362,10 +370,10 @@ describe('applyTraceToExisting (ADR-026)', () => {
     });
 
     expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
-    expect(result.project.scene.objects.find((o) => o.id === 'trace1')?.operationOverride).toEqual({
-      mode: 'fill',
-      fillStyle,
-    });
+    expect(
+      result.project.scene.objects.find((o) => o.id === 'trace1')?.operationOverride,
+    ).toBeUndefined();
+    expect(operationForObject(result.project, 'trace1')).toMatchObject({ mode: 'fill', fillStyle });
   });
 
   it.each([
@@ -379,22 +387,22 @@ describe('applyTraceToExisting (ADR-026)', () => {
       operationOverride: { mode: 'fill', fillStyle },
     });
 
-    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
+    expect(operationForObject(result.project, 'trace1')?.mode).toBe('fill');
   });
 
   it('ensures a line layer for centerline traces', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', centerlineVector());
-    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
+    expect(operationForObject(result.project, 'trace1')?.mode).toBe('line');
   });
 
   it('ensures a line layer for edge detection traces', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', edgeVector());
-    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
+    expect(operationForObject(result.project, 'trace1')?.mode).toBe('line');
   });
 
-  it('flips an existing fill layer back to line for centerline traces', () => {
+  it('keeps an existing fill operation while a centerline trace gets its own line operation', () => {
     const project = projectWithSource();
     const withFillLayer: Project = {
       ...project,
@@ -408,7 +416,8 @@ describe('applyTraceToExisting (ADR-026)', () => {
       'src1',
       centerlineVector(),
     );
-    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
+    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
+    expect(operationForObject(result.project, 'trace1')?.mode).toBe('line');
   });
 
   it('records a single undo entry == the project before', () => {

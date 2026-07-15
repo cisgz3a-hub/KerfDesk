@@ -1,6 +1,5 @@
-// Layer - one per unique stroke color in the scene. Carries the cut/engrave
-// parameters (power, speed, passes) that the OutputStrategy consumes when
-// emitting G-code. WORKFLOW.md F-A7 defines defaults and value ranges.
+// Persisted process operation. The historical `Layer` type name remains while
+// schema v3 moves binding from geometry colors to stable operation ids.
 
 import type { CncLayerSettings } from './machine';
 import type { DitherAlgorithm } from './scene-object';
@@ -60,7 +59,10 @@ export type LayerSubLayer = {
 
 export type Layer = LayerOperationSettings & {
   readonly id: string;
-  readonly color: string; // lowercase 6-digit hex
+  readonly name: string;
+  readonly color: string; // lowercase 6-digit presentation color
+  /** Runtime-only binding identity on a materialized legacy sub-operation. */
+  readonly bindingOperationId?: string;
   readonly visible: boolean;
   readonly output: boolean;
   readonly subLayers: ReadonlyArray<LayerSubLayer>;
@@ -98,7 +100,7 @@ export const LAYER_DEFAULTS = {
   passThrough: false,
   dotWidthCorrectionMm: 0,
   subLayers: [],
-} as const satisfies Omit<Layer, 'id' | 'color'>;
+} as const satisfies Omit<Layer, 'id' | 'name' | 'color'>;
 
 const LAYER_OPERATION_SETTING_KEYS = [
   'mode',
@@ -140,13 +142,19 @@ export function normalizeLayerColor(color: string): string {
   return color.toLowerCase();
 }
 
-export function createLayer(args: { id: string; color: string; mode?: LayerMode }): Layer {
+export function createLayer(args: {
+  id: string;
+  color: string;
+  name?: string;
+  mode?: LayerMode;
+}): Layer {
   const color = normalizeLayerColor(args.color);
   // mode override (F.2.c): raster-image imports want mode='image'
   // from the moment their layer is auto-created so the user does not
   // have to toggle. Other callers inherit LAYER_DEFAULTS.mode ('line').
   return {
     id: args.id,
+    name: args.name?.trim() || 'Operation',
     color,
     ...LAYER_DEFAULTS,
     ...(args.mode !== undefined ? { mode: args.mode } : {}),
@@ -204,7 +212,9 @@ export function createLayerSubLayer(
 export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer {
   return {
     id: `${layer.id}:${subLayer.id}`,
+    name: subLayer.label,
     color: layer.color,
+    bindingOperationId: layer.id,
     visible: layer.visible,
     output: layer.output && subLayer.enabled,
     ...subLayer.settings,

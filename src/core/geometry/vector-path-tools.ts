@@ -62,10 +62,12 @@ export function isVectorPathObject(object: SceneObject): object is VectorSceneOb
 export function materializeVectorObject(object: VectorSceneObject, id = object.id): ImportedSvg {
   const paths = object.paths.map((path) => ({
     color: path.color,
+    ...(path.operationIds === undefined ? {} : { operationIds: path.operationIds }),
     polylines: path.polylines.map((polyline) => materializePolyline(polyline, object.transform)),
   }));
   return {
     ...objectPowerScale(object),
+    ...(object.operationIds === undefined ? {} : { operationIds: object.operationIds }),
     kind: 'imported-svg',
     id,
     source: `${displaySource(object)} (paths)`,

@@ -12,6 +12,7 @@ describe('createLayer', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });
     expect(layer).toEqual({
       id: 'L1',
+      name: 'Operation',
       color: '#ff0000',
       mode: 'line',
       minPower: 0,
@@ -122,6 +123,7 @@ describe('layer sub-layer operations', () => {
     });
     expect(layerFromSubLayer(layer, subLayer)).toMatchObject({
       id: 'L1:sub-1',
+      bindingOperationId: 'L1',
       color: '#ff0000',
       mode: 'line',
       power: 82,
