@@ -8266,6 +8266,12 @@ machine output is evaluated from the burn source. Local dithers use deterministi
 error-diffusion algorithms remain materialized because their error state crosses rows. The legacy
 string API joins the same byte-identical chunks and is bounded by the compiled-output estimate.
 
+**2026-07-15 implementation amendment.** The compiled-output guard stops requesting raster rows as
+soon as either refusal limit is proven instead of scanning the rest of an already-invalid job.
+Because that result is a lower bound, its blocker says "at least" rather than presenting a partial
+count as the exact total. Reads from materialized raster groups use zero-copy row views; compiled
+Job consumers remain read-only and no longer allocate one copied pixel row per guard/preview scan.
+
 ---
 
 ## ADR-203 - Recover Work-Z only from owned, fresh controller offset readback
