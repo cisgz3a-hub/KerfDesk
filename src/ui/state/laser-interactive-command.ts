@@ -3,6 +3,14 @@ import type { ControllerEvent } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
+import {
+  cancelFreshControllerStatusWait,
+  type ControllerStatusWaitRefs,
+} from './laser-controller-status-wait';
+import {
+  cancelPauseResumeTransition,
+  type PauseResumeTransitionRefs,
+} from './laser-pause-resume-transition';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -24,14 +32,15 @@ export type ControllerCommandKind =
   | 'start-arming'
   | 'work-z-recovery';
 
-export type ControllerLifecycleRefs = {
-  controllerCommand: ControllerCommandRequest | null;
-  controllerIdleWait: ControllerIdleWaitRequest | null;
-  controllerResetWait?: ControllerResetWaitRequest | null;
-  // Serial-session/reset generation. Late transport promises from an older
-  // epoch must not mutate the current write/ack ledgers.
-  writeEpoch?: number;
-};
+export type ControllerLifecycleRefs = ControllerStatusWaitRefs &
+  PauseResumeTransitionRefs & {
+    controllerCommand: ControllerCommandRequest | null;
+    controllerIdleWait: ControllerIdleWaitRequest | null;
+    controllerResetWait?: ControllerResetWaitRequest | null;
+    // Serial-session/reset generation. Late transport promises from an older
+    // epoch must not mutate the current write/ack ledgers.
+    writeEpoch?: number;
+  };
 
 type ControllerResetWaitRequest = {
   readonly expectedEpoch: number;
@@ -292,6 +301,11 @@ export function cancelControllerLifecycleRefs(
   if (idleWait !== null) finishIdleWait(refs, idleWait, 'reject', message);
   const resetWait = refs.controllerResetWait;
   if (resetWait != null) finishResetWait(refs, resetWait, 'reject', message);
+  // Reject the encompassing transition first so teardown/Alarm/Stop remains
+  // the fail-dark owner; the nested status-wait rejection must not launch a
+  // duplicate reset from the transition's uncertainty handler.
+  cancelPauseResumeTransition(refs, message);
+  cancelFreshControllerStatusWait(refs, message);
 }
 
 function finishControllerCommand(

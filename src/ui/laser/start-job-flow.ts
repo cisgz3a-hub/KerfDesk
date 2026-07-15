@@ -56,6 +56,12 @@ import {
   sameCheckpoint,
 } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
+import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
+import {
+  captureLaserModeStartSnapshot,
+  type LaserModeStartEvidence,
+  type LaserModeStartSnapshot,
+} from '../state/laser-mode-start-evidence';
 
 export async function runStartJobFlow(): Promise<void> {
   await runStartJobFlowWithCheckpoint(null);
@@ -79,6 +85,7 @@ async function runStartJobFlowWithCheckpoint(
   const app = useStore.getState();
   const { project } = app;
   const laser = useLaserStore.getState();
+  const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
   const prepared = await prepareCurrentStartJob(app, laser, camera);
   if (!prepared.ok) {
@@ -96,6 +103,12 @@ async function runStartJobFlowWithCheckpoint(
     useToastStore.getState().pushToast(prepared.warnings.join('\n'), 'warning');
   }
   const machineKind = machineKindOf(project.machine);
+  const laserModeStartEvidence = confirmLaserModeStartEvidence(
+    project,
+    laserModeStartSnapshot,
+    jobAwareConfirm,
+  );
+  if (laserModeStartEvidence === null) return;
   const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
   if (cncSetupAttestation === null) return;
   // Re-check immediately before startJob performs the first controller write.
@@ -107,17 +120,16 @@ async function runStartJobFlowWithCheckpoint(
     return;
   }
   try {
-    await laser.startJob(prepared.gcode, {
-      streamingMode: streamingModeForController(
-        project.device.controllerKind,
-        project.device.streamingMode,
+    await laser.startJob(
+      prepared.gcode,
+      buildStartJobOptions(
+        project,
+        machineKind,
+        prepared,
+        laserModeStartEvidence,
+        cncSetupAttestation,
       ),
-      rxBufferBytes: project.device.rxBufferBytes,
-      machineKind,
-      ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
-      ...(cncSetupAttestation === undefined ? {} : { cncSetupAttestation }),
-      canvasPlan: prepared.canvasPlan,
-    });
+    );
     armVariableStreamAdvancement(project);
     // Checkpoint the run only once the stream is actually under way
     // (ADR-118); a refused start must not overwrite an older recovery
@@ -139,6 +151,27 @@ async function runStartJobFlowWithCheckpoint(
     useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
+}
+
+function buildStartJobOptions(
+  project: Project,
+  machineKind: MachineKind,
+  prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { readonly ok: true }>,
+  laserModeStartEvidence: LaserModeStartEvidence | undefined,
+  cncSetupAttestation: CncSetupAttestation | undefined,
+) {
+  return {
+    streamingMode: streamingModeForController(
+      project.device.controllerKind,
+      project.device.streamingMode,
+    ),
+    rxBufferBytes: project.device.rxBufferBytes,
+    machineKind,
+    ...(laserModeStartEvidence === undefined ? {} : { laserModeStartEvidence }),
+    ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
+    ...(cncSetupAttestation === undefined ? {} : { cncSetupAttestation }),
+    canvasPlan: prepared.canvasPlan,
+  };
 }
 
 function reportBlockedStart(message: string): void {
@@ -230,7 +263,13 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
   }
   const prepared = prepareRecoverySource();
   if (prepared === null) return;
-  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine, prepared.canvasPlan);
+  await streamResumeFromRawLine(
+    prepared.project,
+    prepared.gcode,
+    fromLine,
+    prepared.canvasPlan,
+    prepared.laserModeStartSnapshot,
+  );
 }
 
 // Resume the checkpointed interrupted job (ADR-118): re-compile the project,
@@ -274,6 +313,7 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
     prepared.gcode,
     fromLine,
     prepared.canvasPlan,
+    prepared.laserModeStartSnapshot,
     checkpoint,
   );
 }
@@ -293,6 +333,7 @@ export function prepareRecoverySource(overrides?: {
   readonly canvasPlan: CanvasMotionPlan;
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly warnings: ReadonlyArray<string>;
+  readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
 } | null {
@@ -354,6 +395,7 @@ export function prepareRecoverySource(overrides?: {
     canvasPlan: prepared.canvasPlan,
     prepared: prepared.prepared,
     warnings: prepared.warnings,
+    laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     ...(prepared.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: prepared.preflightMotionOffset }),

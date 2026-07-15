@@ -105,6 +105,21 @@ describe('grbl-simulator', () => {
     expect(lines.at(-1)).toMatch(/^<Run\|/);
   });
 
+  it('Safety Door stops motion accessories and ~ resumes retained motion', async () => {
+    const { conn, lines } = await openSim({ motionMs: 500 });
+    await pump(5);
+    await conn.write('G1 X5 F600 S100\n');
+    await pump(2);
+    await conn.write('\x84');
+    await conn.write('?');
+    await pump(2);
+    expect(lines.at(-1)).toMatch(/^<Door:1\|.*\|FS:0,0\|.*\|Ov:100,100,100>$/);
+    await conn.write('~');
+    await conn.write('?');
+    await pump(2);
+    expect(lines.at(-1)).toMatch(/^<Run\|/);
+  });
+
   it('soft reset during motion raises ALARM:3, locks G-code out, $X unlocks', async () => {
     const { conn, lines } = await openSim({ motionMs: 500 });
     await pump(5);

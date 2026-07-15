@@ -61,8 +61,8 @@ async function connect(connection: FakeConnection): Promise<void> {
 }
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
   vi.useRealTimers();
+  await useLaserStore.getState().disconnect();
 });
 
 describe('serial connection epoch guards', () => {
@@ -158,7 +158,12 @@ describe('serial connection epoch guards', () => {
     const oldConnection = makeConnection();
     const currentConnection = makeConnection();
     await connect(oldConnection);
-    await connect(currentConnection);
+    const replacement = useLaserStore.getState().connect(adapterFor(currentConnection));
+    await Promise.resolve();
+    oldConnection.emitLine('Grbl 1.1h');
+    await replacement;
+    currentConnection.emitLine('Grbl 1.1h');
+    await Promise.resolve();
     const sessionEpoch = useLaserStore.getState().controllerSessionEpoch;
     const detectedControllerKind = useLaserStore.getState().detectedControllerKind;
 
@@ -179,7 +184,11 @@ describe('serial connection epoch guards', () => {
 
     await useLaserStore.getState().connect(adapterFor(oldConnection));
     await vi.advanceTimersByTimeAsync(100);
-    await useLaserStore.getState().connect(adapterFor(currentConnection));
+    const replacement = useLaserStore.getState().connect(adapterFor(currentConnection));
+    await vi.advanceTimersByTimeAsync(0);
+    oldConnection.emitLine('Grbl 1.1h');
+    await vi.advanceTimersByTimeAsync(0);
+    await replacement;
     await vi.advanceTimersByTimeAsync(151);
     currentConnection.emitLine('Grbl 1.1h');
     await vi.advanceTimersByTimeAsync(300);

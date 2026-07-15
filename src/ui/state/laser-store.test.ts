@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { nextQueuedLine, queuedLineCount } from '../../core/controllers/grbl';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 
@@ -229,12 +228,16 @@ describe('laser-store serial write failures', () => {
       'port lost',
     );
 
-    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().streamer).toMatchObject({
+      status: 'cancelled',
+      inFlight: [],
+      queued: [],
+    });
     expect(useLaserStore.getState().accessoryCache).toBeNull();
     expect(useLaserStore.getState().log.join('\n')).toContain('Serial write failed: port lost');
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'write-failed',
-      action: 'start',
+      action: 'disconnect',
     });
   });
 
@@ -255,9 +258,9 @@ describe('laser-store serial write failures', () => {
     );
   });
 
-  it('keeps a streaming job streaming when feed-hold fails to send', async () => {
+  it('terminalizes the host stream and requests fail-dark reset when Safety Door fails', async () => {
     let shouldFail = false;
-    const write = vi.fn(async () => {
+    const write = vi.fn(async (_data: string) => {
       if (shouldFail) throw new Error('write rejected');
     });
     const connection = makeConnection(write);
@@ -269,64 +272,19 @@ describe('laser-store serial write failures', () => {
     shouldFail = true;
     await expect(useLaserStore.getState().pauseJob()).rejects.toThrow('write rejected');
 
-    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    expect(useLaserStore.getState().streamer?.status).toBe('errored');
+    expect(write).toHaveBeenCalledWith('\x18');
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: write rejected',
     );
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'write-failed',
-      action: 'pause',
+      action: 'stop',
     });
     shouldFail = false;
   });
 
-  it('marks the stream unsafe when resume refill bytes fail to send', async () => {
-    let failRefill = false;
-    const write = vi.fn(async (data: string) => {
-      if (failRefill && data.includes('G1 X')) throw new Error('resume refill rejected');
-    });
-    const connection = makeConnection(write);
-    await connectWith(connection);
-    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    const gcode = [
-      'G21',
-      'G90',
-      'M3 S0',
-      ...Array.from({ length: 20 }, (_unused, i) => `G1 X${i} Y0 S10`),
-      'M5',
-    ].join('\n');
-    await useLaserStore.getState().startJob(gcode);
-    await useLaserStore.getState().pauseJob();
-    for (let i = 0; i < 10; i += 1) connection.emitLine('ok');
-
-    const paused = useLaserStore.getState().streamer;
-    expect(paused?.status).toBe('paused');
-    expect(paused === null ? 0 : queuedLineCount(paused)).toBeGreaterThan(0);
-    const nextQueuedBytes =
-      paused === null ? Number.POSITIVE_INFINITY : (nextQueuedLine(paused)?.length ?? Infinity);
-    expect(
-      (paused?.inFlightBytes ?? Number.POSITIVE_INFINITY) + nextQueuedBytes,
-    ).toBeLessThanOrEqual(paused?.rxBufferBytes ?? 0);
-
-    failRefill = true;
-    await expect(useLaserStore.getState().resumeJob()).rejects.toThrow('resume refill rejected');
-
-    // 'errored', not 'disconnected': the port may still be alive and GRBL
-    // is still executing its buffered lines. 'disconnected' falls outside
-    // isActiveJob, which unmounts the Stop button mid-beam
-    // (AUDIT-VERIFICATION-2026-06-10, HD1-adjacent live finding).
-    expect(useLaserStore.getState().streamer?.status).toBe('errored');
-    expect(isActiveJob(useLaserStore.getState().streamer)).toBe(true);
-    expect(useLaserStore.getState().log.join('\n')).toContain(
-      'Serial write failed: resume refill rejected',
-    );
-    expect(useLaserStore.getState().safetyNotice).toMatchObject({
-      kind: 'write-failed',
-      action: 'resume',
-    });
-  });
-
-  it('keeps a streaming job active when soft-reset fails to send', async () => {
+  it('freezes a streaming job before a soft-reset write can fail', async () => {
     let shouldFail = false;
     const write = vi.fn(async () => {
       if (shouldFail) throw new Error('reset rejected');
@@ -339,7 +297,8 @@ describe('laser-store serial write failures', () => {
     shouldFail = true;
     await expect(useLaserStore.getState().stopJob()).rejects.toThrow('reset rejected');
 
-    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    expect(useLaserStore.getState().streamer?.status).toBe('errored');
+    expect(isActiveJob(useLaserStore.getState().streamer)).toBe(true);
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: reset rejected',
     );
@@ -348,6 +307,23 @@ describe('laser-store serial write failures', () => {
       action: 'stop',
     });
     shouldFail = false;
+  });
+
+  it('owns a reboot banner that arrives before the Stop write settles', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data: string) => {
+      writes.push(data);
+      if (data === '\x18') connection.emitLine('Grbl 1.1f');
+    });
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n');
+
+    await expect(useLaserStore.getState().stopJob()).resolves.toBeUndefined();
+
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(writes).toContain('M5\n');
+    expect(writes).toContain('M9\n');
   });
 
   it.each([

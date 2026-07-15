@@ -35,6 +35,7 @@ import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
+import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
 import { overrideActions } from './override-actions';
 import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
@@ -230,6 +231,9 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
+  // Fail-dark transport heartbeat for active/physically-finishing streams.
+  // Status sequence ownership is session-scoped; teardown always clears it.
+  heartbeatProbe: ActiveStreamHeartbeatProbe;
 } & ResetCleanupRefs;
 
 const refs: LiveRefs = {
@@ -243,9 +247,12 @@ const refs: LiveRefs = {
   onLineArrived: null,
   nextTranscriptId: 1,
   stallProbe: null,
+  heartbeatProbe: null,
   controllerCommand: null,
   controllerIdleWait: null,
   controllerResetWait: null,
+  controllerStatusWait: null,
+  pauseResumeTransition: null,
   writeEpoch: 0,
   pendingResetCleanup: null,
 };

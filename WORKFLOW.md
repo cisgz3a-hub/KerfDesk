@@ -641,7 +641,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Success
 1. User clicks **Disconnect**.
-2. App stops the poll, closes the port, clears the status display.
+2. For a live GRBL-family controller, the app synchronously cancels host refill, sends Ctrl-X, and
+   waits for the reboot banner (500 ms bounded fallback).
+3. App sends best-effort `M5` and `M9`, then stops the poll, closes the port, and clears stale status.
 
 #### Edge — disconnect mid-job
 1. See F-B12.
@@ -702,10 +704,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Success
 1. User clicks **Start job** while connected and idle.
 2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
-4. Every `ok` advances the streamer by one line and writes more.
-5. Progress bar reflects `completed / total` lines.
-6. While the job is active the app holds a screen wake lock so OS
+3. A laser controller that reports `$32=0` is refused. If `$32` cannot be verified, one focused
+   prompt explains the cable-loss/latched-output risk and requires **Start anyway** or Cancel.
+4. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
+5. Every `ok` advances the streamer by one line and writes more.
+6. Progress bar reflects `completed / total` lines.
+7. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
    refuses the lock, one LaserLog line warns the operator to disable
@@ -723,13 +727,29 @@ Pause, Resume, and tool-change Continue appear only in the top Live Motion bar. 
 stable position above the workspace and wraps its status and action groups instead of shrinking the
 controls below their minimum target size.
 
-#### Success — pause (GRBL-family laser with proven laser mode)
-1. User clicks **Pause**. App writes real-time `!` (0x21).
-2. Streamer enters `paused`; no further bytes sent until resume.
-3. Status report transitions to `Hold:0` or `Hold:1`.
+#### Success — pause (GRBL-family laser)
+1. User clicks **Pause**. The app freezes host refill before writing any controller byte.
+2. App writes resumable real-time Safety Door (`0x84`), which decelerates motion and disables the
+   laser output. The Live Motion bar shows **JOB PAUSED** and keeps **ABORT JOB** available.
+3. Pause becomes confirmed only after a fresh same-session report shows a settled `Door` state and
+   explicit controller-commanded spindle/laser-off evidence. Until then no further G-code is sent.
+4. If every G-code line has already been acknowledged but the controller still reports physical
+   `Run`, **Pause** remains available. Resuming this exhausted tail sends `~` but no duplicate G-code.
 
-#### Blocked — laser mode unproven
-1. On a laser job, Pause is refused unless GRBL laser mode is confirmed (`$32=1`): the modal directs the operator to request **ABORT** because feed hold can leave the laser on when `$32=0` or unknown.
+#### Error — active-job transport write fails
+1. This applies to the initial Start chunk, an acknowledgement-triggered refill, and tool-change
+   Continue. The app synchronously freezes and cancels remaining host ownership.
+2. The app joins the one bounded controller transaction: soft reset, reset-boundary wait, `M5`/`M9`,
+   quarantine, and port close. A simultaneous operator Disconnect joins the same transaction.
+3. If the operating system reported the port closed first, that disconnected state wins; a late
+   rejected write cannot restore an active/errored stream.
+4. Reset and cleanup are best-effort while the transport exists. If the cable is already absent,
+   only a verified controller watchdog or hardware interlock can guarantee physical beam shutdown.
+
+#### Blocked — fallback feed hold with laser mode unproven
+1. Safety Door Pause does not depend on `$32` proof. If a different controller exposes only ordinary
+   feed hold and can report settings, that fallback is refused unless laser mode is confirmed
+   (`$32=1`), because feed hold alone can leave laser output asserted.
 2. Software Abort requests the controller-specific reset/de-energize path but cannot guarantee delivery or physical beam-off. Use the machine's physical E-stop or power isolation when unsafe.
 
 #### Exempt — CNC / router jobs
@@ -740,8 +760,10 @@ controls below their minimum target size.
 1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console directs the operator to request **ABORT**, or use the physical E-stop when unsafe.
 
 #### Success — laser / non-CNC resume
-1. User clicks **Resume**. App writes real-time `~`.
-2. Streamer resumes; more bytes flow.
+1. User clicks **Resume**. App writes real-time `~` while the host streamer remains frozen.
+2. The Live Motion bar remains **JOB PAUSED** until a fresh same-session post-write report proves
+   `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
+3. Only after that proof does the streamer resume and send more G-code.
 
 #### Blocked — generic CNC resume
 1. The CNC **Resume** button remains visible but disabled, while **ABORT JOB** remains available.
@@ -768,16 +790,24 @@ controls below their minimum target size.
 
 App writes real-time `?` every 250 ms while active — a streaming job, a motion or controller operation, probing, or auto-focus — and about once a second (every 4th tick) when the machine is idle. Replies are parsed by `parseStatusReport`. The latest report drives the Status panel and the bottom status bar.
 
+While a GRBL-family job is streaming or acknowledged-but-still-finishing, eight missed active status
+reports (2 seconds) trigger a connected-link fault: host refill is cancelled synchronously, Ctrl-X is
+requested, and post-reset `M5`/`M9` cleanup is attempted. This contains a degraded-but-still-writable
+link; it does not claim that bytes can cross a cable that is already physically absent.
+
 ### F-B11. Job progress UI
 
 The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state, and the Machine rail may retain its detailed progress bar. Both update whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
 
 ### F-B12. Disconnect during job (cable yank)
 
-#### Success — graceful close
+#### Error — physical transport lost
 1. The OS fires `port.disconnect`. Adapter's `onClose` handlers fire.
-2. Laser store transitions to `disconnected`; status display clears.
-3. Streamer is left in its last state (in-flight lines never ack'd) so the UI shows progress at the moment of disconnect.
+2. Laser store freezes the sender, preserves the interrupted-job record, transitions to
+   `disconnected`, and clears stale controller observations.
+3. No application command can cross a physically absent transport. Motion and beam shutdown on a
+   cable yank must therefore be owned by a proven controller heartbeat timeout or fail-safe hardware
+   interlock; without that independent path the operator uses the physical E-stop or power isolation.
 
 #### Edge — re-connect after yank
 1. User plugs the cable back in and clicks **Connect…** again. Picker shows the same port. App treats it as a fresh connection — the user must `$H` to re-establish position before resuming work.
@@ -935,8 +965,14 @@ run that finishes cleanly clears it.
    while a meaningful interrupted-job checkpoint exists; they cannot silently
    replace the record.
 2. **Review safe recovery** is the only automatic laser continuation path. It
-   re-validates the same storage record and streams a resume preamble followed by
-   the original program at the exact first unconfirmed raw line.
+   re-validates the same storage record and starts from the exact first unconfirmed
+   raw line with source geometry and line order preserved. The recovery preamble
+   hard-offs with `M5`, repositions with explicit `S0`, and arms at zero power;
+   stationary positive power in the replay is changed to `S0` and restored only on
+   the next actual burn-motion line. Checkpoint recovery and manual Start-from-line
+   use the same `$32` gate as an ordinary Start: reported `$32=0` refuses the run,
+   while an unverified value requires the focused Start-anyway acknowledgement
+   before the separate resume-position confirmation.
 3. **Restart entire job from beginning…** is a separate, strongly confirmed laser
    action. It warns that completed areas may burn again, requires the current
    compiled fingerprint and checkpoint identity to match, and replaces the old
@@ -1059,6 +1095,8 @@ The seven steps are always visible and always ordered:
    write from being queued or executed. Every supported write has its own value confirmation and
    exact re-read check.
 2. Machine-critical travel settings are review-only. There is no fixed-value setup batch.
+3. When the active project is a laser, both Machine Setup and the confirmed Console setting lane
+   reject `$32=0` before serial transmission. Laser `$32=1` and CNC/router `$32=0` remain available.
 
 ---
 

@@ -101,6 +101,7 @@ describe('marlinDriver', () => {
       statusQuery: null,
       hold: null,
       resume: null,
+      safetyDoor: null,
       softReset: null,
       jogCancel: null,
     });

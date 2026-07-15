@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -65,6 +66,7 @@ const JOB_GCODE = 'G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n';
 
 // Mirrors DEFAULT_IDLE_TIMEOUT_MS in laser-interactive-command.ts.
 const IDLE_WAIT_TIMEOUT_MS = 8_000;
+const FRESH_STATUS_INTERVAL_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS / 2;
 
 async function runJobUntilSettleAwaitsIdle(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().startJob(JOB_GCODE);
@@ -122,8 +124,9 @@ describe('post-job settle failure handling', () => {
     await connectWith(connection);
     await runJobUntilSettleAwaitsIdle(connection);
 
-    for (let i = 0; i < 3; i += 1) {
-      vi.advanceTimersByTime(IDLE_WAIT_TIMEOUT_MS - 2_000);
+    const statusIntervals = IDLE_WAIT_TIMEOUT_MS / FRESH_STATUS_INTERVAL_MS + 1;
+    for (let i = 0; i < statusIntervals; i += 1) {
+      await vi.advanceTimersByTimeAsync(FRESH_STATUS_INTERVAL_MS);
       connection.emitLine('<Run|MPos:5.000,0.000,0.000|FS:600,100>');
       await flush();
     }
@@ -142,24 +145,37 @@ describe('post-job settle failure handling', () => {
     expect(controllerOperation()).toBeNull();
   });
 
-  // A settle that really fails (status silence — dead or wedged link) must
-  // not park the store in a permanently-blocking operation: every command,
-  // including Disconnect, gates on controllerOperation being null.
-  it('clears the operation on failure and releases the job at the next Idle', async () => {
-    const connection = makeConnection(async () => undefined);
+  // Status silence while GRBL may still be physically finishing is a transport
+  // fault, not an ordinary settle timeout. Containment must reset/quarantine
+  // the link and must not leave its recovery operation blocking the UI.
+  it('contains status silence and leaves no recovery operation behind', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
     await connectWith(connection);
     await runJobUntilSettleAwaitsIdle(connection);
+    writes.length = 0;
 
-    vi.advanceTimersByTime(IDLE_WAIT_TIMEOUT_MS + 1);
+    await vi.advanceTimersByTimeAsync(
+      ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS + FRESH_STATUS_INTERVAL_MS / 2,
+    );
     await flush();
 
-    expect(controllerOperation()).toBeNull();
-    expect(useLaserStore.getState().safetyNotice).not.toBeNull();
-    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(controllerOperation()).toMatchObject({ kind: 'recovery', phase: 'reset' });
+    expect(writes).toContain('\x18');
 
-    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('Grbl 1.1f');
+    await vi.advanceTimersByTimeAsync(0);
     await flush();
 
-    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      controllerOperation: null,
+      streamer: { status: 'cancelled' },
+      safetyNotice: { kind: 'stream-stalled' },
+    });
+    expect(writes).toContain('M5\n');
+    expect(writes).toContain('M9\n');
   });
 });

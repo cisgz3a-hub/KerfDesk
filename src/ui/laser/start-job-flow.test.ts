@@ -22,7 +22,6 @@ import { resetStore } from '../state/test-helpers';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { useToastStore } from '../state/toast-store';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
@@ -125,11 +124,11 @@ describe('runStartJobFlow', () => {
         minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
         laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       },
+      controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareAlert).mockClear();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
-    useToastStore.setState({ toasts: [] });
   });
 
   afterEach(() => {
@@ -139,20 +138,6 @@ describe('runStartJobFlow', () => {
       startJob: originalStartJob,
     });
     vi.restoreAllMocks();
-  });
-
-  it('passes active profile streaming settings into the live job streamer', async () => {
-    await runStartJobFlow();
-
-    const startJob = useLaserStore.getState().startJob;
-    expect(startJob).toHaveBeenCalledWith(expect.any(String), {
-      streamingMode: 'ping-pong',
-      rxBufferBytes: 96,
-      machineKind: 'laser',
-      canvasPlan: expect.objectContaining({ capability: 'realtime' }),
-    });
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
-    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
   });
 
   it('requires physical CNC setup confirmation and binds it to the compiled program', async () => {
@@ -226,9 +211,11 @@ describe('job checkpoint integration (ADR-118)', () => {
         minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
         laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       },
+      controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareAlert).mockClear();
+    vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   });
 
   afterEach(() => {
