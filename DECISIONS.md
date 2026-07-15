@@ -76,6 +76,7 @@
 | ADR-203 | 2026-07-15 | Accepted | Recover Work-Z only from owned, fresh controller offset readback |
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
 | ADR-205 | 2026-07-15 | Accepted | Machine Setup is one controller-first atomic workflow |
+| ADR-206 | 2026-07-15 | Accepted | Require explicit maintainer permission for every new guard |
 
 ---
 
@@ -8376,3 +8377,43 @@ output generation, workspace bounds, origin transforms, homing, framing, power/s
 accessories, safety zones, and optional calibration now derive from one reviewed draft. Software
 tests can prove this wiring and command policy; physical direction, switches, relays, interlocks,
 beam/spindle behavior, clearances, and calibration remain the operator's hardware gate.
+
+---
+
+## ADR-206 - Require explicit maintainer permission for every new guard
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+Guards can prevent damage, but they can also reject valid work, hide controls, rewrite intent, or
+stop a laser or CNC job from starting. A guard added from convention or hypothetical risk transfers
+control from the operator to the software without the maintainer choosing that tradeoff. Automated
+tests can prove that a refusal behaves as written; they cannot prove that the refusal belongs in the
+product.
+
+### Decision
+
+- A guard is any new behavior that blocks, refuses, gates, caps, clamps, delays, hides, disables,
+  rewrites, or adds confirmation before an otherwise available action, input, output, machine
+  command, job start, preview, save, import, export, or G-code emission.
+- No guard may be implemented, and no existing guard may be expanded to block more, until the
+  maintainer explicitly approves that specific guard in chat. An ADR, tests, review approval, or
+  permission for a different guard is not a substitute. The PR must link or quote the necessity
+  case and approval.
+- Every approval request must first state the concrete failure prevented, current-tree evidence that
+  it is real, why existing guards do not cover it, all valid workflows or inputs the guard may block,
+  the exact operator-facing message and recovery path, and why a warning, measurement, scalable
+  implementation, or other non-blocking alternative is insufficient.
+- The required standard is absolute necessity. “Defense in depth,” convention, hypothetical risk,
+  or a general preference for fail-closed behavior does not meet it.
+- Without explicit approval, work stops at a report of the proposed guard. Narrowing, correcting,
+  or removing an existing guard remains ordinary bug-fix work; expanding its refusal surface needs
+  fresh permission.
+
+### Consequences
+
+The maintainer owns every new capability-versus-refusal tradeoff. Guard proposals become visible
+and reviewable before code exists, and an approval cannot silently spread to other workflows.
+Existing machine-safety behavior is not removed or weakened by this policy; it governs additions
+and expansions from this decision forward.
