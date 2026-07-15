@@ -1,4 +1,5 @@
 import type { Job } from '../job';
+import type { CncContourRunwayPlan, CncRunwayProfile } from './cnc-contour-runway';
 import {
   buildCncRecoveryEventManifest,
   validateCncRecoveryLineSpans,
@@ -35,6 +36,16 @@ export type CncRecoveryPackageIdentityResult =
       readonly reason: 'sha256-unavailable' | 'invalid-line-map' | 'invalid-manifest';
     };
 
+export type CncSupervisedRecoveryPackageInput = {
+  readonly sourceGcode: string;
+  readonly recoveryGcode: string;
+  readonly plan: CncContourRunwayPlan;
+  readonly profile: CncRunwayProfile;
+  readonly reviewId: string;
+  readonly clearedPathProofId: string;
+  readonly completedPrefixProofId: string;
+};
+
 /** Hashes every field that must remain exact before a recovery job is reviewed. */
 export async function createCncRecoveryPackageIdentity(
   input: CncRecoveryPackageInput,
@@ -49,12 +60,26 @@ export async function createCncRecoveryPackageIdentity(
     input.gcode.split('\n').length,
   );
   if (lineMap.kind === 'error') return { kind: 'error', reason: 'invalid-line-map' };
+  return sha256Identity(canonicalPackagePayload(input, canonical, lineMap.spans));
+}
+
+/**
+ * Binds an explicitly selected semantic recovery point to both the exact
+ * interrupted program and the newly generated recovery program. Unlike the
+ * automatic line-map package, this path does not interpret acknowledgement
+ * counts; the operator-selected event and cleared-path proof are hashed in.
+ */
+export async function createCncSupervisedRecoveryPackageIdentity(
+  input: CncSupervisedRecoveryPackageInput,
+): Promise<CncRecoveryPackageIdentityResult> {
+  return sha256Identity(canonicalSupervisedPackagePayload(input));
+}
+
+async function sha256Identity(payload: string): Promise<CncRecoveryPackageIdentityResult> {
   const subtle = globalThis.crypto?.subtle;
   if (subtle === undefined) return { kind: 'error', reason: 'sha256-unavailable' };
   try {
-    const bytes = new TextEncoder().encode(
-      canonicalPackagePayload(input, canonical, lineMap.spans),
-    );
+    const bytes = new TextEncoder().encode(payload);
     const digest = await subtle.digest('SHA-256', bytes);
     return {
       kind: 'ok',
@@ -97,6 +122,30 @@ function canonicalPackagePayload(
     ['origin', input.jobOriginFingerprint],
     ['stock', input.stockFingerprint],
     ['fixtures', input.fixtureFingerprint],
+  ];
+  return fields.map(([name, value]) => lengthPrefix(name) + lengthPrefix(value)).join('');
+}
+
+function canonicalSupervisedPackagePayload(input: CncSupervisedRecoveryPackageInput): string {
+  const fields: ReadonlyArray<readonly [string, string]> = [
+    ['schema', String(CNC_RECOVERY_PACKAGE_SCHEMA_VERSION)],
+    ['mode', 'supervised-explicit-event-v1'],
+    ['source-gcode', input.sourceGcode],
+    ['recovery-gcode', input.recoveryGcode],
+    ['event', input.plan.eventId],
+    ['operation', input.plan.operationId],
+    ['pass', input.plan.passId],
+    ['source', JSON.stringify(input.plan.source)],
+    ['runway', JSON.stringify(input.plan.runwayPolyline)],
+    ['recovery-path', JSON.stringify(input.plan.recoveryPolyline)],
+    ['uncertainty-index', String(input.plan.uncertaintyStartPointIndex)],
+    ['motion', JSON.stringify(input.plan.motion)],
+    ['required-runway-mm', String(input.plan.requiredRunwayMm)],
+    ['available-cleared-mm', String(input.plan.availableClearedMm)],
+    ['profile', JSON.stringify(input.profile)],
+    ['operator-review', input.reviewId],
+    ['cleared-path-proof', input.clearedPathProofId],
+    ['completed-prefix-proof', input.completedPrefixProofId],
   ];
   return fields.map(([name, value]) => lengthPrefix(name) + lengthPrefix(value)).join('');
 }

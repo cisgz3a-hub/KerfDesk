@@ -26,7 +26,9 @@ import {
   type JobCheckpoint,
 } from '../../core/recovery';
 import type { JobOriginPlacement } from '../../core/job';
+import type { PreflightOptions } from '../../core/preflight';
 import { machineKindOf, type MachineKind, type OutputScope, type Project } from '../../core/scene';
+import type { PreparedOutput } from '../../io/gcode';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
@@ -187,7 +189,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     jobAwareAlert(`Cannot resume CNC job:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`);
     return;
   }
-  const prepared = prepareResume();
+  const prepared = prepareRecoverySource();
   if (prepared === null) return;
   await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine, prepared.canvasPlan);
 }
@@ -205,7 +207,7 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
   // resets the live output scope and re-resolves current-position against the
   // post-crash head, both of which would renumber every line and trip the
   // fingerprint refusal below. The frozen origin reproduces the exact bytes.
-  const prepared = prepareResume({
+  const prepared = prepareRecoverySource({
     outputScope: checkpoint.outputScope,
     ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
   });
@@ -230,13 +232,17 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
 // the ORIGINAL run used so the recompiled bytes match its fingerprint even
 // after a crash reset the live values (PST-02); the manual Start-from-line path
 // passes nothing and uses current app state, as before.
-function prepareResume(overrides?: {
+export function prepareRecoverySource(overrides?: {
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
 }): {
   readonly project: Project;
   readonly gcode: string;
   readonly canvasPlan: CanvasMotionPlan;
+  readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
+  readonly warnings: ReadonlyArray<string>;
+  readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
+  readonly jobOrigin?: JobOriginPlacement;
 } | null {
   const app = useStore.getState();
   const { project } = app;
@@ -263,6 +269,7 @@ function prepareResume(overrides?: {
       ovCache: laser.ovCache,
       accessoryCache: laser.accessoryCache ?? null,
       frameVerification: laser.frameVerification,
+      settingsCapability: laser.capabilities.settings,
       activeControllerKind: laser.activeControllerKind,
       detectedControllerKind: laser.detectedControllerKind,
       cameraPlacementActive: camera.placementActive,
@@ -290,7 +297,17 @@ function prepareResume(overrides?: {
     jobAwareAlert(`Cannot resume job:\n\n${lines}`);
     return null;
   }
-  return { project, gcode: prepared.gcode, canvasPlan: prepared.canvasPlan };
+  return {
+    project,
+    gcode: prepared.gcode,
+    canvasPlan: prepared.canvasPlan,
+    prepared: prepared.prepared,
+    warnings: prepared.warnings,
+    ...(prepared.preflightMotionOffset === undefined
+      ? {}
+      : { preflightMotionOffset: prepared.preflightMotionOffset }),
+    ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
+  };
 }
 
 function rotaryRasterAllowed(project: Project): boolean {

@@ -5,6 +5,7 @@ import { createStreamer, step } from '../../core/controllers/grbl';
 import {
   advanceJobCheckpoint,
   createJobCheckpoint,
+  markResumeInFlight,
   withJobInterruption,
 } from '../../core/recovery';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
@@ -62,6 +63,16 @@ function storedDisconnectedCncCheckpoint(): void {
   );
 }
 
+function storedInterruptedRecoveryCheckpoint(): void {
+  const checkpoint = createJobCheckpoint({
+    gcode: GCODE,
+    machineKind: 'cnc',
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    nowIso: NOW,
+  });
+  writeJobCheckpoint(markResumeInFlight(advanceJobCheckpoint(checkpoint, 2, NOW), NOW));
+}
+
 afterEach(() => {
   act(() => {
     root?.unmount();
@@ -94,9 +105,9 @@ describe('CheckpointResumeBanner', () => {
     render();
     expect(host?.textContent).toContain('Interrupted router job');
     expect(host?.textContent).toContain('0 of 4 G-code lines acknowledged');
-    expect(host?.textContent).toContain('Automatic CNC restart');
-    expect(host?.textContent).toContain('diagnostic evidence');
-    expect(host?.querySelector('button')?.textContent).toBe('Review recovery preview');
+    expect(host?.textContent).toContain('Acknowledgements are diagnostic only');
+    expect(host?.textContent).toContain('new recovery job');
+    expect(host?.querySelector('button')?.textContent).toBe('Review supervised recovery');
   });
 
   it('does not offer laser replay before any command was acknowledged', () => {
@@ -105,32 +116,42 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.textContent).toBe('');
   });
 
-  it('retains CNC evidence and offers only a preview review', () => {
+  it('retains CNC evidence and offers the supervised new-job review', () => {
     storedCheckpoint(2, 'cnc');
     render();
 
-    expect(host?.textContent).toContain('Automatic CNC restart');
-    expect(host?.textContent).toContain('acknowledgements do not prove');
-    expect(host?.textContent).toContain('retained as diagnostic evidence');
+    expect(host?.textContent).toContain('Acknowledgements are diagnostic only');
+    expect(host?.textContent).toContain('select the first uncertain native contour segment');
     expect([...(host?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
-      'Review recovery preview',
+      'Review supervised recovery',
       'Dismiss',
     ]);
   });
 
-  it('opens a non-executable CNC recovery review wizard', () => {
+  it('opens the fail-closed supervised CNC recovery wizard', () => {
     storedCheckpoint(2, 'cnc');
     render();
 
     act(() => {
       [...(host?.querySelectorAll('button') ?? [])]
-        .find((button) => button.textContent === 'Review recovery preview')
+        .find((button) => button.textContent === 'Review supervised recovery')
         ?.click();
     });
 
-    expect(host?.textContent).toContain('CNC recovery review — preview only');
-    expect(host?.textContent).toContain('cannot start the spindle');
-    expect(host?.querySelector('button')?.textContent).not.toMatch(/execute|start spindle/i);
+    expect(host?.textContent).toContain('Supervised CNC recovery');
+    expect(host?.textContent).toContain('Acknowledged lines remain transport diagnostics');
+    expect(host?.textContent).not.toContain('Start supervised recovery');
+  });
+
+  it('does not reuse the original checkpoint after a recovery attempt was interrupted', () => {
+    storedInterruptedRecoveryCheckpoint();
+    render();
+
+    expect(host?.textContent).toContain('recovery attempt was itself interrupted');
+    expect(host?.textContent).toContain('cannot start another recovery');
+    expect(
+      [...(host?.querySelectorAll('button') ?? [])].map((button) => button.textContent),
+    ).toEqual(['Dismiss']);
   });
 
   it('shows the persisted interruption cause after reconnect or reload', () => {

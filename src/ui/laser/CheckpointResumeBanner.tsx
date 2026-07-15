@@ -1,8 +1,7 @@
-// CheckpointResumeBanner (ADR-118, ADR-141) — offers executable recovery for
-// interrupted laser jobs and diagnostic evidence only for CNC checkpoints.
+// CheckpointResumeBanner (ADR-118, ADR-200) — offers line-safe laser recovery
+// and a separately generated, explicitly qualified CNC recovery job.
 
 import { useEffect, useState } from 'react';
-import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import type { JobCheckpoint } from '../../core/recovery';
 import { clearJobCheckpoint, readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
@@ -39,7 +38,7 @@ export function CheckpointResumeBanner(props: {
           {startedAt === null ? '' : ` from ${startedAt}`}: {checkpoint.ackedLines} of{' '}
           {checkpoint.sendableLines} G-code lines acknowledged by the controller.{' '}
           {checkpoint.machineKind === 'cnc'
-            ? `${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON} The checkpoint is retained as diagnostic evidence until you dismiss it.`
+            ? cncCheckpointMessage(checkpoint)
             : 'Resume re-checks that the project still produces the same G-code. Laser recovery replays from the first unconfirmed line. If the controller lost power, a few acknowledged lines may not have run.'}
         </p>
         {checkpoint.interruption === undefined ? null : (
@@ -83,7 +82,7 @@ function ReviewRecoveryAction(props: {
   readonly checkpoint: JobCheckpoint;
   readonly disabled: boolean;
   readonly onOpenCncPreview: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
   if (props.checkpoint.machineKind === 'laser') {
     return (
       <button
@@ -96,16 +95,24 @@ function ReviewRecoveryAction(props: {
       </button>
     );
   }
+  if (props.checkpoint.resumeInFlight) return null;
   return (
     <button
       type="button"
       disabled={props.disabled}
       onClick={props.onOpenCncPreview}
-      title="Audit the available evidence and inspect hypothetical runway geometry without commanding the machine."
+      title="Select an uncertain native contour segment, complete physical requalification, and review a newly generated recovery job."
     >
-      Review recovery preview
+      Review supervised recovery
     </button>
   );
+}
+
+function cncCheckpointMessage(checkpoint: JobCheckpoint): string {
+  if (checkpoint.resumeInFlight) {
+    return 'A supervised recovery attempt was itself interrupted. The original checkpoint no longer identifies current work, so it cannot start another recovery. Inspect and requalify the machine, then create a separately reviewed new job.';
+  }
+  return 'Acknowledgements are diagnostic only and will not choose a cut position. Review supervised recovery to select the first uncertain native contour segment, physically clear and requalify the machine, and generate a new recovery job.';
 }
 
 function formatStartedAt(iso: string): string | null {

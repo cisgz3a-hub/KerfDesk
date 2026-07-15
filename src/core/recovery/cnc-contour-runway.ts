@@ -74,7 +74,7 @@ export type CncContourRunwayRequest = {
   readonly uncertaintyEventId: string;
   readonly profile: CncRunwayProfile;
   readonly clearedPathEvidence: {
-    readonly kind: 'committed-through-event';
+    readonly kind: 'committed-through-event' | 'operator-confirmed-through-event';
     readonly eventId: string;
     readonly proofId: string;
   };

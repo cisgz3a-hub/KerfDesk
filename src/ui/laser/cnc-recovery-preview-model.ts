@@ -4,14 +4,13 @@ import {
   type CncContourRunwayPreviewResult,
 } from '../../core/recovery/cnc-contour-runway-preview';
 import { buildCncRecoveryEventManifest, type CncRecoveryEvent } from '../../core/recovery/cnc';
+import {
+  isValidRunwayParameters,
+  type CncRunwayParameters,
+} from '../../core/recovery/cnc-contour-runway-geometry';
+import { cncSupervisedRecoveryRunwayProfile } from '../../core/recovery/cnc-supervised-recovery-job';
 import type { Project } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
-
-export const CNC_RECOVERY_PREVIEW_PARAMETERS = {
-  minRunwayMm: 5,
-  accelerationMmPerSec2: 100,
-  safetyMarginMm: 2,
-} as const;
 
 export type CncRecoveryEvidenceCheck = {
   readonly id: string;
@@ -26,8 +25,9 @@ export type CncRecoveryPreviewEvent = {
 };
 
 export type CncRecoveryPreviewModel = {
-  readonly canExecute: false;
+  readonly canExecute: boolean;
   readonly unavailableReason: string | null;
+  readonly parameters: CncRunwayParameters;
   readonly checks: ReadonlyArray<CncRecoveryEvidenceCheck>;
   readonly events: ReadonlyArray<CncRecoveryPreviewEvent>;
   readonly selectedEventId: string | null;
@@ -39,16 +39,20 @@ export function buildCncRecoveryPreviewModel(
   checkpoint: JobCheckpoint,
   requestedEventId?: string,
 ): CncRecoveryPreviewModel {
+  const parameters = recoveryParameters(project);
   const base = baseEvidenceChecks(checkpoint);
-  if (checkpoint.machineKind !== 'cnc' || project.machine?.kind !== 'cnc') {
-    return unavailable(base, 'Open the original CNC project to review its recovery geometry.');
-  }
+  const initialRefusal = initialRefusalReason(project, checkpoint, parameters);
+  if (initialRefusal !== null) return unavailable(base, initialRefusal, parameters);
   const prepared = prepareOutput(project, {
     outputScope: checkpoint.outputScope,
     ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
   });
   if (!prepared.ok) {
-    return unavailable(base, 'The current project cannot be compiled into a previewable CNC job.');
+    return unavailable(
+      base,
+      'The current project cannot be compiled into a previewable CNC job.',
+      parameters,
+    );
   }
   const emitted = emitPreparedGcode(prepared, {
     outputScope: checkpoint.outputScope,
@@ -58,6 +62,7 @@ export function buildCncRecoveryPreviewModel(
     return unavailable(
       base,
       'The current project fails CNC preflight, so geometry is unavailable.',
+      parameters,
     );
   }
   const programMatches = fingerprintsEqual(fingerprintGcode(emitted.gcode), checkpoint.fingerprint);
@@ -66,6 +71,7 @@ export function buildCncRecoveryPreviewModel(
     return unavailable(
       checks,
       'The current project does not reproduce the interrupted program. No geometry is shown.',
+      parameters,
     );
   }
   const manifest = buildCncRecoveryEventManifest(prepared.job);
@@ -79,19 +85,34 @@ export function buildCncRecoveryPreviewModel(
           job: prepared.job,
           manifest,
           uncertaintyEventId: selectedEventId,
-          parameters: CNC_RECOVERY_PREVIEW_PARAMETERS,
+          parameters,
         });
   return {
-    canExecute: false,
+    canExecute: geometry?.kind === 'preview',
     unavailableReason:
       events.length === 0
         ? 'This job has no single-tool native contour segment eligible for runway preview.'
         : null,
     checks,
+    parameters,
     events,
     selectedEventId,
     geometry,
   };
+}
+
+function initialRefusalReason(
+  project: Project,
+  checkpoint: JobCheckpoint,
+  parameters: CncRunwayParameters,
+): string | null {
+  if (!isValidRunwayParameters(parameters)) {
+    return 'The device acceleration setting is invalid, so a recovery runway cannot be qualified.';
+  }
+  if (checkpoint.machineKind !== 'cnc' || project.machine?.kind !== 'cnc') {
+    return 'Open the original CNC project to review its recovery geometry.';
+  }
+  return null;
 }
 
 function baseEvidenceChecks(checkpoint: JobCheckpoint): ReadonlyArray<CncRecoveryEvidenceCheck> {
@@ -143,10 +164,12 @@ function programIdentityCheck(matches: boolean): CncRecoveryEvidenceCheck {
 function unavailable(
   checks: ReadonlyArray<CncRecoveryEvidenceCheck>,
   unavailableReason: string,
+  parameters: CncRunwayParameters,
 ): CncRecoveryPreviewModel {
   return {
     canExecute: false,
     unavailableReason,
+    parameters,
     checks,
     events: [],
     selectedEventId: null,
@@ -175,5 +198,14 @@ function selectEventId(
   if (requestedEventId !== undefined && events.some(({ id }) => id === requestedEventId)) {
     return requestedEventId;
   }
-  return events[0]?.id ?? null;
+  return null;
+}
+
+function recoveryParameters(project: Project): CncRunwayParameters {
+  const profile = cncSupervisedRecoveryRunwayProfile(project.device.accelMmPerSec2, 'preview');
+  return {
+    minRunwayMm: profile.minRunwayMm,
+    accelerationMmPerSec2: profile.accelerationMmPerSec2,
+    safetyMarginMm: profile.safetyMarginMm,
+  };
 }
