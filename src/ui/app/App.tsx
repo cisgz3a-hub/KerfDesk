@@ -5,7 +5,7 @@
 
 import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
-import { PersistentJobStop, useJobShortcuts } from '../laser';
+import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
@@ -53,7 +53,7 @@ export function App(): JSX.Element {
   return (
     <div style={shellStyle}>
       <CommandShell />
-      <PersistentJobStop />
+      <LiveMotionBar />
       <main style={mainStyle}>
         <ToolStrip />
         <div style={canvasAreaStyle}>

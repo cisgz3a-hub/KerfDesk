@@ -77,6 +77,7 @@
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
 | ADR-205 | 2026-07-15 | Accepted | Machine Setup is one controller-first atomic workflow |
 | ADR-206 | 2026-07-15 | Accepted | Require explicit maintainer permission for every new guard |
+| ADR-207 | 2026-07-15 | Accepted | One top live-motion bar owns run controls |
 
 ---
 
@@ -8417,3 +8418,41 @@ The maintainer owns every new capability-versus-refusal tradeoff. Guard proposal
 and reviewable before code exists, and an approval cannot silently spread to other workflows.
 Existing machine-safety behavior is not removed or weakened by this policy; it governs additions
 and expansions from this decision forward.
+
+---
+
+## ADR-207 - One top live-motion bar owns run controls
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+Active jobs rendered the same software Abort action in three places: a fixed viewport button, the
+Numeric Edits bar, and the Machine rail. Pause and Resume were also duplicated. The controls called
+the same store actions, so the repetition did not provide independent safety. It obscured hierarchy,
+made the most important controls small, and produced overlapping buttons at narrow widths.
+
+### Decision
+
+- A single full-width **Live Motion** bar, directly below the command shell and above the workspace,
+  owns Pause, Resume, tool-change Continue, and software Abort while a job or machine operation is
+  active. Numeric Edits and the Machine rail do not render duplicate run actions.
+- The bar shows the active state and job progress beside its actions. Its controls use a minimum
+  48 px target height; software Abort is at least 144 px wide and is labelled **ABORT JOB** or
+  **ABORT MOTION** so its scope is explicit.
+- The bar participates in normal layout so it cannot cover unrelated controls, but uses the highest
+  app stacking order while active so a dialog cannot hide the software Abort path. It wraps at narrow
+  widths rather than shrinking or scrolling the actions away.
+- Software Abort remains an immediate controller-specific reset/de-energize request with no
+  confirmation dialog. It is not a safety-rated E-stop and the bar directs the operator to physical
+  E-stop or power isolation for danger.
+- The Machine rail may still show detailed progress, safety explanation, overrides, and setup state.
+  It may be collapsed during a run because the canonical controls are independent of rail visibility.
+  The `Ctrl+.` shortcut and crash-screen recovery remain independent fallback paths.
+
+### Consequences
+
+There is one obvious action cluster to learn and test, with a stable position and larger targets.
+Responsive layouts no longer stack competing Abort buttons. Removing a panel or changing selection
+tools cannot remove the visible software Abort path, while the UI remains honest that only physical
+hardware can provide a safety-rated emergency stop.

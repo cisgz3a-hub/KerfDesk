@@ -32,7 +32,7 @@ describe('JobControls action hierarchy', () => {
     }
   });
 
-  it('places Cancel frame before placement details while framing', async () => {
+  it('places passive frame status before placement details while framing', async () => {
     useLaserStore.setState({
       motionOperation: {
         kind: 'frame',
@@ -43,13 +43,15 @@ describe('JobControls action hierarchy', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Cancel frame'), startFrom(view.host))).toBe(true);
+      expect(
+        precedes(elementContaining(view.host, 'Frame motion is active'), startFrom(view.host)),
+      ).toBe(true);
     } finally {
       await view.unmount();
     }
   });
 
-  it('places Pause and ABORT before placement details during a job', async () => {
+  it('keeps run actions out of the rail while placing safety detail before placement', async () => {
     useLaserStore.setState({
       streamer: {
         status: 'streaming',
@@ -66,8 +68,15 @@ describe('JobControls action hierarchy', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Pause'), startFrom(view.host))).toBe(true);
-      expect(precedes(button(view.host, 'ABORT'), startFrom(view.host))).toBe(true);
+      expect(
+        precedes(elementContaining(view.host, 'Pause is feed hold only'), startFrom(view.host)),
+      ).toBe(true);
+      const labels = [...view.host.querySelectorAll('button')].map(
+        (candidate) => candidate.textContent,
+      );
+      expect(labels).not.toContain('Pause');
+      expect(labels).not.toContain('ABORT');
+      expect(labels).not.toContain('ABORT JOB');
     } finally {
       await view.unmount();
     }
@@ -106,6 +115,14 @@ function startFrom(host: HTMLElement): HTMLSelectElement {
   const select = host.querySelector('select[aria-label="Start from"]');
   if (!(select instanceof HTMLSelectElement)) throw new Error('Start from control not rendered');
   return select;
+}
+
+function elementContaining(host: HTMLElement, text: string): HTMLElement {
+  const match = [...host.querySelectorAll('span')].find((candidate) =>
+    candidate.textContent?.includes(text),
+  );
+  if (!(match instanceof HTMLElement)) throw new Error(`Text not rendered: ${text}`);
+  return match;
 }
 
 function precedes(first: Element, second: Element): boolean {

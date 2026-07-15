@@ -190,7 +190,7 @@ describe('LaserWindow autofocus busy controls', () => {
     }
   });
 
-  it('disables jog controls and shows Cancel frame while Frame is active', async () => {
+  it('disables jog controls and leaves frame Abort to the top bar', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       motionOperation: {
@@ -213,7 +213,7 @@ describe('LaserWindow autofocus busy controls', () => {
         );
       });
 
-      expect(button(host, 'Cancel frame').disabled).toBe(false);
+      expect(host.textContent).toContain('Frame motion is active. Use ABORT MOTION in the top bar');
       const stepSelect = host.querySelector<HTMLSelectElement>(
         'select[aria-label="Jog step size"]',
       );

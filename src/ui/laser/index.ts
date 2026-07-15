@@ -1,3 +1,3 @@
 export { LaserWindow } from './LaserWindow';
-export { PersistentJobStop } from './PersistentJobStop';
+export { LiveMotionBar } from './LiveMotionBar';
 export { useJobShortcuts } from './use-job-shortcuts';

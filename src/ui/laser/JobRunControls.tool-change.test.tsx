@@ -1,5 +1,5 @@
-// CNC-04 — RunningControls shows a Continue button and the re-zero instruction
-// while a job is held at an M0 tool change, and mounts ABORT throughout.
+// CNC-04 — RunningControls keeps the detailed tool-change instruction while the
+// canonical Continue and Abort actions remain in LiveMotionBar (ADR-207).
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -58,7 +58,7 @@ afterEach(async () => {
 });
 
 describe('RunningControls tool-change (CNC-04)', () => {
-  it('shows Continue + the re-zero instruction and keeps ABORT while held at a tool change', async () => {
+  it('shows the re-zero instruction without duplicating the top-bar actions', async () => {
     useLaserStore.setState({
       streamer: readyToolChangeStreamer(),
       toolChangeIdleSeen: true,
@@ -75,21 +75,14 @@ describe('RunningControls tool-change (CNC-04)', () => {
     };
 
     expect(host.textContent).toContain('Continue');
-    expect(host.textContent).toContain('ABORT');
     expect(host.textContent).toContain('re-zero Z on the stock top');
     expect(host.textContent).toContain(
       'Continue unlocks only after fresh Idle and tool-matched Z zero',
     );
-    const continueButton = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Continue',
-    );
-    expect(continueButton?.disabled).toBe(true);
-    // Pause/Resume belong to streaming/paused, not a tool-change hold.
-    expect(host.textContent).not.toContain('Pause');
-    expect(host.textContent).not.toContain('Resume');
+    expect(host.querySelectorAll('button')).toHaveLength(0);
   });
 
-  it('enables Continue only after Z zero and explains the spindle-off lift', async () => {
+  it('explains the spindle-off lift after Z zero without owning Continue', async () => {
     useLaserStore.setState({
       streamer: readyToolChangeStreamer(),
       toolChangeIdleSeen: true,
@@ -105,11 +98,8 @@ describe('RunningControls tool-change (CNC-04)', () => {
       host.remove();
     };
 
-    const continueButton = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Continue',
-    );
-    expect(continueButton?.disabled).toBe(false);
-    expect(continueButton?.title).toContain('safe Z with the spindle off');
+    expect(host.querySelectorAll('button')).toHaveLength(0);
+    expect(host.textContent).toContain('lifts to safe Z before spindle start');
   });
 
   it('names the bit in the prompt when the compiled label is known (R5)', async () => {
@@ -129,7 +119,7 @@ describe('RunningControls tool-change (CNC-04)', () => {
     expect(host.textContent).not.toContain('Load the next bit');
   });
 
-  it('does not show Continue for an ordinary streaming job', async () => {
+  it('shows ordinary streaming safety copy without a duplicate Pause button', async () => {
     const { host, root } = await renderRunningControls({
       isStreaming: true,
       isPaused: false,
@@ -140,7 +130,9 @@ describe('RunningControls tool-change (CNC-04)', () => {
       host.remove();
     };
 
-    expect(host.textContent).not.toContain('Continue');
     expect(host.textContent).toContain('Pause');
+    expect([...host.querySelectorAll('button')].map((button) => button.textContent)).not.toContain(
+      'Pause',
+    );
   });
 });

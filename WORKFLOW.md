@@ -48,11 +48,12 @@
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
 - **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers." A header chevron collapses it to a narrow named strip; the same strip expands it.
-- **Machine controls panel**: docked at the far right. It uses the same collapse/expand pattern, except it cannot be collapsed while a job is active because the visible software **ABORT** control must remain reachable.
+- **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the top Live Motion bar.
+- **Live Motion bar**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears directly below the command shell and above the workspace. It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs without covering workspace content.
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
 - **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
-- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both while idle, and `Reset Workspace Layout` restores both panels. Machine-panel hiding and the combined toggle are disabled while a job is active.
+- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores both panels. Panel visibility does not affect the Live Motion bar.
 
 #### Disabled controls
 - `File → Save Project`
@@ -690,6 +691,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B7. Pause / resume
 
+Pause, Resume, and tool-change Continue appear only in the top Live Motion bar. The bar remains in a
+stable position above the workspace and wraps its status and action groups instead of shrinking the
+controls below their minimum target size.
+
 #### Success — pause (GRBL-family laser with proven laser mode)
 1. User clicks **Pause**. App writes real-time `!` (0x21).
 2. Streamer enters `paused`; no further bytes sent until resume.
@@ -711,14 +716,14 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 2. Streamer resumes; more bytes flow.
 
 #### Blocked — generic CNC resume
-1. The CNC **Resume** button remains visible but disabled, while software **ABORT** remains available.
+1. The CNC **Resume** button remains visible but disabled, while **ABORT JOB** remains available.
 2. The store independently refuses CNC Resume before writing `~` or refilling the stream because a GRBL status snapshot cannot prove that the physical spindle stayed turning while the cutter may be engaged.
 3. The operator must request ABORT, inspect and clear the cutter using a machine-specific procedure, and start a newly reviewed recovery job.
 
 ### F-B8. Software Abort / Controller Reset
 
 #### Success
-1. User clicks **ABORT** (Controller Reset). The control explicitly says it is not a safety-rated E-stop and directs the operator to the machine's physical E-stop for danger.
+1. User clicks the single **ABORT JOB** or **ABORT MOTION** action in the Live Motion bar. The control explicitly says it is a controller reset request, not a safety-rated E-stop, and directs the operator to the machine's physical E-stop or power isolation for danger.
 2. The app sends the active driver's controller-specific abort/reset path: GRBL-family drivers may use realtime `\x18`; drivers without realtime reset use their queued best-effort de-energize commands.
 3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
 4. A GRBL controller enters `Alarm` after reset; the user clears with `$X` (F-B9).
@@ -737,7 +742,7 @@ App writes real-time `?` every 250 ms while active — a streaming job, a motion
 
 ### F-B11. Job progress UI
 
-Progress bar shows `completed / total` lines as a percentage with the count overlaid. Updates whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
+The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state, and the Machine rail may retain its detailed progress bar. Both update whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
 
 ### F-B12. Disconnect during job (cable yank)
 
