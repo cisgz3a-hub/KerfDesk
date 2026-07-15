@@ -291,6 +291,10 @@ phase; tracked here so they don't get lost.
 19. **`SceneObject` extensible from day one** (ADR-014).
 20. **Third-party libraries pass evaluation policy** (ADR-017): license, maintenance, fit, size, CVE status.
 
+### Maintainer authority
+
+21. **No new guards without explicit prior maintainer permission** (ADR-206). No blocking, refusal, gate, cap, clamp, delay, hidden/disabled control, silent rewrite, confirmation, or expansion of an existing refusal surface may be introduced until the maintainer approves that specific guard after receiving a written explanation of why it is absolutely necessary. The PR records that explanation and approval. Tests, convention, “defense in depth,” and hypothetical risk are not approval. Without permission, do not add the guard or ship a change that depends on it; stop and report the proposal.
+
 ---
 
 ## Success metrics
