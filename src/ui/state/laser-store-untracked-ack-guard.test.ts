@@ -122,11 +122,48 @@ describe('untracked-ack start guard', () => {
 
     await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
     const started = useLaserStore.getState().startJob(JOB_GCODE);
-    const failure = expect(started).rejects.toThrow(/acknowledge/i);
+    const failure = expect(started).rejects.toThrow(/1 terminal acknowledgement is still owed/i);
     await vi.advanceTimersByTimeAsync(2_000);
     await failure;
 
     expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('names stalled transport writes separately from terminal acknowledgements', async () => {
+    vi.useFakeTimers();
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({ pendingTransportWrites: 2 });
+
+    const started = useLaserStore.getState().startJob(JOB_GCODE);
+    const failure = expect(started).rejects.toThrow(/2 controller writes are still in transport/i);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await failure;
+
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('does not create background status traffic while draining the Start queue fence', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+
+    await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    writes.length = 0;
+
+    const started = useLaserStore.getState().startJob(JOB_GCODE);
+    await vi.advanceTimersByTimeAsync(750);
+    const writesWhileFencing = writes.slice();
+
+    connection.emitLine('ok');
+    await vi.advanceTimersByTimeAsync(50);
+    await started;
+
+    expect(writesWhileFencing).toEqual([]);
   });
 
   it('an alarm clears the pending-ack counter', async () => {

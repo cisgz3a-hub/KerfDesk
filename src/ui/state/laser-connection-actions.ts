@@ -346,6 +346,11 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
     refs.stallProbe = stall.probe;
     if (stall.stalled && s.safetyNotice === null) set({ safetyNotice: streamStalledNotice() });
+    // Start owns this boundary: queue-fence must converge to zero without
+    // background writes, and CNC live-status sends its own freshness query.
+    // Polling here can otherwise keep pendingTransportWrites continuously
+    // non-zero or race the explicitly owned Start observation.
+    if (s.controllerOperation?.kind === 'start-arming') return;
     if (realtimeQuery !== null) {
       if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
       void safeWrite(realtimeQuery).catch(() => undefined);

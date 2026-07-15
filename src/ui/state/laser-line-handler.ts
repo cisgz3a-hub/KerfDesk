@@ -172,10 +172,7 @@ function handleWelcomeLine(
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   observeControllerResetBoundary(refs);
-  const probeRecovering =
-    state.controllerOperation?.kind === 'probe' && state.controllerOperation.phase === 'recovering';
-  const probeRebooted =
-    state.controllerOperation?.kind === 'probe' && state.controllerOperation.phase !== 'recovering';
+  const resetPolicy = controllerResetBoundaryPolicy(state);
   const mismatchLog =
     detected === refs.driver.kind
       ? {}
@@ -205,7 +202,7 @@ function handleWelcomeLine(
     mpgActive: null,
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
-    ...(probeRecovering ? {} : { controllerOperation: null, probeBusy: false }),
+    ...(resetPolicy.preserveOperation ? {} : { controllerOperation: null, probeBusy: false }),
     fireActive: false,
     frameVerification: null,
     homingState: 'unknown',
@@ -214,17 +211,29 @@ function handleWelcomeLine(
     ...mismatchLog,
     ...rebootDuringJobPatch(state),
   });
-  if (!probeRecovering) {
-    cancelControllerLifecycleRefs(
-      refs,
-      probeRebooted ? 'Controller rebooted during the probe transaction.' : 'Controller rebooted.',
-    );
+  if (!resetPolicy.preserveOperation) {
+    cancelControllerLifecycleRefs(refs, resetPolicy.cancellationReason);
   }
   // Beam-off cleanup deferred by a commanded reset (Stop, auto-stop) goes
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and
   // cannot be orphaned by this banner.
   flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'));
+}
+
+function controllerResetBoundaryPolicy(state: LaserState): {
+  readonly preserveOperation: boolean;
+  readonly cancellationReason: string;
+} {
+  const operation = state.controllerOperation;
+  const probeRecovering = operation?.kind === 'probe' && operation.phase === 'recovering';
+  const probeRebooted = operation?.kind === 'probe' && operation.phase !== 'recovering';
+  return {
+    preserveOperation: probeRecovering || operation?.kind === 'recovery',
+    cancellationReason: probeRebooted
+      ? 'Controller rebooted during the probe transaction.'
+      : 'Controller rebooted.',
+  };
 }
 
 // A banner while the stream is still live can only be an UNCOMMANDED reboot
@@ -241,11 +250,13 @@ function rebootDuringJobPatch(
   // 'tool-change' is an active hold with the M0 still queued and pre-M0 motion
   // possibly draining — a reboot there kills the job just like streaming/paused
   // (Codex audit: this status list was not updated when tool-change landed).
-  if (
-    streamer === null ||
-    !['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)
-  )
-    return {};
+  if (streamer === null) return {};
+  if (!['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)) {
+    // A reset banner is a firmware RX-buffer boundary even for an already
+    // disconnected stream. Its old in-flight lines can no longer own replies
+    // from the new session, including the reconnect settings-query `ok`.
+    return streamer.inFlight.length === 0 ? {} : { streamer: wipeInFlight(streamer) };
+  }
   return {
     streamer: wipeInFlight(markErrored(streamer)),
     // First notice wins — an earlier root cause is what the operator needs.

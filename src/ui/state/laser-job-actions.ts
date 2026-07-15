@@ -36,6 +36,10 @@ import { startControllerCommand, type ControllerLifecycleRefs } from './laser-in
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
+  hasPendingControllerWrite,
+  startPendingControllerMessage,
+} from './laser-start-queue-fence';
+import {
   assertAutofocusIdle,
   pushLog,
   setupCommandBlockMessage,
@@ -65,10 +69,6 @@ const PAUSE_UNSUPPORTED_MESSAGE =
 // silent past this budget is a connection problem the operator must see.
 const UNTRACKED_ACK_DRAIN_TIMEOUT_MS = 1_500;
 const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
-const START_PENDING_ACK_MESSAGE =
-  'A previous controller write is still in transport or awaiting acknowledgement. Start was ' +
-  'blocked so its terminal response cannot corrupt the job stream — check the connection and try again.';
-
 export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
   'The compiled tool plan does not match the CNC program pauses. Start was blocked so tool identity cannot drift at a change boundary.';
 
@@ -107,7 +107,10 @@ export function jobActions(
         const acknowledgedOverrides = cncSetupOverrideAcknowledgement(options.cncSetupAttestation);
         assertCncLiveStartReady(set, get, machineKind, acknowledgedOverrides);
         assertStartReservation(get, setupEpoch);
-        if (hasPendingControllerWrite(get())) throw new Error(START_PENDING_ACK_MESSAGE);
+        const pendingState = get();
+        if (hasPendingControllerWrite(pendingState)) {
+          throw new Error(startPendingControllerMessage(pendingState));
+        }
         assertGcodeFitsController(gcode, options);
         const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
         const entersHoldNow = stepped.state.status === 'tool-change';
@@ -289,13 +292,9 @@ function assertStartReservation(get: GetFn, expected: StartSetupEpoch): void {
 async function waitForUntrackedAckDrain(get: GetFn): Promise<void> {
   const deadline = Date.now() + UNTRACKED_ACK_DRAIN_TIMEOUT_MS;
   while (hasPendingControllerWrite(get())) {
-    if (Date.now() > deadline) throw new Error(START_PENDING_ACK_MESSAGE);
+    if (Date.now() > deadline) throw new Error(startPendingControllerMessage(get()));
     await sleep(UNTRACKED_ACK_DRAIN_POLL_MS);
   }
-}
-
-function hasPendingControllerWrite(state: LaserState): boolean {
-  return state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0;
 }
 
 function sleep(ms: number): Promise<void> {

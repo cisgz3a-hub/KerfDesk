@@ -17,11 +17,13 @@ import { pushLog } from './laser-store-helpers';
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
+type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type DriverFn = () => ControllerDriver;
 
 export function controllerRecoveryActions(
   set: SetFn,
+  get: GetFn,
   refs: ControllerLifecycleRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
@@ -31,12 +33,20 @@ export function controllerRecoveryActions(
       const softReset = driver().realtime.softReset;
       if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
       cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
+      const resetWriteEpoch = refs.writeEpoch ?? 0;
       set((state) => ({
         ...invalidateControllerSessionEvidence(state),
         controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 },
       }));
       try {
-        await safeWrite(softReset, 'wake');
+        try {
+          await safeWrite(softReset, 'wake');
+        } catch (error) {
+          // Web Serial may deliver the commanded reboot banner before its
+          // write Promise resolves. That observed boundary is stronger than
+          // the old transport Promise, provided recovery still owns it.
+          if (!observedOwnedRecoveryReset(get, refs, resetWriteEpoch)) throw error;
+        }
         set((state) => ({
           statusReport: null,
           alarmCode: null,
@@ -81,4 +91,17 @@ export function controllerRecoveryActions(
       }
     },
   };
+}
+
+function observedOwnedRecoveryReset(
+  get: GetFn,
+  refs: ControllerLifecycleRefs,
+  previousWriteEpoch: number,
+): boolean {
+  const state = get();
+  return (
+    (refs.writeEpoch ?? 0) > previousWriteEpoch &&
+    state.connection.kind === 'connected' &&
+    state.controllerOperation?.kind === 'recovery'
+  );
 }

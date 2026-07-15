@@ -442,6 +442,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ),
   ...controllerRecoveryActions(
     set,
+    get,
     refs,
     (line, action) => safeWrite(set, get, line, action),
     () => refs.driver,
