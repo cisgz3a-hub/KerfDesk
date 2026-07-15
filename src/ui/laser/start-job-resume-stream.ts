@@ -9,6 +9,8 @@ import {
 } from '../state/canvas-motion-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
+import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { resumeConfirmation } from './resume-confirmation';
 import { markOwnedResumeCheckpoint } from './start-job-checkpoint-policy';
 
@@ -20,19 +22,20 @@ export async function streamResumeFromRawLine(
   gcode: string,
   fromLine: number,
   originalCanvasPlan: CanvasMotionPlan,
+  laserModeStartSnapshot: LaserModeStartSnapshot,
   checkpointToResume?: JobCheckpoint,
 ): Promise<void> {
-  const machine = project.machine;
-  const resume = buildResumeProgram(gcode, fromLine, {
-    machineKind: machineKindOf(project.machine),
-    safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
-    spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
-    plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
-  });
+  const resume = buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return;
   }
+  const laserModeStartEvidence = confirmLaserModeStartEvidence(
+    project,
+    laserModeStartSnapshot,
+    jobAwareConfirm,
+  );
+  if (laserModeStartEvidence === null) return;
   const proceed = jobAwareConfirm(
     resumeConfirmation(machineKindOf(project.machine), fromLine, resume.fromLine),
   );
@@ -62,6 +65,7 @@ export async function streamResumeFromRawLine(
       ),
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
+      ...(laserModeStartEvidence === undefined ? {} : { laserModeStartEvidence }),
       canvasPlan: rebuildCanvasPlanForGcode(
         originalCanvasPlan,
         resumeGcode,
@@ -75,3 +79,13 @@ export async function streamResumeFromRawLine(
 }
 
 const RESUME_PLUNGE_MM_PER_MIN = 300;
+
+function resumeBuildOptions(project: Project) {
+  const machine = project.machine;
+  return {
+    machineKind: machineKindOf(machine),
+    safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
+    spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
+    plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
+  } as const;
+}

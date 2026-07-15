@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
+import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -55,6 +57,9 @@ async function flush(): Promise<void> {
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  useStore.setState((state) => ({
+    project: { ...state.project, machine: LASER_MACHINE_CONFIG },
+  }));
 });
 
 afterEach(async () => {
@@ -215,6 +220,93 @@ describe('laser-store machine settings', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
 
     await expect(useLaserStore.getState().writeGrblSetting(999, '1')).rejects.toThrow(/unknown/i);
+  });
+
+  it('blocks $32=0 at the serial write boundary for the active laser setup', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: LASER_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({
+      statusReport: idleStatus(),
+      grblSettingsRows: settingsMapToRows(new Map([[32, '1']])),
+      lastSettingsReadAt: Date.now(),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    writes.length = 0;
+
+    await expect(useLaserStore.getState().writeGrblSetting(32, '0')).rejects.toThrow(
+      /laser machine setup cannot write \$32=0/i,
+    );
+    expect(writes).toEqual([]);
+  });
+
+  it('retains $32=0 firmware writes for the active CNC setup', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({
+      statusReport: idleStatus(),
+      grblSettingsRows: settingsMapToRows(new Map([[32, '1']])),
+      lastSettingsReadAt: Date.now(),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    writes.length = 0;
+
+    const write = useLaserStore.getState().writeGrblSetting(32, '0');
+    await flush();
+    expect(writes).toEqual(['$32=0\n']);
+
+    connection.emitLine('ok');
+    await flush();
+    connection.emitLine('$32=0');
+    connection.emitLine('ok');
+    await write;
+  });
+
+  it('applies the same laser/CNC $32 policy to confirmed Console setting writes', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({ statusReport: idleStatus() });
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().sendConsoleCommand('$32=0', { confirmed: true }),
+    ).rejects.toThrow(/laser machine setup cannot write \$32=0/i);
+    expect(writes).toEqual([]);
+
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    await useLaserStore.getState().sendConsoleCommand('$32=0', { confirmed: true });
+    expect(writes).toEqual(['$32=0\n']);
+  });
+
+  it('rejects every non-canonical laser $32 Console value before serial write', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({ statusReport: idleStatus() });
+    writes.length = 0;
+
+    for (const command of ['$32=0.5', '$32=.5', '$32=1.0', '$32=2', '$32=256']) {
+      await expect(
+        useLaserStore.getState().sendConsoleCommand(command, { confirmed: true }),
+      ).rejects.toThrow(/laser machine setup cannot write \$32=0/i);
+    }
+    expect(writes).toEqual([]);
   });
 });
 

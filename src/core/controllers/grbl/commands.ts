@@ -19,6 +19,9 @@ export const RT_RESUME = '~';
 /** Feed hold (pause). GRBL transitions into Hold:0 / Hold:1. */
 export const RT_HOLD = '!';
 
+/** Safety Door. GRBL stops motion and de-energizes spindle/coolant outputs. */
+export const RT_SAFETY_DOOR = '\x84';
+
 /** Soft reset (Ctrl-X = 0x18). Clears alarm, empties planner, no position loss
  *  if already idle. */
 export const RT_SOFT_RESET = '\x18';

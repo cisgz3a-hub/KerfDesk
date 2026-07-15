@@ -61,9 +61,12 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
   const continueToolChange = useLaserStore((state) => state.continueToolChange);
   const hasRealtimePause = useLaserStore((state) => state.capabilities.realtimePause);
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
+  const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
   const resumeBlockMessage = cncResumeBlockMessage(machineKind);
-  if (streamer?.status === 'streaming') {
+  const canPause =
+    streamer?.status === 'streaming' || (streamer?.status === 'done' && isControllerRunning);
+  if (canPause) {
     return (
       <ActionButton
         label="Pause"

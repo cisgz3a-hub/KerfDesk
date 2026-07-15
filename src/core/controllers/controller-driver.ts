@@ -22,6 +22,8 @@ export type ControllerRealtime = {
   readonly statusQuery: string | null;
   /** Feed hold (GRBL '!'). */
   readonly hold: string | null;
+  /** Safety Door (GRBL 0x84): controlled motion stop plus accessory shutdown. */
+  readonly safetyDoor: string | null;
   /** Cycle start / resume (GRBL '~'). */
   readonly resume: string | null;
   /** Abort / soft reset (GRBL \x18). */

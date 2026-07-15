@@ -22,7 +22,15 @@ import {
   type SimVec3,
 } from './grbl-sim-gcode';
 
-export type GrblSimMachineLabel = 'Idle' | 'Run' | 'Jog' | 'Hold' | 'Alarm' | 'Home' | 'Sleep';
+export type GrblSimMachineLabel =
+  | 'Idle'
+  | 'Run'
+  | 'Jog'
+  | 'Hold'
+  | 'Door'
+  | 'Alarm'
+  | 'Home'
+  | 'Sleep';
 
 export type GrblSimState = {
   readonly machine: GrblSimMachineLabel;
@@ -127,12 +135,14 @@ export function reduceGrblSim(
 }
 
 export function statusReportLine(state: GrblSimState): string {
-  const label = state.machine === 'Hold' ? 'Hold:0' : state.machine;
+  const label =
+    state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? 'Door:1' : state.machine;
   const isMoving = state.machine === 'Run' || state.machine === 'Jog' || state.machine === 'Hold';
   const feed = isMoving ? Math.round(state.feed) : 0;
   const spindle = isMoving ? Math.round(state.spindle) : 0;
   const wco = totalWco(state);
-  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}|WCO:${formatVec3(wco)}>`;
+  const stoppedAccessories = state.machine === 'Door' ? '|Ov:100,100,100' : '';
+  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}|WCO:${formatVec3(wco)}${stoppedAccessories}>`;
 }
 
 function totalWco(state: GrblSimState): SimVec3 {
@@ -149,19 +159,30 @@ function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions)
     const holds = state.machine === 'Run' || state.machine === 'Jog';
     return { state: holds ? { ...state, machine: 'Hold' } : state, effects: [] };
   }
-  if (byte === '~') {
-    if (state.machine !== 'Hold') return { state, effects: [] };
-    return {
-      state: { ...state, machine: state.pendingMotions > 0 ? 'Run' : 'Idle' },
-      effects: [],
-    };
-  }
+  if (byte === '\x84') return reduceSafetyDoor(state);
+  if (byte === '~') return reduceCycleStart(state);
   if (byte === '\x18') return reduceSoftReset(state, opts);
   if (byte === '\x85') {
     if (state.machine !== 'Jog') return { state, effects: [] };
     return { state: { ...state, machine: 'Idle', pendingMotions: 0 }, effects: [] };
   }
   return { state, effects: [] };
+}
+
+function reduceSafetyDoor(state: GrblSimState): GrblSimReaction {
+  const stops = ['Idle', 'Run', 'Jog', 'Hold'].includes(state.machine);
+  return {
+    state: stops ? { ...state, machine: 'Door', spindle: 0 } : state,
+    effects: [],
+  };
+}
+
+function reduceCycleStart(state: GrblSimState): GrblSimReaction {
+  if (state.machine !== 'Hold' && state.machine !== 'Door') return { state, effects: [] };
+  return {
+    state: { ...state, machine: state.pendingMotions > 0 ? 'Run' : 'Idle' },
+    effects: [],
+  };
 }
 
 function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {

@@ -87,6 +87,7 @@ describe('smoothiewareDriver', () => {
       statusQuery: '?',
       hold: '!',
       resume: '~',
+      safetyDoor: null,
       softReset: '\x18',
       jogCancel: null,
     });

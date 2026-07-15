@@ -4,12 +4,16 @@
 // profile's baud rate. Type-only LaserState/LiveRefs imports — no runtime
 // cycle (same pattern as the sibling action modules).
 
-import { idleCollector } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
-import { cancelControllerLifecycleRefs, startControllerCommand } from './laser-interactive-command';
+import { startControllerCommand } from './laser-interactive-command';
 import { beginSettingsCollection } from './detected-settings-action';
+import {
+  claimIntentionalDisconnect,
+  closeConnectionOnce,
+  teardownConnectionRefs,
+} from './laser-connection-teardown';
+import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { handleLine, type HandlerRefs } from './laser-line-handler';
-import { cancelResetCleanup } from './laser-reset-cleanup';
 import {
   streamStalledNotice,
   writeFailedNotice,
@@ -25,6 +29,7 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment';
 import { appendSystemNotice } from './laser-system-notice';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
@@ -56,8 +61,15 @@ export function connectionActions(
     connect: async (adapter, options = {}) => {
       const previousConnection = refs.connection;
       if (previousConnection !== null) {
-        teardown(refs);
-        await previousConnection.close().catch(() => undefined);
+        try {
+          if (isGrblFamilyDriver(refs.driver)) {
+            await runGrblDisconnectTransaction(set, refs, safeWrite);
+          }
+        } catch {
+          set({ safetyNotice: writeFailedNotice('disconnect') });
+        }
+        if (refs.connection === previousConnection) teardownConnectionRefs(refs);
+        await closeConnectionOnce(previousConnection).catch(() => undefined);
       }
       refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
       refs.nextTranscriptId = 1;
@@ -86,7 +98,7 @@ export function connectionActions(
         });
         refs.unsubscribeClose = conn.onClose(() => {
           if (refs.connection !== conn) return;
-          teardown(refs);
+          teardownConnectionRefs(refs);
           set(buildPortClosePatch);
         });
         set(connectedControllerStatePatch);
@@ -101,11 +113,11 @@ export function connectionActions(
           })
           .finally(() => {
             if (refs.connection !== conn) return;
-            set((state) =>
-              state.controllerOperation?.kind === 'connection-handshake'
-                ? { controllerOperation: null }
-                : {},
-            );
+            // A Disconnect/reset transaction replaces the handshake operation
+            // with recovery and advances the serial epoch. Its abandoned raw
+            // line wait must not restart polling into the teardown boundary.
+            if (get().controllerOperation?.kind !== 'connection-handshake') return;
+            set({ controllerOperation: null });
             startStatusPolling(set, get, refs, safeWrite);
           });
       } catch (err) {
@@ -175,11 +187,18 @@ async function runDisconnect(
 ): Promise<void> {
   assertAutofocusIdle(get());
   const conn = refs.connection;
-  const stopCommands = disconnectStopCommands(get(), refs.driver);
-  if (stopCommands.length > 0) {
+  if (conn === null) {
+    teardownConnectionRefs(refs);
+  } else {
+    const ownsIntentionalDisconnect = claimIntentionalDisconnect(conn);
     try {
-      for (const stopCommand of stopCommands) {
-        await safeWrite(stopCommand, 'disconnect');
+      if (isGrblFamilyDriver(refs.driver)) {
+        await runGrblDisconnectTransaction(set, refs, safeWrite);
+      } else {
+        const stopCommands = disconnectStopCommands(get(), refs.driver);
+        for (const stopCommand of stopCommands) {
+          await safeWrite(stopCommand, 'disconnect');
+        }
       }
     } catch {
       // The stop-before-disconnect write failed (USB likely already gone),
@@ -187,11 +206,14 @@ async function runDisconnect(
       // tear down the link the operator asked to drop (don't rethrow).
       set({ safetyNotice: writeFailedNotice('disconnect') });
     }
-  }
-  teardown(refs);
-  if (conn !== null) {
-    const close = forgetDevice && conn.forget !== undefined ? conn.forget : conn.close;
-    await close().catch(() => undefined);
+    if (!ownsIntentionalDisconnect) {
+      await closeConnectionOnce(conn, forgetDevice).catch(() => undefined);
+      return;
+    }
+    const ownsConnection = refs.connection === conn;
+    if (ownsConnection) teardownConnectionRefs(refs);
+    await closeConnectionOnce(conn, forgetDevice).catch(() => undefined);
+    if (!ownsConnection) return;
   }
   set((state) => ({
     connection: { kind: 'disconnected' },
@@ -343,27 +365,6 @@ function handshakeIsCurrent(
   return refs.connection === connection && (refs.writeEpoch ?? 0) === writeEpoch;
 }
 
-function teardown(refs: LiveRefs): void {
-  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
-  cancelControllerLifecycleRefs(refs);
-  cancelResetCleanup(refs);
-  refs.unsubscribeLine?.();
-  refs.unsubscribeClose?.();
-  if (refs.pollHandle !== null) clearInterval(refs.pollHandle);
-  refs.connection = null;
-  refs.unsubscribeLine = null;
-  refs.unsubscribeClose = null;
-  refs.pollHandle = null;
-  refs.settingsCollector = idleCollector();
-  refs.settingsCollectorSessionEpoch = null;
-  refs.onLineArrived = null;
-  refs.nextTranscriptId = 1;
-  refs.stallProbe = null;
-  refs.controllerCommand = null;
-  refs.controllerIdleWait = null;
-  refs.controllerResetWait = null;
-}
-
 function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: SafeWriteFn): void {
   const realtimeQuery = refs.driver.realtime.statusQuery;
   const queuedQuery = refs.driver.commands.queuedStatusQuery;
@@ -372,6 +373,7 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
   refs.pollHandle = setInterval(() => {
     pollTick++;
     const s = get();
+    if (containLostStreamHeartbeat(set, s, refs, safeWrite)) return;
     const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
     refs.stallProbe = stall.probe;
     if (stall.stalled && s.safetyNotice === null) set({ safetyNotice: streamStalledNotice() });
@@ -379,7 +381,7 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     // background writes, and CNC live-status sends its own freshness query.
     // Polling here can otherwise keep pendingTransportWrites continuously
     // non-zero or race the explicitly owned Start observation.
-    if (s.controllerOperation?.kind === 'start-arming') return;
+    if (controllerOperationOwnsPolling(s)) return;
     if (realtimeQuery !== null) {
       if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
       void safeWrite(realtimeQuery).catch(() => undefined);
@@ -394,6 +396,12 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     if (!canSendQueuedStatusQuery(s, refs, pollTick)) return;
     void safeWrite(`${queuedQuery}\n`).catch(() => undefined);
   }, STATUS_POLL_MS);
+}
+
+function controllerOperationOwnsPolling(state: LaserState): boolean {
+  const operation = state.controllerOperation;
+  if (operation?.kind === 'start-arming') return true;
+  return operation?.kind === 'recovery' && operation.phase === 'reset';
 }
 
 function canSendQueuedStatusQuery(state: LaserState, refs: LiveRefs, pollTick: number): boolean {
