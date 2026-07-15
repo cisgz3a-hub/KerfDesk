@@ -24,6 +24,7 @@ import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import { jobPlacementAfterDeviceChange, type JobPlacementSettings } from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
+import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
 import { pushUndo } from './scene-mutations';
 
 type MachineState = {
@@ -172,8 +173,12 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
     current?.kind === 'cnc'
       ? { ...state.project.device, cncSubProfile: { ...current.params } }
       : state.project.device;
+  const scene =
+    kind === 'cnc'
+      ? applyCncTextDefaultsForScene(state.project.scene, machine)
+      : state.project.scene;
   return {
-    project: { ...state.project, device, machine },
+    project: { ...state.project, device, machine, scene },
     cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],

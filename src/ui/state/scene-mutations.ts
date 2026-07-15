@@ -9,6 +9,9 @@
 import {
   addLayer,
   addObject,
+  artworkOperationName,
+  createArtworkOperation,
+  createArtworkOperations,
   createLayer,
   fitObjectToBed,
   type ImportedSvg,
@@ -18,12 +21,13 @@ import {
   replaceObject,
   type Scene,
   type SceneObject,
+  sceneObjectUsesOperation,
   type TextObject,
   type TracedImage,
   type Transform,
-  updateLayer,
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
+import { duplicateArtworkWithOperations } from './duplicate-artwork';
 
 // Shared undo/redo stack ceiling. store-actions caps the redo stack against the
 // same value, so it lives here (the module both stacks depend on) rather than
@@ -89,67 +93,7 @@ export function findReimportTarget(scene: Scene, object: SceneObject): ImportedS
   return null;
 }
 
-export function ensureLayersForColors(
-  scene: Scene,
-  paths: ReadonlyArray<{ readonly color: string }>,
-): Scene {
-  let out = scene;
-  for (const path of paths) {
-    const exists = out.layers.some((l) => l.color === path.color);
-    if (!exists) {
-      out = addLayer(out, createLayer({ id: path.color, color: path.color }));
-    }
-  }
-  return out;
-}
-
-function ensureFillLayersForColors(
-  scene: Scene,
-  paths: ReadonlyArray<{ readonly color: string }>,
-): Scene {
-  return ensureLayersForMode(scene, paths, 'fill');
-}
-
-function ensureNewFillLayersForColors(
-  scene: Scene,
-  paths: ReadonlyArray<{ readonly color: string }>,
-): Scene {
-  let out = scene;
-  for (const path of paths) {
-    const exists = out.layers.some((l) => l.color === path.color);
-    if (!exists) {
-      out = addLayer(out, createLayer({ id: path.color, color: path.color, mode: 'fill' }));
-    }
-  }
-  return out;
-}
-
-function ensureLineLayersForColors(
-  scene: Scene,
-  paths: ReadonlyArray<{ readonly color: string }>,
-): Scene {
-  return ensureLayersForMode(scene, paths, 'line');
-}
-
-function ensureLayersForMode(
-  scene: Scene,
-  paths: ReadonlyArray<{ readonly color: string }>,
-  mode: 'fill' | 'line',
-): Scene {
-  let out = scene;
-  for (const path of paths) {
-    const existing = out.layers.find((l) => l.color === path.color);
-    if (existing === undefined) {
-      out = addLayer(out, createLayer({ id: path.color, color: path.color, mode }));
-    } else if (existing.mode !== mode) {
-      out = updateLayer(out, existing.id, { mode });
-    }
-  }
-  return out;
-}
-
-// F.2.c: dedicated layer-ensurer for raster images. Same shape as
-// ensureLayersForColors but the new layer comes up in mode='image'
+// F.2.c: dedicated layer-ensurer for raster images. The new layer comes up in mode='image'
 // instead of the default 'line'. If a layer with that color already
 // exists, it's untouched — we don't auto-flip an existing layer's
 // mode (would surprise the user; they may have other line/fill work
@@ -218,12 +162,9 @@ export function applyDuplicate(
     // Duplicate places the clone exactly over the source (LightBurn parity); the
     // operator then moves it. Fresh imports (applyFreshImport) and paste keep
     // their own stagger — only Duplicate is in place.
-    const clone = {
-      ...original,
-      id: newIdFor(oldId),
-    } as SceneObject;
-    scene = addObject(scene, clone);
-    newIds.push(clone.id);
+    const duplicated = duplicateArtworkWithOperations(scene, original, newIdFor(oldId));
+    scene = duplicated.scene;
+    newIds.push(duplicated.object.id);
   }
   if (newIds.length === 0) return null;
   const [first, ...rest] = newIds;
@@ -244,20 +185,9 @@ export function applyDuplicate(
 // one used-color per path; raster-image contributes its single `color` field
 // (F.2.c). Match the same kinds compileJob walks.
 export function pruneOrphanLayers(scene: Scene): Scene {
-  const usedColors = new Set<string>();
-  for (const obj of scene.objects) {
-    if (
-      obj.kind === 'imported-svg' ||
-      obj.kind === 'text' ||
-      obj.kind === 'traced-image' ||
-      obj.kind === 'shape'
-    ) {
-      for (const p of obj.paths) usedColors.add(p.color);
-    } else if (obj.kind === 'raster-image') {
-      usedColors.add(obj.color);
-    }
-  }
-  const kept = scene.layers.filter((l) => usedColors.has(l.color));
+  const kept = scene.layers.filter((operation) =>
+    scene.objects.some((object) => sceneObjectUsesOperation(object, operation)),
+  );
   if (kept.length === scene.layers.length) return scene;
   return { ...scene, layers: kept };
 }
@@ -289,25 +219,12 @@ export function applyFreshImport(
     const color = resolveRasterLayerColor(s.project.scene, positioned.color);
     if (color !== positioned.color) positioned = { ...positioned, color };
   }
+  const created = createArtworkOperations(s.project.scene, positioned, {
+    mode: freshArtworkMode(positioned),
+  });
+  positioned = created.object;
   let scene = addObject(s.project.scene, positioned);
-  if (
-    positioned.kind === 'imported-svg' ||
-    positioned.kind === 'text' ||
-    positioned.kind === 'traced-image'
-  ) {
-    scene = ensureLayersForColors(scene, positioned.paths);
-  } else if (positioned.kind === 'raster-image') {
-    // F.2.c: ensure an image-mode layer exists for the raster's
-    // color. Raster images bring their own color (typically the
-    // canonical DEFAULT_RASTER_LAYER_COLOR) and need mode='image'
-    // on the created layer so the eventual F.2.d compile arm
-    // dispatches to emit-raster.
-    scene = ensureRasterImageLayer(scene, positioned.color);
-  } else if (positioned.kind === 'relief') {
-    // H.4: a relief binds to a plain layer by color; its CNC settings live
-    // on that layer (laser mode fields are inert for it).
-    scene = ensureLayersForColors(scene, [{ color: positioned.color }]);
-  }
+  for (const operation of created.operations) scene = addLayer(scene, operation);
   return {
     project: { ...s.project, scene },
     selectedObjectId: positioned.id,
@@ -318,6 +235,15 @@ export function applyFreshImport(
     redoStack: [],
     dirty: true,
   };
+}
+
+function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
+  if (object.kind === 'raster-image') return 'image';
+  if (object.kind === 'traced-image') {
+    if (object.traceMode === 'centerline' || object.traceMode === 'edge') return 'line';
+    return object.operationOverride?.mode ?? 'fill';
+  }
+  return object.operationOverride?.mode ?? 'line';
 }
 
 // Build the transform that lands a trace pixel-for-pixel over the bitmap
@@ -377,8 +303,11 @@ export function applyTraceToExisting(
   if (options.replaceTraceId !== undefined) {
     scene = removeObject(scene, options.replaceTraceId);
   }
-  scene = addObject(scene, positionedTrace);
-  scene = ensureLayersForTrace(scene, positionedTrace);
+  const created = createArtworkOperations(scene, positionedTrace, {
+    mode: freshArtworkMode(positionedTrace),
+  });
+  scene = addObject(scene, created.object);
+  for (const operation of created.operations) scene = addLayer(scene, operation);
   if (prepared.shouldPruneLayers) {
     scene = pruneOrphanLayers(scene);
   }
@@ -437,20 +366,6 @@ function positionTrace(
   };
 }
 
-function ensureLayersForTrace(scene: Scene, trace: TracedImage): Scene {
-  if (trace.traceMode === 'centerline' || trace.traceMode === 'edge') {
-    return ensureLineLayersForColors(scene, trace.paths);
-  }
-  if (usesObjectFillOverride(trace)) {
-    return ensureNewFillLayersForColors(scene, trace.paths);
-  }
-  return ensureFillLayersForColors(scene, trace.paths);
-}
-
-function usesObjectFillOverride(trace: TracedImage): boolean {
-  return trace.operationOverride?.mode === 'fill';
-}
-
 export function applyReimport(
   s: StateSlice,
   existing: ImportedSvg,
@@ -460,9 +375,17 @@ export function applyReimport(
   // chosen position/scale/rotation survives. Layer settings carry
   // over for any color still present (layers are keyed by color,
   // scene-wide).
-  const replaced: ImportedSvg = { ...incoming, id: existing.id, transform: existing.transform };
-  let scene = replaceObject(s.project.scene, existing.id, replaced);
-  scene = ensureLayersForColors(scene, replaced.paths);
+  const { operationIds: _incomingOperationIds, ...incomingWithoutOperationIds } = incoming;
+  const inheritedPaths = inheritPathOperationIds(existing, incoming);
+  const replaced: ImportedSvg = {
+    ...incomingWithoutOperationIds,
+    id: existing.id,
+    transform: existing.transform,
+    paths: inheritedPaths,
+  };
+  const prepared = addMissingReimportOperations(s.project.scene, replaced);
+  let scene = replaceObject(prepared.scene, existing.id, prepared.object);
+  scene = pruneOrphanLayers(scene);
   const oldColors = new Set(existing.paths.map((p) => p.color));
   const newColors = new Set(replaced.paths.map((p) => p.color));
   let kept = 0;
@@ -487,31 +410,79 @@ export function applyReimport(
   };
 }
 
+function inheritPathOperationIds(
+  existing: ImportedSvg,
+  incoming: ImportedSvg,
+): ImportedSvg['paths'] {
+  return incoming.paths.map((path) => {
+    const previous = existing.paths.find((candidate) => candidate.color === path.color);
+    const ids =
+      previous?.operationIds ?? (previous === undefined ? undefined : existing.operationIds);
+    return ids === undefined ? path : { ...path, operationIds: ids };
+  });
+}
+
+function addMissingReimportOperations(
+  scene: Scene,
+  object: ImportedSvg,
+): { readonly scene: Scene; readonly object: ImportedSvg } {
+  const missingColors = [
+    ...new Set(
+      object.paths
+        .filter((path) => (path.operationIds?.length ?? 0) === 0)
+        .map((path) => path.color.toLowerCase()),
+    ),
+  ];
+  if (missingColors.length === 0) return { scene, object };
+  let workingScene = scene;
+  let paths = object.paths;
+  const assignedCount = new Set(paths.flatMap((path) => path.operationIds ?? [])).size;
+  missingColors.forEach((color, index) => {
+    const created = createArtworkOperation(workingScene, object, {
+      name: `${artworkOperationName(object)} ${assignedCount + index + 1}`,
+    });
+    workingScene = addLayer(workingScene, created.operation);
+    paths = paths.map((path) =>
+      path.color.toLowerCase() === color && (path.operationIds?.length ?? 0) === 0
+        ? { ...path, operationIds: [created.operation.id] }
+        : path,
+    );
+  });
+  return { scene: workingScene, object: { ...object, paths } };
+}
+
 // Insert or update a TextObject by id. On edit (id matches), keeps
 // the existing object's transform so the user's position survives
 // re-renders. On add, fits to the bed like a fresh SVG import.
 export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult {
   const existing = s.project.scene.objects.find((o) => o.id === text.id);
-  const hadLayer = s.project.scene.layers.some((layer) => layer.color === text.color);
   let scene: Scene;
+  let operationId: string | null = null;
   if (existing !== undefined) {
     const preserved: TextObject = {
       ...text,
       transform: text.pathText === undefined ? existing.transform : text.transform,
+      ...(existing.operationIds === undefined ? {} : { operationIds: existing.operationIds }),
+      paths: text.paths.map((path, index) => {
+        const operationIds = 'paths' in existing ? existing.paths[index]?.operationIds : undefined;
+        return operationIds === undefined ? path : { ...path, operationIds };
+      }),
     };
     scene = replaceObject(s.project.scene, text.id, preserved);
-  } else if (text.pathText !== undefined) {
-    scene = addObject(s.project.scene, text);
   } else {
-    const fitted = fitObjectToBed(text, s.project.device.bedWidth, s.project.device.bedHeight);
-    scene = addObject(s.project.scene, fitted);
+    const created = createArtworkOperation(s.project.scene, text);
+    const prepared =
+      text.pathText !== undefined
+        ? created.object
+        : fitObjectToBed(created.object, s.project.device.bedWidth, s.project.device.bedHeight);
+    scene = addLayer(addObject(s.project.scene, prepared), created.operation);
+    operationId = created.operation.id;
   }
-  scene = ensureLayersForColors(scene, text.paths);
   // H.6c: a text layer born in CNC mode gets text-appropriate CNC settings
   // (v-carve with a v-bit, on-path engrave otherwise) instead of the
   // letter-destroying profile-outside default.
-  if (!hadLayer) {
-    scene = applyCncTextDefaultsToNewLayer(scene, s.project.machine, text.color, text.fontKey);
+  if (operationId !== null) {
+    scene = applyCncTextDefaultsToNewLayer(scene, s.project.machine, operationId, text.fontKey);
   }
   return {
     project: { ...s.project, scene },

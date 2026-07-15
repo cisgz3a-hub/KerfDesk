@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { primaryOperationForObject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
@@ -16,11 +17,154 @@ const mockPlatform: PlatformAdapter = {
   id: 'mock',
   pickFilesForOpen: async () => [],
   pickFileForSave: async () => null,
-  serial: {
-    isSupported: () => false,
-    requestPort: async () => null,
-  },
+  serial: { isSupported: () => false, requestPort: async () => null },
 };
+
+afterEach(() => resetStore());
+
+describe('selected artwork cut settings', () => {
+  it('updates job air assist on the selected artwork operation', async () => {
+    arrangeArtwork();
+    const panel = await renderPanel();
+    try {
+      const air = requireInput(panel.host, 'input[aria-label="Air assist for selected operation"]');
+      expect(air.checked).toBe(false);
+
+      await act(async () => air.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+      expect(operation().airAssist).toBe(true);
+    } finally {
+      await panel.unmount();
+    }
+  });
+
+  it('shows CNC fields instead of laser air assist in CNC mode', async () => {
+    useStore.getState().setMachineKind('cnc');
+    arrangeArtwork();
+    const panel = await renderPanel();
+    try {
+      expect(
+        panel.host.querySelector('input[aria-label="Air assist for selected operation"]'),
+      ).toBeNull();
+      expect(panel.host.textContent).toContain('Cut depth');
+    } finally {
+      await panel.unmount();
+    }
+  });
+
+  it('stages advanced settings and applies them only after OK', async () => {
+    arrangeArtwork();
+    const panel = await renderPanel();
+    try {
+      await openAdvancedSettings(panel.host);
+      const power = requireInput(panel.host, 'input[aria-label="Cut settings power"]');
+      const speed = requireInput(panel.host, 'input[aria-label="Cut settings speed"]');
+      await act(async () => {
+        power.value = '42';
+        power.dispatchEvent(new Event('input', { bubbles: true }));
+        speed.value = '1777';
+        speed.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(operation().power).toBe(30);
+
+      await clickButton(panel.host, 'OK');
+
+      expect(operation()).toMatchObject({ power: 42, speed: 1777 });
+    } finally {
+      await panel.unmount();
+    }
+  });
+
+  it('caps advanced speed to the active device maximum', async () => {
+    arrangeArtwork();
+    useStore.setState((state) => ({
+      project: { ...state.project, device: { ...state.project.device, maxFeed: 1200 } },
+    }));
+    const panel = await renderPanel();
+    try {
+      await openAdvancedSettings(panel.host);
+      const speed = requireInput(panel.host, 'input[aria-label="Cut settings speed"]');
+      expect(speed.max).toBe('1200');
+      expect(speed.value).toBe('1200');
+      await clickButton(panel.host, 'OK');
+      expect(operation().speed).toBe(1200);
+    } finally {
+      await panel.unmount();
+    }
+  });
+
+  it('cancels staged settings without changing the operation', async () => {
+    arrangeArtwork();
+    const panel = await renderPanel();
+    try {
+      await openAdvancedSettings(panel.host);
+      const speed = requireInput(panel.host, 'input[aria-label="Cut settings speed"]');
+      await act(async () => {
+        speed.value = '999';
+        speed.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await clickButton(panel.host, 'Cancel');
+      expect(operation().speed).toBe(1500);
+      expect(panel.host.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      await panel.unmount();
+    }
+  });
+
+  it('edits image settings directly on the selected artwork operation', async () => {
+    arrangeArtwork();
+    useStore.getState().setLayerParam(operation().id, { mode: 'image' });
+    const panel = await renderPanel();
+    try {
+      const negative = requireInput(
+        panel.host,
+        'input[aria-label="Negative image for selected objects"]',
+      );
+      const interval = requireInput(
+        panel.host,
+        'input[aria-label="Line interval for selected objects"]',
+      );
+      await act(async () => negative.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+      await act(async () => {
+        interval.value = '0.2';
+        Simulate.change(interval);
+      });
+      await act(async () => Simulate.blur(interval));
+
+      expect(operation()).toMatchObject({ negativeImage: true, linesPerMm: 5 });
+      expect(useStore.getState().project.scene.objects[0]?.operationOverride).toBeUndefined();
+    } finally {
+      await panel.unmount();
+    }
+  });
+
+  it('applies fill style from the advanced operation dialog', async () => {
+    arrangeArtwork();
+    useStore.getState().setLayerParam(operation().id, { mode: 'fill', fillStyle: 'scanline' });
+    const panel = await renderPanel();
+    try {
+      await openAdvancedSettings(panel.host);
+      const fillStyle = requireSelect(panel.host, 'select[name="fillStyle"]');
+      fillStyle.value = 'offset';
+      await clickButton(panel.host, 'OK');
+      expect(operation().fillStyle).toBe('offset');
+    } finally {
+      await panel.unmount();
+    }
+  });
+});
+
+function arrangeArtwork(): void {
+  useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+}
+
+function operation() {
+  const scene = useStore.getState().project.scene;
+  const object = scene.objects.find((candidate) => candidate.id === 'O1');
+  const selected = object === undefined ? null : primaryOperationForObject(object, scene.layers);
+  if (selected === null) throw new Error('selected operation missing');
+  return selected;
+}
 
 function PanelUnderTest(): JSX.Element {
   return (
@@ -30,10 +174,7 @@ function PanelUnderTest(): JSX.Element {
   );
 }
 
-async function renderPanel(): Promise<{
-  readonly host: HTMLDivElement;
-  readonly unmount: () => Promise<void>;
-}> {
+async function renderPanel(): Promise<{ host: HTMLDivElement; unmount: () => Promise<void> }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
@@ -50,331 +191,16 @@ async function renderPanel(): Promise<{
   };
 }
 
-afterEach(() => {
-  resetStore();
-});
-
-describe('CutsLayersPanel cut settings editor', () => {
-  it('toggles job air assist directly from the layer row', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const air = requireInput(host, 'input[aria-label="Job air assist for #ff0000"]');
-      expect(air.checked).toBe(false);
-
-      await act(async () => {
-        air.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      expect(useStore.getState().project.scene.layers[0]?.airAssist).toBe(true);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('hides job air assist while editing CNC layers', async () => {
-    useStore.getState().setMachineKind('cnc');
-    useStore.getState().createManualLayer('#ff0000');
-    const { host, unmount } = await renderPanel();
-    try {
-      expect(host.querySelector('input[aria-label="Job air assist for #ff0000"]')).toBeNull();
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('opens a staged editor and applies changes only after OK', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-      const power = requireInput(host, 'input[aria-label="Cut settings power"]');
-      const speed = requireInput(host, 'input[aria-label="Cut settings speed"]');
-
-      await act(async () => {
-        power.value = '42';
-        power.dispatchEvent(new Event('input', { bubbles: true }));
-        speed.value = '1777';
-        speed.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-      expect(useStore.getState().project.scene.layers[0]?.power).toBe(30);
-
-      await clickButtonWithText(host, 'OK');
-
-      const layer = useStore.getState().project.scene.layers[0];
-      expect(layer?.power).toBe(42);
-      expect(layer?.speed).toBe(1777);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('caps staged cut setting speed to the active device max feed', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.setState((state) => ({
-      project: {
-        ...state.project,
-        device: { ...state.project.device, maxFeed: 1200 },
-      },
-    }));
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-      const speed = requireInput(host, 'input[aria-label="Cut settings speed"]');
-      expect(speed.max).toBe('1200');
-      expect(speed.value).toBe('1200');
-      await clickButtonWithText(host, 'OK');
-
-      expect(useStore.getState().project.scene.layers[0]?.speed).toBe(1200);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('cancels staged cut setting edits without mutating the layer', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-      const speed = requireInput(host, 'input[aria-label="Cut settings speed"]');
-      await act(async () => {
-        speed.value = '999';
-        speed.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-
-      await clickButtonWithText(host, 'Cancel');
-
-      expect(useStore.getState().project.scene.layers[0]?.speed).toBe(1500);
-      expect(host.querySelector('[role="dialog"]')).toBeNull();
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('does not show job air assist inside the Cut Settings dialog', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { airAssist: true });
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-
-      expect(host.querySelector('input[name="airAssist"]')).toBeNull();
-      await clickButtonWithText(host, 'OK');
-
-      expect(useStore.getState().project.scene.layers[0]?.airAssist).toBe(true);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('makes a layer default from the Cut Settings dialog', async () => {
-    useStore.getState().createManualLayer('#ff0000');
-    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 24, speed: 1888 });
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-      await clickButtonWithText(host, 'Make Default');
-
-      await act(async () => {
-        useStore.getState().deleteLayerAndObjects('#ff0000');
-        useStore.getState().createManualLayer('#ff0000');
-      });
-
-      expect(useStore.getState().project.scene.layers[0]).toMatchObject({
-        id: '#ff0000',
-        color: '#ff0000',
-        mode: 'fill',
-        power: 24,
-        speed: 1888,
-      });
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('applies image toggles from the staged image editor', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-      requireInput(host, 'input[name="negativeImage"]').checked = true;
-      requireInput(host, 'input[name="passThrough"]').checked = true;
-      requireInput(host, 'input[name="imageBidirectional"]').checked = false;
-      requireInput(host, 'input[name="dotWidthCorrectionMm"]').value = '0.08';
-
-      await clickButtonWithText(host, 'OK');
-
-      const layer = useStore.getState().project.scene.layers[0];
-      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
-      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
-      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(false);
-      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
-        0.08,
-      );
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('maps staged cut-settings DPI into image lines per mm', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
-    const { host, unmount } = await renderPanel();
-    try {
-      await openCutSettings(host, '#ff0000');
-      const dpiInput = requireInput(host, 'input[name="imageDpi"]');
-      dpiInput.value = '508';
-      expect(dpiInput.validity.stepMismatch).toBe(false);
-      expect(dpiInput.checkValidity()).toBe(true);
-
-      await clickButtonWithText(host, 'OK');
-
-      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(20);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('applies image toggles from the selected artwork settings to the selected object only', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
-    const { host, unmount } = await renderPanel();
-    try {
-      const negative = requireInput(
-        host,
-        'input[aria-label="Negative image for selected objects"]',
-      );
-      const passThrough = requireInput(
-        host,
-        'input[aria-label="Pass-through image for selected objects"]',
-      );
-      const bidirectional = requireInput(
-        host,
-        'input[aria-label="Bidirectional image scan for selected objects"]',
-      );
-      const dotWidth = requireInput(
-        host,
-        'input[aria-label="Dot width correction for selected objects"]',
-      );
-
-      await act(async () => {
-        negative.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        passThrough.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        bidirectional.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-      await act(async () => {
-        dotWidth.value = '0.07';
-        Simulate.change(dotWidth);
-      });
-      await act(async () => {
-        Simulate.blur(dotWidth);
-      });
-
-      const state = useStore.getState();
-      const layer = state.project.scene.layers[0];
-      const override = state.project.scene.objects[0]?.operationOverride;
-      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(false);
-      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(false);
-      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(true);
-      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(0);
-      expect(override?.negativeImage).toBe(true);
-      expect(override?.passThrough).toBe(true);
-      expect(override?.imageBidirectional).toBe(false);
-      expect(override?.dotWidthCorrectionMm).toBe(0.07);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('maps selected artwork line interval and DPI edits onto the selected object only', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
-    const { host, unmount } = await renderPanel();
-    try {
-      const interval = requireInput(host, 'input[aria-label="Line interval for selected objects"]');
-      await act(async () => {
-        interval.value = '0.2';
-        Simulate.change(interval);
-      });
-      await act(async () => {
-        Simulate.blur(interval);
-      });
-      let state = useStore.getState();
-      expect(state.project.scene.layers[0]?.linesPerMm).toBe(10);
-      expect(state.project.scene.objects[0]?.operationOverride?.linesPerMm).toBe(5);
-
-      const dpi = requireInput(host, 'input[aria-label="DPI for selected objects"]');
-      await act(async () => {
-        dpi.value = '254';
-        Simulate.change(dpi);
-      });
-      expect(dpi.validity.stepMismatch).toBe(false);
-      expect(dpi.checkValidity()).toBe(true);
-      await act(async () => {
-        Simulate.blur(dpi);
-      });
-      state = useStore.getState();
-      expect(state.project.scene.layers[0]?.linesPerMm).toBe(10);
-      expect(state.project.scene.objects[0]?.operationOverride?.linesPerMm).toBe(10);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('applies selected artwork Fill Style to the object override and reset removes it', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', fillStyle: 'scanline' });
-    const { host, unmount } = await renderPanel();
-    try {
-      const fillStyle = requireSelect(host, 'select[aria-label="Fill style for selected objects"]');
-      expect(fillStyle.value).toBe('scanline');
-
-      await act(async () => {
-        fillStyle.value = 'offset';
-        Simulate.change(fillStyle);
-      });
-
-      let state = useStore.getState();
-      expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
-      expect(state.project.scene.objects[0]?.operationOverride?.fillStyle).toBe('offset');
-
-      await act(async () => {
-        fillStyle.value = 'island';
-        Simulate.change(fillStyle);
-      });
-
-      state = useStore.getState();
-      expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
-      expect(state.project.scene.objects[0]?.operationOverride?.fillStyle).toBe('island');
-
-      await clickButtonWithText(host, 'Reset to layer defaults');
-
-      state = useStore.getState();
-      expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
-      expect(state.project.scene.objects[0]?.operationOverride).toBeUndefined();
-    } finally {
-      await unmount();
-    }
-  });
-});
-
-async function openCutSettings(host: HTMLElement, color: string): Promise<void> {
-  const edit = host.querySelector(`button[aria-label="Edit cut settings for ${color}"]`);
-  if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
-  await act(async () => {
-    edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+async function openAdvancedSettings(host: HTMLElement): Promise<void> {
+  await clickButton(host, 'Advanced cut settings');
 }
 
-async function clickButtonWithText(host: HTMLElement, text: string): Promise<void> {
+async function clickButton(host: HTMLElement, text: string): Promise<void> {
   const button = [...host.querySelectorAll('button')].find(
     (candidate) => candidate.textContent === text,
   );
   if (!(button instanceof HTMLButtonElement)) throw new Error(`${text} button missing`);
-  await act(async () => {
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+  await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 }
 
 function requireInput(host: HTMLElement, selector: string): HTMLInputElement {

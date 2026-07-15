@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   findRegistrationBoxes,
   IDENTITY_TRANSFORM,
+  primaryOperationForObject,
   REGISTRATION_LAYER_ID,
   transformedBBox,
 } from '../../core/scene';
@@ -72,8 +73,11 @@ describe('addCapturedBoardBox', () => {
     drawArtwork();
     useStore.getState().addCapturedBoardBox(120, 80);
     const scene = useStore.getState().project.scene;
+    const artwork = scene.objects.find((object) => object.id === 'art');
+    const artworkOperation =
+      artwork === undefined ? null : primaryOperationForObject(artwork, scene.layers);
     expect(scene.layers.find((l) => l.id === REGISTRATION_LAYER_ID)?.output).toBe(false);
-    expect(scene.layers.find((l) => l.id === '#0000ff')?.output).toBe(true);
+    expect(artworkOperation?.output).toBe(true);
   });
 });
 

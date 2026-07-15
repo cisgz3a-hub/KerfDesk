@@ -22,10 +22,14 @@
 // still added rather than silently lost, mirroring applyTraceToExisting's
 // missing-source fallback.
 
-import { addObject, type RasterImage, removeObject } from '../../core/scene';
 import {
-  ensureRasterImageLayer,
-  resolveRasterLayerColor,
+  addLayer,
+  addObject,
+  createArtworkOperation,
+  type RasterImage,
+  removeObject,
+} from '../../core/scene';
+import {
   type MutationResult,
   pruneOrphanLayers,
   pushUndo,
@@ -38,19 +42,21 @@ export function applyConvertToBitmap(
   raster: RasterImage,
 ): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
   let scene = s.project.scene;
-  const color = resolveRasterLayerColor(scene, raster.color, raster.linesPerMm);
-  const converted = color === raster.color ? raster : { ...raster, color };
   for (const sourceId of sourceIds) {
     if (scene.objects.some((o) => o.id === sourceId)) {
       scene = removeObject(scene, sourceId);
     }
   }
-  scene = addObject(scene, converted);
-  scene = ensureRasterImageLayer(scene, converted.color, converted.linesPerMm);
+  scene = pruneOrphanLayers(scene);
+  const created = createArtworkOperation(scene, raster, { mode: 'image' });
+  const converted = created.object as RasterImage;
+  scene = addLayer(addObject(scene, converted), {
+    ...created.operation,
+    linesPerMm: raster.linesPerMm,
+  });
   // Drop the source vectors' color layers if nothing else references them —
   // same cleanup removeSceneObject does, so converted shapes don't leave
   // stale line/fill rows (with their power/speed) in the Cuts panel.
-  scene = pruneOrphanLayers(scene);
   return {
     project: { ...s.project, scene },
     selectedObjectId: converted.id,

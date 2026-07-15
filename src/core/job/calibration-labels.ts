@@ -41,7 +41,12 @@ const DIGITS: Record<string, ReadonlyArray<SegmentName>> = {
 
 export function createCalibrationLabelLayer(id: string): Layer {
   return {
-    ...createLayer({ id, color: CALIBRATION_LABEL_COLOR, mode: 'line' }),
+    ...createLayer({
+      id,
+      name: 'Calibration labels',
+      color: CALIBRATION_LABEL_COLOR,
+      mode: 'line',
+    }),
     power: LABEL_POWER,
     speed: LABEL_SPEED,
   };
@@ -49,6 +54,7 @@ export function createCalibrationLabelLayer(id: string): Layer {
 
 export function createCalibrationLabelObject(args: {
   readonly id: string;
+  readonly operationId: string;
   readonly text: string;
   readonly x: number;
   readonly y: number;
@@ -59,6 +65,7 @@ export function createCalibrationLabelObject(args: {
     kind: 'imported-svg',
     id: args.id,
     source: `${SOURCE_PREFIX}${args.text}`,
+    operationIds: [args.operationId],
     bounds: rendered.bounds,
     transform: { ...IDENTITY_TRANSFORM, x: args.x, y: args.y },
     paths: [{ color: CALIBRATION_LABEL_COLOR, polylines: rendered.polylines }],

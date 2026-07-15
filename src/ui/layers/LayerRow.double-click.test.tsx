@@ -6,8 +6,8 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { useUiStore } from '../state/ui-store';
 import { resetStore, svgObj } from '../state/test-helpers';
+import { useUiStore } from '../state/ui-store';
 import { CutsLayersPanel } from './CutsLayersPanel';
 
 (
@@ -18,19 +18,8 @@ const mockPlatform: PlatformAdapter = {
   id: 'mock',
   pickFilesForOpen: async () => [],
   pickFileForSave: async () => null,
-  serial: {
-    isSupported: () => false,
-    requestPort: async () => null,
-  },
+  serial: { isSupported: () => false, requestPort: async () => null },
 };
-
-function PanelUnderTest(): JSX.Element {
-  return (
-    <PlatformProvider adapter={mockPlatform}>
-      <CutsLayersPanel />
-    </PlatformProvider>
-  );
-}
 
 afterEach(() => {
   resetStore();
@@ -42,104 +31,31 @@ afterEach(() => {
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
-describe('LayerRow double-click cut settings', () => {
-  it('selects a layer row as the current drawing layer', async () => {
+describe('compact operation row and selected operation settings', () => {
+  it('makes an operation row the current drawing color without putting settings in the row', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const mounted = await mountPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<PanelUnderTest />);
-      });
+      const row = operationRow(mounted.host);
+      await click(row);
 
-      const row = host.querySelector('section[aria-label="Layer #ff0000"]');
-      if (!(row instanceof HTMLElement)) throw new Error('layer row missing');
-      await act(async () => {
-        row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      expect(useUiStore.getState().activeLayerColor).toBe('#ff0000');
+      expect(useUiStore.getState().activeLayerColor).toBe('#2563eb');
       expect(row.getAttribute('aria-current')).toBe('true');
+      expect(row.querySelector('select')).toBeNull();
+      expect(row.textContent).not.toContain('Advanced cut settings');
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await mounted.unmount();
     }
   });
 
-  it('opens the cut settings dialog by double-clicking a layer entry', async () => {
+  it('opens advanced settings from the selected artwork inspector', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const mounted = await mountPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<PanelUnderTest />);
-      });
-
-      const row = host.querySelector('section[aria-label="Layer #ff0000"]');
-      if (!(row instanceof HTMLElement)) throw new Error('layer row missing');
-      await act(async () => {
-        row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-      });
-
-      expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+      await click(advancedButton(mounted.host));
+      expect(mounted.host.querySelector('[role="dialog"]')).not.toBeNull();
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    }
-  });
-
-  it('does not open cut settings when double-clicking an interactive layer control', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<PanelUnderTest />);
-      });
-
-      const mode = host.querySelector('select[aria-label="Mode for #ff0000"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('mode select missing');
-      await act(async () => {
-        mode.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-      });
-
-      expect(host.querySelector('[role="dialog"]')).toBeNull();
-    } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    }
-  });
-
-  it('does not open cut settings when double-clicking an interactive layer label', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<PanelUnderTest />);
-      });
-
-      const showToggle = Array.from(host.querySelectorAll('label')).find((label) =>
-        label.textContent?.includes('Show'),
-      );
-      if (!(showToggle instanceof HTMLLabelElement)) throw new Error('show label missing');
-      await act(async () => {
-        showToggle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-      });
-
-      expect(host.querySelector('[role="dialog"]')).toBeNull();
-    } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await mounted.unmount();
     }
   });
 
@@ -159,64 +75,73 @@ describe('LayerRow double-click cut settings', () => {
         }),
     ],
     ['active autofocus', () => useLaserStore.setState({ autofocusBusy: true })],
-  ] as const)('blocks cut settings while %s is running', async (_label, makeBusy) => {
+  ] as const)('blocks advanced settings during %s', async (_label, makeBusy) => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     makeBusy();
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const mounted = await mountPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<PanelUnderTest />);
-      });
-
-      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
-      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
-      expect(edit.disabled).toBe(true);
-
-      const row = host.querySelector('section[aria-label="Layer #ff0000"]');
-      if (!(row instanceof HTMLElement)) throw new Error('layer row missing');
-      await act(async () => {
-        row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-      });
-
-      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(advancedButton(mounted.host).disabled).toBe(true);
+      expect(mounted.host.querySelector('[role="dialog"]')).toBeNull();
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await mounted.unmount();
     }
   });
 
-  it('closes an open cut settings dialog when machine activity starts', async () => {
+  it('closes advanced settings when machine activity starts', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const mounted = await mountPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<PanelUnderTest />);
-      });
-
-      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
-      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
-      await act(async () => {
-        edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-      expect(host.querySelector('[role="dialog"]')).not.toBeNull();
-
-      await act(async () => {
-        useLaserStore.setState({ autofocusBusy: true });
-      });
-
-      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      await click(advancedButton(mounted.host));
+      expect(mounted.host.querySelector('[role="dialog"]')).not.toBeNull();
+      await act(async () => useLaserStore.setState({ autofocusBusy: true }));
+      expect(mounted.host.querySelector('[role="dialog"]')).toBeNull();
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await mounted.unmount();
     }
   });
 });
+
+async function mountPanel(): Promise<{
+  readonly host: HTMLDivElement;
+  readonly unmount: () => Promise<void>;
+}> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(
+      <PlatformProvider adapter={mockPlatform}>
+        <CutsLayersPanel />
+      </PlatformProvider>,
+    );
+  });
+  return {
+    host,
+    unmount: async () => {
+      await act(async () => root?.unmount());
+      host.remove();
+    },
+  };
+}
+
+function operationRow(host: HTMLElement): HTMLElement {
+  const row = host.querySelector('section[aria-label="Operation O1"]');
+  if (!(row instanceof HTMLElement)) throw new Error('operation row missing');
+  return row;
+}
+
+function advancedButton(host: HTMLElement): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent === 'Advanced cut settings',
+  );
+  if (!(button instanceof HTMLButtonElement)) throw new Error('advanced settings button missing');
+  return button;
+}
+
+async function click(element: HTMLElement): Promise<void> {
+  await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+}
 
 function activeStreamer(): StreamerState {
   return { status: 'streaming' } as StreamerState;

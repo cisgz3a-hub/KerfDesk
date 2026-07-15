@@ -4,6 +4,7 @@ import {
   createProject,
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
+  operationIdsForObject,
   type ColoredPath,
   type Project,
   type RasterImage,
@@ -81,12 +82,13 @@ describe('scene clipboard actions', () => {
     expect(pasted[0]?.transform).toMatchObject({ x: 10, y: 10 });
     expect(state.selectedObjectId).toBe(pasted[0]?.id);
     expect(state.additionalSelectedIds.size).toBe(4);
-    expect(state.project.scene.layers.map((layer) => layer.color).sort()).toEqual([
-      '#000000',
-      '#123456',
-      '#808080',
-      '#ff0000',
-    ]);
+    expect(state.project.scene.layers).toHaveLength(4);
+    expect(new Set(state.project.scene.layers.map((layer) => layer.color)).size).toBe(4);
+    expect(
+      pasted.every(
+        (object) => operationIdsForObject(object, state.project.scene.layers).length > 0,
+      ),
+    ).toBe(true);
     expect(state.undoStack).toHaveLength(1);
     expect(state.dirty).toBe(true);
   });
@@ -112,7 +114,22 @@ describe('scene clipboard actions', () => {
 
     const state = useStore.getState();
     expect(state.project.scene.objects).toHaveLength(5);
-    expect(state.project.scene.layers.some((layer) => layer.color === '#808080')).toBe(true);
+    const pastedRaster = state.project.scene.objects.find(
+      (object) => object.kind === 'raster-image' && object.id !== 'raster-1',
+    );
+    expect(pastedRaster).toBeDefined();
+    expect(
+      pastedRaster === undefined
+        ? []
+        : operationIdsForObject(pastedRaster, state.project.scene.layers),
+    ).toHaveLength(1);
+    const pastedRasterOperation = state.project.scene.layers.find(
+      (operation) =>
+        pastedRaster !== undefined &&
+        operationIdsForObject(pastedRaster, state.project.scene.layers).includes(operation.id),
+    );
+    expect(pastedRasterOperation?.mode).toBe('image');
+    expect(pastedRasterOperation?.color).not.toBe('#808080');
   });
 });
 

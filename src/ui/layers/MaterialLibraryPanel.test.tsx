@@ -214,10 +214,12 @@ describe('MaterialLibraryPanel', () => {
 
   it('assigns a selected preset to the selected target layer', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    const targetId = useStore.getState().project.scene.layers[1]?.id;
+    if (targetId === undefined) throw new Error('target operation missing');
     useStore.getState().setMaterialLibrary(library([preset()]));
     const { host, root } = await renderPanel();
     try {
-      await setSelectValue(select(host, 'Material library target layer'), '#0000ff');
+      await setSelectValue(select(host, 'Material library target layer'), targetId);
       await setSelectValue(select(host, 'Material library preset'), 'birch-3mm-cut');
 
       await act(async () => {
@@ -226,7 +228,7 @@ describe('MaterialLibraryPanel', () => {
 
       const target = useStore
         .getState()
-        .project.scene.layers.find((layer) => layer.id === '#0000ff');
+        .project.scene.layers.find((layer) => layer.id === targetId);
       expect(target).toBeDefined();
       if (target === undefined) throw new Error('target layer missing');
       expect(captureMaterialRecipe(target)).toEqual(recipe());

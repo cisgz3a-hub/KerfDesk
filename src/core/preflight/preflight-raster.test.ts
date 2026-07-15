@@ -134,7 +134,13 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
       ...createProject(),
       scene: {
         ...EMPTY_SCENE,
-        objects: [{ ...grayRaster, lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==' }],
+        objects: [
+          {
+            ...grayRaster,
+            operationIds: [baseLayer.id],
+            lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
+          },
+        ],
         layers: [{ ...baseLayer, subLayers: [imageSubLayer] }],
       },
     };

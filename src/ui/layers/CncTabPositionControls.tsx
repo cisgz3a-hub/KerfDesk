@@ -1,5 +1,6 @@
 import {
-  sceneObjectUsesLayerColor,
+  pathUsesOperation,
+  sceneObjectUsesOperation,
   type CncLayerSettings,
   type Layer,
   type SceneObject,
@@ -23,17 +24,18 @@ export function CncTabPositionControls(props: {
   const fitToSelection = useStore((state) => state.fitToSelection);
   const toolMode = useUiStore((state) => state.toolMode);
   const setToolMode = useUiStore((state) => state.setToolMode);
+  const tabPathColor = selectedTabPathColor(selectedObject, layer);
   const manualCount =
-    selectedObject?.cncTabAnchors?.filter((anchor) => anchor.layerColor === layer.color).length ??
+    selectedObject?.cncTabAnchors?.filter((anchor) => anchor.layerColor === tabPathColor).length ??
     0;
   const canEdit = canEditTabPositions(
     selectedObjectId,
     hasAdditionalSelection,
     selectedObject,
-    layer.color,
+    layer,
     settings,
   );
-  const editing = toolMode.kind === 'cnc-tabs' && toolMode.layerColor === layer.color;
+  const editing = toolMode.kind === 'cnc-tabs' && toolMode.layerColor === tabPathColor;
   return (
     <Row label="Tab positions">
       <button
@@ -46,8 +48,8 @@ export function CncTabPositionControls(props: {
             : 'Select one unlocked profile object to edit its tab positions.'
         }
         onClick={() => {
-          seedAnchors(layer.color, settings.tabsPerShape);
-          setToolMode({ kind: 'cnc-tabs', layerColor: layer.color });
+          seedAnchors(tabPathColor, settings.tabsPerShape);
+          setToolMode({ kind: 'cnc-tabs', layerColor: tabPathColor });
           fitToSelection();
         }}
       >
@@ -57,7 +59,7 @@ export function CncTabPositionControls(props: {
         <button
           type="button"
           onClick={() => {
-            resetAnchors(layer.color);
+            resetAnchors(tabPathColor);
             useUiStore.getState().resetToolMode();
           }}
           title="Discard dragged positions and distribute tabs automatically again."
@@ -73,7 +75,7 @@ function canEditTabPositions(
   selectedObjectId: string | null,
   hasAdditionalSelection: boolean,
   selectedObject: SceneObject | undefined,
-  layerColor: string,
+  layer: Layer,
   settings: CncLayerSettings,
 ): boolean {
   return (
@@ -82,7 +84,12 @@ function canEditTabPositions(
     selectedObject !== undefined &&
     selectedObject.locked !== true &&
     'paths' in selectedObject &&
-    sceneObjectUsesLayerColor(selectedObject, layerColor) &&
+    sceneObjectUsesOperation(selectedObject, layer) &&
     settings.cutType.startsWith('profile')
   );
+}
+
+function selectedTabPathColor(object: SceneObject | undefined, layer: Layer): string {
+  if (object === undefined || !('paths' in object)) return layer.color;
+  return object.paths.find((path) => pathUsesOperation(object, path, layer))?.color ?? layer.color;
 }

@@ -13,7 +13,7 @@ import {
   STREAMED_RASTER_PIXEL_THRESHOLD,
   supportsStreamedRasterRows,
 } from '../raster/raster-budget';
-import { type Layer, type RasterImage, type SceneObject } from '../scene';
+import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
 import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
@@ -29,7 +29,7 @@ export function compileRasterGroupsForLayer(
 ): RasterGroup[] {
   const groups: RasterGroup[] = [];
   for (const obj of objects) {
-    if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
+    if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, layer)) continue;
     if (obj.role === 'trace-source') continue;
     const effectiveLayer = layerWithObjectOverride(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;

@@ -93,7 +93,12 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
   const layers: Layer[] = speeds.map((speed, row) => {
     const color = materialTestLayerColor(row);
     return {
-      ...createLayer({ id: `material-test-row-${row}`, color, mode: 'fill' }),
+      ...createLayer({
+        id: `material-test-row-${row}`,
+        name: `Material test ${formatCalibrationNumber(speed)} mm/min`,
+        color,
+        mode: 'fill',
+      }),
       power: powerHigh,
       speed,
     };
@@ -111,7 +116,16 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
       const y = cellY(layout, row);
       const objectId = `material-test-cell-r${row}-c${column}`;
       objects.push(
-        squareObject({ id: objectId, color: layer.color, cellWidth, cellHeight, x, y, powerScale }),
+        squareObject({
+          id: objectId,
+          operationId: layer.id,
+          color: layer.color,
+          cellWidth,
+          cellHeight,
+          x,
+          y,
+          powerScale,
+        }),
       );
       cells.push({
         row,
@@ -126,8 +140,9 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
     }
   }
 
-  objects.push(...materialTestLabelObjects(layout));
-  layers.push(createCalibrationLabelLayer('material-test-labels'));
+  const labelLayer = createCalibrationLabelLayer('material-test-labels');
+  objects.push(...materialTestLabelObjects(layout, labelLayer.id));
+  layers.push(labelLayer);
 
   return { scene: { objects, layers }, cells };
 }
@@ -156,11 +171,15 @@ function materialTestLayout(args: {
   };
 }
 
-function materialTestLabelObjects(layout: MaterialTestLayout): ReadonlyArray<ImportedSvg> {
+function materialTestLabelObjects(
+  layout: MaterialTestLayout,
+  operationId: string,
+): ReadonlyArray<ImportedSvg> {
   return [
     ...layout.powerLabels.map((label, column) =>
       createCalibrationLabelObject({
         id: `material-test-power-c${column}`,
+        operationId,
         text: label,
         x:
           cellX(layout, column) +
@@ -172,6 +191,7 @@ function materialTestLabelObjects(layout: MaterialTestLayout): ReadonlyArray<Imp
     ...layout.speedLabels.map((label, row) =>
       createCalibrationLabelObject({
         id: `material-test-speed-r${row}`,
+        operationId,
         text: label,
         x: layout.origin.x,
         y: cellY(layout, row) + centerOffset(layout.cellHeight, layout.labelSize),
@@ -183,6 +203,7 @@ function materialTestLabelObjects(layout: MaterialTestLayout): ReadonlyArray<Imp
 
 function squareObject(args: {
   readonly id: string;
+  readonly operationId: string;
   readonly color: string;
   readonly cellWidth: number;
   readonly cellHeight: number;
@@ -195,6 +216,7 @@ function squareObject(args: {
     kind: 'imported-svg',
     id: args.id,
     source: 'material-test-grid',
+    operationIds: [args.operationId],
     bounds,
     transform: { ...IDENTITY_TRANSFORM, x: args.x, y: args.y },
     paths: [{ color: args.color, polylines: [squarePolyline(args.cellWidth, args.cellHeight)] }],

@@ -3,9 +3,9 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { createProject, PROJECT_SCHEMA_VERSION } from './project';
 
 describe('createProject', () => {
-  it('starts at schemaVersion 1 (Phase A)', () => {
+  it('starts at schemaVersion 3', () => {
     expect(createProject().schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(PROJECT_SCHEMA_VERSION).toBe(2);
+    expect(PROJECT_SCHEMA_VERSION).toBe(3);
   });
 
   it('uses the default device profile when none is passed', () => {

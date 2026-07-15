@@ -25,12 +25,18 @@ export function generateRotaryCalibrationPattern(setup: RotarySetup): RotaryCali
     kind: 'imported-svg',
     id: 'rotary-calibration-pattern',
     source: 'Rotary calibration pattern',
+    operationIds: ['rotary-calibration'],
     bounds: { minX: 0, minY: 0, maxX: WIDTH_MM, maxY: heightMm },
     transform: IDENTITY_TRANSFORM,
     paths: [{ color: COLOR, polylines }],
   };
   const layer = {
-    ...createLayer({ id: 'rotary-calibration', color: COLOR, mode: 'line' }),
+    ...createLayer({
+      id: 'rotary-calibration',
+      name: 'Rotary calibration',
+      color: COLOR,
+      mode: 'line',
+    }),
     power: 10,
     speed: 1500,
   };

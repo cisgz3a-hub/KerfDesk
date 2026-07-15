@@ -3,6 +3,7 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  primaryOperationForObject,
   type RasterImage,
   type ShapeObject,
 } from '../../core/scene';
@@ -28,9 +29,11 @@ describe('fill selection action', () => {
     const outer = shapeById('outer');
     const inner = shapeById('inner');
     expect(outer.color).toBe('#000000');
-    expect(inner.color).not.toBe('#000000');
-    expect(layerByColor('#000000').mode).toBe('line');
-    expect(layerByColor(inner.color).mode).toBe('fill');
+    expect(inner.color).toBe('#000000');
+    expect(operationForShape(outer).mode).toBe('line');
+    expect(operationForShape(inner).mode).toBe('fill');
+    expect(operationForShape(inner).id).not.toBe(operationForShape(outer).id);
+    expect(operationForShape(inner).color).not.toBe(operationForShape(outer).color);
     expect(state.selectedObjectId).toBe('inner');
     expect(state.additionalSelectedIds.size).toBe(0);
     expect(state.dirty).toBe(true);
@@ -66,11 +69,11 @@ describe('fill selection action', () => {
 
     useStore.getState().fillSelectionSeparately();
 
-    const fillColor = shapeById('inner-a').color;
-    expect(fillColor).not.toBe('#000000');
-    expect(shapeById('inner-b').color).toBe(fillColor);
+    const fillOperation = operationForShape(shapeById('inner-a'));
+    expect(operationForShape(shapeById('inner-b')).id).toBe(fillOperation.id);
     expect(shapeById('outer').color).toBe('#000000');
-    expect(layerByColor(fillColor).mode).toBe('fill');
+    expect(fillOperation.color).not.toBe('#000000');
+    expect(fillOperation.mode).toBe('fill');
     expect(layerByColor('#000000').mode).toBe('line');
   });
 
@@ -164,4 +167,10 @@ function layerByColor(color: string) {
   const layer = useStore.getState().project.scene.layers.find((item) => item.color === color);
   if (layer === undefined) throw new Error(`missing layer ${color}`);
   return layer;
+}
+
+function operationForShape(shape: ShapeObject) {
+  const operation = primaryOperationForObject(shape, useStore.getState().project.scene.layers);
+  if (operation === null) throw new Error(`missing operation for ${shape.id}`);
+  return operation;
 }

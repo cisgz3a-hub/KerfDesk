@@ -22,6 +22,7 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
   if (!isObject(layer)) return `missing or invalid \`${path}\``;
   return firstError([
     requireString(layer, `${path}.id`),
+    requireString(layer, `${path}.name`),
     requireString(layer, `${path}.color`),
     requireLiteral(layer, `${path}.mode`, ['line', 'fill', 'image']),
     optionalLiteral(layer, `${path}.powerMode`, ['constant', 'dynamic']),

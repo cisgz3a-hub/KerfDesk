@@ -100,6 +100,7 @@ export function generateScanOffsetCalibrationPattern(
     objects.push(
       swatchObject({
         id: objectId,
+        operationId: layer.id,
         color: layer.color,
         width: swatchWidth,
         height: swatchHeight,
@@ -120,11 +121,13 @@ export function generateScanOffsetCalibrationPattern(
   // Burn a speed label under each swatch. The Measured Scan Offset apply UI asks
   // the operator to enter the offset for the speed they read off the swatch, so
   // the speed must be engraved beside it (same as the material/interval grids).
+  const labelLayer = createCalibrationLabelLayer('scan-offset-calibration-labels');
   objects.push(
     ...cells.map((cell) => {
       const label = formatCalibrationNumber(cell.speed);
       return createCalibrationLabelObject({
         id: `scan-offset-calibration-label-${cell.step}`,
+        operationId: labelLayer.id,
         text: label,
         x: cell.bounds.minX + centerOffset(swatchWidth, calibrationLabelWidthMm(label, labelSize)),
         y: cell.bounds.maxY + labelGap,
@@ -132,7 +135,7 @@ export function generateScanOffsetCalibrationPattern(
       });
     }),
   );
-  layers.push(createCalibrationLabelLayer('scan-offset-calibration-labels'));
+  layers.push(labelLayer);
 
   return { scene: { objects, layers }, cells };
 }
@@ -146,7 +149,12 @@ function scanOffsetLayer(args: {
 }): Layer {
   const color = scanOffsetLayerColor(args.step);
   return {
-    ...createLayer({ id: `scan-offset-calibration-step-${args.step}`, color, mode: 'fill' }),
+    ...createLayer({
+      id: `scan-offset-calibration-step-${args.step}`,
+      name: `Scan offset ${formatCalibrationNumber(args.speed)} mm/min`,
+      color,
+      mode: 'fill',
+    }),
     speed: args.speed,
     power: args.power,
     hatchAngleDeg: 0,
@@ -160,6 +168,7 @@ function scanOffsetLayer(args: {
 
 function swatchObject(args: {
   readonly id: string;
+  readonly operationId: string;
   readonly color: string;
   readonly width: number;
   readonly height: number;
@@ -171,6 +180,7 @@ function swatchObject(args: {
     kind: 'imported-svg',
     id: args.id,
     source: 'scan-offset-calibration-pattern',
+    operationIds: [args.operationId],
     bounds,
     transform: { ...IDENTITY_TRANSFORM, x: args.x, y: args.y },
     paths: [{ color: args.color, polylines: [rectanglePolyline(args.width, args.height)] }],

@@ -1,7 +1,7 @@
 import type { AirAssistCommand } from '../../core/devices';
 import {
   machineKindOf,
-  sceneObjectUsesLayerColor,
+  sceneObjectUsesOperation,
   type Layer,
   type Project,
   type Scene,
@@ -37,10 +37,9 @@ export type AirAssistDefaultActions = {
 
 export function projectAirAssistDefaultSyncSummary(project: Project): AirAssistDefaultSyncSummary {
   const outputLayers = outputLaserLayers(project);
-  const outputLayerColors = new Set(outputLayers.map((layer) => layer.color));
   const disabledOutputLayerCount = outputLayers.filter((layer) => !layer.airAssist).length;
   const disabledObjectOverrideCount = project.scene.objects.filter((object) =>
-    hasDisabledAirOverrideOnOutputLayer(object, outputLayerColors),
+    hasDisabledAirOverrideOnOutputLayer(object, outputLayers),
   ).length;
   const airOutputUnset = project.device.airAssistCommand === 'none';
   return {
@@ -86,12 +85,12 @@ function projectWithAirAssistDefaults(project: Project): Project {
 
 function sceneWithAirAssistDefaults(project: Project): Scene {
   const outputLayers = outputLaserLayers(project);
-  const outputLayerColors = new Set(outputLayers.map((layer) => layer.color));
+  const outputLayerIds = new Set(outputLayers.map((layer) => layer.id));
   const layers = mapChanged(project.scene.layers, (layer) =>
-    outputLayerColors.has(layer.color) && !layer.airAssist ? { ...layer, airAssist: true } : layer,
+    outputLayerIds.has(layer.id) && !layer.airAssist ? { ...layer, airAssist: true } : layer,
   );
   const objects = mapChanged(project.scene.objects, (object) =>
-    objectWithAirAssistOverrideEnabled(object, outputLayerColors),
+    objectWithAirAssistOverrideEnabled(object, outputLayers),
   );
   if (layers === project.scene.layers && objects === project.scene.objects) return project.scene;
   return { ...project.scene, layers, objects };
@@ -104,21 +103,18 @@ function outputLaserLayers(project: Project): ReadonlyArray<Layer> {
 
 function objectWithAirAssistOverrideEnabled(
   object: SceneObject,
-  outputLayerColors: ReadonlySet<string>,
+  outputLayers: ReadonlyArray<Layer>,
 ): SceneObject {
-  if (!hasDisabledAirOverrideOnOutputLayer(object, outputLayerColors)) return object;
+  if (!hasDisabledAirOverrideOnOutputLayer(object, outputLayers)) return object;
   return { ...object, operationOverride: { ...object.operationOverride, airAssist: true } };
 }
 
 function hasDisabledAirOverrideOnOutputLayer(
   object: SceneObject,
-  outputLayerColors: ReadonlySet<string>,
+  outputLayers: ReadonlyArray<Layer>,
 ): boolean {
   if (object.operationOverride?.airAssist !== false) return false;
-  for (const color of outputLayerColors) {
-    if (sceneObjectUsesLayerColor(object, color)) return true;
-  }
-  return false;
+  return outputLayers.some((operation) => sceneObjectUsesOperation(object, operation));
 }
 
 function mapChanged<T>(items: ReadonlyArray<T>, mapItem: (item: T) => T): ReadonlyArray<T> {

@@ -4,6 +4,7 @@ import {
   findRegistrationBoxes,
   findRegistrationLayer,
   IDENTITY_TRANSFORM,
+  operationIdsForObject,
   REGISTRATION_LAYER_ID,
   registrationRunState,
   type Project,
@@ -15,6 +16,14 @@ import {
 } from './registration-box-actions';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+
+function operationIdFor(objectId: string): string {
+  const { objects, layers } = useStore.getState().project.scene;
+  const object = objects.find((candidate) => candidate.id === objectId);
+  const id = object === undefined ? undefined : operationIdsForObject(object, layers)[0];
+  if (id === undefined) throw new Error(`operation missing for ${objectId}`);
+  return id;
+}
 
 function slice(): { readonly project: Project; readonly undoStack: ReadonlyArray<Project> } {
   return { project: createProject(), undoStack: [] };
@@ -99,13 +108,14 @@ describe('addRegistrationBox store action', () => {
         transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
       }),
     );
+    const enabledOperationId = operationIdFor('art');
 
     useStore.getState().addRegistrationBox(80, 40);
 
     const scene = useStore.getState().project.scene;
     expect(registrationRunState(scene)).toBe('artwork');
     expect(scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output).toBe(false);
-    expect(scene.layers.find((layer) => layer.id === '#0000ff')?.output).toBe(true);
+    expect(scene.layers.find((layer) => layer.id === enabledOperationId)?.output).toBe(true);
   });
 
   it('does not re-enable disabled artwork layers when placing a box around artwork', () => {
@@ -117,6 +127,7 @@ describe('addRegistrationBox store action', () => {
         transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
       }),
     );
+    const enabledOperationId = operationIdFor('enabled-art');
     useStore.getState().drawShape(
       createRectangle({
         id: 'disabled-art',
@@ -125,14 +136,15 @@ describe('addRegistrationBox store action', () => {
         transform: { ...IDENTITY_TRANSFORM, x: 40, y: 10 },
       }),
     );
-    useStore.getState().setLayerParam('#00aa00', { output: false });
+    const disabledOperationId = operationIdFor('disabled-art');
+    useStore.getState().setLayerParam(disabledOperationId, { output: false });
 
     useStore.getState().addRegistrationBox(80, 40);
 
     const scene = useStore.getState().project.scene;
     expect(scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output).toBe(false);
-    expect(scene.layers.find((layer) => layer.id === '#0000ff')?.output).toBe(true);
-    expect(scene.layers.find((layer) => layer.id === '#00aa00')?.output).toBe(false);
+    expect(scene.layers.find((layer) => layer.id === enabledOperationId)?.output).toBe(true);
+    expect(scene.layers.find((layer) => layer.id === disabledOperationId)?.output).toBe(false);
   });
 });
 

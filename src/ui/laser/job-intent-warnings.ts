@@ -6,7 +6,14 @@ import {
   rasterBoundsInMachineCoords,
 } from '../../core/job';
 import { pixelExtentForMm } from '../../core/raster';
-import { type Layer, type LayerMode, type Project, type RasterImage } from '../../core/scene';
+import {
+  pathUsesOperation,
+  sceneObjectUsesOperation,
+  type Layer,
+  type LayerMode,
+  type Project,
+  type RasterImage,
+} from '../../core/scene';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
@@ -14,25 +21,24 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   const warnings = [...detectUncalibratedJobWarnings(job)];
   appendFillHeatWarnings(job, warnings);
 
-  const outputLayersByColor = new Map(
-    project.scene.layers.filter((layer) => layer.output).map((layer) => [layer.color, layer]),
-  );
+  const outputLayers = project.scene.layers.filter((layer) => layer.output);
   const seen = new Set<string>();
 
   for (const obj of project.scene.objects) {
     if (obj.kind === 'raster-image') {
-      const upsample = rasterUpsampleWarning(obj, outputLayersByColor, project);
+      const upsample = rasterUpsampleWarning(obj, outputLayers, project);
       if (upsample !== null) warnings.push(upsample);
       continue;
     }
     if (obj.kind !== 'traced-image') continue;
     for (const path of obj.paths) {
-      const layer = outputLayersByColor.get(path.color);
-      if (layer === undefined || layer.mode === 'image') continue;
-      const key = `${obj.id}:${layer.id}:${layer.mode}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      warnings.push(traceVectorWarning(obj.source, layer.mode, project));
+      for (const layer of outputLayers) {
+        if (!pathUsesOperation(obj, path, layer) || layer.mode === 'image') continue;
+        const key = `${obj.id}:${layer.id}:${layer.mode}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        warnings.push(traceVectorWarning(obj.source, layer.mode, project));
+      }
     }
   }
 
@@ -91,10 +97,10 @@ function isSensitiveIslandFillGroupWithOverscan(
 // stored luma doesn't have — say so before the operator commits material.
 function rasterUpsampleWarning(
   obj: RasterImage,
-  outputLayersByColor: ReadonlyMap<string, Layer>,
+  outputLayers: ReadonlyArray<Layer>,
   project: Project,
 ): string | null {
-  const layer = outputLayersByColor.get(obj.color);
+  const layer = outputLayers.find((operation) => sceneObjectUsesOperation(obj, operation));
   if (layer === undefined || layer.mode !== 'image' || obj.role === 'trace-source') return null;
   return describeRasterUpsample(obj, layer, project);
 }

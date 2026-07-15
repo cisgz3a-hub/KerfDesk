@@ -11,6 +11,7 @@
 import type { DeviceProfile } from '../../core/devices';
 import {
   outputOperationLayers,
+  sceneObjectUsesOperation,
   type Layer,
   type Project,
   type RasterImage,
@@ -51,7 +52,7 @@ export function drawRasterPreview(
     for (const operationLayer of outputOperationLayers(layer)) {
       if (operationLayer.mode !== 'image') continue;
       for (const obj of project.scene.objects) {
-        if (obj.kind !== 'raster-image' || obj.color !== operationLayer.color) continue;
+        if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, operationLayer)) continue;
         if (obj.role === 'trace-source') continue;
         drawOnePreview(
           ctx,
@@ -179,17 +180,16 @@ function adjustmentKey(obj: RasterImage): string {
 }
 
 function liveRasterPreviewDataUrls(project: Project): Set<string> {
-  const imageLayerColors = new Set(
-    project.scene.layers
-      .flatMap((layer) => outputOperationLayers(layer))
-      .filter((layer) => layer.mode === 'image')
-      .map((layer) => layer.color),
-  );
+  const imageOperations = project.scene.layers
+    .flatMap((layer) => outputOperationLayers(layer))
+    .filter((layer) => layer.mode === 'image');
   const live = new Set<string>();
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
-    if (imageLayerColors.has(obj.color)) live.add(obj.dataUrl);
+    if (imageOperations.some((operation) => sceneObjectUsesOperation(obj, operation))) {
+      live.add(obj.dataUrl);
+    }
   }
   return live;
 }

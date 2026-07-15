@@ -1,10 +1,4 @@
-import {
-  sceneObjectUsesLayerColor,
-  type ObjectOperationOverride,
-  type Project,
-  type SceneObject,
-  type ShapeObject,
-} from '../../core/scene';
+import type { ObjectOperationOverride, Project, SceneObject, ShapeObject } from '../../core/scene';
 import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -31,10 +25,6 @@ export type ObjectPropertiesActions = {
   readonly setSelectedObjectsPowerScale: (powerScale: number) => void;
   readonly setSelectedShapeSpec: (spec: ParametricShapeSpec) => void;
   readonly setSelectedObjectsOperationOverride: (patch: ObjectOperationOverride) => void;
-  readonly setSelectedObjectsOperationOverrideForLayer: (
-    layerColor: string,
-    patch: ObjectOperationOverride,
-  ) => void;
   readonly clearSelectedObjectsOperationOverride: () => void;
 };
 
@@ -85,11 +75,7 @@ export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropert
         };
       }),
     setSelectedObjectsOperationOverride: (patch) =>
-      setSelectedObjectsOperationOverrideMatching(set, patch, () => true),
-    setSelectedObjectsOperationOverrideForLayer: (layerColor, patch) =>
-      setSelectedObjectsOperationOverrideMatching(set, patch, (object) =>
-        sceneObjectUsesLayerColor(object, layerColor),
-      ),
+      setSelectedObjectsOperationOverrideMatching(set, patch),
     clearSelectedObjectsOperationOverride: () =>
       set((state) => {
         const ids = selectedObjectIds(state);
@@ -123,7 +109,6 @@ function shapeSpecEqual(left: ShapeObject, right: ShapeObject): boolean {
 function setSelectedObjectsOperationOverrideMatching(
   set: ObjectPropertiesSet,
   patch: ObjectOperationOverride,
-  matches: (object: SceneObject) => boolean,
 ): void {
   set((state) => {
     const ids = selectedObjectIds(state);
@@ -132,7 +117,7 @@ function setSelectedObjectsOperationOverrideMatching(
     if (Object.keys(sanitized).length === 0) return {};
     let changed = false;
     const objects = state.project.scene.objects.map((object) => {
-      if (!ids.has(object.id) || !matches(object)) return object;
+      if (!ids.has(object.id)) return object;
       const operationOverride = { ...(object.operationOverride ?? {}), ...sanitized };
       if (operationOverrideEqual(object.operationOverride, operationOverride)) return object;
       changed = true;

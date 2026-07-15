@@ -44,8 +44,10 @@ export type CurveSubpath = {
 };
 
 export type ColoredPath = {
-  // Lowercase 6-digit hex color, e.g. '#ff0000'. Layers are keyed by this value.
+  // Lowercase 6-digit source-artwork color, e.g. '#ff0000'. Schema-v3
+  // operation bindings are explicit; color remains a legacy fallback.
   readonly color: string;
+  readonly operationIds?: ReadonlyArray<string>;
   readonly polylines: ReadonlyArray<Polyline>;
   // Schema-v2 canonical geometry. `polylines` remains a deterministic
   // compatibility view while preview and compilation migrate subsystem by
@@ -107,6 +109,9 @@ export type ObjectOperationOverride = {
 };
 
 export type ObjectPowerScale = {
+  // Named process operations used by the whole artwork. A path-level binding
+  // takes precedence for imported artwork that needs independent operations.
+  readonly operationIds?: ReadonlyArray<string>;
   // LightBurn Shape Properties: per-shape scale applied to layer power.
   readonly powerScale?: number;
   // Optional per-object operation settings. Missing fields inherit the object's
@@ -378,36 +383,6 @@ export type SceneObject =
   | RasterImage
   | ShapeObject
   | ReliefObject;
-
-export function sceneObjectPrimaryLayerColor(object: SceneObject): string | null {
-  switch (object.kind) {
-    case 'raster-image':
-    case 'relief':
-    case 'shape':
-    case 'text':
-      return object.color;
-    case 'imported-svg':
-    case 'traced-image':
-      return object.paths[0]?.color ?? null;
-    default:
-      return assertNever(object);
-  }
-}
-
-export function sceneObjectUsesLayerColor(object: SceneObject, color: string): boolean {
-  switch (object.kind) {
-    case 'raster-image':
-    case 'relief':
-    case 'shape':
-    case 'text':
-      return object.color === color;
-    case 'imported-svg':
-    case 'traced-image':
-      return object.paths.some((path) => path.color === color);
-    default:
-      return assertNever(object);
-  }
-}
 
 // Exhaustiveness helper. Place in the default arm of every `switch` over a
 // discriminated union so adding a variant produces exactly one TS error (the

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import {
+  createLayer,
+  IDENTITY_TRANSFORM,
+  operationIdsForObject,
+  type RasterImage,
+} from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -52,7 +57,7 @@ describe('layer store actions', () => {
     expect(useStore.getState().project.scene.layers).toHaveLength(0);
   });
 
-  it('commitLayerDraft atomically updates settings, color, and bound artwork', () => {
+  it('commitLayerDraft updates operation settings and presentation color without recoloring artwork', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const current = useStore.getState().project.scene.layers[0];
     if (current === undefined) throw new Error('layer missing');
@@ -75,29 +80,34 @@ describe('layer store actions', () => {
     const object = state.project.scene.objects[0];
     expect(object?.kind).toBe('imported-svg');
     if (object?.kind !== 'imported-svg') throw new Error('expected imported svg');
-    expect(object.paths[0]?.color).toBe('#00ff00');
+    expect(object.paths[0]?.color).toBe('#ff0000');
     expect(state.undoStack).toHaveLength(undoBefore + 1);
   });
 
-  it('setLayerColor syncs bound artwork and is undoable', () => {
+  it('setLayerColor changes only the automatic operation color and is undoable', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     const undoBefore = useStore.getState().undoStack.length;
+    const beforeColors = useStore.getState().project.scene.layers.map((layer) => layer.color);
+    const [firstOperationId] = operationIdsFor('O1');
+    if (firstOperationId === undefined) throw new Error('operation missing');
 
-    useStore.getState().setLayerColor('#ff0000', '#00FF00');
+    useStore.getState().setLayerColor(firstOperationId, '#00FF00');
 
     const state = useStore.getState();
-    expect(state.project.scene.layers.map((layer) => layer.color)).toEqual(['#00ff00', '#0000ff']);
+    expect(state.project.scene.layers.map((layer) => layer.color)).toEqual([
+      '#00ff00',
+      beforeColors[1],
+    ]);
     const object = state.project.scene.objects[0];
     expect(object?.kind).toBe('imported-svg');
     if (object?.kind !== 'imported-svg') throw new Error('expected imported svg');
-    expect(object.paths.map((path) => path.color)).toEqual(['#00ff00', '#0000ff']);
+    expect(object.paths.map((path) => path.color)).toEqual(['#ff0000', '#0000ff']);
     expect(state.undoStack).toHaveLength(undoBefore + 1);
 
     useStore.getState().undo();
-    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
-      '#ff0000',
-      '#0000ff',
-    ]);
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual(
+      beforeColors,
+    );
   });
 
   it('assignSelectionToLayer moves selected object colors and prunes orphan layers', () => {
@@ -110,7 +120,7 @@ describe('layer store actions', () => {
     const obj = useStore.getState().project.scene.objects[0];
     expect(obj?.kind).toBe('imported-svg');
     if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
-    expect(obj.paths.map((path) => path.color)).toEqual(['#00ff00']);
+    expect(obj.paths.map((path) => path.color)).toEqual(['#ff0000']);
     expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
       '#00ff00',
     ]);
@@ -130,30 +140,37 @@ describe('layer store actions', () => {
     ]);
   });
 
-  it('selectObjectsOnLayer selects every vector object using that layer color', () => {
+  it('selectObjectsOnLayer selects artwork intentionally sharing one operation', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff', '#ff0000']));
+    const [sharedOperationId] = operationIdsFor('O1');
+    if (sharedOperationId === undefined) throw new Error('operation missing');
+    useStore.getState().importSvgObject(svgObj('O2', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O3', ['#0000ff']));
+    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
+    useStore.getState().useOperationForSelection(sharedOperationId);
     useStore.setState({
       dirty: false,
       selectedObjectId: 'O3',
       additionalSelectedIds: new Set(['missing']),
     });
+    const undoBefore = useStore.getState().undoStack.length;
 
-    useStore.getState().selectObjectsOnLayer('#ff0000');
+    useStore.getState().selectObjectsOnLayer(sharedOperationId);
 
     const state = useStore.getState();
     expect(state.selectedObjectId).toBe('O1');
     expect([...state.additionalSelectedIds]).toEqual(['O2']);
     expect(state.dirty).toBe(false);
-    expect(state.undoStack).toHaveLength(3);
+    expect(state.undoStack).toHaveLength(undoBefore);
   });
 
   it('selectObjectsOnLayer selects raster objects by raster color', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importRasterImage(rasterObj('R1'));
+    const [rasterOperationId] = operationIdsFor('R1');
+    if (rasterOperationId === undefined) throw new Error('raster operation missing');
 
-    useStore.getState().selectObjectsOnLayer('#808080');
+    useStore.getState().selectObjectsOnLayer(rasterOperationId);
 
     const state = useStore.getState();
     expect(state.selectedObjectId).toBe('R1');
@@ -178,15 +195,17 @@ describe('layer store actions', () => {
       additionalSelectedIds: new Set(['O2']),
       dirty: false,
     });
+    const [operationId] = operationIdsFor('O1');
+    if (operationId === undefined) throw new Error('operation missing');
 
-    useStore.getState().setLayerParam('#ff0000', { visible: false });
+    useStore.getState().setLayerParam(operationId, { visible: false });
 
     const state = useStore.getState();
     expect(state.selectedObjectId).toBe('O2');
     expect(state.additionalSelectedIds.size).toBe(0);
   });
 
-  it('deleteLayerAndObjects removes matching vector paths and preserves unrelated paths', () => {
+  it('deleteLayerAndObjects removes only artwork bound to that explicit operation', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#ff0000', '#0000ff']));
     useStore.getState().importSvgObject(svgObj('O3', ['#00ff00']));
@@ -196,16 +215,19 @@ describe('layer store actions', () => {
       additionalSelectedIds: new Set(['O2', 'O3']),
       dirty: false,
     });
+    const [operationId] = operationIdsFor('O1');
+    if (operationId === undefined) throw new Error('operation missing');
 
-    useStore.getState().deleteLayerAndObjects('#ff0000');
+    useStore.getState().deleteLayerAndObjects(operationId);
 
     const state = useStore.getState();
     expect(state.project.scene.objects.map((object) => object.id)).toEqual(['O2', 'O3']);
     const kept = state.project.scene.objects[0];
     expect(kept?.kind).toBe('imported-svg');
     if (kept?.kind !== 'imported-svg') throw new Error('expected imported svg');
-    expect(kept.paths.map((path) => path.color)).toEqual(['#0000ff']);
-    expect(state.project.scene.layers.map((layer) => layer.color)).toEqual(['#0000ff', '#00ff00']);
+    expect(kept.paths.map((path) => path.color)).toEqual(['#ff0000', '#0000ff']);
+    expect(operationIdsFor('O2')).toHaveLength(2);
+    expect(operationIdsFor('O3')).toHaveLength(1);
     expect(state.selectedObjectId).toBeNull();
     expect([...state.additionalSelectedIds]).toEqual(['O2', 'O3']);
     expect(state.undoStack).toHaveLength(undoBefore + 1);
@@ -222,13 +244,13 @@ describe('layer store actions', () => {
   it('deleteLayerAndObjects removes raster objects assigned to the layer color', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importRasterImage(rasterObj('R1'));
+    const [rasterOperationId] = operationIdsFor('R1');
+    if (rasterOperationId === undefined) throw new Error('raster operation missing');
 
-    useStore.getState().deleteLayerAndObjects('#808080');
+    useStore.getState().deleteLayerAndObjects(rasterOperationId);
 
     expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual(['O1']);
-    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
-      '#ff0000',
-    ]);
+    expect(useStore.getState().project.scene.layers).toHaveLength(1);
   });
 
   it('deleteLayerAndObjects removes an empty manual layer', () => {
@@ -242,75 +264,6 @@ describe('layer store actions', () => {
     expect(useStore.getState().project.scene.objects).toHaveLength(0);
     expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
     expect(useStore.getState().dirty).toBe(true);
-  });
-
-  it('copyLayerSettings captures settings without dirty or undo changes', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
-    useStore.getState().setLayerParam('#ff0000', {
-      mode: 'fill',
-      minPower: 12,
-      power: 66,
-      speed: 2222,
-      passes: 3,
-      output: false,
-      hatchAngleDeg: 45,
-      fillBidirectional: false,
-      fillCrossHatch: true,
-    });
-    useStore.setState({ dirty: false, undoStack: [] });
-
-    useStore.getState().copyLayerSettings('#ff0000');
-
-    expect(useStore.getState().dirty).toBe(false);
-    expect(useStore.getState().undoStack).toHaveLength(0);
-  });
-
-  it('pasteLayerSettings applies copied settings while preserving target id and color', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
-    useStore.getState().setLayerParam('#ff0000', {
-      mode: 'fill',
-      minPower: 12,
-      power: 66,
-      speed: 2222,
-      passes: 3,
-      output: false,
-      hatchAngleDeg: 45,
-      fillBidirectional: false,
-      fillCrossHatch: true,
-    });
-    useStore.getState().copyLayerSettings('#ff0000');
-    useStore.setState({ dirty: false, undoStack: [] });
-
-    useStore.getState().pasteLayerSettings('#0000ff');
-
-    const pasted = useStore.getState().project.scene.layers.find((layer) => layer.id === '#0000ff');
-    expect(pasted).toMatchObject({
-      id: '#0000ff',
-      color: '#0000ff',
-      mode: 'fill',
-      minPower: 12,
-      power: 66,
-      speed: 2222,
-      passes: 3,
-      output: false,
-      hatchAngleDeg: 45,
-      fillBidirectional: false,
-      fillCrossHatch: true,
-    });
-    expect(useStore.getState().undoStack).toHaveLength(1);
-    expect(useStore.getState().dirty).toBe(true);
-  });
-
-  it('pasteLayerSettings without copied settings is a no-op', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const before = useStore.getState().project;
-    useStore.setState({ dirty: false, undoStack: [] });
-
-    useStore.getState().pasteLayerSettings('#ff0000');
-
-    expect(useStore.getState().project).toBe(before);
-    expect(useStore.getState().undoStack).toHaveLength(0);
-    expect(useStore.getState().dirty).toBe(false);
   });
 
   it('adds, updates, deletes, and undoes layer sub-layers', () => {
@@ -407,8 +360,8 @@ describe('layer store actions', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
 
     expect(useStore.getState().project.scene.layers[0]).toMatchObject({
-      id: '#ff0000',
-      color: '#ff0000',
+      id: 'operation-O1',
+      color: '#2563eb',
       mode: 'fill',
       power: 22,
     });
@@ -430,3 +383,9 @@ describe('layer store actions', () => {
     });
   });
 });
+
+function operationIdsFor(objectId: string): ReadonlyArray<string> {
+  const { objects, layers } = useStore.getState().project.scene;
+  const object = objects.find((candidate) => candidate.id === objectId);
+  return object === undefined ? [] : operationIdsForObject(object, layers);
+}

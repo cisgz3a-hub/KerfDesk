@@ -66,10 +66,9 @@ export function updateLayer(
   };
 }
 
-/** Changes a layer's scene-wide color key while preserving its stable id.
- * Every bound artwork path and CNC tab anchor follows the new color. A color
- * already owned by another layer is rejected as a no-op instead of silently
- * merging two independently configured operations. */
+/** Changes an operation's presentation color while preserving its stable id.
+ * Schema-v3 explicit bindings do not recolor source artwork. Legacy unbound
+ * geometry follows the color so pre-v3 in-memory scenes keep working. */
 export function recolorLayer(scene: Scene, layerId: string, color: string): Scene {
   const target = scene.layers.find((layer) => layer.id === layerId);
   if (target === undefined) return scene;
@@ -82,9 +81,18 @@ export function recolorLayer(scene: Scene, layerId: string, color: string): Scen
       layer.id === layerId ? { ...layer, color: nextColor } : layer,
     ),
     objects: scene.objects.map((object) =>
-      recolorSceneObjectLayer(object, target.color, nextColor),
+      hasExplicitOperationBinding(object)
+        ? object
+        : recolorSceneObjectLayer(object, target.color, nextColor),
     ),
   };
+}
+
+function hasExplicitOperationBinding(object: SceneObject): boolean {
+  return (
+    object.operationIds !== undefined ||
+    ('paths' in object && object.paths.some((path) => path.operationIds !== undefined))
+  );
 }
 
 export function removeLayer(scene: Scene, layerId: string): Scene {

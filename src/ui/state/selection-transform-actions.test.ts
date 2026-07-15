@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { applyTransform, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
+import {
+  applyTransform,
+  IDENTITY_TRANSFORM,
+  primaryOperationForObject,
+  type SceneObject,
+} from '../../core/scene';
 import { resetStore, svgObj } from './test-helpers';
 import { useStore } from './store';
 
@@ -56,7 +61,11 @@ describe('selection transform actions', () => {
 
   it('does not apply stale selection transform edits to hidden-layer objects', () => {
     useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', { visible: false });
+    const scene = useStore.getState().project.scene;
+    const object = scene.objects.find((candidate) => candidate.id === 'A');
+    const operation = object === undefined ? null : primaryOperationForObject(object, scene.layers);
+    if (operation === null) throw new Error('operation missing');
+    useStore.getState().setLayerParam(operation.id, { visible: false });
     const before = useStore.getState().project.scene.objects[0]?.transform;
     useStore.setState({ undoStack: [], dirty: false });
 

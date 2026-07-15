@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProject } from '../../core/scene';
+import { createProject, primaryOperationForObject } from '../../core/scene';
 import { createRectangle } from '../../core/shapes';
 import { applyDrawShape } from './draw-shape-mutation';
 
@@ -20,15 +20,18 @@ describe('applyDrawShape', () => {
     expect(result.additionalSelectedIds.size).toBe(0);
   });
 
-  it('auto-creates a line (cut) layer for the shape colour', () => {
+  it('auto-creates a line operation with an automatic presentation color', () => {
     const shape = createRectangle({
       id: 'S2',
       color: '#123456',
       spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
     });
     const result = applyDrawShape(emptySlice(), shape);
-    const layer = result.project.scene.layers.find((l) => l.color === '#123456');
-    expect(layer).toBeDefined();
+    const stored = result.project.scene.objects[0];
+    const layer =
+      stored === undefined ? null : primaryOperationForObject(stored, result.project.scene.layers);
+    expect(layer).not.toBeNull();
+    expect(layer?.color).not.toBe(shape.color);
     // Drawn vectors default to a line/cut layer (LightBurn parity).
     expect(layer?.mode).toBe('line');
   });

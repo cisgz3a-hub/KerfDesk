@@ -3,6 +3,7 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  operationIdsForObject,
   type ColoredPath,
   type ShapeObject,
 } from '../../core/scene';
@@ -46,6 +47,9 @@ describe('vector path actions', () => {
       { x: 5, y: 7 },
     ]);
     expect(state.selectedObjectId).toBe('shape-a');
+    expect(
+      object === undefined ? [] : operationIdsForObject(object, state.project.scene.layers),
+    ).toEqual(['#111111']);
     expect(state.additionalSelectedIds.size).toBe(0);
     expect(state.undoStack).toHaveLength(1);
     expect(state.dirty).toBe(true);
@@ -56,6 +60,15 @@ describe('vector path actions', () => {
       shapeObject('left', '#222222', squarePath('#222222', 0, 0, 10), IDENTITY_TRANSFORM),
       shapeObject('right', '#222222', squarePath('#222222', 5, 0, 10), IDENTITY_TRANSFORM),
     ]);
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          layers: state.project.scene.layers.map((operation) => ({ ...operation, power: 61 })),
+        },
+      },
+    }));
     useStore.setState({
       selectedObjectId: 'left',
       additionalSelectedIds: new Set(['right']),
@@ -74,6 +87,12 @@ describe('vector path actions', () => {
       transform: IDENTITY_TRANSFORM,
     });
     expect(object?.kind === 'imported-svg' ? object.paths[0]?.polylines : []).toHaveLength(1);
+    const weldedOperationIds =
+      object === undefined ? [] : operationIdsForObject(object, state.project.scene.layers);
+    expect(weldedOperationIds).toHaveLength(1);
+    expect(weldedOperationIds).not.toContain('#222222');
+    expect(state.project.scene.layers).toHaveLength(1);
+    expect(state.project.scene.layers[0]?.power).toBe(61);
     expect(state.selectedObjectId).toBe(object?.id);
     expect(state.additionalSelectedIds.size).toBe(0);
     expect(state.undoStack).toHaveLength(1);
@@ -152,6 +171,10 @@ describe('boolean + offset actions (ADR-103 G1)', () => {
       bounds: { minX: 0, minY: 0, maxX: 5, maxY: 10 },
     });
     expect(state.selectedObjectId).toBe(object?.id);
+    expect(
+      object === undefined ? [] : operationIdsForObject(object, state.project.scene.layers),
+    ).toHaveLength(1);
+    expect(state.project.scene.layers).toHaveLength(1);
     expect(state.undoStack).toHaveLength(1);
     // Undo restores both source objects.
     state.undo();
@@ -198,6 +221,15 @@ describe('boolean + offset actions (ADR-103 G1)', () => {
     const offset = state.project.scene.objects.find((object) => object.id !== 'src');
     expect(offset).toMatchObject({ kind: 'imported-svg', source: 'Offset paths (+2 mm)' });
     expect(offset?.bounds.minX).toBeCloseTo(-2, 3);
+    const source = state.project.scene.objects.find((object) => object.id === 'src');
+    const sourceOperationIds =
+      source === undefined ? [] : operationIdsForObject(source, state.project.scene.layers);
+    const offsetOperationIds =
+      offset === undefined ? [] : operationIdsForObject(offset, state.project.scene.layers);
+    expect(sourceOperationIds).toHaveLength(1);
+    expect(offsetOperationIds).toHaveLength(1);
+    expect(offsetOperationIds).not.toEqual(sourceOperationIds);
+    expect(state.project.scene.layers).toHaveLength(2);
     expect(state.selectedObjectId).toBe(offset?.id);
     expect(state.undoStack).toHaveLength(1);
   });
@@ -222,7 +254,7 @@ function loadObjects(objects: ReadonlyArray<ShapeObject>): void {
     project: {
       ...createProject(),
       scene: {
-        objects,
+        objects: objects.map((object) => ({ ...object, operationIds: [object.color] })),
         layers: colors.map((color) => createLayer({ id: color, color })),
         groups: [],
       },

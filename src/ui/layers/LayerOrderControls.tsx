@@ -22,11 +22,11 @@ export function LayerOrderControls(props: {
 }): JSX.Element {
   const moveLayer = useStore((s) => s.moveLayer);
   return (
-    <span style={orderControlStyle} aria-label={`Order controls for ${props.layer.color}`}>
+    <span style={orderControlStyle} aria-label={`Order controls for ${props.layer.name}`}>
       <button
         type="button"
-        title="Move layer up"
-        aria-label={`Move ${props.layer.color} up`}
+        title="Move operation up"
+        aria-label={`Move ${props.layer.name} up`}
         disabled={!props.canMoveUp}
         onClick={() => moveLayer(props.layer.id, 'up')}
         style={orderButtonStyle}
@@ -35,8 +35,8 @@ export function LayerOrderControls(props: {
       </button>
       <button
         type="button"
-        title="Move layer down"
-        aria-label={`Move ${props.layer.color} down`}
+        title="Move operation down"
+        aria-label={`Move ${props.layer.name} down`}
         disabled={!props.canMoveDown}
         onClick={() => moveLayer(props.layer.id, 'down')}
         style={orderButtonStyle}

@@ -150,8 +150,8 @@ describe('Toolbar Convert to Bitmap', () => {
           renderType: 'use-cut-settings',
           dpi: 127,
           layers: [
-            { color: '#ff0000', mode: 'line' },
-            { color: '#0000ff', mode: 'fill' },
+            expect.objectContaining({ color: '#ff0000', mode: 'line' }),
+            expect.objectContaining({ color: '#0000ff', mode: 'fill' }),
           ],
         }),
       );

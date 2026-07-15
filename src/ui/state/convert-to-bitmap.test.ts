@@ -10,6 +10,7 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  primaryOperationForObject,
   type ImportedSvg,
   type Project,
   type RasterImage,
@@ -71,6 +72,16 @@ function projectWithVector(color: string = SOURCE_COLOR): Project {
   };
 }
 
+function operationForRaster(project: Project, id = 'bmp1') {
+  const raster = project.scene.objects.find(
+    (object): object is RasterImage => object.kind === 'raster-image' && object.id === id,
+  );
+  if (raster === undefined) throw new Error(`missing raster ${id}`);
+  const operation = primaryOperationForObject(raster, project.scene.layers);
+  if (operation === null) throw new Error(`missing operation for raster ${id}`);
+  return operation;
+}
+
 describe('applyConvertToBitmap (ADR-029)', () => {
   it('deletes the source vector and adds the raster (LightBurn discards the original)', () => {
     const result = applyConvertToBitmap(
@@ -93,7 +104,8 @@ describe('applyConvertToBitmap (ADR-029)', () => {
       raster,
     );
     const added = result.project.scene.objects.find((o) => o.kind === 'raster-image');
-    expect(added).toEqual(raster); // mutation must not mangle the built bitmap
+    expect(added).toMatchObject(raster); // geometry stays intact while the bitmap gains its operation
+    expect(added?.operationIds).toHaveLength(1);
     expect(added?.bounds).toEqual(src.bounds);
     expect(added?.transform).toEqual(src.transform);
   });
@@ -107,13 +119,13 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     expect(result.selectedObjectId).toBe('bmp1');
   });
 
-  it('ensures an image-mode layer for the raster color', () => {
+  it('creates an image-mode operation for the raster', () => {
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
       ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
-    expect(result.project.scene.layers.find((l) => l.color === RASTER_COLOR)?.mode).toBe('image');
+    expect(operationForRaster(result.project).mode).toBe('image');
   });
 
   it('creates the image layer at the converted bitmap density', () => {
@@ -123,7 +135,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
       ['src-vec'],
       raster,
     );
-    expect(result.project.scene.layers.find((l) => l.color === raster.color)?.linesPerMm).toBe(3.2);
+    expect(operationForRaster(result.project).linesPerMm).toBe(3.2);
   });
 
   it('does not reuse an existing image layer with a different density', () => {
@@ -148,9 +160,11 @@ describe('applyConvertToBitmap (ADR-029)', () => {
 
     expect(added).toBeDefined();
     if (added === undefined) throw new Error('converted raster was not added');
-    expect(added.color).not.toBe(RASTER_COLOR);
-    expect(result.project.scene.layers.find((l) => l.color === RASTER_COLOR)?.linesPerMm).toBe(10);
-    expect(result.project.scene.layers.find((l) => l.color === added.color)?.linesPerMm).toBe(3.2);
+    const existingOperation = operationForRaster(result.project, existingRaster.id);
+    const convertedOperation = operationForRaster(result.project, added.id);
+    expect(convertedOperation.id).not.toBe(existingOperation.id);
+    expect(existingOperation.linesPerMm).toBe(10);
+    expect(convertedOperation.linesPerMm).toBe(3.2);
   });
 
   it("prunes the source vector's now-orphaned color layer", () => {
@@ -159,9 +173,10 @@ describe('applyConvertToBitmap (ADR-029)', () => {
       ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
-    const colors = result.project.scene.layers.map((l) => l.color);
-    expect(colors).not.toContain(SOURCE_COLOR);
-    expect(colors).toContain(RASTER_COLOR);
+    expect(result.project.scene.layers.map((operation) => operation.id)).not.toContain(
+      SOURCE_COLOR,
+    );
+    expect(operationForRaster(result.project).mode).toBe('image');
   });
 
   it('keeps the source color layer when another object still uses it', () => {

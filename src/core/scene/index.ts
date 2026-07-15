@@ -14,13 +14,30 @@ export {
   captureLayerOperationSettings,
   createLayer,
   createLayerSubLayer,
-  isLayerColor,
   layerFromSubLayer,
   layerOperationSettingsEqual,
   normalizeLayerColor,
   nextLayerSubLayerId,
   outputOperationLayers,
 } from './layer';
+export {
+  artworkOperationName,
+  createArtworkOperation,
+  createArtworkOperations,
+  nextOperationColor,
+} from './artwork-operation';
+export {
+  appendSceneObjectOperationBinding,
+  bindSceneObjectToOperations,
+  operationArtworkCount,
+  remapSceneObjectOperationBindings,
+  removeSceneObjectOperationBinding,
+  replaceSceneObjectOperationBinding,
+  operationIdsForObject,
+  pathUsesOperation,
+  primaryOperationForObject,
+  sceneObjectUsesOperation,
+} from './operation-binding';
 export {
   REGISTRATION_LAYER_COLOR,
   REGISTRATION_LAYER_ID,
@@ -46,21 +63,16 @@ export type {
   FontKey,
   ImportedSvg,
   EllipticalArcPathSegment,
-  LinePathSegment,
   ObjectOperationOverride,
   ObjectPowerScale,
   PathTextSettings,
-  EllipseShape,
   Polyline,
   PathSegment,
-  PolygonShape,
   RasterImage,
-  RectangleShape,
   ReliefObject,
   SceneObject,
   ShapeObject,
   ShapeSpec,
-  StarShape,
   TextAlignment,
   TextObject,
   TracedImage,
@@ -69,16 +81,11 @@ export type {
 } from './scene-object';
 export {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  MAX_FLATTENED_CURVE_SEGMENTS,
   curveSubpathBounds,
   flattenColoredPathCurves,
   flattenCurveSubpath,
   polylineToCurveSubpath,
   transformCurveSubpathUniform,
-  type FlattenCurveOptions,
-  type FlattenColoredPathResult,
-  type FlattenCurveResult,
-  type UniformCurveTransform,
 } from './curve-path';
 export {
   breakCurveAtNode,
@@ -100,15 +107,12 @@ export {
   RELIEF_EMBED_TRIANGLE_LIMIT,
   IDENTITY_TRANSFORM,
   assertNever,
-  sceneObjectPrimaryLayerColor,
-  sceneObjectUsesLayerColor,
 } from './scene-object';
 
 export { applyTransform, flipTransformAboutCenter } from './transform';
 export type {
   SelectionAnchor,
   SelectionFlipAxis,
-  SelectionMetrics,
   SelectionTransform,
   SelectionTransformEdit,
   SelectionTransformError,

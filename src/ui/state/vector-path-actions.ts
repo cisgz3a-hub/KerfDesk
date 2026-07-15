@@ -8,16 +8,24 @@ import {
   type VectorBooleanOp,
   type VectorSceneObject,
 } from '../../core/geometry';
-import { addObject, removeObject, replaceObject, type Project, type Scene } from '../../core/scene';
+import {
+  addLayer,
+  addObject,
+  bindSceneObjectToOperations,
+  createArtworkOperation,
+  primaryOperationForObject,
+  removeObject,
+  replaceObject,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+  type Scene,
+  type SceneObject,
+} from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
-import {
-  ensureLayersForColors,
-  pruneOrphanLayers,
-  pushUndo,
-  type StateSlice,
-} from './scene-mutations';
+import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 
 export type VectorPathActions = {
   readonly convertSelectionToPath: () => void;
@@ -76,9 +84,8 @@ function dogboneSelectionMutation(
     // leave the rest (WORKFLOW F-CNC26; CNV-04 keeps this one silent).
     const result = dogboneVectorObject(object, bitDiameterMm);
     if (result.kind === 'error') continue;
-    const relieved = result.value;
-    scene = replaceObject(scene, object.id, relieved);
-    scene = ensureLayersForColors(scene, relieved.paths);
+    const prepared = prepareCollapsedEdit(scene, object, result.value);
+    scene = replaceObject(prepared.scene, object.id, prepared.object);
     changed = true;
   }
   if (!changed) return state;
@@ -107,7 +114,6 @@ function convertSelectionToPathMutation(
     }
     const materialized = materializeVectorObject(object, object.id);
     scene = replaceObject(scene, object.id, materialized);
-    scene = ensureLayersForColors(scene, materialized.paths);
     changed = true;
   }
   if (!changed) return state;
@@ -134,12 +140,12 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
     useToastStore.getState().pushToast(weldResult.error.message, 'warning');
     return state;
   }
-  const welded = weldResult.value;
+  const prepared = prepareIndependentArtwork(state.project.scene, weldResult.value, selected[0]);
+  const welded = prepared.object;
   const removeIds = new Set(selected.map((object) => object.id));
-  let scene = state.project.scene;
+  let scene = prepared.scene;
   for (const id of removeIds) scene = removeObject(scene, id);
   scene = removeObjectIdsFromGroups(scene, removeIds);
-  scene = ensureLayersForColors(scene, welded.paths);
   scene = addObject(scene, welded);
   scene = pruneOrphanLayers(scene);
   return {
@@ -166,12 +172,12 @@ function booleanSelectionMutation(
     useToastStore.getState().pushToast(combineResult.error.message, 'warning');
     return state;
   }
-  const combined = combineResult.value;
+  const prepared = prepareIndependentArtwork(state.project.scene, combineResult.value, selected[0]);
+  const combined = prepared.object;
   const removeIds = new Set(selected.map((object) => object.id));
-  let scene = state.project.scene;
+  let scene = prepared.scene;
   for (const id of removeIds) scene = removeObject(scene, id);
   scene = removeObjectIdsFromGroups(scene, removeIds);
-  scene = ensureLayersForColors(scene, combined.paths);
   scene = addObject(scene, combined);
   scene = pruneOrphanLayers(scene);
   return {
@@ -202,9 +208,9 @@ function offsetSelectionMutation(
     useToastStore.getState().pushToast(offsetResult.error.message, 'warning');
     return state;
   }
-  const offset = offsetResult.value;
-  let scene = state.project.scene;
-  scene = ensureLayersForColors(scene, offset.paths);
+  const prepared = prepareIndependentArtwork(state.project.scene, offsetResult.value, selected[0]);
+  const offset = prepared.object;
+  let scene = prepared.scene;
   scene = addObject(scene, offset);
   return {
     project: { ...state.project, scene },
@@ -215,6 +221,58 @@ function offsetSelectionMutation(
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
+  };
+}
+
+function prepareIndependentArtwork(
+  scene: Scene,
+  artwork: ImportedSvg,
+  source: SceneObject | undefined,
+): { readonly scene: Scene; readonly object: ImportedSvg } {
+  const seed = createArtworkOperation(scene, artwork);
+  const sourceOperation =
+    source === undefined ? null : primaryOperationForObject(source, scene.layers);
+  const operation: Layer =
+    sourceOperation === null
+      ? seed.operation
+      : {
+          ...sourceOperation,
+          ...(artwork.operationOverride ?? {}),
+          id: seed.operation.id,
+          name: seed.operation.name,
+          color: seed.operation.color,
+          subLayers: [],
+        };
+  return {
+    scene: addLayer(scene, operation),
+    object: seed.object as ImportedSvg,
+  };
+}
+
+function prepareCollapsedEdit(
+  scene: Scene,
+  source: VectorSceneObject,
+  artwork: ImportedSvg,
+): { readonly scene: Scene; readonly object: ImportedSvg } {
+  const sourceOperation = primaryOperationForObject(source, scene.layers);
+  const withMetadata: ImportedSvg = {
+    ...artwork,
+    ...(source.locked === undefined ? {} : { locked: source.locked }),
+    ...(source.powerScale === undefined ? {} : { powerScale: source.powerScale }),
+    ...(source.operationOverride === undefined
+      ? {}
+      : { operationOverride: source.operationOverride }),
+  };
+  if (sourceOperation !== null) {
+    return {
+      scene,
+      object: bindSceneObjectToOperations(withMetadata, [sourceOperation.id]) as ImportedSvg,
+    };
+  }
+  const created = createArtworkOperation(scene, withMetadata);
+  return {
+    scene: addLayer(scene, created.operation),
+    object: created.object as ImportedSvg,
   };
 }
 

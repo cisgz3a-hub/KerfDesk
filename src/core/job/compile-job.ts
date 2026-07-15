@@ -22,10 +22,11 @@ import {
   type Layer,
   layerOperationSettingsEqual,
   outputOperationLayers,
+  pathUsesOperation,
+  sceneObjectUsesOperation,
   type Polyline,
   type Scene,
   type SceneObject,
-  type Transform,
   type Vec2,
   withClosingPoint,
 } from '../scene';
@@ -221,7 +222,7 @@ function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
     case 'text':
     case 'traced-image':
     case 'shape':
-      return obj.paths.some((path) => path.color === layer.color);
+      return sceneObjectUsesOperation(obj, layer);
     case 'raster-image':
     case 'relief':
       return false;
@@ -316,16 +317,16 @@ function appendSegmentsFromObject(
   // variant lands (per ADR-014).
   switch (obj.kind) {
     case 'imported-svg':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'text':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'traced-image':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'shape':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'raster-image':
       // F.2.c: SceneObject union now includes raster-image. The
@@ -351,16 +352,16 @@ function appendFillContoursFromObject(
 ): void {
   switch (obj.kind) {
     case 'imported-svg':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'text':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'traced-image':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'shape':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'raster-image':
     case 'relief':
@@ -371,17 +372,18 @@ function appendFillContoursFromObject(
 }
 
 function appendFillPathContours(
-  paths: ReadonlyArray<ColoredPath>,
-  transform: Transform,
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
   layer: Layer,
   device: DeviceProfile,
   out: Polyline[],
 ): void {
-  for (const path of paths) {
-    if (path.color !== layer.color) continue;
+  for (const path of object.paths) {
+    if (!pathUsesOperation(object, path, layer)) continue;
     for (const polyline of compilationPolylines(path)) {
       out.push({
-        points: polyline.points.map((p) => toMachineCoords(applyTransform(p, transform), device)),
+        points: polyline.points.map((p) =>
+          toMachineCoords(applyTransform(p, object.transform), device),
+        ),
         closed: polyline.closed,
       });
     }
@@ -398,18 +400,17 @@ function appendFillPathContours(
 // layer-wide machine-space path above so hatch spacing is physical and
 // same-layer contours interact before hatching.
 function appendPathSegments(
-  paths: ReadonlyArray<ColoredPath>,
-  transform: Transform,
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
   layer: Layer,
   device: DeviceProfile,
   out: CutSegment[],
 ): void {
-  for (const path of paths) {
-    if (path.color !== layer.color) continue;
+  for (const path of object.paths) {
+    if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
     for (const polyline of compilationPolylines(path)) {
       const points: Vec2[] = polyline.points.map((p) =>
-        toMachineCoords(applyTransform(p, transform), device),
+        toMachineCoords(applyTransform(p, object.transform), device),
       );
       if (shouldApplyKerf(polyline, layer)) {
         closedForKerf.push({ points, closed: true });

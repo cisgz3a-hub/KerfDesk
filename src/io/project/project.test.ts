@@ -166,9 +166,11 @@ describe('deserializeProject', () => {
   });
 
   it('reports invalid when scene.objects is not an array (I-5)', () => {
-    const result = deserializeProject(
-      '{"schemaVersion":1,"device":{},"workspace":{},"scene":{"objects":null,"layers":[]}}',
-    );
+    const raw = JSON.parse(serializeProject(createProject())) as {
+      scene: { objects: unknown };
+    };
+    raw.scene.objects = null;
+    const result = deserializeProject(JSON.stringify(raw));
     expect(result.kind).toBe('invalid');
     if (result.kind === 'invalid') {
       expect(result.reason).toMatch(/scene\.objects/);
@@ -292,6 +294,7 @@ describe('deserializeProject', () => {
         layers: [
           {
             id: 'L1',
+            name: 'Legacy line',
             color: '#ff0000',
             mode: 'line',
             power: 30,

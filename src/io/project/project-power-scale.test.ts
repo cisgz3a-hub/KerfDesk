@@ -21,6 +21,7 @@ function rawProject(objects: readonly Record<string, unknown>[]): string {
       layers: [
         {
           id: 'L1',
+          name: 'Vector operation',
           color: '#ff0000',
           mode: 'line',
           minPower: 0,

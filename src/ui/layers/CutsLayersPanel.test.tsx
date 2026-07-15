@@ -18,10 +18,7 @@ const mockPlatform: PlatformAdapter = {
   id: 'mock',
   pickFilesForOpen: async () => [],
   pickFileForSave: async () => null,
-  serial: {
-    isSupported: () => false,
-    requestPort: async () => null,
-  },
+  serial: { isSupported: () => false, requestPort: async () => null },
 };
 
 function PanelUnderTest(): JSX.Element {
@@ -58,361 +55,196 @@ afterEach(() => {
   useUiStore.getState().setCutsLayersView('layers');
 });
 
-describe('CutsLayersPanel layer order controls', () => {
-  it('collapses to a narrow strip and expands from the same location', async () => {
+describe('Artwork Operations panel', () => {
+  it('collapses and expands with the artwork-operation identity', async () => {
     const { host, unmount } = await renderPanel();
     try {
-      const collapse = host.querySelector('button[aria-label="Collapse Cuts / Layers panel"]');
+      const collapse = host.querySelector(
+        'button[aria-label="Collapse Artwork / Operations panel"]',
+      );
       if (!(collapse instanceof HTMLButtonElement)) throw new Error('collapse button missing');
-
       await act(async () => collapse.click());
       expect(
-        host.querySelector('aside[aria-label="Cuts / Layers panel collapsed"]'),
+        host.querySelector('aside[aria-label="Artwork / Operations panel collapsed"]'),
       ).not.toBeNull();
-
-      const expand = host.querySelector('button[aria-label="Expand Cuts / Layers panel"]');
+      const expand = host.querySelector('button[aria-label="Expand Artwork / Operations panel"]');
       if (!(expand instanceof HTMLButtonElement)) throw new Error('expand button missing');
       await act(async () => expand.click());
-
-      expect(host.querySelector('aside[aria-label="Cuts / Layers panel"]')).not.toBeNull();
+      expect(host.querySelector('aside[aria-label="Artwork / Operations panel"]')).not.toBeNull();
     } finally {
       await unmount();
     }
   });
 
-  it('edits only selected artwork from the selected artwork settings', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
-    useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set() });
+  it('shows independent automatic colors for same-colored artwork', async () => {
+    importTwoBlackArtworks();
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.querySelector('[aria-label="Operation Johann"]')).not.toBeNull();
+      expect(host.querySelector('[aria-label="Operation Box"]')).not.toBeNull();
+      expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+        '#2563eb',
+        '#dc2626',
+      ]);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('edits only the operation belonging to the clicked artwork', async () => {
+    importTwoBlackArtworks();
+    useStore.getState().selectObject('Johann');
     const { host, unmount } = await renderPanel();
     try {
       const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('layer mode missing');
-
+      const power = host.querySelector('input[aria-label="Power for selected objects"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('mode missing');
+      if (!(power instanceof HTMLInputElement)) throw new Error('power missing');
       await act(async () => {
         mode.value = 'fill';
         Simulate.change(mode);
       });
-
-      const state = useStore.getState();
-      const layer = state.project.scene.layers.find((candidate) => candidate.id === '#000000');
-      const first = state.project.scene.objects.find((object) => object.id === 'O1');
-      const second = state.project.scene.objects.find((object) => object.id === 'O2');
-      expect(layer?.mode).toBe('line');
-      expect(first?.operationOverride).toBeUndefined();
-      expect(second?.operationOverride).toMatchObject({ mode: 'fill' });
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('edits only selected artwork power from the selected artwork settings', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
-    useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set() });
-    const { host, unmount } = await renderPanel();
-    try {
-      const power = host.querySelector('input[aria-label="Power for selected objects"]');
-      if (!(power instanceof HTMLInputElement)) throw new Error('layer power missing');
-
-      act(() => {
+      await act(async () => {
         power.value = '55';
         Simulate.change(power);
       });
-      act(() => {
-        Simulate.blur(power);
+      await act(async () => Simulate.blur(power));
+      const layers = useStore.getState().project.scene.layers;
+      expect(layers.find((layer) => layer.name === 'Johann')).toMatchObject({
+        mode: 'fill',
+        power: 55,
       });
-
-      const state = useStore.getState();
-      const layer = state.project.scene.layers.find((candidate) => candidate.id === '#000000');
-      const first = state.project.scene.objects.find((object) => object.id === 'O1');
-      const second = state.project.scene.objects.find((object) => object.id === 'O2');
-      expect(layer?.power).toBe(30);
-      expect(first?.operationOverride).toBeUndefined();
-      expect(second?.operationOverride).toMatchObject({ power: 55 });
+      expect(layers.find((layer) => layer.name === 'Box')).toMatchObject({
+        mode: 'line',
+        power: 30,
+      });
     } finally {
       await unmount();
     }
   });
 
-  it('edits all selected same-color artwork from the selected artwork settings', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
-    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
+  it('offers and applies one unified operation for a multi-selection', async () => {
+    importTwoBlackArtworks();
+    useStore.setState({ selectedObjectId: 'Johann', additionalSelectedIds: new Set(['Box']) });
     const { host, unmount } = await renderPanel();
     try {
-      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('layer mode missing');
+      expect(host.querySelector('[aria-label="Multiple artwork operations"]')).not.toBeNull();
+      const unify = buttonByText(host, 'Use one operation for selection');
+      await act(async () => unify.click());
+      const ids = useStore.getState().project.scene.objects.map((object) => object.operationIds);
+      expect(ids[0]).toEqual(ids[1]);
+      expect(host.querySelector('[aria-label="Selected artwork operation"]')).not.toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
 
-      await act(async () => {
-        mode.value = 'fill';
-        Simulate.change(mode);
-      });
+  it('makes one member of a shared operation unique', async () => {
+    importTwoBlackArtworks();
+    const sharedId = useStore.getState().project.scene.layers[0]!.id;
+    useStore.setState({ selectedObjectId: 'Johann', additionalSelectedIds: new Set(['Box']) });
+    useStore.getState().useOperationForSelection(sharedId);
+    useStore.setState({ selectedObjectId: 'Box', additionalSelectedIds: new Set() });
+    const { host, unmount } = await renderPanel();
+    try {
+      const unique = buttonByText(host, 'Make unique');
+      await act(async () => unique.click());
+      const ids = useStore.getState().project.scene.objects.map((object) => object.operationIds);
+      expect(ids[0]).not.toEqual(ids[1]);
+    } finally {
+      await unmount();
+    }
+  });
 
+  it('adds a second first-class operation without a Sub-layers box', async () => {
+    useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+    const { host, unmount } = await renderPanel();
+    try {
+      await act(async () => buttonByText(host, 'Add operation').click());
       const state = useStore.getState();
-      const layer = state.project.scene.layers.find((candidate) => candidate.id === '#000000');
-      expect(layer?.mode).toBe('line');
-      expect(state.project.scene.objects.map((object) => object.operationOverride)).toEqual([
-        { mode: 'fill' },
-        { mode: 'fill' },
+      expect(state.project.scene.layers).toHaveLength(2);
+      expect(state.project.scene.objects[0]?.operationIds).toHaveLength(2);
+      expect(host.textContent).not.toContain('Sub-layers');
+      expect(host.querySelectorAll('section[aria-label^="Operation "]')).toHaveLength(2);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps operation rows compact and moves output order', async () => {
+    importTwoBlackArtworks();
+    const { host, unmount } = await renderPanel();
+    try {
+      const boxRow = host.querySelector('[aria-label="Operation Box"]');
+      expect(boxRow?.querySelector('input[aria-label^="Power for"]')).toBeNull();
+      const moveUp = host.querySelector('button[aria-label="Move Box up"]');
+      if (!(moveUp instanceof HTMLButtonElement)) throw new Error('move button missing');
+      await act(async () => moveUp.click());
+      expect(useStore.getState().project.scene.layers.map((layer) => layer.name)).toEqual([
+        'Box',
+        'Johann',
       ]);
     } finally {
       await unmount();
     }
   });
 
-  it('keeps selected-object layer cards compact to avoid duplicate settings panels', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
-    useStore.getState().selectObject('O1');
+  it('selects all artwork intentionally sharing an operation', async () => {
+    importTwoBlackArtworks();
+    const sharedId = useStore.getState().project.scene.layers[0]!.id;
+    useStore.setState({ selectedObjectId: 'Johann', additionalSelectedIds: new Set(['Box']) });
+    useStore.getState().useOperationForSelection(sharedId);
+    useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
     const { host, unmount } = await renderPanel();
     try {
-      expect(host.textContent).toContain('Selected Artwork Settings');
-      expect(host.textContent).toContain('Editing selected (1)');
-      expect(host.querySelector('select[aria-label="Mode for selected objects"]')).not.toBeNull();
-      expect(host.querySelector('select[aria-label="Mode for #000000"]')).toBeNull();
-      expect(host.querySelector('input[aria-label="Power for #000000"]')).toBeNull();
-      expect(host.textContent).toContain('Use Selected Artwork Settings above for this selection.');
+      const select = host.querySelector('button[aria-label="Select all artwork using Johann"]');
+      if (!(select instanceof HTMLButtonElement)) throw new Error('select button missing');
+      await act(async () => select.click());
+      expect(useStore.getState().selectedObjectId).toBe('Johann');
+      expect([...useStore.getState().additionalSelectedIds]).toEqual(['Box']);
     } finally {
       await unmount();
     }
   });
 
-  it('keeps raster image adjustment controls inside the selected artwork inspector', async () => {
+  it('uses the same selection inspector for CNC operation settings', async () => {
+    useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+    useStore.getState().setMachineKind('cnc');
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.querySelector('[aria-label="Selected artwork operation"]')).not.toBeNull();
+      expect(host.querySelector('select[aria-label^="Cut type for"]')).not.toBeNull();
+      expect(host.querySelector('input[aria-label="Power for selected objects"]')).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps raster adjustments inside the selected artwork inspector', async () => {
     useStore.getState().importRasterImage(rasterObj('R1'));
     const { host, unmount } = await renderPanel();
     try {
-      const selectedPanel = host.querySelector('[aria-label="Selected object properties"]');
-      if (!(selectedPanel instanceof HTMLElement)) throw new Error('selected panel missing');
-
-      expect(
-        selectedPanel.querySelector('[aria-label="Selected image adjustments"]'),
-      ).not.toBeNull();
+      const selected = host.querySelector('[aria-label="Selected object properties"]');
+      expect(selected?.querySelector('[aria-label="Selected image adjustments"]')).not.toBeNull();
       expect(host.querySelectorAll('[aria-label="Selected image adjustments"]')).toHaveLength(1);
-
-      const selectedPanelBottom = selectedPanel.getBoundingClientRect().bottom;
-      const imageAdjustTop = (
-        selectedPanel.querySelector('[aria-label="Selected image adjustments"]') as HTMLElement
-      ).getBoundingClientRect().top;
-      expect(imageAdjustTop).toBeGreaterThanOrEqual(
-        selectedPanelBottom - selectedPanel.offsetHeight,
-      );
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('moves a layer up through the Cuts / Layers panel', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff', '#00ff00']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const moveBlueUp = host.querySelector('button[aria-label="Move #0000ff up"]');
-      if (!(moveBlueUp instanceof HTMLButtonElement)) throw new Error('move button missing');
-
-      await act(async () => {
-        moveBlueUp.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      expect(useStore.getState().project.scene.layers.map((layer) => layer.id)).toEqual([
-        '#0000ff',
-        '#ff0000',
-        '#00ff00',
-      ]);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('disables boundary layer move buttons', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const topUp = host.querySelector('button[aria-label="Move #ff0000 up"]');
-      const bottomDown = host.querySelector('button[aria-label="Move #0000ff down"]');
-      if (!(topUp instanceof HTMLButtonElement)) throw new Error('top move button missing');
-      if (!(bottomDown instanceof HTMLButtonElement)) throw new Error('bottom move button missing');
-
-      expect(topUp.disabled).toBe(true);
-      expect(bottomDown.disabled).toBe(true);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('adds a manual layer and assigns the selected object to it', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().selectObject('O1');
-    const { host, unmount } = await renderPanel();
-    try {
-      const color = host.querySelector('input[aria-label="New layer color"]');
-      const add = host.querySelector('button[aria-label="Add layer"]');
-      if (!(color instanceof HTMLInputElement)) throw new Error('new layer color missing');
-      if (!(add instanceof HTMLButtonElement)) throw new Error('add layer button missing');
-
-      await act(async () => {
-        color.value = '#00ff00';
-        Simulate.change(color);
-        add.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
-        '#ff0000',
-        '#00ff00',
-      ]);
-
-      const assign = host.querySelector('button[aria-label="Assign selection to #00ff00"]');
-      if (!(assign instanceof HTMLButtonElement)) throw new Error('assign button missing');
-      await act(async () => {
-        assign.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      const obj = useStore.getState().project.scene.objects[0];
-      expect(obj?.kind).toBe('imported-svg');
-      if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
-      expect(obj.paths.map((path) => path.color)).toEqual(['#00ff00']);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('selects all objects on a layer from the Cuts / Layers panel', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff', '#ff0000']));
-    useStore.getState().importSvgObject(svgObj('O3', ['#0000ff']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const selectRed = host.querySelector('button[aria-label="Select all objects on #ff0000"]');
-      if (!(selectRed instanceof HTMLButtonElement)) throw new Error('select layer button missing');
-
-      await act(async () => {
-        selectRed.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      const state = useStore.getState();
-      expect(state.selectedObjectId).toBe('O1');
-      expect([...state.additionalSelectedIds]).toEqual(['O2']);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('deletes a layer and its assigned artwork from the Cuts / Layers panel', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const deleteRed = host.querySelector('button[aria-label="Delete layer #ff0000"]');
-      if (!(deleteRed instanceof HTMLButtonElement)) throw new Error('delete layer button missing');
-
-      await act(async () => {
-        deleteRed.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual(['O2']);
-      expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
-        '#0000ff',
-      ]);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('copies and pastes layer settings from the Cuts / Layers panel', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
-    useStore.getState().setLayerParam('#ff0000', { power: 71, speed: 2345, passes: 4 });
-    const { host, unmount } = await renderPanel();
-    try {
-      const copyRed = host.querySelector('button[aria-label="Copy settings from #ff0000"]');
-      const pasteBlue = host.querySelector('button[aria-label="Paste settings to #0000ff"]');
-      if (!(copyRed instanceof HTMLButtonElement)) throw new Error('copy button missing');
-      if (!(pasteBlue instanceof HTMLButtonElement)) throw new Error('paste button missing');
-
-      await act(async () => {
-        copyRed.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-      await act(async () => {
-        pasteBlue.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      const blue = useStore.getState().project.scene.layers.find((layer) => layer.id === '#0000ff');
-      expect(blue).toMatchObject({ color: '#0000ff', power: 71, speed: 2345, passes: 4 });
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('adds and edits a sub-layer operation from the Cuts / Layers panel', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const addSubLayer = host.querySelector('button[aria-label="Add sub-layer for #ff0000"]');
-      if (!(addSubLayer instanceof HTMLButtonElement)) throw new Error('add sub-layer missing');
-
-      await act(async () => {
-        addSubLayer.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      const mode = host.querySelector('select[aria-label="Mode for Sub-layer 1 #ff0000"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('sub-layer mode missing');
-      await act(async () => {
-        mode.value = 'fill';
-        Simulate.change(mode);
-      });
-
-      expect(useStore.getState().project.scene.layers[0]?.subLayers[0]).toMatchObject({
-        id: 'sub-1',
-        label: 'Sub-layer 1',
-        enabled: true,
-        settings: { mode: 'fill' },
-      });
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('keeps sub-layer action controls inside a narrow layer card', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const { host, unmount } = await renderPanel();
-    try {
-      const addSubLayer = host.querySelector('button[aria-label="Add sub-layer for #ff0000"]');
-      if (!(addSubLayer instanceof HTMLButtonElement)) throw new Error('add sub-layer missing');
-
-      await act(async () => {
-        addSubLayer.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      const deleteButton = host.querySelector(
-        'button[aria-label="Delete Sub-layer 1 for #ff0000"]',
-      );
-      if (!(deleteButton instanceof HTMLButtonElement)) throw new Error('delete button missing');
-      const row = deleteButton.parentElement;
-      if (!(row instanceof HTMLDivElement)) throw new Error('sub-layer row missing');
-
-      expect(row.style.display).toBe('flex');
-      expect(row.style.flexWrap).toBe('wrap');
-      expect(row.style.minWidth).toBe('0');
-      expect(row.style.overflow).toBe('hidden');
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('keeps the Layers list visible when an object is selected [LAY-02]', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set() });
-    const { host, unmount } = await renderPanel();
-    try {
-      const panel = host.querySelector('#cuts-layers-layers-panel');
-      expect(panel).not.toBeNull();
-      // The Layers page is the default and remains mounted while selected-object
-      // settings are shown, so selection never hides the layer rows.
-      expect(
-        panel?.querySelector('button[aria-label="Select all objects on #ff0000"]'),
-      ).not.toBeNull();
     } finally {
       await unmount();
     }
   });
 });
+
+function importTwoBlackArtworks(): void {
+  useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+  useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
+}
+
+function buttonByText(host: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent === text,
+  );
+  if (!(button instanceof HTMLButtonElement)) throw new Error(`${text} button missing`);
+  return button;
+}
 
 function rasterObj(id: string): RasterImage {
   return {
