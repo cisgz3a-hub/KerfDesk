@@ -440,8 +440,11 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     ...(state.liveCanvasRun === null || state.liveCanvasRun === undefined
       ? {}
       : { liveCanvasRun: { ...state.liveCanvasRun, lifecycle: 'disconnected' as const } }),
-    // Replies owed by the dead controller will never arrive.
+    // Replies and transport completions owned by the dead session can no
+    // longer qualify. teardown() advanced writeEpoch before this patch, so a
+    // late completion is intentionally unable to mutate the new ledger.
     pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
     ...(state.fireActive
       ? { safetyNotice: disconnectDuringFireNotice() }
       : wasUnsafeActive

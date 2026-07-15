@@ -17,6 +17,41 @@ function deferredConnection(capture: (release: () => void) => void): SerialConne
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
+type DroppableConnection = FakeConnection & {
+  readonly emitClose: () => void;
+  readonly releaseBlockedWrite: () => void;
+};
+
+function droppableConnection(): DroppableConnection {
+  const lineHandlers = new Set<(line: string) => void>();
+  const closeHandlers = new Set<() => void>();
+  let releaseBlockedWrite: () => void = () => undefined;
+  return {
+    write: async (data) => {
+      if (data !== '$I\n') return;
+      await new Promise<void>((resolve) => {
+        releaseBlockedWrite = resolve;
+      });
+    },
+    onLine: (handler) => {
+      lineHandlers.add(handler);
+      return () => lineHandlers.delete(handler);
+    },
+    onClose: (handler) => {
+      closeHandlers.add(handler);
+      return () => closeHandlers.delete(handler);
+    },
+    close: async () => undefined,
+    emitLine: (line) => {
+      for (const handler of lineHandlers) handler(line);
+    },
+    emitClose: () => {
+      for (const handler of closeHandlers) handler();
+    },
+    releaseBlockedWrite: () => releaseBlockedWrite(),
+  };
+}
+
 function zeroZConnection(capture: (release: () => void) => void): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   return {
@@ -57,6 +92,30 @@ afterEach(async () => {
 });
 
 describe('safe-write transport epochs', () => {
+  it('retires unresolved transport ownership when the serial port closes', async () => {
+    const connection = droppableConnection();
+    await useLaserStore.getState().connect(adapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    await flush();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+
+    const command = useLaserStore.getState().sendConsoleCommand('$I');
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitClose();
+    const transportWritesAfterClose = useLaserStore.getState().pendingTransportWrites;
+    const untrackedAcksAfterClose = useLaserStore.getState().pendingUntrackedAcks;
+    connection.releaseBlockedWrite();
+    await expect(command).rejects.toThrow(/serial session changed/i);
+
+    expect(transportWritesAfterClose).toBe(0);
+    expect(untrackedAcksAfterClose).toBe(0);
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+  });
+
   it('does not let an old-session completion erase a new in-flight write', async () => {
     let releaseOld: () => void = () => undefined;
     let releaseNew: () => void = () => undefined;
