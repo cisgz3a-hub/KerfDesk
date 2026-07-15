@@ -1,6 +1,7 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
+import { useState } from 'react';
 import { describeAlarm } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
@@ -19,7 +20,7 @@ import { ConnectionBar } from './ConnectionBar';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
-import { DeviceSetupControls } from './device-setup';
+import { DeviceSetupControls, type DeviceSetupOpenRequest } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -30,15 +31,12 @@ import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 
 export function LaserWindow(): JSX.Element {
+  const [machineSetupRequest, setMachineSetupRequest] = useState<DeviceSetupOpenRequest>();
   const machinePanel = useMachinePanelVisibility();
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
-  const connect = useLaserStore((s) => s.connect);
-  const disconnect = useLaserStore((s) => s.disconnect);
-  const home = useLaserStore((s) => s.home);
-  const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
-  const wakeController = useLaserStore((s) => s.wakeController);
+  const control = useControllerActions();
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
@@ -49,27 +47,15 @@ export function LaserWindow(): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const controllerKind = useStore((s) => s.project.device.controllerKind);
   const profileBaudRate = useStore((s) => s.project.device.baudRate);
-  const canUnlock = useLaserStore((s) => s.capabilities.unlock);
-  const machineOperationBusy = isMachineOperationBusy({
-    autofocusBusy,
-    motionOperation,
-    controllerOperation,
-  });
-  // H6: jog mid-job interleaves $J= acks into the character-counted stream —
-  // every ack pops the stream head, so the 120-byte RX accounting drifts and
-  // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
+  const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
+  // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
   const jogBlocked = useJogBlocked();
-  const controllerIdle = statusReport?.state === 'Idle';
-  const controllerSleep = statusReport?.state === 'Sleep';
-  const showAlarmBanner = !controllerSleep && hasAlarmRecovery(alarmCode, statusReport?.state);
+  const controllerDisplay = controllerDisplayState(statusReport, alarmCode);
   const connected = connection.kind === 'connected';
-
   const supportsSerial = platform.serial.isSupported();
-  // File-only profiles (Ruida .rd export) have no live link to open — the
-  // Connect button and machine controls stay dark and a hint explains why.
+  // File-only profiles have no live link; keep machine controls dark and explain why.
   const isFileOnlyProfile = isFileOnlyController(controllerKind);
-
   if (!machinePanel.requestedVisible && !jobActive) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -84,34 +70,42 @@ export function LaserWindow(): JSX.Element {
       />
       <SafetyNoticeBanner />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
-      <DeviceSetupControls />
+      <DeviceSetupControls openRequest={machineSetupRequest} />
       <ConnectionBar
         connection={connection}
         machineNoun={machineNoun(machineKind)}
-        onConnect={() => void connect(platform, { controllerKind, baudRate: profileBaudRate })}
-        onDisconnect={() => void disconnect().catch(() => undefined)}
+        onConnect={() =>
+          void control.connect(platform, { controllerKind, baudRate: profileBaudRate })
+        }
+        onDisconnect={() => void control.disconnect().catch(() => undefined)}
         onForget={confirmForgetDevice}
         disabled={!supportsSerial || machineOperationBusy || isFileOnlyProfile}
       />
-      {showAlarmBanner && (
+      {controllerDisplay.showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}
           homingEnabled={homingEnabled}
-          canUnlock={canUnlock}
-          onHome={() => void home().catch(() => undefined)}
-          onUnlock={() => void unlockAlarm().catch(() => undefined)}
+          canUnlock={control.canUnlock}
+          onHome={() => void control.home().catch(() => undefined)}
+          onUnlock={() => void control.unlockAlarm().catch(() => undefined)}
         />
       )}
-      {controllerSleep && (
-        <SleepBanner onWake={() => void wakeController().catch(() => undefined)} />
+      {controllerDisplay.sleep && (
+        <SleepBanner onWake={() => void control.wakeController().catch(() => undefined)} />
       )}
       <StatusDisplay />
       <JogPad
-        disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jogBlocked)}
+        disabled={isJogPadDisabled(
+          connected,
+          controllerDisplay.idle,
+          machineOperationBusy,
+          jogBlocked,
+        )}
       />
       <ProbePanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
+        onConfigureAutofocus={() => setMachineSetupRequest({ initialStep: 'safety' })}
         onStartJob={() => void runStartJobFlow()}
       />
       <MachineConsoleSection />
@@ -140,6 +134,24 @@ function useMachinePanelVisibility(): {
   const requestedVisible = useUiStore((s) => s.railPanelVisibility.machine);
   const togglePanel = useUiStore((s) => s.toggleRailPanel);
   return { requestedVisible, toggle: () => togglePanel('machine') };
+}
+
+function useControllerActions(): {
+  readonly connect: ReturnType<typeof useLaserStore.getState>['connect'];
+  readonly disconnect: ReturnType<typeof useLaserStore.getState>['disconnect'];
+  readonly home: ReturnType<typeof useLaserStore.getState>['home'];
+  readonly unlockAlarm: ReturnType<typeof useLaserStore.getState>['unlockAlarm'];
+  readonly wakeController: ReturnType<typeof useLaserStore.getState>['wakeController'];
+  readonly canUnlock: boolean;
+} {
+  return {
+    connect: useLaserStore((s) => s.connect),
+    disconnect: useLaserStore((s) => s.disconnect),
+    home: useLaserStore((s) => s.home),
+    unlockAlarm: useLaserStore((s) => s.unlockAlarm),
+    wakeController: useLaserStore((s) => s.wakeController),
+    canUnlock: useLaserStore((s) => s.capabilities.unlock),
+  };
 }
 
 function isFileOnlyController(
@@ -214,6 +226,18 @@ function hasAlarmRecovery(code: number | null, state: string | undefined): boole
   return code !== null || state === 'Alarm';
 }
 
+function controllerDisplayState(
+  report: ReturnType<typeof useLaserStore.getState>['statusReport'],
+  alarmCode: number | null,
+): { readonly idle: boolean; readonly sleep: boolean; readonly showAlarmBanner: boolean } {
+  const sleep = report?.state === 'Sleep';
+  return {
+    idle: report?.state === 'Idle',
+    sleep,
+    showAlarmBanner: !sleep && hasAlarmRecovery(alarmCode, report?.state),
+  };
+}
+
 // A settled tool-change hold deliberately permits jog + Zero-Z so the operator
 // can touch off the new bit — the same carve-out the store's setup gate makes
 // (setupBlockingJobCommandBlockMessage). Without honouring it the multi-tool CNC
@@ -230,14 +254,12 @@ function isJogPadDisabled(
   return !connected || !controllerIdle || machineOperationBusy || jogBlocked;
 }
 
-function isMachineOperationBusy(state: {
-  readonly autofocusBusy: boolean;
-  readonly motionOperation: unknown;
-  readonly controllerOperation: unknown;
-}): boolean {
-  return (
-    state.autofocusBusy || state.motionOperation !== null || state.controllerOperation !== null
-  );
+function machineBusy(
+  autofocusBusy: boolean,
+  motionOperation: unknown,
+  controllerOperation: unknown,
+): boolean {
+  return autofocusBusy || motionOperation !== null || controllerOperation !== null;
 }
 
 function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {

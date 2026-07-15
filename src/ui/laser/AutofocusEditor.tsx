@@ -36,8 +36,26 @@ export function AutofocusEditor(props: {
 }): JSX.Element {
   return (
     <div style={focusBlockStyle}>
+      <p style={focusIntroStyle}>
+        Choose a known machine preset, or paste the exact command from your controller
+        documentation.
+      </p>
+      <span style={presetLabelStyle}>Known machine presets</span>
+      <div style={presetsRowStyle}>
+        {AUTOFOCUS_PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => props.onChange(p.command)}
+            title={p.hint}
+            style={presetButtonStyle}
+          >
+            Use {p.label}
+          </button>
+        ))}
+      </div>
       <label htmlFor="autofocus-cmd" style={focusLabelStyle}>
-        Auto-focus command
+        Auto-focus command or macro
       </label>
       <textarea
         id="autofocus-cmd"
@@ -49,22 +67,8 @@ export function AutofocusEditor(props: {
         title="G-code or firmware command KerfDesk sends when auto-focus is requested. Leave blank to disable auto-focus."
         style={textareaStyle}
       />
-      <div style={presetsRowStyle}>
-        {AUTOFOCUS_PRESETS.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            onClick={() => props.onChange(p.command)}
-            title={p.hint}
-            style={presetButtonStyle}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
       <p style={focusHintStyle}>
-        Empty by default — autofocus protocols are vendor-specific. Pick a preset above for known
-        machines, or paste your controller&apos;s command. Common error replies:{' '}
+        Leave this empty when the machine has no supported auto-focus routine. Common error replies:{' '}
         <code style={inlineCodeStyle}>error:9</code> (no probe pin) and{' '}
         <code style={inlineCodeStyle}>error:20</code> (unsupported G-code on this firmware).
       </p>
@@ -75,10 +79,17 @@ export function AutofocusEditor(props: {
 const focusBlockStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 2,
-  marginTop: 4,
-  borderTop: '1px solid var(--lf-border)',
-  paddingTop: 4,
+  gap: 5,
+};
+const focusIntroStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  lineHeight: 1.4,
+};
+const presetLabelStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+  fontWeight: 600,
 };
 const focusLabelStyle: React.CSSProperties = {
   fontSize: 12,
@@ -100,7 +111,7 @@ const focusHintStyle: React.CSSProperties = {
 };
 const presetsRowStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4 };
 const presetButtonStyle: React.CSSProperties = {
-  fontSize: 10,
-  padding: '2px 6px',
+  fontSize: 11,
+  padding: '5px 8px',
   cursor: 'pointer',
 };

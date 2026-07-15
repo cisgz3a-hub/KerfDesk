@@ -93,6 +93,25 @@ describe('LaserWindow device-setup nudge', () => {
     }
   });
 
+  it('opens the dedicated auto-focus setup directly from an unconfigured machine', async () => {
+    const { host, unmount } = await renderLaserWindow();
+    try {
+      const setup = button(host, 'Set up auto-focus');
+      expect(setup.disabled).toBe(false);
+
+      await act(async () => setup.click());
+
+      expect(host.textContent).toContain('Step 5 of 7');
+      expect(host.textContent).toContain('Auto-focus setup');
+      expect(host.textContent).toContain('Not configured');
+      const field = host.querySelector<HTMLTextAreaElement>('#autofocus-cmd');
+      expect(field).toBeInstanceOf(HTMLTextAreaElement);
+      expect(field?.closest('details')?.open).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
   it('clears the nudge after the machine is set up through the wizard', async () => {
     useLaserStore.setState({ connection: { kind: 'connected' } } as Partial<
       ReturnType<typeof useLaserStore.getState>

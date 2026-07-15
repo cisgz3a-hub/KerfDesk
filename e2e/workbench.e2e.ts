@@ -158,6 +158,18 @@ baseTest(
   },
 );
 
+baseTest('unconfigured auto-focus opens its setup section directly', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Set up auto-focus', exact: true }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
+  await expect(dialog).toContainText('Step 5 of 7 — Safety & calibration');
+  await expect(dialog).toContainText('Auto-focus setup');
+  await expect(dialog.getByLabel('Auto-focus command or macro')).toBeVisible();
+});
+
 baseTest('Machine Setup stays navigable at the narrow breakpoint', async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await page.goto('/');
