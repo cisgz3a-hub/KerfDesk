@@ -3,8 +3,8 @@
 // Stop/Pause/Resume/Disconnect write, or a USB drop while a job was running. The
 // copy names the PHYSICAL E-stop because once the link is gone, no software
 // command can stop motion (GRBL keeps executing its buffered commands). It
-// stays until the operator dismisses it (clearSafetyNotice) or a fresh connect
-// clears it — it is deliberately not auto-hidden.
+// stays until the operator explicitly acknowledges it. Reconnect does not
+// clear it and neither action touches the separate interrupted-job checkpoint.
 
 import { useLaserStore } from '../state/laser-store';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
@@ -19,32 +19,64 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'frame-limit': 'Frame hit a machine limit',
 };
 
-export function SafetyNoticeBanner(): JSX.Element | null {
+type Props = {
+  /** Re-opens the serial picker. Calling connect also tears down a stale link. */
+  readonly onReconnect?: () => void;
+  readonly reconnectDisabled?: boolean;
+};
+
+export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
   const notice = useLaserStore((s) => s.safetyNotice);
+  const connection = useLaserStore((s) => s.connection);
+  const statusState = useLaserStore((s) => s.statusReport?.state ?? null);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   const wakeController = useLaserStore((s) => s.wakeController);
   if (notice === null) return null;
   const title = SAFETY_NOTICE_TITLES[notice.kind];
+  const resetAvailable = connection.kind === 'connected' && statusState === 'Sleep';
+  const reconnectRecommended =
+    connection.kind !== 'connected' ||
+    notice.kind === 'write-failed' ||
+    notice.kind === 'stream-stalled';
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
       <p style={messageStyle}>{notice.message}</p>
+      <p style={guidanceStyle}>
+        This warning is separate from the interrupted-job checkpoint. Reconnecting or resetting the
+        controller does not resume the job and does not erase that checkpoint.
+      </p>
       <div style={actionsStyle}>
-        <button
-          type="button"
-          onClick={() => void wakeController().catch(() => undefined)}
-          style={recoverStyle}
-          title="Send Ctrl-X soft reset and clear stuck local controller state."
-        >
-          Recover controller
-        </button>
+        {reconnectRecommended && props.onReconnect !== undefined ? (
+          <button
+            type="button"
+            onClick={props.onReconnect}
+            disabled={props.reconnectDisabled || connection.kind === 'connecting'}
+            style={recoverStyle}
+            title="Tear down any stale serial session and open the controller connection picker."
+          >
+            {connection.kind === 'connecting' ? 'Reconnecting…' : 'Reconnect controller…'}
+          </button>
+        ) : null}
+        {resetAvailable ? (
+          <button
+            type="button"
+            onClick={() => void wakeController().catch(() => undefined)}
+            disabled={controllerOperation !== null}
+            style={recoverStyle}
+            title="Send Ctrl-X to a connected sleeping controller. This does not resume the job."
+          >
+            Reset controller (does not resume job)
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={clear}
           style={dismissStyle}
-          title="Dismiss this safety notice after you have checked the machine."
+          title="Acknowledge this warning after using the physical E-stop or checking the machine."
         >
-          Dismiss
+          I made the machine safe
         </button>
       </div>
     </div>
@@ -60,6 +92,12 @@ const bannerStyle: React.CSSProperties = {
 };
 const titleStyle: React.CSSProperties = { fontSize: 13, display: 'block' };
 const messageStyle: React.CSSProperties = { margin: '6px 0', fontSize: 12, lineHeight: 1.4 };
+const guidanceStyle: React.CSSProperties = {
+  margin: '6px 0',
+  fontSize: 11,
+  lineHeight: 1.4,
+  fontWeight: 600,
+};
 const actionsStyle: React.CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
 const recoverStyle: React.CSSProperties = {
   background: 'var(--lf-bg)',

@@ -4,9 +4,11 @@
 import { useEffect, useState } from 'react';
 import type { JobCheckpoint } from '../../core/recovery';
 import { clearJobCheckpoint, readJobCheckpoint } from '../state/job-checkpoint-storage';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { runCheckpointResumeFlow } from './start-job-flow';
+import { runRestartInterruptedJobFlow } from './start-job-restart-flow';
 import { CncRecoveryPreviewWizard } from './CncRecoveryPreviewWizard';
 
 export function CheckpointResumeBanner(props: {
@@ -22,13 +24,7 @@ export function CheckpointResumeBanner(props: {
   useEffect(() => {
     if (!jobActive) setCheckpoint(readJobCheckpoint());
   }, [jobActive]);
-  if (
-    jobActive ||
-    checkpoint === null ||
-    (checkpoint.machineKind === 'laser' && checkpoint.ackedLines === 0)
-  ) {
-    return null;
-  }
+  if (!isVisibleCheckpoint(jobActive, checkpoint)) return null;
   const startedAt = formatStartedAt(checkpoint.startedAtIso);
   return (
     <>
@@ -49,24 +45,15 @@ export function CheckpointResumeBanner(props: {
               : ` Rejected command: ${checkpoint.interruption.rejectedLine}`}
           </p>
         )}
-        <div style={rowStyle}>
-          <ReviewRecoveryAction
-            checkpoint={checkpoint}
-            disabled={props.disabled || props.busy}
-            onOpenCncPreview={() => setCncPreviewOpen(true)}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              clearJobCheckpoint();
-              setCncPreviewOpen(false);
-              setCheckpoint(null);
-            }}
-            title="Discard the interrupted-job record."
-          >
-            Dismiss
-          </button>
-        </div>
+        <CheckpointActions
+          checkpoint={checkpoint}
+          disabled={props.disabled || props.busy}
+          onOpenCncPreview={() => setCncPreviewOpen(true)}
+          onDiscard={() => {
+            setCncPreviewOpen(false);
+            setCheckpoint(null);
+          }}
+        />
       </div>
       {cncPreviewOpen ? (
         <CncRecoveryPreviewWizard
@@ -75,6 +62,60 @@ export function CheckpointResumeBanner(props: {
         />
       ) : null}
     </>
+  );
+}
+
+function isVisibleCheckpoint(
+  jobActive: boolean,
+  checkpoint: JobCheckpoint | null,
+): checkpoint is JobCheckpoint {
+  if (jobActive || checkpoint === null) return false;
+  if (checkpoint.machineKind !== 'laser' || checkpoint.ackedLines > 0) return true;
+  return checkpoint.interruption !== undefined || checkpoint.resumeInFlight;
+}
+
+function CheckpointActions(props: {
+  readonly checkpoint: JobCheckpoint;
+  readonly disabled: boolean;
+  readonly onOpenCncPreview: () => void;
+  readonly onDiscard: () => void;
+}): JSX.Element {
+  const discard = (): void => {
+    if (
+      !jobAwareConfirm(
+        'Discard this interrupted-job recovery record?\n\nThis does not stop or move the machine, but you will no longer be able to resume from this checkpoint.',
+      )
+    ) {
+      return;
+    }
+    clearJobCheckpoint();
+    props.onDiscard();
+  };
+  return (
+    <div style={rowStyle}>
+      <ReviewRecoveryAction
+        checkpoint={props.checkpoint}
+        disabled={props.disabled}
+        onOpenCncPreview={props.onOpenCncPreview}
+      />
+      {props.checkpoint.machineKind === 'laser' ? (
+        <button
+          type="button"
+          disabled={props.disabled}
+          onClick={() => void runRestartInterruptedJobFlow(props.checkpoint)}
+          title="Deliberately stream the same laser job again from line 1. This is not resume."
+        >
+          Restart entire job from beginning…
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={discard}
+        title="Permanently discard the interrupted-job record after checking the machine."
+      >
+        Discard recovery record…
+      </button>
+    </div>
   );
 }
 
@@ -132,7 +173,7 @@ const textStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   margin: '0 0 6px 0',
 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 6 };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
 const causeStyle: React.CSSProperties = {
   ...textStyle,
   color: 'var(--lf-danger)',

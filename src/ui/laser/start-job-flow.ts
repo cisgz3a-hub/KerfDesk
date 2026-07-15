@@ -9,7 +9,7 @@
 // startJob-failed alert in the catch arm can fire after streaming began,
 // and a native dialog there would freeze the ack pump and Abort button.
 
-import { buildResumeProgram, type OverrideValues } from '../../core/controllers/grbl';
+import type { OverrideValues } from '../../core/controllers/grbl';
 import type { StatusQueryCapability } from '../../core/controllers';
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import {
@@ -21,7 +21,6 @@ import {
   createJobCheckpoint,
   fingerprintGcode,
   fingerprintsEqual,
-  markResumeInFlight,
   rawResumeLine,
   type JobCheckpoint,
 } from '../../core/recovery';
@@ -45,20 +44,38 @@ import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness'
 import { renderVariableText } from '../text/render-variable-text';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
-import { resumeConfirmation } from './resume-confirmation';
 import { useCameraStore } from '../state/camera-store';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
-import {
-  rebuildCanvasPlanForGcode,
-  reportedWorkPositionMm,
-  type CanvasMotionPlan,
-} from '../state/canvas-motion-plan';
+import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { useStartBlockerStore } from './start-blocker-store';
 import { reducedOverrideAcknowledgement } from '../state/cnc-accessory-readiness';
 import { useToastStore } from '../state/toast-store';
+import {
+  checkpointProgramIssue,
+  checkpointStartIssue,
+  sameCheckpoint,
+} from './start-job-checkpoint-policy';
+import { streamResumeFromRawLine } from './start-job-resume-stream';
 
 export async function runStartJobFlow(): Promise<void> {
+  await runStartJobFlowWithCheckpoint(null);
+}
+
+export async function runConfirmedCheckpointReplacementStart(
+  checkpoint: JobCheckpoint,
+): Promise<void> {
+  await runStartJobFlowWithCheckpoint(checkpoint);
+}
+
+async function runStartJobFlowWithCheckpoint(
+  checkpointToReplace: JobCheckpoint | null,
+): Promise<void> {
   useStartBlockerStore.getState().clear();
+  const initialCheckpointIssue = checkpointStartIssue(checkpointToReplace);
+  if (initialCheckpointIssue !== null) {
+    reportBlockedStart(initialCheckpointIssue);
+    return;
+  }
   const app = useStore.getState();
   const { project } = app;
   const laser = useLaserStore.getState();
@@ -70,12 +87,25 @@ export async function runStartJobFlow(): Promise<void> {
     jobAwareAlert(`Cannot start job:\n\n${lines}`);
     return;
   }
+  const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
+  if (programIssue !== null) {
+    reportBlockedStart(programIssue);
+    return;
+  }
   if (prepared.warnings.length > 0) {
     useToastStore.getState().pushToast(prepared.warnings.join('\n'), 'warning');
   }
   const machineKind = machineKindOf(project.machine);
   const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
   if (cncSetupAttestation === null) return;
+  // Re-check immediately before startJob performs the first controller write.
+  // Preparation and operator dialogs are asynchronous; a storage event from
+  // another window must not let this run replace a newer checkpoint.
+  const finalCheckpointIssue = checkpointStartIssue(checkpointToReplace);
+  if (finalCheckpointIssue !== null) {
+    reportBlockedStart(finalCheckpointIssue);
+    return;
+  }
   try {
     await laser.startJob(prepared.gcode, {
       streamingMode: streamingModeForController(
@@ -109,6 +139,11 @@ export async function runStartJobFlow(): Promise<void> {
     useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
+}
+
+function reportBlockedStart(message: string): void {
+  useStartBlockerStore.getState().report([message]);
+  jobAwareAlert(`Cannot start job:\n\n${message}`);
 }
 
 async function prepareCurrentStartJob(
@@ -203,6 +238,13 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
 // edited project silently renumbers every line), then map the acked-sendable
 // count back to the raw line the stream died at.
 export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promise<void> {
+  const current = readJobCheckpoint();
+  if (current === null || !sameCheckpoint(current, checkpoint)) {
+    jobAwareAlert(
+      'Cannot resume the interrupted job:\n\nThe recovery record changed or was removed. Review the current recovery banner before continuing.',
+    );
+    return;
+  }
   if (checkpoint.machineKind === 'cnc') {
     jobAwareAlert(`Cannot resume CNC job:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`);
     return;
@@ -227,7 +269,13 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
     return;
   }
   const fromLine = rawResumeLine(prepared.gcode, checkpoint.ackedLines);
-  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine, prepared.canvasPlan);
+  await streamResumeFromRawLine(
+    prepared.project,
+    prepared.gcode,
+    fromLine,
+    prepared.canvasPlan,
+    checkpoint,
+  );
 }
 
 // Shared resume front half: readiness gate + re-compile. Same gate as a
@@ -319,62 +367,6 @@ function rotaryRasterAllowed(project: Project): boolean {
     profileSupportsCapability(project.device, 'rotary')
   );
 }
-
-// Shared resume back half: build the re-entry program, confirm, suspend
-// checkpoint tracking (the resume run has its own numbering — ADR-118), and
-// stream it.
-async function streamResumeFromRawLine(
-  project: Project,
-  gcode: string,
-  fromLine: number,
-  originalCanvasPlan: CanvasMotionPlan,
-): Promise<void> {
-  const machine = project.machine;
-  const resume = buildResumeProgram(gcode, fromLine, {
-    machineKind: machineKindOf(project.machine),
-    safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
-    spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
-    plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
-  });
-  if (resume.kind === 'error') {
-    jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
-    return;
-  }
-  const proceed = jobAwareConfirm(
-    resumeConfirmation(machineKindOf(project.machine), fromLine, resume.fromLine),
-  );
-  if (!proceed) return;
-  const checkpoint = readJobCheckpoint();
-  if (checkpoint !== null) {
-    writeJobCheckpoint(markResumeInFlight(checkpoint, new Date().toISOString()));
-  }
-  try {
-    const laser = useLaserStore.getState();
-    const resumeGcode = resume.lines.join('\n');
-    const initialPosition = reportedWorkPositionMm(
-      laser,
-      laser.controllerSettings?.reportInches === true,
-    );
-    await useLaserStore.getState().startJob(resume.lines.join('\n'), {
-      streamingMode: streamingModeForController(
-        project.device.controllerKind,
-        project.device.streamingMode,
-      ),
-      rxBufferBytes: project.device.rxBufferBytes,
-      machineKind: machineKindOf(project.machine),
-      canvasPlan: rebuildCanvasPlanForGcode(
-        originalCanvasPlan,
-        resumeGcode,
-        initialPosition ?? undefined,
-      ),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    jobAwareAlert(`Could not resume job:\n\n${message}`);
-  }
-}
-
-const RESUME_PLUNGE_MM_PER_MIN = 300;
 
 function liveStatusQueryCapability(
   controllerKind: ControllerKind,

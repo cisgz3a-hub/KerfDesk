@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createStreamer,
+  disconnect as disconnectStreamer,
+  step,
+} from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -61,6 +66,94 @@ afterEach(async () => {
 });
 
 describe('serial connection epoch guards', () => {
+  it('keeps Start blocked until the reconnect settings query receives its terminal acknowledgement', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+
+    await useLaserStore.getState().connect(adapterFor(connection));
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'connection-handshake',
+      phase: 'waiting-controller',
+    });
+
+    connection.emitLine('Grbl 1.1h');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(writes).toContain('$$\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
+      pendingUntrackedAcks: 1,
+    });
+
+    connection.emitLine('$0=10');
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
+      pendingUntrackedAcks: 1,
+    });
+
+    connection.emitLine('ok');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
+  it('does not let an interrupted stream steal the reconnect settings acknowledgement', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    const interrupted = disconnectStreamer(
+      step(createStreamer('G1 X1 S100\nG1 X2 S100\nG1 X3 S100')).state,
+    );
+    expect(interrupted.inFlight.length).toBeGreaterThan(0);
+    useLaserStore.setState({ streamer: interrupted });
+
+    await useLaserStore.getState().connect(adapterFor(connection));
+    connection.emitLine('Grbl 1.1h');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(writes).toContain('$$\n');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitLine('$0=10');
+    connection.emitLine('ok');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().streamer).toMatchObject({
+      status: 'disconnected',
+      inFlight: [],
+      completed: interrupted.completed,
+    });
+
+    connection.emitLine('ok');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(useLaserStore.getState().streamer).toMatchObject({
+      status: 'disconnected',
+      inFlight: [],
+      completed: interrupted.completed,
+    });
+  });
+
+  it('does not classify a handshake-only disconnect as an interrupted job', async () => {
+    vi.useFakeTimers();
+    const connection = makeConnection();
+
+    await useLaserStore.getState().connect(adapterFor(connection));
+    connection.emitClose();
+
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      controllerOperation: null,
+      safetyNotice: null,
+    });
+  });
+
   it('ignores line and close callbacks from a replaced connection', async () => {
     const oldConnection = makeConnection();
     const currentConnection = makeConnection();

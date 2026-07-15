@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter } from '../../platform/types';
+import { connectedControllerStatePatch } from './laser-connection-actions';
 import { useLaserStore } from './laser-store';
 
 function adapterWithRequestPort(
@@ -76,5 +77,19 @@ describe('connect port-picker failures', () => {
       grblSettingsRows: [],
       lastSettingsReadAt: null,
     });
+  });
+
+  it('preserves an unacknowledged safety incident across reconnect', () => {
+    const safetyNotice = {
+      kind: 'disconnect-during-job' as const,
+      message: 'USB connection was lost during an active job.',
+    };
+
+    const patch = connectedControllerStatePatch({
+      ...useLaserStore.getState(),
+      safetyNotice,
+    });
+
+    expect(patch.safetyNotice).toBe(safetyNotice);
   });
 });

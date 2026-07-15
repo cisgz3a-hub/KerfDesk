@@ -97,8 +97,8 @@ export type LaserState = LaserStoreActions & {
   readonly fireActive: boolean;
   // P0-B: operator-facing safety alert raised when the store cannot guarantee
   // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
-  // drop mid-job. null = nothing to warn about. Cleared on the next successful
-  // connect or via clearSafetyNotice.
+  // drop mid-job. null = nothing to warn about. Reconnect preserves the notice;
+  // only explicit operator acknowledgment via clearSafetyNotice clears it.
   readonly safetyNotice: LaserSafetyNotice | null;
   readonly autofocusBusy: boolean;
   // ADR-103 G2 - a touch-plate probe cycle is mid-flight.

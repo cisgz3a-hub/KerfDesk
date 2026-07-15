@@ -33,7 +33,6 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 export function LaserWindow(): JSX.Element {
   const [machineSetupRequest, setMachineSetupRequest] = useState<DeviceSetupOpenRequest>();
   const machinePanel = useMachinePanelVisibility();
-  const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
   const control = useControllerActions();
@@ -45,17 +44,12 @@ export function LaserWindow(): JSX.Element {
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   // ADR-101 §7: shared chrome re-labels machine-aware; behavior is identical.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
-  const controllerKind = useStore((s) => s.project.device.controllerKind);
-  const profileBaudRate = useStore((s) => s.project.device.baudRate);
   const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
   // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
   const jogBlocked = useJogBlocked();
   const controllerDisplay = controllerDisplayState(statusReport, alarmCode);
   const connected = connection.kind === 'connected';
-  const supportsSerial = platform.serial.isSupported();
-  // File-only profiles have no live link; keep machine controls dark and explain why.
-  const isFileOnlyProfile = isFileOnlyController(controllerKind);
   if (!machinePanel.requestedVisible && !jobActive) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -68,18 +62,12 @@ export function LaserWindow(): JSX.Element {
         jobActive={jobActive}
         onCollapse={machinePanel.toggle}
       />
-      <SafetyNoticeBanner />
-      <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
-      <DeviceSetupControls openRequest={machineSetupRequest} />
-      <ConnectionBar
-        connection={connection}
-        machineNoun={machineNoun(machineKind)}
-        onConnect={() =>
-          void control.connect(platform, { controllerKind, baudRate: profileBaudRate })
-        }
-        onDisconnect={() => void control.disconnect().catch(() => undefined)}
-        onForget={confirmForgetDevice}
-        disabled={!supportsSerial || machineOperationBusy || isFileOnlyProfile}
+      <ConnectionRecoveryControls
+        machineKind={machineKind}
+        autofocusBusy={autofocusBusy}
+        motionOperation={motionOperation}
+        controllerOperation={controllerOperation}
+        openRequest={machineSetupRequest}
       />
       {controllerDisplay.showAlarmBanner && (
         <AlarmBanner
@@ -152,6 +140,52 @@ function useControllerActions(): {
     wakeController: useLaserStore((s) => s.wakeController),
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
   };
+}
+
+function ConnectionRecoveryControls(props: {
+  readonly machineKind: MachineKind;
+  readonly autofocusBusy: boolean;
+  readonly motionOperation: ReturnType<typeof useLaserStore.getState>['motionOperation'];
+  readonly controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'];
+  readonly openRequest: DeviceSetupOpenRequest | undefined;
+}): JSX.Element {
+  const platform = usePlatform();
+  const connection = useLaserStore((s) => s.connection);
+  const control = useControllerActions();
+  const controllerKind = useStore((s) => s.project.device.controllerKind);
+  const profileBaudRate = useStore((s) => s.project.device.baudRate);
+  const supportsSerial = platform.serial.isSupported();
+  const isFileOnlyProfile = isFileOnlyController(controllerKind);
+  const connect = (): void => {
+    void control.connect(platform, { controllerKind, baudRate: profileBaudRate });
+  };
+  return (
+    <>
+      <SafetyNoticeBanner
+        onReconnect={connect}
+        reconnectDisabled={
+          !supportsSerial ||
+          props.autofocusBusy ||
+          props.motionOperation !== null ||
+          isFileOnlyProfile
+        }
+      />
+      <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
+      <DeviceSetupControls openRequest={props.openRequest} />
+      <ConnectionBar
+        connection={connection}
+        machineNoun={machineNoun(props.machineKind)}
+        onConnect={connect}
+        onDisconnect={() => void control.disconnect().catch(() => undefined)}
+        onForget={confirmForgetDevice}
+        disabled={
+          !supportsSerial ||
+          connectionBusy(props.autofocusBusy, props.motionOperation, props.controllerOperation) ||
+          isFileOnlyProfile
+        }
+      />
+    </>
+  );
 }
 
 function isFileOnlyController(
@@ -260,6 +294,22 @@ function machineBusy(
   controllerOperation: unknown,
 ): boolean {
   return autofocusBusy || motionOperation !== null || controllerOperation !== null;
+}
+
+// Connection management is the escape hatch for a stale reset or startup
+// handshake. Keep Disconnect/Reconnect available for those controller-owned
+// operations while motion and autofocus retain their stricter lockout.
+function connectionBusy(
+  autofocusBusy: boolean,
+  motionOperation: unknown,
+  controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'],
+): boolean {
+  if (autofocusBusy || motionOperation !== null) return true;
+  return (
+    controllerOperation !== null &&
+    controllerOperation.kind !== 'recovery' &&
+    controllerOperation.kind !== 'connection-handshake'
+  );
 }
 
 function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
