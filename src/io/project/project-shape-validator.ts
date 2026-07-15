@@ -1,9 +1,5 @@
 import { DITHER_ALGORITHMS, RELIEF_EMBED_TRIANGLE_LIMIT } from '../../core/scene';
-import {
-  isGcodeDialectSelection,
-  isGrblRxBufferBytes,
-  isScanOffsetTable,
-} from '../../core/devices';
+import { isScanOffsetTable } from '../../core/devices';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateCurveSubpaths } from './project-curve-shape-validator';
@@ -79,8 +75,8 @@ function validateDevice(device: Record<string, unknown>): string | null {
     requireString(device, 'device.autofocusCommand'),
     optionalLiteral(device, 'device.airAssistCommand', ['none', 'M7', 'M8']),
     optionalLiteral(device, 'device.streamingMode', ['char-counted', 'ping-pong']),
-    optionalGrblRxBufferBytes(device, 'device.rxBufferBytes'),
-    optionalGcodeDialect(device, 'device.gcodeDialect'),
+    profileField.optionalGrblRxBufferBytes(device, 'device.rxBufferBytes'),
+    profileField.optionalGcodeDialect(device, 'device.gcodeDialect'),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
     profileField.optionalProfileCapabilities(device, 'device.capabilities'),
@@ -428,18 +424,4 @@ function validatePoint(value: unknown, path: string): string | null {
 function optionalScanOffsetTable(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || isScanOffsetTable(value) ? null : `missing or invalid \`${path}\``;
-}
-
-function optionalGcodeDialect(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || isGcodeDialectSelection(value)
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function optionalGrblRxBufferBytes(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || isGrblRxBufferBytes(value)
-    ? null
-    : `missing or invalid \`${path}\``;
 }

@@ -12,13 +12,18 @@ import type { DeviceProfile } from '../../../core/devices';
 import { NumberField } from '../../common/NumberField';
 import { AirAssistRow, FireControlRow, LaserPowerRows } from '../DeviceProfilePowerFields';
 import { Row, numInputStyle, unitStyle } from '../device-settings-shared';
-import type { DeviceSetupStepProps } from './device-setup-flow';
+import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupMachineStep(props: DeviceSetupStepProps): JSX.Element {
-  return props.state.draftMachine.kind === 'cnc' ? (
-    <CncMachineStep {...props} machine={props.state.draftMachine} />
-  ) : (
-    <LaserMachineStep {...props} />
+  return (
+    <div style={outputStackStyle}>
+      {deviceSetupSupportsMachineKind(props.state, 'laser') ? (
+        <LaserMachineStep {...props} />
+      ) : null}
+      {deviceSetupSupportsMachineKind(props.state, 'cnc') ? (
+        <CncMachineStep {...props} machine={props.state.cncDraft} />
+      ) : null}
+    </div>
   );
 }
 
@@ -175,6 +180,7 @@ function MachineNumberRow(props: {
 }
 
 const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
+const outputStackStyle: React.CSSProperties = { display: 'grid', gap: 14 };
 const introStyle: React.CSSProperties = {
   display: 'grid',
   gap: 4,

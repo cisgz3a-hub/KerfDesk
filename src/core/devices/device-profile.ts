@@ -50,6 +50,8 @@ export type MachineProfileSource = 'built-in' | 'custom' | 'imported' | 'lightbu
 export type ProfileCapability =
   | 'grbl'
   | 'wcs'
+  | 'laser-output'
+  | 'cnc-output'
   | 'air-assist'
   | 'no-go-zones'
   | 'scan-offsets'
@@ -61,6 +63,8 @@ export type ProfileCapability =
 export const PROFILE_CAPABILITIES = [
   'grbl',
   'wcs',
+  'laser-output',
+  'cnc-output',
   'air-assist',
   'no-go-zones',
   'scan-offsets',
@@ -119,6 +123,22 @@ export type LaserSubProfile = {
   readonly notes?: string;
 };
 
+// Physical CNC values that belong to the machine rather than to one job.
+// Stock, material, selected bit, and tiling remain project-specific in
+// CncMachineConfig. Keeping this small block on DeviceProfile lets a machine
+// with interchangeable laser/spindle toolheads retain both output contracts
+// while the project still selects exactly one active compiler mode.
+export type CncSubProfile = {
+  readonly safeZMm: number;
+  readonly spindleMaxRpm: number;
+  readonly spindleSpinupSec: number;
+  readonly coolant?: 'off' | 'mist' | 'flood';
+  readonly parkXMm?: number;
+  readonly parkYMm?: number;
+};
+
+export type DeviceMachineKind = 'laser' | 'cnc';
+
 export type DeviceProfile = {
   readonly name: string;
   readonly profileId?: string;
@@ -140,6 +160,7 @@ export type DeviceProfile = {
   readonly rxBufferBytes: number;
   readonly gcodeDialect: GcodeDialectSelection;
   readonly laserSubProfile?: LaserSubProfile;
+  readonly cncSubProfile?: CncSubProfile;
   readonly cameraProfile?: CameraProfile;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
@@ -210,6 +231,27 @@ export type DeviceProfile = {
   // proprietary touch-probe sequences) paste their machine's command here.
   readonly autofocusCommand: string;
 };
+
+export function explicitMachineKindsForProfile(
+  profile: Pick<DeviceProfile, 'capabilities'>,
+): ReadonlyArray<DeviceMachineKind> {
+  const capabilities = profile.capabilities ?? [];
+  return [
+    ...(capabilities.includes('laser-output') ? (['laser'] as const) : []),
+    ...(capabilities.includes('cnc-output') ? (['cnc'] as const) : []),
+  ];
+}
+
+// Profiles saved before output capabilities existed remain unrestricted so
+// old Laser/CNC projects do not become unstartable on load. Machine Setup
+// converts that legacy ambiguity into an explicit selection on its next Save.
+export function deviceSupportsMachineKind(
+  profile: Pick<DeviceProfile, 'capabilities'>,
+  machineKind: DeviceMachineKind,
+): boolean {
+  const explicit = explicitMachineKindsForProfile(profile);
+  return explicit.length === 0 || explicit.includes(machineKind);
+}
 
 export const MIN_ESTIMATE_TIME_SCALE = 0.1;
 export const MAX_ESTIMATE_TIME_SCALE = 5;

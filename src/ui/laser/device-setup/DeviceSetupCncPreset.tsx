@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { CNC_MACHINE_CATALOG } from '../../../core/cnc';
-import type { DeviceSetupStepProps } from './device-setup-flow';
+import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupCncPreset({
   state,
@@ -12,10 +12,10 @@ export function DeviceSetupCncPreset({
 }: DeviceSetupStepProps): JSX.Element | null {
   const [selectedId, setSelectedId] = useState('');
   const preset = CNC_MACHINE_CATALOG.find((item) => item.id === selectedId) ?? null;
-  if (state.draftMachine.kind !== 'cnc') return null;
+  if (!deviceSetupSupportsMachineKind(state, 'cnc')) return null;
 
   const apply = (): void => {
-    if (preset === null || state.draftMachine.kind !== 'cnc') return;
+    if (preset === null) return;
     dispatch({
       kind: 'edit',
       patch: { bedWidth: preset.bedWidthMm, bedHeight: preset.bedHeightMm },
@@ -23,8 +23,8 @@ export function DeviceSetupCncPreset({
     dispatch({
       kind: 'edit-machine',
       machine: {
-        ...state.draftMachine,
-        params: { ...state.draftMachine.params, spindleMaxRpm: preset.spindleMaxRpm },
+        ...state.cncDraft,
+        params: { ...state.cncDraft.params, spindleMaxRpm: preset.spindleMaxRpm },
       },
     });
   };

@@ -4,11 +4,13 @@
 
 import type { Dispatch } from 'react';
 import { selectControllerDriver } from '../../../core/controllers';
+import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
 import {
   controllerCompatibleProfile,
   validateMachineProfile,
   type ControllerKind,
   type DeviceProfile,
+  type ProfileCapability,
 } from '../../../core/devices';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -19,6 +21,9 @@ import {
   type MachineConfig,
   type MachineKind,
 } from '../../../core/scene';
+import { deviceSetupSupportsMachineKind } from './device-setup-capability';
+
+export { deviceSetupSupportsMachineKind } from './device-setup-capability';
 
 export type DeviceSetupStep =
   | 'identify'
@@ -45,6 +50,9 @@ export function deviceSetupStepOrder(_machineKind: MachineKind): ReadonlyArray<D
 
 export type DeviceSetupState = {
   readonly step: DeviceSetupStep;
+  // Physical output capability. This may contain both kinds, while
+  // `machineKind` remains the one active project/compiler mode after Save.
+  readonly machineKinds: ReadonlyArray<MachineKind>;
   readonly machineKind: MachineKind;
   readonly baseline: DeviceProfile;
   readonly baselineMachine: MachineConfig;
@@ -68,6 +76,10 @@ export type DeviceSetupAction =
   | { readonly kind: 'go'; readonly step: DeviceSetupStep }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'edit-machine'; readonly machine: MachineConfig }
+  | {
+      readonly kind: 'set-machine-kinds';
+      readonly machineKinds: readonly [MachineKind, ...MachineKind[]];
+    }
   | { readonly kind: 'select-machine-kind'; readonly machineKind: MachineKind }
   | { readonly kind: 'select-controller'; readonly controllerKind: ControllerKind }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
@@ -105,20 +117,21 @@ export function initDeviceSetup(
   const controllerRead =
     facts.controllerRead ?? (detected !== null || facts.detectedControllerKind !== undefined);
   const baselineMachine = initialMachine(facts);
-  const cncDraft =
-    baselineMachine.kind === 'cnc'
-      ? baselineMachine
-      : (facts.fallbackCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG);
+  const cncDraft = initialCncDraft(profile, baselineMachine, facts.fallbackCncMachine);
+  const baselineKind = machineKindOf(baselineMachine);
+  const machineKinds = initialMachineKinds(profile, baselineKind);
+  const machineKind = initialActiveMachineKind(machineKinds, baselineKind);
   return {
     step: 'identify',
-    machineKind: machineKindOf(baselineMachine),
+    machineKinds,
+    machineKind,
     baseline: profile,
     baselineMachine,
     detected: detected ?? {},
     detectedControllerKind: facts.detectedControllerKind ?? null,
     controllerRead,
     draft: profile,
-    draftMachine: baselineMachine,
+    draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
     cncDraft,
     presetApplied: false,
     firmwareBackupConfirmed: false,
@@ -130,6 +143,34 @@ function initialMachine(facts: DeviceSetupDetectedFacts): MachineConfig {
   if (facts.machine !== undefined) return facts.machine;
   if (facts.machineKind === 'cnc') return facts.fallbackCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
   return LASER_MACHINE_CONFIG;
+}
+
+function initialCncDraft(
+  profile: DeviceProfile,
+  baselineMachine: MachineConfig,
+  fallbackCncMachine?: CncMachineConfig,
+): CncMachineConfig {
+  const draft =
+    baselineMachine.kind === 'cnc'
+      ? baselineMachine
+      : (fallbackCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG);
+  if (baselineMachine.kind === 'cnc' || profile.cncSubProfile === undefined) return draft;
+  return { ...draft, params: { ...profile.cncSubProfile } };
+}
+
+function initialMachineKinds(
+  profile: DeviceProfile,
+  baselineKind: MachineKind,
+): ReadonlyArray<MachineKind> {
+  const explicitKinds = explicitMachineKindsForProfile(profile);
+  return explicitKinds.length === 0 ? [baselineKind] : explicitKinds;
+}
+
+function initialActiveMachineKind(
+  machineKinds: ReadonlyArray<MachineKind>,
+  baselineKind: MachineKind,
+): MachineKind {
+  return machineKinds.includes(baselineKind) ? baselineKind : (machineKinds[0] ?? 'laser');
 }
 
 export function deviceSetupReducer(
@@ -152,11 +193,9 @@ function reduceDraftAction(
     case 'edit':
       return invalidateFirmwarePlan(state, { draft: { ...state.draft, ...action.patch } });
     case 'edit-machine':
-      return invalidateFirmwarePlan(state, {
-        machineKind: machineKindOf(action.machine),
-        draftMachine: action.machine,
-        ...(action.machine.kind === 'cnc' ? { cncDraft: action.machine } : {}),
-      });
+      return editMachineDraft(state, action.machine);
+    case 'set-machine-kinds':
+      return setMachineKinds(state, action.machineKinds);
     case 'select-machine-kind':
       return selectMachineKind(state, action.machineKind);
     case 'select-controller':
@@ -178,6 +217,31 @@ function reduceDraftAction(
     default:
       return assertNever(action);
   }
+}
+
+function editMachineDraft(state: DeviceSetupState, machine: MachineConfig): DeviceSetupState {
+  if (machine.kind === 'laser') {
+    return invalidateFirmwarePlan(state, {
+      ...(state.machineKind === 'laser' ? { draftMachine: machine } : {}),
+    });
+  }
+  return invalidateFirmwarePlan(state, {
+    cncDraft: machine,
+    ...(state.machineKind === 'cnc' ? { draftMachine: machine } : {}),
+  });
+}
+
+function setMachineKinds(
+  state: DeviceSetupState,
+  requested: readonly [MachineKind, ...MachineKind[]],
+): DeviceSetupState {
+  const machineKinds = (['laser', 'cnc'] as const).filter((kind) => requested.includes(kind));
+  const machineKind = machineKinds.includes(state.machineKind) ? state.machineKind : requested[0];
+  return invalidateFirmwarePlan(state, {
+    machineKinds,
+    machineKind,
+    draftMachine: machineKind === 'cnc' ? state.cncDraft : LASER_MACHINE_CONFIG,
+  });
 }
 
 function selectMachineKind(state: DeviceSetupState, machineKind: MachineKind): DeviceSetupState {
@@ -222,14 +286,14 @@ function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>):
     { ...state.draft, ...profilePatch },
     state.draft.controllerKind,
   ).profile;
-  if (state.draftMachine.kind !== 'cnc' || !positive(patch.maxPowerS ?? 0)) {
+  if (state.machineKind !== 'cnc' || !positive(patch.maxPowerS ?? 0)) {
     return invalidateFirmwarePlan(state, { draft });
   }
-  const draftMachine: CncMachineConfig = {
-    ...state.draftMachine,
-    params: { ...state.draftMachine.params, spindleMaxRpm: patch.maxPowerS ?? 0 },
+  const cncDraft: CncMachineConfig = {
+    ...state.cncDraft,
+    params: { ...state.cncDraft.params, spindleMaxRpm: patch.maxPowerS ?? 0 },
   };
-  return invalidateFirmwarePlan(state, { draft, draftMachine, cncDraft: draftMachine });
+  return invalidateFirmwarePlan(state, { draft, draftMachine: cncDraft, cncDraft });
 }
 
 function profilePatchForMachineKind(
@@ -245,7 +309,40 @@ function profilePatchForMachineKind(
 }
 
 function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSetupState {
-  return invalidateFirmwarePlan(state, { draft: profile, presetApplied: true });
+  const explicitKinds = explicitMachineKindsForProfile(profile);
+  const machineKinds = explicitKinds.length === 0 ? state.machineKinds : explicitKinds;
+  const machineKind = machineKinds.includes(state.machineKind)
+    ? state.machineKind
+    : (machineKinds[0] ?? 'laser');
+  const cncDraft =
+    profile.cncSubProfile === undefined
+      ? state.cncDraft
+      : { ...state.cncDraft, params: { ...profile.cncSubProfile } };
+  return invalidateFirmwarePlan(state, {
+    draft: profile,
+    machineKinds,
+    machineKind,
+    draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
+    cncDraft,
+    presetApplied: true,
+  });
+}
+
+export function machineSetupProfile(state: DeviceSetupState): DeviceProfile {
+  const { capabilities: draftCapabilities, cncSubProfile: _discardedCnc, ...base } = state.draft;
+  void _discardedCnc;
+  const capabilities: ProfileCapability[] = (draftCapabilities ?? []).filter(
+    (capability) => capability !== 'laser-output' && capability !== 'cnc-output',
+  );
+  if (deviceSetupSupportsMachineKind(state, 'laser')) capabilities.push('laser-output');
+  if (deviceSetupSupportsMachineKind(state, 'cnc')) capabilities.push('cnc-output');
+  return {
+    ...base,
+    capabilities,
+    ...(deviceSetupSupportsMachineKind(state, 'cnc')
+      ? { cncSubProfile: { ...state.cncDraft.params } }
+      : {}),
+  };
 }
 
 function updateDetectedFacts(
@@ -282,13 +379,13 @@ function invalidateFirmwarePlan(
 }
 
 export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyArray<string> {
-  const issues = [...validateMachineProfile(state.draft)];
+  const issues = [...validateMachineProfile(machineSetupProfile(state))];
   const driver = selectControllerDriver(state.draft.controllerKind);
-  if (state.draftMachine.kind === 'cnc' && !driver.capabilities.cncJobs) {
+  if (state.machineKind === 'cnc' && !driver.capabilities.cncJobs) {
     issues.push(`${driver.label} cannot run KerfDesk CNC jobs. Choose a GRBL-family controller.`);
   }
-  if (state.draftMachine.kind === 'cnc') {
-    const params = state.draftMachine.params;
+  if (state.machineKind === 'cnc') {
+    const params = state.cncDraft.params;
     if (!positive(params.safeZMm)) issues.push('CNC safe Z must be greater than zero.');
     if (!positive(params.spindleMaxRpm)) {
       issues.push('CNC spindle maximum must be greater than zero.');

@@ -15,7 +15,7 @@ import { SafetyZonesPanel } from '../MachineSetupSafetyZones';
 import { PlannerAdvanced } from '../PlannerAdvanced';
 import { ScanOffsetEditor } from '../ScanOffsetEditor';
 import { Row, numInputStyle, unitStyle } from '../device-settings-shared';
-import type { DeviceSetupStepProps } from './device-setup-flow';
+import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupSafetyStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const draft = state.draft;
@@ -69,7 +69,7 @@ export function DeviceSetupSafetyStep({ state, dispatch }: DeviceSetupStepProps)
           />
         </div>
       </details>
-      {state.draftMachine.kind === 'laser' ? (
+      {deviceSetupSupportsMachineKind(state, 'laser') ? (
         <LaserCalibrationSections draft={draft} update={update} />
       ) : null}
     </section>

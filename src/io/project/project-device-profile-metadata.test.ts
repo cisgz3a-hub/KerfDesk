@@ -61,6 +61,35 @@ describe('project device profile metadata persistence', () => {
     expect(result.project.device.estimateTravelTimeScale).toBe(1.07);
   });
 
+  it('roundtrips hybrid capability and the inactive CNC machine sub-profile', () => {
+    const project = createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      capabilities: [...(DEFAULT_DEVICE_PROFILE.capabilities ?? []), 'laser-output', 'cnc-output'],
+      cncSubProfile: {
+        safeZMm: 8,
+        spindleMaxRpm: 18000,
+        spindleSpinupSec: 2.5,
+        coolant: 'flood',
+        parkXMm: -5,
+        parkYMm: 405,
+      },
+    });
+
+    const result = deserializeProject(serializeProject(project));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.machine).toBeUndefined();
+    expect(result.project.device.capabilities).toEqual(
+      expect.arrayContaining(['laser-output', 'cnc-output']),
+    );
+    expect(result.project.device.cncSubProfile).toMatchObject({
+      safeZMm: 8,
+      spindleMaxRpm: 18000,
+      coolant: 'flood',
+    });
+  });
+
   it('rejects malformed preview timing calibration factors', () => {
     const raw = JSON.parse(serializeProject(createProject()));
     raw.device.estimateCutTimeScale = 0;

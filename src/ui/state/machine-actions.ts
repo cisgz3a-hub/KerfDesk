@@ -86,15 +86,21 @@ export function machineActions(set: MachineSet): MachineActions {
         const current = state.project.machine;
         const currentKind = current?.kind ?? 'laser';
         if (currentKind === kind) return {};
+        const cachedBase = state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
+        const cncBase =
+          state.cachedCncMachine === null && state.project.device.cncSubProfile !== undefined
+            ? { ...cachedBase, params: { ...state.project.device.cncSubProfile } }
+            : cachedBase;
         const machine =
           kind === 'laser'
             ? LASER_MACHINE_CONFIG
-            : cncMachineWithCustomTools(
-                state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG,
-                state.cncLibrary.customTools,
-              );
+            : cncMachineWithCustomTools(cncBase, state.cncLibrary.customTools);
+        const device =
+          current?.kind === 'cnc'
+            ? { ...state.project.device, cncSubProfile: { ...current.params } }
+            : state.project.device;
         return {
-          project: { ...state.project, machine },
+          project: { ...state.project, device, machine },
           cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],
@@ -118,7 +124,11 @@ export function machineActions(set: MachineSet): MachineActions {
           ...(nextTiling === null ? {} : { tiling: nextTiling }),
         };
         return {
-          project: { ...state.project, machine },
+          project: {
+            ...state.project,
+            device: { ...state.project.device, cncSubProfile: { ...machine.params } },
+            machine,
+          },
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],
           dirty: true,
@@ -164,23 +174,28 @@ function cncMachineSetupStatePatch(
   const baseDevice = patch.deviceProfile ?? state.project.device;
   const device: DeviceProfile = { ...baseDevice, ...patch.devicePatch };
   const params = { ...machine.params, ...patch.paramsPatch };
+  const deviceWithCnc: DeviceProfile = { ...device, cncSubProfile: { ...params } };
   const project: Project = {
     ...state.project,
     scene:
       patch.paramsPatch?.spindleMaxRpm === undefined
         ? state.project.scene
         : sceneWithSpindleCeiling(state.project.scene, patch.paramsPatch.spindleMaxRpm),
-    device,
+    device: deviceWithCnc,
     workspace: {
       ...state.project.workspace,
-      width: device.bedWidth,
-      height: device.bedHeight,
+      width: deviceWithCnc.bedWidth,
+      height: deviceWithCnc.bedHeight,
     },
     machine: { ...machine, params },
   };
   return {
     project,
-    jobPlacement: jobPlacementAfterDeviceChange(state.jobPlacement, state.project.device, device),
+    jobPlacement: jobPlacementAfterDeviceChange(
+      state.jobPlacement,
+      state.project.device,
+      deviceWithCnc,
+    ),
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,

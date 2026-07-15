@@ -2,6 +2,8 @@ import type { DeviceProfile } from '../../core/devices';
 import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
+  type CncMachineConfig,
+  type CncTool,
   type MachineConfig,
   type Project,
   type Transform,
@@ -99,46 +101,79 @@ function replaceMachineSetupAction(set: Setter): Pick<AppState, 'replaceMachineS
       profile: DeviceProfile,
       machine: MachineConfig,
       retainedMachine?: MachineConfig,
-    ) =>
-      set((s) => {
-        const nextMachine =
-          machine.kind === 'cnc'
-            ? cncMachineWithCustomTools(machine, s.cncLibrary.customTools)
-            : machine;
-        const retainedCncMachine = retainedMachine?.kind === 'cnc' ? retainedMachine : undefined;
-        const retainedCnc =
-          nextMachine.kind === 'cnc'
-            ? nextMachine
-            : (retainedCncMachine ??
-              (s.project.machine?.kind === 'cnc' ? s.project.machine : s.cachedCncMachine));
-        const nextCachedCnc =
-          retainedCnc === null || retainedCnc === undefined
-            ? null
-            : cncMachineWithCustomTools(retainedCnc, s.cncLibrary.customTools);
-        const scene =
-          nextMachine.kind === 'cnc'
-            ? sceneWithSpindleCeiling(s.project.scene, nextMachine.params.spindleMaxRpm)
-            : s.project.scene;
-        return {
-          project: {
-            ...s.project,
-            scene,
-            device: profile,
-            machine: nextMachine,
-            workspace: {
-              ...s.project.workspace,
-              width: profile.bedWidth,
-              height: profile.bedHeight,
-            },
-          },
-          jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, profile),
-          cachedCncMachine: nextCachedCnc,
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+    ) => set((s) => replacementMachineSetupState(s, profile, machine, retainedMachine)),
   };
+}
+
+function replacementMachineSetupState(
+  state: AppState,
+  profile: DeviceProfile,
+  machine: MachineConfig,
+  retainedMachine?: MachineConfig,
+): Partial<AppState> {
+  const nextMachine = machineWithCustomTools(machine, state.cncLibrary.customTools);
+  const retainedCnc = retainedCncForSetup(state, nextMachine, retainedMachine);
+  const nextCachedCnc = cachedCncWithCustomTools(retainedCnc, state.cncLibrary.customTools);
+  const nextProfile = profileWithCncSettings(profile, nextCachedCnc);
+  const scene =
+    nextMachine.kind === 'cnc'
+      ? sceneWithSpindleCeiling(state.project.scene, nextMachine.params.spindleMaxRpm)
+      : state.project.scene;
+  return {
+    project: {
+      ...state.project,
+      scene,
+      device: nextProfile,
+      machine: nextMachine,
+      workspace: {
+        ...state.project.workspace,
+        width: nextProfile.bedWidth,
+        height: nextProfile.bedHeight,
+      },
+    },
+    jobPlacement: jobPlacementAfterDeviceChange(
+      state.jobPlacement,
+      state.project.device,
+      nextProfile,
+    ),
+    cachedCncMachine: nextCachedCnc,
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function machineWithCustomTools(
+  machine: MachineConfig,
+  customTools: ReadonlyArray<CncTool>,
+): MachineConfig {
+  return machine.kind === 'cnc' ? cncMachineWithCustomTools(machine, customTools) : machine;
+}
+
+function retainedCncForSetup(
+  state: AppState,
+  nextMachine: MachineConfig,
+  retainedMachine?: MachineConfig,
+): CncMachineConfig | null {
+  if (nextMachine.kind === 'cnc') return nextMachine;
+  if (retainedMachine?.kind === 'cnc') return retainedMachine;
+  if (state.project.machine?.kind === 'cnc') return state.project.machine;
+  return state.cachedCncMachine;
+}
+
+function cachedCncWithCustomTools(
+  machine: CncMachineConfig | null,
+  customTools: ReadonlyArray<CncTool>,
+): CncMachineConfig | null {
+  return machine === null ? null : cncMachineWithCustomTools(machine, customTools);
+}
+
+function profileWithCncSettings(
+  profile: DeviceProfile,
+  cachedCnc: CncMachineConfig | null,
+): DeviceProfile {
+  if (profile.capabilities?.includes('cnc-output') !== true || cachedCnc === null) return profile;
+  return { ...profile, cncSubProfile: { ...cachedCnc.params } };
 }
 
 export function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection'> {
