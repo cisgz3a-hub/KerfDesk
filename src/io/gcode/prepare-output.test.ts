@@ -122,6 +122,28 @@ describe('prepareOutput', () => {
     expect(firstCutSegmentStart(prepared)).toEqual({ x: 100, y: 300 });
   });
 
+  it('preserves artwork priority through placement and path optimization', () => {
+    const base = createProject();
+    const firstOperation = createLayer({ id: 'first-op', color: '#2563eb' });
+    const secondOperation = createLayer({ id: 'second-op', color: '#dc2626' });
+    const first = { ...lineObject('A', 10), operationIds: [firstOperation.id] };
+    const second = { ...lineObject('B', 120), operationIds: [secondOperation.id] };
+    const project: Project = {
+      ...base,
+      optimization: { ...base.optimization, layerPriority: 'reverse-project-order' },
+      scene: {
+        objects: [first, second],
+        layers: [firstOperation, secondOperation],
+        artworkOrder: ['B', 'A'],
+      },
+    };
+
+    const prepared = prepareOutput(project);
+
+    if (!prepared.ok) throw new Error('expected prepared output');
+    expect(prepared.job.groups.map((group) => group.sourceObjectId)).toEqual(['B', 'A']);
+  });
+
   it('refuses an over-budget raster (ok:false) without producing a job', () => {
     const prepared = prepareOutput(hugeRasterProject());
     expect(prepared.ok).toBe(false);

@@ -10,9 +10,10 @@
 // arrays, indexed loops) → repeatable across runs.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
+import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
-import { effectiveObjectPowerPercent, objectPowerScalePercent } from './object-power-scale';
+import { objectPowerScalePercent } from './object-power-scale';
 import {
   applyTransform,
   assertNever,
@@ -36,7 +37,8 @@ import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import { offsetFillContours } from './offset-fill';
-import type { CutGroup, CutSegment, FillSegment, Group, Job } from './job';
+import type { CutSegment, FillSegment, Group, Job } from './job';
+import { commonVectorGroupFields } from './vector-group-fields';
 
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
 
@@ -50,13 +52,17 @@ const layerFillCache = new WeakMap<
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
-  for (const layer of scene.layers) {
-    if (!layer.output) continue;
+  const orderedObjects = orderedArtworkObjects(scene);
+  for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
     for (const operationLayer of outputOperationLayers(layer)) {
       if (operationLayer.mode !== 'image') {
-        groups.push(...compileVectorGroupsForLayer(scene.objects, operationLayer, device));
+        groups.push(
+          ...compileVectorGroupsForLayer(scene.objects, operationLayer, device, priorityObjectId),
+        );
       }
-      groups.push(...compileRasterGroupsForLayer(scene.objects, operationLayer, device));
+      groups.push(
+        ...compileRasterGroupsForLayer(orderedObjects, operationLayer, device, scene.objects),
+      );
     }
   }
   return { groups };
@@ -66,15 +72,24 @@ function compileVectorGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  priorityObjectId: string,
 ): Group[] {
   const matchingObjects = objects.filter((obj) => vectorObjectMatchesLayer(obj, layer));
   if (matchingObjects.every((obj) => obj.operationOverride === undefined)) {
-    return vectorGroupsForObjects(objects, matchingObjects, layer, device);
+    return vectorGroupsForObjects(objects, matchingObjects, layer, device, priorityObjectId);
   }
 
   const groups: Group[] = [];
   for (const bucket of vectorObjectBucketsForLayer(objects, layer)) {
-    groups.push(...vectorGroupsForObjects(bucket.objects, bucket.objects, bucket.layer, device));
+    groups.push(
+      ...vectorGroupsForObjects(
+        bucket.objects,
+        bucket.objects,
+        bucket.layer,
+        device,
+        priorityObjectId,
+      ),
+    );
   }
   return groups;
 }
@@ -84,14 +99,25 @@ function vectorGroupsForObjects(
   matchingObjects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  priorityObjectId: string,
 ): Group[] {
+  const onlyObject = matchingObjects.length === 1 ? matchingObjects[0] : undefined;
+  if (onlyObject !== undefined) {
+    return vectorGroupsForLayer(sourceObjects, layer, device, onlyObject, priorityObjectId);
+  }
   const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
   if (sharedScale !== undefined) {
-    return vectorGroupsForLayer(sourceObjects, layer, device, { powerScale: sharedScale });
+    return vectorGroupsForLayer(
+      sourceObjects,
+      layer,
+      device,
+      { powerScale: sharedScale },
+      priorityObjectId,
+    );
   }
   const groups: Group[] = [];
   for (const obj of matchingObjects) {
-    groups.push(...vectorGroupsForLayer([obj], layer, device, obj));
+    groups.push(...vectorGroupsForLayer([obj], layer, device, obj, priorityObjectId));
   }
   return groups;
 }
@@ -127,14 +153,15 @@ function vectorGroupsForLayer(
   layer: Layer,
   device: DeviceProfile,
   powerSource: SceneObject | { readonly powerScale: number },
+  sourceObjectId?: string,
 ): Group[] {
   if (layer.mode === 'fill') {
     if (layer.fillStyle === 'island') {
-      return islandFillGroupsForLayer(objects, layer, device, powerSource);
+      return islandFillGroupsForLayer(objects, layer, device, powerSource, sourceObjectId);
     }
     const segments = collectFillSegmentsForLayer(objects, layer, device);
     if (segments.length === 0) return [];
-    const common = commonGroupFields(layer, device, powerSource);
+    const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
     return [
       {
         ...common,
@@ -147,7 +174,7 @@ function vectorGroupsForLayer(
   }
   const segments = collectLineSegmentsForLayer(objects, layer, device);
   if (segments.length === 0) return [];
-  const common = commonGroupFields(layer, device, powerSource);
+  const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   return [{ ...common, kind: 'cut' as const, segments }];
 }
 
@@ -156,8 +183,9 @@ function islandFillGroupsForLayer(
   layer: Layer,
   device: DeviceProfile,
   powerSource: SceneObject | { readonly powerScale: number },
+  sourceObjectId?: string,
 ): Group[] {
-  const common = commonGroupFields(layer, device, powerSource);
+  const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const fillRule = fillRuleForLayer(objects, layer);
   const contours = collectFillContoursForLayer(objects, layer, device);
   const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
@@ -185,22 +213,6 @@ function islandFillGroupsForLayer(
       },
     ];
   });
-}
-
-function commonGroupFields(
-  layer: Layer,
-  device: DeviceProfile,
-  powerSource: SceneObject | { readonly powerScale: number },
-): Omit<CutGroup, 'kind' | 'segments'> {
-  return {
-    layerId: layer.id,
-    color: layer.color,
-    power: effectiveObjectPowerPercent(layer, powerSource),
-    ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
-    speed: Math.min(layer.speed, device.maxFeed),
-    passes: Math.max(1, Math.floor(layer.passes)),
-    airAssist: layer.airAssist,
-  };
 }
 
 function sharedObjectPowerScalePercent(objects: ReadonlyArray<SceneObject>): number | undefined {

@@ -126,6 +126,27 @@ describe('optimizePaths', () => {
     expect(result.groups.map((candidate) => candidate.layerId)).toEqual(['L2', 'L1']);
   });
 
+  it('never reverses artwork priority when reversing operations', () => {
+    const a1 = { ...group([seg([0, 0], [1, 0])]), layerId: 'L1', sourceObjectId: 'A' };
+    const a2 = { ...group([seg([2, 0], [3, 0])]), layerId: 'L2', sourceObjectId: 'A' };
+    const b1 = { ...group([seg([4, 0], [5, 0])]), layerId: 'L1', sourceObjectId: 'B' };
+    const b2 = { ...group([seg([6, 0], [7, 0])]), layerId: 'L2', sourceObjectId: 'B' };
+
+    const result = optimizePaths(
+      { groups: [a1, a2, b1, b2] },
+      { ...DEFAULT_PROJECT_OPTIMIZATION, layerPriority: 'reverse-project-order' },
+    );
+
+    expect(result.groups.map((candidate) => [candidate.sourceObjectId, candidate.layerId])).toEqual(
+      [
+        ['A', 'L2'],
+        ['A', 'L1'],
+        ['B', 'L2'],
+        ['B', 'L1'],
+      ],
+    );
+  });
+
   it('uses the selected planning start point as the nearest-neighbor seed', () => {
     const farFirst = seg([100, 0], [101, 0]);
     const nearSecond = seg([0, 0], [1, 0]);

@@ -169,6 +169,29 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
+  it('moves selected artwork to the first machine priority without changing canvas order', async () => {
+    useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
+    useStore.getState().selectObject('Box');
+    const { host, root } = await render();
+    try {
+      expect(host.textContent).toContain('Position 2 of 2');
+      const first = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'First',
+      );
+      if (!(first instanceof HTMLButtonElement)) throw new Error('first priority button missing');
+      await act(async () => first.click());
+
+      const scene = useStore.getState().project.scene;
+      expect(scene.artworkOrder).toEqual(['Box', 'Johann']);
+      expect(scene.objects.map((object) => object.id)).toEqual(['Johann', 'Box']);
+      expect(host.textContent).toContain('Position 1 of 2');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('offers one unified operation when selected artworks have different settings', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));

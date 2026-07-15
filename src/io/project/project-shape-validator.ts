@@ -12,6 +12,7 @@ import { validatePathText } from './project-path-text-validator';
 import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import { validateCncTabAnchors } from './project-cnc-tab-validator';
+import { validateOptionalArtworkOrder } from './project-artwork-order-validator';
 import {
   firstError,
   isObject,
@@ -120,6 +121,7 @@ function validateScene(scene: Record<string, unknown>): string | null {
     validateSceneBudgets(scene) ??
     validateArray(layers, 'scene.layers', validateProjectLayer) ??
     validateArray(objects, 'scene.objects', validateSceneObject) ??
+    validateOptionalArtworkOrder(scene, 'scene.artworkOrder') ??
     optionalSceneGroups(scene, 'scene.groups') ??
     validateSceneIntegrity(scene)
   );
