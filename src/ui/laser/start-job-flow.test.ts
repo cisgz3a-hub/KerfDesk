@@ -389,11 +389,6 @@ describe('job checkpoint integration (ADR-118)', () => {
       ...idleStatus,
       mPos: { x, y, z: 0 },
     });
-    // This test isolates checkpoint placement behavior from the no-homing
-    // Frame gate, which has its own integration coverage.
-    useStore.getState().updateDeviceProfile({
-      homing: { ...useStore.getState().project.device.homing, enabled: true },
-    });
     // Start a Current-Position job with the head at (10,10): the compiled bytes
     // anchor the job to that work position.
     useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });

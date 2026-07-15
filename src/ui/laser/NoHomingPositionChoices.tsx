@@ -1,7 +1,7 @@
 const JOG_METHOD_LABEL = 'Jog with controls';
 const SELECTED_LABEL = 'Selected';
 const JOG_INSTRUCTION =
-  'Jog to the job anchor with the arrows. Frame to confirm the area, then Start.';
+  'Jog to the job anchor with the arrows. Frame is optional; Start uses the live head position.';
 const CHOOSE_JOG_LABEL = 'Choose jog positioning';
 const CHOOSE_JOG_TITLE =
   'Select jog positioning. The live head position is read when Frame and Start run.';

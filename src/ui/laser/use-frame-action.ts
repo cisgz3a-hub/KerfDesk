@@ -147,7 +147,7 @@ function dispatchFrameIfSafe(
     return;
   }
   const feed = project.device.framingFeedMmPerMin;
-  const frameRequirement = frameVerificationRequirement(project.device, placement);
+  const frameRequirement = frameVerificationRequirement(placement);
   void frame(bounds, feed)
     .then(() => {
       if (frameRequirement === 'none') return;

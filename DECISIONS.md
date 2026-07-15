@@ -7888,22 +7888,28 @@ simpler relative-placement choice.
   Set origin, and Verified Origin selection.
 - Unlock is never sent merely because the controller reports Alarm. The operator must explicitly
   confirm the head is safely positioned by pressing the guided Unlock action.
-- Relative Current Position and User Origin jobs on a no-homing profile require a matching completed
-  Frame before Start, using the same bounds/origin signature and invalidation rules as Verified Origin.
-  Absolute Coordinates remains available for an operator who deliberately performs repeatable manual
-  homing, and its existing safety behavior is unchanged.
+- Relative Current Position and User Origin jobs on a no-homing profile do not require a completed
+  Frame before Start. Frame remains available for the operator to inspect the perimeter, while the
+  existing relative size/envelope preflight remains active. Verified Origin keeps its matching-frame
+  requirement. Absolute Coordinates remains available for an operator who deliberately performs
+  repeatable manual homing, and its existing safety behavior is unchanged.
 - The raw Release motors control remains available for homing-enabled and advanced workflows, but the
   no-homing surface routes it through the guide so Wake and Set-origin ordering cannot be missed.
 
 ### Consequences
 
-The common button-jog workflow becomes Jog, Frame, Start, with no preliminary capture action; Set
-origin is reserved for reusable origins or the guided hand-move path. The hand-move path still has
-unavoidable controller recovery steps, but
-the UI owns their order and never marks the position ready before controller acknowledgement and a
-fresh Idle report. Frame verification becomes consistently mandatory whenever a no-homing profile
-uses relative placement. Hardware validation remains required because OEM GRBL derivatives can vary
-in their `$SLP`, reset, and alarm behavior.
+The common button-jog workflow becomes Jog, optional Frame, Start, with no preliminary capture
+action; Set origin is reserved for reusable origins or the guided hand-move path. The hand-move path
+still has unavoidable controller recovery steps, but the UI owns their order and never marks the
+position ready before controller acknowledgement and a fresh Idle report. Frame verification remains
+mandatory only for Verified Origin. Hardware validation remains required because OEM GRBL derivatives
+can vary in their `$SLP`, reset, and alarm behavior.
+
+**2026-07-15 maintainer amendment.** The mandatory Frame gate for no-homing Current Position and
+User Origin was removed by direct maintainer instruction. The gate could invalidate its own proof:
+Frame finishes at the perimeter's lower-left corner, while Current Position resolves the selected
+anchor from the live head again at Start, producing different bounds for eight of nine anchors. The
+Frame action and relative size/envelope preflight remain available; only the Start refusal was removed.
 ---
 
 ## ADR-194 - Add native Hershey single-line CNC text without a runtime dependency

@@ -21,7 +21,7 @@ export function requiredFrameIssueFromPrepared(args: {
   readonly placement: Extract<ResolvedJobPlacement, { readonly ok: true }>;
   readonly machine: RequiredFrameSnapshot;
 }): string | null {
-  const requirement = frameVerificationRequirement(args.device, args.placement);
+  const requirement = frameVerificationRequirement(args.placement);
   if (requirement === 'none') return null;
   const bounds = computeJobBounds(args.prepared.job, args.prepared.project.device);
   if (bounds === null) return null;
@@ -30,5 +30,5 @@ export function requiredFrameIssueFromPrepared(args: {
     wco: args.machine.wcoCache ?? null,
     workOriginActive: args.machine.workOriginActive === true,
   });
-  return valid ? null : frameVerificationBlockedMessage(requirement);
+  return valid ? null : frameVerificationBlockedMessage();
 }
