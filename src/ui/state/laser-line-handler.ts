@@ -20,6 +20,11 @@ import {
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner } from '../../core/controllers';
 import { flushResetCleanup } from './laser-reset-cleanup';
+import {
+  qualifiedController,
+  qualifyingController,
+  scheduleControllerQualification,
+} from './laser-controller-qualification';
 import { controllerRebootNotice } from './laser-safety-notice';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
@@ -122,6 +127,7 @@ function publishDetectedSettings(
       sessionEpoch: state.controllerSessionEpoch,
       observedAt: Date.now(),
     },
+    controllerQualification: qualifiedController(state.controllerSessionEpoch, 'verified'),
     grblSettingsRows: detected.settingsRows,
     lastSettingsReadAt: Date.now(),
   });
@@ -168,6 +174,7 @@ function handleWelcomeLine(
   const detected = detectControllerFromBanner(raw);
   if (detected === null) return;
   const state = get();
+  const nextSessionEpoch = state.controllerSessionEpoch + 1;
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
@@ -186,10 +193,11 @@ function handleWelcomeLine(
   set({
     detectedControllerKind: detected,
     statusReport: null,
-    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    controllerSessionEpoch: nextSessionEpoch,
     statusObservation: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: qualifyingController(nextSessionEpoch, 'reset-cleanup'),
     detectedSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -219,6 +227,7 @@ function handleWelcomeLine(
   // F2): the controller is fully booted, so the ok cannot be swallowed and
   // cannot be orphaned by this banner.
   flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'));
+  scheduleControllerQualification(set, get, refs, nextSessionEpoch);
 }
 
 function controllerResetBoundaryPolicy(state: LaserState): {

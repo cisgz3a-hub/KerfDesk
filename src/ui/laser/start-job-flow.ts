@@ -10,43 +10,36 @@
 // and a native dialog there would freeze the ack pump and Abort button.
 
 import type { OverrideValues } from '../../core/controllers/grbl';
-import type { StatusQueryCapability } from '../../core/controllers';
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
+import { streamingModeForController } from '../../core/devices';
 import {
-  profileSupportsCapability,
-  streamingModeForController,
-  type ControllerKind,
-} from '../../core/devices';
-import {
-  createJobCheckpoint,
   fingerprintGcode,
   fingerprintsEqual,
   rawResumeLine,
   type JobCheckpoint,
 } from '../../core/recovery';
-import type { JobOriginPlacement } from '../../core/job';
-import type { PreflightOptions } from '../../core/preflight';
-import { machineKindOf, type MachineKind, type OutputScope, type Project } from '../../core/scene';
-import type { PreparedOutput } from '../../io/gcode';
+import { machineKindOf, type MachineKind, type OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
-import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
+import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
+import {
+  createExecutionArtifact,
+  createRunId,
+  recoveryRepository,
+  type LastCompletedReceipt,
+  type RecoveryRepository,
+  type RunId,
+} from '../state/recovery';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
   cncControllerEpochOf,
   createCncSetupAttestation,
   type CncSetupAttestation,
 } from '../state/cnc-setup-attestation';
-import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
-import { renderVariableText } from '../text/render-variable-text';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
-import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useCameraStore } from '../state/camera-store';
-import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
-import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { useStartBlockerStore } from './start-blocker-store';
 import { reducedOverrideAcknowledgement } from '../state/cnc-accessory-readiness';
 import { useToastStore } from '../state/toast-store';
@@ -56,21 +49,38 @@ import {
   sameCheckpoint,
 } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
+import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
 
-export async function runStartJobFlow(): Promise<void> {
-  await runStartJobFlowWithCheckpoint(null);
+export async function runStartJobFlow(
+  repository: RecoveryRepository = recoveryRepository,
+): Promise<void> {
+  await runStartJobFlowWithCheckpoint(null, null, repository);
 }
 
 export async function runConfirmedCheckpointReplacementStart(
   checkpoint: JobCheckpoint,
+  repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
-  await runStartJobFlowWithCheckpoint(checkpoint);
+  await runStartJobFlowWithCheckpoint(checkpoint, null, repository);
+}
+
+/** Exact-job replay after a fully settled completion. This still performs the
+ * complete current Start flow and creates a new run identity at line one. */
+export async function runCompletedJobAgainFlow(
+  receipt: LastCompletedReceipt,
+  repository: RecoveryRepository = recoveryRepository,
+): Promise<void> {
+  await runStartJobFlowWithCheckpoint(null, receipt, repository);
 }
 
 async function runStartJobFlowWithCheckpoint(
   checkpointToReplace: JobCheckpoint | null,
+  completedReceipt: LastCompletedReceipt | null,
+  repository: RecoveryRepository,
 ): Promise<void> {
   useStartBlockerStore.getState().clear();
+  const laser = useLaserStore.getState();
+  if (blockUnqualifiedStart(laser)) return;
   const initialCheckpointIssue = checkpointStartIssue(checkpointToReplace);
   if (initialCheckpointIssue !== null) {
     reportBlockedStart(initialCheckpointIssue);
@@ -78,13 +88,19 @@ async function runStartJobFlowWithCheckpoint(
   }
   const app = useStore.getState();
   const { project } = app;
-  const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
   const prepared = await prepareCurrentStartJob(app, laser, camera);
   if (!prepared.ok) {
     useStartBlockerStore.getState().report(prepared.messages);
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start job:\n\n${lines}`);
+    return;
+  }
+  if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
+    await repository.discardCompletedReceipt(completedReceipt.runId);
+    useToastStore
+      .getState()
+      .pushToast('The completed job changed. Use Start job to run the current canvas.', 'warning');
     return;
   }
   const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
@@ -98,107 +114,242 @@ async function runStartJobFlowWithCheckpoint(
   const machineKind = machineKindOf(project.machine);
   const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
   if (cncSetupAttestation === null) return;
-  // Re-check immediately before startJob performs the first controller write.
-  // Preparation and operator dialogs are asynchronous; a storage event from
-  // another window must not let this run replace a newer checkpoint.
-  const finalCheckpointIssue = checkpointStartIssue(checkpointToReplace);
-  if (finalCheckpointIssue !== null) {
-    reportBlockedStart(finalCheckpointIssue);
-    return;
+  const currentLaser = await currentLaserForAuthorizedStart({
+    preparedAgainst: laser,
+    checkpointToReplace,
+    completedReceipt,
+    repository,
+  });
+  if (currentLaser === null) return;
+  await streamPreparedStart({
+    app,
+    project,
+    laser: currentLaser,
+    prepared,
+    machineKind,
+    cncSetupAttestation,
+    repository,
+  });
+}
+
+async function currentLaserForAuthorizedStart(args: {
+  readonly preparedAgainst: ReturnType<typeof useLaserStore.getState>;
+  readonly checkpointToReplace: JobCheckpoint | null;
+  readonly completedReceipt: LastCompletedReceipt | null;
+  readonly repository: RecoveryRepository;
+}): Promise<ReturnType<typeof useLaserStore.getState> | null> {
+  // Preparation and operator dialogs are asynchronous. Re-check every owner
+  // immediately before startJob performs the first controller write.
+  const checkpointIssue = checkpointStartIssue(args.checkpointToReplace);
+  if (checkpointIssue !== null) {
+    reportBlockedStart(checkpointIssue);
+    return null;
   }
+  if (
+    args.completedReceipt !== null &&
+    !(await completedReceiptIsCurrent(args.completedReceipt, args.repository))
+  ) {
+    return null;
+  }
+  const current = useLaserStore.getState();
+  if (blockUnqualifiedStart(current)) return null;
+  if (startPreparationStillCurrent(args.preparedAgainst, current)) return current;
+  reportBlockedStart(
+    'Controller or machine setup changed while Start was being prepared. Review the current setup and press Start again.',
+  );
+  return null;
+}
+
+function startPreparationStillCurrent(
+  preparedAgainst: ReturnType<typeof useLaserStore.getState>,
+  current: ReturnType<typeof useLaserStore.getState>,
+): boolean {
+  return (
+    current.controllerSessionEpoch === preparedAgainst.controllerSessionEpoch &&
+    current.controllerSettings === preparedAgainst.controllerSettings &&
+    current.controllerSettingsObservation === preparedAgainst.controllerSettingsObservation &&
+    sameStartStatus(current.statusReport, preparedAgainst.statusReport) &&
+    current.trustedPositionEpoch === preparedAgainst.trustedPositionEpoch &&
+    current.workZReferenceEpoch === preparedAgainst.workZReferenceEpoch &&
+    current.workZZeroEvidence === preparedAgainst.workZZeroEvidence
+  );
+}
+
+function sameStartStatus(
+  current: ReturnType<typeof useLaserStore.getState>['statusReport'],
+  preparedAgainst: ReturnType<typeof useLaserStore.getState>['statusReport'],
+): boolean {
+  if (current === null || preparedAgainst === null) return current === preparedAgainst;
+  return (
+    current.state === preparedAgainst.state &&
+    current.subState === preparedAgainst.subState &&
+    sameAxes(current.mPos, preparedAgainst.mPos) &&
+    sameAxes(current.wPos, preparedAgainst.wPos) &&
+    sameAxes(current.wco, preparedAgainst.wco)
+  );
+}
+
+function sameAxes(
+  current: { readonly x: number; readonly y: number; readonly z: number } | null,
+  preparedAgainst: { readonly x: number; readonly y: number; readonly z: number } | null,
+): boolean {
+  return (
+    current === preparedAgainst ||
+    (current !== null &&
+      preparedAgainst !== null &&
+      current.x === preparedAgainst.x &&
+      current.y === preparedAgainst.y &&
+      current.z === preparedAgainst.z)
+  );
+}
+
+function blockUnqualifiedStart(laser: ReturnType<typeof useLaserStore.getState>): boolean {
+  const message = controllerQualificationStartBlockMessage(
+    laser.controllerQualification,
+    laser.controllerSessionEpoch,
+  );
+  if (message === null) return false;
+  useStartBlockerStore.getState().report([message]);
+  return true;
+}
+
+async function streamPreparedStart(args: {
+  readonly app: ReturnType<typeof useStore.getState>;
+  readonly project: ReturnType<typeof useStore.getState>['project'];
+  readonly laser: ReturnType<typeof useLaserStore.getState>;
+  readonly prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>;
+  readonly machineKind: MachineKind;
+  readonly cncSetupAttestation: CncSetupAttestation | undefined;
+  readonly repository: RecoveryRepository;
+}): Promise<void> {
+  const runId = createRunId();
+  const staged = await stageFreshExecutionArtifact({
+    runId,
+    prepared: args.prepared,
+    outputScope: currentOutputScope(args.app),
+    laser: args.laser,
+    repository: args.repository,
+  });
   try {
-    await laser.startJob(prepared.gcode, {
+    await args.laser.startJob(args.prepared.gcode, {
+      runId,
       streamingMode: streamingModeForController(
-        project.device.controllerKind,
-        project.device.streamingMode,
+        args.project.device.controllerKind,
+        args.project.device.streamingMode,
       ),
-      rxBufferBytes: project.device.rxBufferBytes,
-      machineKind,
-      ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
-      ...(cncSetupAttestation === undefined ? {} : { cncSetupAttestation }),
-      canvasPlan: prepared.canvasPlan,
+      rxBufferBytes: args.project.device.rxBufferBytes,
+      machineKind: args.machineKind,
+      ...(args.prepared.cncToolPlan === undefined
+        ? {}
+        : { cncToolPlan: args.prepared.cncToolPlan }),
+      ...(args.cncSetupAttestation === undefined
+        ? {}
+        : { cncSetupAttestation: args.cncSetupAttestation }),
+      canvasPlan: args.prepared.canvasPlan,
     });
-    armVariableStreamAdvancement(project);
-    // Checkpoint the run only once the stream is actually under way
-    // (ADR-118); a refused start must not overwrite an older recovery
-    // record. useJobCheckpoint advances it from streamer acks.
-    writeJobCheckpoint(
-      createJobCheckpoint({
-        gcode: prepared.gcode,
-        machineKind,
-        // Capture the scope + RESOLVED origin THIS run compiled with so resume
-        // reproduces identical bytes even after a crash resets the live values
-        // (PST-02) and re-resolves current-position to the post-crash head (R1).
-        outputScope: currentOutputScope(app),
-        ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
-        nowIso: new Date().toISOString(),
-      }),
-    );
+    armVariableStreamAdvancement(args.project);
+    await activateAcceptedFreshRun(runId, staged, args.repository);
   } catch (err) {
+    if (staged) void args.repository.discardStagedRun(runId);
     const message = err instanceof Error ? err.message : String(err);
     useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
 }
 
+function replayCompilationMatches(
+  prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>,
+  receipt: LastCompletedReceipt,
+): boolean {
+  return (
+    prepared.canvasPlan.retentionKey === receipt.artifact.executionSignature &&
+    fingerprintsEqual(fingerprintGcode(prepared.gcode), receipt.artifact.fingerprint)
+  );
+}
+
+async function completedReceiptIsCurrent(
+  receipt: LastCompletedReceipt,
+  repository: RecoveryRepository,
+): Promise<boolean> {
+  const refreshed = await repository.refresh();
+  const current = refreshed.ok ? refreshed.value.lastCompletedReceipt : null;
+  if (current?.runId === receipt.runId) return true;
+  useToastStore
+    .getState()
+    .pushToast(
+      'The completed-job replay offer changed. Review the current job controls.',
+      'warning',
+    );
+  return false;
+}
+
+async function stageFreshExecutionArtifact(args: {
+  readonly runId: RunId;
+  readonly prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>;
+  readonly outputScope: OutputScope;
+  readonly laser: ReturnType<typeof useLaserStore.getState>;
+  readonly repository: RecoveryRepository;
+}): Promise<boolean> {
+  try {
+    const artifact = createExecutionArtifact({
+      runId: args.runId,
+      gcode: args.prepared.gcode,
+      prepared: args.prepared.prepared,
+      outputScope: args.outputScope,
+      ...(args.prepared.jobOrigin === undefined ? {} : { jobOrigin: args.prepared.jobOrigin }),
+      canvasPlan: args.prepared.canvasPlan,
+      ...(args.prepared.cncToolPlan === undefined
+        ? {}
+        : { cncToolPlan: args.prepared.cncToolPlan }),
+      controllerSettings: args.laser.controllerSettings,
+      controllerObservation: {
+        statusReport: args.laser.statusReport,
+        wco: args.laser.wcoCache,
+        overrides: args.laser.ovCache,
+        accessories: args.laser.accessoryCache ?? null,
+        workZZeroEvidence: args.laser.workZZeroEvidence,
+        activeControllerKind: args.laser.activeControllerKind,
+        detectedControllerKind: args.laser.detectedControllerKind,
+        controllerSessionEpoch: args.laser.controllerSessionEpoch,
+      },
+      createdAtIso: new Date().toISOString(),
+    });
+    const staged = await args.repository.stageArtifact(artifact);
+    if (staged.ok) return true;
+  } catch {
+    // Artifact construction/storage is best-effort. A current job must never
+    // be refused because recovery persistence is unavailable.
+  }
+  return false;
+}
+
+async function activateAcceptedFreshRun(
+  runId: RunId,
+  staged: boolean,
+  repository: RecoveryRepository,
+): Promise<void> {
+  if (staged) {
+    const activated = await repository.activateFreshRun(runId);
+    if (activated.ok && activated.value) return;
+  }
+  // The controller accepted a new stream, so an older capsule no longer
+  // describes the machine even when this run could not be persisted.
+  await repository.noteUntrackedRunAccepted();
+  reportRecoveryUnavailable();
+}
+
+function reportRecoveryUnavailable(): void {
+  useToastStore
+    .getState()
+    .pushToast(
+      'Job recovery is unavailable for this run. The job can continue normally.',
+      'warning',
+    );
+}
+
 function reportBlockedStart(message: string): void {
   useStartBlockerStore.getState().report([message]);
   jobAwareAlert(`Cannot start job:\n\n${message}`);
-}
-
-async function prepareCurrentStartJob(
-  app: ReturnType<typeof useStore.getState>,
-  laser: ReturnType<typeof useLaserStore.getState>,
-  camera: ReturnType<typeof useCameraStore.getState>,
-) {
-  const { project, jobPlacement } = app;
-  const registration = currentPrintCutOutputRegistration(project);
-  return prepareStartJobSnapshot(
-    project,
-    laser.controllerSettings,
-    {
-      statusReport: laser.statusReport,
-      alarmCode: laser.alarmCode,
-      hasActiveStreamer: isActiveJob(laser.streamer),
-      cncJobsSupported: laser.capabilities.cncJobs,
-      motionOperationActive: laser.motionOperation !== null,
-      controllerOperationActive: laser.controllerOperation !== null,
-      autofocusBusy: laser.autofocusBusy,
-      workOriginActive: laser.workOriginActive,
-      workZZeroEvidence: laser.workZZeroEvidence,
-      workZReferenceEpoch: laser.workZReferenceEpoch,
-      controllerSessionEpoch: laser.controllerSessionEpoch,
-      wcoCache: laser.wcoCache,
-      ovCache: laser.ovCache,
-      accessoryCache: laser.accessoryCache ?? null,
-      frameVerification: laser.frameVerification,
-      settingsCapability: laser.capabilities.settings,
-      activeControllerKind: laser.activeControllerKind,
-      detectedControllerKind: laser.detectedControllerKind,
-      cameraPlacementActive: camera.placementActive,
-      cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
-      cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
-        project.device.cameraAlignment,
-        project.device.cameraCalibration,
-        camera.surfaceHeightMm,
-      ),
-      homingState: laser.homingState,
-      trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
-      reportInches: laser.controllerSettings?.reportInches === true,
-      statusQuery: liveStatusQueryCapability(
-        laser.activeControllerKind,
-        laser.capabilities.statusQuery,
-      ),
-    },
-    jobPlacement,
-    currentOutputScope(app),
-    rotaryRasterAllowed(project),
-    {
-      clock: () => new Date(),
-      renderVariableText,
-      ...(registration === undefined ? {} : { registration }),
-    },
-  );
 }
 
 function confirmCncSetup(
@@ -284,95 +435,3 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
 // the ORIGINAL run used so the recompiled bytes match its fingerprint even
 // after a crash reset the live values (PST-02); the manual Start-from-line path
 // passes nothing and uses current app state, as before.
-export function prepareRecoverySource(overrides?: {
-  readonly outputScope: OutputScope;
-  readonly jobOrigin?: JobOriginPlacement;
-}): {
-  readonly project: Project;
-  readonly gcode: string;
-  readonly canvasPlan: CanvasMotionPlan;
-  readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
-  readonly warnings: ReadonlyArray<string>;
-  readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
-  readonly jobOrigin?: JobOriginPlacement;
-} | null {
-  const app = useStore.getState();
-  const { project } = app;
-  const outputScope = overrides?.outputScope ?? currentOutputScope(app);
-  const laser = useLaserStore.getState();
-  const camera = useCameraStore.getState();
-  const prepared = prepareStartJob(
-    project,
-    laser.controllerSettings,
-    {
-      statusReport: laser.statusReport,
-      alarmCode: laser.alarmCode,
-      hasActiveStreamer: isActiveJob(laser.streamer),
-      cncJobsSupported: laser.capabilities.cncJobs,
-      motionOperationActive: laser.motionOperation !== null,
-      controllerOperationActive: laser.controllerOperation !== null,
-      autofocusBusy: laser.autofocusBusy,
-      workOriginActive: laser.workOriginActive,
-      workZZeroEvidence: laser.workZZeroEvidence,
-      workZReferenceEpoch: laser.workZReferenceEpoch,
-      controllerSessionEpoch: laser.controllerSessionEpoch,
-      wcoCache: laser.wcoCache,
-      ovCache: laser.ovCache,
-      accessoryCache: laser.accessoryCache ?? null,
-      frameVerification: laser.frameVerification,
-      settingsCapability: laser.capabilities.settings,
-      activeControllerKind: laser.activeControllerKind,
-      detectedControllerKind: laser.detectedControllerKind,
-      cameraPlacementActive: camera.placementActive,
-      cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
-      cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
-        project.device.cameraAlignment,
-        project.device.cameraCalibration,
-        camera.surfaceHeightMm,
-      ),
-      homingState: laser.homingState,
-      trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
-      reportInches: laser.controllerSettings?.reportInches === true,
-      statusQuery: liveStatusQueryCapability(
-        laser.activeControllerKind,
-        laser.capabilities.statusQuery,
-      ),
-    },
-    app.jobPlacement,
-    outputScope,
-    overrides?.jobOrigin,
-    rotaryRasterAllowed(project),
-  );
-  if (!prepared.ok) {
-    const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(`Cannot resume job:\n\n${lines}`);
-    return null;
-  }
-  return {
-    project,
-    gcode: prepared.gcode,
-    canvasPlan: prepared.canvasPlan,
-    prepared: prepared.prepared,
-    warnings: prepared.warnings,
-    ...(prepared.preflightMotionOffset === undefined
-      ? {}
-      : { preflightMotionOffset: prepared.preflightMotionOffset }),
-    ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
-  };
-}
-
-function rotaryRasterAllowed(project: Project): boolean {
-  return (
-    useExperimentalLaserFeatures.getState().features.rotaryRaster &&
-    profileSupportsCapability(project.device, 'rotary')
-  );
-}
-
-function liveStatusQueryCapability(
-  controllerKind: ControllerKind,
-  configured: StatusQueryCapability,
-): StatusQueryCapability {
-  if (controllerKind === 'marlin') return 'queued-poll';
-  if (controllerKind === 'ruida') return 'none';
-  return configured;
-}

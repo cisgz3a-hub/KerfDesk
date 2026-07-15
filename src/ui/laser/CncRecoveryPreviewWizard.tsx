@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import type { JobCheckpoint } from '../../core/recovery';
 import { Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
+import type { RecoveryCapsule } from '../state/recovery';
 import {
   CncRecoveryQualificationStep,
   isCncRecoveryReviewComplete,
@@ -11,6 +11,7 @@ import { CncRecoveryRunwayPreview } from './CncRecoveryRunwayPreview';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
 import {
   buildCncRecoveryPreviewModel,
+  buildLegacyFingerprintOnlyCncRecoveryPreviewModel,
   type CncRecoveryEvidenceCheck,
   type CncRecoveryPreviewModel,
 } from './cnc-recovery-preview-model';
@@ -29,7 +30,7 @@ const EMPTY_REVIEW: CncRecoveryReviewDraft = {
 };
 
 export function CncRecoveryPreviewWizard(props: {
-  readonly checkpoint: JobCheckpoint;
+  readonly capsule: RecoveryCapsule;
   readonly onClose: () => void;
 }): JSX.Element {
   const project = useStore((state) => state.project);
@@ -37,22 +38,19 @@ export function CncRecoveryPreviewWizard(props: {
   const [requestedEventId, setRequestedEventId] = useState('');
   const [review, setReview] = useState<CncRecoveryReviewDraft>(EMPTY_REVIEW);
   const [starting, setStarting] = useState(false);
-  const model = useMemo(
-    () =>
-      buildCncRecoveryPreviewModel(
-        project,
-        props.checkpoint,
-        requestedEventId === '' ? undefined : requestedEventId,
-      ),
-    [project, props.checkpoint, requestedEventId],
-  );
+  const model = useMemo(() => {
+    const eventId = requestedEventId === '' ? undefined : requestedEventId;
+    return props.capsule.artifact.kind === 'exact-execution'
+      ? buildCncRecoveryPreviewModel(props.capsule, eventId)
+      : buildLegacyFingerprintOnlyCncRecoveryPreviewModel(project, props.capsule, eventId);
+  }, [project, props.capsule, requestedEventId]);
   const stepIndex = STEPS.indexOf(step);
   const reviewComplete = isCncRecoveryReviewComplete(review);
   const canStart = model.canExecute && reviewComplete && !starting;
   const startRecovery = async (): Promise<void> => {
     if (!canStart || model.selectedEventId === null) return;
     setStarting(true);
-    const started = await runCncSupervisedRecoveryFlow(props.checkpoint, {
+    const started = await runCncSupervisedRecoveryFlow(props.capsule, {
       ...review,
       uncertaintyEventId: model.selectedEventId,
     });

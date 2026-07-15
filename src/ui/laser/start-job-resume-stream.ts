@@ -9,6 +9,7 @@ import {
 } from '../state/canvas-motion-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { recoveryRepository } from '../state/recovery';
 import { resumeConfirmation } from './resume-confirmation';
 import { markOwnedResumeCheckpoint } from './start-job-checkpoint-policy';
 
@@ -68,6 +69,10 @@ export async function streamResumeFromRawLine(
         initialPosition ?? undefined,
       ),
     });
+    // Manual start-from-line is deliberately outside exact recovery tracking,
+    // but an accepted stream changes physical machine state. An older capsule
+    // or completed-job receipt must not remain eligible afterward.
+    await recoveryRepository.noteUntrackedRunAccepted();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     jobAwareAlert(`Could not resume job:\n\n${message}`);

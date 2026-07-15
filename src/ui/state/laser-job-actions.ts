@@ -116,6 +116,7 @@ export function jobActions(
         const entersHoldNow = stepped.state.status === 'tool-change';
         set((state) => ({
           streamer: stepped.state,
+          activeRunId: options.runId ?? null,
           ...liveCanvasStartPatch(options.canvasPlan),
           accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
           activeJobMachineKind: options.machineKind ?? 'laser',
@@ -131,6 +132,7 @@ export function jobActions(
         } catch (err) {
           set((state) => ({
             streamer: null,
+            activeRunId: state.activeRunId === options.runId ? null : state.activeRunId,
             ...liveCanvasLifecyclePatch(state, 'errored'),
           }));
           throw err;

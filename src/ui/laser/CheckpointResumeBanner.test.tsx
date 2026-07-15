@@ -1,28 +1,24 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
-import {
-  advanceJobCheckpoint,
-  createJobCheckpoint,
-  markResumeInFlight,
-  withJobInterruption,
-} from '../../core/recovery';
-import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
-import { useLaserStore } from '../state/laser-store';
+import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../core/scene';
+import type { PreparedOutput } from '../../io/gcode';
+import { useStore } from '../state';
+import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
+import { initialLaserState } from '../state/laser-store-helpers';
+import { useLaserStore } from '../state/laser-store';
+import {
+  createExecutionArtifact,
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+  RecoveryRepository,
+} from '../state/recovery';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 
-vi.mock('./start-job-flow', () => ({
-  runCheckpointResumeFlow: vi.fn(async () => undefined),
-}));
-
-vi.mock('./start-job-restart-flow', () => ({
-  runRestartInterruptedJobFlow: vi.fn(async () => undefined),
-}));
-
 vi.mock('../state/job-aware-dialogs', () => ({
+  jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
 }));
 
@@ -30,226 +26,155 @@ vi.mock('../state/job-aware-dialogs', () => ({
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const NOW = '2026-07-07T03:00:00.000Z';
-const GCODE = ['; layer', 'G21', 'G90', 'G1 X10 S100', 'M5'].join('\n');
+const NOW = '2026-07-15T10:00:00.000Z';
+const LATER = '2026-07-15T10:01:00.000Z';
+const GCODE = ['G21', 'G90', 'G1 X10 S100', 'M5'].join('\n');
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
-function render(): void {
-  host = document.createElement('div');
-  document.body.appendChild(host);
-  const r = createRoot(host);
-  act(() => {
-    r.render(<CheckpointResumeBanner disabled={false} busy={false} />);
-  });
-  root = r;
-}
-
-function storedCheckpoint(acked: number, machineKind: 'laser' | 'cnc' = 'laser'): void {
-  const cp = createJobCheckpoint({
-    gcode: GCODE,
-    machineKind,
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    nowIso: NOW,
-  });
-  writeJobCheckpoint(advanceJobCheckpoint(cp, acked, NOW));
-}
-
-function storedDisconnectedCncCheckpoint(): void {
-  const cp = createJobCheckpoint({
-    gcode: GCODE,
-    machineKind: 'cnc',
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    nowIso: NOW,
-  });
-  writeJobCheckpoint(
-    withJobInterruption(
-      advanceJobCheckpoint(cp, 2, NOW),
-      { kind: 'disconnect', message: 'USB connection was lost during the router job.' },
-      NOW,
-    ),
-  );
-}
-
-function storedDisconnectedLaserCheckpointBeforeAck(): void {
-  const cp = createJobCheckpoint({
-    gcode: GCODE,
-    machineKind: 'laser',
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    nowIso: NOW,
-  });
-  writeJobCheckpoint(
-    withJobInterruption(
-      cp,
-      { kind: 'disconnect', message: 'USB connection was lost before an acknowledgement.' },
-      NOW,
-    ),
-  );
-}
-
-function storedInterruptedRecoveryCheckpoint(): void {
-  const checkpoint = createJobCheckpoint({
-    gcode: GCODE,
-    machineKind: 'cnc',
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    nowIso: NOW,
-  });
-  writeJobCheckpoint(markResumeInFlight(advanceJobCheckpoint(checkpoint, 2, NOW), NOW));
-}
-
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
+  act(() => root?.unmount());
   host?.remove();
   root = null;
   host = null;
-  useLaserStore.setState({ streamer: null });
-  localStorage.clear();
+  useStore.getState().newProject();
+  useLaserStore.setState(initialLaserState());
   vi.clearAllMocks();
 });
 
 describe('CheckpointResumeBanner', () => {
-  it('renders the interrupted-job offer when a checkpoint with progress exists', () => {
-    storedCheckpoint(2);
-    render();
+  it('shows an isolated, collapsed recovery card without a Start blocker', async () => {
+    const repository = await interruptedRepository();
+    render(repository);
 
-    expect(host?.textContent).toContain('Interrupted laser job');
-    expect(host?.textContent).toContain('2 of 4 G-code lines acknowledged by the controller');
-    expect(host?.querySelector('button')?.textContent).toBe('Review safe recovery');
+    expect(host?.textContent).toContain('Interrupted job saved');
+    expect(host?.textContent).toContain('2 of 4 lines acknowledged');
+    expect(host?.textContent).toContain('isolated from the current canvas');
+    expect(host?.textContent).toContain('ordinary Start');
+    expect(host?.querySelector('details')?.open).toBe(false);
+    expect(host?.querySelector('[role="alert"]')).toBeNull();
+    expect(button('Review recovery').disabled).toBe(false);
   });
 
-  it('renders nothing without a checkpoint', () => {
-    render();
+  it('renders nothing when no interrupted capsule is saved', async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    render(repository);
+
     expect(host?.textContent).toBe('');
   });
 
-  it('retains recovery guidance when interruption happens before the first acknowledgement', () => {
-    storedCheckpoint(0, 'cnc');
-    render();
-    expect(host?.textContent).toContain('Interrupted router job');
-    expect(host?.textContent).toContain('0 of 4 G-code lines acknowledged');
-    expect(host?.textContent).toContain('Acknowledgements are diagnostic only');
-    expect(host?.textContent).toContain('new recovery job');
-    expect(host?.querySelector('button')?.textContent).toBe('Review supervised recovery');
+  it('opens and closes review without mutating the repository or either live store', async () => {
+    const repository = await interruptedRepository();
+    const repositoryBefore = repository.getSnapshot();
+    const repositoryValueBefore = structuredClone(repositoryBefore);
+    const appBefore = useStore.getState();
+    const laserBefore = useLaserStore.getState();
+    render(repository);
+
+    act(() => button('Review recovery').click());
+    expect(host?.textContent).toContain('Review interrupted laser job');
+    expect(host?.textContent).toContain('does not change the current canvas');
+
+    act(() => button('Close').click());
+    expect(host?.textContent).not.toContain('Review interrupted laser job');
+    expect(repository.getSnapshot()).toBe(repositoryBefore);
+    expect(repository.getSnapshot()).toEqual(repositoryValueBefore);
+    expect(useStore.getState()).toBe(appBefore);
+    expect(useLaserStore.getState()).toBe(laserBefore);
   });
 
-  it('does not offer laser replay before any command was acknowledged', () => {
-    storedCheckpoint(0, 'laser');
-    render();
-    expect(host?.textContent).toBe('');
-  });
+  it('discards only the selected recovery capsule after confirmation', async () => {
+    const repository = await interruptedRepository();
+    const appBefore = useStore.getState();
+    const laserBefore = useLaserStore.getState();
+    render(repository);
 
-  it('retains CNC evidence and offers the supervised new-job review', () => {
-    storedCheckpoint(2, 'cnc');
-    render();
-
-    expect(host?.textContent).toContain('Acknowledgements are diagnostic only');
-    expect(host?.textContent).toContain('select the first uncertain native contour segment');
-    expect([...(host?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
-      'Review supervised recovery',
-      'Discard recovery record…',
-    ]);
-  });
-
-  it('opens the fail-closed supervised CNC recovery wizard', () => {
-    storedCheckpoint(2, 'cnc');
-    render();
-
-    act(() => {
-      [...(host?.querySelectorAll('button') ?? [])]
-        .find((button) => button.textContent === 'Review supervised recovery')
-        ?.click();
+    await act(async () => {
+      button('Discard').click();
+      await vi.waitFor(() => expect(repository.getSnapshot().recoveryCapsule).toBeNull());
     });
 
-    expect(host?.textContent).toContain('Supervised CNC recovery');
-    expect(host?.textContent).toContain('Acknowledged lines remain transport diagnostics');
-    expect(host?.textContent).not.toContain('Start supervised recovery');
-  });
-
-  it('does not reuse the original checkpoint after a recovery attempt was interrupted', () => {
-    storedInterruptedRecoveryCheckpoint();
-    render();
-
-    expect(host?.textContent).toContain('recovery attempt was itself interrupted');
-    expect(host?.textContent).toContain('cannot start another recovery');
-    expect(
-      [...(host?.querySelectorAll('button') ?? [])].map((button) => button.textContent),
-    ).toEqual(['Discard recovery record…']);
-  });
-
-  it('retains a laser recovery record when disconnect happened before the first ack', () => {
-    storedDisconnectedLaserCheckpointBeforeAck();
-    render();
-
-    expect(host?.textContent).toContain('Interrupted laser job');
-    expect(host?.textContent).toContain('0 of 4 G-code lines acknowledged');
-    expect(host?.textContent).toContain('Recorded cause:');
-  });
-
-  it('shows the persisted interruption cause after reconnect or reload', () => {
-    storedDisconnectedCncCheckpoint();
-    render();
-
-    expect(host?.textContent).toContain('Recorded cause:');
-    expect(host?.textContent).toContain('USB connection was lost during the router job.');
-  });
-
-  it('renders nothing while a job is active', () => {
-    storedCheckpoint(2);
-    useLaserStore.setState({ streamer: step(createStreamer(GCODE)).state });
-    render();
-
-    expect(host?.textContent).toBe('');
-  });
-
-  it('explicit discard confirmation clears the stored checkpoint and hides the banner', () => {
-    storedCheckpoint(3);
-    render();
-    const dismiss = [...(host?.querySelectorAll('button') ?? [])].find(
-      (b) => b.textContent === 'Discard recovery record…',
-    );
-    expect(dismiss).toBeDefined();
-
-    act(() => {
-      dismiss?.click();
-    });
-
-    expect(readJobCheckpoint()).toBeNull();
-    expect(host?.textContent).toBe('');
     expect(jobAwareConfirm).toHaveBeenCalledWith(expect.stringContaining('Discard this'));
+    expect(host?.textContent).toBe('');
+    expect(useStore.getState()).toBe(appBefore);
+    expect(useLaserStore.getState()).toBe(laserBefore);
   });
 
-  it('resume hands the checkpoint to runCheckpointResumeFlow', async () => {
-    const { runCheckpointResumeFlow } = await import('./start-job-flow');
-    storedCheckpoint(2);
-    render();
-
-    act(() => {
-      host?.querySelector('button')?.click();
+  it('hides the card while a live job owns the controller', async () => {
+    const repository = await interruptedRepository();
+    useLaserStore.setState({
+      streamer: step(createStreamer(GCODE)).state,
     });
+    render(repository);
 
-    expect(runCheckpointResumeFlow).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(runCheckpointResumeFlow).mock.calls[0]?.[0]).toMatchObject({
-      ackedLines: 2,
-    });
-  });
-
-  it('hands deliberate line-1 restart to the separate restart flow', async () => {
-    const { runRestartInterruptedJobFlow } = await import('./start-job-restart-flow');
-    storedCheckpoint(2);
-    render();
-
-    act(() => {
-      [...(host?.querySelectorAll('button') ?? [])]
-        .find((button) => button.textContent === 'Restart entire job from beginning…')
-        ?.click();
-    });
-
-    expect(runRestartInterruptedJobFlow).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(runRestartInterruptedJobFlow).mock.calls[0]?.[0]).toMatchObject({
-      ackedLines: 2,
-    });
+    expect(host?.textContent).toBe('');
   });
 });
+
+function render(repository: RecoveryRepository): void {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  act(() => {
+    root?.render(<CheckpointResumeBanner busy={false} repository={repository} />);
+  });
+}
+
+function button(label: string): HTMLButtonElement {
+  const candidate = [...(host?.querySelectorAll('button') ?? [])].find(
+    (element) => element.textContent === label,
+  );
+  if (!(candidate instanceof HTMLButtonElement)) {
+    throw new Error(`Expected button: ${label}`);
+  }
+  return candidate;
+}
+
+function createRepository(): RecoveryRepository {
+  return new RecoveryRepository({
+    backend: new MemoryRecoveryStorageBackend(),
+    generationStore: new MemoryRecoveryGenerationStore(),
+    legacyStorage: { read: () => null, clear: () => undefined },
+    nowIso: () => LATER,
+  });
+}
+
+async function interruptedRepository(): Promise<RecoveryRepository> {
+  const repository = createRepository();
+  await repository.initialize();
+  const project = useStore.getState().project;
+  const artifact = createExecutionArtifact({
+    runId: 'run-interrupted-laser',
+    gcode: GCODE,
+    prepared: preparedProject(project),
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    canvasPlan: { retentionKey: 'interrupted-signature' } as CanvasMotionPlan,
+    controllerSettings: null,
+    createdAtIso: NOW,
+  });
+  expect((await repository.stageArtifact(artifact)).ok).toBe(true);
+  expect((await repository.activateFreshRun(artifact.runId, NOW)).ok).toBe(true);
+  expect((await repository.updateProgress(artifact.runId, 2, LATER)).ok).toBe(true);
+  expect(
+    (
+      await repository.interruptRun(
+        artifact.runId,
+        2,
+        { kind: 'disconnect', message: 'USB connection was lost during the job.' },
+        LATER,
+      )
+    ).ok,
+  ).toBe(true);
+  return repository;
+}
+
+function preparedProject(project: Project): Extract<PreparedOutput, { readonly ok: true }> {
+  return {
+    ok: true,
+    project,
+    job: { groups: [] },
+    jobOriginOffset: { x: 0, y: 0 },
+  } as Extract<PreparedOutput, { readonly ok: true }>;
+}

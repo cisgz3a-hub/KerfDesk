@@ -22,6 +22,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 let host: HTMLDivElement;
 let root: Root | null;
+const CONTROLLER_EPOCH = 7;
 
 beforeEach(() => {
   resetStore();
@@ -29,6 +30,12 @@ beforeEach(() => {
   useLaserStore.setState({
     ...initialLaserState(),
     connection: { kind: 'connected' },
+    controllerSessionEpoch: CONTROLLER_EPOCH,
+    controllerQualification: {
+      kind: 'qualified',
+      epoch: CONTROLLER_EPOCH,
+      settings: 'verified',
+    },
     statusReport: {
       state: 'Idle',
       subState: null,

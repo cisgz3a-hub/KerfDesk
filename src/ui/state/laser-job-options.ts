@@ -4,8 +4,11 @@ import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import type { CanvasMotionPlan } from './canvas-motion-plan';
 import type { CncSetupAttestation } from './cnc-setup-attestation';
 import type { CncToolPlanEntry } from './cnc-tool-plan';
+import type { RunId } from './recovery';
 
 export type StartJobOptions = CreateStreamerOptions & {
+  /** Stable ownership for persistence; unrelated runs must never share progress. */
+  readonly runId?: RunId;
   readonly machineKind?: MachineKind;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncSetupAttestation?: CncSetupAttestation;

@@ -14,7 +14,6 @@ const h = vi.hoisted(() => ({
     safetyNotice: null as object | null,
     motionOperation: null as object | null,
     controllerOperation: null as object | null,
-    checkpointPending: false,
   },
   pushToast: vi.fn(),
   registration: { addEventListener: vi.fn() },
@@ -42,9 +41,6 @@ vi.mock('../state/laser-store', () => ({
       motionOperation: h.machine.motionOperation,
       controllerOperation: h.machine.controllerOperation,
     }),
-}));
-vi.mock('../state/job-checkpoint-storage', () => ({
-  readJobCheckpoint: () => (h.machine.checkpointPending ? { schema: 3 } : null),
 }));
 vi.mock('../state/toast-store', () => ({
   useToastStore: (sel: (s: { pushToast: typeof h.pushToast }) => unknown) =>
@@ -79,7 +75,6 @@ beforeEach(() => {
   h.machine.safetyNotice = null;
   h.machine.motionOperation = null;
   h.machine.controllerOperation = null;
-  h.machine.checkpointPending = false;
   localStorage.clear();
   vi.clearAllMocks();
 });
@@ -139,11 +134,11 @@ describe('PwaUpdatePrompt', () => {
     expect(host.querySelector(BANNER)).toBeNull();
   });
 
-  it('suppresses Reload while an interrupted-job checkpoint is unresolved', async () => {
+  it('does not let an archived interrupted-job checkpoint suppress Reload', async () => {
     h.swState.needRefresh = true;
-    h.machine.checkpointPending = true;
+    localStorage.setItem('laserforge.job-checkpoint.v1', '{"archived":true}');
     const { host } = await render();
-    expect(host.querySelector(BANNER)).toBeNull();
+    expect(host.querySelector(BANNER)).not.toBeNull();
   });
 
   it('reloads with the new service worker when Reload is clicked', async () => {

@@ -6,6 +6,11 @@ import {
 import type { ControllerDriver } from '../../core/controllers';
 import { beginSettingsCollection } from './detected-settings-action';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import {
+  failedControllerQualificationPatch,
+  qualifiedController,
+  qualifyingController,
+} from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -53,12 +58,21 @@ async function readMachineSettingsAction(
   write: SettingsWriteFn,
 ): Promise<void> {
   const settingsQuery = refs.driver.commands.settingsQuery;
-  if (settingsQuery === null) {
-    return blockRead(set, get, 'This controller does not support a settings dump.');
-  }
   const blocked = machineSettingsReadBlockReason(get(), refs);
   if (blocked !== null) return blockRead(set, get, blocked);
-  beginSettingsCollection(refs, get().controllerSessionEpoch);
+  const qualificationEpoch = get().controllerSessionEpoch;
+  if (settingsQuery === null) {
+    set((state) => ({
+      controllerQualification: qualifiedController(qualificationEpoch, 'not-required'),
+      lastWriteError: null,
+      log: pushLog(
+        state,
+        `[lf2] ${refs.driver.label} does not require a controller settings dump.`,
+      ),
+    }));
+    return;
+  }
+  beginSettingsCollection(refs, qualificationEpoch);
   set({
     controllerOperation: {
       kind: 'interactive-command',
@@ -68,6 +82,7 @@ async function readMachineSettingsAction(
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
@@ -79,6 +94,7 @@ async function readMachineSettingsAction(
       action: 'console',
       source: 'console',
     });
+    finishSettingsQualification(set, get, refs, qualificationEpoch);
     clearInteractiveOperation(set);
   } catch (err) {
     failSettingsOperation(set, get, refs, 'read', err);
@@ -133,7 +149,8 @@ async function writeAndVerifySetting(
     action: 'console',
     source: 'console',
   });
-  beginSettingsCollection(refs, get().controllerSessionEpoch);
+  const qualificationEpoch = get().controllerSessionEpoch;
+  beginSettingsCollection(refs, qualificationEpoch);
   set({
     controllerOperation: {
       kind: 'interactive-command',
@@ -143,6 +160,7 @@ async function writeAndVerifySetting(
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
@@ -153,6 +171,7 @@ async function writeAndVerifySetting(
     action: 'console',
     source: 'console',
   });
+  finishSettingsQualification(set, get, refs, qualificationEpoch);
   if (!settingWasVerified(get, id, trimmed)) {
     throw new Error(`Controller did not report $${id}=${trimmed} after re-read.`);
   }
@@ -176,10 +195,35 @@ function failSettingsOperation(
   clearInteractiveOperation(set);
   const message = err instanceof Error ? err.message : String(err);
   set({
+    ...failedControllerQualificationPatch(get(), get().controllerSessionEpoch, message),
     lastWriteError: message,
     log: pushLog(get(), `[lf2] Machine settings ${operation} failed: ${message}`),
   });
   throw err instanceof Error ? err : new Error(message);
+}
+
+function finishSettingsQualification(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  expectedEpoch: number,
+): void {
+  const state = get();
+  if (
+    state.controllerQualification.kind === 'qualified' &&
+    state.controllerQualification.epoch === expectedEpoch
+  ) {
+    return;
+  }
+  refs.settingsCollector = idleCollector();
+  refs.settingsCollectorSessionEpoch = null;
+  set((current) =>
+    failedControllerQualificationPatch(
+      current,
+      expectedEpoch,
+      'The controller settings response was empty. Retry reading controller settings.',
+    ),
+  );
 }
 
 function machineSettingsReadBlockReason(
@@ -190,6 +234,9 @@ function machineSettingsReadBlockReason(
   if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
   if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
   if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
+  if (state.statusReport?.state !== 'Idle') {
+    return 'Controller must report Idle before reading machine settings.';
+  }
   const controllerOperationMessage = controllerOperationCommandBlockMessage(
     state.controllerOperation,
   );

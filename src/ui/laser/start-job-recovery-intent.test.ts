@@ -15,9 +15,14 @@ import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+  RecoveryRepository,
+  type LegacyCheckpointStorage,
+} from '../state/recovery';
 import { resetStore } from '../state/test-helpers';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
-import { runRestartInterruptedJobFlow } from './start-job-restart-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -25,6 +30,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 }));
 
 const originalStartJob = useLaserStore.getState().startJob;
+const CONTROLLER_EPOCH = 7;
 const idleStatus: StatusReport = {
   state: 'Idle',
   subState: null,
@@ -56,6 +62,45 @@ const lineObject: SceneObject = {
   ],
 };
 
+function recoveryHarness(): RecoveryRepository {
+  const legacyStorage: LegacyCheckpointStorage = {
+    read: () => null,
+    clear: () => undefined,
+  };
+  return new RecoveryRepository({
+    backend: new MemoryRecoveryStorageBackend(),
+    generationStore: new MemoryRecoveryGenerationStore(),
+    legacyStorage,
+    nowIso: () => '2026-07-15T12:00:00.000Z',
+  });
+}
+
+function startSpy() {
+  return vi.mocked(useLaserStore.getState().startJob);
+}
+
+async function makeInterruptedRun(repository: RecoveryRepository) {
+  await runStartJobFlow(repository);
+  const active = repository.getSnapshot().activeRun;
+  if (active === null) throw new Error('Expected an active tracked run.');
+  const acknowledged = Math.min(2, active.sendableLines);
+  await repository.updateProgress(active.runId, acknowledged);
+  await repository.interruptRun(active.runId, acknowledged, {
+    kind: 'disconnect',
+    message: 'Cable removed.',
+  });
+  const capsule = repository.getSnapshot().recoveryCapsule;
+  if (capsule === null) throw new Error('Expected an interrupted recovery capsule.');
+  return capsule;
+}
+
+async function compileCurrentLaserJob(): Promise<string> {
+  await runStartJobFlow(recoveryHarness());
+  const gcode = startSpy().mock.calls[0]?.[0];
+  if (typeof gcode !== 'string') throw new Error('Expected Start to compile G-code.');
+  return gcode;
+}
+
 beforeEach(() => {
   localStorage.clear();
   resetStore();
@@ -78,6 +123,12 @@ beforeEach(() => {
   useLaserStore.setState({
     ...initialLaserState(),
     connection: { kind: 'connected' },
+    controllerSessionEpoch: CONTROLLER_EPOCH,
+    controllerQualification: {
+      kind: 'qualified',
+      epoch: CONTROLLER_EPOCH,
+      settings: 'verified',
+    },
     statusReport: idleStatus,
     controllerSettings: {
       maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
@@ -97,52 +148,48 @@ afterEach(() => {
 });
 
 describe('interrupted laser job intent separation', () => {
-  it('blocks ordinary Start before any controller write when recovery has progress', async () => {
-    const interrupted = advanceJobCheckpoint(
-      createJobCheckpoint({
-        gcode: 'G21\nG90\nG1 X1 S1\nM5',
-        machineKind: 'laser',
-        outputScope: DEFAULT_OUTPUT_SCOPE,
-        nowIso: '2026-07-07T01:00:00.000Z',
-      }),
-      2,
-      '2026-07-07T01:01:00.000Z',
-    );
-    writeJobCheckpoint(interrupted);
+  it('preserves an older recovery capsule when a new ordinary Start is rejected', async () => {
+    const repository = recoveryHarness();
+    const interrupted = await makeInterruptedRun(repository);
+    const rejectedStart = vi.fn(async () => {
+      throw new Error('Controller refused the first write.');
+    });
+    useLaserStore.setState({ startJob: rejectedStart });
 
-    await runStartJobFlow();
+    await runStartJobFlow(repository);
 
-    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
-    expect(readJobCheckpoint()).toEqual(interrupted);
-    expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('Start is blocked'));
+    expect(rejectedStart).toHaveBeenCalledTimes(1);
+    expect(repository.getSnapshot().activeRun).toBeNull();
+    expect(repository.getSnapshot().recoveryCapsule).toMatchObject({
+      runId: interrupted.runId,
+      revision: interrupted.revision,
+    });
   });
 
-  it('restarts the matching job from line 1 only through explicit restart', async () => {
-    await runStartJobFlow();
-    const firstStart = vi.mocked(useLaserStore.getState().startJob);
-    const originalGcode = firstStart.mock.calls[0]?.[0];
-    const initial = readJobCheckpoint();
-    if (initial === null || typeof originalGcode !== 'string') throw new Error('start failed');
-    const interrupted = advanceJobCheckpoint(initial, 2, '2026-07-07T02:00:00.000Z');
-    writeJobCheckpoint(interrupted);
-    const restarted = vi.fn<(gcode: string, options?: object) => Promise<void>>(
-      async () => undefined,
-    );
-    useLaserStore.setState({ startJob: restarted });
+  it('replaces an older recovery capsule only after a new ordinary Start is accepted', async () => {
+    const repository = recoveryHarness();
+    const interrupted = await makeInterruptedRun(repository);
+    const acceptedStart = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob: acceptedStart });
 
-    await runRestartInterruptedJobFlow(interrupted);
+    await runStartJobFlow(repository);
 
-    expect(jobAwareConfirm).toHaveBeenCalledWith(expect.stringContaining('This is NOT resume'));
-    expect(restarted).toHaveBeenCalledTimes(1);
-    expect(restarted.mock.calls[0]?.[0]).toBe(originalGcode);
-    expect(readJobCheckpoint()).toMatchObject({ ackedLines: 0, resumeInFlight: false });
+    expect(acceptedStart).toHaveBeenCalledTimes(1);
+    expect(repository.getSnapshot().activeRun?.runId).not.toBe(interrupted.runId);
+    expect(repository.getSnapshot().recoveryCapsule).toBeNull();
+    expect(jobAwareAlert).not.toHaveBeenCalledWith(expect.stringContaining('Start is blocked'));
   });
 
-  it('refuses a stale checkpoint object after the stored record advances', async () => {
-    await runStartJobFlow();
-    const stale = readJobCheckpoint();
-    if (stale === null) throw new Error('start failed');
-    writeJobCheckpoint(advanceJobCheckpoint(stale, 2, '2026-07-07T02:00:00.000Z'));
+  it('refuses a stale legacy checkpoint object after the stored record advances', async () => {
+    const gcode = await compileCurrentLaserJob();
+    const stale = createJobCheckpoint({
+      gcode,
+      machineKind: 'laser',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      nowIso: '2026-07-07T02:00:00.000Z',
+    });
+    writeJobCheckpoint(stale);
+    writeJobCheckpoint(advanceJobCheckpoint(stale, 2, '2026-07-07T02:01:00.000Z'));
     useLaserStore.setState({ startJob: vi.fn(async () => undefined) });
 
     await runCheckpointResumeFlow(stale);
@@ -151,13 +198,15 @@ describe('interrupted laser job intent separation', () => {
     expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('record changed'));
   });
 
-  it('replays the exact original tail beginning at the first unconfirmed raw line', async () => {
-    await runStartJobFlow();
-    const firstStart = vi.mocked(useLaserStore.getState().startJob);
-    const gcode = firstStart.mock.calls[0]?.[0];
-    const initial = readJobCheckpoint();
-    if (initial === null || typeof gcode !== 'string') throw new Error('start failed');
-    const interrupted = advanceJobCheckpoint(initial, 2, '2026-07-07T03:00:00.000Z');
+  it('keeps the explicit legacy fallback on the exact tail of matching G-code', async () => {
+    const gcode = await compileCurrentLaserJob();
+    const initial = createJobCheckpoint({
+      gcode,
+      machineKind: 'laser',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      nowIso: '2026-07-07T03:00:00.000Z',
+    });
+    const interrupted = advanceJobCheckpoint(initial, 2, '2026-07-07T03:01:00.000Z');
     writeJobCheckpoint(interrupted);
     const resumedStart = vi.fn<(gcode: string, options?: object) => Promise<void>>(
       async () => undefined,
@@ -175,7 +224,7 @@ describe('interrupted laser job intent separation', () => {
     expect(resumeProgram.endsWith(exactTail)).toBe(true);
   });
 
-  it('manual start-from-line never stamps an unrelated checkpoint', async () => {
+  it('manual start-from-line never stamps an unrelated legacy checkpoint', async () => {
     const unrelated = advanceJobCheckpoint(
       createJobCheckpoint({
         gcode: 'G21\nG1 X999 S999\nM5',

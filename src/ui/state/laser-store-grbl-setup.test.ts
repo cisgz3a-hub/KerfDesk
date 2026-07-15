@@ -53,6 +53,8 @@ describe('retired fixed GRBL setup action', () => {
     });
     await useLaserStore.getState().connect(adapter(connection));
     connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    for (let index = 0; index < 5; index += 1) await Promise.resolve();
     connection.emitLine('$30=1000');
     connection.emitLine('$32=1');
     connection.emitLine('$130=400');

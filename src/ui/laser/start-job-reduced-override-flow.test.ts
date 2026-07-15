@@ -22,6 +22,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 }));
 
 const originalStartJob = useLaserStore.getState().startJob;
+const CONTROLLER_EPOCH = 7;
 const idleStatus: StatusReport = {
   state: 'Idle',
   subState: null,
@@ -69,14 +70,20 @@ describe('CNC reduced-override Start flow', () => {
     useLaserStore.setState({
       ...initialLaserState(),
       connection: { kind: 'connected' },
+      controllerSessionEpoch: CONTROLLER_EPOCH,
+      controllerQualification: {
+        kind: 'qualified',
+        epoch: CONTROLLER_EPOCH,
+        settings: 'verified',
+      },
       statusReport: idleStatus,
       controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
       ovCache: { feed: 80, rapid: 50, spindle: 60 },
       accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
-      workZReferenceEpoch: 7,
+      workZReferenceEpoch: CONTROLLER_EPOCH,
       workZZeroEvidence: {
         source: 'manual-zero',
-        referenceEpoch: 7,
+        referenceEpoch: CONTROLLER_EPOCH,
         toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
       },
       startJob: vi.fn(async () => undefined),

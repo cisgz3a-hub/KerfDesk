@@ -5,6 +5,7 @@
 import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
+import type { ControllerQualificationScheduleRefs } from './laser-controller-qualification';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
@@ -23,7 +24,7 @@ export type HandlerRefs = ControllerLifecycleRefs &
     // get().log.length on a 50 ms loop (R-L2 audit finding).
     onLineArrived: (() => void) | null;
     nextTranscriptId?: number;
-  };
+  } & ControllerQualificationScheduleRefs;
 
 export type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),

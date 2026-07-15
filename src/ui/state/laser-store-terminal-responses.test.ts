@@ -42,6 +42,7 @@ async function flush(): Promise<void> {
 async function connectReady(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapter(connection));
   connection.emitLine('Grbl 1.1f');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
   await flush();
   connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
@@ -63,6 +64,7 @@ describe('ordinary controller terminal responses', () => {
     expect(writes).not.toContain('$$\n');
 
     connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await new Promise((resolve) => setTimeout(resolve, 350));
     await flush();
     expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);

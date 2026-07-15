@@ -12,6 +12,7 @@ import {
 } from '../../core/controllers/grbl';
 import { grblDriver, type ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import {
@@ -317,6 +318,7 @@ type InitialLaserState = Pick<
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
+  | 'activeRunId'
   | 'liveCanvasRun'
   | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
@@ -330,6 +332,7 @@ type InitialLaserState = Pick<
   | 'detectedSettings'
   | 'controllerSettings'
   | 'controllerSettingsObservation'
+  | 'controllerQualification'
   | 'grblSettingsRows'
   | 'lastSettingsReadAt'
   | 'wcoCache'
@@ -368,6 +371,7 @@ export function initialLaserState(): InitialLaserState {
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    activeRunId: null,
     liveCanvasRun: null,
     activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
@@ -381,6 +385,7 @@ export function initialLaserState(): InitialLaserState {
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: disconnectedControllerQualification(0),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
@@ -417,6 +422,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     // GRBL clears G92 on the reset that fires when the port closes; persistent

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { createJobCheckpoint, advanceJobCheckpoint } from '../../core/recovery';
+import { afterEach, describe, expect, it } from 'vitest';
+import { advanceJobCheckpoint, createJobCheckpoint, type JobCheckpoint } from '../../core/recovery';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -11,17 +11,164 @@ import {
   type Project,
 } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
-import { buildCncRecoveryPreviewModel } from './cnc-recovery-preview-model';
+import { useStore } from '../state';
+import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import {
+  createExecutionArtifact,
+  type ExecutionArtifactV1,
+  type LegacyFingerprintOnlyArtifactV1,
+} from '../state/recovery/execution-artifact';
+import type { RecoveryCapsule } from '../state/recovery/recovery-model';
+import {
+  buildCncRecoveryPreviewModel,
+  buildLegacyFingerprintOnlyCncRecoveryPreviewModel,
+} from './cnc-recovery-preview-model';
 
 const NOW = '2026-07-14T12:00:00.000Z';
+const SELECTED_EVENT = 'cnc-op-1/pass-1/cut-2';
 
-function cncProject(): Project {
+afterEach(() => {
+  useStore.setState({ project: createProject() });
+});
+
+describe('buildCncRecoveryPreviewModel', () => {
+  it('uses the archived prepared job and manifest for exact capsule geometry', () => {
+    const capsule = exactCapsule(cncProject());
+    const unselected = buildCncRecoveryPreviewModel(capsule);
+    expect(unselected.canExecute).toBe(false);
+    expect(unselected.geometry).toBeNull();
+    expect(unselected.events.length).toBeGreaterThan(0);
+
+    const model = buildCncRecoveryPreviewModel(capsule, SELECTED_EVENT);
+    expect(model.canExecute).toBe(true);
+    expect(model.unavailableReason).toBeNull();
+    expect(model.geometry).toMatchObject({ kind: 'preview', executable: false });
+    expect(model.parameters).toEqual({
+      minRunwayMm: 5,
+      accelerationMmPerSec2: 100,
+      safetyMarginMm: 2,
+    });
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'program-identity', status: 'matched' }),
+    );
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'semantic-line-map', status: 'matched' }),
+    );
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'machine-state', status: 'diagnostic' }),
+    );
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'execution-fence', status: 'missing' }),
+    );
+  });
+
+  it('ignores an unrelated changed current project for an exact capsule preview', () => {
+    const capsule = exactCapsule(cncProject(20));
+    useStore.setState({ project: cncProject(30) });
+
+    const model = buildCncRecoveryPreviewModel(capsule, SELECTED_EVENT);
+    expect(model.canExecute).toBe(true);
+    if (model.geometry?.kind !== 'preview') throw new Error('Expected archived runway preview.');
+    expect(model.geometry.uncertaintySegment).toEqual([
+      { x: 40, y: 380 },
+      { x: 60, y: 380 },
+    ]);
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'program-identity',
+        detail: expect.stringContaining('exact emitted G-code'),
+      }),
+    );
+  });
+
+  it('keeps current-project compilation behind the named legacy-only fallback', () => {
+    const original = cncProject(20);
+    const checkpoint = matchingCheckpoint(original);
+    const capsule = legacyCapsule(checkpoint);
+
+    const sealedApi = buildCncRecoveryPreviewModel(capsule, SELECTED_EVENT);
+    expect(sealedApi).toMatchObject({
+      canExecute: false,
+      unavailableReason: expect.stringContaining('explicit legacy current-project fallback'),
+    });
+
+    const matching = buildLegacyFingerprintOnlyCncRecoveryPreviewModel(
+      original,
+      capsule,
+      SELECTED_EVENT,
+    );
+    expect(matching.canExecute).toBe(true);
+    expect(matching.checks).toContainEqual(
+      expect.objectContaining({ id: 'program-identity', status: 'matched' }),
+    );
+
+    const changed = buildLegacyFingerprintOnlyCncRecoveryPreviewModel(
+      cncProject(30),
+      capsule,
+      SELECTED_EVENT,
+    );
+    expect(changed).toMatchObject({
+      canExecute: false,
+      geometry: null,
+      unavailableReason: expect.stringContaining('does not reproduce'),
+    });
+    expect(changed.checks).toContainEqual(
+      expect.objectContaining({ id: 'program-identity', status: 'mismatch' }),
+    );
+  });
+
+  it('refuses an exact capsule whose archived semantic manifest is missing', () => {
+    const capsule = exactCapsule(cncProject());
+    const { cncRecoveryManifest, ...artifactWithoutManifest } = capsule.artifact;
+    if (cncRecoveryManifest === undefined) throw new Error('Expected archived CNC manifest.');
+    const broken: ExactCapsule = {
+      ...capsule,
+      artifact: artifactWithoutManifest,
+    };
+    const model = buildCncRecoveryPreviewModel(broken, SELECTED_EVENT);
+    expect(model).toMatchObject({
+      canExecute: false,
+      geometry: null,
+      unavailableReason: expect.stringContaining('semantic recovery manifest'),
+    });
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'semantic-line-map', status: 'missing' }),
+    );
+  });
+
+  it('uses archived device acceleration and fails closed when it is invalid', () => {
+    const project = cncProject();
+    const capsule = exactCapsule({
+      ...project,
+      device: { ...project.device, accelMmPerSec2: 0 },
+    });
+    expect(buildCncRecoveryPreviewModel(capsule)).toMatchObject({
+      canExecute: false,
+      geometry: null,
+      unavailableReason: expect.stringContaining('archived device acceleration'),
+    });
+  });
+
+  it('retains the deprecated checkpoint overload only as migration compatibility', () => {
+    const project = cncProject();
+    const model = buildCncRecoveryPreviewModel(project, matchingCheckpoint(project));
+    expect(model.events.length).toBeGreaterThan(0);
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'program-identity', status: 'matched' }),
+    );
+  });
+});
+
+type ExactCapsule = RecoveryCapsule & { readonly artifact: ExecutionArtifactV1 };
+
+function cncProject(segmentLength = 20): Project {
   const color = '#ff0000';
+  const finalX = 20 + segmentLength * 3;
   const object: ImportedSvg = {
     kind: 'imported-svg',
-    id: 'square',
-    source: 'square.svg',
-    bounds: { minX: 20, minY: 20, maxX: 80, maxY: 20 },
+    id: 'straight-path',
+    source: 'straight.svg',
+    bounds: { minX: 20, minY: 20, maxX: finalX, maxY: 20 },
     transform: IDENTITY_TRANSFORM,
     paths: [
       {
@@ -31,9 +178,9 @@ function cncProject(): Project {
             closed: false,
             points: [
               { x: 20, y: 20 },
-              { x: 40, y: 20 },
-              { x: 60, y: 20 },
-              { x: 80, y: 20 },
+              { x: 20 + segmentLength, y: 20 },
+              { x: 20 + segmentLength * 2, y: 20 },
+              { x: finalX, y: 20 },
             ],
           },
         ],
@@ -55,7 +202,34 @@ function cncProject(): Project {
   };
 }
 
-function matchingCheckpoint(project: Project) {
+function exactCapsule(project: Project): ExactCapsule {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) throw new Error('Expected prepared CNC output.');
+  const emitted = emitPreparedGcode(prepared);
+  if (!emitted.preflight.ok) throw new Error('Expected valid CNC preflight.');
+  const runId = 'run-archived-cnc';
+  const artifact = createExecutionArtifact({
+    runId,
+    gcode: emitted.gcode,
+    prepared,
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    canvasPlan: { retentionKey: 'archived-cnc-signature' } as CanvasMotionPlan,
+    controllerSettings: null,
+    createdAtIso: NOW,
+  });
+  return {
+    runId,
+    artifactKind: artifact.kind,
+    revision: 1,
+    ackedLines: Math.min(3, artifact.sendableLines),
+    sendableLines: artifact.sendableLines,
+    interruption: { kind: 'disconnect', message: 'Connection lost.' },
+    updatedAtIso: NOW,
+    artifact,
+  };
+}
+
+function matchingCheckpoint(project: Project): JobCheckpoint {
   const prepared = prepareOutput(project);
   if (!prepared.ok) throw new Error('Expected prepared CNC output.');
   const emitted = emitPreparedGcode(prepared);
@@ -72,75 +246,27 @@ function matchingCheckpoint(project: Project) {
   );
 }
 
-describe('buildCncRecoveryPreviewModel', () => {
-  it('requires an explicit semantic segment selection before preparing supervised execution', () => {
-    const project = cncProject();
-    const checkpoint = matchingCheckpoint(project);
-    const unselected = buildCncRecoveryPreviewModel(project, checkpoint);
-    expect(unselected.canExecute).toBe(false);
-    expect(unselected.geometry).toBeNull();
-    expect(unselected.events.length).toBeGreaterThan(0);
-
-    const model = buildCncRecoveryPreviewModel(project, checkpoint, 'cnc-op-1/pass-1/cut-2');
-    expect(model.canExecute).toBe(true);
-    expect(model.unavailableReason).toBeNull();
-    expect(model.geometry).toMatchObject({ kind: 'preview', executable: false });
-    expect(model.parameters).toEqual({
-      minRunwayMm: 5,
-      accelerationMmPerSec2: 100,
-      safetyMarginMm: 2,
-    });
-    expect(model.checks).toContainEqual(
-      expect.objectContaining({ id: 'program-identity', status: 'matched' }),
-    );
-    expect(model.checks).toContainEqual(
-      expect.objectContaining({ id: 'execution-fence', status: 'missing' }),
-    );
-  });
-
-  it('refuses geometry when the current project does not match the checkpoint', () => {
-    const project = cncProject();
-    const checkpoint = createJobCheckpoint({
-      gcode: 'G21\nG90\nM30',
-      machineKind: 'cnc',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: NOW,
-    });
-    const model = buildCncRecoveryPreviewModel(project, checkpoint);
-    expect(model.canExecute).toBe(false);
-    expect(model.geometry).toBeNull();
-    expect(model.unavailableReason).toContain('does not reproduce');
-    expect(model.checks).toContainEqual(
-      expect.objectContaining({ id: 'program-identity', status: 'mismatch' }),
-    );
-  });
-
-  it('refuses a laser project even when the checkpoint says CNC', () => {
-    const project = createProject();
-    const checkpoint = createJobCheckpoint({
-      gcode: 'G21\nG90\nM30',
-      machineKind: 'cnc',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: NOW,
-    });
-    expect(buildCncRecoveryPreviewModel(project, checkpoint)).toMatchObject({
-      canExecute: false,
-      geometry: null,
-      unavailableReason: expect.stringContaining('original CNC project'),
-    });
-  });
-
-  it('fails closed instead of inventing an acceleration for an invalid device profile', () => {
-    const validProject = cncProject();
-    const invalidProject = {
-      ...validProject,
-      device: { ...validProject.device, accelMmPerSec2: 0 },
-    };
-    const model = buildCncRecoveryPreviewModel(invalidProject, matchingCheckpoint(validProject));
-    expect(model).toMatchObject({
-      canExecute: false,
-      geometry: null,
-      unavailableReason: expect.stringContaining('acceleration setting is invalid'),
-    });
-  });
-});
+function legacyCapsule(checkpoint: JobCheckpoint): RecoveryCapsule {
+  const artifact: LegacyFingerprintOnlyArtifactV1 = {
+    schemaVersion: 1,
+    kind: 'legacy-fingerprint-only',
+    runId: 'legacy-cnc',
+    createdAtIso: checkpoint.startedAtIso,
+    migratedAtIso: NOW,
+    fingerprint: checkpoint.fingerprint,
+    sendableLines: checkpoint.sendableLines,
+    machineKind: checkpoint.machineKind,
+    outputScope: checkpoint.outputScope,
+    ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
+  };
+  return {
+    runId: artifact.runId,
+    artifactKind: artifact.kind,
+    revision: 1,
+    ackedLines: checkpoint.ackedLines,
+    sendableLines: checkpoint.sendableLines,
+    interruption: { kind: 'unknown', message: 'Migrated legacy record.' },
+    updatedAtIso: NOW,
+    artifact,
+  };
+}

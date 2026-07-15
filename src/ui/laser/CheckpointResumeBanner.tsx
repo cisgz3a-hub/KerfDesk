@@ -1,181 +1,165 @@
-// CheckpointResumeBanner (ADR-118, ADR-200) — offers line-safe laser recovery
-// and a separately generated, explicitly qualified CNC recovery job.
+// Optional, newest-only recovery capsule. Archived jobs are observational
+// until the operator explicitly reaches a final supervised Start action.
 
-import { useEffect, useState } from 'react';
-import type { JobCheckpoint } from '../../core/recovery';
-import { clearJobCheckpoint, readJobCheckpoint } from '../state/job-checkpoint-storage';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { useState } from 'react';
+import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
-import { runCheckpointResumeFlow } from './start-job-flow';
-import { runRestartInterruptedJobFlow } from './start-job-restart-flow';
+import {
+  recoveryRepository,
+  type RecoveryCapsule,
+  type RecoveryRepository,
+} from '../state/recovery';
+import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
 import { CncRecoveryPreviewWizard } from './CncRecoveryPreviewWizard';
+import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
+import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 
 export function CheckpointResumeBanner(props: {
-  readonly disabled: boolean;
   readonly busy: boolean;
+  readonly repository?: RecoveryRepository;
 }): JSX.Element | null {
-  const jobActive = useLaserStore((s) => isActiveJob(s.streamer));
-  const [checkpoint, setCheckpoint] = useState<JobCheckpoint | null>(null);
-  const [cncPreviewOpen, setCncPreviewOpen] = useState(false);
-  // Re-read whenever the job state settles: on mount, after a run ends, and
-  // after a resume attempt (successful ones flip jobActive; refused ones
-  // leave the record for another try).
-  useEffect(() => {
-    if (!jobActive) setCheckpoint(readJobCheckpoint());
-  }, [jobActive]);
-  if (!isVisibleCheckpoint(jobActive, checkpoint)) return null;
-  const startedAt = formatStartedAt(checkpoint.startedAtIso);
+  const repository = props.repository ?? recoveryRepository;
+  const capsule = useRecoveryRepositorySnapshot(repository).recoveryCapsule;
+  const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
+  const [reviewOpen, setReviewOpen] = useState(false);
+  if (jobActive || capsule === null) return null;
+
   return (
     <>
-      <div style={bannerStyle} role="status">
-        <p style={textStyle}>
-          Interrupted {checkpoint.machineKind === 'cnc' ? 'router' : 'laser'} job
-          {startedAt === null ? '' : ` from ${startedAt}`}: {checkpoint.ackedLines} of{' '}
-          {checkpoint.sendableLines} G-code lines acknowledged by the controller.{' '}
-          {checkpoint.machineKind === 'cnc'
-            ? cncCheckpointMessage(checkpoint)
-            : 'Resume re-checks that the project still produces the same G-code. Laser recovery replays from the first unconfirmed line. If the controller lost power, a few acknowledged lines may not have run.'}
-        </p>
-        {checkpoint.interruption === undefined ? null : (
-          <p style={causeStyle}>
-            <strong>Recorded cause:</strong> {checkpoint.interruption.message}
-            {checkpoint.interruption.rejectedLine === undefined
-              ? ''
-              : ` Rejected command: ${checkpoint.interruption.rejectedLine}`}
-          </p>
-        )}
-        <CheckpointActions
-          checkpoint={checkpoint}
-          disabled={props.disabled || props.busy}
-          onOpenCncPreview={() => setCncPreviewOpen(true)}
-          onDiscard={() => {
-            setCncPreviewOpen(false);
-            setCheckpoint(null);
-          }}
+      <details style={bannerStyle} aria-label="Interrupted job recovery">
+        <summary style={summaryStyle}>
+          <strong>Interrupted job saved</strong>
+          <span style={summaryDetailStyle}>
+            {' '}
+            · {capsule.artifact.machineKind === 'cnc' ? 'router' : 'laser'} · {capsule.ackedLines}{' '}
+            of {capsule.sendableLines} lines acknowledged
+          </span>
+        </summary>
+        <RecoveryDescription capsule={capsule} />
+        <RecoveryActions
+          capsule={capsule}
+          repository={repository}
+          disabled={props.busy}
+          onReview={() => setReviewOpen(true)}
         />
-      </div>
-      {cncPreviewOpen ? (
-        <CncRecoveryPreviewWizard
-          checkpoint={checkpoint}
-          onClose={() => setCncPreviewOpen(false)}
+      </details>
+      {reviewOpen && capsule.artifact.machineKind === 'cnc' ? (
+        <CncRecoveryPreviewWizard capsule={capsule} onClose={() => setReviewOpen(false)} />
+      ) : null}
+      {reviewOpen && capsule.artifact.machineKind === 'laser' ? (
+        <LaserRecoveryReviewDialog
+          capsule={capsule}
+          onClose={() => setReviewOpen(false)}
+          onStart={(saved) => runLaserRecoveryCapsuleFlow(saved, repository)}
         />
       ) : null}
     </>
   );
 }
 
-function isVisibleCheckpoint(
-  jobActive: boolean,
-  checkpoint: JobCheckpoint | null,
-): checkpoint is JobCheckpoint {
-  if (jobActive || checkpoint === null) return false;
-  if (checkpoint.machineKind !== 'laser' || checkpoint.ackedLines > 0) return true;
-  return checkpoint.interruption !== undefined || checkpoint.resumeInFlight;
+function RecoveryDescription({ capsule }: { readonly capsule: RecoveryCapsule }): JSX.Element {
+  const startedAt = formatStartedAt(capsule.artifact.createdAtIso);
+  const exact = capsule.artifact.kind === 'exact-execution';
+  return (
+    <div role="status">
+      <p style={textStyle}>
+        Saved {capsule.artifact.machineKind === 'cnc' ? 'router' : 'laser'} run
+        {startedAt === null ? '' : ` from ${startedAt}`}. It is isolated from the current canvas,
+        project, profile, controller settings, origins, and ordinary Start.
+      </p>
+      <p style={textStyle}>
+        {exact
+          ? 'Review uses the sealed exact G-code and prepared execution artifact. Archived controller observations are diagnostics only.'
+          : 'This migrated legacy record contains only a fingerprint. Explicit review may use the current project only when its compiled fingerprint matches.'}
+      </p>
+      <p style={causeStyle}>
+        <strong>Recorded cause:</strong> {capsule.interruption.message}
+        {capsule.interruption.rejectedLine === undefined
+          ? ''
+          : ` Rejected command: ${capsule.interruption.rejectedLine}`}
+      </p>
+      {capsule.claim === undefined ? null : (
+        <p style={causeStyle}>
+          A recovery attempt was claimed at{' '}
+          {formatStartedAt(capsule.claim.claimedAtIso) ?? 'an unknown time'}. Inspect the machine
+          before discarding this record; another recovery cannot start from it.
+        </p>
+      )}
+    </div>
+  );
 }
 
-function CheckpointActions(props: {
-  readonly checkpoint: JobCheckpoint;
+function RecoveryActions(props: {
+  readonly capsule: RecoveryCapsule;
+  readonly repository: RecoveryRepository;
   readonly disabled: boolean;
-  readonly onOpenCncPreview: () => void;
-  readonly onDiscard: () => void;
+  readonly onReview: () => void;
 }): JSX.Element {
-  const discard = (): void => {
+  const discard = async (): Promise<void> => {
     if (
       !jobAwareConfirm(
-        'Discard this interrupted-job recovery record?\n\nThis does not stop or move the machine, but you will no longer be able to resume from this checkpoint.',
+        'Discard this interrupted-job recovery record?\n\nThis does not stop or move the machine. The current canvas and machine profile are unchanged.',
       )
     ) {
       return;
     }
-    clearJobCheckpoint();
-    props.onDiscard();
+    const result = await props.repository.discardRecovery({
+      runId: props.capsule.runId,
+      revision: props.capsule.revision,
+    });
+    if (!result.ok || !result.value) {
+      jobAwareAlert(
+        'The recovery record changed before it could be discarded. Review the current card.',
+      );
+    }
   };
   return (
     <div style={rowStyle}>
-      <ReviewRecoveryAction
-        checkpoint={props.checkpoint}
-        disabled={props.disabled}
-        onOpenCncPreview={props.onOpenCncPreview}
-      />
-      {props.checkpoint.machineKind === 'laser' ? (
-        <button
-          type="button"
-          disabled={props.disabled}
-          onClick={() => void runRestartInterruptedJobFlow(props.checkpoint)}
-          title="Deliberately stream the same laser job again from line 1. This is not resume."
-        >
-          Restart entire job from beginning…
-        </button>
-      ) : null}
       <button
         type="button"
-        onClick={discard}
-        title="Permanently discard the interrupted-job record after checking the machine."
+        disabled={props.disabled || props.capsule.claim !== undefined}
+        onClick={props.onReview}
+        title="Open a read-only review. No live state changes until final supervised Start."
       >
-        Discard recovery record…
+        {props.capsule.artifact.machineKind === 'cnc'
+          ? 'Review supervised recovery'
+          : 'Review recovery'}
+      </button>
+      <button
+        type="button"
+        onClick={() => void discard()}
+        title="Permanently discard only this isolated recovery capsule."
+      >
+        Discard
       </button>
     </div>
   );
 }
 
-function ReviewRecoveryAction(props: {
-  readonly checkpoint: JobCheckpoint;
-  readonly disabled: boolean;
-  readonly onOpenCncPreview: () => void;
-}): JSX.Element | null {
-  if (props.checkpoint.machineKind === 'laser') {
-    return (
-      <button
-        type="button"
-        disabled={props.disabled}
-        onClick={() => void runCheckpointResumeFlow(props.checkpoint)}
-        title="Verify the project, review the safe recovery point, and continue only if work zero is unchanged."
-      >
-        Review safe recovery
-      </button>
-    );
-  }
-  if (props.checkpoint.resumeInFlight) return null;
-  return (
-    <button
-      type="button"
-      disabled={props.disabled}
-      onClick={props.onOpenCncPreview}
-      title="Select an uncertain native contour segment, complete physical requalification, and review a newly generated recovery job."
-    >
-      Review supervised recovery
-    </button>
-  );
-}
-
-function cncCheckpointMessage(checkpoint: JobCheckpoint): string {
-  if (checkpoint.resumeInFlight) {
-    return 'A supervised recovery attempt was itself interrupted. The original checkpoint no longer identifies current work, so it cannot start another recovery. Inspect and requalify the machine, then create a separately reviewed new job.';
-  }
-  return 'Acknowledgements are diagnostic only and will not choose a cut position. Review supervised recovery to select the first uncertain native contour segment, physically clear and requalify the machine, and generate a new recovery job.';
-}
-
 function formatStartedAt(iso: string): string | null {
   const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toLocaleString();
 }
 
 const bannerStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
-  borderLeft: '3px solid var(--lf-warning)',
   borderRadius: 4,
   padding: '6px 8px',
+};
+const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
+const summaryDetailStyle: React.CSSProperties = {
+  color: 'var(--lf-text-muted)',
+  fontWeight: 400,
 };
 const textStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
-  margin: '0 0 6px 0',
+  margin: '6px 0',
 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
 const causeStyle: React.CSSProperties = {
   ...textStyle,
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-warning)',
   fontWeight: 500,
 };

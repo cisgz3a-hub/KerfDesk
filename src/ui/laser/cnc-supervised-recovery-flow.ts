@@ -1,18 +1,13 @@
-import { streamingModeForController } from '../../core/devices';
-import {
-  fingerprintGcode,
-  fingerprintsEqual,
-  markResumeInFlight,
-  serializeJobCheckpoint,
-  type JobCheckpoint,
-} from '../../core/recovery';
+import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import {
   assessCncRecovery,
   buildCncRecoveryEventManifest,
   type CncContourRunwayPlan,
+  type CncRecoveryEventManifest,
   type CncRunwayProfile,
 } from '../../core/recovery/cnc';
 import { createCncSupervisedRecoveryPackageIdentity } from '../../core/recovery/cnc-recovery-package';
+import { recoveryEventsEqual } from '../../core/recovery/cnc-contour-runway-source';
 import {
   buildCncSupervisedRecoveryJob,
   cncSupervisedRecoveryRunwayProfile,
@@ -26,12 +21,22 @@ import {
   createCncSetupAttestation,
   type CncSetupAttestation,
 } from '../state/cnc-setup-attestation';
-import { cncToolPlan } from '../state/cnc-tool-plan';
-import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
-import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
-import { prepareRecoverySource } from './start-job-flow';
+import {
+  recoveryRepository,
+  type RecoveryCapsule,
+  type RecoveryRepository,
+} from '../state/recovery';
+import {
+  claimCncRecoveryCapsule,
+  streamCncRecoveryProgram,
+} from './cnc-supervised-recovery-stream';
+import {
+  prepareArchivedRecoverySource,
+  prepareRecoverySource,
+  type PreparedRecoverySource,
+} from './start-job-source';
 
 export type CncSupervisedRecoveryReview = {
   readonly uncertaintyEventId: string;
@@ -45,9 +50,10 @@ export type CncSupervisedRecoveryReview = {
   readonly clearedPathConfirmed: boolean;
 };
 
-type RecoverySource = NonNullable<ReturnType<typeof prepareRecoverySource>>;
+type RecoverySource = PreparedRecoverySource;
 type RecoveryContext = {
   readonly source: RecoverySource;
+  readonly manifest: CncRecoveryEventManifest;
   readonly reviewId: string;
   readonly clearedPathProofId: string;
   readonly completedPrefixProofId: string;
@@ -60,26 +66,27 @@ type PlannedRecovery = RecoveryContext & {
 };
 
 export async function runCncSupervisedRecoveryFlow(
-  checkpoint: JobCheckpoint,
+  capsule: RecoveryCapsule,
   review: CncSupervisedRecoveryReview,
+  repository: RecoveryRepository = recoveryRepository,
 ): Promise<boolean> {
-  if (!checkpointIsCurrentAndUnclaimed(checkpoint)) return false;
-  const context = prepareRecoveryContext(checkpoint, review);
+  const context = prepareRecoveryContext(capsule, review);
   if (context === null) return false;
-  const planned = planRecoveryProgram(checkpoint, context);
+  const planned = planRecoveryProgram(capsule, context);
   if (planned === null) return false;
   if (!(await authorizeRecoveryPackage(planned))) return false;
   const attestation = confirmRecoveryStart(planned);
   if (attestation === null) return false;
-  if (!markStoredCheckpointResumeInFlight(checkpoint)) return false;
-  return streamRecoveryProgram(planned, attestation);
+  const claimed = await claimCncRecoveryCapsule(capsule, repository);
+  if (claimed === null) return false;
+  return streamCncRecoveryProgram(planned, attestation, claimed, repository);
 }
 
 function prepareRecoveryContext(
-  checkpoint: JobCheckpoint,
+  capsule: RecoveryCapsule,
   review: CncSupervisedRecoveryReview,
 ): RecoveryContext | null {
-  if (checkpoint.machineKind !== 'cnc') {
+  if (capsule.artifact.machineKind !== 'cnc') {
     jobAwareAlert('Cannot start CNC recovery:\n\nThe retained checkpoint is not a CNC job.');
     return null;
   }
@@ -88,18 +95,10 @@ function prepareRecoveryContext(
     jobAwareAlert(`Cannot start CNC recovery:\n\n${reviewIssue}`);
     return null;
   }
-  const source = prepareRecoverySource({
-    outputScope: checkpoint.outputScope,
-    ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
-  });
+  const source = recoverySource(capsule);
   if (source === null) return null;
-  if (!fingerprintsEqual(fingerprintGcode(source.gcode), checkpoint.fingerprint)) {
-    jobAwareAlert(
-      'Cannot start CNC recovery:\n\nThe current project no longer produces the interrupted ' +
-        'program. Re-open the exact original project before reviewing a recovery job.',
-    );
-    return null;
-  }
+  const manifest = recoveryManifest(capsule, source);
+  if (manifest === null) return null;
   const priorEventId = priorCutEventId(review.uncertaintyEventId);
   if (priorEventId === null) {
     jobAwareAlert(
@@ -111,6 +110,7 @@ function prepareRecoveryContext(
   const reviewId = createReviewId();
   return {
     source,
+    manifest,
     reviewId,
     clearedPathProofId: `${reviewId}/clear-through/${priorEventId}`,
     completedPrefixProofId: `${reviewId}/complete-before/${review.uncertaintyEventId}`,
@@ -123,12 +123,12 @@ function prepareRecoveryContext(
 }
 
 function planRecoveryProgram(
-  checkpoint: JobCheckpoint,
+  capsule: RecoveryCapsule,
   context: RecoveryContext,
 ): PlannedRecovery | null {
   const recovery = buildCncSupervisedRecoveryJob({
     job: context.source.prepared.job,
-    manifest: buildCncRecoveryEventManifest(context.source.prepared.job),
+    manifest: context.manifest,
     uncertaintyEventId: context.uncertaintyEventId,
     profile: context.profile,
     clearedPathEvidence: clearedPathEvidence(context),
@@ -139,7 +139,7 @@ function planRecoveryProgram(
   }
   const emitted = emitPreparedGcode(
     { ...context.source.prepared, job: recovery.job },
-    recoveryEmitOptions(checkpoint, context.source),
+    recoveryEmitOptions(capsule, context.source),
   );
   if (!emitted.preflight.ok) {
     const messages = emitted.preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
@@ -158,9 +158,9 @@ function clearedPathEvidence(context: RecoveryContext) {
   };
 }
 
-function recoveryEmitOptions(checkpoint: JobCheckpoint, source: RecoverySource) {
+function recoveryEmitOptions(capsule: RecoveryCapsule, source: RecoverySource) {
   return {
-    outputScope: checkpoint.outputScope,
+    outputScope: capsule.artifact.outputScope,
     ...(source.jobOrigin === undefined ? {} : { jobOrigin: source.jobOrigin }),
     ...(source.preflightMotionOffset === undefined
       ? {}
@@ -222,65 +222,47 @@ function confirmRecoveryStart(planned: PlannedRecovery): CncSetupAttestation | n
   );
 }
 
-async function streamRecoveryProgram(
-  planned: PlannedRecovery,
-  cncSetupAttestation: CncSetupAttestation,
-): Promise<boolean> {
-  const laser = useLaserStore.getState();
-  const initialPosition = reportedWorkPositionMm(
-    laser,
-    laser.controllerSettings?.reportInches === true,
+function recoverySource(capsule: RecoveryCapsule): RecoverySource | null {
+  if (capsule.artifact.kind === 'exact-execution') {
+    return prepareArchivedRecoverySource(capsule.artifact);
+  }
+  const source = prepareRecoverySource({
+    outputScope: capsule.artifact.outputScope,
+    ...(capsule.artifact.jobOrigin === undefined ? {} : { jobOrigin: capsule.artifact.jobOrigin }),
+  });
+  if (source === null) return null;
+  if (!fingerprintsEqual(fingerprintGcode(source.gcode), capsule.artifact.fingerprint)) {
+    jobAwareAlert(
+      'Cannot start legacy CNC recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
+    );
+    return null;
+  }
+  return source;
+}
+
+function recoveryManifest(
+  capsule: RecoveryCapsule,
+  source: RecoverySource,
+): CncRecoveryEventManifest | null {
+  if (capsule.artifact.kind === 'legacy-fingerprint-only') {
+    return buildCncRecoveryEventManifest(source.prepared.job);
+  }
+  const archived = capsule.artifact.cncRecoveryManifest;
+  const rebuilt = buildCncRecoveryEventManifest(source.prepared.job);
+  if (
+    archived !== undefined &&
+    archived.events.length === rebuilt.events.length &&
+    archived.events.every((event, index) => {
+      const rebuiltEvent = rebuilt.events[index];
+      return rebuiltEvent !== undefined && recoveryEventsEqual(event, rebuiltEvent);
+    })
+  ) {
+    return archived;
+  }
+  jobAwareAlert(
+    'Cannot start CNC recovery:\n\nThe sealed semantic recovery manifest is missing or inconsistent with its archived prepared job.',
   );
-  try {
-    await laser.startJob(planned.gcode, {
-      streamingMode: streamingModeForController(
-        planned.source.project.device.controllerKind,
-        planned.source.project.device.streamingMode,
-      ),
-      rxBufferBytes: planned.source.project.device.rxBufferBytes,
-      machineKind: 'cnc',
-      cncSetupAttestation,
-      ...toolPlanOption(planned.recovery),
-      canvasPlan: rebuildCanvasPlanForGcode(
-        planned.source.canvasPlan,
-        planned.gcode,
-        initialPosition ?? undefined,
-      ),
-    });
-    return true;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    jobAwareAlert(`Could not start CNC recovery:\n\n${message}`);
-    return false;
-  }
-}
-
-function toolPlanOption(recovery: CncSupervisedRecoveryJob) {
-  const plan = cncToolPlan(recovery.job);
-  return plan.length === 0 ? {} : { cncToolPlan: plan };
-}
-
-function checkpointIsCurrentAndUnclaimed(checkpoint: JobCheckpoint): boolean {
-  const stored = readJobCheckpoint();
-  if (stored === null || serializeJobCheckpoint(stored) !== serializeJobCheckpoint(checkpoint)) {
-    jobAwareAlert(
-      'Cannot start CNC recovery:\n\nThe retained checkpoint changed or was dismissed. Re-open the current recovery review.',
-    );
-    return false;
-  }
-  if (stored.resumeInFlight) {
-    jobAwareAlert(
-      'Cannot start CNC recovery:\n\nA recovery attempt was already started from this checkpoint. Its original progress no longer identifies current work; inspect the machine and create a separately reviewed new job.',
-    );
-    return false;
-  }
-  return true;
-}
-
-function markStoredCheckpointResumeInFlight(checkpoint: JobCheckpoint): boolean {
-  if (!checkpointIsCurrentAndUnclaimed(checkpoint)) return false;
-  writeJobCheckpoint(markResumeInFlight(checkpoint, new Date().toISOString()));
-  return true;
+  return null;
 }
 
 function validateReview(review: CncSupervisedRecoveryReview): string | null {

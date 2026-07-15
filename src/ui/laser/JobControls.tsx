@@ -28,15 +28,20 @@ import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
+import { RunAgainControl } from './RunAgainControl';
 
 type Props = {
   readonly disabled: boolean;
+  /** Disables only Start while controller qualification is incomplete. Other
+   * safe setup controls remain available so the operator can recover. */
+  readonly startDisabledReason?: string | null;
   readonly onConfigureAutofocus?: () => void;
   readonly onStartJob: () => void;
 };
 
 export function JobControls({
   disabled,
+  startDisabledReason,
   onConfigureAutofocus = doNothing,
   onStartJob,
 }: Props): JSX.Element {
@@ -70,6 +75,7 @@ export function JobControls({
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}
+        startDisabledReason={startDisabledReason}
         onConfigureAutofocus={onConfigureAutofocus}
         onStartJob={onStartJob}
       />
@@ -97,7 +103,8 @@ export function JobControls({
       <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
-      <CheckpointResumeBanner disabled={disabled} busy={controlsBusy} />
+      <CheckpointResumeBanner busy={controlsBusy} />
+      <RunAgainControl disabled={disabled} busy={controlsBusy} />
       <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
@@ -123,6 +130,7 @@ function shouldShowIdleOverrideReset(
 function SetupRow(props: {
   readonly disabled: boolean;
   readonly streaming: boolean;
+  readonly startDisabledReason: string | null | undefined;
   readonly onConfigureAutofocus: () => void;
   readonly onStartJob: () => void;
 }): JSX.Element {
@@ -181,8 +189,8 @@ function SetupRow(props: {
       <button
         type="button"
         onClick={props.onStartJob}
-        disabled={busy}
-        title={startJobTitle(estimate, jobTimeNoun(machineKind))}
+        disabled={busy || props.startDisabledReason != null}
+        title={props.startDisabledReason ?? startJobTitle(estimate, jobTimeNoun(machineKind))}
       >
         Start job
       </button>
