@@ -77,6 +77,7 @@ import {
 import { materialPresetActions, type MaterialPresetActions } from './material-preset-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { operationActions, type OperationActions } from './operation-actions';
+import { artworkOrderActions, type ArtworkOrderActions } from './artwork-order-actions';
 import { imageMaskActions, type ImageMaskActions } from './image-mask-actions';
 import {
   sceneClipboardActions,
@@ -144,6 +145,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 
 export type AppState = ObjectPropertiesActions &
   OperationActions &
+  ArtworkOrderActions &
   CncTabActions &
   ArrayActions &
   NestActions &
@@ -411,6 +413,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...materialPresetActions(set),
   ...objectPropertiesActions(set),
   ...operationActions(set),
+  ...artworkOrderActions(set),
   ...cncTabActions(set),
   ...imageMaskActions(set),
   ...sceneClipboardActions(set),
