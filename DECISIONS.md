@@ -71,14 +71,15 @@
 | ADR-198 | 2026-07-14 | Accepted | Add a pinned OFL EMS stroke-font family with lazy data loading |
 | ADR-199 | 2026-07-14 | Accepted | Fair decorative stroke fonts with the shared trace cubic fitter |
 | ADR-200 | 2026-07-14 | Accepted | CNC recovery is evidence-gated and software Abort is not an E-stop |
-| ADR-201 | 2026-07-15 | Accepted | Gate CNC Start by protocol capability and exact override acknowledgement |
+| ADR-201 | 2026-07-15 | Amended | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
-| ADR-203 | 2026-07-15 | Accepted | Recover Work-Z only from owned, fresh controller offset readback |
+| ADR-203 | 2026-07-15 | Amended | Recover Work-Z only from owned controller offset readback (see ADR-209) |
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
 | ADR-205 | 2026-07-15 | Accepted | Machine Setup is one controller-first atomic workflow |
 | ADR-206 | 2026-07-15 | Accepted | Require explicit maintainer permission for every new guard |
 | ADR-207 | 2026-07-15 | Accepted | One top live-motion bar owns run controls |
 | ADR-208 | 2026-07-15 | Accepted | Remove obstructive 4040 and advisory machine policies |
+| ADR-209 | 2026-07-15 | Accepted | Remove universal CNC expiry, depth, override, and spin-up policies |
 
 ---
 
@@ -4142,7 +4143,7 @@ Setup wizard) is the first.
 
 ## ADR-098 — CNC router mode becomes a first-class product track (Phase H "Router")
 
-**Status:** Accepted
+**Status:** Amended by ADR-209
 **Date:** 2026-07-02
 
 ### Context
@@ -4177,9 +4178,9 @@ motion polish (ramps, climb/conventional, leads, parking), and tiling.
    AUDIT.md rows stay CLAIMED until that evidence exists.
 4. The laser non-negotiables extend to CNC with analogs: bounds check, origin
    honesty, no partial output, deterministic G-code (snapshot + fuzz), units
-   honest, pure core — plus two CNC-specific invariants enforced on emitted
-   text: **no XY rapid below safe Z** (`findPlungedTravelIssues`, shipped) and
-   **no cut below stock bottom + 1 mm** (`findOverdeepCutIssues`, Phase H.1).
+   honest, pure core — plus the CNC-specific **no XY rapid below safe Z**
+   invariant (`findPlungedTravelIssues`, shipped). The former universal
+   stock-bottom depth cap is superseded by ADR-209.
 
 #### Standing 4040 air-cut protocol (referenced by every sub-phase)
 
@@ -8208,7 +8209,7 @@ manual intervention.
 
 ## ADR-201 - Gate CNC Start by protocol capability and exact override acknowledgement
 
-**Status:** Accepted | **Date:** 2026-07-15
+**Status:** Amended by ADR-209 | **Date:** 2026-07-15
 
 ### Context
 
@@ -8285,7 +8286,7 @@ Job consumers remain read-only and no longer allocate one copied pixel row per g
 
 ## ADR-203 - Recover Work-Z only from owned, fresh controller offset readback
 
-**Status:** Accepted | **Date:** 2026-07-15
+**Status:** Amended by ADR-209 | **Date:** 2026-07-15
 
 ### Context
 
@@ -8425,6 +8426,48 @@ The maintainer owns every new capability-versus-refusal tradeoff. Guard proposal
 and reviewable before code exists, and an approval cannot silently spread to other workflows.
 Existing machine-safety behavior is not removed or weakened by this policy; it governs additions
 and expansions from this decision forward.
+
+---
+
+## ADR-209 - Remove universal CNC expiry, depth, override, and spin-up policies
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+Four audited CNC policies refused valid machine-specific workflows without measuring a concrete
+fault: controller-read Work-Z evidence expired after five minutes even when its session and setup
+epochs had not changed; any spindle reduction blocked Start while equivalent feed and rapid
+reductions could be acknowledged; stock thickness imposed a universal cut-depth ceiling; and every
+spindle was forced to use at least a 0.5-second spin-up delay.
+
+The maintainer explicitly directed that these policies be removed while retaining the idle/alarm
+check, active-job exclusion, laser-on-travel detection, non-finite-coordinate checks, CNC
+plunged-rapid checks, active spindle/coolant detection, probe-plate removal, and first-tool / Work-Z
+matching.
+
+### Decision
+
+- Controller-read Work-Z evidence has no wall-clock expiry. It remains bound to the controller
+  session, reference/setup epoch, selected WCS, active tool, compiled first-tool plan, and all
+  existing invalidation events. This amends the freshness-window portion of ADR-203.
+- A known positive feed, rapid, or spindle override at or below 100% may proceed after one exact
+  three-channel acknowledgement. Unknown, zero, invalid, increased, or post-acknowledgement changed
+  values still refuse before any job byte. This amends the spindle-reduction portion of ADR-201.
+- Remove the stock-thickness-plus-allowance ceiling from CNC layer settings, emitted G-code,
+  standalone preflight, relief roughing, and inlay validation. Finite positive configured depth,
+  non-finite-coordinate, and plunged-rapid validation remain. The non-blocking through-cut/tab
+  advisory remains available.
+- Accept every finite non-negative machine spin-up delay. Emit the configured positive value
+  exactly; zero emits no `G4` dwell. Negative and non-finite values remain invalid.
+
+### Consequences
+
+GRBL 4040 and other no-homing machines do not lose unchanged Work-Z proof because time passed.
+Operators can intentionally reduce spindle speed with the same explicit review used for reduced
+motion, select depths appropriate to their stock/spoilboard/setup, and configure the spindle delay
+their hardware actually needs. The concrete machine-state and emitted-motion protections named
+above remain in force; no new guard is introduced by this decision.
 
 ---
 

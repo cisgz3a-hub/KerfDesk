@@ -318,24 +318,21 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.message.includes('V-carve requires'))).toBe(false);
   });
 
-  it('flags emitted Z below the stock floor even when settings look sane (H.1)', () => {
-    // Settings say 1 mm deep, but the emitted text plunges through the
-    // spoilboard — the text-level invariant catches what settings cannot.
+  it('does not impose a universal stock-depth cap on emitted Z', () => {
     const overdeep = GOOD_GCODE.replace('G1 Z-1.000 F300', 'G1 Z-99.000 F300');
     const result = runCncPreflight(projectWithCnc({ depthMm: 1 }), config, overdeep);
-    expect(result.issues.some((issue) => issue.code === 'cnc-overdeep-cut')).toBe(true);
-    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).not.toContain('cnc-overdeep-cut');
   });
 
-  it('flags cut depth far beyond the stock thickness', () => {
+  it('does not impose a universal stock-depth cap on layer settings', () => {
     const result = runCncPreflight(projectWithCnc({ depthMm: 20 }), config, GOOD_GCODE);
-    expect(result.issues.some((issue) => issue.code === 'cnc-depth-exceeds-stock')).toBe(true);
+    expect(result.issues.map((issue) => issue.code)).not.toContain('cnc-depth-exceeds-stock');
   });
 
-  it('allows a through-cut slightly past the stock bottom', () => {
+  it('allows configured depth past the stock bottom', () => {
     const depthMm = config.stock.thicknessMm + 0.5;
     const result = runCncPreflight(projectWithCnc({ depthMm }), config, GOOD_GCODE);
-    expect(result.issues.some((issue) => issue.code === 'cnc-depth-exceeds-stock')).toBe(false);
+    expect(result.ok).toBe(true);
   });
 
   it('flags plunged XY rapids in the emitted motion', () => {

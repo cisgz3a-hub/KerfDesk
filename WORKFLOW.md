@@ -411,7 +411,8 @@ grouped by what each validates:
 
 **CNC mode adds**
 18. **CNC layer settings are valid and the layer produces toolpaths.**
-19. **Cut depth stays within the stock** (plus the through-cut allowance).
+19. **Configured cut depths are finite and positive.** Their relationship to stock thickness is
+    operator-selected; stock thickness does not impose a universal depth cap.
 20. **No single pass cuts deeper than the configured maximum.**
 21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
 
@@ -1889,8 +1890,8 @@ F-CNC19 tiling.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
-3. Emitted G-code passes both the plunged-travel and overdeep-cut
-   invariants; the object transform (move/scale/rotate) is honored.
+3. Emitted G-code passes the plunged-travel invariant; the object transform
+   (move/scale/rotate) is honored.
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
@@ -2212,8 +2213,9 @@ F-CNC19 tiling.
    cycle runs at the plunge feed (GRBL has no G81/G83 — the cycle is
    explicit motion).
 
-#### Error — depth beyond stock + allowance
-1. The standard depth preflight blocks, same as any cut type.
+#### Error — invalid depth
+1. A non-finite or non-positive drill depth fails the standard CNC settings
+   validation. Finite positive depths are not capped by stock thickness.
 
 #### Empty
 1. Open paths are ignored; a layer with no closed shapes drills nothing
@@ -2769,35 +2771,33 @@ F-CNC19 tiling.
 #### Success
 1. A native CNC job, a post-tool-change restart, and a standalone surfacing
    program all retract to configured safe Z before `M3`.
-2. Each spindle start then emits a positive, machine-configured `G4` dwell
-   before the first plunge or other cutting motion.
+2. Each spindle start uses the machine-configured spin-up delay exactly. A
+   positive value emits `G4`; zero deliberately emits no dwell.
 
-#### Error — missing spin-up time
-1. Spindle spin-up durations below 0.5 seconds, including zero and negative
-   values, plus non-finite values, fail CNC preflight. No Start or export path
-   may write the invalid program to a machine or file.
-2. Standalone surfacing generation rejects the same invalid duration instead
-   of producing `G4 P0` or starting the spindle against the work surface.
+#### Error — invalid spin-up time
+1. Negative and non-finite spindle spin-up durations fail CNC preflight. Zero
+   and finite positive values are accepted without a universal minimum.
+2. Standalone surfacing generation follows the same rule and omits `G4` when
+   the configured duration is zero.
 
 #### Edge — physical at-speed feedback
 1. The delay is a time-based operator setting, not sensor proof. GRBL `FS`
-   feedback must not be used as proof of measured physical RPM; machines that
-   need more than the 0.5-second input floor must use a longer delay.
+   feedback must not be used as proof of measured physical RPM; each machine
+   must be configured with the delay its spindle actually requires.
 
 ### F-CNC39. Start from the compiled controller-override baseline — Phase H.11
 
 #### Success
-1. When the live GRBL `Ov:` cache is known, CNC Start requires feed, rapid,
-   and spindle overrides to be exactly 100/100/100.
-2. A capable Idle controller with any non-default value shows the existing
-   per-channel override controls so the operator can reset and observe each
-   value before retrying Start.
+1. When the live GRBL `Ov:` cache is known, CNC Start accepts the exact
+   100/100/100 baseline immediately.
+2. Positive feed, rapid, or spindle reductions from 1-100% may also Start after
+   the operator sees and acknowledges all three exact percentages.
 3. Once streaming begins, the operator may still adjust overrides deliberately
    through the existing in-job controls.
 
 #### Error — stale override changes the physical plan
-1. CNC Start blocks and names all three current percentages when any known
-   value differs from 100%. The compiled G-code, fingerprint, and setup
+1. CNC Start blocks an increase above 100%, zero/invalid values, or a changed
+   value after acknowledgement. The compiled G-code, fingerprint, and setup
    attestation do not substitute for this live controller state.
 
 #### Edge — unknown or externally changed state

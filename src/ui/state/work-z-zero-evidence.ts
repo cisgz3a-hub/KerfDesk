@@ -2,7 +2,6 @@ import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/wor
 import { activeCncTool, type Project } from '../../core/scene';
 
 export type WorkZZeroEvidenceSource = 'manual-zero' | 'probe' | 'controller-readback';
-export const CONTROLLER_WORK_Z_FRESHNESS_MS = 5 * 60 * 1000;
 
 export const PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE =
   'Remove the touch plate and probe lead from the stock and cutter, then click ' +
@@ -75,20 +74,14 @@ export function isWorkZZeroEvidenceCurrent(
   );
 }
 
-export function isWorkZEvidenceFreshForStart(
+export function isWorkZEvidenceCurrentForStart(
   evidence: WorkZZeroEvidence | null | undefined,
   referenceEpoch: number | undefined,
   controllerSessionEpoch: number | undefined,
-  nowMs: number,
 ): boolean {
   if (!isWorkZZeroEvidenceCurrent(evidence, referenceEpoch)) return false;
   if (evidence?.source !== 'controller-readback') return true;
-  const ageMs = nowMs - (evidence.observedAtMs ?? Number.NEGATIVE_INFINITY);
-  return (
-    evidence.controllerSessionEpoch === controllerSessionEpoch &&
-    ageMs >= 0 &&
-    ageMs <= CONTROLLER_WORK_Z_FRESHNESS_MS
-  );
+  return evidence.controllerSessionEpoch === controllerSessionEpoch;
 }
 
 export function probePlateRemovalRequired(evidence: WorkZZeroEvidence | null | undefined): boolean {

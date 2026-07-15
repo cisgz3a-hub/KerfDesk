@@ -40,8 +40,9 @@ function messages(project: Project, ovCache: OverrideValues | null): string {
 describe('CNC Start live override baseline', () => {
   it.each([
     { feed: 200, rapid: 100, spindle: 100 },
-    { feed: 100, rapid: 100, spindle: 10 },
-  ])('blocks increased feed or changed spindle overrides: $feed/$rapid/$spindle', (overrides) => {
+    { feed: 100, rapid: 100, spindle: 110 },
+    { feed: 100, rapid: 100, spindle: 0 },
+  ])('blocks increased or invalid overrides: $feed/$rapid/$spindle', (overrides) => {
     expect(messages(cncProject, overrides)).toContain(
       `Current live values are feed ${overrides.feed}%, rapid ${overrides.rapid}%, spindle ${overrides.spindle}%.`,
     );
@@ -51,15 +52,17 @@ describe('CNC Start live override baseline', () => {
     { feed: 80, rapid: 100, spindle: 100 },
     { feed: 100, rapid: 50, spindle: 100 },
     { feed: 70, rapid: 25, spindle: 100 },
-  ])('permits a positive feed/rapid reduction for explicit acknowledgement', (overrides) => {
+    { feed: 100, rapid: 100, spindle: 60 },
+    { feed: 80, rapid: 50, spindle: 60 },
+  ])('permits positive reductions for explicit acknowledgement', (overrides) => {
     expect(cncOverrideStartIssue('cnc', overrides)).toBeNull();
     expect(cncOverrideStartWarning('cnc', overrides)).toContain(
-      `feed ${overrides.feed}%, rapid ${overrides.rapid}%`,
+      `feed ${overrides.feed}%, rapid ${overrides.rapid}%, spindle ${overrides.spindle}%`,
     );
   });
 
   it('requires the final fresh values to match the exact acknowledged reduction', () => {
-    const overrides = { feed: 80, rapid: 50, spindle: 100 };
+    const overrides = { feed: 80, rapid: 50, spindle: 60 };
     const acknowledgement = reducedOverrideAcknowledgement(overrides);
 
     expect(cncOverrideFinalStartIssue('cnc', overrides, acknowledgement)).toBeNull();

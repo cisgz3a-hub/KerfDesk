@@ -71,7 +71,7 @@ describe('CNC reduced-override Start flow', () => {
       connection: { kind: 'connected' },
       statusReport: idleStatus,
       controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
-      ovCache: { feed: 80, rapid: 50, spindle: 100 },
+      ovCache: { feed: 80, rapid: 50, spindle: 60 },
       accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
       workZReferenceEpoch: 7,
       workZZeroEvidence: {
@@ -93,12 +93,12 @@ describe('CNC reduced-override Start flow', () => {
     await runStartJobFlow();
 
     expect(jobAwareConfirm).toHaveBeenCalledWith(
-      expect.stringMatching(/feed 80%, rapid 50%, spindle 100%/i),
+      expect.stringMatching(/feed 80%, rapid 50%, spindle 60%/i),
     );
     expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
     const startJob = vi.mocked(useLaserStore.getState().startJob);
     expect(startJob.mock.calls[0]?.[1]?.cncSetupAttestation).toMatchObject({
-      acknowledgedReducedOverrides: { feed: 80, rapid: 50, spindle: 100 },
+      acknowledgedReducedOverrides: { feed: 80, rapid: 50, spindle: 60 },
     });
   });
 });

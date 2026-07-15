@@ -7,7 +7,6 @@ import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import {
   findNonFiniteCoords,
   findOutOfBoundsCoords,
-  findOverdeepCutIssues,
   findPlungedTravelIssues,
   isGcodeCommand,
   parseGcodeWord,
@@ -114,10 +113,5 @@ function appendTextInvariantIssues(
       code: 'spindle-start-before-clearance',
       message: `Line ${issue.lineNumber}: ${issue.reason}`,
     });
-  }
-  for (const issue of findOverdeepCutIssues(gcode, {
-    stockThicknessMm: machine.stock.thicknessMm,
-  }).slice(0, MAX_REPORTED_ISSUES)) {
-    issues.push({ code: 'cnc-overdeep-cut', message: `Line ${issue.lineNumber}: ${issue.reason}` });
   }
 }

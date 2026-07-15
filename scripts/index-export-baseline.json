@@ -12,7 +12,6 @@
   "src/core/shapes/index.ts": 29,
   "src/core/controllers/index.ts": 23,
   "src/core/controllers/ruida/index.ts": 23,
-  "src/core/invariants/index.ts": 23,
   "src/core/material-library/index.ts": 21,
   "src/core/text/index.ts": 25,
   "src/io/gcode/index.ts": 22

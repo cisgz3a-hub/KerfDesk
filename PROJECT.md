@@ -127,7 +127,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | Sub-phase | Delivers | Status |
 |---|---|---|
 | H.0 | Governance: ADR-098, this table, F-CNC flows, verification checklist | Done |
-| H.1 | `CncPass` contour/path3d union (tidy-first) + overdeep-cut invariant | Built |
+| H.1 | `CncPass` contour/path3d union (tidy-first) + plunged-rapid invariant | Built |
 | H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview | Built |
 | H.3 | True V-carving: clipper2 inward offset ladder, `tipAngleDeg` depth law, flat-bottom fallback | Built |
 | H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview | Built |

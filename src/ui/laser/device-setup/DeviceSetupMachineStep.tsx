@@ -110,9 +110,9 @@ function CncParameterRows(props: {
         label="Spin-up delay"
         unit="s"
         value={machine.params.spindleSpinupSec}
-        min={0.5}
+        min={0}
         max={30}
-        step={0.5}
+        step={0.1}
         onCommit={(spindleSpinupSec) => updateParams({ spindleSpinupSec })}
       />
       <Row label="Coolant">

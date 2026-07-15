@@ -123,11 +123,18 @@ describe('buildSurfacingProgram', () => {
     });
   });
 
-  it.each([0, 0.499])('rejects a %s-second spin-up delay below the safety floor', (spinupSec) => {
-    expect(buildSurfacingProgram({ ...PARAMS, spindleSpinupSec: spinupSec })).toEqual({
-      ok: false,
-      reason: 'Surfacing spindle spin-up must be at least 0.5 seconds.',
-    });
+  it('allows zero spin-up delay and omits the dwell', () => {
+    const result = buildSurfacingProgram({ ...PARAMS, spindleSpinupSec: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.program.lines.some((line) => line.startsWith('G4 P'))).toBe(false);
+  });
+
+  it('preserves a positive spin-up delay below the former floor', () => {
+    const result = buildSurfacingProgram({ ...PARAMS, spindleSpinupSec: 0.499 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.program.lines).toContain('G4 P0.499');
   });
 });
 

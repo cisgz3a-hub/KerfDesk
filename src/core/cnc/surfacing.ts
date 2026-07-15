@@ -46,7 +46,6 @@ const MIN_STEP_MM = 0.05;
 // arrays. 100k rows is ~a 5 m area at the 0.05 mm minimum step — far beyond
 // any real bed — so no valid job is affected. Checked before allocation.
 const MAX_SURFACING_ITERATIONS = 100_000;
-const MIN_SPINDLE_SPINUP_SEC = 0.5;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
 
 function fmt(value: number): string {
@@ -94,8 +93,8 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     'G94',
     `G0 Z${fmt(params.safeZMm)}`,
     `M3 S${Math.round(params.spindleRpm)}`,
-    `G4 P${params.spindleSpinupSec.toFixed(3)}`,
   ];
+  if (params.spindleSpinupSec > 0) lines.push(`G4 P${params.spindleSpinupSec.toFixed(3)}`);
   for (const depth of depths) {
     lines.push('G0 X0.000 Y0.000');
     lines.push(`G1 Z${fmt(-depth)} F${fmt(params.plungeMmPerMin)}`);
@@ -155,7 +154,7 @@ function positiveFiniteReason(label: string, value: number): string | null {
 }
 
 function spindleSpinupReason(value: number): string | null {
-  return Number.isFinite(value) && value >= MIN_SPINDLE_SPINUP_SEC
+  return Number.isFinite(value) && value >= 0
     ? null
-    : `Surfacing spindle spin-up must be at least ${MIN_SPINDLE_SPINUP_SEC} seconds.`;
+    : 'Surfacing spindle spin-up must be a finite number at or above 0 seconds.';
 }

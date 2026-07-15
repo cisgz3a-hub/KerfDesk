@@ -4,54 +4,10 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { CncGroup, CncPass, Job } from '../job';
 import { cncGrblStrategy } from '../output';
 import { findPlungedTravelIssues } from './cnc-motion';
-import { findOverdeepCutIssues } from './cnc-depth';
 
-describe('findOverdeepCutIssues', () => {
-  it('accepts cuts down to the stock floor plus allowance', () => {
-    const gcode = [
-      'G21',
-      'G0 Z3.810',
-      'G0 X10.000 Y10.000',
-      'G1 Z-7.350 F300',
-      'G1 X20.000 Y10.000 F1000',
-    ].join('\n');
-    expect(findOverdeepCutIssues(gcode, { stockThicknessMm: 6.35 })).toEqual([]);
-  });
-
-  it('flags a G1 below the stock floor with the line number', () => {
-    const gcode = ['G21', 'G0 Z3.810', 'G1 Z-7.500 F300'].join('\n');
-    const issues = findOverdeepCutIssues(gcode, { stockThicknessMm: 6.35 });
-    expect(issues).toHaveLength(1);
-    expect(issues[0]?.lineNumber).toBe(3);
-    expect(issues[0]?.reason).toContain('-7.350');
-  });
-
-  it('flags a G0 rapid below the floor too', () => {
-    const issues = findOverdeepCutIssues('G0 Z-10.000', { stockThicknessMm: 6.35 });
-    expect(issues).toHaveLength(1);
-  });
-
-  it('ignores comments and non-motion lines', () => {
-    const gcode = ['; plunge Z-99 in a comment', '(Z-99 here too)', 'M3 S12000', 'G4 P3.000'].join(
-      '\n',
-    );
-    expect(findOverdeepCutIssues(gcode, { stockThicknessMm: 1 })).toEqual([]);
-  });
-
-  it('honours a custom allowance', () => {
-    expect(
-      findOverdeepCutIssues('G1 Z-6.500 F300', { stockThicknessMm: 6, allowanceMm: 0 }),
-    ).toHaveLength(1);
-    expect(
-      findOverdeepCutIssues('G1 Z-6.500 F300', { stockThicknessMm: 6, allowanceMm: 1 }),
-    ).toEqual([]);
-  });
-});
-
-// Property: any job the CNC emitter produces from in-stock passes — contour or
-// path3d — satisfies BOTH text-level invariants (no plunged travel, no overdeep
-// cut). This permanently ties the emitter's motion contract to the invariants.
-describe('cnc emitter × depth/motion invariants (property)', () => {
+// Property: any CNC job the emitter produces keeps every rapid above safe Z.
+// This permanently ties the emitter's motion contract to the plunged-travel invariant.
+describe('cnc emitter × motion invariant (property)', () => {
   const STOCK_MM = 10;
   const SAFE_Z_MM = 3.81;
 
@@ -92,13 +48,12 @@ describe('cnc emitter × depth/motion invariants (property)', () => {
       passes,
     }));
 
-  it('emitted G-code never travels plunged and never cuts below stock (100 seeds)', () => {
+  it('emitted G-code never travels plunged (100 seeds)', () => {
     fc.assert(
       fc.property(group, (g) => {
         const job: Job = { groups: [g] };
         const gcode = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
         expect(findPlungedTravelIssues(gcode, { safeZMm: SAFE_Z_MM })).toEqual([]);
-        expect(findOverdeepCutIssues(gcode, { stockThicknessMm: STOCK_MM })).toEqual([]);
       }),
       { numRuns: 100 },
     );

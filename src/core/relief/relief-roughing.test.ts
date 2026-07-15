@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { compileCncJob } from '../cnc/compile-cnc-job';
 import { cncGrblStrategy } from '../output';
-import { findOverdeepCutIssues, findPlungedTravelIssues } from '../invariants';
+import { findPlungedTravelIssues } from '../invariants';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -160,11 +160,6 @@ describe('relief roughing — compile pipeline', () => {
 
     const gcode = cncGrblStrategy.emit(job, device);
     expect(findPlungedTravelIssues(gcode, { safeZMm: group.safeZMm })).toEqual([]);
-    expect(
-      findOverdeepCutIssues(gcode, {
-        stockThicknessMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm,
-      }),
-    ).toEqual([]);
   });
 
   it('emits deterministic G-code (snapshot)', () => {
