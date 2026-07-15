@@ -80,6 +80,7 @@
 | ADR-207 | 2026-07-15 | Accepted | One top live-motion bar owns run controls |
 | ADR-208 | 2026-07-15 | Accepted | Remove obstructive 4040 and advisory machine policies |
 | ADR-209 | 2026-07-15 | Accepted | Remove universal CNC expiry, depth, override, and spin-up policies |
+| ADR-210 | 2026-07-15 | Accepted | Enforce explicit machine output capability at every project entry point |
 
 ---
 
@@ -8574,3 +8575,56 @@ There is one obvious action cluster to learn and test, with a stable position an
 Responsive layouts no longer stack competing Abort buttons. Removing a panel or changing selection
 tools cannot remove the visible software Abort path, while the UI remains honest that only physical
 hardware can provide a safety-rated emergency stop.
+
+---
+
+## ADR-210 - Enforce explicit machine output capability at every project entry point
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+Machine Setup already persisted `laser-output` and `cnc-output`, but the rail treated those values as
+advisory styling. An unavailable segment still called `setMachineKind`, the store always accepted the
+switch, and **New Project** implicitly selected Laser. A Laser-only profile could therefore enter CNC
+controls and output, while a CNC-only profile could enter Laser controls and output or silently
+change to Laser after **New Project**. The downstream workspace, compiler, emitter, and machine
+controls intentionally follow the active `project.machine.kind`, so none of their existing checks
+could correct this contradictory state.
+
+The new refusal meets ADR-206's approval requirement. Before implementation, the maintainer asked
+for Laser-only machines to have no CNC access, CNC-only machines to have no Laser access, hybrid
+machines to allow both, and an explanation when the unavailable mode is pressed. After receiving a
+detailed necessity case and implementation plan, the maintainer explicitly directed: **"build"**.
+
+A warning alone is insufficient because it would still enter the mode the selected physical-output
+contract excludes. The refusal affects only profiles with exactly one explicit output capability.
+Hybrid profiles, legacy profiles with neither capability, the currently supported mode, ordinary
+project editing, and all non-mode configuration remain available.
+
+### Decision
+
+- `DeviceProfile.capabilities` is the single capability source. `laser-output` alone permits only
+  Laser, `cnc-output` alone permits only CNC, both permit both, and neither preserves legacy access.
+- The Laser/CNC segmented control keeps an unavailable mode visible, focusable, muted, and marked
+  `aria-disabled`. Mouse or keyboard activation shows: **"CNC mode is unavailable. This machine is
+  set to Laser only. Open Machine Setup and choose CNC only or Laser + CNC."** The symmetric Laser
+  message names **CNC only** and offers **Laser only or Laser + CNC**. No project or history state is
+  mutated.
+- The store enforces the same contract in `setMachineKind`; UI styling is not the security boundary.
+  The atomic Machine Setup replacement also refuses a profile paired with the opposite active
+  machine kind.
+- **New Project** resolves the blank project against the configured capability and the previously
+  active mode. CNC-only stays CNC; hybrid and legacy machines keep the previously active kind.
+- Native project open, LightBurn migration, and autosave recovery resolve a contradictory active
+  kind before installing the project. A displaced CNC configuration is cached, the repaired project
+  is dirty, and a warning directs the operator to Machine Setup. No incompatible project state is
+  silently saved over the source file.
+
+### Consequences
+
+Explicit single-output machine profiles cannot reach the opposite mode through the rail, direct
+store calls, **New Project**, file open, autosave recovery, or Machine Setup persistence. Hybrid
+machines retain ordinary two-way switching. Older projects remain usable until the operator records
+an explicit physical-output choice, while contradictory current files recover visibly without
+discarding reusable CNC configuration.

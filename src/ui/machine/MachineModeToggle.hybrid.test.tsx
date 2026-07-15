@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG, machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { MachineModeToggle } from './MachineModeToggle';
 
 (
@@ -13,9 +14,19 @@ import { MachineModeToggle } from './MachineModeToggle';
 beforeEach(() => {
   resetStore();
   useStore.setState({ cachedCncMachine: null });
+  clearToasts();
 });
 
-afterEach(() => resetStore());
+afterEach(() => {
+  clearToasts();
+  resetStore();
+});
+
+function clearToasts(): void {
+  for (const toast of useToastStore.getState().toasts) {
+    useToastStore.getState().dismissToast(toast.id);
+  }
+}
 
 async function renderToggle(): Promise<{ host: HTMLDivElement; root: Root }> {
   const host = document.createElement('div');
@@ -32,7 +43,7 @@ function modeButton(host: HTMLElement, label: string): HTMLButtonElement {
 }
 
 describe('MachineModeToggle machine capability', () => {
-  it('warns without blocking a mode excluded by an explicit single-output profile', async () => {
+  it('keeps CNC visibly locked and explains the block for a laser-only profile', async () => {
     useStore.setState((state) => ({
       project: {
         ...state.project,
@@ -45,9 +56,43 @@ describe('MachineModeToggle machine capability', () => {
       expect(modeButton(host, 'Laser').disabled).toBe(false);
       const cnc = modeButton(host, 'CNC');
       expect(cnc.disabled).toBe(false);
-      expect(cnc.title).toContain('Open Machine Setup');
+      expect(cnc.getAttribute('aria-disabled')).toBe('true');
+      expect(cnc.title).toContain('This machine is set to Laser only');
       await act(async () => cnc.click());
+      expect(machineKindOf(useStore.getState().project.machine)).toBe('laser');
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'warning',
+        message: expect.stringContaining('CNC mode is unavailable'),
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps Laser visibly locked and explains the block for a CNC-only profile', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          capabilities: ['cnc-output'],
+          cncSubProfile: DEFAULT_CNC_MACHINE_CONFIG.params,
+        },
+        machine: DEFAULT_CNC_MACHINE_CONFIG,
+      },
+    }));
+    const { host, root } = await renderToggle();
+    try {
+      const laser = modeButton(host, 'Laser');
+      expect(laser.disabled).toBe(false);
+      expect(laser.getAttribute('aria-disabled')).toBe('true');
+      await act(async () => laser.click());
       expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'warning',
+        message: expect.stringContaining('Laser mode is unavailable'),
+      });
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -71,6 +116,7 @@ describe('MachineModeToggle machine capability', () => {
     try {
       const cnc = modeButton(host, 'CNC');
       expect(cnc.disabled).toBe(false);
+      expect(cnc.getAttribute('aria-disabled')).toBe('false');
       await act(async () => cnc.click());
       const state = useStore.getState();
       expect(machineKindOf(state.project.machine)).toBe('cnc');

@@ -25,6 +25,8 @@ import type { SaveTarget } from '../../platform/types';
 import { defaultJobPlacementForDevice, type JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
+import type { ProjectMachineCapabilityLoadResult } from './project-machine-capability';
+import { projectActions } from './project-actions';
 import type { CncMachineConfig, EmbeddedFont } from '../../core/scene';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
@@ -61,13 +63,13 @@ import {
 } from './air-assist-default-actions';
 import {
   MATERIAL_LIBRARY_STATE_DEFAULTS,
-  currentMaterialLibraryState,
+  type currentMaterialLibraryState,
   materialLibraryActions,
   type MaterialLibraryActions,
 } from './material-library-actions';
 import {
   SAVED_LIBRARIES_STATE_DEFAULTS,
-  currentSavedLibrariesState,
+  type currentSavedLibrariesState,
   savedLibrariesActions,
   type SavedLibrariesActions,
 } from './saved-libraries-actions';
@@ -116,6 +118,7 @@ import {
   interactionActions,
   saveTrackingActions,
   sceneActions,
+  type MachineSetupReplacementResult,
   viewActions,
 } from './store-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
@@ -211,7 +214,7 @@ export type AppState = ObjectPropertiesActions &
     readonly sceneClipboard: SceneClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
 
-    readonly setProject: (project: Project) => void;
+    readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
     readonly newProject: () => void;
     readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
 
@@ -301,7 +304,9 @@ export type AppState = ObjectPropertiesActions &
     readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
     readonly replaceDeviceProfile: (profile: DeviceProfile) => void;
-    readonly replaceMachineSetup: (...args: [DeviceProfile, MachineConfig, MachineConfig?]) => void;
+    readonly replaceMachineSetup: (
+      ...args: [DeviceProfile, MachineConfig, MachineConfig?]
+    ) => MachineSetupReplacementResult;
     readonly undo: () => void;
     readonly redo: () => void;
     // Single-select on plain click; clears all when id is null.
@@ -327,12 +332,8 @@ export type AppState = ObjectPropertiesActions &
     readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
     readonly markSaved: (target: SaveTarget) => void;
-    readonly markLoaded: (filename: string) => void;
+    readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
   };
-
-type Setter = (
-  fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
-) => void;
 
 function initialState(
   project = createProject(),
@@ -391,49 +392,9 @@ function initialState(
   };
 }
 
-function currentLayerDefaultsState(
-  state: Pick<AppState, 'layerDefaults'>,
-): Pick<AppState, 'layerDefaults'> {
-  return { layerDefaults: state.layerDefaults };
-}
-
-// The CNC library is app-level (H.7) — like the material library, it must
-// survive New Project / Open.
-function currentCncLibraryState(state: Pick<AppState, 'cncLibrary'>): Pick<AppState, 'cncLibrary'> {
-  return { cncLibrary: state.cncLibrary };
-}
-
-function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'> {
-  return {
-    setProject: (project) =>
-      set((s) => ({
-        ...initialState(project),
-        ...currentMaterialLibraryState(s),
-        ...currentSavedLibrariesState(s),
-        ...currentLayerDefaultsState(s),
-        ...currentCncLibraryState(s),
-      })),
-    newProject: () =>
-      set((s) => {
-        const project = createProject(s.project.device);
-        return {
-          ...initialState(project),
-          // Machine profiles are app-level (like the material and CNC libraries
-          // above): File -> New keeps the configured device — bed, origin, no-go
-          // zones, scan offsets, camera alignment — instead of silently reverting
-          // to the Default 400x400 (LightBurn parity; ADR device-lifecycle).
-          ...currentMaterialLibraryState(s),
-          ...currentSavedLibrariesState(s),
-          ...currentLayerDefaultsState(s),
-          ...currentCncLibraryState(s),
-        };
-      }),
-  };
-}
-
 export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
-  ...projectActions(set),
+  ...projectActions(set, get, initialState),
   ...objectInsertActions(set, get),
   ...imageImportActions(set, get),
   ...breakApartActions(set),
@@ -442,7 +403,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...externalGcodeActions(set),
   ...cncLibraryActions(set),
   ...layerActions(set),
-  ...machineActions(set),
+  ...machineActions(set, get),
   ...airAssistDefaultActions(set, get),
   ...fillSelectionActions(set),
   ...vectorPathActions(set),

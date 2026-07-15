@@ -34,7 +34,7 @@ function fileCtx(
     platform: mockPlatform,
     project: createProject(),
     importSvgObject: vi.fn((): ImportOutcome => ({ kind: 'added' })),
-    setProject: vi.fn(),
+    setProject: vi.fn(() => ({ kind: 'loaded' as const })),
     newProject: vi.fn(),
     savedName: null,
     jobPlacement: DEFAULT_JOB_PLACEMENT,

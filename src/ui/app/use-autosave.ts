@@ -29,6 +29,7 @@ import {
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { repairedMachineCapabilityMessage } from '../machine/machine-capability-messages';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not write this project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
@@ -107,7 +108,15 @@ export function runAutosaveRecovery(
       '(Click Cancel to discard the auto-save and start fresh.)',
   );
   if (ok) {
-    s.setProject(record.project);
+    const loadResult = s.setProject(record.project);
+    if (loadResult.kind === 'capability-repaired') {
+      useToastStore
+        .getState()
+        .pushToast(
+          repairedMachineCapabilityMessage(loadResult.activeKind, loadResult.preservedCnc),
+          'warning',
+        );
+    }
     // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
     // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
     // write, and the discard confirms all stay armed — and KEEP a slot;
