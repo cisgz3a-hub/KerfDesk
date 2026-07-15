@@ -229,7 +229,6 @@ describe('job checkpoint integration (ADR-118)', () => {
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareAlert).mockClear();
-    vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   });
 
   afterEach(() => {
