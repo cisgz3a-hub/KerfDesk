@@ -88,6 +88,7 @@ export type PreflightOptions = {
 };
 
 const MAX_BOUNDS_ISSUES = 5;
+const MAX_BLANK_FEED_ISSUES = 5;
 
 // Blocking threshold for long laser-off FEED moves (G1 with effective S0), in
 // mm. Matches ADR-035's fill gap-rapid split (gaps > 5 mm become G0 rapids), so
@@ -446,7 +447,7 @@ function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): voi
 // post-ADR-035 output is clean; a hit means a regression or an old export.
 function appendLongBlankFeedIssues(gcode: string, issues: PreflightIssue[]): void {
   const blankFeed = findLongBlankFeedMoves(gcode, { thresholdMm: LONG_BLANK_FEED_THRESHOLD_MM });
-  for (const issue of blankFeed.slice(0, MAX_BOUNDS_ISSUES)) {
+  for (const issue of blankFeed.slice(0, MAX_BLANK_FEED_ISSUES)) {
     issues.push({
       code: 'long-blank-feed',
       message: `Line ${issue.lineNumber}: blank G1 feed move ${issue.distanceMm.toFixed(3)} mm exceeds ${LONG_BLANK_FEED_THRESHOLD_MM.toFixed(3)} mm. Regenerate output or lower the fill blank-feed threshold after hardware verification.`,

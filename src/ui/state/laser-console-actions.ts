@@ -1,7 +1,10 @@
 import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { beginSettingsCollection } from './detected-settings-action';
-import type { ConsoleStateEffect } from '../../core/controllers/console-state-effect';
+import {
+  hasAccessoryCommand,
+  type ConsoleStateEffect,
+} from '../../core/controllers/console-state-effect';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -75,7 +78,7 @@ export function consoleActions(
           lastSettingsReadAt: null,
         });
       }
-      if (commandChangesAccessories(prepared.command.normalized)) {
+      if (hasAccessoryCommand(prepared.command.normalized)) {
         // Invalidate before the async write yields so Start cannot race a
         // just-sent M3/M4/M5/M7/M8/M9 while the prior all-off cache remains.
         set((state) => ({
@@ -196,7 +199,7 @@ function consoleObservationPatch(
     // setup/job action can trust Idle, but preserve unrelated position proof.
     statusReport: null,
     statusObservation: null,
-    ...(commandChangesAccessories(command)
+    ...(hasAccessoryCommand(command)
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),
     log: pushLog(
@@ -214,15 +217,6 @@ function settingsInvalidationPatch(): Partial<LaserState> {
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   };
-}
-
-function commandChangesAccessories(command: string): boolean {
-  const uncommented =
-    command
-      .replace(/\([^)]*\)/g, ' ')
-      .split(';', 1)[0]
-      ?.toUpperCase() ?? '';
-  return /M0?[345789](?=$|[^0-9.])/.test(uncommented);
 }
 
 function unknownCoordinatePatch(): Partial<LaserState> {

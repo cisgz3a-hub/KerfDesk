@@ -28,7 +28,7 @@ export function commonConsoleStateEffect(input: string): ConsoleStateEffect {
   if (TOOL_COMMAND_RE.test(code)) return 'tool';
   if (!COORDINATE_COMMAND_RE.test(code)) {
     if (MOTION_COMMAND_RE.test(code)) return 'machine-state';
-    if (ACCESSORY_COMMAND_RE.test(code)) return 'accessories';
+    if (hasAccessoryCommand(code)) return 'accessories';
     if (DWELL_COMMAND_RE.test(code)) return 'non-positional';
     return 'machine-state';
   }
@@ -39,6 +39,11 @@ export function commonConsoleStateEffect(input: string): ConsoleStateEffect {
   if (changesXy && !changesZ) return 'coordinates-xy';
   if (changesZ && !changesXy) return 'coordinates-z';
   return 'coordinates-all';
+}
+
+/** Return whether uncommented G-code contains a spindle, laser, or coolant command. */
+export function hasAccessoryCommand(input: string): boolean {
+  return ACCESSORY_COMMAND_RE.test(stripGcodeComments(input).toUpperCase());
 }
 
 function stripGcodeComments(input: string): string {
