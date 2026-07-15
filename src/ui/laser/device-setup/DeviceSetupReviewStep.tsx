@@ -4,7 +4,7 @@
 import { Button } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import type { DeviceSetupStepProps } from './device-setup-flow';
-import { machineSetupValidationIssues } from './device-setup-flow';
+import { deviceSetupSupportsMachineKind, machineSetupValidationIssues } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
@@ -25,7 +25,7 @@ export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps)
       <WorkspaceReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
       <OutputReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'machine' })} />
       <SafetyReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'safety' })} />
-      <HardwareHandoff machineKind={state.machineKind} />
+      <HardwareHandoff machineKinds={state.machineKinds} />
     </section>
   );
 }
@@ -67,7 +67,17 @@ function ConnectionReview(props: {
       : 'Not used';
   return (
     <ReviewSection title="Machine and connection" onEdit={props.onEdit}>
-      <ReviewRow label="Type" value={state.machineKind === 'cnc' ? 'CNC router / mill' : 'Laser'} />
+      <ReviewRow
+        label="Capability"
+        value={
+          state.machineKinds.length === 2
+            ? 'Laser + CNC'
+            : state.machineKinds[0] === 'cnc'
+              ? 'CNC only'
+              : 'Laser only'
+        }
+      />
+      <ReviewRow label="Active mode" value={state.machineKind === 'cnc' ? 'CNC' : 'Laser'} />
       <ReviewRow label="Profile" value={state.draft.name} />
       <ReviewRow label="Controller" value={`${guide.label} (${guide.transportLabel})`} />
       <ReviewRow label="Baud" value={baud} />
@@ -121,20 +131,24 @@ function OutputReview(props: {
   readonly state: DeviceSetupStepProps['state'];
   readonly onEdit: () => void;
 }): JSX.Element {
-  const cnc = props.state.draftMachine.kind === 'cnc';
   return (
-    <ReviewSection
-      title={cnc ? 'CNC machine output' : 'Laser machine output'}
-      onEdit={props.onEdit}
-    >
-      {cnc ? <CncOutputRows state={props.state} /> : <LaserOutputRows state={props.state} />}
-    </ReviewSection>
+    <>
+      {deviceSetupSupportsMachineKind(props.state, 'laser') ? (
+        <ReviewSection title="Laser machine output" onEdit={props.onEdit}>
+          <LaserOutputRows state={props.state} />
+        </ReviewSection>
+      ) : null}
+      {deviceSetupSupportsMachineKind(props.state, 'cnc') ? (
+        <ReviewSection title="CNC machine output" onEdit={props.onEdit}>
+          <CncOutputRows state={props.state} />
+        </ReviewSection>
+      ) : null}
+    </>
   );
 }
 
 function CncOutputRows({ state }: { readonly state: DeviceSetupStepProps['state'] }): JSX.Element {
-  if (state.draftMachine.kind !== 'cnc') return <></>;
-  const params = state.draftMachine.params;
+  const params = state.cncDraft.params;
   return (
     <>
       <ReviewRow label="Safe Z" value={`${params.safeZMm} mm`} />
@@ -192,7 +206,7 @@ function SafetyReview(props: {
           state.draft.zProbePresent === true ? 'Recorded; hardware test pending' : 'Not recorded'
         }
       />
-      {state.machineKind === 'laser' ? <LaserSafetyRows state={state} /> : null}
+      {deviceSetupSupportsMachineKind(state, 'laser') ? <LaserSafetyRows state={state} /> : null}
     </ReviewSection>
   );
 }
@@ -245,12 +259,14 @@ function ReviewRow(props: { readonly label: string; readonly value: string }): J
   );
 }
 
-function HardwareHandoff(props: { readonly machineKind: 'laser' | 'cnc' }): JSX.Element {
+function HardwareHandoff(props: {
+  readonly machineKinds: ReadonlyArray<'laser' | 'cnc'>;
+}): JSX.Element {
   return (
     <div style={hardwareStyle}>
       <strong>Hardware commissioning — operator check after saving</strong>
       <ul style={hardwareListStyle}>
-        {hardwareChecklist(props.machineKind).map((item) => (
+        {hardwareChecklist(props.machineKinds).map((item) => (
           <li key={item}>☐ {item}</li>
         ))}
       </ul>
@@ -262,7 +278,7 @@ function HardwareHandoff(props: { readonly machineKind: 'laser' | 'cnc' }): JSX.
   );
 }
 
-function hardwareChecklist(machineKind: 'laser' | 'cnc'): ReadonlyArray<string> {
+function hardwareChecklist(machineKinds: ReadonlyArray<'laser' | 'cnc'>): ReadonlyArray<string> {
   const common = [
     'Emergency stop and disconnect path work',
     'Axis labels, positive directions, and travel limits match the machine',
@@ -270,19 +286,28 @@ function hardwareChecklist(machineKind: 'laser' | 'cnc'): ReadonlyArray<string> 
     'Origin and displayed position match a measured point',
     'Frame / dry-run path clears clamps, fixtures, and no-go zones',
   ];
-  return machineKind === 'cnc'
+  const cnc = machineKinds.includes('cnc')
     ? [
-        ...common,
         'Z-positive retracts away from stock and Safe Z clears clamps',
         'Spindle S value, spin-up time, coolant relay, and park point are correct',
         'Probe plate thickness, electrical contact, and plate removal are verified',
       ]
-    : [
-        ...common,
+    : [];
+  const laser = machineKinds.includes('laser')
+    ? [
         'Beam remains off during travel and at S0',
         'Lowest-power pulse and maximum S scale are verified on scrap',
         'Air-assist relay, focus method, enclosure, interlocks, and exhaust are verified',
-      ];
+      ]
+    : [];
+  const swap =
+    machineKinds.length === 2
+      ? [
+          'Only one toolhead is installed and powered for the selected active mode',
+          'Toolhead swap wiring, firmware mode, and interlocks are verified before every changeover',
+        ]
+      : [];
+  return [...common, ...laser, ...cnc, ...swap];
 }
 
 const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 9 };

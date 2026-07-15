@@ -325,6 +325,7 @@ function canonicalMachineMetadata(profile: DeviceProfile): Partial<DeviceProfile
     ...(profile.laserSubProfile !== undefined
       ? { laserSubProfile: { ...profile.laserSubProfile } }
       : {}),
+    ...(profile.cncSubProfile !== undefined ? { cncSubProfile: { ...profile.cncSubProfile } } : {}),
     ...(profile.cameraProfile !== undefined
       ? { cameraProfile: normalizeCameraProfile(profile.cameraProfile) }
       : {}),

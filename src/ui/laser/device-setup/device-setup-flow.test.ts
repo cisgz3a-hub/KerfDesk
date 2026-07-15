@@ -10,6 +10,7 @@ import {
   DEVICE_SETUP_STEP_ORDER,
   deviceSetupReducer,
   initDeviceSetup,
+  machineSetupProfile,
   machineSetupValidationIssues,
   type DeviceSetupState,
 } from './device-setup-flow';
@@ -44,7 +45,7 @@ describe('unified machine setup flow', () => {
 
   it('keeps DeviceProfile and CNC config in the same draft', () => {
     let state = open();
-    state = deviceSetupReducer(state, { kind: 'select-machine-kind', machineKind: 'cnc' });
+    state = deviceSetupReducer(state, { kind: 'set-machine-kinds', machineKinds: ['cnc'] });
     expect(state.draftMachine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
     if (state.draftMachine.kind !== 'cnc') throw new Error('expected CNC draft');
     const machine = {
@@ -64,6 +65,10 @@ describe('unified machine setup flow', () => {
         ...DEFAULT_CNC_MACHINE_CONFIG,
         params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, safeZMm: 12 },
       },
+    });
+    state = deviceSetupReducer(state, {
+      kind: 'set-machine-kinds',
+      machineKinds: ['laser', 'cnc'],
     });
     state = deviceSetupReducer(state, { kind: 'select-machine-kind', machineKind: 'laser' });
     state = deviceSetupReducer(state, { kind: 'select-machine-kind', machineKind: 'cnc' });
@@ -86,10 +91,30 @@ describe('unified machine setup flow', () => {
   });
 
   it('blocks unsupported CNC/controller combinations', () => {
-    let state = deviceSetupReducer(open(), { kind: 'select-machine-kind', machineKind: 'cnc' });
+    let state = deviceSetupReducer(open(), {
+      kind: 'set-machine-kinds',
+      machineKinds: ['cnc'],
+    });
     state = deviceSetupReducer(state, { kind: 'select-controller', controllerKind: 'marlin' });
     expect(machineSetupValidationIssues(state).join(' ')).toMatch(/cannot run KerfDesk CNC jobs/);
     expect(canAdvanceDeviceSetup(state)).toBe(false);
+  });
+
+  it('persists both output capabilities and CNC machine values for a hybrid machine', () => {
+    let state = deviceSetupReducer(open(), {
+      kind: 'set-machine-kinds',
+      machineKinds: ['laser', 'cnc'],
+    });
+    const machine = {
+      ...state.cncDraft,
+      params: { ...state.cncDraft.params, safeZMm: 11, spindleMaxRpm: 24000 },
+    };
+    state = deviceSetupReducer(state, { kind: 'edit-machine', machine });
+    const profile = machineSetupProfile(state);
+    expect(profile.capabilities).toEqual(expect.arrayContaining(['laser-output', 'cnc-output']));
+    expect(profile.cncSubProfile).toMatchObject({ safeZMm: 11, spindleMaxRpm: 24000 });
+    expect(state.machineKind).toBe('laser');
+    expect(state.draftMachine).toEqual(LASER_MACHINE_CONFIG);
   });
 
   it('keeps readback separate until the operator explicitly accepts it', () => {

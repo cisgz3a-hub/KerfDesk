@@ -2,6 +2,8 @@ import { validateCameraProfileShape } from '../../core/camera';
 import {
   HARD_MAX_FIRE_POWER_PERCENT,
   isEstimateTimeScale,
+  isGcodeDialectSelection,
+  isGrblRxBufferBytes,
   PROFILE_CAPABILITIES,
   type ProfileCapability,
 } from '../../core/devices';
@@ -61,6 +63,23 @@ export function optionalLaserSubProfile(obj: Record<string, unknown>, path: stri
     requireLiteral(value, `${path}.focusMode`, ['fixed-lever', 'manual', 'unknown']),
     requireLiteral(value, `${path}.airAssist`, ['built-in', 'manual', 'none', 'unknown']),
   ]);
+}
+
+export function optionalGcodeDialect(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || isGcodeDialectSelection(value)
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
+export function optionalGrblRxBufferBytes(
+  obj: Record<string, unknown>,
+  path: string,
+): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || isGrblRxBufferBytes(value)
+    ? null
+    : `missing or invalid \`${path}\``;
 }
 
 export function optionalCameraProfile(obj: Record<string, unknown>, path: string): string | null {

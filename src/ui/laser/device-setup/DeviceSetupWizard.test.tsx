@@ -78,6 +78,9 @@ describe('DeviceSetupWizard', () => {
       expect(view.host.textContent).toContain('Step 1 of 7 — Machine & controller');
       expect(view.host.textContent).toContain('Start here before connecting.');
       expect(view.host.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+      expect(
+        view.host.querySelectorAll('nav[aria-label="Machine Setup steps"] button'),
+      ).toHaveLength(7);
       expect(view.host.textContent).not.toContain('ready to cut');
     } finally {
       await view.unmount();
@@ -196,7 +199,7 @@ describe('DeviceSetupWizard', () => {
   it('shows CNC-only machine settings and commits them with the profile', async () => {
     const view = await renderWizard();
     try {
-      const radios = view.host.querySelectorAll('input[name="machine-kind"]');
+      const radios = view.host.querySelectorAll('input[name="machine-capability"]');
       const cncRadio = radios.item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
@@ -217,7 +220,40 @@ describe('DeviceSetupWizard', () => {
       if (machine?.kind === 'cnc') expect(machine.params.safeZMm).toBe(9);
       expect(useStore.getState().project.device.bedWidth).toBe(300);
       expect(useStore.getState().project.device.bedHeight).toBe(180);
+      expect(useStore.getState().project.device.capabilities).toContain('cnc-output');
+      expect(useStore.getState().project.device.capabilities).not.toContain('laser-output');
+      expect(useStore.getState().project.device.cncSubProfile?.safeZMm).toBe(9);
       expect(useStore.getState().cachedCncMachine?.params.safeZMm).toBe(9);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('saves a hybrid machine with both output contracts and one explicit active mode', async () => {
+    const view = await renderWizard();
+    try {
+      const hybridRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(2);
+      if (!(hybridRadio instanceof HTMLInputElement)) throw new Error('hybrid radio missing');
+      await act(async () => hybridRadio.click());
+      expect(view.host.textContent).toContain('Active mode after Save');
+      expect(view.host.textContent).toContain('interchangeable laser and spindle toolheads');
+
+      await act(async () => button(view.host, 'Next').click()); // connect
+      await act(async () => button(view.host, 'Next').click()); // workspace
+      await act(async () => button(view.host, 'Next').click()); // machine output
+      expect(view.host.textContent).toContain('Laser output and accessories');
+      expect(view.host.textContent).toContain('CNC clearance and spindle contract');
+      await changeInput(view.host, 'Safe Z', '10');
+      await advanceToReview(view.host);
+      await act(async () => button(view.host, 'Save machine setup').click());
+
+      const state = useStore.getState();
+      expect(state.project.machine?.kind).toBe('laser');
+      expect(state.project.device.capabilities).toEqual(
+        expect.arrayContaining(['laser-output', 'cnc-output']),
+      );
+      expect(state.project.device.cncSubProfile?.safeZMm).toBe(10);
+      expect(state.cachedCncMachine?.params.safeZMm).toBe(10);
     } finally {
       await view.unmount();
     }
@@ -226,7 +262,7 @@ describe('DeviceSetupWizard', () => {
   it('blocks a controller that cannot run the selected CNC output contract', async () => {
     const view = await renderWizard();
     try {
-      const cncRadio = view.host.querySelectorAll('input[name="machine-kind"]').item(1);
+      const cncRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
       await changeSelect(view.host, 'Controller firmware', 'marlin');

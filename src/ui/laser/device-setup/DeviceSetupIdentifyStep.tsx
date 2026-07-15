@@ -24,8 +24,13 @@ import {
 } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
 import { ImportExportPanel } from '../MachineSetupImportExport';
-import type { DeviceSetupStepProps } from './device-setup-flow';
+import {
+  deviceSetupSupportsMachineKind,
+  machineSetupProfile,
+  type DeviceSetupStepProps,
+} from './device-setup-flow';
 import { DeviceSetupCncPreset } from './DeviceSetupCncPreset';
+import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
 import {
   machineSetupControllerGuide,
   machineSetupControllerGuides,
@@ -39,7 +44,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
   return (
     <section style={sectionStyle}>
       <SetupIntroduction />
-      <MachineTypeChoice state={state} dispatch={dispatch} />
+      <DeviceSetupMachineCapability state={state} dispatch={dispatch} />
       <DeviceSetupCncPreset state={state} dispatch={dispatch} />
       <ControllerContract
         state={state}
@@ -47,7 +52,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
         dispatch={dispatch}
         update={update}
       />
-      {state.machineKind === 'cnc' && !driver.capabilities.cncJobs ? (
+      {deviceSetupSupportsMachineKind(state, 'cnc') && !driver.capabilities.cncJobs ? (
         <p role="alert" style={warningStyle}>
           {guide.label} is not a KerfDesk CNC streaming target. Choose GRBL, grblHAL, or FluidNC
           before continuing with a CNC machine.
@@ -56,7 +61,9 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
       {driver.capabilities.transport === 'serial' ? (
         <AdvancedConnection state={state} controllerKind={controllerKind} update={update} />
       ) : null}
-      {state.machineKind === 'laser' ? <ProfileCatalog state={state} dispatch={dispatch} /> : null}
+      {deviceSetupSupportsMachineKind(state, 'laser') ? (
+        <ProfileCatalog state={state} dispatch={dispatch} />
+      ) : null}
       <ProfileImport state={state} dispatch={dispatch} />
     </section>
   );
@@ -67,47 +74,10 @@ function SetupIntroduction(): JSX.Element {
     <div style={introStyle}>
       <strong>Start here before connecting.</strong>
       <span>
-        Choose the machine type and controller printed in the machine manual, controller screen, or
-        firmware banner. These choices control connection, commands, output, and safety gates.
+        Choose every toolhead this physical machine supports, then choose the one KerfDesk should
+        make active after Save. The active mode alone controls commands, output, and safety gates.
       </span>
     </div>
-  );
-}
-
-function MachineTypeChoice({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
-  return (
-    <fieldset style={fieldsetStyle}>
-      <legend>Machine type</legend>
-      <MachineKindRadio
-        label="Laser — beam power, air assist, raster, and focus settings"
-        checked={state.machineKind === 'laser'}
-        onChange={() => dispatch({ kind: 'select-machine-kind', machineKind: 'laser' })}
-      />
-      <MachineKindRadio
-        label="CNC router / mill — safe Z, spindle, coolant, and park settings"
-        checked={state.machineKind === 'cnc'}
-        onChange={() => dispatch({ kind: 'select-machine-kind', machineKind: 'cnc' })}
-      />
-    </fieldset>
-  );
-}
-
-function MachineKindRadio(props: {
-  readonly label: string;
-  readonly checked: boolean;
-  readonly onChange: () => void;
-}): JSX.Element {
-  return (
-    <label style={choiceStyle}>
-      <input
-        type="radio"
-        name="machine-kind"
-        checked={props.checked}
-        onChange={props.onChange}
-        title={`Configure this project for a ${props.label} machine.`}
-      />
-      <span>{props.label}</span>
-    </label>
   );
 }
 
@@ -271,7 +241,7 @@ function ProfileImport({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
         final Save machine setup button.
       </p>
       <ImportExportPanel
-        profile={state.draft}
+        profile={machineSetupProfile(state)}
         onApply={(profile) => dispatch({ kind: 'apply-preset', profile })}
       />
     </details>
@@ -358,19 +328,6 @@ function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confide
 
 const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
 const introStyle: React.CSSProperties = { display: 'grid', gap: 4, fontSize: 12, lineHeight: 1.45 };
-const fieldsetStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 10,
-};
-const choiceStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 8,
-  alignItems: 'flex-start',
-  fontSize: 12,
-};
 const settingsStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const mutedInlineStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 11 };
 const warningStyle: React.CSSProperties = {

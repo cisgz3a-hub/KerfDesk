@@ -134,7 +134,7 @@ baseTest(
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
 
-    await dialog.getByRole('radio', { name: /CNC router \/ mill/ }).check();
+    await dialog.getByRole('radio', { name: /CNC only/ }).check();
     await dialog.getByLabel('Built-in CNC machine').selectOption('genmitsu-3018');
     await dialog.getByRole('button', { name: 'Load into draft', exact: true }).click();
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();

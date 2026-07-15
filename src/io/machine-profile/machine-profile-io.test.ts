@@ -167,6 +167,41 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.rxBufferBytes).toBe(96);
   });
 
+  it('roundtrips hybrid output capability and machine-wide CNC settings', () => {
+    const profile: DeviceProfile = {
+      ...profileWithCalibration(),
+      capabilities: [
+        ...(profileWithCalibration().capabilities ?? []),
+        'laser-output',
+        'cnc-output',
+      ],
+      cncSubProfile: {
+        safeZMm: 9,
+        spindleMaxRpm: 24000,
+        spindleSpinupSec: 4,
+        coolant: 'mist',
+        parkXMm: 5,
+        parkYMm: 390,
+      },
+    };
+    const result = deserializeMachineProfileDocument(
+      serializeMachineProfileDocument({
+        format: MACHINE_PROFILE_FORMAT,
+        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+        profile,
+        source: { kind: 'custom', label: 'Hybrid machine' },
+        reviewNotes: [],
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.capabilities).toEqual(
+      expect.arrayContaining(['laser-output', 'cnc-output']),
+    );
+    expect(result.document.profile.cncSubProfile).toEqual(profile.cncSubProfile);
+  });
+
   it('backfills legacy machine profiles without explicit streaming settings', () => {
     const profile = profileWithCalibration();
     const {

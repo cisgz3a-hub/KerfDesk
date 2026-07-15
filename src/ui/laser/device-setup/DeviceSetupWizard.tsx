@@ -20,6 +20,7 @@ import {
   initDeviceSetup,
   isFirstDeviceSetupStep,
   isLastDeviceSetupStep,
+  machineSetupProfile,
   machineSetupValidationIssues,
   type DeviceSetupAction,
   type DeviceSetupState,
@@ -119,8 +120,9 @@ function useMachineSetupSave(
     });
   };
   const saveAndSync = async (): Promise<void> => {
-    replaceMachineSetup(state.draft, state.draftMachine, state.cncDraft);
-    props.onConfigured?.(state.draft);
+    const profile = machineSetupProfile(state);
+    replaceMachineSetup(profile, state.draftMachine, state.cncDraft);
+    props.onConfigured?.(profile);
     try {
       for (const write of writes) await writeGrblSetting(write.id, write.desired);
       if (writes.length > 0) {
@@ -161,7 +163,7 @@ function SetupLayout(props: {
   const stepNumber = stepOrder.indexOf(props.state.step) + 1;
   return (
     <div className="lf-machine-setup-layout" style={layoutStyle}>
-      <SetupStepper state={props.state} stepOrder={stepOrder} />
+      <SetupStepper state={props.state} stepOrder={stepOrder} dispatch={props.dispatch} />
       <div style={contentStyle}>
         <p style={stepHintStyle}>
           Step {stepNumber} of {stepOrder.length} — {STEP_TITLES[props.state.step]}
@@ -175,18 +177,23 @@ function SetupLayout(props: {
 function SetupStepper(props: {
   readonly state: DeviceSetupState;
   readonly stepOrder: ReadonlyArray<DeviceSetupStep>;
+  readonly dispatch: React.Dispatch<DeviceSetupAction>;
 }): JSX.Element {
   return (
     <nav className="lf-machine-setup-stepper" aria-label="Machine Setup steps" style={stepperStyle}>
       {props.stepOrder.map((step, index) => (
-        <div
+        <button
           key={step}
+          type="button"
+          onClick={() => props.dispatch({ kind: 'go', step })}
           aria-current={step === props.state.step ? 'step' : undefined}
+          aria-label={`Go to step ${index + 1}: ${STEP_TITLES[step]}`}
+          title={`Open ${STEP_TITLES[step]}`}
           style={{ ...stepStyle, ...(step === props.state.step ? activeStepStyle : {}) }}
         >
           <span style={stepNumberStyle}>{index + 1}</span>
           <span>{STEP_TITLES[step]}</span>
-        </div>
+        </button>
       ))}
     </nav>
   );
@@ -300,8 +307,14 @@ const stepStyle: React.CSSProperties = {
   alignItems: 'center',
   padding: '7px 6px',
   borderRadius: 5,
+  border: 0,
+  width: '100%',
+  background: 'transparent',
   color: 'var(--lf-text-muted)',
   fontSize: 12,
+  fontFamily: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
 };
 const activeStepStyle: React.CSSProperties = {
   background: 'var(--lf-bg-2)',

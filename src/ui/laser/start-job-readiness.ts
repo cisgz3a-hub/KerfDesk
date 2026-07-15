@@ -127,7 +127,8 @@ export type MachineStartSnapshot = {
 // parse it differently.
 function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): string[] {
   const issues = [...findMachineStartIssues(machine)];
-  if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
+  const machineKind = machineKindOf(project.machine);
+  if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
     issues.push(CNC_REQUIRES_GRBL_MESSAGE);
   }
   issues.push(...cncOverrideStartIssues(project, machine.ovCache));
