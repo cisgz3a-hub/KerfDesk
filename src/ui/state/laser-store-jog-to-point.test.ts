@@ -38,6 +38,7 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
   connection.emitLine('ok');
   await flush();
@@ -173,6 +174,7 @@ describe('jogToMachinePosition', () => {
   it('errors without a live machine position', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
+    useLaserStore.setState({ statusReport: null, statusObservation: null });
     // No status report emitted → no known position.
 
     await expect(useLaserStore.getState().jogToMachinePosition(10, 10, 1000)).rejects.toThrow(

@@ -39,9 +39,9 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
   connection.emitLine('ok');
-  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
 }
 
@@ -339,6 +339,9 @@ describe('stop-path ack attribution', () => {
     useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
     await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'marlin' });
     connection.emitLine('start');
+    await flush();
+    connection.emitLine('X:0.00 Y:0.00 Z:0.00 E:0.00 Count X:0 Y:0 Z:0');
+    connection.emitLine('ok');
     await flush();
   }
 

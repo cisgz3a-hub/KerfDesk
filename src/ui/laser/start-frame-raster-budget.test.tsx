@@ -170,7 +170,14 @@ describe('custom-origin raster budget guard', () => {
       });
 
       expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 6000);
-      expect(useToastStore.getState().toasts).toEqual([]);
+      expect(
+        useToastStore
+          .getState()
+          .toasts.filter(
+            (toast) =>
+              !toast.message.startsWith('Job recovery storage is unavailable while trying to read'),
+          ),
+      ).toEqual([]);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());

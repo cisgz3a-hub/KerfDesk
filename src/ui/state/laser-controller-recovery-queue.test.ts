@@ -57,6 +57,7 @@ async function connectAndDrainHandshake(
 ): Promise<void> {
   await useLaserStore.getState().connect(adapter(connection));
   connection.emitLine('Grbl 1.1f');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
   expect(writes).toContain('$$\n');
   connection.emitLine('ok');

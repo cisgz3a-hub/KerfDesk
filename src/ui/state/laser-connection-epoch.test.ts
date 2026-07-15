@@ -57,6 +57,7 @@ function adapterFor(connection: SerialConnection): PlatformAdapter {
 async function connect(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(connection));
   connection.emitLine('Grbl 1.1h');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await Promise.resolve();
 }
 
@@ -78,6 +79,7 @@ describe('serial connection epoch guards', () => {
     });
 
     connection.emitLine('Grbl 1.1h');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await vi.advanceTimersByTimeAsync(0);
 
     expect(writes).toContain('$$\n');
@@ -113,6 +115,7 @@ describe('serial connection epoch guards', () => {
 
     await useLaserStore.getState().connect(adapterFor(connection));
     connection.emitLine('Grbl 1.1h');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await vi.advanceTimersByTimeAsync(0);
 
     expect(writes).toContain('$$\n');
@@ -191,6 +194,7 @@ describe('serial connection epoch guards', () => {
     await replacement;
     await vi.advanceTimersByTimeAsync(151);
     currentConnection.emitLine('Grbl 1.1h');
+    currentConnection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await vi.advanceTimersByTimeAsync(300);
 
     expect(currentWrites).toContain('$$\n');

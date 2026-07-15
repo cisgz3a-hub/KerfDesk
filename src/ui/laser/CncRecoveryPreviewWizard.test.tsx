@@ -1,7 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { advanceJobCheckpoint, createJobCheckpoint } from '../../core/recovery';
 import {
   createLayer,
   createProject,
@@ -14,6 +13,8 @@ import {
 } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import { useStore } from '../state';
+import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
 import { CncRecoveryPreviewWizard } from './CncRecoveryPreviewWizard';
 
@@ -77,44 +78,48 @@ function previewProject(): Project {
   };
 }
 
-function matchingCheckpoint(project: Project) {
+function exactCapsule(project: Project): RecoveryCapsule {
   const prepared = prepareOutput(project);
   if (!prepared.ok) throw new Error('Expected prepared CNC output.');
   const emitted = emitPreparedGcode(prepared);
   if (!emitted.preflight.ok) throw new Error('Expected valid CNC preflight.');
-  return advanceJobCheckpoint(
-    createJobCheckpoint({
-      gcode: emitted.gcode,
-      machineKind: 'cnc',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: '2026-07-14T12:00:00.000Z',
-    }),
-    3,
-    '2026-07-14T12:00:00.000Z',
-  );
+  const runId = 'run-archived-cnc';
+  const artifact = createExecutionArtifact({
+    runId,
+    gcode: emitted.gcode,
+    prepared,
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    canvasPlan: { retentionKey: 'archived-cnc-signature' } as CanvasMotionPlan,
+    controllerSettings: null,
+    createdAtIso: '2026-07-14T12:00:00.000Z',
+  });
+  return {
+    runId,
+    artifactKind: artifact.kind,
+    revision: 1,
+    ackedLines: Math.min(3, artifact.sendableLines),
+    sendableLines: artifact.sendableLines,
+    interruption: { kind: 'disconnect', message: 'Connection lost.' },
+    updatedAtIso: '2026-07-14T12:01:00.000Z',
+    artifact,
+  };
 }
 
-function renderWizard(project = createProject()): {
-  readonly checkpoint: ReturnType<typeof matchingCheckpoint>;
+function renderWizard(archivedProject: Project): {
+  readonly capsule: RecoveryCapsule;
   readonly onClose: ReturnType<typeof vi.fn>;
 } {
-  useStore.setState({ project });
-  const checkpoint =
-    project.machine?.kind === 'cnc'
-      ? matchingCheckpoint(project)
-      : createJobCheckpoint({
-          gcode: 'G21\nG90\nM30',
-          machineKind: 'cnc',
-          outputScope: DEFAULT_OUTPUT_SCOPE,
-          nowIso: '2026-07-14T12:00:00.000Z',
-        });
+  const openProject = createProject();
+  useStore.setState({ project: openProject });
+  const capsule = exactCapsule(archivedProject);
   host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   const onClose = vi.fn();
-  act(() => root.render(<CncRecoveryPreviewWizard checkpoint={checkpoint} onClose={onClose} />));
+  act(() => root.render(<CncRecoveryPreviewWizard capsule={capsule} onClose={onClose} />));
   unmount = () => root.unmount();
-  return { checkpoint, onClose };
+  expect(useStore.getState().project).toBe(openProject);
+  return { capsule, onClose };
 }
 
 function wizardButton(label: string): HTMLButtonElement {
@@ -164,7 +169,7 @@ function completePhysicalQualification(qualificationId: string): void {
 
 describe('CncRecoveryPreviewWizard', () => {
   it('keeps execution gated until geometry and every physical qualification are explicit', async () => {
-    const { checkpoint, onClose } = renderWizard(previewProject());
+    const { capsule, onClose } = renderWizard(previewProject());
     expect(host?.textContent).toContain('Evidence audit');
     expect(host?.textContent).toContain('Controller acknowledgements');
 
@@ -186,7 +191,7 @@ describe('CncRecoveryPreviewWizard', () => {
     expect(start.disabled).toBe(false);
     await act(async () => start.click());
     expect(runCncSupervisedRecoveryFlow).toHaveBeenCalledWith(
-      checkpoint,
+      capsule,
       expect.objectContaining({
         uncertaintyEventId: expect.stringContaining('cut-2'),
         qualificationId: 'AIR-CUT-2026-07-15',
@@ -213,5 +218,66 @@ describe('CncRecoveryPreviewWizard', () => {
     expect(host?.textContent).toContain('Required runway:');
     expect(host?.textContent).toContain('Available straight tangent:');
     expect(selector.value).toMatch(/cut-2$/);
+  });
+
+  it('requires fresh event-specific confirmations after changing the uncertainty segment', () => {
+    renderWizard(previewProject());
+    act(() => wizardButton('Next: Geometry').click());
+    chooseUncertaintyEvent('cut-2');
+    act(() => wizardButton('Next: Physical checks').click());
+    completePhysicalQualification('AIR-CUT-2026-07-15');
+    act(() => wizardButton('Next: Final review').click());
+
+    act(() => wizardButton('Back').click());
+    act(() => wizardButton('Back').click());
+    chooseUncertaintyEvent('cut-3');
+    act(() => wizardButton('Next: Physical checks').click());
+
+    const checks = [...(host?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])];
+    expect(checks.slice(0, 5).every((checkbox) => checkbox.checked)).toBe(true);
+    expect(checks.slice(5).map((checkbox) => checkbox.checked)).toEqual([false, false]);
+    expect(wizardButton('Next: Final review').disabled).toBe(true);
+  });
+
+  it('blocks duplicate Start, Close, Escape, and Back while startup is in flight', async () => {
+    const { onClose } = renderWizard(previewProject());
+    act(() => wizardButton('Next: Geometry').click());
+    chooseUncertaintyEvent();
+    act(() => wizardButton('Next: Physical checks').click());
+    completePhysicalQualification('AIR-CUT-2026-07-15');
+    act(() => wizardButton('Next: Final review').click());
+
+    let resolveStart: ((started: boolean) => void) | undefined;
+    vi.mocked(runCncSupervisedRecoveryFlow).mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
+    const start = wizardButton('Start supervised recovery');
+    act(() => {
+      start.click();
+      start.click();
+    });
+
+    expect(runCncSupervisedRecoveryFlow).toHaveBeenCalledTimes(1);
+    expect(wizardButton('Starting recovery…').disabled).toBe(true);
+    expect(wizardButton('Close').disabled).toBe(true);
+    expect(wizardButton('Back').disabled).toBe(true);
+    act(() => {
+      host
+        ?.querySelector('[role="dialog"]')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveStart?.(false);
+      await Promise.resolve();
+    });
+    expect(wizardButton('Start supervised recovery').disabled).toBe(false);
+    expect(wizardButton('Close').disabled).toBe(false);
+    act(() => wizardButton('Close').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -5,15 +5,21 @@
 // cycle (same pattern as the sibling action modules).
 
 import { selectControllerDriver } from '../../core/controllers';
-import { startControllerCommand } from './laser-interactive-command';
-import { beginSettingsCollection } from './detected-settings-action';
 import {
   claimIntentionalDisconnect,
   closeConnectionOnce,
+  connectionForgetRequested,
   teardownConnectionRefs,
 } from './laser-connection-teardown';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
-import { handleLine, type HandlerRefs } from './laser-line-handler';
+import { handleLine } from './laser-line-handler';
+import {
+  disconnectedControllerQualification,
+  failedControllerQualificationPatch,
+  qualifyingController,
+} from './laser-controller-qualification';
+import { runControllerHandshake } from './laser-controller-handshake';
+import { recoveryRepository } from './recovery';
 import {
   streamStalledNotice,
   writeFailedNotice,
@@ -25,12 +31,12 @@ import {
   detectStreamStall,
   disconnectStopCommands,
   hasUnsettledStreamAcks,
+  initialLaserState,
   isActiveJob,
   pushLog,
 } from './laser-store-helpers';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment';
-import { appendSystemNotice } from './laser-system-notice';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -43,13 +49,13 @@ type SafeWriteFn = (
   action?: LaserSafetyAction,
   source?: TranscriptSource,
 ) => Promise<void>;
+type LiveConnection = NonNullable<LiveRefs['connection']>;
+
+const forgetFinalizations = new WeakMap<LiveConnection, Promise<void>>();
 
 // 250 ms tick; idle machines only emit a status query every 4th tick.
 const STATUS_POLL_MS = 250;
 const IDLE_POLL_DIVISOR = 4;
-const PASSIVE_STARTUP_WAIT_MS = 250;
-const ACTIVE_HANDSHAKE_WAIT_MS = 1750;
-const LATE_BANNER_SETTLE_MS = 300;
 
 export function connectionActions(
   set: SetFn,
@@ -82,7 +88,12 @@ export function connectionActions(
         // Connect buttons disabled.
         const portRef = await adapter.serial.requestPort();
         if (portRef === null) {
-          set({ connection: { kind: 'disconnected' } });
+          set((state) => ({
+            connection: { kind: 'disconnected' },
+            controllerQualification: disconnectedControllerQualification(
+              state.controllerSessionEpoch,
+            ),
+          }));
           return;
         }
         const baudRate = options.baudRate ?? refs.driver.defaultBaudRate;
@@ -102,11 +113,12 @@ export function connectionActions(
           set(buildPortClosePatch);
         });
         set(connectedControllerStatePatch);
-        void runHandshake(set, get, refs, safeWrite, baudRate)
+        void runControllerHandshake(set, get, refs, safeWrite, baudRate)
           .catch((err: unknown) => {
             if (refs.connection !== conn) return;
             const message = err instanceof Error ? err.message : String(err);
             set((state) => ({
+              ...failedControllerQualificationPatch(state, state.controllerSessionEpoch, message),
               lastWriteError: message,
               log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
             }));
@@ -122,7 +134,12 @@ export function connectionActions(
           });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        set({ connection: { kind: 'failed', error: message } });
+        set((state) => ({
+          connection: { kind: 'failed', error: message },
+          controllerQualification: disconnectedControllerQualification(
+            state.controllerSessionEpoch,
+          ),
+        }));
       }
     },
     disconnect: () => runDisconnect(set, get, refs, safeWrite, false),
@@ -131,13 +148,16 @@ export function connectionActions(
 }
 
 function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserState> {
+  const nextEpoch = state.controllerSessionEpoch + 1;
   return {
     connection: { kind: 'connecting' },
-    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    controllerSessionEpoch: nextEpoch,
+    statusReport: null,
     statusObservation: null,
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: qualifyingController(nextEpoch, 'controller-response'),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     homingProof: null,
@@ -149,10 +169,16 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
+    wcoCache: null,
+    ovCache: null,
+    accessoryCache: null,
+    mpgActive: null,
+    workOriginActive: false,
+    workOriginSource: 'none',
+    frameVerification: null,
     capabilities: refs.driver.capabilities,
     activeControllerKind: refs.driver.kind,
     detectedControllerKind: null,
-    mpgActive: null,
   };
 }
 
@@ -186,34 +212,34 @@ async function runDisconnect(
   forgetDevice: boolean,
 ): Promise<void> {
   assertAutofocusIdle(get());
-  const conn = refs.connection;
-  if (conn === null) {
-    teardownConnectionRefs(refs);
-  } else {
-    const ownsIntentionalDisconnect = claimIntentionalDisconnect(conn);
-    try {
-      if (isGrblFamilyDriver(refs.driver)) {
-        await runGrblDisconnectTransaction(set, refs, safeWrite);
-      } else {
-        const stopCommands = disconnectStopCommands(get(), refs.driver);
-        for (const stopCommand of stopCommands) {
-          await safeWrite(stopCommand, 'disconnect');
-        }
-      }
-    } catch {
-      // The stop-before-disconnect write failed (USB likely already gone),
-      // so the machine may still run buffered commands. Warn — but STILL
-      // tear down the link the operator asked to drop (don't rethrow).
-      set({ safetyNotice: writeFailedNotice('disconnect') });
+  const closed = await closeControllerTransport(set, get, refs, safeWrite, forgetDevice);
+  if (!closed.ownsFinalState) {
+    if (forgetDevice && closed.connection !== null && refs.connection === null) {
+      await finalizeForgottenControllerOnce(
+        closed.connection,
+        set,
+        get,
+        refs,
+        closed.stopCouldNotBeConfirmed,
+      );
     }
-    if (!ownsIntentionalDisconnect) {
-      await closeConnectionOnce(conn, forgetDevice).catch(() => undefined);
-      return;
+    return;
+  }
+  const forgetWasUpgraded =
+    closed.connection !== null && connectionForgetRequested(closed.connection);
+  if (forgetDevice || forgetWasUpgraded) {
+    if (closed.connection === null) {
+      await finalizeForgottenController(set, get, refs, closed.stopCouldNotBeConfirmed);
+    } else {
+      await finalizeForgottenControllerOnce(
+        closed.connection,
+        set,
+        get,
+        refs,
+        closed.stopCouldNotBeConfirmed,
+      );
     }
-    const ownsConnection = refs.connection === conn;
-    if (ownsConnection) teardownConnectionRefs(refs);
-    await closeConnectionOnce(conn, forgetDevice).catch(() => undefined);
-    if (!ownsConnection) return;
+    return;
   }
   set((state) => ({
     connection: { kind: 'disconnected' },
@@ -224,6 +250,7 @@ async function runDisconnect(
     detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     streamer: null,
@@ -250,119 +277,94 @@ async function runDisconnect(
   }));
 }
 
-// Establish a quiet startup boundary before sending the queued settings query.
-// A status poll used to trigger `$$` immediately; a delayed welcome banner could
-// then reset the ack ledger before the query's `ok`, falsely reporting that
-// reply as unowned on the next jog. Wait briefly for a passive banner, use only
-// a realtime status probe when needed, and give a non-banner first line one
-// final settle window before any ack-producing command is sent.
-async function runHandshake(
+async function closeControllerTransport(
   set: SetFn,
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
-  baudRate: number,
-): Promise<void> {
+  forgetDevice: boolean,
+): Promise<{
+  readonly connection: LiveConnection | null;
+  readonly ownsFinalState: boolean;
+  readonly stopCouldNotBeConfirmed: boolean;
+}> {
   const connection = refs.connection;
-  if (connection === null) return;
-  let expectedWriteEpoch = refs.writeEpoch ?? 0;
-  let sawWelcomeBoundary = false;
-  const acceptControllerLineEpoch = (): boolean => {
-    if (refs.connection !== connection) return false;
-    const currentWriteEpoch = refs.writeEpoch ?? 0;
-    if (currentWriteEpoch === expectedWriteEpoch) return true;
-    // The first welcome banner is the expected controller-reset boundary for
-    // a new port. Adopt that one epoch after the line has identified firmware;
-    // all later awaits are strict so a reset during settle still aborts.
-    if (currentWriteEpoch === expectedWriteEpoch + 1 && get().detectedControllerKind !== null) {
-      expectedWriteEpoch = currentWriteEpoch;
-      sawWelcomeBoundary = true;
-      return true;
-    }
-    return false;
+  if (connection === null) {
+    teardownConnectionRefs(refs);
+    return { connection, ownsFinalState: true, stopCouldNotBeConfirmed: false };
+  }
+  const ownsFinalState = claimIntentionalDisconnect(connection);
+  let stopCouldNotBeConfirmed = false;
+  try {
+    await stopBeforeDisconnect(set, get, refs, safeWrite);
+  } catch {
+    set({ safetyNotice: writeFailedNotice('disconnect') });
+    stopCouldNotBeConfirmed = true;
+  }
+  if (!ownsFinalState) {
+    await closeConnectionOnce(connection, forgetDevice).catch(() => undefined);
+    return { connection, ownsFinalState: false, stopCouldNotBeConfirmed };
+  }
+  const stillOwnsConnection = refs.connection === connection;
+  if (stillOwnsConnection) teardownConnectionRefs(refs);
+  await closeConnectionOnce(connection, forgetDevice).catch(() => undefined);
+  return {
+    connection,
+    ownsFinalState: stillOwnsConnection,
+    stopCouldNotBeConfirmed,
   };
-  let gotLine = await waitForNextControllerLine(refs, PASSIVE_STARTUP_WAIT_MS);
-  if (!acceptControllerLineEpoch()) return;
-  if (!gotLine) {
-    const realtimeQuery = refs.driver.realtime.statusQuery;
-    const nextLine = waitForNextControllerLine(refs, ACTIVE_HANDSHAKE_WAIT_MS);
-    if (realtimeQuery !== null) {
-      await safeWrite(realtimeQuery);
-      if (!acceptControllerLineEpoch()) return;
-    }
-    gotLine = await nextLine;
-    if (!acceptControllerLineEpoch()) return;
-  }
-
-  if (!gotLine) {
-    const driver = refs.driver;
-    set(
-      appendSystemNotice(
-        get(),
-        refs,
-        `[lf2] No controller response within 2 s. Check baud rate (${baudRate}) and that the device is ${driver.label}.`,
-      ),
-    );
-    return;
-  }
-  await settleAfterControllerLine(sawWelcomeBoundary);
-  if (!acceptControllerLineEpoch()) return;
-  const settingsQuery = refs.driver.commands.settingsQuery;
-  if (settingsQuery === null) {
-    set({ log: pushLog(get(), '[lf2] Connected.') });
-    return;
-  }
-  set({
-    controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
-    log: pushLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
-    detectedSettings: null,
-    controllerSettings: null,
-    controllerSettingsObservation: null,
-    grblSettingsRows: [],
-    lastSettingsReadAt: null,
-  });
-  beginSettingsCollection(refs, get().controllerSessionEpoch);
-  await startControllerCommand(refs, safeWrite, {
-    kind: 'connection-handshake',
-    label: 'controller settings query',
-    command: `${settingsQuery}\n`,
-    source: 'system',
-  });
-  if (!handshakeIsCurrent(refs, connection, expectedWriteEpoch)) return;
 }
 
-function settleAfterControllerLine(sawWelcomeBoundary: boolean): Promise<void> {
-  if (sawWelcomeBoundary) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, LATE_BANNER_SETTLE_MS));
-}
-
-function waitForNextControllerLine(refs: HandlerRefs, timeoutMs: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const settle = (gotLine: boolean): void => {
-      if (settled) return;
-      settled = true;
-      resolve(gotLine);
-    };
-    const onLineArrived = (): void => {
-      clearTimeout(timer);
-      if (refs.onLineArrived === onLineArrived) refs.onLineArrived = null;
-      settle(true);
-    };
-    const timer = setTimeout(() => {
-      if (refs.onLineArrived === onLineArrived) refs.onLineArrived = null;
-      settle(false);
-    }, timeoutMs);
-    refs.onLineArrived = onLineArrived;
-  });
-}
-
-function handshakeIsCurrent(
+async function stopBeforeDisconnect(
+  set: SetFn,
+  get: GetFn,
   refs: LiveRefs,
-  connection: NonNullable<LiveRefs['connection']>,
-  writeEpoch: number,
-): boolean {
-  return refs.connection === connection && (refs.writeEpoch ?? 0) === writeEpoch;
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  if (isGrblFamilyDriver(refs.driver)) {
+    await runGrblDisconnectTransaction(set, refs, safeWrite);
+    return;
+  }
+  for (const stopCommand of disconnectStopCommands(get(), refs.driver)) {
+    await safeWrite(stopCommand, 'disconnect');
+  }
+}
+
+function finalizeForgottenControllerOnce(
+  connection: LiveConnection,
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  stopCouldNotBeConfirmed: boolean,
+): Promise<void> {
+  const existing = forgetFinalizations.get(connection);
+  if (existing !== undefined) return existing;
+  const finalization = finalizeForgottenController(set, get, refs, stopCouldNotBeConfirmed);
+  forgetFinalizations.set(connection, finalization);
+  return finalization;
+}
+
+async function finalizeForgottenController(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  stopCouldNotBeConfirmed: boolean,
+): Promise<void> {
+  await recoveryRepository.purgeControllerData();
+  refs.driver = selectControllerDriver(undefined);
+  const retainDisconnectWarning = stopCouldNotBeConfirmed || disconnectStopIsUncertain(get());
+  set((state) => ({
+    ...initialLaserState(),
+    controllerSessionEpoch: state.controllerSessionEpoch + 1,
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    safetyNotice: retainDisconnectWarning ? writeFailedNotice('disconnect') : null,
+  }));
+}
+
+function disconnectStopIsUncertain(state: LaserState): boolean {
+  return state.safetyNotice?.kind === 'write-failed' && state.safetyNotice.action === 'disconnect';
 }
 
 function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: SafeWriteFn): void {

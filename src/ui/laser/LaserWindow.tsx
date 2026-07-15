@@ -3,9 +3,7 @@
 
 import { useState } from 'react';
 import { describeAlarm } from '../../core/controllers/grbl';
-import { selectControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
-import { usePlatform } from '../app/platform-context';
 import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -15,20 +13,21 @@ import {
   jogFrameCommandBlockMessage,
   setupBlockingJobCommandBlockMessage,
 } from '../state/laser-store-helpers';
-import { machineControlsLabel, machineDisplayName, machineNoun } from '../machine/machine-labels';
-import { ConnectionBar } from './ConnectionBar';
+import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
+import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
-import { DeviceSetupControls, type DeviceSetupOpenRequest } from './device-setup';
+import type { DeviceSetupOpenRequest } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
 import { ProbePanel } from './ProbePanel';
-import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { useStartBlockerStore } from './start-blocker-store';
+import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
 
 export function LaserWindow(): JSX.Element {
   const [machineSetupRequest, setMachineSetupRequest] = useState<DeviceSetupOpenRequest>();
@@ -39,6 +38,8 @@ export function LaserWindow(): JSX.Element {
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
+  const controllerQualification = useLaserStore((s) => s.controllerQualification);
+  const controllerSessionEpoch = useLaserStore((s) => s.controllerSessionEpoch);
   const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
@@ -62,12 +63,13 @@ export function LaserWindow(): JSX.Element {
         jobActive={jobActive}
         onCollapse={machinePanel.toggle}
       />
-      <ConnectionRecoveryControls
+      <ControllerConnectionControls
         machineKind={machineKind}
         autofocusBusy={autofocusBusy}
         motionOperation={motionOperation}
         controllerOperation={controllerOperation}
         openRequest={machineSetupRequest}
+        onForget={confirmForgetController}
       />
       {controllerDisplay.showAlarmBanner && (
         <AlarmBanner
@@ -93,6 +95,10 @@ export function LaserWindow(): JSX.Element {
       <ProbePanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
+        startDisabledReason={qualificationStartDisabledReason(
+          controllerQualification,
+          controllerSessionEpoch,
+        )}
         onConfigureAutofocus={() => setMachineSetupRequest({ initialStep: 'safety' })}
         onStartJob={() => void runStartJobFlow()}
       />
@@ -101,12 +107,18 @@ export function LaserWindow(): JSX.Element {
   );
 }
 
-function confirmForgetDevice(): void {
-  if (!jobAwareConfirm('Forget this device and remove its browser serial permission?')) return;
-  void useLaserStore
-    .getState()
-    .forgetDevice?.()
-    .catch(() => undefined);
+function confirmForgetController(): void {
+  if (
+    !jobAwareConfirm(
+      'Forget this controller, remove its browser serial permission, and clear all controller and recovery state? Your canvas and machine profile will stay open.',
+    )
+  ) {
+    return;
+  }
+  void (async () => {
+    await useLaserStore.getState().forgetDevice?.();
+    useStartBlockerStore.getState().clear();
+  })().catch(() => undefined);
 }
 
 function useJogBlocked(): boolean {
@@ -142,56 +154,11 @@ function useControllerActions(): {
   };
 }
 
-function ConnectionRecoveryControls(props: {
-  readonly machineKind: MachineKind;
-  readonly autofocusBusy: boolean;
-  readonly motionOperation: ReturnType<typeof useLaserStore.getState>['motionOperation'];
-  readonly controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'];
-  readonly openRequest: DeviceSetupOpenRequest | undefined;
-}): JSX.Element {
-  const platform = usePlatform();
-  const connection = useLaserStore((s) => s.connection);
-  const control = useControllerActions();
-  const controllerKind = useStore((s) => s.project.device.controllerKind);
-  const profileBaudRate = useStore((s) => s.project.device.baudRate);
-  const supportsSerial = platform.serial.isSupported();
-  const isFileOnlyProfile = isFileOnlyController(controllerKind);
-  const connect = (): void => {
-    void control.connect(platform, { controllerKind, baudRate: profileBaudRate });
-  };
-  return (
-    <>
-      <SafetyNoticeBanner
-        onReconnect={connect}
-        reconnectDisabled={
-          !supportsSerial ||
-          props.autofocusBusy ||
-          props.motionOperation !== null ||
-          isFileOnlyProfile
-        }
-      />
-      <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
-      <DeviceSetupControls openRequest={props.openRequest} />
-      <ConnectionBar
-        connection={connection}
-        machineNoun={machineNoun(props.machineKind)}
-        onConnect={connect}
-        onDisconnect={() => void control.disconnect().catch(() => undefined)}
-        onForget={confirmForgetDevice}
-        disabled={
-          !supportsSerial ||
-          connectionBusy(props.autofocusBusy, props.motionOperation, props.controllerOperation) ||
-          isFileOnlyProfile
-        }
-      />
-    </>
-  );
-}
-
-function isFileOnlyController(
-  controllerKind: Parameters<typeof selectControllerDriver>[0],
-): boolean {
-  return selectControllerDriver(controllerKind).capabilities.transport === 'file-only';
+function qualificationStartDisabledReason(
+  qualification: ReturnType<typeof useLaserStore.getState>['controllerQualification'],
+  currentEpoch: number,
+): string | null {
+  return controllerQualificationStartBlockMessage(qualification, currentEpoch);
 }
 
 function CollapsedMachineRail(props: {
@@ -233,29 +200,6 @@ function MachineConsoleSection(): JSX.Element {
   );
 }
 
-function ConnectionHints(props: {
-  readonly supportsSerial: boolean;
-  readonly isFileOnlyProfile: boolean;
-}): JSX.Element | null {
-  if (props.isFileOnlyProfile) {
-    return (
-      <p style={hintStyle}>
-        This profile is file-export only: use Save G-code… to write an experimental .rd job and run
-        it from the machine panel. Live Ruida streaming is not available in this build.
-      </p>
-    );
-  }
-  if (!props.supportsSerial) {
-    return (
-      <p style={hintStyle}>
-        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave (may require enabling
-        under Brave Shields/flags), or Arc, or install the Windows desktop app.
-      </p>
-    );
-  }
-  return null;
-}
-
 function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {
   return code !== null || state === 'Alarm';
 }
@@ -294,22 +238,6 @@ function machineBusy(
   controllerOperation: unknown,
 ): boolean {
   return autofocusBusy || motionOperation !== null || controllerOperation !== null;
-}
-
-// Connection management is the escape hatch for a stale reset or startup
-// handshake. Keep Disconnect/Reconnect available for those controller-owned
-// operations while motion and autofocus retain their stricter lockout.
-function connectionBusy(
-  autofocusBusy: boolean,
-  motionOperation: unknown,
-  controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'],
-): boolean {
-  if (autofocusBusy || motionOperation !== null) return true;
-  return (
-    controllerOperation !== null &&
-    controllerOperation.kind !== 'recovery' &&
-    controllerOperation.kind !== 'connection-handshake'
-  );
 }
 
 function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
@@ -418,11 +346,6 @@ const panelStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 10,
-};
-const hintStyle: React.CSSProperties = {
-  color: 'var(--lf-danger-fg)',
-  fontStyle: 'italic',
-  margin: 0,
 };
 const alarmStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',

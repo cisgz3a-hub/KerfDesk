@@ -8,8 +8,9 @@ import {
   serializeJobCheckpoint,
   type JobCheckpoint,
 } from '../../core/recovery';
+import { LEGACY_JOB_CHECKPOINT_STORAGE_KEY } from './recovery';
 
-export const JOB_CHECKPOINT_STORAGE_KEY = 'laserforge.job-checkpoint.v1';
+export const JOB_CHECKPOINT_STORAGE_KEY = LEGACY_JOB_CHECKPOINT_STORAGE_KEY;
 
 // Streaming writes are throttled to once per this many acked lines; status
 // transitions (pause / cancel / error / disconnect) always write immediately.

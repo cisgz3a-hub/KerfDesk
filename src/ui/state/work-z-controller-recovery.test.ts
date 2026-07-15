@@ -78,6 +78,7 @@ describe('owned controller Work-Z recovery', () => {
     });
     await useLaserStore.getState().connect(adapter(connection));
     connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await flush();
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');

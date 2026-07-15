@@ -1,6 +1,7 @@
 import { idleCollector } from '../../core/controllers/grbl';
 import type { SerialConnection } from '../../platform/types';
 import { cancelControllerLifecycleRefs } from './laser-interactive-command';
+import { cancelScheduledControllerQualification } from './laser-controller-qualification';
 import { cancelResetCleanup } from './laser-reset-cleanup';
 import type { LiveRefs } from './laser-store';
 
@@ -41,9 +42,22 @@ export function closeConnectionOnce(
       await connection.forget();
       return;
     }
-    await connection.close();
+    try {
+      await connection.close();
+    } finally {
+      // A concurrent Forget can upgrade the request while close() is pending.
+      // Re-check after closing so browser permission is still revoked exactly once.
+      if (request?.forget === true && connection.forget !== undefined) {
+        await connection.forget();
+      }
+    }
   });
   return request.promise;
+}
+
+/** True once any concurrent closer has upgraded this port close to Forget. */
+export function connectionForgetRequested(connection: SerialConnection): boolean {
+  return closeRequests.get(connection)?.forget === true;
 }
 
 /** Resolve the startup raw-line wait without letting it qualify as a real line. */
@@ -59,6 +73,7 @@ export function teardownConnectionRefs(refs: LiveRefs): void {
   cancelRawControllerLineWait(refs);
   cancelControllerLifecycleRefs(refs);
   cancelResetCleanup(refs);
+  cancelScheduledControllerQualification(refs);
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();
   if (refs.pollHandle !== null) clearInterval(refs.pollHandle);

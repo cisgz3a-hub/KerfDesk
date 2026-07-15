@@ -7,21 +7,13 @@ import {
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 
 export function checkpointStartIssue(checkpointToReplace: JobCheckpoint | null): string | null {
+  // Archived recovery is advisory state, never authority over a fresh Start.
+  // Only an explicit restart/recovery flow supplies checkpointToReplace; that
+  // path still verifies ownership immediately before the controller write.
+  if (checkpointToReplace === null) return null;
   const current = readJobCheckpoint();
-  if (checkpointToReplace !== null) {
-    if (current !== null && sameCheckpoint(current, checkpointToReplace)) return null;
-    return 'The interrupted-job recovery record changed while Start was being prepared. No controller command was sent; review the current recovery banner and try again.';
-  }
-  if (current === null || !checkpointNeedsOperatorDecision(current)) return null;
-  const recoveryChoices =
-    current.machineKind === 'cnc'
-      ? 'Use Review supervised recovery or Discard recovery record in the recovery banner.'
-      : 'Use Review safe recovery, Restart entire job from the beginning, or Discard recovery record in the recovery banner.';
-  return (
-    `An interrupted ${current.machineKind === 'cnc' ? 'router' : 'laser'} job recovery record is still active ` +
-    `(${current.ackedLines} of ${current.sendableLines} lines acknowledged). Start is blocked so that record cannot be overwritten. ` +
-    recoveryChoices
-  );
+  if (current !== null && sameCheckpoint(current, checkpointToReplace)) return null;
+  return 'The interrupted-job recovery record changed while Start was being prepared. No controller command was sent; review the current recovery banner and try again.';
 }
 
 export function checkpointProgramIssue(
@@ -64,10 +56,4 @@ export function markOwnedResumeCheckpoint(
   }
   writeJobCheckpoint(markResumeInFlight(current, nowIso));
   return 'marked';
-}
-
-function checkpointNeedsOperatorDecision(checkpoint: JobCheckpoint): boolean {
-  return (
-    checkpoint.ackedLines > 0 || checkpoint.resumeInFlight || checkpoint.interruption !== undefined
-  );
 }

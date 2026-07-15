@@ -66,9 +66,10 @@ async function connectReady(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(connection));
   connection.emitLine('Grbl 1.1f');
   await flush();
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  await flush();
   connection.emitLine('$32=1');
   connection.emitLine('ok');
-  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
 }
 

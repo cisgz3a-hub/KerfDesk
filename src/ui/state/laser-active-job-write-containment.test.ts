@@ -102,10 +102,14 @@ async function connectReady(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(connection));
   connection.emitLine('Grbl 1.1f');
   await flush();
+  connection.emitLine(IDLE);
+  await vi.waitFor(() =>
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({ phase: 'settings' }),
+  );
   connection.emitLine('$32=1');
   connection.emitLine('ok');
-  connection.emitLine(IDLE);
-  await flush();
+  await vi.waitFor(() => expect(useLaserStore.getState().controllerOperation).toBeNull());
+  expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
 }
 
 async function flush(): Promise<void> {
@@ -142,7 +146,9 @@ describe('active-job transport write containment', () => {
     rejectInitial = true;
 
     await expect(
-      useLaserStore.getState().startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n'),
+      useLaserStore
+        .getState()
+        .startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n', { runId: 'run-first-write-reject' }),
     ).rejects.toThrow('job transport rejected');
     await flush();
 
@@ -157,6 +163,7 @@ describe('active-job transport write containment', () => {
       safetyNotice: { kind: 'write-failed', action: 'start' },
     });
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    expect(useLaserStore.getState().activeRunId).toBeNull();
   });
 
   it('joins operator Disconnect to one reset when an ack-triggered refill write rejects', async () => {

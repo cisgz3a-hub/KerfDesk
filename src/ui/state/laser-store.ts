@@ -22,6 +22,10 @@ import { runAutofocus } from './autofocus-action';
 import { consoleActions } from './laser-console-actions';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
+import type {
+  ControllerQualification,
+  ControllerQualificationScheduleRefs,
+} from './laser-controller-qualification';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
@@ -55,6 +59,7 @@ import { fireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import { workZRecoveryActions } from './work-z-recovery-actions';
 import type { LaserStoreActions } from './laser-store-action-types';
+import type { RunId } from './recovery';
 import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
@@ -107,6 +112,8 @@ export type LaserState = LaserStoreActions & {
   readonly motionOperation: LaserMotionOperation | null;
   readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
+  /** Immutable recovery/replay ownership for the current streamer. */
+  readonly activeRunId: RunId | null;
   /** Controller-reported canvas truth for the active or most recently
    * completed run. The started plan is immutable for the life of the run. */
   readonly liveCanvasRun?: LiveCanvasRun | null;
@@ -138,6 +145,10 @@ export type LaserState = LaserStoreActions & {
   readonly detectedSettings: Partial<DeviceProfile> | null;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly controllerSettingsObservation: SessionObservationStamp | null;
+  /** Qualification of the live controller session. Every record is bound to
+   * controllerSessionEpoch so late replies from a reset or forgotten port can
+   * never make a newer session look ready. */
+  readonly controllerQualification: ControllerQualification;
   readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
   readonly lastSettingsReadAt: number | null;
   /**
@@ -231,10 +242,12 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
-  // Fail-dark transport heartbeat for active/physically-finishing streams.
-  // Status sequence ownership is session-scoped; teardown always clears it.
-  heartbeatProbe: ActiveStreamHeartbeatProbe;
-} & ResetCleanupRefs;
+} & ResetCleanupRefs &
+  ControllerQualificationScheduleRefs & {
+    // Fail-dark transport heartbeat for active/physically-finishing streams.
+    // Status sequence ownership is session-scoped; teardown always clears it.
+    heartbeatProbe: ActiveStreamHeartbeatProbe;
+  };
 
 const refs: LiveRefs = {
   connection: null,
@@ -247,6 +260,9 @@ const refs: LiveRefs = {
   onLineArrived: null,
   nextTranscriptId: 1,
   stallProbe: null,
+  qualificationTimer: null,
+  qualificationDeadline: null,
+  runControllerQualification: null,
   heartbeatProbe: null,
   controllerCommand: null,
   controllerIdleWait: null,
@@ -409,63 +425,68 @@ function detectedSettingsActions(
   };
 }
 
-export const useLaserStore = create<LaserState>((set, get) => ({
-  ...initialLaserState(),
-  ...connectionActions(set, get, refs, (line, action, source) =>
+export const useLaserStore = create<LaserState>((set, get) => {
+  const settingsActions = grblSettingsActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
-  ),
-  ...autofocusActions(set, get, refs, (line, action, source) =>
-    safeWrite(set, get, line, action, source),
-  ),
-  ...jogActions(set, get, refs, (line, action, source) =>
-    safeWrite(set, get, line, action, source),
-  ),
-  ...airAssistActions(set, get),
-  ...fireActions(set, get, (line, action, source) => safeWrite(set, get, line, action, source)),
-  ...probeActions(set, get, refs, (line, action, source) =>
-    safeWrite(set, get, line, action, source),
-  ),
-  ...overrideActions(
-    (line) => safeWrite(set, get, line),
-    () => get().capabilities.overrides,
-    () =>
-      get().controllerOperation?.kind === 'probe'
-        ? 'Realtime overrides are locked during a probe transaction.'
-        : null,
-  ),
-  ...jobActions(
-    set,
-    get,
-    refs,
-    (line, action) => safeWrite(set, get, line, action),
-    () => refs.driver,
-  ),
-  ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
-  ...grblSettingsActions(set, get, refs, (line, action, source) =>
-    safeWrite(set, get, line, action, source),
-  ),
-  ...consoleActions(set, get, refs, (line, action, source) =>
-    safeWrite(set, get, line, action, source),
-  ),
-  ...controllerRecoveryActions(
-    set,
-    get,
-    refs,
-    (line, action) => safeWrite(set, get, line, action),
-    () => refs.driver,
-  ),
-  ...originActions(set, get, refs, (line, action, source) =>
-    safeWrite(set, get, line, action, source),
-  ),
-  ...workZRecoveryActions(
-    set,
-    get,
-    refs,
-    (line) => safeWrite(set, get, line),
-    () => refs.driver,
-  ),
-  ...detectedSettingsActions(set, get),
-  clearSafetyNotice: () => set({ safetyNotice: null }),
-  pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
-  markFrameVerified: (verification) => set({ frameVerification: verification }),
-}));
+  );
+  refs.runControllerQualification = settingsActions.readMachineSettings;
+  return {
+    ...initialLaserState(),
+    ...connectionActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...autofocusActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...jogActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...airAssistActions(set, get),
+    ...fireActions(set, get, (line, action, source) => safeWrite(set, get, line, action, source)),
+    ...probeActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...overrideActions(
+      (line) => safeWrite(set, get, line),
+      () => get().capabilities.overrides,
+      () =>
+        get().controllerOperation?.kind === 'probe'
+          ? 'Realtime overrides are locked during a probe transaction.'
+          : null,
+    ),
+    ...jobActions(
+      set,
+      get,
+      refs,
+      (line, action) => safeWrite(set, get, line, action),
+      () => refs.driver,
+    ),
+    ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
+    ...settingsActions,
+    retryControllerQualification: settingsActions.readMachineSettings,
+    ...consoleActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...controllerRecoveryActions(
+      set,
+      get,
+      refs,
+      (line, action) => safeWrite(set, get, line, action),
+      () => refs.driver,
+    ),
+    ...originActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...workZRecoveryActions(
+      set,
+      get,
+      refs,
+      (line) => safeWrite(set, get, line),
+      () => refs.driver,
+    ),
+    ...detectedSettingsActions(set, get),
+    clearSafetyNotice: () => set({ safetyNotice: null }),
+    pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
+    markFrameVerified: (verification) => set({ frameVerification: verification }),
+  };
+});

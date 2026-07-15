@@ -921,91 +921,117 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
-While a job streams, the app keeps a ~200-byte checkpoint in localStorage:
-a fingerprint of the compiled program plus the GRBL-acked line count
-(updated every 25 acks and on every pause/stop/error/disconnect). Only a
-run that finishes cleanly clears it.
+While a job streams, the app owns an immutable exact execution artifact in
+IndexedDB plus a small `activeRun` slot keyed by a unique run ID. Progress is
+updated every 25 acknowledgements and at state transitions. Interruption moves
+that run into the single newest recovery capsule; clean settled Idle creates a
+separate exact replay receipt.
 
 #### Success — resume after a crash
-1. App/tab/PC died mid-job. Operator relaunches; autosave recovery
-   restores the project (F-C3).
-2. The Laser window shows the banner: "Interrupted laser job from
-   <time>: N of M G-code lines acknowledged by the controller."
+1. App/tab/PC died mid-job. Operator relaunches. Recovery loads independently
+   of the open/autosaved project (F-C3).
+2. Job controls show a collapsed, non-red **Interrupted job saved** card with
+   Review and Discard. Its acknowledgement count is transport evidence only.
 3. If a red machine-safety notice is present, a lost/failed transport offers
    **Reconnect controller…**, never Ctrl-X. The operator physically makes the
    machine safe, reconnects, then uses **I made the machine safe** to acknowledge
-   the incident. Reconnect/acknowledge do not clear or resume the checkpoint.
-4. Operator homes when position may have been lost and confirms the work zero is
-   unchanged (same contract as manual Start-from-line).
-5. For laser jobs, **Review safe recovery** re-compiles the project, verifies
-   the fingerprint, and maps the acknowledged count to the first unconfirmed
-   raw line.
-6. For router jobs, the acknowledged count remains diagnostic only. A retained
-   checkpoint may open **Review supervised recovery**, where the operator—not
+   the incident. Reconnect/acknowledge do not clear or resume the capsule.
+4. Review is a read-only sandbox until its final Start action. Opening, closing,
+   or cancelling it cannot change the canvas, project/profile, controller
+   settings, origins, Work Z, G-code, or recovery ownership.
+5. Laser Review uses the capsule's exact archived G-code. A migrated legacy
+   fingerprint-only record alone may use the explicitly named current-project
+   fingerprint fallback.
+   The archived program remains the source of truth, while the generated
+   re-entry hard-offs with `M5`/`S0`, repositions without power, and restores
+   positive power only on actual burn motion. The live session's `$32` evidence
+   is confirmed again before the capsule can be claimed.
+6. For router jobs, the acknowledged count remains diagnostic only. The exact
+   capsule opens **Review supervised recovery**, where the operator—not
    the count—selects the first uncertain native contour segment. Execution is
    available only after the cutter is clear, the spindle is stopped, position/
    WCS/Z zero and tool/workholding are requalified, all earlier machining and
    the displayed tangent runway are confirmed, and a machine-specific air-cut
    or scrap-test qualification record is entered.
-7. The router flow recompiles the exact checkpointed source, generates a new
-   recovery job, SHA-256 binds the source/recovery bytes, semantic segment,
+7. The router flow uses the archived prepared semantic job and manifest,
+   generates a new recovery job, and SHA-256 binds source/recovery bytes, segment,
    runway profile, and review proofs, then repeats the ordinary CNC Start and
    setup-attestation gates before streaming. It never streams the old program
    from an acknowledged line.
-8. The checkpoint records the terminal safety reason when one is available
+8. The capsule records the terminal safety reason when one is available
    (disconnect, controller error/rejected line, reboot, write failure, or
    cancellation) and shows it after reload/reconnect.
-9. The checkpoint clears only after the controller reports connected,
-   physical Idle; the final GRBL `ok` alone is not physical completion.
-10. A CNC checkpoint with zero acknowledgements still shows the diagnostic review; it never implies
+9. Only final **Start supervised recovery** claims the current run/revision.
+   Failure before controller acceptance releases the claim for retry. Once
+   transmission may have begun, an interrupted attempt becomes the newest capsule.
+   A rejected recovery write remains fail-dark and Abort-visible while the
+   transport is reset and quarantined.
+10. A CNC capsule with zero acknowledgements still shows diagnostic review; it never implies
    that no physical motion occurred.
 
-#### Start, resume, restart, and discard are separate intents
-1. Ordinary **Start job** and Ctrl+Return are blocked before any controller write
-   while a meaningful interrupted-job checkpoint exists; they cannot silently
-   replace the record.
-2. **Review safe recovery** is the only automatic laser continuation path. It
-   re-validates the same storage record and starts from the exact first unconfirmed
-   raw line with source geometry and line order preserved. The recovery preamble
-   hard-offs with `M5`, repositions with explicit `S0`, and arms at zero power;
-   stationary positive power in the replay is changed to `S0` and restored only on
-   the next actual burn-motion line. Checkpoint recovery and manual Start-from-line
-   use the same `$32` gate as an ordinary Start: reported `$32=0` refuses the run,
-   while an unverified value requires the focused Start-anyway acknowledgement
-   before the separate resume-position confirmation.
-3. **Restart entire job from beginning…** is a separate, strongly confirmed laser
-   action. It warns that completed areas may burn again, requires the current
-   compiled fingerprint and checkpoint identity to match, and replaces the old
-   record only after line-1 streaming starts successfully.
-4. **Discard recovery record…** requires confirmation and only deletes the local
-   recovery record; it does not stop, reset, reconnect, or move the machine.
+#### Start, recovery, replay, and discard are separate intents
+1. Ordinary **Start job** and Ctrl+Return ignore archived recovery records and
+   validate and compile the current project from line 1. Merely showing, opening,
+   or closing recovery cannot import archived G-code, settings, origins, or
+   controller observations into the live session.
+2. **Review** is the only route from a capsule to executable recovery. It validates
+   the live controller and setup against the archived artifact without importing
+   archived controller values into the current profile or firmware.
+3. A failed ordinary Start leaves the old capsule untouched. Once a fresh current
+   job is accepted by the transport, its staged artifact becomes `activeRun` and
+   supersedes the old capsule because machine state has changed.
+4. **Discard** deletes only the capsule. It does not stop, reset, reconnect, move,
+   or modify the current job.
+5. Recovery storage/quota/schema failure shows a nonblocking warning. Current Start
+   and the PWA update/reload prompt remain available.
 
 #### Error — project changed since the run
-1. Fingerprint mismatch → alert explains the project no longer produces
-   the interrupted program; nothing is streamed. Manual Start-from-line remains
-   available for laser jobs only.
-2. A checkpoint resume re-compiles with the output scope and the RESOLVED job
-   origin the ORIGINAL run used (both stored in the checkpoint, schema v3), so a
-   crash no longer trips this error on its own — including a Current Position
-   job, whose frozen head XY is reused instead of re-resolved against the
-   post-crash position. The alert names a changed object, output scope, or job
-   placement as the possible causes when the bytes genuinely differ (PST-02, R1).
+1. Exact capsules do not depend on the current project and therefore cannot fail
+   merely because the open canvas changed. Artifact integrity or archived
+   semantic-manifest mismatch refuses before any controller command.
+2. A migrated legacy fingerprint-only capsule may refuse when the current project,
+   scope, or resolved placement no longer compiles to the archived fingerprint.
 
 #### Edge — controller lost power too
 1. Acknowledged lines may include a buffer's worth GRBL never executed; the
-   banner says so. Laser recovery can replay from an earlier line. CNC recovery
-   never converts that transport-level count into a cut position or automatic
-   machine motion.
+   card says so. CNC recovery never converts that transport-level count into a
+   cut position or automatic machine motion.
 
 #### Edge — recovery job is itself interrupted
-1. The original CNC checkpoint is marked once the generated recovery starts.
-   If that attempt is interrupted, its old progress no longer describes the
-   work and **Review supervised recovery** is removed. The operator must inspect
-   and requalify the machine and create a separately reviewed new job.
+1. The recovery attempt receives a new run ID. If interrupted after transmission
+   may have begun, that attempt becomes the newest capsule and the source is no
+   longer offered. The operator must inspect and requalify before another review.
 
 #### Edge — deliberate software Abort
-1. Abort keeps the checkpoint (an aborted job still requires recovery review);
-   **Discard recovery record…** on the banner is the explicit discard.
+1. Abort keeps the run as the newest capsule (an aborted job still requires
+   recovery review); **Discard** on the card is the explicit deletion.
+
+#### Clean completion and Run Again
+1. Completion requires all stream acknowledgements, the controller-specific
+   settle marker, and fresh stable Idle. Then `activeRun` is removed and an exact
+   `lastCompletedReceipt` is retained.
+2. **Run same job again from start** appears only while canvas, machine profile,
+   output scope, placement, and execution signature still match. Clicking performs
+   fresh compilation/qualification and starts line 1 with a new run ID and zero
+   recovery progress.
+3. Any relevant edit hides the offer. The receipt remains diagnostic history
+   until another accepted run replaces it; **Forget Controller** clears it.
+   Ordinary **Start current job** remains available.
+
+#### Controller qualification and Forget Controller
+1. Connection, reset/Abort cleanup, wake, probe recovery, reboot banner, and
+   controller-setting writes start one epoch-bound qualification flow. GRBL-family
+   controllers own one `$$` read after fresh Idle; unsupported dumps are
+   `not-required`, and late prior-epoch replies are ignored.
+2. Start is inline-disabled with **Reading controller settings…** while qualifying.
+   Failure shows **Retry reading controller settings** and Reconnect. Real `$30`,
+   `$32`, Alarm/non-Idle, current-tool, and Work-Z mismatches still refuse Start.
+3. **Forget Controller** safely stops active motion when possible, closes/revokes
+   transport permission, advances epochs, and clears controller/live-run/recovery/
+   replay/evidence/error/log state. It preserves the canvas, layers, profile,
+   libraries, and preferences. It does not send `$RST=*` or factory-reset EEPROM.
+4. An ordinary Idle Forget has no error dialog. If transport failure leaves motion
+   uncertain, the physical-safety warning remains instead of claiming a clean stop.
 
 ---
 
@@ -2421,6 +2447,13 @@ F-CNC19 tiling.
    six contacts succeed. One acknowledged `G10 L20 P0 X... Y... Z...`
    then commits the complete corner frame before the bit parks just
    outside it. Corner choice mirrors all directions and signs.
+4. When current Work-Z evidence is missing, a connected, Idle controller
+   that supports owned modal/WCS reads exposes **Advanced: Reuse existing
+   controller setup** → **Use existing controller Z zero**. After explicit
+   stock-top/tool confirmation, it reads `$G` → `$#` → `$G` and records the
+   verified offset; it never probes, moves, writes a zero, imports G-code, or
+   starts interrupted-job recovery. Success replaces the action with compact
+   verified status.
 
 #### Error — probe never fires / fires early
 1. ALARM:5 (no contact within travel): named toast — check the clip
@@ -2616,11 +2649,11 @@ F-CNC19 tiling.
 ### F-CNC27. Supervised CNC interruption recovery — Phase H.11 (ADR-200)
 
 #### Success
-1. CNC Job controls show a collapsed **CNC interruption recovery** explanation
+1. CNC Job controls show the neutral collapsed **Interrupted job saved** card
    instead of a raw G-code line input. Generic checkpoint resume and arbitrary
    start-from-line remain blocked in both UI and core.
-2. After an interrupted CNC job, the retained checkpoint offers **Review
-   supervised recovery** only for a first recovery attempt. Controller
+2. After an interrupted CNC job, the newest exact capsule offers **Review
+   supervised recovery**. Controller
    acknowledgements are displayed as diagnostics and never select geometry.
 3. The wizard requires an explicit first-uncertain native contour segment; no
    segment is preselected. It previews the uncertainty segment, remaining path,
@@ -2634,10 +2667,10 @@ F-CNC19 tiling.
    re-homed/requalified with G54 XY/WCS and Z zero verified; installed tool intact;
    stock/workholding unchanged; all machining before the selected segment known
    complete; and the entire displayed runway physically clear.
-6. Start recompiles the original scope and resolved origin and requires its
-   fingerprint to match the checkpoint. A SHA-256 package binds the exact source
-   and generated recovery G-code, semantic plan, runway profile, operator review,
-   cleared-runway proof, and completed-prefix proof.
+6. Start uses the sealed prepared semantic job, recovery manifest, original scope,
+   resolved origin, and exact G-code from the capsule; the open canvas is not a
+   recovery input. A SHA-256 package binds source and generated recovery G-code,
+   semantic plan, runway profile, review, cleared-runway proof, and prefix proof.
 7. The new job keeps the uncertainty remainder, every later pass in that
    operation, and every later operation. Its machine order is safe-Z retract →
    spindle start and dwell → rapid to the confirmed-clear runway start → feed
@@ -2655,28 +2688,27 @@ F-CNC19 tiling.
    visible control. The supervised path is a newly compiled Job, not a relaxation
    of that refusal. Laser recovery still refuses out-of-range lines, programs
    using G91 before the resume point, and empty tails.
-2. Recovery refuses a changed project/fingerprint, non-CNC or mixed output,
+2. Recovery refuses artifact/manifest integrity mismatch, non-CNC or mixed output,
    multi-tool job, imported/3D/arc/helical pass, missing qualification or physical
    confirmation, invalid motion/profile, missing straight runway, failed
-   preflight, stale checkpoint, or any ordinary Start blocker.
+   preflight, stale/claimed capsule revision, or any ordinary Start blocker.
 3. If the cutter may still be embedded, spindle state is not physically known,
    or position/tool/workholding cannot be requalified, the wizard cannot command
    an escape. Use the machine manufacturer's manual procedure and physical E-stop
    or power isolation where required.
 
 #### Empty
-1. Without a retained first-attempt CNC checkpoint, only the collapsed guidance
-   is shown. Laser Start from line is disabled while disconnected or any
-   job/motion is active.
+1. Without a retained CNC capsule, no recovery card is shown.
+   Laser Start from line is disabled while disconnected or any job/motion is active.
 
 #### Edge — laser jobs
 1. Programs with no Z words never receive Z commands in the preamble —
    a laser resume re-fires at the recorded XY without touching Z.
 
 #### Edge — interrupted recovery attempt
-1. Once a generated CNC recovery has started, the original checkpoint is marked
-   in-flight. If that run fails or the app crashes, the same checkpoint cannot
-   generate another recovery because it no longer represents current work.
+1. A pre-acceptance failure releases the attempt claim, so the same capsule remains
+   retryable. If transmission may have begun and the run fails or the app crashes,
+   the attempt becomes the newest capsule; the source no longer represents current work.
 
 ### F-CNC28. Watch the live 3D result while designing — ADR-105 G9
 

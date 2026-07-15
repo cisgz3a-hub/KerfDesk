@@ -120,6 +120,7 @@ async function runStartJob(
     const entersHoldNow = stepped.state.status === 'tool-change';
     set((state) => ({
       streamer: stepped.state,
+      activeRunId: options.runId ?? null,
       ...liveCanvasStartPatch(options.canvasPlan),
       accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
       activeJobMachineKind: options.machineKind ?? 'laser',
@@ -134,6 +135,13 @@ async function runStartJob(
       await safeWrite(stepped.toSend, 'start');
     } catch (error) {
       containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start');
+      // The first transport write did not resolve as accepted, so the staged
+      // run must not replace an older recovery capsule. Keep the fail-dark
+      // errored streamer and safety notice, but release only this run's
+      // persistence ownership so the outer flow can discard its staging row.
+      set((state) => ({
+        activeRunId: state.activeRunId === options.runId ? null : state.activeRunId,
+      }));
       throw error;
     }
   } finally {

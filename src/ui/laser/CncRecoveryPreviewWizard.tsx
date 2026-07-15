@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import type { JobCheckpoint } from '../../core/recovery';
+import { useMemo, useRef, useState } from 'react';
 import { Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
+import type { RecoveryCapsule } from '../state/recovery';
 import {
   CncRecoveryQualificationStep,
   isCncRecoveryReviewComplete,
@@ -11,6 +12,7 @@ import { CncRecoveryRunwayPreview } from './CncRecoveryRunwayPreview';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
 import {
   buildCncRecoveryPreviewModel,
+  buildLegacyFingerprintOnlyCncRecoveryPreviewModel,
   type CncRecoveryEvidenceCheck,
   type CncRecoveryPreviewModel,
 } from './cnc-recovery-preview-model';
@@ -29,7 +31,7 @@ const EMPTY_REVIEW: CncRecoveryReviewDraft = {
 };
 
 export function CncRecoveryPreviewWizard(props: {
-  readonly checkpoint: JobCheckpoint;
+  readonly capsule: RecoveryCapsule;
   readonly onClose: () => void;
 }): JSX.Element {
   const project = useStore((state) => state.project);
@@ -37,38 +39,55 @@ export function CncRecoveryPreviewWizard(props: {
   const [requestedEventId, setRequestedEventId] = useState('');
   const [review, setReview] = useState<CncRecoveryReviewDraft>(EMPTY_REVIEW);
   const [starting, setStarting] = useState(false);
-  const model = useMemo(
-    () =>
-      buildCncRecoveryPreviewModel(
-        project,
-        props.checkpoint,
-        requestedEventId === '' ? undefined : requestedEventId,
-      ),
-    [project, props.checkpoint, requestedEventId],
-  );
+  const startInFlight = useRef(false);
+  const model = useMemo(() => {
+    const eventId = requestedEventId === '' ? undefined : requestedEventId;
+    return props.capsule.artifact.kind === 'exact-execution'
+      ? buildCncRecoveryPreviewModel(props.capsule, eventId)
+      : buildLegacyFingerprintOnlyCncRecoveryPreviewModel(project, props.capsule, eventId);
+  }, [project, props.capsule, requestedEventId]);
   const stepIndex = STEPS.indexOf(step);
   const reviewComplete = isCncRecoveryReviewComplete(review);
   const canStart = model.canExecute && reviewComplete && !starting;
+  const closeReadOnly = (): void => {
+    if (!startInFlight.current) props.onClose();
+  };
+  const selectEvent = (eventId: string): void => {
+    if (eventId === requestedEventId) return;
+    setRequestedEventId(eventId);
+    setReview((current) => ({
+      ...current,
+      priorWorkConfirmed: false,
+      clearedPathConfirmed: false,
+    }));
+  };
   const startRecovery = async (): Promise<void> => {
-    if (!canStart || model.selectedEventId === null) return;
+    if (!canStart || model.selectedEventId === null || startInFlight.current) return;
+    startInFlight.current = true;
     setStarting(true);
-    const started = await runCncSupervisedRecoveryFlow(props.checkpoint, {
-      ...review,
-      uncertaintyEventId: model.selectedEventId,
-    });
+    let started = false;
+    try {
+      started = await runCncSupervisedRecoveryFlow(props.capsule, {
+        ...review,
+        uncertaintyEventId: model.selectedEventId,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      jobAwareAlert(`Cannot start CNC recovery:\n\n${message}`);
+    } finally {
+      startInFlight.current = false;
+      setStarting(false);
+    }
     if (started) props.onClose();
-    else setStarting(false);
   };
   return (
-    <Dialog title="Supervised CNC recovery" size="lg" onClose={props.onClose}>
+    <Dialog title="Supervised CNC recovery" size="lg" onClose={closeReadOnly}>
       <RecoverySafetyWarning />
       <p style={stepLabelStyle}>
         Step {stepIndex + 1} of {STEPS.length}: {stepTitle(step)}
       </p>
       {step === 'evidence' ? <EvidenceStep checks={model.checks} /> : null}
-      {step === 'geometry' ? (
-        <GeometryStep model={model} onSelectEvent={setRequestedEventId} />
-      ) : null}
+      {step === 'geometry' ? <GeometryStep model={model} onSelectEvent={selectEvent} /> : null}
       {step === 'qualification' ? (
         <CncRecoveryQualificationStep review={review} onChange={setReview} />
       ) : null}
@@ -82,7 +101,7 @@ export function CncRecoveryPreviewWizard(props: {
         reviewComplete={reviewComplete}
         canStart={canStart}
         starting={starting}
-        onClose={props.onClose}
+        onClose={closeReadOnly}
         onStep={setStep}
         onStart={() => void startRecovery()}
       />
@@ -103,12 +122,22 @@ function RecoveryWizardActions(props: {
 }): JSX.Element {
   return (
     <DialogActions>
-      <button type="button" onClick={props.onClose} title="Close without moving the machine.">
+      <button
+        type="button"
+        disabled={props.starting}
+        onClick={props.onClose}
+        title={
+          props.starting
+            ? 'Wait for the supervised recovery start attempt to finish.'
+            : 'Close without moving the machine.'
+        }
+      >
         Close
       </button>
       {props.stepIndex > 0 ? (
         <button
           type="button"
+          disabled={props.starting}
           onClick={() => props.onStep(STEPS[props.stepIndex - 1] ?? 'evidence')}
           title="Return to the previous recovery review step."
         >

@@ -5594,7 +5594,7 @@ runs one.
 
 ## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
 
-**Status:** accepted.
+**Status:** amended (isolated IndexedDB execution artifacts, 2026-07-15).
 
 ### Context
 
@@ -5605,95 +5605,69 @@ hand. The 2026-07-07 trust audit called this out (gap 3b): for a
 multi-hour job, "guess the line" is the difference between salvaging a
 workpiece and scrapping it.
 
-Two existing pillars make a cheap, correct fix possible:
-
-1. **Deterministic G-code (non-negotiable #5).** Start-from-line already
-   RE-COMPILES the program from the current project
-   (`runStartFromLineFlow` → `prepareStartJob` → `prepared.gcode`); byte
-   determinism is what keeps its line numbers valid. A checkpoint
-   therefore never needs to persist the G-code text (raster jobs exceed
-   localStorage quotas) — only a fingerprint of it.
-2. **Autosave recovery (Phase C).** The project itself is already
-   restored after a crash, so re-compilation has its input.
+The original v1 stored only a fingerprint and acknowledgement count, then
+recompiled the open autosaved project. That was not an isolated recovery
+record: project restoration, scope/origin drift, global Start blocking, and
+controller-session residue could all affect an unrelated current job. Recovery
+therefore needs an exact immutable execution artifact and separate ownership
+from the live editor/controller state.
 
 ### Decision
 
-- **Pure core module `src/core/recovery/job-checkpoint.ts`:** a
-  `JobCheckpoint` = FNV-1a fingerprint of the streamed text (hash, char
-  count, raw line count) + the acked count + machine kind + ISO
-  timestamps (passed in — core cannot read the clock). Two numbering
-  systems meet here and must not be confused: the streamer's
-  `completed`/`total` count SENDABLE lines (blanks and full-line
-  comments are never streamed — `isSendableGcodeLine`, now exported from
-  the streamer as the single definition), while `buildResumeProgram` and
-  Start-from-line speak RAW file lines. The checkpoint stores the acked
-  SENDABLE count plus the program's sendable total; `rawResumeLine`
-  converts acked-sendable back to the raw line number against the
-  re-compiled text at resume time. Strict `parse` validation and
-  monotonic `advance`.
-- **Write path:** `runStartJobFlow` writes the initial checkpoint right
-  after the stream starts. A `use-job-checkpoint` hook (App-mounted,
-  laser-store-subscribed like ADR-117's wake lock) advances
-  `ackedLines` from `streamer.completed` — every 25 acked lines while
-  streaming, immediately on any status transition (pause, error,
-  disconnect, cancel). The checkpoint is a ~200-byte localStorage
-  record; the hook re-reads it per store fire (microseconds) so there is
-  no cache to go stale.
-- **Clear-on-done only.** A checkpoint survives Stop, error, disconnect,
-  and crash; only a run reaching `done` (all lines acked) clears it —
-  a deliberately stopped job is still resumable, and the banner's
-  **Discard recovery record…** action is the explicit discard.
-- **Resume path is the EXISTING one, gated by the fingerprint.** The
-  recovery banner (Laser window, shown when a checkpoint with progress
-  exists and no job is active) calls `runCheckpointResumeFlow`: it
-  re-compiles, REFUSES when the fingerprint of `prepared.gcode` differs
-  — an edited project silently producing different line numbers is
-  exactly the failure this gate exists to stop — then maps the acked
-  count to the raw resume line and hands off to the shared
-  Start-from-line body. Manual Start-from-line stays ungated (the
-  free-form escape hatch).
-- **Resume runs are not themselves checkpointed (v1).** A resume program
-  (preamble + tail) has its own line numbering; mapping a crash inside
-  it back to original coordinates is deferred. Both resume flows stamp
-  `resumeInFlight` on the stored checkpoint before streaming, and the
-  hook additionally requires the streamer total to equal the
-  checkpoint's sendable count — belt and braces so foreign ack counts
-  can never corrupt the record. If a resume run finishes, the job is
-  done and the checkpoint clears; if it dies, the ORIGINAL checkpoint
-  still stands — stale toward earlier lines, which re-burns a short
-  stretch rather than leaving a gap.
+- Store recovery in a versioned IndexedDB repository. It owns three newest-only
+  slots: the exact `activeRun`, zero or one interrupted `recoveryCapsule`, and
+  zero or one clean `lastCompletedReceipt`. Immutable artifacts are keyed by a
+  unique `runId`; progress and terminal writes must own that identity, so jobs
+  with equal line counts cannot update one another.
+- An exact artifact contains emitted G-code and fingerprint, materialized output,
+  output scope, resolved origin, streaming/device configuration, canvas/tool
+  plans, and (for CNC) the prepared semantic job and recovery manifest. Archived
+  controller observations are diagnostics only: they are never written to
+  firmware or copied into the open profile/session.
+- Fresh Start stages the artifact before the first write, but does not replace an
+  older capsule. Only transport acceptance activates the new run and supersedes
+  the older capsule. A refused preflight, operator cancellation, settings error,
+  or failed first write deletes the staged artifact and preserves the capsule.
+- The App-mounted tracker advances only the live `activeRunId`, throttles ordinary
+  progress writes, and moves terminal streams to the capsule. Clean completion
+  requires all acknowledgements, controller-specific settlement, and fresh stable
+  Idle; only then is a replay receipt created. A terminal event that races ahead
+  of activation is deferred and retried after acceptance, without delaying or
+  refusing the machine stream.
+- Recovery storage failures are nonblocking warnings. Superseded referenced
+  artifacts are garbage-collected after an atomic slot transition. A deletion
+  generation marker prevents an incomplete Forget purge from resurrecting old
+  slots after reload.
+- The former `laserforge.job-checkpoint.v1` localStorage value is migrated once as
+  a nonblocking `legacy-fingerprint-only` capsule. It may use the old current-
+  project fingerprint fallback only inside explicit recovery; ordinary Start,
+  update prompts, and controller qualification never consult it.
 
 ### Consequences
 
-- After a crash: relaunch → autosave restores the project → banner
-  offers "resume from line N" → recompile + fingerprint check → the
-  proven resume preamble (ADR-103 G7) re-enters the cut. No G-code file
-  round-trip, no guessing.
-- `ackedLines` measures GRBL acks (parsed into the RX buffer), not
-  execution. If the CONTROLLER also lost power, up to a buffer's worth
-  of acked lines never ran — the mapped resume line can be a few lines
-  late. The banner says so; the manual Start-from-line control remains
-  the operator-editable escape hatch. Backing up re-burns, skipping
-  forward leaves gaps, so the conservative direction is down. If only
-  the app died, GRBL finished its buffer and the mapped line is exact.
-- Work zero must be unchanged — same contract as manual Start-from-line
-  (the existing confirm says it).
-- localStorage writes on the ack path are throttled (25 lines) and
-  ~200 bytes; failures (quota, private mode) are swallowed — a
-  persistence failure never blocks a job. Once a meaningful checkpoint is
-  successfully stored, the 2026-07-15 amendment deliberately blocks ordinary
-  Start until the operator chooses resume, full restart, or explicit discard.
+- An interrupted run appears as the collapsed, non-red **Interrupted job saved**
+  card. Review/open/close/cancel is read-only. Only the final explicitly confirmed
+  supervised Start may claim and activate it.
+- Laser recovery streams from the sealed exact G-code. CNC recovery uses the
+  sealed prepared semantic job and manifest, never acknowledgement count as cut
+  proof. Both require fresh qualification of the connected controller and
+  physical setup.
+- A claim is revision- and attempt-ID-bound across windows. Pre-acceptance failure
+  releases it for retry; uncertainty after transmission begins becomes the newest
+  interrupted attempt rather than poisoning the source capsule.
+- Ordinary **Start current job** always compiles the current canvas from line 1.
+  Cleanly completed, still-exact work separately offers **Run same job again from
+  start**, which recompiles, rechecks the signature/fingerprint, and creates a new
+  run identity with zero progress and no recovery state.
 
 ### Verification
 
-Core: fingerprint determinism/sensitivity, parse rejection corpus,
-advance monotonicity, resume-line clamping. Storage: round-trip +
-corrupt-payload clearing. Hook: interval + transition write policy,
-freeze on foreign totals, clear-on-done. Flow: checkpoint written on
-start, fingerprint mismatch refuses with no stream. Banner: render /
-dismiss / hidden-while-active. NOT verified: a real crash + resume on
-hardware — CLAIMED in AUDIT.md until the maintainer kills the app
-mid-burn and resumes.
+Repository tests cover multi-megabyte round trips, immutable run ownership,
+newest-only replacement, claim conflicts, legacy/corrupt/quota handling, deletion
+generation, garbage collection, and completion/interruption before activation.
+Flow/UI tests cover nonblocking ordinary Start, read-only Review/Cancel, retryable
+failed recovery, exact replay invalidation, and PWA independence. Hardware crash,
+air-cut recovery, and physical CNC qualification remain release acceptance work.
 
 ### Amendment â€” schema v2: also store the output scope + job placement (2026-07-11, PST-02)
 
@@ -5717,19 +5691,28 @@ controller reset look like job recovery even though the durable checkpoint is a 
   operator acknowledgment does. None of these actions reads, clears, or advances the job checkpoint.
 - Connection management remains an escape hatch during recovery and startup-handshake ownership. Other
   motion and job controls remain gated until the link and controller state are settled.
-- Ordinary Start (including Ctrl+Return) now fails closed before `startJob` can write to the controller
-  whenever a meaningful interrupted-job record exists. The banner presents three distinct intents:
-  fingerprint-verified **Review safe recovery**, strongly confirmed **Restart entire job from
-  beginning…**, and strongly confirmed **Discard recovery record…**. A line-1 restart may replace the
-  checkpoint only when the current project still compiles to the checkpointed fingerprint and the slot
-  has not changed; the old record survives any refused/failed start.
-- Checkpoint resume verifies that the same storage record still exists both before compilation and
-  immediately before streaming. Manual Start-from-line stamps `resumeInFlight` only when its compiled
-  program owns the stored fingerprint. Replay starts from the original G-code sliced at
-  `rawResumeLine(ackedLines)`, preserving the exact first unconfirmed source line, geometry, and line
-  order. Power placement is safety-normalized before streaming: stationary positive power becomes
-  `S0`, then the intended positive `S` is restored on the next actual burn-motion line. The replay tail
-  is therefore not always byte-identical to the source tail.
+- Ordinary Start (including Ctrl+Return) remains independent of an archived interrupted-job record;
+  opening or dismissing recovery does not import its settings, G-code, origin, Work Z, or machine
+  observations. The neutral card offers **Review** and **Discard**; a separate line-one replay exists
+  only after verified clean completion.
+- Recovery Review is a temporary sandbox. Its final Start transaction claims the current run/revision
+  with a unique attempt ID, validates the live controller, stages a new attempt artifact, and replaces
+  recovery state only after transport acceptance. Pre-acceptance failure releases the claim; an
+  uncertain post-write failure is itself the newest capsule.
+- Laser recovery treats archived G-code as immutable source input but generates a fail-dark re-entry:
+  `M5`/`S0` precede unpowered positioning, positive power returns only on burn motion, and session-bound
+  live `$32` evidence is confirmed before the capsule claim and checked again at the wire boundary.
+- Controller readiness is epoch-bound: disconnected → qualifying (response/reset cleanup/settings
+  read) → qualified or failed. GRBL-family reset/reconnect/wake/probe/settings-write paths own one `$$`
+  read after fresh Idle; late replies from prior epochs cannot qualify Start. Failure is shown inline
+  with Retry/Reconnect instead of a generic settings-confirmation alert.
+- **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
+  clears controller evidence, live execution, recovery/replay data, notices, errors, transcript, and
+  logs while preserving the project, selected profile, libraries, and preferences. It is a logical app
+  reset, not GRBL `$RST=*` or a physical EEPROM factory reset; uncertain motion retains a safety warning.
+- A clean settled run retains an exact receipt. **Run same job again from start** remains available only
+  while canvas/profile/scope/placement/execution signature match, then performs full fresh qualification
+  and compilation and starts a new run ID at line 1.
 
 ## ADR-119 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
 
@@ -8224,18 +8207,20 @@ multi-tool work, and imported/path3d/arc/helical motion remain unsupported. Its 
 safe-Z retract, spindle start and configured dwell, rapid to the confirmed-clear runway start, feed
 plunge, tangent re-entry, and remaining work.
 
-Immediately before streaming, KerfDesk recompiles the original output scope and resolved origin,
-requires the checkpoint fingerprint to match, and creates a SHA-256 package over the exact source
-and recovery bytes, semantic plan, runway profile, operator review, completed-prefix proof, and
-cleared-runway proof. The ordinary CNC Idle/alarm/controller compatibility/work-zero/override/
+Immediately before streaming, KerfDesk uses the capsule's sealed prepared semantic job, manifest,
+output scope, resolved origin, and exact emitted source bytes; it does not read or mutate the open
+canvas. It creates a SHA-256 package over the exact source and recovery bytes, semantic plan, runway
+profile, operator review, completed-prefix proof, and cleared-runway proof. The ordinary CNC Idle/
+alarm/controller compatibility/work-zero/override/
 accessory/bounds/no-go checks and exact-program setup attestation run again. These software gates do
 not sense the physical setup or make the host Abort an E-stop; the operator must supervise re-entry
 with the physical E-stop reachable.
 
-Once recovery streaming is attempted, the original checkpoint is marked in-flight. If that recovery
-is interrupted, KerfDesk refuses to reuse the original checkpoint because it no longer describes
-current work; the operator must inspect and requalify the machine and create a separately reviewed
-new job. Possible cutter engagement still has no desktop-controlled escape path and always remains
+Opening or cancelling review is read-only. Only **Start supervised recovery** claims the capsule by
+run ID, revision, and attempt ID. Failure before controller acceptance releases that claim and leaves
+the source retryable. Once transmission may have begun, the attempt receives its own run identity; an
+interruption makes that attempt the newest capsule because the source no longer describes current
+work. Possible cutter engagement still has no desktop-controlled escape path and always remains
 manual intervention.
 
 ---
@@ -8338,6 +8323,10 @@ owner established that offset.
 - Recovered evidence is a distinct source and remains subject to the same tool-plan match, plate/tool
   handling, invalidation, and final Start reservation rules as manual Zero Z and probing.
 - A status-frame `WCO`, machine position, or prior-session cache alone never creates Work-Z evidence.
+- The UI names this read-only action **Use existing controller Z zero** and keeps it under the
+  advanced **Reuse existing controller setup** disclosure. It is separate from interrupted-job
+  recovery: the owned `$G` → `$#` → `$G` readback does not move, probe, zero, import G-code, or
+  restore archived job/controller settings.
 
 ### Consequences
 

@@ -50,13 +50,14 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
   };
 }
 
-async function connectWith(connection: FakeConnection): Promise<void> {
+async function connectWith(connection: FakeConnection, freshIdle = true): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
+  if (freshIdle) connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   // Let the handshake's $$ write land, then ack it like real GRBL does —
   // startJob waits for owed untracked acks to drain.
   await flushConnect();
-  connection.emitLine('ok');
+  if (freshIdle) connection.emitLine('ok');
   await flushConnect();
 }
 
@@ -101,14 +102,14 @@ describe('laser-store active-job command guard', () => {
       const connection = makeConnection(async (data) => {
         writes.push(data);
       });
-      await connectWith(connection);
+      await connectWith(connection, false);
       expect(useLaserStore.getState().statusReport).toBeNull();
       writes.length = 0;
 
-      await expect(runCommand()).rejects.toThrow(/Idle status report/i);
+      await expect(runCommand()).rejects.toThrow(/controller operation is active/i);
 
       expect(writes.some((line) => line.startsWith('$J='))).toBe(false);
-      expect(useLaserStore.getState().lastWriteError).toMatch(/Idle status report/i);
+      expect(useLaserStore.getState().lastWriteError).toMatch(/controller operation is active/i);
       expect(getMotionOperation()).toBeNull();
     },
   );

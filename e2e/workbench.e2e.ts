@@ -376,7 +376,7 @@ kerfDeskTest(
   },
 );
 
-baseTest('an interrupted-job checkpoint surfaces recovery before normal work', async ({ page }) => {
+baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       'laserforge.job-checkpoint.v1',
@@ -398,8 +398,14 @@ baseTest('an interrupted-job checkpoint surfaces recovery before normal work', a
     );
   });
   await page.goto('/');
-  await expect(page.getByText('Interrupted laser job', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Review safe recovery' })).toBeVisible();
+  const savedRecovery = page.getByText('Interrupted job saved', { exact: true });
+  await expect(savedRecovery).toBeVisible();
+  await expect(page.getByText('Last Start attempt blocked', { exact: true })).toHaveCount(0);
+  await savedRecovery.click();
+  await expect(
+    page.getByText('It is isolated from the current canvas', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
 
 async function installFileSystemMocks(page: Page): Promise<void> {

@@ -15,7 +15,6 @@
 import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
-import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -34,7 +33,6 @@ export function PwaUpdatePrompt(): JSX.Element | null {
       s.motionOperation !== null ||
       s.controllerOperation !== null,
   );
-  const checkpointPending = readJobCheckpoint() !== null;
   // Bumped by the `updatefound` handler after it clears the persisted dismissal.
   // The value is unused for logic (storage is the source of truth); its only job
   // is to re-render THIS mounted instance so a currently-suppressed prompt (which
@@ -74,7 +72,7 @@ export function PwaUpdatePrompt(): JSX.Element | null {
   // SW's own version is not legible client-side — sw.js is unhashed — and the
   // running bundle stays fixed until the waiting SW activates.
   const isDismissed = loadDismissedUpdateVersion() === __APP_VERSION__;
-  if (!needRefresh || machineRecoveryPending || checkpointPending || isDismissed) return null;
+  if (!needRefresh || machineRecoveryPending || isDismissed) return null;
   return (
     <div
       role="alert"

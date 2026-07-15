@@ -55,6 +55,7 @@ function setZone(zone: NoGoZone): void {
 async function connectIdleAtOrigin(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
   connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
@@ -112,6 +113,7 @@ describe('jog no-go zone guard (DEV-04)', () => {
     const connection = makeConnection(async (data) => void writes.push(data));
     await useLaserStore.getState().connect(makeAdapter(connection));
     connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:30.000,30.000,0.000|FS:0,0>');
     await flush();
     connection.emitLine('ok');
     // Park the head at (30,30) — inside the clamp (20..40).

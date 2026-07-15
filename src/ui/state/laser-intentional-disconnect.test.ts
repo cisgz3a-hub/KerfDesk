@@ -5,6 +5,7 @@ import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-disconnect-transaction';
 import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
+import { recoveryRepository } from './recovery';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -31,6 +32,9 @@ function makeConnection(
     onClose: () => () => undefined,
     close: async () => {
       events.push(`${label}:close`);
+    },
+    forget: async () => {
+      events.push(`${label}:forget`);
     },
     emitLine,
   };
@@ -60,9 +64,13 @@ async function connectReady(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(connection));
   connection.emitLine('Grbl 1.1f');
   await flush();
-  connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  await flush();
+  await vi.waitFor(() =>
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({ phase: 'settings' }),
+  );
+  connection.emitLine('$32=1');
+  connection.emitLine('ok');
+  await vi.waitFor(() => expect(useLaserStore.getState().controllerOperation).toBeNull());
 }
 
 async function flush(): Promise<void> {
@@ -130,6 +138,40 @@ describe('intentional GRBL connection teardown', () => {
       `old:write:${JSON.stringify('M9\n')}`,
       'old:close',
     ]);
+  });
+
+  it('upgrades concurrent Disconnect plus Forget into one full finalization', async () => {
+    const events: string[] = [];
+    const connection = makeConnection('old', events);
+    await connectReady(connection);
+    const purge = vi.spyOn(recoveryRepository, 'purgeControllerData');
+    useLaserStore.setState({
+      log: ['stale controller log'],
+      lastWriteError: 'stale controller error',
+    });
+    events.length = 0;
+
+    const disconnect = useLaserStore.getState().disconnect();
+    const forgetDevice = useLaserStore.getState().forgetDevice;
+    if (forgetDevice === undefined) throw new Error('Forget Controller action is unavailable.');
+    const forget = forgetDevice();
+    await flush();
+    connection.emitLine('Grbl 1.1f');
+    await Promise.all([disconnect, forget]);
+
+    expect(
+      events.filter((event) => event === `old:write:${JSON.stringify(RT_SOFT_RESET)}`),
+    ).toHaveLength(1);
+    expect(events.filter((event) => event === 'old:forget')).toHaveLength(1);
+    expect(purge).toHaveBeenCalledTimes(1);
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      streamer: null,
+      activeRunId: null,
+      log: [],
+      transcript: [],
+      lastWriteError: null,
+    });
   });
 
   it('falls back to cleanup and close when the reboot banner never arrives', async () => {

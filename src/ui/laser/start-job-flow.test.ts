@@ -1,34 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { fingerprintGcode } from '../../core/recovery';
 import {
   createLayer,
   createProject,
   DEFAULT_CNC_MACHINE_CONFIG,
-  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
-import type { StatusReport } from '../../core/controllers/grbl';
-import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
-import {
-  advanceJobCheckpoint,
-  createJobCheckpoint,
-  fingerprintGcode,
-  fingerprintsEqual,
-} from '../../core/recovery';
 import { useStore } from '../state';
-import { resetStore } from '../state/test-helpers';
-import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
-import { useLaserStore } from '../state/laser-store';
-import { initialLaserState } from '../state/laser-store-helpers';
-import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
   cncControllerEpochOf,
   cncSetupAttestationMatches,
 } from '../state/cnc-setup-attestation';
-import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
+import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import { useLaserStore } from '../state/laser-store';
+import { initialLaserState } from '../state/laser-store-helpers';
+import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import type { LegacyCheckpointStorage } from '../state/recovery/legacy-checkpoint-migration';
+import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
+import { useStartBlockerStore } from './start-blocker-store';
+import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -36,6 +34,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 }));
 
 const originalStartJob = useLaserStore.getState().startJob;
+const CONTROLLER_EPOCH = 7;
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -84,6 +83,28 @@ function runnableProject() {
   };
 }
 
+type RepositoryHarness = {
+  readonly repository: RecoveryRepository;
+  readonly backend: MemoryRecoveryStorageBackend;
+};
+
+function recoveryHarness(): RepositoryHarness {
+  const backend = new MemoryRecoveryStorageBackend();
+  const legacyStorage: LegacyCheckpointStorage = {
+    read: () => null,
+    clear: () => undefined,
+  };
+  return {
+    backend,
+    repository: new RecoveryRepository({
+      backend,
+      generationStore: new MemoryRecoveryGenerationStore(),
+      legacyStorage,
+      nowIso: () => '2026-07-15T12:00:00.000Z',
+    }),
+  };
+}
+
 function configureReadyCncStart(): void {
   useStore.setState((state) => ({
     project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
@@ -97,76 +118,148 @@ function configureReadyCncStart(): void {
       flood: false,
       mist: false,
     },
-    workZReferenceEpoch: 7,
+    workZReferenceEpoch: CONTROLLER_EPOCH,
     workZZeroEvidence: {
       source: 'manual-zero',
-      referenceEpoch: 7,
+      referenceEpoch: CONTROLLER_EPOCH,
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
     },
   });
 }
 
+function startSpy() {
+  return vi.mocked(useLaserStore.getState().startJob);
+}
+
+async function makeInterruptedRun(repository: RecoveryRepository) {
+  await runStartJobFlow(repository);
+  const active = repository.getSnapshot().activeRun;
+  if (active === null) throw new Error('Expected an active tracked run.');
+  await repository.updateProgress(active.runId, Math.min(2, active.sendableLines));
+  await repository.interruptRun(active.runId, Math.min(2, active.sendableLines), {
+    kind: 'disconnect',
+    message: 'Cable removed.',
+  });
+  const capsule = repository.getSnapshot().recoveryCapsule;
+  if (capsule === null) throw new Error('Expected an interrupted recovery capsule.');
+  return capsule;
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  resetStore();
+  useStore.setState({
+    project: runnableProject(),
+    selectedObjectId: null,
+    additionalSelectedIds: new Set(),
+  });
+  useLaserStore.setState({
+    ...initialLaserState(),
+    connection: { kind: 'connected' },
+    statusReport: idleStatus,
+    controllerSessionEpoch: CONTROLLER_EPOCH,
+    controllerQualification: {
+      kind: 'qualified',
+      epoch: CONTROLLER_EPOCH,
+      settings: 'verified',
+    },
+    controllerSettings: {
+      maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
+      minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
+      laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
+    },
+    controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+    startJob: vi.fn(async () => undefined),
+  });
+  vi.mocked(jobAwareAlert).mockClear();
+  vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+  useStartBlockerStore.getState().clear();
+  useToastStore.setState({ toasts: [] });
+});
+
+afterEach(() => {
+  localStorage.clear();
+  useLaserStore.setState({
+    ...initialLaserState(),
+    startJob: originalStartJob,
+  });
+  vi.restoreAllMocks();
+});
+
 describe('runStartJobFlow', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    resetStore();
-    useStore.setState({
-      project: runnableProject(),
-      selectedObjectId: null,
-      additionalSelectedIds: new Set(),
-    });
-    useLaserStore.setState({
-      ...initialLaserState(),
-      connection: { kind: 'connected' },
-      statusReport: idleStatus,
-      controllerSettings: {
-        maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
-        minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
-        laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
-      },
-      controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
-      startJob: vi.fn(async () => undefined),
-    });
-    vi.mocked(jobAwareAlert).mockClear();
-    vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+  it('passes a new run identity and active-profile streaming settings to the streamer', async () => {
+    const { repository } = recoveryHarness();
+    await runStartJobFlow(repository);
+
+    expect(startSpy()).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        runId: expect.stringMatching(/^run-/),
+        streamingMode: 'ping-pong',
+        rxBufferBytes: 96,
+        machineKind: 'laser',
+        laserModeStartEvidence: expect.objectContaining({
+          controllerSessionEpoch: CONTROLLER_EPOCH,
+          laserModeEnabled: true,
+          unverifiedAcknowledged: false,
+        }),
+        canvasPlan: expect.objectContaining({ capability: 'realtime' }),
+      }),
+    );
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    localStorage.clear();
+  it('blocks inline while controller qualification is not current', async () => {
+    const { repository } = recoveryHarness();
     useLaserStore.setState({
-      ...initialLaserState(),
-      startJob: originalStartJob,
+      controllerQualification: {
+        kind: 'qualifying',
+        epoch: CONTROLLER_EPOCH,
+        phase: 'settings-read',
+      },
     });
-    vi.restoreAllMocks();
+
+    await runStartJobFlow(repository);
+
+    expect(startSpy()).not.toHaveBeenCalled();
+    expect(useStartBlockerStore.getState().messages).toEqual(['Reading controller settings…']);
+    expect(jobAwareAlert).not.toHaveBeenCalled();
   });
 
   it('requires physical CNC setup confirmation and binds it to the compiled program', async () => {
+    const { repository } = recoveryHarness();
     configureReadyCncStart();
 
-    await runStartJobFlow();
+    await runStartJobFlow(repository);
 
     expect(jobAwareConfirm).toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
-    const startJob = vi.mocked(useLaserStore.getState().startJob);
-    expect(startJob).toHaveBeenCalledTimes(1);
-    const gcode = startJob.mock.calls[0]?.[0];
-    const options = startJob.mock.calls[0]?.[1];
-    if (typeof gcode !== 'string') throw new Error('CNC Start did not compile G-code');
+    expect(startSpy()).toHaveBeenCalledTimes(1);
+    const gcode = startSpy().mock.calls[0]?.[0];
+    const options = startSpy().mock.calls[0]?.[1];
+    if (typeof gcode !== 'string') throw new Error('CNC Start did not compile G-code.');
     expect(options?.machineKind).toBe('cnc');
-    const epoch = cncControllerEpochOf(useLaserStore.getState());
-    expect(cncSetupAttestationMatches(options?.cncSetupAttestation, gcode, epoch)).toBe(true);
+    expect(
+      cncSetupAttestationMatches(
+        options?.cncSetupAttestation,
+        gcode,
+        cncControllerEpochOf(useLaserStore.getState()),
+      ),
+    ).toBe(true);
   });
 
   it('does not stream a CNC program when physical setup confirmation is declined', async () => {
+    const { repository } = recoveryHarness();
     configureReadyCncStart();
     vi.mocked(jobAwareConfirm).mockReturnValueOnce(false);
 
-    await runStartJobFlow();
+    await runStartJobFlow(repository);
 
     expect(jobAwareConfirm).toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
-    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+    expect(startSpy()).not.toHaveBeenCalled();
   });
 
-  it('forces ping-pong when a legacy Marlin profile retained char-counted streaming', async () => {
+  it('forces ping-pong for a legacy Marlin profile with char-counted streaming', async () => {
+    const { repository } = recoveryHarness();
     useStore.setState((state) => ({
       project: {
         ...state.project,
@@ -177,15 +270,11 @@ describe('runStartJobFlow', () => {
         },
       },
     }));
-    useLaserStore.setState({
-      activeControllerKind: 'marlin',
-      detectedControllerKind: 'marlin',
-    });
+    useLaserStore.setState({ activeControllerKind: 'marlin', detectedControllerKind: 'marlin' });
 
-    await runStartJobFlow();
+    await runStartJobFlow(repository);
 
-    const options = vi.mocked(useLaserStore.getState().startJob).mock.calls[0]?.[1];
-    expect(options).toMatchObject({
+    expect(startSpy().mock.calls[0]?.[1]).toMatchObject({
       streamingMode: 'ping-pong',
       rxBufferBytes: 96,
       machineKind: 'laser',
@@ -193,247 +282,140 @@ describe('runStartJobFlow', () => {
   });
 });
 
-describe('job checkpoint integration (ADR-118)', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    resetStore();
-    useStore.setState({
-      project: runnableProject(),
-      selectedObjectId: null,
-      additionalSelectedIds: new Set(),
-    });
-    useLaserStore.setState({
-      ...initialLaserState(),
-      connection: { kind: 'connected' },
-      statusReport: idleStatus,
-      controllerSettings: {
-        maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
-        minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
-        laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
-      },
-      controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
-      startJob: vi.fn(async () => undefined),
-    });
-    vi.mocked(jobAwareAlert).mockClear();
-    vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
-  });
+describe('isolated execution recovery ownership', () => {
+  it('stores exact streamed G-code as a line-zero active run only after Start is accepted', async () => {
+    const { repository } = recoveryHarness();
 
-  afterEach(() => {
-    localStorage.clear();
-    useLaserStore.setState({
-      ...initialLaserState(),
-      startJob: originalStartJob,
-    });
-    vi.restoreAllMocks();
-  });
+    await runStartJobFlow(repository);
 
-  function streamedGcode(): string {
-    const startJob = vi.mocked(useLaserStore.getState().startJob);
-    const gcode = startJob.mock.calls[0]?.[0];
-    if (typeof gcode !== 'string') throw new Error('startJob was not called with gcode');
-    return gcode;
-  }
-
-  it('writes a checkpoint fingerprinting the streamed program on start', async () => {
-    await runStartJobFlow();
-
-    const checkpoint = readJobCheckpoint();
-    expect(checkpoint).not.toBeNull();
-    expect(checkpoint?.fingerprint).toEqual(fingerprintGcode(streamedGcode()));
-    expect(checkpoint?.ackedLines).toBe(0);
-    expect(checkpoint?.resumeInFlight).toBe(false);
-    expect(checkpoint?.machineKind).toBe('laser');
-  });
-
-  it('keeps an older checkpoint when the start is refused by startJob', async () => {
-    const older = createJobCheckpoint({
-      gcode: 'G1 X1 S1\nM5',
-      machineKind: 'laser',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: '2026-07-07T01:00:00.000Z',
-    });
-    writeJobCheckpoint(older);
-    useLaserStore.setState({
-      startJob: vi.fn(async () => {
-        throw new Error('refused');
-      }),
-    });
-
-    await runStartJobFlow();
-
-    expect(readJobCheckpoint()).toEqual(older);
-  });
-
-  it('refuses a checkpoint resume when the project no longer matches the fingerprint', async () => {
-    const foreign = createJobCheckpoint({
-      gcode: 'G1 X999 S999\nM5',
-      machineKind: 'laser',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: '2026-07-07T01:00:00.000Z',
-    });
-    writeJobCheckpoint(foreign);
-
-    await runCheckpointResumeFlow(foreign);
-
-    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
-    expect(jobAwareAlert).toHaveBeenCalledWith(
-      expect.stringContaining('no longer produces the same G-code'),
+    const active = repository.getSnapshot().activeRun;
+    expect(active).not.toBeNull();
+    expect(active?.ackedLines).toBe(0);
+    expect(active?.artifact.gcode).toBe(startSpy().mock.calls[0]?.[0]);
+    expect(active?.artifact.fingerprint).toEqual(
+      fingerprintGcode(startSpy().mock.calls[0]?.[0] ?? ''),
     );
-    expect(readJobCheckpoint()).toEqual(foreign);
+    expect(repository.getSnapshot().recoveryCapsule).toBeNull();
   });
 
-  it('resumes a matching checkpoint and stamps it resume-in-flight', async () => {
-    await runStartJobFlow();
-    const gcode = streamedGcode();
-    const stored = readJobCheckpoint();
-    expect(stored).not.toBeNull();
-    if (stored === null) throw new Error('unreachable');
-    writeJobCheckpoint(advanceJobCheckpoint(stored, 2, '2026-07-07T02:00:00.000Z'));
-    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
-      async () => undefined,
-    );
-    useLaserStore.setState({ startJob });
+  it('does not let a 2516 / 118035 interrupted capsule block a different normal job', async () => {
+    const { repository } = recoveryHarness();
+    await runStartJobFlow(repository);
+    const template = repository.getSnapshot().activeRun?.artifact;
+    if (template === undefined) throw new Error('Expected a template artifact.');
+    const interruptedGcode = 'G1 X1\n'.repeat(118_035);
+    const archived = createExecutionArtifact({
+      runId: 'run-118035-lines',
+      gcode: interruptedGcode,
+      prepared: template.prepared,
+      outputScope: template.outputScope,
+      canvasPlan: template.canvasPlan,
+      controllerSettings: template.archivedControllerObservation.settings,
+      createdAtIso: '2026-07-15T11:00:00.000Z',
+    });
+    await repository.stageArtifact(archived);
+    await repository.activateFreshRun(archived.runId);
+    await repository.updateProgress(archived.runId, 2_516);
+    await repository.interruptRun(archived.runId, 2_516, {
+      kind: 'disconnect',
+      message: 'Router disconnected.',
+    });
+    startSpy().mockClear();
 
-    const resumed = readJobCheckpoint();
-    if (resumed === null) throw new Error('unreachable');
-    await runCheckpointResumeFlow(resumed);
+    await runStartJobFlow(repository);
 
-    expect(startJob).toHaveBeenCalledTimes(1);
-    const resumeProgram = startJob.mock.calls[0]?.[0] ?? '';
-    expect(resumeProgram).toContain('resume preamble');
-    expect(resumeProgram).not.toBe(gcode);
-    expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
+    expect(startSpy()).toHaveBeenCalledTimes(1);
+    expect(repository.getSnapshot().activeRun?.runId).not.toBe(archived.runId);
+    expect(repository.getSnapshot().recoveryCapsule).toBeNull();
+    expect(jobAwareAlert).not.toHaveBeenCalledWith(expect.stringContaining('2516'));
   });
 
-  it('resumes after a crash reset the output scope the run used (PST-02)', async () => {
-    const objectB: SceneObject = {
-      ...lineObject,
-      id: 'line-object-b',
-      bounds: { minX: 20, minY: 20, maxX: 30, maxY: 30 },
-      paths: [
-        {
-          color: '#ff0000',
-          polylines: [
-            {
-              points: [
-                { x: 21, y: 21 },
-                { x: 29, y: 29 },
-              ],
-              closed: false,
-            },
-          ],
-        },
-      ],
-    };
-    useStore.setState({
+  it('preserves the older capsule when a new ordinary Start is refused before acceptance', async () => {
+    const { repository } = recoveryHarness();
+    const capsule = await makeInterruptedRun(repository);
+    useLaserStore.setState({ startJob: vi.fn(async () => Promise.reject(new Error('refused'))) });
+
+    await runStartJobFlow(repository);
+
+    expect(repository.getSnapshot().recoveryCapsule).toEqual(capsule);
+    expect(repository.getSnapshot().activeRun).toBeNull();
+  });
+
+  it('replaces the older capsule only after a new ordinary Start is accepted', async () => {
+    const { repository } = recoveryHarness();
+    const capsule = await makeInterruptedRun(repository);
+    startSpy().mockClear();
+
+    await runStartJobFlow(repository);
+
+    expect(startSpy()).toHaveBeenCalledTimes(1);
+    expect(repository.getSnapshot().activeRun?.runId).not.toBe(capsule.runId);
+    expect(repository.getSnapshot().recoveryCapsule).toBeNull();
+  });
+
+  it('continues the job with a warning when artifact persistence is unavailable', async () => {
+    const { repository, backend } = recoveryHarness();
+    backend.failNext('put-artifact');
+
+    await runStartJobFlow(repository);
+
+    expect(startSpy()).toHaveBeenCalledTimes(1);
+    expect(repository.getSnapshot().activeRun).toBeNull();
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringContaining('recovery is unavailable'),
+    });
+  });
+});
+
+describe('completed-job replay', () => {
+  it('runs the exact completed job from line one with a new run identity and no recovery', async () => {
+    const { repository } = recoveryHarness();
+    await runStartJobFlow(repository);
+    const first = repository.getSnapshot().activeRun;
+    if (first === null) throw new Error('Expected the first active run.');
+    await repository.completeRun(first.runId);
+    const receipt = repository.getSnapshot().lastCompletedReceipt;
+    if (receipt === null) throw new Error('Expected a completed receipt.');
+    startSpy().mockClear();
+
+    await runCompletedJobAgainFlow(receipt, repository);
+
+    const replay = repository.getSnapshot().activeRun;
+    expect(startSpy()).toHaveBeenCalledTimes(1);
+    expect(replay?.runId).not.toBe(first.runId);
+    expect(replay?.ackedLines).toBe(0);
+    expect(replay?.artifact.gcode).toBe(first.artifact.gcode);
+    expect(repository.getSnapshot().recoveryCapsule).toBeNull();
+    expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
+  });
+
+  it('invalidates replay when the current canvas no longer compiles to the receipt', async () => {
+    const { repository } = recoveryHarness();
+    await runStartJobFlow(repository);
+    const first = repository.getSnapshot().activeRun;
+    if (first === null) throw new Error('Expected the first active run.');
+    await repository.completeRun(first.runId);
+    const receipt = repository.getSnapshot().lastCompletedReceipt;
+    if (receipt === null) throw new Error('Expected a completed receipt.');
+    useStore.setState((state) => ({
       project: {
-        ...runnableProject(),
+        ...state.project,
         scene: {
-          ...EMPTY_SCENE,
-          objects: [lineObject, objectB],
-          layers: [createLayer({ id: 'red', color: '#ff0000' })],
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) =>
+            object.id === lineObject.id
+              ? { ...object, transform: { ...object.transform, x: object.transform.x + 5 } }
+              : object,
+          ),
         },
       },
-      selectedObjectId: 'line-object',
-      additionalSelectedIds: new Set(),
-      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
-    });
+    }));
+    startSpy().mockClear();
 
-    await runStartJobFlow();
-    const selectiveGcode = streamedGcode();
-    const stored = readJobCheckpoint();
-    if (stored === null) throw new Error('unreachable');
-    expect(stored.outputScope.cutSelectedGraphics).toBe(true);
-    expect(stored.outputScope.selectedObjectIds).toEqual(['line-object']);
-    expect(fingerprintsEqual(fingerprintGcode(selectiveGcode), stored.fingerprint)).toBe(true);
+    await runCompletedJobAgainFlow(receipt, repository);
 
-    useStore.setState({
-      selectedObjectId: null,
-      additionalSelectedIds: new Set(),
-      outputScopeSettings: { cutSelectedGraphics: false, useSelectionOrigin: false },
-    });
-    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
-      async () => undefined,
-    );
-    useLaserStore.setState({ startJob });
-    vi.mocked(jobAwareAlert).mockClear();
-
-    await runCheckpointResumeFlow(stored);
-
-    expect(jobAwareAlert).not.toHaveBeenCalledWith(
-      expect.stringContaining('no longer produces the same G-code'),
-    );
-    expect(startJob).toHaveBeenCalledTimes(1);
-  });
-
-  it('resumes a Current-Position job after the head moved (R1)', async () => {
-    const headAt = (x: number, y: number): StatusReport => ({
-      ...idleStatus,
-      mPos: { x, y, z: 0 },
-    });
-    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
-    useLaserStore.setState({ statusReport: headAt(10, 10) });
-
-    await runStartJobFlow();
-    const started = readJobCheckpoint();
-    if (started === null) throw new Error('unreachable');
-    expect(started.jobOrigin).toEqual({
-      startFrom: 'current-position',
-      anchor: 'front-left',
-      currentPosition: { x: 10, y: 10 },
-    });
-
-    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
-      async () => undefined,
-    );
-    useLaserStore.setState({ startJob, statusReport: headAt(60, 60) });
-    vi.mocked(jobAwareAlert).mockClear();
-
-    await runCheckpointResumeFlow(started);
-
-    expect(jobAwareAlert).not.toHaveBeenCalledWith(
-      expect.stringContaining('no longer produces the same G-code'),
-    );
-    expect(startJob).toHaveBeenCalledTimes(1);
-  });
-
-  it('manual start-from-line also suspends checkpoint tracking', async () => {
-    await runStartJobFlow();
-    expect(readJobCheckpoint()?.resumeInFlight).toBe(false);
-
-    await runStartFromLineFlow(2);
-
-    expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
-  });
-
-  it('refuses manual CNC start-from-line before compiling or streaming', async () => {
-    useStore.getState().setMachineKind('cnc');
-
-    await runStartFromLineFlow(2);
-
-    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
-    expect(jobAwareAlert).toHaveBeenCalledWith(
-      expect.stringContaining(CNC_AUTOMATIC_RECOVERY_DISABLED_REASON),
-    );
-  });
-
-  it('keeps a CNC checkpoint as evidence and refuses to execute it', async () => {
-    const checkpoint = createJobCheckpoint({
-      gcode: 'G21\nG90\nM3 S12000\nG1 X10 F500\nM5',
-      machineKind: 'cnc',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: '2026-07-13T01:00:00.000Z',
-    });
-    writeJobCheckpoint(advanceJobCheckpoint(checkpoint, 2, '2026-07-13T01:01:00.000Z'));
-
-    const stored = readJobCheckpoint();
-    if (stored === null) throw new Error('unreachable');
-    await runCheckpointResumeFlow(stored);
-
-    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
-    expect(jobAwareAlert).toHaveBeenCalledWith(
-      expect.stringContaining(CNC_AUTOMATIC_RECOVERY_DISABLED_REASON),
-    );
-    expect(readJobCheckpoint()).toEqual(stored);
+    expect(startSpy()).not.toHaveBeenCalled();
+    expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
   });
 });

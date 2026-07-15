@@ -1,73 +1,160 @@
-// useJobCheckpoint (ADR-118) — keeps the interrupted-job checkpoint current
-// while a job streams. runStartJobFlow writes the initial record; this hook
-// advances ackedLines from streamer.completed (every
-// CHECKPOINT_ACK_INTERVAL_LINES while streaming, immediately on any status
-// transition) and clears the slot only after 'done' is followed by connected,
-// physical Idle. A checkpoint survives Stop, error, disconnect, and crash.
-//
-// A resume run (preamble + tail, its own line numbering) is NOT tracked (v1,
-// ADR-118): the flow stamps `resumeInFlight` before launching it, and this
-// hook also requires the streamer total to equal the checkpoint's sendable
-// count — belt and braces so foreign ack counts can never corrupt the
-// original record. The original checkpoint stays put — stale toward earlier
-// lines, which re-burns a short stretch rather than leaving a gap. A resume
-// run's settled Idle still clears the slot: the job is physically complete.
-//
-// The checkpoint is ~200 bytes; re-reading it per store fire costs
-// microseconds and leaves no cache to go stale against the flow's writes.
+// Run-owned recovery tracking. Exact G-code lives once in IndexedDB; this hook
+// advances only the active runId's small slot record and promotes terminal
+// streams to the isolated newest-only recovery capsule. Completion is recorded
+// only after the acknowledged stream has settled to fresh physical Idle.
 
 import { useEffect } from 'react';
-import type { StreamerStatus } from '../../core/controllers/grbl';
-import { advanceJobCheckpoint, withJobInterruption } from '../../core/recovery';
-import {
-  CHECKPOINT_ACK_INTERVAL_LINES,
-  clearJobCheckpoint,
-  readJobCheckpoint,
-  writeJobCheckpoint,
-} from '../state/job-checkpoint-storage';
+import type { StreamerState, StreamerStatus } from '../../core/controllers/grbl';
+import type { JobInterruption } from '../../core/recovery';
+import { recoveryRepository, type RecoveryRepository, type RunId } from '../state/recovery';
 import { useLaserStore, type LaserState } from '../state/laser-store';
+import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { checkpointInterruption } from './checkpoint-interruption';
+
+type StreamObservation = {
+  readonly runId: RunId;
+  readonly status: StreamerStatus;
+  readonly completed: number;
+};
 
 export function installJobCheckpointTracking(
   nowIso: () => string = () => new Date().toISOString(),
+  repository: RecoveryRepository = recoveryRepository,
 ): () => void {
-  let lastStatus: StreamerStatus | null = null;
-  const sync = (state: LaserState): void => {
-    const streamer = state.streamer;
-    if (streamer === null) {
-      clearSettledCheckpoint(state, lastStatus);
-      lastStatus = null;
+  let previous: StreamObservation | null = null;
+  let lastQueuedAck = 0;
+  let terminalQueued = false;
+  let queue: Promise<void> = initialize(repository);
+
+  const enqueue = (work: () => Promise<void>): void => {
+    queue = queue.then(work).catch(() => undefined);
+  };
+
+  const observeMissingStreamer = (state: LaserState, priorState: LaserState | undefined): void => {
+    if (previous !== null) {
+      const ended = previous;
+      const work = settledCleanly(state, priorState, ended.status)
+        ? () => completeAndClear(repository, ended, nowIso)
+        : () => interruptAndClear(repository, ended, state, nowIso);
+      enqueue(work);
+    }
+    previous = null;
+    lastQueuedAck = 0;
+    terminalQueued = false;
+  };
+
+  const observeStreamer = (state: LaserState, streamer: StreamerState): void => {
+    const runId = state.activeRunId;
+    if (runId === null) {
+      previous = null;
       return;
     }
-    const statusChanged = streamer.status !== lastStatus;
-    lastStatus = streamer.status;
-    const checkpoint = readJobCheckpoint();
-    if (checkpoint === null) return;
-    if (checkpoint.resumeInFlight) return; // resume run streaming — frozen
-    if (streamer.total !== checkpoint.sendableLines) return; // foreign run — frozen
-    const due = streamer.completed - checkpoint.ackedLines >= CHECKPOINT_ACK_INTERVAL_LINES;
-    if (!due && !statusChanged) return;
-    const now = nowIso();
-    const advanced = advanceJobCheckpoint(checkpoint, streamer.completed, now);
+    if (previous?.runId !== runId) {
+      previous = null;
+      lastQueuedAck = cachedAck(repository, runId);
+      terminalQueued = false;
+    }
+    const statusChanged = streamer.status !== previous?.status;
     const interruption = statusChanged
       ? checkpointInterruption(streamer.status, state.safetyNotice)
       : null;
-    writeJobCheckpoint(
-      interruption === null ? advanced : withJobInterruption(advanced, interruption, now),
-    );
+    const observation = { runId, status: streamer.status, completed: streamer.completed };
+    previous = observation;
+
+    if (interruption !== null && !terminalQueued) {
+      terminalQueued = true;
+      lastQueuedAck = Math.max(lastQueuedAck, streamer.completed);
+      enqueue(async () => {
+        await repository.interruptRun(runId, streamer.completed, interruption, nowIso());
+      });
+      return;
+    }
+
+    const due = streamer.completed - lastQueuedAck >= CHECKPOINT_ACK_INTERVAL_LINES;
+    if (!due && !statusChanged) return;
+    lastQueuedAck = Math.max(lastQueuedAck, streamer.completed);
+    enqueue(async () => {
+      await repository.updateProgress(runId, streamer.completed, nowIso());
+    });
   };
+
+  const sync = (state: LaserState, priorState?: LaserState): void => {
+    if (state.streamer === null) observeMissingStreamer(state, priorState);
+    else observeStreamer(state, state.streamer);
+  };
+
   sync(useLaserStore.getState());
   return useLaserStore.subscribe(sync);
 }
 
-function clearSettledCheckpoint(state: LaserState, lastStatus: StreamerStatus | null): void {
-  if (
-    lastStatus === 'done' &&
+function cachedAck(repository: RecoveryRepository, runId: RunId): number {
+  const active = repository.getSnapshot().activeRun;
+  return active?.runId === runId ? active.ackedLines : 0;
+}
+
+async function completeAndClear(
+  repository: RecoveryRepository,
+  ended: StreamObservation,
+  nowIso: () => string,
+): Promise<void> {
+  await repository.completeRun(ended.runId, nowIso());
+  clearInactiveRunOwnership(ended.runId);
+}
+
+async function interruptAndClear(
+  repository: RecoveryRepository,
+  ended: StreamObservation,
+  state: LaserState,
+  nowIso: () => string,
+): Promise<void> {
+  await repository.interruptRun(
+    ended.runId,
+    ended.completed,
+    disappearedStreamInterruption(ended.status, state),
+    nowIso(),
+  );
+  clearInactiveRunOwnership(ended.runId);
+}
+
+function settledCleanly(
+  state: LaserState,
+  priorState: LaserState | undefined,
+  previousStatus: StreamerStatus,
+): boolean {
+  return (
+    previousStatus === 'done' &&
+    priorState?.streamer?.status === 'done' &&
+    priorState.controllerOperation?.kind === 'post-job-settle' &&
+    priorState.controllerOperation.phase === 'awaiting-idle' &&
     state.connection.kind === 'connected' &&
     state.statusReport?.state === 'Idle'
-  ) {
-    clearJobCheckpoint();
+  );
+}
+
+function disappearedStreamInterruption(
+  previousStatus: StreamerStatus,
+  state: LaserState,
+): JobInterruption {
+  return (
+    checkpointInterruption(previousStatus, state.safetyNotice) ?? {
+      kind: state.connection.kind === 'connected' ? 'unknown' : 'disconnect',
+      message:
+        state.connection.kind === 'connected'
+          ? 'The job stream ended before clean physical completion.'
+          : 'The controller connection ended before clean physical completion.',
+    }
+  );
+}
+
+function clearInactiveRunOwnership(runId: RunId): void {
+  const state = useLaserStore.getState();
+  if (state.streamer === null && state.activeRunId === runId) {
+    useLaserStore.setState({ activeRunId: null });
   }
+}
+
+async function initialize(repository: RecoveryRepository): Promise<void> {
+  await repository.initialize();
 }
 
 export function useJobCheckpoint(): void {
