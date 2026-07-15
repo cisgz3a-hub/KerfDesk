@@ -128,6 +128,7 @@ function RecoveryActions(props: {
       </button>
       <button
         type="button"
+        disabled={props.disabled}
         onClick={() => void discard()}
         title="Permanently discard only this isolated recovery capsule."
       >

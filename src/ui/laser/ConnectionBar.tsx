@@ -9,8 +9,9 @@
 // machineNoun keeps the hover copy machine-aware ("laser" / "router",
 // ADR-101 §7) while this component stays presentational.
 
-import type { ConnectionState } from '../state/laser-store';
+import { assertNever } from '../../core/scene';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
+import type { ConnectionState } from '../state/laser-store';
 
 type Props = {
   readonly connection: ConnectionState;
@@ -29,35 +30,14 @@ export function ConnectionBar(props: Props): JSX.Element {
   return (
     <div style={containerStyle}>
       <div style={rowStyle}>
-        {connection.kind === 'connected' ? (
-          <>
-            <button
-              type="button"
-              onClick={onDisconnect}
-              disabled={disabled}
-              title={`Close the current ${machineNoun} serial connection but keep device permission.`}
-            >
-              Disconnect
-            </button>
-            <button
-              type="button"
-              onClick={onForget}
-              disabled={disabled}
-              title={`Disconnect and remove this ${machineNoun} from the browser's permitted devices.`}
-            >
-              Forget Controller
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={onConnect}
-            disabled={disabled || connection.kind === 'connecting'}
-            title={`Open the browser serial picker and connect to your ${machineNoun} controller.`}
-          >
-            {connection.kind === 'connecting' ? 'Connecting…' : 'Connect…'}
-          </button>
-        )}
+        <ConnectionActions
+          connection={connection}
+          machineNoun={machineNoun}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+          onForget={onForget}
+          disabled={disabled}
+        />
         <StatusDot connection={connection} />
         {connection.kind === 'failed' && <span style={errorStyle}>Failed: {connection.error}</span>}
       </div>
@@ -68,6 +48,52 @@ export function ConnectionBar(props: Props): JSX.Element {
         disabled={disabled}
       />
     </div>
+  );
+}
+
+function ConnectionActions(props: Props): JSX.Element {
+  switch (props.connection.kind) {
+    case 'connected':
+      return (
+        <>
+          <button
+            type="button"
+            onClick={props.onDisconnect}
+            disabled={props.disabled}
+            title={`Close the current ${props.machineNoun} serial connection but keep device permission.`}
+          >
+            Disconnect
+          </button>
+          <button
+            type="button"
+            onClick={props.onForget}
+            disabled={props.disabled}
+            title={`Disconnect and remove this ${props.machineNoun} from the browser's permitted devices.`}
+          >
+            Forget Controller
+          </button>
+        </>
+      );
+    case 'connecting':
+      return connectButton(props, 'Connecting…', true);
+    case 'disconnected':
+    case 'failed':
+      return connectButton(props, 'Connect…', props.disabled);
+    default:
+      return assertNever(props.connection, 'ConnectionState');
+  }
+}
+
+function connectButton(props: Props, label: string, disabled: boolean): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={props.onConnect}
+      disabled={disabled}
+      title={`Open the browser serial picker and connect to your ${props.machineNoun} controller.`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -117,22 +143,20 @@ function QualificationNotice(props: {
 function qualificationMessage(
   phase: Extract<ControllerQualification, { readonly kind: 'qualifying' }>['phase'],
 ): string {
-  if (phase === 'controller-response') return 'Waiting for controller response…';
-  if (phase === 'reset-cleanup') {
-    return 'Controller reset detected. Waiting for fresh Idle before reading settings…';
+  switch (phase) {
+    case 'controller-response':
+      return 'Waiting for controller response…';
+    case 'reset-cleanup':
+      return 'Controller reset detected. Waiting for fresh Idle before reading settings…';
+    case 'settings-read':
+      return 'Reading controller settings…';
+    default:
+      return assertNever(phase, 'ControllerQualificationPhase');
   }
-  return 'Reading controller settings…';
 }
 
 function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
-  const color =
-    connection.kind === 'connected'
-      ? 'var(--lf-success)'
-      : connection.kind === 'connecting'
-        ? 'var(--lf-warning)'
-        : connection.kind === 'failed'
-          ? 'var(--lf-danger)'
-          : 'var(--lf-text-faint)';
+  const color = connectionStatusColor(connection);
   return (
     <span
       title={connection.kind}
@@ -145,6 +169,21 @@ function StatusDot({ connection }: { readonly connection: ConnectionState }): JS
       }}
     />
   );
+}
+
+function connectionStatusColor(connection: ConnectionState): string {
+  switch (connection.kind) {
+    case 'connected':
+      return 'var(--lf-success)';
+    case 'connecting':
+      return 'var(--lf-warning)';
+    case 'failed':
+      return 'var(--lf-danger)';
+    case 'disconnected':
+      return 'var(--lf-text-faint)';
+    default:
+      return assertNever(connection, 'ConnectionState');
+  }
 }
 
 const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };

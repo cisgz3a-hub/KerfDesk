@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import type { RecoveryCapsule } from '../state/recovery/recovery-model';
+import { assertNever } from '../../core/scene';
+import type { RecoveryCapsule } from '../state/recovery';
 import { Dialog, DialogActions } from '../kit';
 
 export type LaserRecoveryReviewDialogProps = {
@@ -59,7 +60,7 @@ function useRecoveryStart(props: LaserRecoveryReviewDialogProps): {
         return;
       }
       setFailureMessage(
-        'Recovery was not started. The saved job is still available; resolve the live controller requirement and try again.',
+        'Recovery was not started. Review the current recovery card and live controller state before trying again.',
       );
     } catch (error: unknown) {
       setFailureMessage(failureFrom(error));
@@ -202,19 +203,30 @@ function ArtifactSummary({ capsule }: { readonly capsule: RecoveryCapsule }): JS
 }
 
 function interruptionLabel(kind: RecoveryCapsule['interruption']['kind']): string {
-  if (kind === 'disconnect') return 'Connection lost';
-  if (kind === 'controller-error') return 'Controller rejected the run';
-  if (kind === 'write-failed') return 'Transport write failed';
-  if (kind === 'controller-reboot') return 'Controller restarted';
-  if (kind === 'stream-stalled') return 'Stream stopped responding';
-  if (kind === 'cancelled') return 'Run was cancelled';
-  return 'Unknown interruption';
+  switch (kind) {
+    case 'disconnect':
+      return 'Connection lost';
+    case 'controller-error':
+      return 'Controller rejected the run';
+    case 'write-failed':
+      return 'Transport write failed';
+    case 'controller-reboot':
+      return 'Controller restarted';
+    case 'stream-stalled':
+      return 'Stream stopped responding';
+    case 'cancelled':
+      return 'Run was cancelled';
+    case 'unknown':
+      return 'Unknown interruption';
+    default:
+      return assertNever(kind, 'job interruption kind');
+  }
 }
 
 function failureFrom(error: unknown): string {
   return error instanceof Error && error.message.trim() !== ''
     ? error.message
-    : 'Recovery was not started. The saved job is still available and can be retried.';
+    : 'Recovery was not started. Review the current recovery card before trying again.';
 }
 
 function formatCount(value: number): string {

@@ -87,7 +87,7 @@ async function quarantineStreamFault(
     set({ safetyNotice: writeFailedNotice('disconnect') });
   } finally {
     // An explicit Disconnect joining this reset owns final state clearing.
-    if (!isIntentionalDisconnectClaimed(connection)) {
+    if (!isIntentionalDisconnectClaimed(refs, connection)) {
       if (refs.connection === connection) {
         teardownConnectionRefs(refs);
         set((state) => {
@@ -97,7 +97,7 @@ async function quarantineStreamFault(
             : { ...patch, safetyNotice: state.safetyNotice };
         });
       }
-      await closeConnectionOnce(connection).catch(() => undefined);
+      await closeConnectionOnce(refs, connection).catch(() => undefined);
     }
   }
 }
@@ -115,6 +115,9 @@ function isLiveRefs(refs: object): refs is LiveRefs {
     'nextTranscriptId',
     'stallProbe',
     'heartbeatProbe',
+    'closeRequests',
+    'intentionalDisconnects',
+    'forgetFinalizations',
     'controllerCommand',
     'controllerIdleWait',
     'controllerResetWait',

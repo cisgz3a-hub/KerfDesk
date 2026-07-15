@@ -1,14 +1,21 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
-import type {
-  ExecutionArtifactV1,
-  LegacyFingerprintOnlyArtifactV1,
-} from '../state/recovery/execution-artifact';
-import type { RecoveryCapsule } from '../state/recovery/recovery-model';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_OUTPUT_SCOPE,
+  EMPTY_SCENE,
+  IDENTITY_TRANSFORM,
+  type SceneObject,
+} from '../../core/scene';
+import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
+import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
+import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 
+// React DOM's test renderer reads this conventional global. The optional
+// augmentation is test-only and does not change the production global type.
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,8 +39,9 @@ describe('LaserRecoveryReviewDialog', () => {
     renderDialog(capsule, onClose, onStart);
 
     expect(host?.textContent).toContain('Exact job artifact saved');
-    expect(host?.textContent).toContain('2,516 of 118,035 sendable lines acknowledged');
-    expect(host?.textContent).toContain('115,519 remaining');
+    expect(host?.textContent).toContain(
+      `${capsule.ackedLines} of ${capsule.sendableLines} sendable lines acknowledged`,
+    );
     expect(host?.textContent).toContain('Connection lost');
     expect(host?.textContent).toContain('USB cable disconnected');
     expect(host?.textContent).toContain('diagnostic evidence only');
@@ -85,7 +93,7 @@ describe('LaserRecoveryReviewDialog', () => {
     });
     expect(onClose).not.toHaveBeenCalled();
     expect(host?.querySelector('[role="alert"]')?.textContent).toContain(
-      'saved job is still available',
+      'Review the current recovery card',
     );
     expect(button('Start supervised recovery').disabled).toBe(false);
 
@@ -125,35 +133,61 @@ function button(label: string): HTMLButtonElement {
 }
 
 function exactCapsule(): RecoveryCapsule {
-  const artifact: ExecutionArtifactV1 = {
-    schemaVersion: 1,
-    kind: 'exact-execution',
-    runId: 'run-exact-laser',
-    createdAtIso: '2026-07-15T09:00:00.000Z',
-    gcode: 'G21\nM4 S500\nG1 X10 F600\nM5',
-    fingerprint: { fnv1a: 123, chars: 30, lines: 4 },
-    sendableLines: 118_035,
-    machineKind: 'laser',
-    controller: {
-      kind: 'grbl-v1.1',
-      streamingMode: 'char-counted',
-      rxBufferBytes: 120,
-    },
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    executionSignature: 'exact-laser-signature',
-    prepared: { ok: true } as ExecutionArtifactV1['prepared'],
-    canvasPlan: {} as ExecutionArtifactV1['canvasPlan'],
-    archivedControllerObservation: {
-      settings: null,
-      observedAtIso: '2026-07-15T09:00:00.000Z',
+  const line: SceneObject = {
+    kind: 'imported-svg',
+    id: 'dialog-fixture-line',
+    source: 'dialog-fixture.svg',
+    bounds: { minX: 1, minY: 1, maxX: 9, maxY: 9 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 1, y: 1 },
+              { x: 9, y: 9 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const project = {
+    ...createProject(),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [line],
+      layers: [createLayer({ id: 'red', color: '#ff0000' })],
     },
   };
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) throw new Error('Expected a valid prepared laser fixture.');
+  const emitted = emitPreparedGcode(prepared);
+  if (!emitted.preflight.ok) throw new Error('Expected valid laser fixture G-code.');
+  const canvasPlan = buildCanvasMotionPlan({
+    gcode: emitted.gcode,
+    prepared,
+    machine: { statusReport: null, alarmCode: null, hasActiveStreamer: false },
+    retentionKey: 'exact-laser-signature',
+  });
+  const artifact = createExecutionArtifact({
+    runId: 'run-exact-laser',
+    createdAtIso: '2026-07-15T09:00:00.000Z',
+    gcode: emitted.gcode,
+    prepared,
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    canvasPlan,
+    controllerSettings: null,
+  });
+  const ackedLines = Math.min(2, artifact.sendableLines);
   return {
     runId: artifact.runId,
     artifactKind: artifact.kind,
     revision: 4,
-    ackedLines: 2_516,
-    sendableLines: 118_035,
+    ackedLines,
+    sendableLines: artifact.sendableLines,
     interruption: {
       kind: 'disconnect',
       message: 'USB cable disconnected',
@@ -164,7 +198,7 @@ function exactCapsule(): RecoveryCapsule {
 }
 
 function legacyCapsule(): RecoveryCapsule {
-  const artifact: LegacyFingerprintOnlyArtifactV1 = {
+  const artifact = {
     schemaVersion: 1,
     kind: 'legacy-fingerprint-only',
     runId: 'legacy-laser',
@@ -174,7 +208,7 @@ function legacyCapsule(): RecoveryCapsule {
     sendableLines: 8,
     machineKind: 'laser',
     outputScope: DEFAULT_OUTPUT_SCOPE,
-  };
+  } satisfies Extract<RecoveryCapsule['artifact'], { readonly kind: 'legacy-fingerprint-only' }>;
   return {
     runId: artifact.runId,
     artifactKind: artifact.kind,

@@ -13,9 +13,11 @@ import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
-import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
-import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
-import type { LegacyCheckpointStorage } from '../state/recovery/legacy-checkpoint-migration';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+  type LegacyCheckpointStorage,
+} from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
@@ -148,6 +150,69 @@ describe('exact laser recovery activation', () => {
       revision: capsule.revision,
     });
     expect(retained).not.toHaveProperty('claim');
+  });
+
+  it('recovers a recovery attempt again after that exact resume run is interrupted', async () => {
+    const repository = recoveryHarness();
+    const originalCapsule = await interruptedCapsule(repository);
+    const recoveryStart = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob: recoveryStart });
+
+    expect(await runLaserRecoveryCapsuleFlow(originalCapsule, repository)).toBe(true);
+    const firstRecovery = repository.getSnapshot().activeRun;
+    if (firstRecovery === null) throw new Error('Expected the first recovery run.');
+    expect(firstRecovery.artifact.laserResumeChain).toHaveLength(1);
+    await repository.interruptRun(firstRecovery.runId, 0, {
+      kind: 'disconnect',
+      message: 'Recovery connection lost.',
+    });
+    const recoveredAgain = repository.getSnapshot().recoveryCapsule;
+    if (recoveredAgain === null) throw new Error('Expected the interrupted recovery capsule.');
+
+    expect(await runLaserRecoveryCapsuleFlow(recoveredAgain, repository)).toBe(true);
+
+    expect(recoveryStart).toHaveBeenCalledTimes(2);
+    expect(repository.getSnapshot().activeRun?.artifact.laserResumeChain).toHaveLength(2);
+    expect(repository.getSnapshot().recoveryCapsule).toBeNull();
+  });
+
+  it('retries claim release before cleanup and remains retryable when staged discard fails', async () => {
+    const repository = recoveryHarness();
+    const capsule = await interruptedCapsule(repository);
+    useLaserStore.setState({ startJob: vi.fn(async () => Promise.reject(new Error('refused'))) });
+    const releaseClaim = repository.releaseRecoveryClaim.bind(repository);
+    let releaseCalls = 0;
+    const release = vi
+      .spyOn(repository, 'releaseRecoveryClaim')
+      .mockImplementation(async (...args) => {
+        releaseCalls += 1;
+        return releaseCalls === 1
+          ? { ok: false, error: 'storage-unavailable' }
+          : releaseClaim(...args);
+      });
+    vi.spyOn(repository, 'discardStagedRun').mockResolvedValue({
+      ok: false,
+      error: 'storage-unavailable',
+    });
+
+    expect(await runLaserRecoveryCapsuleFlow(capsule, repository)).toBe(false);
+
+    expect(release).toHaveBeenCalledTimes(2);
+    expect(repository.getSnapshot().recoveryCapsule).toMatchObject({ runId: capsule.runId });
+    expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
+  });
+
+  it('treats an unexpected successful staging value as a pre-acceptance failure', async () => {
+    const repository = recoveryHarness();
+    const capsule = await interruptedCapsule(repository);
+    const recoveryStart = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob: recoveryStart });
+    vi.spyOn(repository, 'stageArtifact').mockResolvedValue({ ok: true, value: false as never });
+
+    expect(await runLaserRecoveryCapsuleFlow(capsule, repository)).toBe(false);
+
+    expect(recoveryStart).not.toHaveBeenCalled();
+    expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
   });
 });
 

@@ -141,6 +141,20 @@ describe('webSerial connection cleanup', () => {
     expect(port.close).toHaveBeenCalledTimes(1);
     expect(port.forget).toHaveBeenCalledTimes(1);
   });
+
+  it('can revoke permission after a prior normal close', async () => {
+    const port = installMockSerial(new MockPort());
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    const conn = await ref.open({ baudRate: 115200 });
+
+    await conn.close();
+    await conn.forget?.();
+    await conn.forget?.();
+
+    expect(port.close).toHaveBeenCalledTimes(1);
+    expect(port.forget).toHaveBeenCalledTimes(1);
+  });
 });
 
 function installMockSerial(port: MockPort, pairedPorts: SerialPort[] = []): MockPort {

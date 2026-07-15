@@ -73,10 +73,15 @@ export class IndexedDbRecoveryStorageBackend implements RecoveryStorageBackend {
     const database = await this.database();
     const tx = database.transaction(ARTIFACT_STORE, 'readwrite');
     const store = tx.objectStore(ARTIFACT_STORE);
-    await walkCursor(store.openCursor(), (cursor) => {
-      if (typeof cursor.key === 'string' && !retainedRunIds.has(cursor.key)) cursor.delete();
-    });
-    await transactionFinished(tx);
+    try {
+      await walkCursor(store.openCursor(), (cursor) => {
+        if (typeof cursor.key === 'string' && !retainedRunIds.has(cursor.key)) cursor.delete();
+      });
+      await transactionFinished(tx);
+    } catch (error) {
+      abortIfActive(tx);
+      throw error;
+    }
   }
 
   async purge(generation: number): Promise<void> {
@@ -130,13 +135,21 @@ function walkCursor(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     pending.onsuccess = () => {
-      const cursor = pending.result;
-      if (cursor === null) {
-        resolve();
-        return;
+      try {
+        const cursor = pending.result;
+        if (cursor === null) {
+          resolve();
+          return;
+        }
+        visit(cursor);
+        cursor.continue();
+      } catch (error) {
+        reject(
+          error instanceof Error
+            ? error
+            : new Error('Recovery storage cursor visitor failed unexpectedly.'),
+        );
       }
-      visit(cursor);
-      cursor.continue();
     };
     pending.onerror = () => reject(pending.error ?? new Error('Recovery storage cursor failed.'));
   });

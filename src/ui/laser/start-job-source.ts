@@ -2,7 +2,6 @@ import type { StatusQueryCapability } from '../../core/controllers';
 import { profileSupportsCapability, type ControllerKind } from '../../core/devices';
 import type { JobOriginPlacement, JobPlacementSettings } from '../../core/job';
 import type { PreflightOptions } from '../../core/preflight';
-import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import type { OutputScope, Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { currentOutputScope, useStore } from '../state';
@@ -21,6 +20,7 @@ import type { ExecutionArtifactV1 } from '../state/recovery';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
+import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-binding';
 
 export type PreparedRecoverySource = {
   readonly project: Project;
@@ -29,6 +29,7 @@ export type PreparedRecoverySource = {
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly warnings: ReadonlyArray<string>;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
+  readonly laserResumeChain: NonNullable<ExecutionArtifactV1['laserResumeChain']>;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
 };
@@ -90,9 +91,9 @@ export function prepareArchivedRecoverySource(
     artifact.jobOrigin,
   );
   if (checked === null) return null;
-  if (!fingerprintsEqual(fingerprintGcode(checked.gcode), artifact.fingerprint)) {
+  if (!recoveryArtifactPreparedProgramMatches(artifact)) {
     jobAwareAlert(
-      'Cannot start supervised recovery:\n\nThe saved execution artifact failed its exact G-code integrity check. No controller command was sent.',
+      'Cannot start supervised recovery:\n\nThe archived prepared job does not reproduce the saved exact G-code lineage. No controller command was sent.',
     );
     return null;
   }
@@ -102,6 +103,7 @@ export function prepareArchivedRecoverySource(
     gcode: artifact.gcode,
     prepared: artifact.prepared,
     canvasPlan: artifact.canvasPlan,
+    laserResumeChain: artifact.laserResumeChain ?? [],
   };
 }
 
@@ -149,6 +151,7 @@ function prepareRecoveryProjectSource(
     prepared: prepared.prepared,
     warnings: prepared.warnings,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+    laserResumeChain: [],
     ...(prepared.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: prepared.preflightMotionOffset }),

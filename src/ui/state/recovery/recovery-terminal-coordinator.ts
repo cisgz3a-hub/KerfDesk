@@ -78,7 +78,8 @@ export class RecoveryTerminalCoordinator {
     // the already accepted machine stream.
     let settled = await persist(runId, terminal);
     if (!settled.ok) settled = await persist(runId, terminal);
-    if (settled.ok && settled.value) this.pendingTerminals.delete(runId);
+    if (!settled.ok || !settled.value) return settled;
+    this.pendingTerminals.delete(runId);
     return activated;
   }
 }

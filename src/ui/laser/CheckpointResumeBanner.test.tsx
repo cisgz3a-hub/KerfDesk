@@ -10,8 +10,10 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
-import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
-import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+} from '../state/recovery/testing';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -99,6 +101,14 @@ describe('CheckpointResumeBanner', () => {
     expect(useLaserStore.getState()).toBe(laserBefore);
   });
 
+  it('disables both recovery actions while the controller rail is busy', async () => {
+    const repository = await interruptedRepository();
+    render(repository, true);
+
+    expect(button('Review recovery').disabled).toBe(true);
+    expect(button('Discard').disabled).toBe(true);
+  });
+
   it('hides the card while a live job owns the controller', async () => {
     const repository = await interruptedRepository();
     useLaserStore.setState({
@@ -110,12 +120,12 @@ describe('CheckpointResumeBanner', () => {
   });
 });
 
-function render(repository: RecoveryRepository): void {
+function render(repository: RecoveryRepository, busy = false): void {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   act(() => {
-    root?.render(<CheckpointResumeBanner busy={false} repository={repository} />);
+    root?.render(<CheckpointResumeBanner busy={busy} repository={repository} />);
   });
 }
 

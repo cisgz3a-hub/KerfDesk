@@ -271,7 +271,7 @@ async function streamPreparedStart(args: {
     armVariableStreamAdvancement(args.project);
     await activateAcceptedFreshRun(runId, staged, args.repository);
   } catch (err) {
-    if (staged) void args.repository.discardStagedRun(runId);
+    if (staged) await args.repository.discardStagedRun(runId);
     const message = err instanceof Error ? err.message : String(err);
     useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);

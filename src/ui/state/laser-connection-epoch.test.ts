@@ -13,13 +13,17 @@ type FakeConnection = SerialConnection & {
   readonly closeCount: () => number;
 };
 
-function makeConnection(writes: string[] = []): FakeConnection {
+function makeConnection(
+  writes: string[] = [],
+  onWrite?: (data: string) => void | Promise<void>,
+): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
   let closes = 0;
   return {
     write: async (data) => {
       writes.push(data);
+      await onWrite?.(data);
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -199,5 +203,62 @@ describe('serial connection epoch guards', () => {
 
     expect(currentWrites).toContain('$$\n');
     expect(currentWrites).not.toContain('?');
+  });
+
+  it('does not publish a handshake failure into the epoch created by a later reboot', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    let rejectStatusQuery = (_error: Error): void => {
+      throw new Error('Status query rejection was not installed.');
+    };
+    const connection = makeConnection(writes, (data) => {
+      if (data !== '?') return;
+      return new Promise<void>((_resolve, reject) => {
+        rejectStatusQuery = reject;
+      });
+    });
+
+    await useLaserStore.getState().connect(adapterFor(connection));
+    connection.emitLine('Grbl 1.1h');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes).toContain('?');
+    const firstWelcomeEpoch = useLaserStore.getState().controllerSessionEpoch;
+
+    connection.emitLine('Grbl 1.1h');
+    const currentEpoch = useLaserStore.getState().controllerSessionEpoch;
+    expect(currentEpoch).toBe(firstWelcomeEpoch + 1);
+    rejectStatusQuery(new Error('stale handshake write failed'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerSessionEpoch: currentEpoch,
+      controllerQualification: {
+        kind: 'qualifying',
+        epoch: currentEpoch,
+        phase: 'reset-cleanup',
+      },
+      lastWriteError: null,
+    });
+  });
+
+  it('accepts only the first welcome boundary in one startup handshake', async () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+
+    await useLaserStore.getState().connect(adapterFor(connection));
+    connection.emitLine('Grbl 1.1h');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes).toContain('?');
+
+    connection.emitLine('Grbl 1.1h');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(writes).not.toContain('$$\n');
+    expect(useLaserStore.getState().controllerQualification).toMatchObject({
+      kind: 'qualifying',
+      phase: 'reset-cleanup',
+    });
   });
 });

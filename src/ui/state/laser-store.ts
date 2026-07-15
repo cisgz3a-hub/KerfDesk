@@ -32,6 +32,7 @@ import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
+import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardown';
 import { jobActions } from './laser-job-actions';
 import { appendSystemNotice } from './laser-system-notice';
 import { jogActions } from './laser-jog-actions';
@@ -243,10 +244,14 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
 } & ResetCleanupRefs &
+  ConnectionTeardownOwnershipRefs &
   ControllerQualificationScheduleRefs & {
     // Fail-dark transport heartbeat for active/physically-finishing streams.
     // Status sequence ownership is session-scoped; teardown always clears it.
     heartbeatProbe: ActiveStreamHeartbeatProbe;
+    /** Store-local Forget finalization ownership. A module-global WeakMap can
+     * couple independent store instances that happen to share a test port. */
+    forgetFinalizations: WeakMap<SerialConnection, Promise<void>>;
   };
 
 const refs: LiveRefs = {
@@ -264,6 +269,9 @@ const refs: LiveRefs = {
   qualificationDeadline: null,
   runControllerQualification: null,
   heartbeatProbe: null,
+  closeRequests: new WeakMap(),
+  intentionalDisconnects: new WeakMap(),
+  forgetFinalizations: new WeakMap(),
   controllerCommand: null,
   controllerIdleWait: null,
   controllerResetWait: null,

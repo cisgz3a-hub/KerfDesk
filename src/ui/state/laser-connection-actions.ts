@@ -6,10 +6,11 @@
 
 import { selectControllerDriver } from '../../core/controllers';
 import {
-  claimIntentionalDisconnect,
   closeConnectionOnce,
   connectionForgetRequested,
+  runIntentionalDisconnectOnce,
   teardownConnectionRefs,
+  type IntentionalDisconnectRequest,
 } from './laser-connection-teardown';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { handleLine } from './laser-line-handler';
@@ -38,6 +39,7 @@ import {
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment';
 import type { LaserState, LiveRefs } from './laser-store';
+import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -50,8 +52,6 @@ type SafeWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 type LiveConnection = NonNullable<LiveRefs['connection']>;
-
-const forgetFinalizations = new WeakMap<LiveConnection, Promise<void>>();
 
 // 250 ms tick; idle machines only emit a status query every 4th tick.
 const STATUS_POLL_MS = 250;
@@ -75,7 +75,7 @@ export function connectionActions(
           set({ safetyNotice: writeFailedNotice('disconnect') });
         }
         if (refs.connection === previousConnection) teardownConnectionRefs(refs);
-        await closeConnectionOnce(previousConnection).catch(() => undefined);
+        await closeConnectionOnce(refs, previousConnection).catch(() => undefined);
       }
       refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
       refs.nextTranscriptId = 1;
@@ -113,25 +113,7 @@ export function connectionActions(
           set(buildPortClosePatch);
         });
         set(connectedControllerStatePatch);
-        void runControllerHandshake(set, get, refs, safeWrite, baudRate)
-          .catch((err: unknown) => {
-            if (refs.connection !== conn) return;
-            const message = err instanceof Error ? err.message : String(err);
-            set((state) => ({
-              ...failedControllerQualificationPatch(state, state.controllerSessionEpoch, message),
-              lastWriteError: message,
-              log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
-            }));
-          })
-          .finally(() => {
-            if (refs.connection !== conn) return;
-            // A Disconnect/reset transaction replaces the handshake operation
-            // with recovery and advances the serial epoch. Its abandoned raw
-            // line wait must not restart polling into the teardown boundary.
-            if (get().controllerOperation?.kind !== 'connection-handshake') return;
-            set({ controllerOperation: null });
-            startStatusPolling(set, get, refs, safeWrite);
-          });
+        startConnectedControllerHandshake(set, get, refs, safeWrite, conn, baudRate);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         set((state) => ({
@@ -145,6 +127,42 @@ export function connectionActions(
     disconnect: () => runDisconnect(set, get, refs, safeWrite, false),
     forgetDevice: () => runDisconnect(set, get, refs, safeWrite, true),
   };
+}
+
+function startConnectedControllerHandshake(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: LiveConnection,
+  baudRate: number,
+): void {
+  let qualificationEpoch = get().controllerSessionEpoch;
+  void runControllerHandshake(set, get, refs, safeWrite, baudRate, (epoch) => {
+    qualificationEpoch = epoch;
+  })
+    .catch((error: unknown) => {
+      if (refs.connection !== connection) return;
+      const message = error instanceof Error ? error.message : String(error);
+      set((state) =>
+        state.controllerSessionEpoch === qualificationEpoch
+          ? {
+              ...failedControllerQualificationPatch(state, qualificationEpoch, message),
+              lastWriteError: message,
+              log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
+            }
+          : {},
+      );
+    })
+    .finally(() => {
+      if (refs.connection !== connection || get().controllerSessionEpoch !== qualificationEpoch) {
+        return;
+      }
+      // A reset transaction replaces the handshake and owns subsequent polling.
+      if (get().controllerOperation?.kind !== 'connection-handshake') return;
+      set({ controllerOperation: null });
+      startStatusPolling(set, get, refs, safeWrite);
+    });
 }
 
 function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserState> {
@@ -212,36 +230,24 @@ async function runDisconnect(
   forgetDevice: boolean,
 ): Promise<void> {
   assertAutofocusIdle(get());
-  const closed = await closeControllerTransport(set, get, refs, safeWrite, forgetDevice);
-  if (!closed.ownsFinalState) {
-    if (forgetDevice && closed.connection !== null && refs.connection === null) {
-      await finalizeForgottenControllerOnce(
-        closed.connection,
-        set,
-        get,
-        refs,
-        closed.stopCouldNotBeConfirmed,
-      );
-    }
+  const connection = refs.connection;
+  if (connection === null) {
+    teardownConnectionRefs(refs);
+    if (forgetDevice) await finalizeForgottenController(set, get, refs, false);
     return;
   }
-  const forgetWasUpgraded =
-    closed.connection !== null && connectionForgetRequested(closed.connection);
-  if (forgetDevice || forgetWasUpgraded) {
-    if (closed.connection === null) {
-      await finalizeForgottenController(set, get, refs, closed.stopCouldNotBeConfirmed);
-    } else {
-      await finalizeForgottenControllerOnce(
-        closed.connection,
-        set,
-        get,
-        refs,
-        closed.stopCouldNotBeConfirmed,
-      );
-    }
-    return;
-  }
-  set((state) => ({
+  await runIntentionalDisconnectOnce(
+    refs,
+    connection,
+    forgetDevice,
+    (request) => runOwnedIntentionalDisconnect(set, get, refs, safeWrite, connection, request),
+    () =>
+      finalizeForgottenControllerOnce(connection, set, get, refs, disconnectStopIsUncertain(get())),
+  );
+}
+
+function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
+  return {
     connection: { kind: 'disconnected' },
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
@@ -274,26 +280,17 @@ async function runDisconnect(
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
     ...liveCanvasLifecyclePatch(state, 'disconnected'),
-  }));
+  };
 }
 
-async function closeControllerTransport(
+async function runOwnedIntentionalDisconnect(
   set: SetFn,
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
-  forgetDevice: boolean,
-): Promise<{
-  readonly connection: LiveConnection | null;
-  readonly ownsFinalState: boolean;
-  readonly stopCouldNotBeConfirmed: boolean;
-}> {
-  const connection = refs.connection;
-  if (connection === null) {
-    teardownConnectionRefs(refs);
-    return { connection, ownsFinalState: true, stopCouldNotBeConfirmed: false };
-  }
-  const ownsFinalState = claimIntentionalDisconnect(connection);
+  connection: LiveConnection,
+  request: IntentionalDisconnectRequest,
+): Promise<void> {
   let stopCouldNotBeConfirmed = false;
   try {
     await stopBeforeDisconnect(set, get, refs, safeWrite);
@@ -301,18 +298,25 @@ async function closeControllerTransport(
     set({ safetyNotice: writeFailedNotice('disconnect') });
     stopCouldNotBeConfirmed = true;
   }
-  if (!ownsFinalState) {
-    await closeConnectionOnce(connection, forgetDevice).catch(() => undefined);
-    return { connection, ownsFinalState: false, stopCouldNotBeConfirmed };
-  }
   const stillOwnsConnection = refs.connection === connection;
   if (stillOwnsConnection) teardownConnectionRefs(refs);
-  await closeConnectionOnce(connection, forgetDevice).catch(() => undefined);
-  return {
-    connection,
-    ownsFinalState: stillOwnsConnection,
-    stopCouldNotBeConfirmed,
-  };
+  let closeError: unknown = null;
+  try {
+    await closeConnectionOnce(refs, connection, request.forgetRequested);
+  } catch (error) {
+    closeError = error;
+    stopCouldNotBeConfirmed = true;
+    set({ safetyNotice: writeFailedNotice('disconnect') });
+  }
+  const forgetWasRequested = request.forgetRequested || connectionForgetRequested(refs, connection);
+  if (forgetWasRequested) {
+    await finalizeForgottenControllerOnce(connection, set, get, refs, stopCouldNotBeConfirmed);
+  } else if (stillOwnsConnection) {
+    set(disconnectedStatePatch);
+  }
+  if (closeError !== null) {
+    throw closeError instanceof Error ? closeError : new Error(String(closeError));
+  }
 }
 
 async function stopBeforeDisconnect(
@@ -337,10 +341,10 @@ function finalizeForgottenControllerOnce(
   refs: LiveRefs,
   stopCouldNotBeConfirmed: boolean,
 ): Promise<void> {
-  const existing = forgetFinalizations.get(connection);
+  const existing = refs.forgetFinalizations.get(connection);
   if (existing !== undefined) return existing;
   const finalization = finalizeForgottenController(set, get, refs, stopCouldNotBeConfirmed);
-  forgetFinalizations.set(connection, finalization);
+  refs.forgetFinalizations.set(connection, finalization);
   return finalization;
 }
 
@@ -350,9 +354,13 @@ async function finalizeForgottenController(
   refs: LiveRefs,
   stopCouldNotBeConfirmed: boolean,
 ): Promise<void> {
-  await recoveryRepository.purgeControllerData();
-  refs.driver = selectControllerDriver(undefined);
   const retainDisconnectWarning = stopCouldNotBeConfirmed || disconnectStopIsUncertain(get());
+  // purgeControllerData clears its published recovery snapshot and writes the
+  // deletion generation before its first await. Start it, then reset the live
+  // controller state immediately so a slow IndexedDB delete cannot leave a
+  // closed port looking connected and qualified.
+  const purge = recoveryRepository.purgeControllerData();
+  refs.driver = selectControllerDriver(undefined);
   set((state) => ({
     ...initialLaserState(),
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
@@ -361,6 +369,22 @@ async function finalizeForgottenController(
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     safetyNotice: retainDisconnectWarning ? writeFailedNotice('disconnect') : null,
   }));
+
+  let purgeWarning: string | null = null;
+  try {
+    const purged = await purge;
+    if (!purged.ok) purgeWarning = `recovery storage reported ${purged.error}`;
+  } catch (error) {
+    purgeWarning = error instanceof Error ? error.message : String(error);
+  }
+  if (purgeWarning !== null) {
+    useToastStore
+      .getState()
+      .pushToast(
+        `Controller state was reset, but recovery storage could not be purged: ${purgeWarning}`,
+        'warning',
+      );
+  }
 }
 
 function disconnectStopIsUncertain(state: LaserState): boolean {

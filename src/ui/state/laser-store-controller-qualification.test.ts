@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { recoveryRepository } from './recovery';
 import { useLaserStore } from './laser-store';
@@ -125,6 +126,87 @@ describe('epoch-bound controller qualification', () => {
     expect(useLaserStore.getState().controllerQualification).toMatchObject({
       kind: 'qualified',
       settings: 'verified',
+    });
+  });
+
+  it.each(['read', 'write'] as const)(
+    'does not let a stale settings %s failure poison a newer qualification epoch',
+    async (operation) => {
+      const writes: string[] = [];
+      const connection = makeConnection(writes);
+      await connectQualified(connection);
+      const oldEpoch = useLaserStore.getState().controllerSessionEpoch;
+      const pending =
+        operation === 'read'
+          ? useLaserStore.getState().readMachineSettings()
+          : useLaserStore.getState().writeGrblSetting(30, '900');
+      await flush();
+      const nextEpoch = oldEpoch + 1;
+      useLaserStore.setState({
+        controllerSessionEpoch: nextEpoch,
+        controllerQualification: {
+          kind: 'qualifying',
+          epoch: nextEpoch,
+          phase: 'settings-read',
+        },
+        controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
+        lastWriteError: 'new-session-marker',
+      });
+
+      connection.emitLine('error:1');
+      await expect(pending).rejects.toThrow();
+
+      expect(useLaserStore.getState()).toMatchObject({
+        controllerSessionEpoch: nextEpoch,
+        controllerQualification: {
+          kind: 'qualifying',
+          epoch: nextEpoch,
+          phase: 'settings-read',
+        },
+        controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
+        lastWriteError: 'new-session-marker',
+      });
+    },
+  );
+
+  it('does not verify a setting write against rows from a newer controller epoch', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectQualified(connection);
+    const oldEpoch = useLaserStore.getState().controllerSessionEpoch;
+    const pending = useLaserStore.getState().writeGrblSetting(30, '900');
+    await flush();
+    expect(writes).toContain('$30=900\n');
+
+    connection.emitLine('ok');
+    await flush();
+    expect(writes).toContain('$$\n');
+    const nextEpoch = oldEpoch + 1;
+    useLaserStore.setState({
+      controllerSessionEpoch: nextEpoch,
+      controllerQualification: {
+        kind: 'qualified',
+        epoch: nextEpoch,
+        settings: 'verified',
+      },
+      controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
+      grblSettingsRows: settingsMapToRows(new Map([[30, '900']])),
+      lastWriteError: 'new-session-marker',
+    });
+    connection.emitLine('ok');
+
+    await expect(pending).rejects.toThrow(
+      'Controller session changed while verifying the machine setting.',
+    );
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerSessionEpoch: nextEpoch,
+      controllerQualification: {
+        kind: 'qualified',
+        epoch: nextEpoch,
+        settings: 'verified',
+      },
+      controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
+      lastWriteError: 'new-session-marker',
     });
   });
 

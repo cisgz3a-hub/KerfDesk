@@ -1,4 +1,3 @@
-import { buildResumeProgram } from '../../core/controllers/grbl';
 import { streamingModeForController } from '../../core/devices';
 import { fingerprintGcode, fingerprintsEqual, rawResumeLine } from '../../core/recovery';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
@@ -19,8 +18,8 @@ import {
 } from './start-job-source';
 import { resumeConfirmation } from './resume-confirmation';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
-
-const LASER_RESUME_PLUNGE_MM_PER_MIN = 300;
+import { buildLaserResumeProgram } from './laser-resume-program';
+import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 
 /** Final, explicit activation for the sealed laser recovery dialog. Review and
  * cancellation never call this function and therefore cannot claim a capsule. */
@@ -40,6 +39,7 @@ type PlannedLaserRecovery = {
   readonly capsule: RecoveryCapsule;
   readonly source: PreparedRecoverySource;
   readonly resumeGcode: string;
+  readonly resumeFromLine: number;
   readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
 };
 
@@ -63,12 +63,7 @@ function planLaserRecovery(capsule: RecoveryCapsule): PlannedLaserRecovery | nul
   const source = recoverySource(capsule);
   if (source === null) return null;
   const fromLine = rawResumeLine(source.gcode, capsule.ackedLines);
-  const resume = buildResumeProgram(source.gcode, fromLine, {
-    machineKind: 'laser',
-    safeZMm: 0,
-    spindleSpinupSec: 0,
-    plungeMmPerMin: LASER_RESUME_PLUNGE_MM_PER_MIN,
-  });
+  const resume = buildLaserResumeProgram(source.gcode, fromLine);
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
@@ -85,6 +80,7 @@ function planLaserRecovery(capsule: RecoveryCapsule): PlannedLaserRecovery | nul
     capsule,
     source,
     resumeGcode: resume.lines.join('\n'),
+    resumeFromLine: fromLine,
     laserModeStartEvidence,
   };
 }
@@ -128,6 +124,7 @@ async function stageLaserRecoveryAttempt(
     runId: recoveryRunId,
     gcode: planned.resumeGcode,
     prepared: planned.source.prepared,
+    laserResumeChain: [...planned.source.laserResumeChain, { fromLine: planned.resumeFromLine }],
     outputScope: planned.capsule.artifact.outputScope,
     ...(planned.source.jobOrigin === undefined ? {} : { jobOrigin: planned.source.jobOrigin }),
     canvasPlan,
@@ -136,11 +133,17 @@ async function stageLaserRecoveryAttempt(
     createdAtIso: new Date().toISOString(),
   });
   const staged = await repository.stageArtifact(artifact);
-  if (!staged.ok) {
-    await repository.releaseRecoveryClaim(planned.capsule.runId, claim.attemptId);
-    jobAwareAlert(
-      'Cannot start supervised recovery:\n\nThe recovery attempt could not be stored safely. The saved job remains available and no controller command was sent.',
-    );
+  if (!staged.ok || staged.value !== recoveryRunId) {
+    const cleanup = await cleanupRejectedRecoveryAttempt({
+      repository,
+      sourceRunId: planned.capsule.runId,
+      attemptId: claim.attemptId,
+      stagedRunId: recoveryRunId,
+    });
+    const message = cleanup.claimReleased
+      ? 'The recovery attempt could not be stored safely. The saved job remains available and no controller command was sent.'
+      : 'No controller command was sent, but the recovery-storage claim could not be released. Reload after recovery storage is available; do not assume this capsule is retryable yet.';
+    jobAwareAlert(`Cannot start supervised recovery:\n\n${message}`);
     return null;
   }
   return { ...planned, ...claim, recoveryRunId, canvasPlan, laser };
@@ -218,9 +221,16 @@ async function resolveFailedAttempt(args: {
   const state = useLaserStore.getState();
   const message = args.error instanceof Error ? args.error.message : String(args.error);
   if (state.streamer === null || state.activeRunId !== args.recoveryRunId) {
-    await args.repository.releaseRecoveryClaim(args.sourceCapsule.runId, args.attemptId);
-    await args.repository.discardStagedRun(args.recoveryRunId);
-    jobAwareAlert(`Could not start laser recovery:\n\n${message}`);
+    const cleanup = await cleanupRejectedRecoveryAttempt({
+      repository: args.repository,
+      sourceRunId: args.sourceCapsule.runId,
+      attemptId: args.attemptId,
+      stagedRunId: args.recoveryRunId,
+    });
+    const cleanupMessage = cleanup.claimReleased
+      ? message
+      : `${message}\n\nNo controller command was accepted, but the recovery-storage claim could not be released. Reload after recovery storage is available.`;
+    jobAwareAlert(`Could not start laser recovery:\n\n${cleanupMessage}`);
     return;
   }
   const activated = await args.repository.activateClaimedRecovery({

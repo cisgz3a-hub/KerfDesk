@@ -133,6 +133,33 @@ function makeConnection(port: SerialPort): SerialConnection {
     for (const h of closeSubs) h();
   };
 
+  let forgetPromise: Promise<void> | null = null;
+  const forgetConnection = (): Promise<void> => {
+    forgetPromise ??= (async () => {
+      const needsClose = !ctx.closed;
+      if (needsClose) {
+        ctx.closed = true;
+        port.removeEventListener('disconnect', handleDroppedConnection);
+        await closeStreamsOnce();
+        try {
+          await port.close();
+        } catch (err) {
+          console.warn('port.close() rejected:', err);
+        }
+      }
+      // Permission revocation remains valid after a prior normal close. A
+      // late concurrent Forget must not become a no-op merely because the
+      // transport owner already marked the duplex stream closed.
+      try {
+        await port.forget?.();
+      } catch (err) {
+        console.warn('port.forget() rejected:', err);
+      }
+      if (needsClose) for (const h of closeSubs) h();
+    })();
+    return forgetPromise;
+  };
+
   return {
     write: async (data: string) => {
       if (ctx.writer === undefined) throw new Error('Serial port not writable.');
@@ -148,15 +175,6 @@ function makeConnection(port: SerialPort): SerialConnection {
     },
     close: closeConnection,
     forget: async () => {
-      if (ctx.closed) return;
-      ctx.closed = true;
-      port.removeEventListener('disconnect', handleDroppedConnection);
-      await closeStreamsOnce();
-      try {
-        await port.close();
-      } catch (err) {
-        console.warn('port.close() rejected:', err);
-      }
       // A2 audit finding: revoke the in-page permission for this port on
       // explicit Forget Device so a long-running tab doesn't accumulate
       // per-port permissions across many laser sessions. Only do this
@@ -165,12 +183,7 @@ function makeConnection(port: SerialPort): SerialConnection {
       // pairing so the user can plug back in without re-picking.
       // Chromium 103+ ships forget(); on older runtimes the optional
       // chain is a no-op rather than a TypeError.
-      try {
-        await port.forget?.();
-      } catch (err) {
-        console.warn('port.forget() rejected:', err);
-      }
-      for (const h of closeSubs) h();
+      await forgetConnection();
     },
   };
 }

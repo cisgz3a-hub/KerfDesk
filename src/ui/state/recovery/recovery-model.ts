@@ -1,4 +1,4 @@
-import type { JobInterruption } from '../../../core/recovery';
+import { parseOptionalJobInterruption, type JobInterruption } from '../../../core/recovery';
 import type {
   ExecutionArtifactV1,
   LegacyFingerprintOnlyArtifactV1,
@@ -188,9 +188,7 @@ function isClaim(value: unknown): value is RecoveryClaim {
 }
 
 function isInterruption(value: unknown): value is JobInterruption {
-  return (
-    isRecord(value) && typeof value['kind'] === 'string' && typeof value['message'] === 'string'
-  );
+  return parseOptionalJobInterruption(value)?.interruption !== undefined;
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

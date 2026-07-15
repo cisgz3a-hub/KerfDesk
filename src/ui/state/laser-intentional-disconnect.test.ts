@@ -6,6 +6,7 @@ import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
 import { recoveryRepository } from './recovery';
+import { useToastStore } from './toast-store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -95,6 +96,7 @@ beforeEach(async () => {
     .disconnect()
     .catch(() => undefined);
   useLaserStore.setState(initialLaserState());
+  useToastStore.setState({ toasts: [] });
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -106,6 +108,7 @@ afterEach(async () => {
     .disconnect()
     .catch(() => undefined);
   useLaserStore.setState(initialLaserState());
+  useToastStore.setState({ toasts: [] });
   vi.restoreAllMocks();
 });
 
@@ -365,5 +368,73 @@ describe('intentional GRBL connection teardown', () => {
     );
     expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(useLaserStore.getState().safetyNotice?.kind).toBe('write-failed');
+  });
+
+  it('still resets controller state when the recovery purge rejects', async () => {
+    const events: string[] = [];
+    const connection = makeConnection('old', events);
+    await connectReady(connection);
+    const purgeControl: { reject?: (reason: Error) => void } = {};
+    const purge = vi.spyOn(recoveryRepository, 'purgeControllerData').mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          purgeControl.reject = reject;
+        }),
+    );
+    useLaserStore.setState({ lastWriteError: 'stale controller error' });
+    const forgetDevice = useLaserStore.getState().forgetDevice;
+    if (forgetDevice === undefined) throw new Error('Forget Controller action is unavailable.');
+    let settled = false;
+
+    const forget = forgetDevice().finally(() => {
+      settled = true;
+    });
+    await flush();
+    connection.emitLine('Grbl 1.1f');
+    await vi.waitFor(() => expect(purge).toHaveBeenCalledOnce());
+
+    expect(settled).toBe(false);
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      controllerQualification: { kind: 'disconnected' },
+      controllerSettings: null,
+      lastWriteError: null,
+      streamer: null,
+      activeRunId: null,
+    });
+    const rejectPurge = purgeControl.reject;
+    if (rejectPurge === undefined) throw new Error('Expected a pending recovery purge.');
+    rejectPurge(new Error('IndexedDB purge rejected'));
+    await forget;
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringContaining('IndexedDB purge rejected'),
+    });
+  });
+
+  it('surfaces a repository failure result without keeping stale controller state', async () => {
+    const events: string[] = [];
+    const connection = makeConnection('old', events);
+    await connectReady(connection);
+    vi.spyOn(recoveryRepository, 'purgeControllerData').mockResolvedValueOnce({
+      ok: false,
+      error: 'storage-unavailable',
+    });
+    useLaserStore.setState({ log: ['stale controller log'] });
+
+    const forget = useLaserStore.getState().forgetDevice?.();
+    await flush();
+    connection.emitLine('Grbl 1.1f');
+    await forget;
+
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      log: [],
+      transcript: [],
+    });
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringContaining('storage-unavailable'),
+    });
   });
 });

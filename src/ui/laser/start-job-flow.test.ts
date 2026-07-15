@@ -20,9 +20,11 @@ import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
-import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
-import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
-import type { LegacyCheckpointStorage } from '../state/recovery/legacy-checkpoint-migration';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+  type LegacyCheckpointStorage,
+} from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useStartBlockerStore } from './start-blocker-store';
@@ -339,6 +341,31 @@ describe('isolated execution recovery ownership', () => {
 
     expect(repository.getSnapshot().recoveryCapsule).toEqual(capsule);
     expect(repository.getSnapshot().activeRun).toBeNull();
+  });
+
+  it('waits for rejected-run cleanup before the Start flow settles', async () => {
+    const { repository } = recoveryHarness();
+    const cleanupControl: { finish?: () => void } = {};
+    const discard = vi.spyOn(repository, 'discardStagedRun').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          cleanupControl.finish = () => resolve({ ok: true, value: true });
+        }),
+    );
+    useLaserStore.setState({ startJob: vi.fn(async () => Promise.reject(new Error('refused'))) });
+    let settled = false;
+
+    const start = runStartJobFlow(repository).finally(() => {
+      settled = true;
+    });
+    await vi.waitFor(() => expect(discard).toHaveBeenCalledTimes(1));
+    expect(settled).toBe(false);
+    const finishCleanup = cleanupControl.finish;
+    if (finishCleanup === undefined) throw new Error('Expected pending staged-run cleanup.');
+    finishCleanup();
+    await start;
+
+    expect(settled).toBe(true);
   });
 
   it('replaces the older capsule only after a new ordinary Start is accepted', async () => {

@@ -16,9 +16,11 @@ import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-s
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { RecoveryRepository } from '../state/recovery';
-import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
-import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
-import type { LegacyCheckpointStorage } from '../state/recovery/legacy-checkpoint-migration';
+import {
+  MemoryRecoveryGenerationStore,
+  MemoryRecoveryStorageBackend,
+  type LegacyCheckpointStorage,
+} from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
