@@ -203,6 +203,7 @@ kerfDeskTest(
     await dialog.getByRole('button', { name: /^Connect/ }).click();
     await expect(dialog).toContainText('Controller connected.');
 
+    await kerfdesk.setSerialSetting(130, '350');
     const beforeRead = serialWrites(await kerfdesk.events()).length;
     await dialog.getByRole('button', { name: 'Run read-only checks', exact: true }).click();
     await expect
@@ -212,6 +213,12 @@ kerfDeskTest(
       .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeRead))
       .toContain('$$\n');
     expect(serialWrites(await kerfdesk.events()).slice(beforeRead)).not.toMatch(/\$\d+=/);
+    await expect(dialog).toContainText('Bed width: 350.000 mm');
+
+    await dialog.getByRole('button', { name: 'Use detected values', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText(
+      'Detected values applied to this setup draft',
+    );
 
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();

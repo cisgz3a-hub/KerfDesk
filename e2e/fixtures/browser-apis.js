@@ -76,6 +76,10 @@ function installSerial() {
   });
   return {
     emitLine,
+    setSetting(id, value) {
+      settings.set(id, value);
+      record('serial-setting-fixture', { id, value });
+    },
     acknowledge(count) {
       for (let index = 0; index < count; index += 1) emitLine('ok');
       emitIdle();
@@ -205,6 +209,7 @@ window.__KERFDESK_E2E__ = {
   events: state.events,
   savedFiles: state.savedFiles,
   emitSerialLine: serial.emitLine,
+  setSerialSetting: serial.setSetting,
   acknowledgeSerial: serial.acknowledge,
   disconnectSerial: serial.disconnect,
   setAutoAcknowledge: (enabled) => {

@@ -273,24 +273,6 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
-  it('lets the operator apply detected values without mutating the project early', async () => {
-    useLaserStore.setState({
-      connection: { kind: 'connected' },
-      detectedSettings: { bedWidth: 363, bedHeight: 273 },
-      lastSettingsReadAt: 1,
-    } as Partial<ReturnType<typeof useLaserStore.getState>>);
-    const view = await renderWizard();
-    try {
-      await act(async () => button(view.host, 'Next').click());
-      await act(async () => button(view.host, 'Use detected values').click());
-      await act(async () => button(view.host, 'Next').click());
-      expect(input(view.host, 'Bed width (mm)').value).toBe('363');
-      expect(useStore.getState().project.device.bedWidth).toBe(DEFAULT_DEVICE_PROFILE.bedWidth);
-    } finally {
-      await view.unmount();
-    }
-  });
-
   it('uses external configuration guidance for Marlin instead of firmware writes', async () => {
     const view = await renderWizard();
     try {

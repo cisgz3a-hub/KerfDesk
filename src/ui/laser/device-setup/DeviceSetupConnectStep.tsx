@@ -162,6 +162,11 @@ function ConnectionActions(props: {
   readonly dispatch: DeviceSetupStepProps['dispatch'];
 }): JSX.Element {
   const { model } = props;
+  const acceptDetected = (): void => {
+    const detected = model.detected;
+    if (detected === null) return;
+    props.dispatch({ kind: 'accept-detected', patch: detected });
+  };
   if (model.connection.kind !== 'connected') {
     return (
       <div style={actionsStyle}>
@@ -177,24 +182,32 @@ function ConnectionActions(props: {
     );
   }
   return (
-    <div style={actionsStyle}>
-      <Button
-        onClick={() => void model.readController()}
-        disabled={model.mismatch}
-        {...helpProps('control:laser.device-setup.reread')}
-      >
-        Run read-only checks
-      </Button>
-      {model.detected !== null && model.rows.length > 0 ? (
+    <>
+      <div style={actionsStyle}>
         <Button
-          variant="primary"
-          onClick={() => props.dispatch({ kind: 'accept-detected', patch: model.detected ?? {} })}
-          {...helpProps('control:laser.device-setup.apply-detected')}
+          onClick={() => void model.readController()}
+          disabled={model.mismatch}
+          {...helpProps('control:laser.device-setup.reread')}
         >
-          Use detected values
+          Run read-only checks
         </Button>
+        {model.detected !== null && model.rows.length > 0 ? (
+          <Button
+            variant="primary"
+            onClick={acceptDetected}
+            {...helpProps('control:laser.device-setup.apply-detected')}
+          >
+            Use detected values
+          </Button>
+        ) : null}
+      </div>
+      {model.state.detectedApplied ? (
+        <p role="status" aria-live="polite" aria-atomic="true" style={confirmationStyle}>
+          Detected values applied to this setup draft. Nothing is saved until you complete the final
+          Save step.
+        </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -283,6 +296,13 @@ const hintStyle: React.CSSProperties = {
   lineHeight: 1.45,
 };
 const warningStyle: React.CSSProperties = { margin: 0, fontSize: 12, color: 'var(--lf-warning)' };
+const confirmationStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-success-fg)',
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1.45,
+};
 const warningCardStyle: React.CSSProperties = {
   display: 'grid',
   gap: 7,
