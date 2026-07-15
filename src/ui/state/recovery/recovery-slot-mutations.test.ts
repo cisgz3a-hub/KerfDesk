@@ -5,6 +5,8 @@ import { activateClaimedRecoveryMutation } from './recovery-slot-mutations';
 
 const RUN_ID = 'run-recovery';
 const NOW = '2026-07-15T10:00:00.000Z';
+// Slot ownership reads only identity and line count; the remaining immutable
+// artifact fields are irrelevant to this mutation fixture.
 const ARTIFACT = { runId: RUN_ID, sendableLines: 4 } as ExecutionArtifactV1;
 
 const ACTIVE_SLOTS: PersistedRecoverySlots = {

@@ -158,8 +158,18 @@ export function cancelRawControllerLineWait(refs: LiveRefs): void {
   pending?.();
 }
 
+/** Invalidate every session owner while keeping the closing port addressable.
+ * A concurrent Forget must still be able to join the in-flight close request. */
+export function quarantineConnectionRefs(refs: LiveRefs): void {
+  clearConnectionSessionRefs(refs, true);
+}
+
 /** Invalidate and release every host-side owner of the current serial session. */
 export function teardownConnectionRefs(refs: LiveRefs): void {
+  clearConnectionSessionRefs(refs, false);
+}
+
+function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean): void {
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   cancelRawControllerLineWait(refs);
   cancelControllerLifecycleRefs(refs);
@@ -168,7 +178,7 @@ export function teardownConnectionRefs(refs: LiveRefs): void {
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();
   if (refs.pollHandle !== null) clearInterval(refs.pollHandle);
-  refs.connection = null;
+  if (!preserveConnection) refs.connection = null;
   refs.unsubscribeLine = null;
   refs.unsubscribeClose = null;
   refs.pollHandle = null;

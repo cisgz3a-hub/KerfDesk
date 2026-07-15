@@ -16,6 +16,7 @@ function makeConnection(
   label: string,
   events: string[],
   onWrite?: (data: string, emitLine: (line: string) => void) => void | Promise<void>,
+  onCloseRequest?: () => void | Promise<void>,
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const emitLine = (line: string): void => {
@@ -33,6 +34,7 @@ function makeConnection(
     onClose: () => () => undefined,
     close: async () => {
       events.push(`${label}:close`);
+      await onCloseRequest?.();
     },
     forget: async () => {
       events.push(`${label}:forget`);
@@ -143,9 +145,20 @@ describe('intentional GRBL connection teardown', () => {
     ]);
   });
 
-  it('upgrades concurrent Disconnect plus Forget into one full finalization', async () => {
+  it('upgrades a closing Disconnect plus Forget into one full finalization', async () => {
     const events: string[] = [];
-    const connection = makeConnection('old', events);
+    let finishClose = (): void => {
+      throw new Error('Transport close did not start.');
+    };
+    const connection = makeConnection(
+      'old',
+      events,
+      undefined,
+      () =>
+        new Promise((resolve) => {
+          finishClose = resolve;
+        }),
+    );
     await connectReady(connection);
     const purge = vi.spyOn(recoveryRepository, 'purgeControllerData');
     useLaserStore.setState({
@@ -155,11 +168,14 @@ describe('intentional GRBL connection teardown', () => {
     events.length = 0;
 
     const disconnect = useLaserStore.getState().disconnect();
+    await flush();
+    connection.emitLine('Grbl 1.1f');
+    await vi.waitFor(() => expect(events).toContain('old:close'));
     const forgetDevice = useLaserStore.getState().forgetDevice;
     if (forgetDevice === undefined) throw new Error('Forget Controller action is unavailable.');
     const forget = forgetDevice();
     await flush();
-    connection.emitLine('Grbl 1.1f');
+    finishClose();
     await Promise.all([disconnect, forget]);
 
     expect(

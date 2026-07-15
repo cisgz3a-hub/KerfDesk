@@ -8,6 +8,7 @@ import { selectControllerDriver } from '../../core/controllers';
 import {
   closeConnectionOnce,
   connectionForgetRequested,
+  quarantineConnectionRefs,
   runIntentionalDisconnectOnce,
   teardownConnectionRefs,
   type IntentionalDisconnectRequest,
@@ -298,8 +299,7 @@ async function runOwnedIntentionalDisconnect(
     set({ safetyNotice: writeFailedNotice('disconnect') });
     stopCouldNotBeConfirmed = true;
   }
-  const stillOwnsConnection = refs.connection === connection;
-  if (stillOwnsConnection) teardownConnectionRefs(refs);
+  if (refs.connection === connection) quarantineConnectionRefs(refs);
   let closeError: unknown = null;
   try {
     await closeConnectionOnce(refs, connection, request.forgetRequested);
@@ -308,10 +308,12 @@ async function runOwnedIntentionalDisconnect(
     stopCouldNotBeConfirmed = true;
     set({ safetyNotice: writeFailedNotice('disconnect') });
   }
+  const ownsFinalState = refs.connection === connection;
+  if (ownsFinalState) refs.connection = null;
   const forgetWasRequested = request.forgetRequested || connectionForgetRequested(refs, connection);
   if (forgetWasRequested) {
     await finalizeForgottenControllerOnce(connection, set, get, refs, stopCouldNotBeConfirmed);
-  } else if (stillOwnsConnection) {
+  } else if (ownsFinalState) {
     set(disconnectedStatePatch);
   }
   if (closeError !== null) {
