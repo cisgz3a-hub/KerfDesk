@@ -126,7 +126,7 @@ describe('serial connection epoch guards', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(useLaserStore.getState().streamer).toMatchObject({
       status: 'disconnected',
-      inFlight: interrupted.inFlight,
+      inFlight: [],
       completed: interrupted.completed,
     });
 
@@ -135,7 +135,7 @@ describe('serial connection epoch guards', () => {
 
     expect(useLaserStore.getState().streamer).toMatchObject({
       status: 'disconnected',
-      inFlight: interrupted.inFlight,
+      inFlight: [],
       completed: interrupted.completed,
     });
   });

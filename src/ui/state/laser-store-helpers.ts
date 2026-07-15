@@ -153,11 +153,10 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
 // M114 polls to observe Idle at all.
 export function hasUnsettledStreamAcks(streamer: StreamerState | null): boolean {
   if (streamer === null) return false;
-  // A disconnected streamer retains its unconfirmed in-flight lines as
-  // recovery evidence, but they belong to the dead serial session and can
-  // never own replies on the replacement connection. Treating them as live
-  // made the reconnect settings `ok` disappear into the interrupted stream,
-  // leaving the handshake's untracked-ack ledger stuck at one.
+  // A disconnected stream belongs to the dead serial session. Its lines may
+  // remain until the reconnect banner wipes them, but they can never own
+  // replies on the replacement connection; exact resume evidence lives in
+  // the separate job checkpoint.
   if (streamer.status === 'disconnected') return false;
   if (streamer.status === 'streaming' || streamer.status === 'paused') return true;
   return streamer.inFlight.length > 0;
