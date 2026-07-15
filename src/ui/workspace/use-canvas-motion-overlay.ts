@@ -64,11 +64,11 @@ export function useCanvasMotionOverlay(
     laser,
   });
 
-  useClearStaleTerminalRun(liveRun, idlePlan);
+  useClearStaleTerminalRun(liveRun, idlePlan?.current === true ? idlePlan.plan : null);
 
   if (previewMode) return null;
   if (liveRun !== null) return { plan: liveRun.plan, run: liveRun, showStartMarkers };
-  return idlePlan === null ? null : { plan: idlePlan, run: null, showStartMarkers };
+  return idlePlan === null ? null : { plan: idlePlan.plan, run: null, showStartMarkers };
 }
 
 type IdlePlanInput = {
@@ -95,9 +95,14 @@ type IdlePlanState = {
   readonly machineRevision: string;
 };
 
+type IdlePlanSelection = {
+  readonly plan: CanvasMotionPlan;
+  readonly current: boolean;
+};
+
 export const IDLE_CANVAS_PLAN_DELAY_MS = 200;
 
-function useIdleCanvasMotionPlan(input: IdlePlanInput): CanvasMotionPlan | null {
+function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null {
   const [idleState, setIdleState] = useState<IdlePlanState | null>(null);
   const requestRef = useRef(0);
   const inputRef = useRef(input);
@@ -136,14 +141,9 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): CanvasMotionPlan | null 
     input.interactionActive,
     input.laser,
   ]);
-  if (
-    input.previewMode ||
-    input.interactionActive ||
-    isActiveCanvasLifecycleOrNull(input.liveRun)
-  ) {
-    return null;
-  }
-  return idleStateMatches(idleState, input) ? idleState.plan : null;
+  if (shouldClearIdlePlan(input) || isActiveCanvasLifecycleOrNull(input.liveRun)) return null;
+  if (idleState === null || !idleStateCanRemainVisible(idleState, input)) return null;
+  return { plan: idleState.plan, current: idleStateMatches(idleState, input) };
 }
 
 export async function buildIdleCanvasMotionPlan(
@@ -218,6 +218,18 @@ function idleStateMatches(
   return (
     state !== null &&
     state.project === input.project &&
+    state.outputScope === input.outputScope &&
+    state.placementSettings === input.placementSettings &&
+    state.rotaryRaster === input.rotaryRaster &&
+    state.registrationKey === input.registrationKey &&
+    state.machineRevision === input.machineRevision
+  );
+}
+
+function idleStateCanRemainVisible(state: IdlePlanState, input: IdlePlanInput): boolean {
+  return (
+    state.project.device === input.project.device &&
+    state.project.machine === input.project.machine &&
     state.outputScope === input.outputScope &&
     state.placementSettings === input.placementSettings &&
     state.rotaryRaster === input.rotaryRaster &&

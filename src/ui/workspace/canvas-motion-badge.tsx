@@ -12,6 +12,8 @@ export function CanvasMotionBadge(props: {
         data-testid="canvas-motion-probe"
         data-lifecycle={overlay.run?.lifecycle ?? 'idle'}
         data-confirmed-route-mm={overlay.run?.route.confirmedRouteMm ?? 0}
+        data-reported-head-x={overlay.run?.reportedHead?.x}
+        data-reported-head-y={overlay.run?.reportedHead?.y}
         aria-label={markerDescription(overlay)}
         style={visuallyHiddenStyle}
       />

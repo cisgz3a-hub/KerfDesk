@@ -296,6 +296,18 @@ kerfDeskTest(
     expect(pixelsAfterStatus.motion).not.toBe(pixelsBeforeStatus.motion);
     expect(pixelsAfterStatus.design).toBe(pixelsBeforeStatus.design);
 
+    const trustedHeadX = await probe.getAttribute('data-reported-head-x');
+    const trustedHeadY = await probe.getAttribute('data-reported-head-y');
+    expect(trustedHeadX).not.toBeNull();
+    expect(trustedHeadY).not.toBeNull();
+    await kerfdesk.emitSerialLine(
+      '<Run|MPos:999.000,999.000,0.000|WCO:0.000,0.000,0.000|FS:1500,0>',
+    );
+    await expect(page.getByTestId('canvas-motion-status')).toContainText('Route match uncertain');
+    await expect(probe).toHaveAttribute('data-reported-head-x', trustedHeadX ?? '');
+    await expect(probe).toHaveAttribute('data-reported-head-y', trustedHeadY ?? '');
+    expect((await canvasPixels(page)).motion).toBe(pixelsAfterStatus.motion);
+
     await page.getByRole('button', { name: 'Pause', exact: true }).first().click();
     const atPause = Number(await probe.getAttribute('data-confirmed-route-mm'));
     await kerfdesk.emitSerialLine(
