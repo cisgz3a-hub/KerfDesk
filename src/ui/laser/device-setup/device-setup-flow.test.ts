@@ -174,6 +174,33 @@ describe('unified machine setup flow', () => {
     expect(state.draftMachine.params.spindleMaxRpm).toBe(24000);
   });
 
+  it('keeps apply confirmation through duplicate detected syncs and clears it for new values', () => {
+    let state = initDeviceSetup(
+      DEFAULT_DEVICE_PROFILE,
+      { bedWidth: 610 },
+      { controllerRead: true },
+    );
+    state = deviceSetupReducer(state, {
+      kind: 'accept-detected',
+      patch: { bedWidth: 610 },
+    });
+    expect(state.detectedApplied).toBe(true);
+
+    state = deviceSetupReducer(state, {
+      kind: 'detected-updated',
+      detected: { bedWidth: 610 },
+      controllerRead: true,
+    });
+    expect(state.detectedApplied).toBe(true);
+
+    state = deviceSetupReducer(state, {
+      kind: 'detected-updated',
+      detected: { bedWidth: 611 },
+      controllerRead: true,
+    });
+    expect(state.detectedApplied).toBe(false);
+  });
+
   it('blocks invalid geometry but leaves connect and firmware optional', () => {
     let state = deviceSetupReducer(open(), { kind: 'edit', patch: { bedWidth: 0 } });
     expect(canAdvanceDeviceSetup(state)).toBe(false);

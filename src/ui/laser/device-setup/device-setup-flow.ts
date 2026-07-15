@@ -22,6 +22,7 @@ import {
   type MachineKind,
 } from '../../../core/scene';
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
+import { mergeDetectedSetupFacts } from './device-setup-detected-facts';
 
 export { deviceSetupSupportsMachineKind } from './device-setup-capability';
 
@@ -289,13 +290,19 @@ function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>):
     state.draft.controllerKind,
   ).profile;
   if (state.machineKind !== 'cnc' || !positive(patch.maxPowerS ?? 0)) {
-    return invalidateFirmwarePlan(state, { draft, detectedApplied: true });
+    return invalidateFirmwarePlan(state, { detected: patch, draft, detectedApplied: true });
   }
   const cncDraft: CncMachineConfig = {
     ...state.cncDraft,
     params: { ...state.cncDraft.params, spindleMaxRpm: patch.maxPowerS ?? 0 },
   };
-  const accepted = { draft, draftMachine: cncDraft, cncDraft, detectedApplied: true };
+  const accepted = {
+    detected: patch,
+    draft,
+    draftMachine: cncDraft,
+    cncDraft,
+    detectedApplied: true,
+  };
   return invalidateFirmwarePlan(state, accepted);
 }
 
@@ -352,22 +359,8 @@ function updateDetectedFacts(
   state: DeviceSetupState,
   action: Extract<DeviceSetupAction, { readonly kind: 'detected-updated' }>,
 ): DeviceSetupState {
-  if (
-    (action.detected === undefined || action.detected === state.detected) &&
-    action.detectedControllerKind === undefined &&
-    action.controllerRead === undefined
-  ) {
-    return state;
-  }
-  return invalidateFirmwarePlan(state, {
-    detected: action.detected ?? state.detected,
-    detectedApplied: false,
-    detectedControllerKind:
-      action.detectedControllerKind === undefined
-        ? state.detectedControllerKind
-        : action.detectedControllerKind,
-    controllerRead: action.controllerRead ?? true,
-  });
+  const facts = mergeDetectedSetupFacts(state, action);
+  return facts === null ? state : invalidateFirmwarePlan(state, facts);
 }
 
 function invalidateFirmwarePlan(
