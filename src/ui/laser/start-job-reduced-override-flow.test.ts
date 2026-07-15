@@ -95,6 +95,7 @@ describe('CNC reduced-override Start flow', () => {
     expect(jobAwareConfirm).toHaveBeenCalledWith(
       expect.stringMatching(/feed 80%, rapid 50%, spindle 100%/i),
     );
+    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
     const startJob = vi.mocked(useLaserStore.getState().startJob);
     expect(startJob.mock.calls[0]?.[1]?.cncSetupAttestation).toMatchObject({
       acknowledgedReducedOverrides: { feed: 80, rapid: 50, spindle: 100 },

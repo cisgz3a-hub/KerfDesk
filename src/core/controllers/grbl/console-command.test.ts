@@ -65,7 +65,7 @@ describe('prepareConsoleCommand', () => {
         requiresIdle: true,
         requiresNoActiveOperation: true,
         requiresConfirmation: true,
-        stateEffect: 'configuration',
+        stateEffect: 'configuration-nonpositional',
       },
     });
   });
@@ -105,7 +105,7 @@ describe('prepareConsoleCommand', () => {
         requiresIdle: true,
         requiresNoActiveOperation: true,
         requiresConfirmation: false,
-        stateEffect: 'machine-state',
+        stateEffect: 'accessories',
       },
     });
   });
@@ -126,5 +126,12 @@ describe('prepareConsoleCommand', () => {
         command: { stateEffect },
       });
     }
+  });
+
+  it('keeps axis-calibration writes position-invalidating', () => {
+    expect(prepareConsoleCommand('$100=250')).toMatchObject({
+      ok: true,
+      command: { stateEffect: 'configuration' },
+    });
   });
 });

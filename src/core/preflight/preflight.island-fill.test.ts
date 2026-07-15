@@ -89,52 +89,34 @@ function fineDetailFillProject(
   };
 }
 
-describe('machine-profile preflight', () => {
+describe('Island Fill preflight', () => {
   it('allows 4040 Island Fill jobs with short sweeps when overscan is enabled', () => {
     const project = neotronicsFineDetailFillProject('island');
-
     const result = runPreflight(project, emit(project));
-
-    expect(result.issues.map((issue) => issue.code)).not.toContain('machine-island-fill-risk');
+    expect(result).toEqual({ ok: true, issues: [] });
   });
 
-  it('blocks 4040 Island Fill when overscan is disabled', () => {
+  it('does not block 4040 Island Fill when overscan is disabled', () => {
     const project = neotronicsFineDetailFillProject('island', 0);
-
     const result = runPreflight(project, emit(project));
-
-    expect(result.issues).toContainEqual({
-      code: 'machine-island-fill-risk',
-      message:
-        'Neotronics 4040-safe Island Fill needs fill overscan greater than 0 mm so the head has laser-off acceleration runway. Set Fill overscan to 5 mm or use Scanline Fill.',
-    });
+    expect(result).toEqual({ ok: true, issues: [] });
   });
 
-  it('blocks safe-dialect custom profiles when Island Fill overscan is disabled', () => {
+  it('does not block safe-dialect custom profiles when Island Fill overscan is disabled', () => {
     const project = customSafeDialectFineDetailFillProject('island', 0);
-
     const result = runPreflight(project, emit(project));
-
-    expect(result.issues).toContainEqual({
-      code: 'machine-island-fill-risk',
-      message:
-        'Neotronics 4040-safe Island Fill needs fill overscan greater than 0 mm so the head has laser-off acceleration runway. Set Fill overscan to 5 mm or use Scanline Fill.',
-    });
+    expect(result).toEqual({ ok: true, issues: [] });
   });
 
   it('allows the same 4040 fine-detail geometry with Scanline Fill', () => {
     const project = neotronicsFineDetailFillProject('scanline');
-
     const result = runPreflight(project, emit(project));
-
-    expect(result.issues.map((issue) => issue.code)).not.toContain('machine-island-fill-risk');
+    expect(result).toEqual({ ok: true, issues: [] });
   });
 
   it('does not block Island Fill on other GRBL profiles', () => {
     const project = genericFineDetailFillProject('island');
-
     const result = runPreflight(project, emit(project));
-
-    expect(result.issues.map((issue) => issue.code)).not.toContain('machine-island-fill-risk');
+    expect(result).toEqual({ ok: true, issues: [] });
   });
 });

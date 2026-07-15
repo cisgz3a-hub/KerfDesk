@@ -63,7 +63,6 @@ export type GrblGcodeDialect = {
   readonly rasterPowerMode: GrblPowerMode;
   readonly requiresS0OnRapid: boolean;
   readonly parkAtOriginAfterJob: boolean;
-  readonly controlledLaserOffTravelFeedMmPerMin?: number;
   readonly emitSOnEveryBurnMove: boolean;
   readonly modalFeedrate: boolean;
 };
@@ -118,7 +117,6 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     rasterPowerMode: 'dynamic',
     requiresS0OnRapid: true,
     parkAtOriginAfterJob: false,
-    controlledLaserOffTravelFeedMmPerMin: 800,
     emitSOnEveryBurnMove: true,
     modalFeedrate: false,
   },

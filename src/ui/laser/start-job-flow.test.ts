@@ -22,6 +22,7 @@ import { resetStore } from '../state/test-helpers';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { useToastStore } from '../state/toast-store';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
@@ -128,6 +129,7 @@ describe('runStartJobFlow', () => {
     });
     vi.mocked(jobAwareAlert).mockClear();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+    useToastStore.setState({ toasts: [] });
   });
 
   afterEach(() => {
@@ -149,7 +151,8 @@ describe('runStartJobFlow', () => {
       machineKind: 'laser',
       canvasPlan: expect.objectContaining({ capability: 'realtime' }),
     });
-    expect(jobAwareConfirm).not.toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
   });
 
   it('requires physical CNC setup confirmation and binds it to the compiled program', async () => {
@@ -170,7 +173,7 @@ describe('runStartJobFlow', () => {
 
   it('does not stream a CNC program when physical setup confirmation is declined', async () => {
     configureReadyCncStart();
-    vi.mocked(jobAwareConfirm).mockReturnValueOnce(true).mockReturnValueOnce(false);
+    vi.mocked(jobAwareConfirm).mockReturnValueOnce(false);
 
     await runStartJobFlow();
 

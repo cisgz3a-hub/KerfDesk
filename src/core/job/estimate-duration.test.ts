@@ -206,7 +206,7 @@ describe('estimateJobDuration', () => {
     expect(sensitive.totalSeconds).toBeGreaterThan(adaptive.totalSeconds);
   });
 
-  it('prices sensitive Island Fill laser-off runways at fill feed', () => {
+  it('prices sensitive Island Fill laser-off runways as rapid travel', () => {
     const base: FillGroup = {
       kind: 'fill',
       layerId: 'fill',
@@ -228,7 +228,8 @@ describe('estimateJobDuration', () => {
     const runwaySeconds =
       withRunway.breakdown.travelSeconds - withoutRunway.breakdown.travelSeconds;
 
-    expect(runwaySeconds).toBeGreaterThan(0.5);
+    expect(runwaySeconds).toBeGreaterThan(0);
+    expect(runwaySeconds).toBeLessThan(0.5);
   });
 
   it('prices a multi-span sweep as one continuous cut block over the envelope (ADR-034)', () => {

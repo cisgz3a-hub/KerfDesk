@@ -1,7 +1,10 @@
 import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { beginSettingsCollection } from './detected-settings-action';
-import type { ConsoleStateEffect } from '../../core/controllers/console-state-effect';
+import {
+  hasAccessoryCommand,
+  type ConsoleStateEffect,
+} from '../../core/controllers/console-state-effect';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -75,7 +78,7 @@ export function consoleActions(
           lastSettingsReadAt: null,
         });
       }
-      if (commandChangesAccessories(prepared.command.normalized)) {
+      if (hasAccessoryCommand(prepared.command.normalized)) {
         // Invalidate before the async write yields so Start cannot race a
         // just-sent M3/M4/M5/M7/M8/M9 while the prior all-off cache remains.
         set((state) => ({
@@ -128,29 +131,22 @@ function consoleStateEffectPatch(
   effect: Exclude<ConsoleStateEffect, 'read-only'>,
   command: string,
 ): Partial<LaserState> {
-  const base: Partial<LaserState> = {
-    // A serial write is not proof that buffered motion or modal mutation has
-    // physically completed. Require a fresh controller report before another
-    // setup/job action can trust Idle or position.
-    statusReport: null,
-    statusObservation: null,
+  const observationPatch = consoleObservationPatch(state, effect, command);
+  const positionPatch: Partial<LaserState> = {
+    ...observationPatch,
     homingProof: null,
-    ...(commandChangesAccessories(command)
-      ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
-      : {}),
     frameVerification: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-    log: pushLog(
-      state,
-      `[lf2] Console ${stateEffectLabel(effect)} invalidated cached machine/setup evidence: ${command}`,
-    ),
   };
   switch (effect) {
     case 'machine-state':
-      return base;
+      return positionPatch;
+    case 'accessories':
+    case 'non-positional':
+      return observationPatch;
     case 'coordinates-xy':
       return {
-        ...base,
+        ...positionPatch,
         workOriginActive: false,
         workOriginSource: 'none',
         wcoCache: null,
@@ -158,46 +154,69 @@ function consoleStateEffectPatch(
     case 'coordinates-z':
     case 'tool':
       return {
-        ...base,
+        ...positionPatch,
         workZZeroEvidence: null,
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
         wcoCache: null,
       };
     case 'coordinates-all':
       return {
-        ...base,
+        ...positionPatch,
         ...unknownCoordinatePatch(),
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
       };
     case 'reference':
       return {
-        ...base,
+        ...positionPatch,
         ...unknownCoordinatePatch(),
         homingState: 'unknown',
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
       };
+    case 'configuration-nonpositional':
+      return {
+        ...observationPatch,
+        ...settingsInvalidationPatch(),
+      };
     case 'configuration':
       return {
-        ...base,
+        ...positionPatch,
         ...unknownCoordinatePatch(),
         homingState: 'unknown',
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
-        detectedSettings: null,
-        controllerSettings: null,
-        controllerSettingsObservation: null,
-        grblSettingsRows: [],
-        lastSettingsReadAt: null,
+        ...settingsInvalidationPatch(),
       };
   }
 }
 
-function commandChangesAccessories(command: string): boolean {
-  const uncommented =
-    command
-      .replace(/\([^)]*\)/g, ' ')
-      .split(';', 1)[0]
-      ?.toUpperCase() ?? '';
-  return /M0?[345789](?=$|[^0-9.])/.test(uncommented);
+function consoleObservationPatch(
+  state: LaserState,
+  effect: Exclude<ConsoleStateEffect, 'read-only'>,
+  command: string,
+): Partial<LaserState> {
+  return {
+    // A serial write is not proof that buffered motion or modal mutation has
+    // physically completed. Require a fresh controller report before another
+    // setup/job action can trust Idle, but preserve unrelated position proof.
+    statusReport: null,
+    statusObservation: null,
+    ...(hasAccessoryCommand(command)
+      ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
+      : {}),
+    log: pushLog(
+      state,
+      `[lf2] Console ${stateEffectLabel(effect)} invalidated cached machine/setup evidence: ${command}`,
+    ),
+  };
+}
+
+function settingsInvalidationPatch(): Partial<LaserState> {
+  return {
+    detectedSettings: null,
+    controllerSettings: null,
+    controllerSettingsObservation: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
+  };
 }
 
 function unknownCoordinatePatch(): Partial<LaserState> {
@@ -213,6 +232,10 @@ function stateEffectLabel(effect: Exclude<ConsoleStateEffect, 'read-only'>): str
   switch (effect) {
     case 'machine-state':
       return 'machine-state command';
+    case 'accessories':
+      return 'accessory command';
+    case 'non-positional':
+      return 'non-positional command';
     case 'coordinates-xy':
       return 'XY-coordinate command';
     case 'coordinates-z':
@@ -225,6 +248,8 @@ function stateEffectLabel(effect: Exclude<ConsoleStateEffect, 'read-only'>): str
       return 'reference-state command';
     case 'configuration':
       return 'configuration command';
+    case 'configuration-nonpositional':
+      return 'non-positional configuration command';
   }
 }
 

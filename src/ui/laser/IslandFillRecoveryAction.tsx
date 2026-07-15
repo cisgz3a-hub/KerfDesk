@@ -1,8 +1,4 @@
 import { useMemo } from 'react';
-import {
-  findMachineProfilePreflightIssues,
-  MACHINE_ISLAND_FILL_RISK_CODE,
-} from '../../core/preflight';
 import { analyzeFillHeatRisk, compileJob, islandFillMotionPolicyForDevice } from '../../core/job';
 import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
 import { useStore } from '../state';
@@ -67,16 +63,14 @@ function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): b
   if (!scoped.ok) return false;
   const scopedProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
-  if (
-    findMachineProfilePreflightIssues(scopedProject).some(
-      (issue) => issue.code === MACHINE_ISLAND_FILL_RISK_CODE,
-    )
-  ) {
-    return true;
-  }
+  const job = compileJob(scopedProject.scene, scopedProject.device);
+  const heatRisk = analyzeFillHeatRisk(job);
   return (
-    analyzeFillHeatRisk(compileJob(scopedProject.scene, scopedProject.device))
-      .sensitiveIslandShortSweepCount > 0
+    heatRisk.sensitiveIslandShortSweepCount > 0 ||
+    heatRisk.islandNoRunwayShortSweepCount > 0 ||
+    job.groups.some(
+      (group) => group.kind === 'fill' && group.fillStyle === 'island' && group.overscanMm <= 0,
+    )
   );
 }
 

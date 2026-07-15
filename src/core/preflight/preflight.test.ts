@@ -191,7 +191,7 @@ describe('runPreflight long blank-feed invariant', () => {
     expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
   });
 
-  it('allows long G1 S0 moves for profiles with controlled laser-off travel', () => {
+  it('flags legacy profile-controlled laser-off feed travel', () => {
     const project: Project = {
       ...createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
       scene: {
@@ -212,7 +212,7 @@ describe('runPreflight long blank-feed invariant', () => {
 
     const result = runPreflight(project, controlledTravelGcode);
 
-    expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
+    expect(result.issues.map((i) => i.code)).toContain('long-blank-feed');
   });
 });
 

@@ -151,7 +151,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     );
   });
 
-  it('emits Neotronics-safe vector output without parking back to X0 Y0', () => {
+  it('emits ordinary laser-off rapid travel for Neotronics vector output without parking', () => {
     const out = grblStrategy.emit(singleCutJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
 
     expect(out).toBe(
@@ -163,7 +163,7 @@ describe('grblStrategy machine compatibility dialects', () => {
         'M3 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
-        'G1 X10.000 Y20.000 F800 S0',
+        'G0 X10.000 Y20.000 S0',
         'G1 X30.000 Y40.000 F1500 S500',
         'G1 X50.000 Y60.000 F1500 S500',
         'M5',
@@ -204,9 +204,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut4040');
     expect(out).not.toMatch(/^M4\b/m);
     expect(out).toContain(
-      ['; pass 2 of 2', 'M3 S0', 'G1 X0.000 Y0.000 F800 S0', 'G1 X5.000 Y0.000 F1200 S600'].join(
-        '\n',
-      ),
+      ['; pass 2 of 2', 'M3 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
     );
   });
 
@@ -216,25 +214,23 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).toContain('M5\nM4 S0\nG0 X0.000 Y0.500 S0');
   });
 
-  it('uses non-modal feed words for Neotronics-safe raster output', () => {
+  it('uses laser-off rapid travel and non-modal burn feed words for Neotronics raster output', () => {
     const out = grblStrategy.emit(singleRasterJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
 
-    expect(out).not.toMatch(/^G0\b/m);
-    expect(out).toContain('G1 X0.000 Y0.500 F800 S0');
+    expect(out).toContain('G0 X0.000 Y0.500 S0');
     expect(out).toContain('G1 X1.000 F1000 S500\nG1 X1.000 F1000 S0');
   });
 
-  it('uses feed-controlled laser-off travel for Neotronics-safe fill output', () => {
+  it('uses ordinary laser-off rapid travel for Neotronics fill output', () => {
     const out = grblStrategy.emit(twoSweepFillJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
 
-    expect(out).not.toMatch(/^G0\b/m);
-    expect(out).toContain('G1 X7.000 Y5.000 F800 S0');
-    expect(out).toContain('G1 X23.000 Y5.000 F800 S0');
-    expect(out).toContain('G1 X37.000 Y5.000 F800 S0');
-    expect(out).toContain('G1 X53.000 Y5.000 F800 S0');
+    expect(out).toContain('G0 X7.000 Y5.000 S0');
+    expect(out).toContain('G0 X23.000 Y5.000 S0');
+    expect(out).toContain('G0 X37.000 Y5.000 S0');
+    expect(out).toContain('G0 X53.000 Y5.000 S0');
   });
 
-  it('keeps sensitive Island Fill runways at burn feed for Neotronics-safe output', () => {
+  it('uses ordinary laser-off rapid travel for sensitive Island Fill runways', () => {
     const out = grblStrategy.emit(
       tinySensitiveIslandFillJob,
       NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -246,17 +242,16 @@ describe('grblStrategy machine compatibility dialects', () => {
     const burn = motions[burnIndex];
     const leadOut = motions[burnIndex + 1];
 
-    expect(out).not.toMatch(/^G0\b/m);
     expect({
       seek: seek?.raw,
       leadIn: leadIn?.raw,
       burn: burn?.raw,
       leadOut: leadOut?.raw,
     }).toEqual({
-      seek: 'G1 X5.000 Y5.000 F800 S0',
-      leadIn: 'G1 X10.000 Y5.000 F1500 S0',
+      seek: 'G0 X5.000 Y5.000 S0',
+      leadIn: 'G0 X10.000 Y5.000 S0',
       burn: 'G1 X13.000 Y5.000 F1500 S900',
-      leadOut: 'G1 X18.000 Y5.000 F1500 S0',
+      leadOut: 'G0 X18.000 Y5.000 S0',
     });
   });
 });
