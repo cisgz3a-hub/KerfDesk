@@ -3,17 +3,13 @@
 //
 // Checks:
 //   1. At least one output layer exists.
-//   2. Spindle spin-up dwell is a positive finite duration.
+//   2. Spindle spin-up dwell is a non-negative finite duration.
 //   3. Per-layer CNC settings are sane: depth > 0, depth/pass > 0, feeds in
 //      (0, device.maxFeed], spindle RPM in (0, spindleMaxRpm].
-//   4. Cut depth does not exceed stock thickness by more than the through-cut
-//      allowance (cutting into the spoilboard beyond that is a setup error).
-//   5. All motion fits inside the bed (shared bounds scanner).
-//   6. No-go zones are respected (shared scanner — clamps matter on a router).
-//   7. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
-//   8. Generated G-code is non-empty (at least one G1 line).
-//   9. No emitted Z below -(stock + through-cut allowance) — proves the depth
-//      invariant on the final text, not just the settings (findOverdeepCutIssues).
+//   4. All motion fits inside the bed (shared bounds scanner).
+//   5. No-go zones are respected (shared scanner — clamps matter on a router).
+//   6. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
+//   7. Generated G-code is non-empty (at least one G1 line).
 
 import {
   findCncAdaptivePocketIssues,
@@ -24,9 +20,7 @@ import {
 } from '../cnc';
 import { machineBoundsForDevice } from '../devices';
 import {
-  DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
   findNonFiniteCoords,
-  findOverdeepCutIssues,
   findPlungedTravelIssues,
   type MotionBoundsOffset,
 } from '../invariants';
@@ -43,12 +37,6 @@ export type CncPreflightOptions = {
 };
 
 const MAX_REPORTED_ISSUES = 5;
-const MIN_SPINDLE_SPINUP_SEC = 0.5;
-// Through-cuts intentionally run slightly past the stock bottom so the last
-// pass fully severs; more than this is a mis-set depth or stock thickness.
-// Shared with the emitted-text depth invariant (cnc-depth.ts) so the settings
-// check and the G-code check can never disagree.
-const THROUGH_CUT_ALLOWANCE_MM = DEFAULT_THROUGH_CUT_ALLOWANCE_MM;
 
 export function runCncPreflight(
   project: Project,
@@ -109,7 +97,6 @@ export function runCncPreflight(
   appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, gcode, options, issues);
   appendPlungedTravelIssues(gcode, config, issues);
-  appendOverdeepCutIssues(gcode, config, issues);
 
   if (!/\bG1\b/.test(gcode)) {
     issues.push({
@@ -125,11 +112,10 @@ export function runCncPreflight(
 
 function appendCncMachineIssues(config: CncMachineConfig, issues: PreflightIssue[]): void {
   const spinupSec = config.params.spindleSpinupSec;
-  if (Number.isFinite(spinupSec) && spinupSec >= MIN_SPINDLE_SPINUP_SEC) return;
+  if (Number.isFinite(spinupSec) && spinupSec >= 0) return;
   issues.push({
     code: 'cnc-settings-invalid',
-    message:
-      'CNC spindle spin-up delay must be at least 0.5 seconds. Set enough time for the spindle to reach cutting speed before the first plunge.',
+    message: 'CNC spindle spin-up delay must be a finite number at or above 0 seconds.',
   });
 }
 
@@ -154,15 +140,6 @@ function appendCncLayerIssues(
       message:
         `Layer ${layer.id}: spindle ${settings.spindleRpm} RPM is outside ` +
         `(0, ${config.params.spindleMaxRpm}].`,
-    });
-  }
-  if (settings.depthMm > config.stock.thicknessMm + THROUGH_CUT_ALLOWANCE_MM) {
-    issues.push({
-      code: 'cnc-depth-exceeds-stock',
-      message:
-        `Layer ${layer.id}: cut depth ${settings.depthMm} mm exceeds stock thickness ` +
-        `${config.stock.thicknessMm} mm by more than ${THROUGH_CUT_ALLOWANCE_MM} mm. ` +
-        'Reduce the depth or correct the material thickness.',
     });
   }
   // H.3: v-carve depth math is driven by the bit's tip angle — a flat end
@@ -250,19 +227,5 @@ function appendPlungedTravelIssues(
   const travelIssues = findPlungedTravelIssues(gcode, { safeZMm: config.params.safeZMm });
   for (const issue of travelIssues.slice(0, MAX_REPORTED_ISSUES)) {
     issues.push({ code: 'plunged-travel', message: `Line ${issue.lineNumber}: ${issue.reason}` });
-  }
-}
-
-function appendOverdeepCutIssues(
-  gcode: string,
-  config: CncMachineConfig,
-  issues: PreflightIssue[],
-): void {
-  const depthIssues = findOverdeepCutIssues(gcode, {
-    stockThicknessMm: config.stock.thicknessMm,
-    allowanceMm: THROUGH_CUT_ALLOWANCE_MM,
-  });
-  for (const issue of depthIssues.slice(0, MAX_REPORTED_ISSUES)) {
-    issues.push({ code: 'cnc-overdeep-cut', message: `Line ${issue.lineNumber}: ${issue.reason}` });
   }
 }

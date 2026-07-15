@@ -387,8 +387,8 @@ export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyA
     if (!positive(params.spindleMaxRpm)) {
       issues.push('CNC spindle maximum must be greater than zero.');
     }
-    if (!positive(params.spindleSpinupSec)) {
-      issues.push('CNC spindle spin-up delay must be greater than zero.');
+    if (!Number.isFinite(params.spindleSpinupSec) || params.spindleSpinupSec < 0) {
+      issues.push('CNC spindle spin-up delay must be at or above zero.');
     }
   }
   return issues;

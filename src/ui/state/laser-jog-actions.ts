@@ -13,7 +13,7 @@ import { markMotionOperationDispatched, startMotionOperation } from './laser-mot
 import { type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
-import { isWorkZEvidenceFreshForStart } from './work-z-zero-evidence';
+import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -132,11 +132,10 @@ function buildFrameDispatchPlan(
     perimeter,
     safeZMm: machine.params.safeZMm,
     preFrameWorkZMm: currentWorkZMm(state.statusReport, state.wcoCache),
-    hasCurrentWorkZEvidence: isWorkZEvidenceFreshForStart(
+    hasCurrentWorkZEvidence: isWorkZEvidenceCurrentForStart(
       state.workZZeroEvidence,
       state.workZReferenceEpoch,
       state.controllerSessionEpoch,
-      Date.now(),
     ),
     buildRetract: refs.driver.commands.buildFrameRetract,
     feed,
@@ -164,11 +163,10 @@ function assertCncPointMoveWorkZReady(set: SetFn, get: GetFn): void {
   if (useStore.getState().project.machine?.kind !== 'cnc') return;
   const state = get();
   if (
-    isWorkZEvidenceFreshForStart(
+    isWorkZEvidenceCurrentForStart(
       state.workZZeroEvidence,
       state.workZReferenceEpoch,
       state.controllerSessionEpoch,
-      Date.now(),
     )
   ) {
     return;

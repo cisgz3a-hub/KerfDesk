@@ -44,6 +44,12 @@ describe('runStandaloneCncPreflight', () => {
     expect(codes).toContain('out-of-bed');
   });
 
+  it('does not impose a universal stock-depth cap', () => {
+    const deep = VALID_BODY.replace('G1 Z-0.500 F300.000', 'G1 Z-99.000 F300.000');
+    const result = runStandaloneCncPreflight(DEVICE, DEFAULT_CNC_MACHINE_CONFIG, deep);
+    expect(result.issues.map((issue) => issue.code)).not.toContain('cnc-overdeep-cut');
+  });
+
   it('fails closed when machine-coordinate no-go zones cannot be located from the file', () => {
     const device = {
       ...DEVICE,

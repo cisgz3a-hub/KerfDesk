@@ -2,8 +2,7 @@
 // cut depth reaches (or passes) the stock thickness with holding tabs disabled
 // frees the part — and any interior hole slugs — on the final pass, where they
 // can catch the bit or fly off. The out-of-box default layer is exactly this
-// (profile-outside, depth == stock == 6.35 mm, tabs off), and nothing else
-// warns about it: preflight only blocks depth > stock + allowance.
+// (profile-outside, depth == stock == 6.35 mm, tabs off).
 //
 // This is an advisory, not a hard gate — through-cutting onto a spoilboard is a
 // legitimate workflow. KerfDesk warns rather than silently auto-adding tabs

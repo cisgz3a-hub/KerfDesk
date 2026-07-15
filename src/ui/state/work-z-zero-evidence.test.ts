@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   captureControllerWorkZEvidence,
-  CONTROLLER_WORK_Z_FRESHNESS_MS,
-  isWorkZEvidenceFreshForStart,
+  isWorkZEvidenceCurrentForStart,
 } from './work-z-zero-evidence';
 
 describe('controller-readback Work-Z evidence', () => {
@@ -16,16 +15,12 @@ describe('controller-readback Work-Z evidence', () => {
     observedAtMs,
   });
 
-  it('is current only inside the owned session and freshness window', () => {
-    expect(isWorkZEvidenceFreshForStart(evidence, 7, 3, observedAtMs + 1)).toBe(true);
-    expect(isWorkZEvidenceFreshForStart(evidence, 7, 4, observedAtMs + 1)).toBe(false);
-    expect(
-      isWorkZEvidenceFreshForStart(
-        evidence,
-        7,
-        3,
-        observedAtMs + CONTROLLER_WORK_Z_FRESHNESS_MS + 1,
-      ),
-    ).toBe(false);
+  it('remains current for the owned session without a wall-clock expiry', () => {
+    expect(isWorkZEvidenceCurrentForStart(evidence, 7, 3)).toBe(true);
+    expect(isWorkZEvidenceCurrentForStart(evidence, 8, 3)).toBe(false);
+    expect(isWorkZEvidenceCurrentForStart(evidence, 7, 4)).toBe(false);
+
+    const dayOldEvidence = { ...evidence, observedAtMs: observedAtMs - 24 * 60 * 60 * 1000 };
+    expect(isWorkZEvidenceCurrentForStart(dayOldEvidence, 7, 3)).toBe(true);
   });
 });

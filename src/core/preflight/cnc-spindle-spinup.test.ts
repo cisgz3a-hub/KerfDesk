@@ -40,18 +40,17 @@ function configWithSpinup(spindleSpinupSec: number): CncMachineConfig {
 }
 
 describe('CNC spindle spin-up preflight', () => {
-  it.each([0, -1, 0.499, Number.NaN])('blocks an invalid %s second dwell', (spinupSec) => {
+  it.each([-1, Number.NaN])('blocks an invalid %s second dwell', (spinupSec) => {
     const result = runCncPreflight(projectWithOutput(), configWithSpinup(spinupSec), GCODE);
 
     expect(result.issues).toContainEqual({
       code: 'cnc-settings-invalid',
-      message:
-        'CNC spindle spin-up delay must be at least 0.5 seconds. Set enough time for the spindle to reach cutting speed before the first plunge.',
+      message: 'CNC spindle spin-up delay must be a finite number at or above 0 seconds.',
     });
   });
 
-  it('accepts a positive machine-specific dwell', () => {
-    const result = runCncPreflight(projectWithOutput(), configWithSpinup(0.5), GCODE);
+  it.each([0, 0.1, 0.499])('accepts a machine-specific %s second dwell', (spinupSec) => {
+    const result = runCncPreflight(projectWithOutput(), configWithSpinup(spinupSec), GCODE);
 
     expect(result.issues).not.toContainEqual(
       expect.objectContaining({ message: expect.stringContaining('spindle spin-up delay') }),

@@ -90,7 +90,6 @@ export type MachineStartSnapshot = {
   readonly workZZeroEvidence?: WorkZZeroEvidence | null;
   readonly workZReferenceEpoch?: number;
   readonly controllerSessionEpoch?: number;
-  readonly nowMs?: number;
   readonly wcoCache?: WorkCoordinateOffset | null;
   // Last live GRBL Ov: field, cached across intermittent status frames.
   // A known non-default value changes physical feed/RPM independently of the
@@ -138,7 +137,6 @@ function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): 
     machine.workZZeroEvidence,
     machine.workZReferenceEpoch,
     machine.controllerSessionEpoch,
-    machine.nowMs,
   );
   if (workZeroIssue !== null) issues.push(workZeroIssue);
   return issues;

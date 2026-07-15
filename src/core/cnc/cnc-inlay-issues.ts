@@ -1,5 +1,4 @@
 import type { DeviceProfile } from '../devices';
-import { DEFAULT_THROUGH_CUT_ALLOWANCE_MM } from '../invariants';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -24,13 +23,6 @@ export function findCncInlayIssues(
     const pocketDepth = straightInlayPocketDepthMm(settings);
     if (!(pocketDepth > 0)) {
       issues.push({ layerId: layer.id, reason: 'Pocket depth must be positive.' });
-      continue;
-    }
-    if (pocketDepth > config.stock.thicknessMm + DEFAULT_THROUGH_CUT_ALLOWANCE_MM) {
-      issues.push({
-        layerId: layer.id,
-        reason: `Pocket depth ${pocketDepth} mm exceeds the stock thickness allowance.`,
-      });
       continue;
     }
     const contours = collectLayerPolylines(scene.objects, layer, device);

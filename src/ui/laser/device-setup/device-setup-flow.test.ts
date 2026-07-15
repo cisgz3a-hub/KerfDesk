@@ -100,6 +100,23 @@ describe('unified machine setup flow', () => {
     expect(canAdvanceDeviceSetup(state)).toBe(false);
   });
 
+  it('allows a zero CNC spindle spin-up delay', () => {
+    let state = deviceSetupReducer(open(), {
+      kind: 'set-machine-kinds',
+      machineKinds: ['cnc'],
+    });
+    state = deviceSetupReducer(state, {
+      kind: 'edit-machine',
+      machine: {
+        ...state.cncDraft,
+        params: { ...state.cncDraft.params, spindleSpinupSec: 0 },
+      },
+    });
+    expect(machineSetupValidationIssues(state)).not.toContain(
+      'CNC spindle spin-up delay must be at or above zero.',
+    );
+  });
+
   it('persists both output capabilities and CNC machine values for a hybrid machine', () => {
     let state = deviceSetupReducer(open(), {
       kind: 'set-machine-kinds',

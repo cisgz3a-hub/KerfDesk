@@ -5,7 +5,7 @@
 import { machineKindOf, type Project } from '../../core/scene';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import {
-  isWorkZEvidenceFreshForStart,
+  isWorkZEvidenceCurrentForStart,
   probePlateRemovalRequired,
   PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
   type WorkZZeroEvidence,
@@ -30,10 +30,9 @@ export function cncWorkZeroStartIssue(
   evidence: WorkZZeroEvidence | null | undefined,
   referenceEpoch: number | undefined,
   controllerSessionEpoch?: number,
-  nowMs = Date.now(),
 ): string | null {
   if (machineKindOf(project.machine) !== 'cnc') return null;
-  if (!isWorkZEvidenceFreshForStart(evidence, referenceEpoch, controllerSessionEpoch, nowMs)) {
+  if (!isWorkZEvidenceCurrentForStart(evidence, referenceEpoch, controllerSessionEpoch)) {
     return CNC_NO_WORK_ZERO_START_MESSAGE;
   }
   return probePlateRemovalRequired(evidence) ? PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE : null;

@@ -58,8 +58,6 @@ export type PreflightCode =
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'
   | 'cnc-layer-empty'
-  | 'cnc-depth-exceeds-stock'
-  | 'cnc-overdeep-cut'
   | 'plunged-travel'
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'

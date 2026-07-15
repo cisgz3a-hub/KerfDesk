@@ -15,7 +15,7 @@ import { controllerOperationCommandBlockMessage } from './laser-controller-opera
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import {
-  isWorkZEvidenceFreshForStart,
+  isWorkZEvidenceCurrentForStart,
   probePlateRemovalRequired,
   PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
 } from './work-z-zero-evidence';
@@ -124,11 +124,10 @@ export function toolChangeHoldEntryPatch(
 export function toolChangeContinueBlockMessage(state: LaserState): string | null {
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
   if (
-    !isWorkZEvidenceFreshForStart(
+    !isWorkZEvidenceCurrentForStart(
       state.workZZeroEvidence,
       state.workZReferenceEpoch,
       state.controllerSessionEpoch,
-      Date.now(),
     )
   ) {
     return TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE;

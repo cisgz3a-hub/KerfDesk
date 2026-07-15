@@ -72,8 +72,8 @@ export function cncOverrideStartIssue(
   }
   if (overrideIsBaseline(overrides) || overrideIsSafeReduction(overrides)) return null;
   return (
-    'CNC Start blocks increased/invalid motion overrides and every changed spindle override. ' +
-    `${overrideValuesLabel(overrides)} Reset spindle to 100% and keep feed/rapid within 1-100%.`
+    'CNC Start blocks increased or invalid controller overrides. ' +
+    `${overrideValuesLabel(overrides)} Keep feed, rapid, and spindle within 1-100%.`
   );
 }
 
@@ -85,8 +85,8 @@ export function cncOverrideStartWarning(
     return null;
   if (overrideIsBaseline(overrides)) return null;
   return (
-    `CNC will start with reduced controller overrides: feed ${overrides.feed}%, rapid ${overrides.rapid}%, spindle 100%. ` +
-    'Lower motion can change chip load, heat, and cut quality. Confirm these exact values are safe for the stock and tool.'
+    `CNC will start with reduced controller overrides: feed ${overrides.feed}%, rapid ${overrides.rapid}%, spindle ${overrides.spindle}%. ` +
+    'Reduced motion or spindle speed can change chip load, heat, and cut quality. Confirm these exact values are safe for the stock and tool.'
   );
 }
 
@@ -108,7 +108,7 @@ export function cncOverrideFinalStartIssue(
   if (blocker !== null || machineKind !== 'cnc' || overrides == null) return blocker;
   if (overrideIsBaseline(overrides)) return null;
   if (acknowledged === undefined) {
-    return `CNC Start requires acknowledgement of the exact reduced feed/rapid values. ${overrideValuesLabel(overrides)}`;
+    return `CNC Start requires acknowledgement of the exact reduced feed/rapid/spindle values. ${overrideValuesLabel(overrides)}`;
   }
   if (overrideValuesEqual(overrides, acknowledged)) return null;
   return (
@@ -130,7 +130,8 @@ function overrideIsSafeReduction(overrides: OverrideValues): boolean {
     overrides.feed <= 100 &&
     overrides.rapid > 0 &&
     overrides.rapid <= 100 &&
-    overrides.spindle === 100
+    overrides.spindle > 0 &&
+    overrides.spindle <= 100
   );
 }
 
