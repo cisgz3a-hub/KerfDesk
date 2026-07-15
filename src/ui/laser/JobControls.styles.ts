@@ -3,13 +3,9 @@ import type { CSSProperties } from 'react';
 export const containerStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 // Rows sit in a fixed-width side rail whose ancestors set overflow-x:hidden with
 // no scrollbar (WorkspaceSidePanels / .lf-rail), so a non-wrapping row pushes its
-// rightmost buttons (Start job, Abort) off-screen and unreachable. Wrap instead —
+// rightmost buttons (for example Start job) off-screen and unreachable. Wrap instead —
 // mirrors OriginRow.originRowStyle, the sibling row that already wraps correctly.
 export const rowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 };
-export const stopBtnStyle: CSSProperties = {
-  background: 'var(--lf-danger)',
-  color: 'var(--lf-on-fill)',
-};
 export const progressContainerStyle: CSSProperties = {
   position: 'relative',
   background: 'var(--lf-bg-input)',
@@ -43,8 +39,7 @@ export const runningSafetyStyle: CSSProperties = {
   fontSize: 12,
   lineHeight: 1.3,
   // Take a full-width line of the wrapping row so this (often long) safety copy
-  // always drops below the buttons instead of competing with the safety-critical
-  // Abort button for horizontal space and pushing it off the rail.
+  // always drops below the buttons and remains readable at narrow rail widths.
   flexBasis: '100%',
   minWidth: 0,
 };

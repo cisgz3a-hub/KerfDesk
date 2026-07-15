@@ -27,19 +27,18 @@ afterEach(async () => {
 });
 
 describe('NumericEditsBar', () => {
-  it('scopes horizontal scrolling to the transform fields so the safety cluster stays pinned', async () => {
+  it('owns only horizontally scrollable transform fields', async () => {
     const container = await render(<NumericEditsBar />);
     const toolbar = container.querySelector('section[aria-label="Numeric Edits Toolbar"]');
     expect(toolbar).toBeInstanceOf(HTMLElement);
     expect((toolbar as HTMLElement).style.minWidth).toBe('0');
     expect((toolbar as HTMLElement).style.maxWidth).toBe('100%');
-    // The scroll lives on the inner edits group, not the whole bar, so the
-    // job-safety cluster (ABORT) rendered alongside it can never be scrolled
-    // out of reach on a narrow window.
+    // Live machine actions are an App-shell sibling, not mixed into selection edits.
     const editsGroup = toolbar?.querySelector(':scope > div');
     expect(editsGroup).toBeInstanceOf(HTMLElement);
     expect((editsGroup as HTMLElement).style.overflowX).toBe('auto');
     expect((editsGroup as HTMLElement).style.minWidth).toBe('0');
+    expect(toolbar?.querySelector('[aria-label="Live machine controls"]')).toBeNull();
   });
 
   it('renders disabled numeric fields when nothing is selected', async () => {

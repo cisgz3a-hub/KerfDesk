@@ -243,7 +243,7 @@ describe('JobControls Frame action', () => {
 });
 
 describe('JobControls running safety copy', () => {
-  it('warns that Pause is feed hold only and ABORT or physical E-stop is the unsafe-condition path', async () => {
+  it('keeps detailed Pause safety copy without duplicating top-bar actions', async () => {
     installProject();
     useLaserStore.setState({
       streamer: {
@@ -269,8 +269,11 @@ describe('JobControls running safety copy', () => {
       });
 
       expect(host.textContent).toContain(
-        'Pause is feed hold only. Use ABORT or the physical E-stop if unsafe.',
+        'Pause is feed hold only. Use ABORT JOB or the physical E-stop if unsafe.',
       );
+      expect(
+        [...host.querySelectorAll('button')].map((button) => button.textContent),
+      ).not.toContain('Pause');
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -279,7 +282,7 @@ describe('JobControls running safety copy', () => {
     }
   });
 
-  it('keeps ABORT visible after a controller error leaves the job in recovery', async () => {
+  it('keeps conflicting machine controls disabled after a controller error', async () => {
     installProject();
     useLaserStore.setState({
       streamer: {
@@ -305,7 +308,8 @@ describe('JobControls running safety copy', () => {
       });
 
       const buttons = [...host.querySelectorAll('button')].map((button) => button.textContent);
-      expect(buttons).toContain('ABORT');
+      expect(buttons).not.toContain('ABORT JOB');
+      expect(buttons).not.toContain('ABORT');
       expect(buttons).not.toContain('Pause');
       expect(buttons).not.toContain('Resume');
       const buttonByText = (text: string): HTMLButtonElement => {
@@ -325,7 +329,7 @@ describe('JobControls running safety copy', () => {
     }
   });
 
-  it('keeps an ABORT escape mounted after a job finishes but before GRBL confirms Idle', async () => {
+  it('keeps conflicting controls disabled while a finished job awaits Idle', async () => {
     installProject();
     useLaserStore.setState({
       streamer: {
@@ -351,7 +355,8 @@ describe('JobControls running safety copy', () => {
       });
 
       const buttons = [...host.querySelectorAll('button')].map((button) => button.textContent);
-      expect(buttons).toContain('ABORT');
+      expect(buttons).not.toContain('ABORT JOB');
+      expect(buttons).not.toContain('ABORT');
       expect(buttons).not.toContain('Pause');
       expect(buttons).not.toContain('Resume');
       const buttonByText = (text: string): HTMLButtonElement => {
@@ -371,7 +376,7 @@ describe('JobControls running safety copy', () => {
     }
   });
 
-  it('shows Cancel frame and disables conflicting controls while Frame is active', async () => {
+  it('shows frame status without a duplicate action and disables conflicting controls', async () => {
     installProject();
     setMotionOperation({ kind: 'frame', sawControllerBusy: false });
     const host = document.createElement('div');
@@ -388,7 +393,10 @@ describe('JobControls running safety copy', () => {
         if (button === undefined) throw new Error(`${text} button not rendered`);
         return button;
       };
-      expect(buttonByText('Cancel frame').disabled).toBe(false);
+      expect(host.textContent).toContain('Frame motion is active. Use ABORT MOTION in the top bar');
+      expect(
+        [...host.querySelectorAll('button')].map((button) => button.textContent),
+      ).not.toContain('Cancel frame');
       expect(buttonByText('Home').disabled).toBe(true);
       expect(buttonByText('Set origin here').disabled).toBe(true);
       expect(buttonByText('Frame').disabled).toBe(true);

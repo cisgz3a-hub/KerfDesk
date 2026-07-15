@@ -10,7 +10,6 @@ import {
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { JobSafetyControls } from '../laser/JobSafetyControls';
 
 const FIELD_STEP_MM = 0.1;
 const ROTATION_STEP_DEG = 1;
@@ -42,7 +41,6 @@ export function NumericEditsBar(): JSX.Element {
         />
         <NumericFields model={model} />
       </div>
-      <JobSafetyControls />
     </section>
   );
 }
@@ -308,9 +306,8 @@ const barStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--lf-border)',
   fontSize: 12,
 };
-// Only the transform controls scroll horizontally; the job-safety cluster is a
-// non-scrolling sibling so the ABORT button can never be pushed out of reach
-// when the fields overflow a narrow window.
+// Transform controls scroll within their own bar. Live machine actions are a
+// separate full-width App-shell sibling (ADR-207), never selection-toolbar content.
 const editsGroupStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
