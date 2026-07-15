@@ -64,10 +64,18 @@ export function useCanvasMotionOverlay(
     laser,
   });
 
-  useClearStaleTerminalRun(liveRun, idlePlan?.current === true ? idlePlan.plan : null);
+  const currentIdlePlan = idlePlan?.current === true ? idlePlan.plan : null;
+  const staleTerminalRun = shouldClearTerminalRun(
+    liveRun,
+    currentIdlePlan,
+    project.scene.objects.length === 0,
+  );
+  useClearStaleTerminalRun(liveRun, staleTerminalRun);
 
   if (previewMode) return null;
-  if (liveRun !== null) return { plan: liveRun.plan, run: liveRun, showStartMarkers };
+  if (liveRun !== null && !staleTerminalRun) {
+    return { plan: liveRun.plan, run: liveRun, showStartMarkers };
+  }
   return idlePlan === null ? null : { plan: idlePlan.plan, run: null, showStartMarkers };
 }
 
@@ -238,15 +246,22 @@ function idleStateCanRemainVisible(state: IdlePlanState, input: IdlePlanInput): 
   );
 }
 
-function useClearStaleTerminalRun(
+function shouldClearTerminalRun(
   liveRun: LiveCanvasRun | null,
   idlePlan: CanvasMotionPlan | null,
-): void {
+  projectIsEmpty: boolean,
+): boolean {
+  if (liveRun === null || isActiveCanvasLifecycle(liveRun)) return false;
+  if (projectIsEmpty) return true;
+  return idlePlan !== null && liveRun.plan.retentionKey !== idlePlan.retentionKey;
+}
+
+function useClearStaleTerminalRun(liveRun: LiveCanvasRun | null, stale: boolean): void {
   useEffect(() => {
-    if (liveRun === null || idlePlan === null || isActiveCanvasLifecycle(liveRun)) return;
-    if (liveRun.plan.retentionKey === idlePlan.retentionKey) return;
+    if (!stale || liveRun === null) return;
+    if (useLaserStore.getState().liveCanvasRun !== liveRun) return;
     useLaserStore.setState({ liveCanvasRun: null });
-  }, [idlePlan, liveRun]);
+  }, [liveRun, stale]);
 }
 
 function canvasMachineSnapshot(

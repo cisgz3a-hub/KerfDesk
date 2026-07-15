@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { resolveJobPlacement } from '../job-placement';
+import { startLiveCanvasRun } from '../state/canvas-motion-plan';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
@@ -164,6 +165,40 @@ describe('idle canvas motion plan', () => {
     });
     expect(observedOverlay?.plan.jobStart).not.toBeNull();
     expect(observedOverlay?.plan).not.toBe(initialPlan);
+  });
+
+  it('clears a canceled job overlay when its final artwork is deleted', async () => {
+    const decoded = deserializeProject(readFileSync('e2e/fixtures/project-basic.lf2', 'utf8'));
+    if (decoded.kind !== 'ok') throw new Error(`Fixture failed to load: ${decoded.kind}`);
+    useStore.setState({
+      project: decoded.project,
+      jobPlacement: { startFrom: 'absolute', anchor: 'front-left' },
+    });
+    useLaserStore.setState(initialLaserState());
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    await act(async () => {
+      root = createRoot(host as HTMLDivElement);
+      root.render(createElement(StoreHarness));
+    });
+    await waitForPublishedOverlay();
+    const plan = observedOverlay?.plan;
+    expect(plan).toBeDefined();
+    if (plan === undefined) throw new Error('Expected an idle canvas plan');
+    await act(async () => {
+      useLaserStore.setState({
+        liveCanvasRun: { ...startLiveCanvasRun(plan), lifecycle: 'stopped' },
+      });
+    });
+    expect(observedOverlay?.run?.lifecycle).toBe('stopped');
+
+    await act(async () => {
+      useStore.getState().removeSceneObject('e2e-square');
+    });
+
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(useLaserStore.getState().liveCanvasRun).toBeNull();
+    expect(observedOverlay).toBeNull();
   });
 });
 
