@@ -6,7 +6,7 @@
 
 import { idleCollector } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
-import { cancelControllerLifecycleRefs } from './laser-interactive-command';
+import { cancelControllerLifecycleRefs, startControllerCommand } from './laser-interactive-command';
 import { beginSettingsCollection } from './detected-settings-action';
 import { handleLine, type HandlerRefs } from './laser-line-handler';
 import { cancelResetCleanup } from './laser-reset-cleanup';
@@ -96,16 +96,32 @@ export function connectionActions(
           safetyNotice: null,
           airAssistOn: false,
           fireActive: false,
-          controllerOperation: null,
+          controllerOperation: {
+            kind: 'connection-handshake',
+            phase: 'waiting-controller',
+          },
           probeBusy: false,
           homingState: 'unknown',
           pendingUntrackedAcks: 0,
           pendingTransportWrites: 0,
         });
         void runHandshake(set, get, refs, safeWrite, baudRate)
-          .catch(() => undefined)
+          .catch((err: unknown) => {
+            if (refs.connection !== conn) return;
+            const message = err instanceof Error ? err.message : String(err);
+            set((state) => ({
+              lastWriteError: message,
+              log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
+            }));
+          })
           .finally(() => {
-            if (refs.connection === conn) startStatusPolling(set, get, refs, safeWrite);
+            if (refs.connection !== conn) return;
+            set((state) =>
+              state.controllerOperation?.kind === 'connection-handshake'
+                ? { controllerOperation: null }
+                : {},
+            );
+            startStatusPolling(set, get, refs, safeWrite);
           });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -215,7 +231,7 @@ async function runHandshake(
   set: SetFn,
   get: GetFn,
   refs: LiveRefs,
-  safeWrite: (line: string) => Promise<void>,
+  safeWrite: SafeWriteFn,
   baudRate: number,
 ): Promise<void> {
   const connection = refs.connection;
@@ -268,6 +284,7 @@ async function runHandshake(
     return;
   }
   set({
+    controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
     log: pushLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
     detectedSettings: null,
     controllerSettings: null,
@@ -276,7 +293,12 @@ async function runHandshake(
     lastSettingsReadAt: null,
   });
   beginSettingsCollection(refs, get().controllerSessionEpoch);
-  await safeWrite(`${settingsQuery}\n`);
+  await startControllerCommand(refs, safeWrite, {
+    kind: 'connection-handshake',
+    label: 'controller settings query',
+    command: `${settingsQuery}\n`,
+    source: 'system',
+  });
   if (!handshakeIsCurrent(refs, connection, expectedWriteEpoch)) return;
 }
 

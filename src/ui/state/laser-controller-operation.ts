@@ -1,5 +1,9 @@
 export type LaserControllerOperation =
   | {
+      readonly kind: 'connection-handshake';
+      readonly phase: 'waiting-controller' | 'settings';
+    }
+  | {
       readonly kind: 'home';
       readonly phase: 'command' | 'settling' | 'awaiting-idle';
       readonly idleReports: number;
@@ -45,6 +49,21 @@ export function controllerOperationCommandBlockMessage(
 }
 
 export function describeControllerOperation(operation: LaserControllerOperation | null): string {
+  if (operation?.kind === 'connection-handshake') {
+    return describeConnectionHandshake(operation.phase);
+  }
+  return describeEstablishedControllerOperation(operation);
+}
+
+function describeConnectionHandshake(phase: 'waiting-controller' | 'settings'): string {
+  return phase === 'waiting-controller'
+    ? 'Waiting for controller response'
+    : 'Reading controller settings';
+}
+
+function describeEstablishedControllerOperation(
+  operation: Exclude<LaserControllerOperation, { readonly kind: 'connection-handshake' }> | null,
+): string {
   if (operation === null) return 'Controller ready';
   if (operation.kind === 'home') {
     if (operation.phase === 'command') return 'Homing';

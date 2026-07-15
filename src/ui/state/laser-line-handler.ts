@@ -229,7 +229,10 @@ function controllerResetBoundaryPolicy(state: LaserState): {
   const probeRecovering = operation?.kind === 'probe' && operation.phase === 'recovering';
   const probeRebooted = operation?.kind === 'probe' && operation.phase !== 'recovering';
   return {
-    preserveOperation: probeRecovering || operation?.kind === 'recovery',
+    preserveOperation:
+      probeRecovering ||
+      operation?.kind === 'recovery' ||
+      operation?.kind === 'connection-handshake',
     cancellationReason: probeRebooted
       ? 'Controller rebooted during the probe transaction.'
       : 'Controller rebooted.',

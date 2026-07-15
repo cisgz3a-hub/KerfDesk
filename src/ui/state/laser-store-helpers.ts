@@ -153,6 +153,12 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
 // M114 polls to observe Idle at all.
 export function hasUnsettledStreamAcks(streamer: StreamerState | null): boolean {
   if (streamer === null) return false;
+  // A disconnected streamer retains its unconfirmed in-flight lines as
+  // recovery evidence, but they belong to the dead serial session and can
+  // never own replies on the replacement connection. Treating them as live
+  // made the reconnect settings `ok` disappear into the interrupted stream,
+  // leaving the handshake's untracked-ack ledger stuck at one.
+  if (streamer.status === 'disconnected') return false;
   if (streamer.status === 'streaming' || streamer.status === 'paused') return true;
   return streamer.inFlight.length > 0;
 }
@@ -400,7 +406,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     wasActiveJob ||
     state.fireActive ||
     state.motionOperation !== null ||
-    state.controllerOperation !== null;
+    isUnsafeControllerOperation(state.controllerOperation);
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
   return {
@@ -450,4 +456,8 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
         ? { safetyNotice: disconnectDuringJobNotice() }
         : {}),
   };
+}
+
+function isUnsafeControllerOperation(operation: LaserState['controllerOperation']): boolean {
+  return operation !== null && operation.kind !== 'connection-handshake';
 }

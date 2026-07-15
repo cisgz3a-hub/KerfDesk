@@ -15,6 +15,7 @@ type CommandWriteFn = (
 
 export type ControllerCommandKind =
   | 'autofocus'
+  | 'connection-handshake'
   | 'home'
   | 'post-job-settle'
   | 'probe'
@@ -353,6 +354,7 @@ function updateOperationIdleReports(
   const operation = state.controllerOperation;
   if (operation === null || operation.kind !== kind) return {};
   if (
+    operation.kind === 'connection-handshake' ||
     operation.kind === 'interactive-command' ||
     operation.kind === 'start-arming' ||
     operation.kind === 'work-z-recovery'

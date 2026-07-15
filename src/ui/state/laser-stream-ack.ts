@@ -22,7 +22,18 @@ import { liveCanvasLifecyclePatch } from './live-canvas-run';
 // budget GRBL has not freed (phantom refill past the real buffer).
 export function settleUntrackedAck(set: SetFn, state: LaserState, clsKind: string): AckOwner {
   const isTerminalAck = clsKind === 'ok' || clsKind === 'error';
-  if (!isTerminalAck || state.pendingUntrackedAcks === 0) return 'stream';
+  if (!isTerminalAck) return 'stream';
+  // The disconnected stream is retained only as recovery evidence. Replies on
+  // a replacement serial session must never advance its unconfirmed lines.
+  // When a reconnect command owns an ack, settle that ledger; otherwise treat
+  // a late terminal response as non-stream traffic and drop it here.
+  if (state.streamer?.status === 'disconnected') {
+    if (state.pendingUntrackedAcks > 0) {
+      set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
+    }
+    return 'untracked';
+  }
+  if (state.pendingUntrackedAcks === 0) return 'stream';
   if (hasUnsettledStreamAcks(state.streamer)) return 'stream';
   set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
   return 'untracked';
