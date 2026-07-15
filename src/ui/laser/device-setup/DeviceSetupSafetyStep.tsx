@@ -84,17 +84,24 @@ function LaserCalibrationSections(props: {
   return (
     <>
       <details style={detailsStyle}>
-        <summary
-          style={summaryStyle}
-          title="Show or hide raster scan-offset and autofocus calibration."
-        >
-          Raster and autofocus calibration
+        <summary style={summaryStyle} title="Show or hide raster scan-offset calibration.">
+          Raster scan-offset calibration
         </summary>
         <div style={bodyStyle}>
           <ScanOffsetEditor
             value={draft.scanningOffsets}
             onChange={(scanningOffsets) => update({ scanningOffsets })}
           />
+        </div>
+      </details>
+      <details open style={detailsStyle}>
+        <summary style={summaryStyle} title="Show or hide auto-focus command setup.">
+          Auto-focus setup
+          <span style={summaryStatusStyle}>
+            {draft.autofocusCommand.trim() === '' ? 'Not configured' : 'Configured'}
+          </span>
+        </summary>
+        <div style={bodyStyle}>
           <AutofocusEditor
             value={draft.autofocusCommand}
             onChange={(autofocusCommand) => update({ autofocusCommand })}
@@ -228,6 +235,12 @@ const detailsStyle: React.CSSProperties = {
   padding: 8,
 };
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12, fontWeight: 600 };
+const summaryStatusStyle: React.CSSProperties = {
+  float: 'right',
+  color: 'var(--lf-text-muted)',
+  fontSize: 11,
+  fontWeight: 500,
+};
 const bodyStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

@@ -31,10 +31,15 @@ import { StartBlockerNotice } from './StartBlockerNotice';
 
 type Props = {
   readonly disabled: boolean;
+  readonly onConfigureAutofocus?: () => void;
   readonly onStartJob: () => void;
 };
 
-export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
+export function JobControls({
+  disabled,
+  onConfigureAutofocus = doNothing,
+  onStartJob,
+}: Props): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const streamer = useLaserStore((s) => s.streamer);
   const status = streamer?.status;
@@ -62,7 +67,12 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
   return (
     <div style={containerStyle}>
-      <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
+      <SetupRow
+        disabled={disabled}
+        streaming={controlsBusy}
+        onConfigureAutofocus={onConfigureAutofocus}
+        onStartJob={onStartJob}
+      />
       <StartBlockerNotice />
       <AccessoryResetControls
         accessories={accessoryCache}
@@ -113,6 +123,7 @@ function shouldShowIdleOverrideReset(
 function SetupRow(props: {
   readonly disabled: boolean;
   readonly streaming: boolean;
+  readonly onConfigureAutofocus: () => void;
   readonly onStartJob: () => void;
 }): JSX.Element {
   const onFrame = useFrameAction();
@@ -128,10 +139,9 @@ function SetupRow(props: {
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
   const frameReady = statusReport?.state === 'Idle';
-  // Disabled when the command is empty — there's no portable autofocus
-  // G-code (see DeviceProfile.autofocusCommand docs); shipping a default
-  // we picked would break someone's machine, so the button is dark until
-  // the user pastes their machine's command.
+  // No portable autofocus G-code exists, so an empty command becomes a direct
+  // setup entry instead of a disabled control that leaves users hunting for
+  // the vendor-specific command field.
   const noAutofocus = autofocusCommand.trim() === '';
   return (
     <div style={rowStyle}>
@@ -148,18 +158,13 @@ function SetupRow(props: {
         Home
       </button>
       {!isCncMachine && (
-        <button
-          type="button"
-          onClick={onAutofocus}
-          disabled={busy || noAutofocus}
-          title={
-            noAutofocus
-              ? 'Set your machine’s autofocus command in Device settings below'
-              : 'Run the autofocus command configured in Device settings'
-          }
-        >
-          Auto-focus
-        </button>
+        <AutofocusButton
+          needsSetup={noAutofocus}
+          busy={busy}
+          streaming={props.streaming}
+          onConfigure={props.onConfigureAutofocus}
+          onRun={onAutofocus}
+        />
       )}
       <button
         type="button"
@@ -185,6 +190,31 @@ function SetupRow(props: {
     </div>
   );
 }
+
+function AutofocusButton(props: {
+  readonly needsSetup: boolean;
+  readonly busy: boolean;
+  readonly streaming: boolean;
+  readonly onConfigure: () => void;
+  readonly onRun: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={props.needsSetup ? props.onConfigure : props.onRun}
+      disabled={props.needsSetup ? props.streaming : props.busy}
+      title={
+        props.needsSetup
+          ? 'Open Machine Setup at Auto-focus setup.'
+          : 'Run the auto-focus command configured in Machine Setup.'
+      }
+    >
+      {props.needsSetup ? 'Set up auto-focus' : 'Auto-focus'}
+    </button>
+  );
+}
+
+const doNothing = (): void => undefined;
 
 function frameBlockedTitle(state: string | undefined): string {
   if (state === undefined) {

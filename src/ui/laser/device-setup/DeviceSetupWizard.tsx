@@ -44,6 +44,7 @@ const STEP_TITLES: Record<DeviceSetupStep, string> = {
 type DeviceSetupWizardProps = {
   readonly onClose: () => void;
   readonly onConfigured?: (profile: DeviceProfile) => void;
+  readonly initialStep?: DeviceSetupStep;
 };
 
 export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
@@ -54,14 +55,15 @@ export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const connectionKind = useLaserStore((s) => s.connection.kind);
-  const [state, dispatch] = useReducer(deviceSetupReducer, project.device, (seed) =>
-    initDeviceSetup(seed, detected, {
+  const [state, dispatch] = useReducer(deviceSetupReducer, project.device, (seed) => {
+    const initial = initDeviceSetup(seed, detected, {
       detectedControllerKind,
       controllerRead: lastReadAt !== null,
       machine: project.machine ?? LASER_MACHINE_CONFIG,
       ...(cachedCncMachine === null ? {} : { fallbackCncMachine: cachedCncMachine }),
-    }),
-  );
+    });
+    return props.initialStep === undefined ? initial : { ...initial, step: props.initialStep };
+  });
   useDetectedSetupSync(dispatch, detected, detectedControllerKind, {
     controllerRead: lastReadAt !== null,
     connected: connectionKind === 'connected',

@@ -3,7 +3,7 @@
 // when the connected profile still needs guided setup. This is the single
 // explicit setup launch, removing the former pair of near-synonym workflows.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
@@ -15,10 +15,18 @@ import {
 } from '../../state/device-setup-configured-persistence';
 import { useLaserStore } from '../../state/laser-store';
 import { deviceProfileSignature, shouldPromptDeviceSetup } from './device-setup-nudge';
+import type { DeviceSetupStep } from './device-setup-flow';
 import { DeviceSetupWizard } from './DeviceSetupWizard';
 
-export function DeviceSetupControls(): JSX.Element {
+export type DeviceSetupOpenRequest = {
+  readonly initialStep: DeviceSetupStep;
+};
+
+export function DeviceSetupControls(props: {
+  readonly openRequest?: DeviceSetupOpenRequest | undefined;
+}): JSX.Element {
   const [machineSetupOpen, setMachineSetupOpen] = useState(false);
+  const [initialStep, setInitialStep] = useState<DeviceSetupStep>('identify');
   const [configured, setConfigured] = useState<ReadonlySet<string>>(() => {
     const storage = browserLocalStorage();
     return storage === null ? new Set() : loadConfiguredSignatures(storage);
@@ -26,6 +34,15 @@ export function DeviceSetupControls(): JSX.Element {
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const device = useStore((s) => s.project.device);
   const needsSetup = shouldPromptDeviceSetup({ connected, device, configured });
+  useEffect(() => {
+    if (props.openRequest === undefined) return;
+    setInitialStep(props.openRequest.initialStep);
+    setMachineSetupOpen(true);
+  }, [props.openRequest]);
+  const openSetup = (step: DeviceSetupStep): void => {
+    setInitialStep(step);
+    setMachineSetupOpen(true);
+  };
   const markConfigured = (profile: DeviceProfile): void => {
     const next = new Set(configured);
     next.add(deviceProfileSignature(profile));
@@ -37,7 +54,7 @@ export function DeviceSetupControls(): JSX.Element {
     <>
       <Button
         variant={needsSetup ? 'primary' : 'default'}
-        onClick={() => setMachineSetupOpen(true)}
+        onClick={() => openSetup('identify')}
         {...helpProps('control:laser.machine-setup.launch')}
       >
         Machine Setup
@@ -49,6 +66,7 @@ export function DeviceSetupControls(): JSX.Element {
       )}
       {machineSetupOpen && (
         <DeviceSetupWizard
+          initialStep={initialStep}
           onClose={() => setMachineSetupOpen(false)}
           onConfigured={markConfigured}
         />
