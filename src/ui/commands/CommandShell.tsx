@@ -8,6 +8,7 @@ import {
   type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
+import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
 import type { PlatformAdapter } from '../../platform/types';
@@ -321,12 +322,10 @@ function AdjustDialog(props: {
   readonly image: NonNullable<ReturnType<typeof useSelectedRaster>>;
   readonly onClose: () => void;
 }): JSX.Element | null {
-  const layer = useStore((s) =>
-    s.project.scene.layers.find((candidate) => candidate.id === props.image.color),
-  );
+  const layer = useStore((s) => primaryOperationForObject(props.image, s.project.scene.layers));
   const setLayerParam = useStore((s) => s.setLayerParam);
   const setRasterImageAdjustments = useStore((s) => s.setRasterImageAdjustments);
-  if (layer === undefined) return null;
+  if (layer === null) return null;
   const onApply = (patch: AdjustImageApply): void => {
     props.onClose();
     setRasterImageAdjustments(props.image.id, patch.imagePatch);

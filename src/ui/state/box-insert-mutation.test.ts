@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateBox, type BoxPanel, type BoxSpec } from '../../core/box';
-import { createProject } from '../../core/scene';
+import { createProject, operationIdsForObject } from '../../core/scene';
 import { applyInsertBoxPanels } from './box-insert-mutation';
 
 const SPEC: BoxSpec = {
@@ -53,19 +53,41 @@ describe('applyInsertBoxPanels', () => {
     expect([...result.additionalSelectedIds].sort()).toEqual(ids.slice(1).sort());
   });
 
-  it('creates the cut layer once and reuses it on repeated generates', () => {
+  it('shares one operation within a generated box and keeps later boxes independent', () => {
     const firstInsert = applyInsertBoxPanels(emptySlice(), generatedPanels());
     if (firstInsert === null) throw new Error('expected insertion');
-    const layers = firstInsert.project.scene.layers.filter((l) => l.color === '#000000');
-    expect(layers).toHaveLength(1);
-    expect(layers[0]?.mode).toBe('line');
+    const [firstOperation] = firstInsert.project.scene.layers;
+    expect(firstInsert.project.scene.layers).toHaveLength(1);
+    expect(firstOperation?.name).toBe('Box panels');
+    expect(firstOperation?.mode).toBe('line');
+    expect(
+      firstInsert.project.scene.objects.map((object) =>
+        operationIdsForObject(object, firstInsert.project.scene.layers),
+      ),
+    ).toEqual(Array.from({ length: 6 }, () => [firstOperation?.id]));
+
     const secondInsert = applyInsertBoxPanels(
       { project: firstInsert.project, undoStack: firstInsert.undoStack },
       generatedPanels(),
     );
     if (secondInsert === null) throw new Error('expected insertion');
     expect(secondInsert.project.scene.objects).toHaveLength(12);
-    expect(secondInsert.project.scene.layers.filter((l) => l.color === '#000000')).toHaveLength(1);
+    expect(secondInsert.project.scene.layers.map((operation) => operation.name)).toEqual([
+      'Box panels',
+      'Box panels 2',
+    ]);
+    const firstBatchIds = secondInsert.project.scene.objects
+      .slice(0, 6)
+      .map((object) => operationIdsForObject(object, secondInsert.project.scene.layers));
+    const secondBatchIds = secondInsert.project.scene.objects
+      .slice(6)
+      .map((object) => operationIdsForObject(object, secondInsert.project.scene.layers));
+    expect(new Set(firstBatchIds.flat())).toEqual(
+      new Set([secondInsert.project.scene.layers[0]?.id]),
+    );
+    expect(new Set(secondBatchIds.flat())).toEqual(
+      new Set([secondInsert.project.scene.layers[1]?.id]),
+    );
     expect(new Set(secondInsert.project.scene.objects.map((o) => o.id)).size).toBe(12);
   });
 

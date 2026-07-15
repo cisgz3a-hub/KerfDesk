@@ -1,7 +1,9 @@
 import {
   applyTransform,
   isClosedEnough,
+  pathUsesOperation,
   type ColoredPath,
+  type Layer,
   type Polyline,
   type Project,
   type SceneObject,
@@ -31,14 +33,14 @@ export function selectedOpenFillContours(
 ): ReadonlyArray<OpenFillContourGroup> {
   const selectedIds = new Set([...(selectedId === null ? [] : [selectedId]), ...additional]);
   if (selectedIds.size === 0) return [];
-  const fillLayerColors = outputFillLayerColors(project);
-  if (fillLayerColors.size === 0) return [];
+  const fillOperations = outputFillOperations(project);
+  if (fillOperations.length === 0) return [];
 
   return project.scene.objects
     .filter(
       (object): object is VectorSceneObject => selectedIds.has(object.id) && 'paths' in object,
     )
-    .flatMap((object) => openFillContoursForObject(object, fillLayerColors));
+    .flatMap((object) => openFillContoursForObject(object, fillOperations));
 }
 
 export function selectedOpenFillContourCount(
@@ -108,20 +110,16 @@ export function isCloseableOpenFillPolyline(
   return Number.isFinite(distanceMm) && distanceMm <= toleranceMm;
 }
 
-function outputFillLayerColors(project: Project): ReadonlySet<string> {
-  return new Set(
-    project.scene.layers
-      .filter((layer) => layer.output && layer.mode === 'fill')
-      .map((layer) => layer.color),
-  );
+function outputFillOperations(project: Project): ReadonlyArray<Layer> {
+  return project.scene.layers.filter((operation) => operation.output && operation.mode === 'fill');
 }
 
 function openFillContoursForObject(
   object: VectorSceneObject,
-  fillLayerColors: ReadonlySet<string>,
+  fillOperations: ReadonlyArray<Layer>,
 ): ReadonlyArray<OpenFillContourGroup> {
   return object.paths.flatMap((path) => {
-    if (!fillLayerColors.has(path.color)) return [];
+    if (!fillOperations.some((operation) => pathUsesOperation(object, path, operation))) return [];
     const polylines = path.polylines.filter((polyline) => !isClosedEnough(polyline));
     return polylines.length === 0 ? [] : [{ object, polylines }];
   });

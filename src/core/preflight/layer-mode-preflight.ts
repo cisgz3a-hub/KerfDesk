@@ -1,4 +1,4 @@
-import { assertNever, type Layer, type SceneObject } from '../scene';
+import { assertNever, sceneObjectUsesOperation, type Layer, type SceneObject } from '../scene';
 
 export type LayerModeMismatchIssue = {
   readonly code: 'layer-mode-mismatch';
@@ -11,31 +11,33 @@ export function findLayerModeMismatchIssues(
 ): ReadonlyArray<LayerModeMismatchIssue> {
   const issues: LayerModeMismatchIssue[] = [];
   for (const obj of objects) {
-    for (const color of objectOutputColors(obj)) {
-      const layers = outputLayers.filter((layer) => layer.color === color);
-      if (layers.length === 0 || layers.some((layer) => objectCanEmitOnLayer(obj, layer))) {
-        continue;
-      }
-      const layer = layers[0];
-      if (layer !== undefined) {
-        issues.push({ code: 'layer-mode-mismatch', message: mismatchMessage(layer) });
-      }
+    if (!hasOutputGeometry(obj)) continue;
+    const assignedLayers = outputLayers.filter((layer) => sceneObjectUsesOperation(obj, layer));
+    if (
+      assignedLayers.length === 0 ||
+      assignedLayers.some((layer) => objectCanEmitOnLayer(obj, layer))
+    ) {
+      continue;
+    }
+    const [firstLayer] = assignedLayers;
+    if (firstLayer !== undefined) {
+      issues.push({ code: 'layer-mode-mismatch', message: mismatchMessage(firstLayer) });
     }
   }
   return issues;
 }
 
-function objectOutputColors(obj: SceneObject): ReadonlyArray<string> {
+function hasOutputGeometry(obj: SceneObject): boolean {
   switch (obj.kind) {
     case 'imported-svg':
     case 'text':
     case 'traced-image':
     case 'shape':
-      return Array.from(new Set(obj.paths.map((path) => path.color)));
+      return obj.paths.length > 0;
     case 'raster-image':
-      return obj.role === 'trace-source' ? [] : [obj.color];
+      return obj.role !== 'trace-source';
     case 'relief':
-      return [];
+      return false;
     default:
       return assertNever(obj, 'SceneObject');
   }

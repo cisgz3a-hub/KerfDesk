@@ -6,7 +6,12 @@
 // movable/removable like any object so the operator can drag it onto the material
 // and delete it when done. Pure — no scene mutation, no I/O.
 
-import { IDENTITY_TRANSFORM, REGISTRATION_LAYER_COLOR, type ShapeObject } from '../scene';
+import {
+  IDENTITY_TRANSFORM,
+  REGISTRATION_LAYER_COLOR,
+  REGISTRATION_LAYER_ID,
+  type ShapeObject,
+} from '../scene';
 import { createEllipse } from './create-ellipse';
 import { createRectangle } from './create-rectangle';
 
@@ -33,7 +38,7 @@ export function createRegistrationBox(args: {
     },
     transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
   });
-  return box;
+  return { ...box, operationIds: [REGISTRATION_LAYER_ID] };
 }
 
 export function createRegistrationCircle(args: {
@@ -43,7 +48,7 @@ export function createRegistrationCircle(args: {
   readonly id?: string;
 }): ShapeObject {
   const diameterMm = sanitizeSize(args.diameterMm);
-  return createEllipse({
+  const circle = createEllipse({
     id: args.id ?? REGISTRATION_BOX_OBJECT_ID,
     color: REGISTRATION_LAYER_COLOR,
     spec: {
@@ -52,6 +57,7 @@ export function createRegistrationCircle(args: {
     },
     transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
   });
+  return { ...circle, operationIds: [REGISTRATION_LAYER_ID] };
 }
 
 function sanitizeSize(value: number): number {

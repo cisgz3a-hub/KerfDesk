@@ -34,6 +34,7 @@ export type FillSegment = CutSegment & {
 export type CutGroup = {
   readonly kind: 'cut';
   readonly layerId: string;
+  readonly sourceObjectId?: string;
   readonly color: string;
   readonly power: number; // 0..100 (percent)
   readonly powerMode?: 'constant' | 'dynamic';
@@ -174,6 +175,7 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
 export type CncGroup = {
   readonly kind: 'cnc';
   readonly layerId: string;
+  readonly sourceObjectId?: string;
   readonly color: string;
   readonly cutType: CncCutType;
   // Multi-tool jobs (H.7): which bit cuts this group. Optional — absent

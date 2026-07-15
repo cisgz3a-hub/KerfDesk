@@ -8,6 +8,10 @@ export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
   readonly groups?: ReadonlyArray<SceneGroup>;
+  // Machine-output priority, intentionally separate from `objects` so changing
+  // run order never changes canvas stacking or hit-testing. Missing entries
+  // (legacy projects and newly inserted artwork) follow `objects` order.
+  readonly artworkOrder?: ReadonlyArray<string>;
 };
 
 export type SceneGroup = {
@@ -18,14 +22,26 @@ export type SceneGroup = {
 
 export type LayerMoveDirection = 'up' | 'down';
 
-export const EMPTY_SCENE: Scene = { objects: [], layers: [], groups: [] };
+export const EMPTY_SCENE: Scene = { objects: [], layers: [], groups: [], artworkOrder: [] };
 
 export function addObject(scene: Scene, object: SceneObject): Scene {
-  return { ...scene, objects: [...scene.objects, object] };
+  return {
+    ...scene,
+    objects: [...scene.objects, object],
+    ...(scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: [...scene.artworkOrder, object.id] }),
+  };
 }
 
 export function removeObject(scene: Scene, objectId: string): Scene {
-  return { ...scene, objects: scene.objects.filter((o) => o.id !== objectId) };
+  return {
+    ...scene,
+    objects: scene.objects.filter((o) => o.id !== objectId),
+    ...(scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: scene.artworkOrder.filter((id) => id !== objectId) }),
+  };
 }
 
 // In-place replace by id — preserves array order so the object's
@@ -66,10 +82,9 @@ export function updateLayer(
   };
 }
 
-/** Changes a layer's scene-wide color key while preserving its stable id.
- * Every bound artwork path and CNC tab anchor follows the new color. A color
- * already owned by another layer is rejected as a no-op instead of silently
- * merging two independently configured operations. */
+/** Changes an operation's presentation color while preserving its stable id.
+ * Schema-v3 explicit bindings do not recolor source artwork. Legacy unbound
+ * geometry follows the color so pre-v3 in-memory scenes keep working. */
 export function recolorLayer(scene: Scene, layerId: string, color: string): Scene {
   const target = scene.layers.find((layer) => layer.id === layerId);
   if (target === undefined) return scene;
@@ -82,9 +97,18 @@ export function recolorLayer(scene: Scene, layerId: string, color: string): Scen
       layer.id === layerId ? { ...layer, color: nextColor } : layer,
     ),
     objects: scene.objects.map((object) =>
-      recolorSceneObjectLayer(object, target.color, nextColor),
+      hasExplicitOperationBinding(object)
+        ? object
+        : recolorSceneObjectLayer(object, target.color, nextColor),
     ),
   };
+}
+
+function hasExplicitOperationBinding(object: SceneObject): boolean {
+  return (
+    object.operationIds !== undefined ||
+    ('paths' in object && object.paths.some((path) => path.operationIds !== undefined))
+  );
 }
 
 export function removeLayer(scene: Scene, layerId: string): Scene {

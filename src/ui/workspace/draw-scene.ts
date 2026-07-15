@@ -277,7 +277,7 @@ function drawObjects(
   onRasterBitmapReady?: () => void,
   displayPolylineCache?: DisplayPolylineCache,
 ): boolean {
-  const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
+  const layerByColor = operationLookup(project.scene.layers);
   let simplified = false;
   for (const obj of project.scene.objects) {
     const isVisible = sceneObjectHasVisibleLayerFromMap(obj, layerByColor);
@@ -295,7 +295,7 @@ function drawObjects(
     // later if needed. Hiding the layer hides its bitmaps (M23) —
     // an orphan color with no layer stays visible so artwork never
     // silently disappears.
-    if (obj.kind === 'raster-image' && layerByColor.get(obj.color)?.visible !== false) {
+    if (obj.kind === 'raster-image' && isVisible) {
       drawRasterImage(
         ctx,
         obj,
@@ -359,17 +359,17 @@ function drawObjectPolylines(
   }
   let simplified = false;
   for (const path of obj.paths) {
-    const layer = layerByColor.get(path.color);
+    const layer = operationForPath(obj, path, layerByColor);
     if (layer === undefined || !layer.visible) continue;
     const effectiveLayer =
       obj.operationOverride === undefined ? layer : { ...layer, ...obj.operationOverride };
     if (effectiveLayer.mode === 'fill') {
       const display = displayPathFor(path, obj, view, displayPolylineCache);
       simplified = includesSimplifiedDisplay(simplified, display);
-      drawFilledDesignGeometry(ctx, obj, display.polylines, effectiveLayer, view, path.color);
+      drawFilledDesignGeometry(ctx, obj, display.polylines, effectiveLayer, view, layer.color);
       continue;
     }
-    ctx.strokeStyle = path.color;
+    ctx.strokeStyle = layer.color;
     ctx.lineWidth = effectiveLayer.output ? 1.5 : 0.75;
     // Single beginPath/stroke per color. Per-polyline stroke() was the cause
     // of the post-import freeze: each stroke is a GPU sync, so a
@@ -381,6 +381,31 @@ function drawObjectPolylines(
     strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
   return simplified;
+}
+
+function operationLookup(layers: ReadonlyArray<Layer>): Map<string, Layer> {
+  const lookup = new Map<string, Layer>();
+  for (const layer of layers) {
+    lookup.set(layer.id, layer);
+    if (!lookup.has(layer.color)) lookup.set(layer.color, layer);
+  }
+  return lookup;
+}
+
+function operationForPath(
+  object: SceneObject,
+  path: ColoredPath,
+  lookup: ReadonlyMap<string, Layer>,
+): Layer | undefined {
+  const operationIds = path.operationIds ?? object.operationIds;
+  if (operationIds !== undefined) {
+    for (const id of operationIds) {
+      const operation = lookup.get(id);
+      if (operation !== undefined) return operation;
+    }
+    return undefined;
+  }
+  return lookup.get(path.color);
 }
 
 function displayPathFor(

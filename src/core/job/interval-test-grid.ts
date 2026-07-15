@@ -82,7 +82,16 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
     const y = origin.y;
     const objectId = `interval-test-cell-${step}`;
     layers.push(layer);
-    objects.push(squareObject({ id: objectId, color: layer.color, size: swatchSize, x, y }));
+    objects.push(
+      squareObject({
+        id: objectId,
+        operationId: layer.id,
+        color: layer.color,
+        size: swatchSize,
+        x,
+        y,
+      }),
+    );
     cells.push({
       step,
       objectId,
@@ -94,11 +103,13 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
     });
   }
 
+  const labelLayer = createCalibrationLabelLayer('interval-test-labels');
   objects.push(
     ...cells.map((cell) => {
       const label = formatCalibrationInterval(cell.intervalMm);
       return createCalibrationLabelObject({
         id: `interval-test-label-${cell.step}`,
+        operationId: labelLayer.id,
         text: label,
         x: cell.bounds.minX + centerOffset(swatchSize, calibrationLabelWidthMm(label, labelSize)),
         y: cell.bounds.maxY + labelGap,
@@ -106,7 +117,7 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
       });
     }),
   );
-  layers.push(createCalibrationLabelLayer('interval-test-labels'));
+  layers.push(labelLayer);
 
   return { scene: { objects, layers }, cells };
 }
@@ -119,7 +130,12 @@ function intervalLayer(args: {
 }): Layer {
   const color = intervalLayerColor(args.step);
   return {
-    ...createLayer({ id: `interval-test-step-${args.step}`, color, mode: 'fill' }),
+    ...createLayer({
+      id: `interval-test-step-${args.step}`,
+      name: `Interval ${formatCalibrationInterval(args.intervalMm)} mm`,
+      color,
+      mode: 'fill',
+    }),
     speed: args.speed,
     power: args.power,
     hatchSpacingMm: args.intervalMm,
@@ -128,6 +144,7 @@ function intervalLayer(args: {
 
 function squareObject(args: {
   readonly id: string;
+  readonly operationId: string;
   readonly color: string;
   readonly size: number;
   readonly x: number;
@@ -138,6 +155,7 @@ function squareObject(args: {
     kind: 'imported-svg',
     id: args.id,
     source: 'interval-test-grid',
+    operationIds: [args.operationId],
     bounds,
     transform: { ...IDENTITY_TRANSFORM, x: args.x, y: args.y },
     paths: [{ color: args.color, polylines: [squarePolyline(args.size)] }],

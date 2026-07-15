@@ -1,5 +1,6 @@
 import {
   DEFAULT_PROJECT_VARIABLE_DATA,
+  primaryOperationForObject,
   type Layer,
   type Project,
   type TextObject,
@@ -93,8 +94,8 @@ function evaluateCutSetting(
   text: TextObject,
   project: Project,
 ): VariableEvaluationResult {
-  const layer = project.scene.layers.find((candidate) => candidate.color === text.color);
-  if (layer === undefined) return { ok: false, message: `No cut layer matches ${text.color}.` };
+  const layer = primaryOperationForObject(text, project.scene.layers);
+  if (layer === null) return { ok: false, message: 'No operation is assigned to this text.' };
   return { ok: true, value: cutSettingValue(field, layer) };
 }
 

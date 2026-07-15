@@ -1,7 +1,7 @@
 // registration-box-actions — insert, replace, lock, or remove the registration jig
 // box on the reserved registration layer (ADR-057). Distinct from applyDrawShape for
 // two reasons: the box must land on the reserved id='registration' layer
-// (createRegistrationLayer), NOT the color-keyed layer ensureLayersForColors would
+// (createRegistrationLayer), not a geometry-color-derived operation
 // create; and only ONE jig may exist, because two boxes would make the
 // box-anchored placement span both (combinedBBox).
 

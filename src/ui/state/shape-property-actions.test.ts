@@ -13,6 +13,7 @@ describe('shape property actions', () => {
       spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 0 },
     });
     useStore.getState().drawShape(rectangle);
+    const storedRectangle = useStore.getState().project.scene.objects[0];
     useStore.setState({ undoStack: [], redoStack: [] });
 
     useStore.getState().setSelectedShapeSpec({
@@ -29,7 +30,7 @@ describe('shape property actions', () => {
     });
     expect(state.undoStack).toHaveLength(1);
     state.undo();
-    expect(useStore.getState().project.scene.objects[0]).toEqual(rectangle);
+    expect(useStore.getState().project.scene.objects[0]).toEqual(storedRectangle);
   });
 
   it('does not edit a shape while multiple objects are selected', () => {
@@ -45,6 +46,7 @@ describe('shape property actions', () => {
     });
     useStore.getState().drawShape(first);
     useStore.getState().drawShape(second);
+    const storedFirst = useStore.getState().project.scene.objects[0];
     useStore.setState({ selectedObjectId: first.id, additionalSelectedIds: new Set([second.id]) });
 
     useStore.getState().setSelectedShapeSpec({
@@ -54,6 +56,6 @@ describe('shape property actions', () => {
       cornerRadiusMm: 5,
     });
 
-    expect(useStore.getState().project.scene.objects[0]).toEqual(first);
+    expect(useStore.getState().project.scene.objects[0]).toEqual(storedFirst);
   });
 });

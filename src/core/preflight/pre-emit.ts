@@ -19,7 +19,11 @@ import {
 import { scenePreparationTooComplex } from '../job/preparation-complexity';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
-import { outputOperationLayers, registrationOutputConflict } from '../scene';
+import {
+  outputOperationLayers,
+  registrationOutputConflict,
+  sceneObjectUsesOperation,
+} from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
@@ -60,7 +64,8 @@ function matchingImageLayers(project: Project, obj: RasterImage): Layer[] {
     .flatMap((layer) => outputOperationLayers(layer))
     .filter(
       (layer) =>
-        layer.color === obj.color && (obj.operationOverride?.mode ?? layer.mode) === 'image',
+        sceneObjectUsesOperation(obj, layer) &&
+        (obj.operationOverride?.mode ?? layer.mode) === 'image',
     );
 }
 

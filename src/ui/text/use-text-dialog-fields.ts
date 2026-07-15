@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  DEFAULT_TEXT_COLOR,
   DEFAULT_FONT_KEY,
   encodeEmbeddedFont,
   FONT_REGISTRY,
@@ -18,12 +19,6 @@ import type {
 } from '../../core/scene';
 import { variableTemplateToSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
-import {
-  initialTextLayerColor,
-  textLayerOptions,
-  type TextLayerNotice,
-  type TextLayerOption,
-} from './text-layer-options';
 import {
   initialTextBend,
   initialTextLetterSpacing,
@@ -50,7 +45,6 @@ export type DialogFields = {
   readonly setFontKey: (value: string) => void;
   readonly setSizeMm: (value: number) => void;
   readonly setAlignment: (value: TextAlignment) => void;
-  readonly setColor: (value: string) => void;
   readonly setLineHeight: (value: number) => void;
   readonly setLetterSpacing: (value: number) => void;
   readonly setBendDeg: (value: number) => void;
@@ -65,16 +59,12 @@ export type DialogFields = {
   readonly setPathReverse: (reverse: boolean) => void;
   readonly variableEnabled: boolean;
   readonly setVariableEnabled: (enabled: boolean) => void;
-  readonly layerOptions: ReadonlyArray<TextLayerOption>;
-  readonly layerNotice?: TextLayerNotice;
-  readonly layerCompatible: boolean;
 };
 
 export function useTextDialogFields(
   state: TextDialogState,
   project: Project,
   selectedObjectId: string | null,
-  activeLayerColor: string | null,
 ): DialogFields {
   const basic = useBasicFields(state);
   const font = useImportedFont(state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY);
@@ -84,14 +74,11 @@ export function useTextDialogFields(
   );
   const embeddedFonts = availableEmbeddedFonts(project, font.importedFont);
   const variableTemplate = variableTemplateValue(state, variableEnabled);
-  const [color, setColor] = useState(() => initialTextLayerColor(state, project, activeLayerColor));
-  const layerOptions = textLayerOptions(project, font.fontKey, color);
-  const layerNotice = layerOptions.find((option) => option.color === color)?.notice;
+  const color = state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR;
   return {
     values: dialogValues(basic, font, path, color, embeddedFonts, variableTemplate),
     ...basic.setters,
     setFontKey: font.setFontKey,
-    setColor,
     importFont: font.importFont,
     fontAvailable:
       FONT_REGISTRY.some((entry) => entry.key === font.fontKey) ||
@@ -102,9 +89,6 @@ export function useTextDialogFields(
     ...path.setters,
     variableEnabled,
     setVariableEnabled,
-    layerOptions,
-    ...(layerNotice === undefined ? {} : { layerNotice }),
-    layerCompatible: layerNotice?.kind !== 'error',
   };
 }
 

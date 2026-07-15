@@ -10,9 +10,10 @@
 // arrays, indexed loops) → repeatable across runs.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
+import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
-import { effectiveObjectPowerPercent, objectPowerScalePercent } from './object-power-scale';
+import { objectPowerScalePercent } from './object-power-scale';
 import {
   applyTransform,
   assertNever,
@@ -22,10 +23,11 @@ import {
   type Layer,
   layerOperationSettingsEqual,
   outputOperationLayers,
+  pathUsesOperation,
+  sceneObjectUsesOperation,
   type Polyline,
   type Scene,
   type SceneObject,
-  type Transform,
   type Vec2,
   withClosingPoint,
 } from '../scene';
@@ -35,7 +37,8 @@ import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import { offsetFillContours } from './offset-fill';
-import type { CutGroup, CutSegment, FillSegment, Group, Job } from './job';
+import type { CutSegment, FillSegment, Group, Job } from './job';
+import { commonVectorGroupFields } from './vector-group-fields';
 
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
 
@@ -49,13 +52,17 @@ const layerFillCache = new WeakMap<
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
-  for (const layer of scene.layers) {
-    if (!layer.output) continue;
+  const orderedObjects = orderedArtworkObjects(scene);
+  for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
     for (const operationLayer of outputOperationLayers(layer)) {
       if (operationLayer.mode !== 'image') {
-        groups.push(...compileVectorGroupsForLayer(scene.objects, operationLayer, device));
+        groups.push(
+          ...compileVectorGroupsForLayer(scene.objects, operationLayer, device, priorityObjectId),
+        );
       }
-      groups.push(...compileRasterGroupsForLayer(scene.objects, operationLayer, device));
+      groups.push(
+        ...compileRasterGroupsForLayer(orderedObjects, operationLayer, device, scene.objects),
+      );
     }
   }
   return { groups };
@@ -65,15 +72,24 @@ function compileVectorGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  priorityObjectId: string,
 ): Group[] {
   const matchingObjects = objects.filter((obj) => vectorObjectMatchesLayer(obj, layer));
   if (matchingObjects.every((obj) => obj.operationOverride === undefined)) {
-    return vectorGroupsForObjects(objects, matchingObjects, layer, device);
+    return vectorGroupsForObjects(objects, matchingObjects, layer, device, priorityObjectId);
   }
 
   const groups: Group[] = [];
   for (const bucket of vectorObjectBucketsForLayer(objects, layer)) {
-    groups.push(...vectorGroupsForObjects(bucket.objects, bucket.objects, bucket.layer, device));
+    groups.push(
+      ...vectorGroupsForObjects(
+        bucket.objects,
+        bucket.objects,
+        bucket.layer,
+        device,
+        priorityObjectId,
+      ),
+    );
   }
   return groups;
 }
@@ -83,14 +99,25 @@ function vectorGroupsForObjects(
   matchingObjects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  priorityObjectId: string,
 ): Group[] {
+  const onlyObject = matchingObjects.length === 1 ? matchingObjects[0] : undefined;
+  if (onlyObject !== undefined) {
+    return vectorGroupsForLayer(sourceObjects, layer, device, onlyObject, priorityObjectId);
+  }
   const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
   if (sharedScale !== undefined) {
-    return vectorGroupsForLayer(sourceObjects, layer, device, { powerScale: sharedScale });
+    return vectorGroupsForLayer(
+      sourceObjects,
+      layer,
+      device,
+      { powerScale: sharedScale },
+      priorityObjectId,
+    );
   }
   const groups: Group[] = [];
   for (const obj of matchingObjects) {
-    groups.push(...vectorGroupsForLayer([obj], layer, device, obj));
+    groups.push(...vectorGroupsForLayer([obj], layer, device, obj, priorityObjectId));
   }
   return groups;
 }
@@ -126,14 +153,15 @@ function vectorGroupsForLayer(
   layer: Layer,
   device: DeviceProfile,
   powerSource: SceneObject | { readonly powerScale: number },
+  sourceObjectId?: string,
 ): Group[] {
   if (layer.mode === 'fill') {
     if (layer.fillStyle === 'island') {
-      return islandFillGroupsForLayer(objects, layer, device, powerSource);
+      return islandFillGroupsForLayer(objects, layer, device, powerSource, sourceObjectId);
     }
     const segments = collectFillSegmentsForLayer(objects, layer, device);
     if (segments.length === 0) return [];
-    const common = commonGroupFields(layer, device, powerSource);
+    const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
     return [
       {
         ...common,
@@ -146,7 +174,7 @@ function vectorGroupsForLayer(
   }
   const segments = collectLineSegmentsForLayer(objects, layer, device);
   if (segments.length === 0) return [];
-  const common = commonGroupFields(layer, device, powerSource);
+  const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   return [{ ...common, kind: 'cut' as const, segments }];
 }
 
@@ -155,8 +183,9 @@ function islandFillGroupsForLayer(
   layer: Layer,
   device: DeviceProfile,
   powerSource: SceneObject | { readonly powerScale: number },
+  sourceObjectId?: string,
 ): Group[] {
-  const common = commonGroupFields(layer, device, powerSource);
+  const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const fillRule = fillRuleForLayer(objects, layer);
   const contours = collectFillContoursForLayer(objects, layer, device);
   const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
@@ -186,22 +215,6 @@ function islandFillGroupsForLayer(
   });
 }
 
-function commonGroupFields(
-  layer: Layer,
-  device: DeviceProfile,
-  powerSource: SceneObject | { readonly powerScale: number },
-): Omit<CutGroup, 'kind' | 'segments'> {
-  return {
-    layerId: layer.id,
-    color: layer.color,
-    power: effectiveObjectPowerPercent(layer, powerSource),
-    ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
-    speed: Math.min(layer.speed, device.maxFeed),
-    passes: Math.max(1, Math.floor(layer.passes)),
-    airAssist: layer.airAssist,
-  };
-}
-
 function sharedObjectPowerScalePercent(objects: ReadonlyArray<SceneObject>): number | undefined {
   let sharedScale: number | undefined;
   for (const obj of objects) {
@@ -221,7 +234,7 @@ function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
     case 'text':
     case 'traced-image':
     case 'shape':
-      return obj.paths.some((path) => path.color === layer.color);
+      return sceneObjectUsesOperation(obj, layer);
     case 'raster-image':
     case 'relief':
       return false;
@@ -316,16 +329,16 @@ function appendSegmentsFromObject(
   // variant lands (per ADR-014).
   switch (obj.kind) {
     case 'imported-svg':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'text':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'traced-image':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'shape':
-      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      appendPathSegments(obj, layer, device, out);
       return;
     case 'raster-image':
       // F.2.c: SceneObject union now includes raster-image. The
@@ -351,16 +364,16 @@ function appendFillContoursFromObject(
 ): void {
   switch (obj.kind) {
     case 'imported-svg':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'text':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'traced-image':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'shape':
-      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      appendFillPathContours(obj, layer, device, out);
       return;
     case 'raster-image':
     case 'relief':
@@ -371,17 +384,18 @@ function appendFillContoursFromObject(
 }
 
 function appendFillPathContours(
-  paths: ReadonlyArray<ColoredPath>,
-  transform: Transform,
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
   layer: Layer,
   device: DeviceProfile,
   out: Polyline[],
 ): void {
-  for (const path of paths) {
-    if (path.color !== layer.color) continue;
+  for (const path of object.paths) {
+    if (!pathUsesOperation(object, path, layer)) continue;
     for (const polyline of compilationPolylines(path)) {
       out.push({
-        points: polyline.points.map((p) => toMachineCoords(applyTransform(p, transform), device)),
+        points: polyline.points.map((p) =>
+          toMachineCoords(applyTransform(p, object.transform), device),
+        ),
         closed: polyline.closed,
       });
     }
@@ -398,18 +412,17 @@ function appendFillPathContours(
 // layer-wide machine-space path above so hatch spacing is physical and
 // same-layer contours interact before hatching.
 function appendPathSegments(
-  paths: ReadonlyArray<ColoredPath>,
-  transform: Transform,
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
   layer: Layer,
   device: DeviceProfile,
   out: CutSegment[],
 ): void {
-  for (const path of paths) {
-    if (path.color !== layer.color) continue;
+  for (const path of object.paths) {
+    if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
     for (const polyline of compilationPolylines(path)) {
       const points: Vec2[] = polyline.points.map((p) =>
-        toMachineCoords(applyTransform(p, transform), device),
+        toMachineCoords(applyTransform(p, object.transform), device),
       );
       if (shouldApplyKerf(polyline, layer)) {
         closedForKerf.push({ points, closed: true });

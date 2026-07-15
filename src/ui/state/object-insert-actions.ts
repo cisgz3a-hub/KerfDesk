@@ -6,6 +6,8 @@
 
 import {
   findRegistrationBoxes,
+  pathUsesOperation,
+  sceneObjectUsesOperation,
   type EmbeddedFont,
   type Layer,
   type Project,
@@ -141,7 +143,10 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
   let changed = false;
   const layers = result.project.scene.layers.map((layer) => {
     if (existing.has(layer.id)) return layer;
-    const settings = defaultSettingsForColor(defaults, layer.color);
+    const settings = defaultSettingsForColor(
+      defaults,
+      sourceColorForOperation(result.project.scene.objects, layer) ?? layer.color,
+    );
     const withDefaults =
       Object.keys(settings).length === 0 ? layer : applyLayerDefaultSettings(layer, settings);
     // Seed fresh CNC layers from the project stock material (ADR-112); no-op
@@ -159,4 +164,21 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
       scene: { ...result.project.scene, layers },
     },
   };
+}
+
+function sourceColorForOperation(
+  objects: ReadonlyArray<SceneObject>,
+  operation: Layer,
+): string | null {
+  for (const object of objects) {
+    if ('paths' in object) {
+      const path = object.paths.find((candidate) =>
+        pathUsesOperation(object, candidate, operation),
+      );
+      if (path !== undefined) return path.color;
+      continue;
+    }
+    if (sceneObjectUsesOperation(object, operation)) return object.color;
+  }
+  return null;
 }

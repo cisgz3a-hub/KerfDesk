@@ -24,7 +24,6 @@ import { FontPicker } from './FontPicker';
 import { FontUsageHint } from './FontUsageHint';
 import { renderTextGeometry } from './render-text-geometry';
 import { PathTextFields } from './PathTextFields';
-import { TextLayerField } from './TextLayerField';
 import { VariableTextFields } from './VariableTextFields';
 import {
   sanitizeTextDialogNumericValues,
@@ -56,10 +55,8 @@ function DialogForm(props: {
   const upsert = useStore((s) => s.upsertTextObject);
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const activeLayerColor = useUiStore((s) => s.activeLayerColor);
-  const setActiveLayerColor = useUiStore((s) => s.setActiveLayerColor);
   const pushToast = useToastStore((s) => s.pushToast);
-  const fields = useTextDialogFields(state, project, selectedObjectId, activeLayerColor);
+  const fields = useTextDialogFields(state, project, selectedObjectId);
   const [submitting, setSubmitting] = useState(false);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -68,7 +65,6 @@ function DialogForm(props: {
       close,
       pushToast,
       setSubmitting,
-      setActiveLayerColor,
     });
   };
   // kit Dialog owns the a11y wiring (Escape closes, Tab cycles, focus
@@ -83,7 +79,6 @@ function DialogForm(props: {
           fields.values.content.trim() !== '' &&
           fields.fontAvailable &&
           fields.pathAvailable &&
-          fields.layerCompatible &&
           !submitting
         }
         submitting={submitting}
@@ -101,7 +96,6 @@ async function commitText(
     readonly close: () => void;
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly setSubmitting: (v: boolean) => void;
-    readonly setActiveLayerColor: (color: string | null) => void;
   },
 ): Promise<void> {
   const normalizedContent = normalizeTextContent(v.content);
@@ -146,7 +140,6 @@ async function commitText(
       paths: placed.rendered.paths,
     };
     ctx.upsert(obj, v.importedFont);
-    ctx.setActiveLayerColor(v.color);
     ctx.close();
   } catch (err) {
     ctx.pushToast(
@@ -189,12 +182,6 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
       </Field>
-      <TextLayerField
-        value={values.color}
-        options={props.fields.layerOptions}
-        {...(props.fields.layerNotice === undefined ? {} : { notice: props.fields.layerNotice })}
-        onChange={props.fields.setColor}
-      />
       <TextDialogNumericFields
         values={values}
         setSizeMm={setSizeMm}

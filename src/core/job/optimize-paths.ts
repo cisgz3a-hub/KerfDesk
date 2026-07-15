@@ -76,6 +76,22 @@ function prioritizeLayerGroups(
   policy: PathOptimizationSettings['layerPriority'],
 ): Group[] {
   if (policy === 'project-order') return [...groups];
+  if (!groups.some((group) => group.sourceObjectId !== undefined)) {
+    return reverseLayerGroups(groups);
+  }
+  const prioritized: Group[] = [];
+  let start = 0;
+  while (start < groups.length) {
+    const sourceObjectId = groups[start]?.sourceObjectId;
+    let end = start + 1;
+    while (end < groups.length && groups[end]?.sourceObjectId === sourceObjectId) end += 1;
+    prioritized.push(...reverseLayerGroups(groups.slice(start, end)));
+    start = end;
+  }
+  return prioritized;
+}
+
+function reverseLayerGroups(groups: ReadonlyArray<Group>): Group[] {
   const order: string[] = [];
   const byLayer = new Map<string, Group[]>();
   for (const group of groups) {
@@ -325,6 +341,7 @@ function isIslandFillGroup(group: Group): group is FillGroup {
 function isCompatibleIslandFillGroup(first: FillGroup, candidate: Group): candidate is FillGroup {
   return (
     isIslandFillGroup(candidate) &&
+    candidate.sourceObjectId === first.sourceObjectId &&
     candidate.layerId === first.layerId &&
     candidate.color === first.color &&
     candidate.power === first.power &&

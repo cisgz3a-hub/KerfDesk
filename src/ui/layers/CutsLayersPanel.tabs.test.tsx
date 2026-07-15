@@ -81,7 +81,7 @@ describe('CutsLayersPanel tabs', () => {
     try {
       expect(host.querySelector('[role="tablist"][aria-label="Cuts and materials"]')).toBeNull();
       expect(host.querySelector('section[aria-label="Material Library"]')).toBeNull();
-      expect(host.querySelector('button[aria-label="Add layer"]')).not.toBeNull();
+      expect(host.textContent).toContain('Import or draw artwork to create its first operation.');
     } finally {
       await act(async () => root.unmount());
     }

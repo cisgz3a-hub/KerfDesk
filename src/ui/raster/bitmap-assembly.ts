@@ -37,6 +37,7 @@ const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
 export type ConvertibleVector = ImportedSvg | TextObject | TracedImage | ShapeObject;
 export type ConvertToBitmapRenderType = 'fill-all' | 'outlines' | 'use-cut-settings';
 export type BitmapLayerSetting = {
+  readonly id?: string;
   readonly color: string;
   readonly mode: LayerMode;
 };
@@ -163,15 +164,53 @@ function conversionPolylineGroups(
   if (renderType === 'outlines') {
     return { fillPolylines: [], outlinePolylines: paths.flatMap((p) => p.polylines) };
   }
-  const layerModes = new Map(options.layers?.map((l) => [l.color.toLowerCase(), l.mode]) ?? []);
+  const layerModesById = new Map(
+    options.layers?.flatMap((operation) =>
+      operation.id === undefined ? [] : [[operation.id, operation.mode] as const],
+    ) ?? [],
+  );
+  const legacyLayerModesByColor = new Map(
+    options.layers?.map((operation) => [operation.color.toLowerCase(), operation.mode]) ?? [],
+  );
   const fillPolylines: Polyline[] = [];
   const outlinePolylines: Polyline[] = [];
   for (const path of paths) {
-    const mode = layerModes.get(path.color.toLowerCase()) ?? 'line';
-    if (mode === 'fill') fillPolylines.push(...path.polylines);
-    else outlinePolylines.push(...path.polylines);
+    appendCutSettingPolylines(
+      path,
+      layerModesById,
+      legacyLayerModesByColor,
+      fillPolylines,
+      outlinePolylines,
+    );
   }
   return { fillPolylines, outlinePolylines };
+}
+
+function appendCutSettingPolylines(
+  path: ColoredPath,
+  layerModesById: ReadonlyMap<string, LayerMode>,
+  legacyLayerModesByColor: ReadonlyMap<string, LayerMode>,
+  fillPolylines: Polyline[],
+  outlinePolylines: Polyline[],
+): void {
+  const modes = cutSettingModes(path, layerModesById, legacyLayerModesByColor);
+  if (modes.includes('fill')) fillPolylines.push(...path.polylines);
+  if (modes.some((mode) => mode !== 'fill')) outlinePolylines.push(...path.polylines);
+}
+
+function cutSettingModes(
+  path: ColoredPath,
+  layerModesById: ReadonlyMap<string, LayerMode>,
+  legacyLayerModesByColor: ReadonlyMap<string, LayerMode>,
+): ReadonlyArray<LayerMode> {
+  if (path.operationIds === undefined) {
+    return [legacyLayerModesByColor.get(path.color.toLowerCase()) ?? 'line'];
+  }
+  const modes = path.operationIds.flatMap((id) => {
+    const mode = layerModesById.get(id);
+    return mode === undefined ? [] : [mode];
+  });
+  return modes.length === 0 ? ['line'] : modes;
 }
 
 function bakeConvertibleTransform(o: ConvertibleVector): {
@@ -180,13 +219,17 @@ function bakeConvertibleTransform(o: ConvertibleVector): {
 } {
   return {
     bounds: transformedBBox(o),
-    paths: o.paths.map((path) => ({
-      color: path.color,
-      polylines: path.polylines.map((polyline) => ({
-        closed: polyline.closed,
-        points: polyline.points.map((point) => applyTransform(point, o.transform)),
-      })),
-    })),
+    paths: o.paths.map((path) => {
+      const operationIds = path.operationIds ?? o.operationIds;
+      return {
+        color: path.color,
+        ...(operationIds === undefined ? {} : { operationIds }),
+        polylines: path.polylines.map((polyline) => ({
+          closed: polyline.closed,
+          points: polyline.points.map((point) => applyTransform(point, o.transform)),
+        })),
+      };
+    }),
   };
 }
 

@@ -6,6 +6,7 @@
 import {
   DEFAULT_CNC_TOOLS,
   activeCncTool,
+  sceneObjectUsesOperation,
   type CncLayerSettings,
   type CncTool,
   type Layer,
@@ -23,9 +24,11 @@ export function useCncTools(): ReadonlyArray<CncTool> {
 // Relief roughing (H.5) reads depth-per-pass + stepover from the layer but
 // takes total depth from the relief object — CncLayerFields keys its
 // honest-card hints on this (handoff §7.C contract fix).
-export function useLayerHasReliefObjects(color: string): boolean {
+export function useLayerHasReliefObjects(layer: Layer): boolean {
   return useStore((s) =>
-    s.project.scene.objects.some((o) => o.kind === 'relief' && o.color === color),
+    s.project.scene.objects.some(
+      (object) => object.kind === 'relief' && sceneObjectUsesOperation(object, layer),
+    ),
   );
 }
 

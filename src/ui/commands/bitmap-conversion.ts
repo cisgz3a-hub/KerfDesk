@@ -13,7 +13,7 @@ export async function convertSelectedVectorsToBitmap(
   try {
     const raster = await buildBitmapFromVectors(convertibles, {
       ...options,
-      layers: layers.map((layer) => ({ color: layer.color, mode: layer.mode })),
+      layers: layers.map((layer) => ({ id: layer.id, color: layer.color, mode: layer.mode })),
     });
     convertToBitmap(
       convertibles.map((convertible) => convertible.id),

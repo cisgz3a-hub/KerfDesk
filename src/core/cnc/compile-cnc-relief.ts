@@ -25,6 +25,7 @@ import {
   type CncTool,
   type Layer,
   type ReliefObject,
+  sceneObjectUsesOperation,
   type SceneObject,
 } from '../scene';
 import { kernelForTool } from '../sim';
@@ -48,7 +49,7 @@ export function compileReliefGroupsForLayer(
   config: CncMachineConfig,
 ): ReadonlyArray<CncGroup> {
   const reliefs = objects.filter(
-    (o): o is ReliefObject => o.kind === 'relief' && o.color === layer.color,
+    (o): o is ReliefObject => o.kind === 'relief' && sceneObjectUsesOperation(o, layer),
   );
   if (reliefs.length === 0) return [];
   const tool = layerCncTool(config, settings);

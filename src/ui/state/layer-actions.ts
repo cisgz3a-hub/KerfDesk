@@ -1,10 +1,12 @@
 import {
   addLayer,
-  assignObjectToLayer,
-  assertNever,
+  bindSceneObjectToOperations,
   createLayer,
   layerOperationSettingsEqual,
+  operationIdsForObject,
+  removeSceneObjectOperationBinding,
   sceneObjectHasVisibleLayer,
+  sceneObjectUsesOperation,
   type Layer,
   type LayerSubLayer,
   type Project,
@@ -21,7 +23,7 @@ import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
-export type LayerSettingsClipboard = Omit<Layer, 'id' | 'color'>;
+export type LayerSettingsClipboard = Omit<Layer, 'id' | 'name' | 'color'>;
 export type { LayerSubLayerPatch } from './layer-sub-layer-actions';
 
 type LayerActionState = StateSlice & {
@@ -78,23 +80,7 @@ export type LayerActions = {
 
 export function layerActions(set: LayerActionSet): LayerActions {
   return {
-    createManualLayer: (color) =>
-      set((state) => {
-        const normalized = normalizeLayerColor(color);
-        if (normalized === null) return {};
-        if (state.project.scene.layers.some((layer) => layer.color === normalized)) return {};
-        const defaults = defaultSettingsForColor(state.layerDefaults, normalized);
-        const base = applyLayerDefaultSettings(
-          createLayer({ id: normalized, color: normalized }),
-          defaults,
-        );
-        // Seed the new layer's feeds from the project stock material (ADR-112);
-        // no-op for laser or when no material is chosen.
-        const machine = state.project.machine;
-        const layer = machine?.kind === 'cnc' ? seedLayerFromStockMaterial(base, machine) : base;
-        const scene = addLayer(state.project.scene, layer);
-        return mutation(state, { ...state.project, scene });
-      }),
+    createManualLayer: createManualLayerAction(set),
     commitLayerDraft: layerDraftCommitter(set),
     setLayerColor: layerColorSetter(set),
     switchIslandFillLayersToScanline: () =>
@@ -115,26 +101,29 @@ export function layerActions(set: LayerActionSet): LayerActions {
       set((state) => {
         const target = state.project.scene.layers.find((layer) => layer.id === layerId);
         if (target === undefined) return {};
-        const usedBefore = usedLayerColors(state.project.scene);
-        let scene = state.project.scene;
-        for (const id of selectedObjectIds(state)) {
-          scene = assignObjectToLayer(scene, id, target.color);
-        }
+        const usedBefore = usedOperationIds(state.project.scene);
+        const selectedIds = new Set(selectedObjectIds(state));
+        let scene: Scene = {
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) =>
+            selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [target.id]) : object,
+          ),
+        };
         scene = pruneAssignmentOrphans(scene, usedBefore);
         if (scene === state.project.scene) return {};
         return mutation(state, { ...state.project, scene });
       }),
     selectObjectsOnLayer: (layerId) =>
       set((state) => {
-        const color = layerColorForSelection(state.project.scene, layerId);
-        if (color === null) return clearSelection();
-        return selectObjectIds(selectableObjectIdsOnLayer(state.project.scene, color));
+        const operation = state.project.scene.layers.find((layer) => layer.id === layerId);
+        if (operation === undefined) return clearSelection();
+        return selectObjectIds(selectableObjectIdsOnLayer(state.project.scene, operation));
       }),
     deleteLayerAndObjects: (layerId) =>
       set((state) => {
         const target = state.project.scene.layers.find((layer) => layer.id === layerId);
         if (target === undefined) return {};
-        const result = deleteLayerContent(state.project.scene, target.id, target.color);
+        const result = deleteLayerContent(state.project.scene, target.id);
         if (result === null) return {};
         return {
           ...mutation(state, { ...state.project, scene: result.scene }),
@@ -157,6 +146,24 @@ export function layerActions(set: LayerActionSet): LayerActions {
       }),
     ...layerSubLayerActions(set),
   };
+}
+
+function createManualLayerAction(set: LayerActionSet): LayerActions['createManualLayer'] {
+  return (color) =>
+    set((state) => {
+      const normalized = normalizeLayerColor(color);
+      if (normalized === null) return {};
+      if (state.project.scene.layers.some((layer) => layer.color === normalized)) return {};
+      const defaults = defaultSettingsForColor(state.layerDefaults, normalized);
+      const base = applyLayerDefaultSettings(
+        createLayer({ id: normalized, color: normalized }),
+        defaults,
+      );
+      const machine = state.project.machine;
+      const layer = machine?.kind === 'cnc' ? seedLayerFromStockMaterial(base, machine) : base;
+      const scene = addLayer(state.project.scene, layer);
+      return mutation(state, { ...state.project, scene });
+    });
 }
 
 function layerDraftCommitter(set: LayerActionSet): LayerActions['commitLayerDraft'] {
@@ -187,17 +194,11 @@ function normalizeLayerColor(color: string): string | null {
 }
 
 function pruneAssignmentOrphans(scene: Scene, usedBefore: ReadonlySet<string>): Scene {
-  const usedAfter = usedLayerColors(scene);
+  const usedAfter = usedOperationIds(scene);
   const layers = scene.layers.filter(
-    (layer) => usedAfter.has(layer.color) || !usedBefore.has(layer.color),
+    (layer) => usedAfter.has(layer.id) || !usedBefore.has(layer.id),
   );
   return layers.length === scene.layers.length ? scene : { ...scene, layers };
-}
-
-function layerColorForSelection(scene: Scene, layerId: string): string | null {
-  const layer = scene.layers.find((candidate) => candidate.id === layerId);
-  if (layer !== undefined) return layer.color;
-  return normalizeLayerColor(layerId);
 }
 
 function selectObjectIds(ids: ReadonlyArray<string>): LayerSelectionMutation {
@@ -212,40 +213,29 @@ function clearSelection(): LayerSelectionMutation {
   return { selectedObjectId: null, additionalSelectedIds: new Set() };
 }
 
-function selectableObjectIdsOnLayer(scene: Scene, color: string): ReadonlyArray<string> {
+function selectableObjectIdsOnLayer(scene: Scene, operation: Layer): ReadonlyArray<string> {
   return scene.objects
-    .filter((object) => objectUsesLayerColor(object, color))
+    .filter((object) => sceneObjectUsesOperation(object, operation))
     .filter((object) => object.locked !== true)
     .filter((object) => sceneObjectHasVisibleLayer(scene, object))
     .map((object) => object.id);
 }
 
-function objectUsesLayerColor(object: Scene['objects'][number], color: string): boolean {
-  switch (object.kind) {
-    case 'imported-svg':
-    case 'text':
-    case 'traced-image':
-    case 'shape':
-      return object.paths.some((path) => path.color === color);
-    case 'raster-image':
-    case 'relief':
-      return object.color === color;
-    default:
-      return assertNever(object, 'SceneObject');
-  }
-}
-
 function deleteLayerContent(
   scene: Scene,
   layerId: string,
-  color: string,
 ): { readonly scene: Scene; readonly removedObjectIds: ReadonlySet<string> } | null {
-  const usedBefore = usedLayerColors(scene);
   const removedObjectIds = new Set<string>();
   const objects: Scene['objects'][number][] = [];
   let changed = false;
   for (const object of scene.objects) {
-    const next = removeLayerColorFromObject(object, color);
+    const operation = scene.layers.find((layer) => layer.id === layerId);
+    if (operation === undefined) return null;
+    if (!sceneObjectUsesOperation(object, operation)) {
+      objects.push(object);
+      continue;
+    }
+    const next = removeSceneObjectOperationBinding(object, layerId, scene.layers);
     if (next === null) {
       removedObjectIds.add(object.id);
       changed = true;
@@ -258,33 +248,9 @@ function deleteLayerContent(
   if (layers.length !== scene.layers.length) changed = true;
   if (!changed) return null;
   return {
-    scene: pruneAssignmentOrphans({ ...scene, objects, layers }, usedBefore),
+    scene: { ...scene, objects, layers },
     removedObjectIds,
   };
-}
-
-function removeLayerColorFromObject(
-  object: Scene['objects'][number],
-  color: string,
-): Scene['objects'][number] | null {
-  switch (object.kind) {
-    case 'imported-svg':
-    case 'traced-image': {
-      const paths = object.paths.filter((path) => path.color !== color);
-      if (paths.length === object.paths.length) return object;
-      return paths.length === 0 ? null : { ...object, paths };
-    }
-    case 'text':
-    case 'shape':
-      return object.color === color || object.paths.some((path) => path.color === color)
-        ? null
-        : object;
-    case 'raster-image':
-    case 'relief':
-      return object.color === color ? null : object;
-    default:
-      return assertNever(object, 'SceneObject');
-  }
 }
 
 function removeDeletedIdsFromSelection(
@@ -362,14 +328,21 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
     subLayers: layer.subLayers,
+    ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
+    ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),
   };
 }
 
 function layerSettingsEqual(layer: Layer, settings: LayerSettingsClipboard): boolean {
-  return LAYER_SETTING_KEYS.every((key) =>
-    key === 'subLayers'
-      ? subLayersEqual(layer.subLayers, settings.subLayers)
-      : layer[key] === settings[key],
+  return (
+    LAYER_SETTING_KEYS.every((key) =>
+      key === 'subLayers'
+        ? subLayersEqual(layer.subLayers, settings.subLayers)
+        : layer[key] === settings[key],
+    ) &&
+    (settings.materialBinding === undefined ||
+      JSON.stringify(layer.materialBinding) === JSON.stringify(settings.materialBinding)) &&
+    (settings.cnc === undefined || JSON.stringify(layer.cnc) === JSON.stringify(settings.cnc))
   );
 }
 
@@ -392,25 +365,8 @@ function subLayersEqual(
   );
 }
 
-function usedLayerColors(scene: Scene): ReadonlySet<string> {
-  const colors = new Set<string>();
-  for (const object of scene.objects) {
-    switch (object.kind) {
-      case 'imported-svg':
-      case 'text':
-      case 'traced-image':
-      case 'shape':
-        for (const path of object.paths) colors.add(path.color);
-        break;
-      case 'raster-image':
-      case 'relief':
-        colors.add(object.color);
-        break;
-      default:
-        assertNever(object, 'SceneObject');
-    }
-  }
-  return colors;
+function usedOperationIds(scene: Scene): ReadonlySet<string> {
+  return new Set(scene.objects.flatMap((object) => operationIdsForObject(object, scene.layers)));
 }
 
 function mutation(state: StateSlice, project: Project): LayerActionMutation {

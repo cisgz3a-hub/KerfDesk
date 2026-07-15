@@ -7,17 +7,15 @@
 
 import {
   addObject,
+  addLayer,
+  bindSceneObjectToOperations,
+  createArtworkOperation,
   IDENTITY_TRANSFORM,
   type Bounds,
   type ImportedSvg,
   type Polyline,
 } from '../../core/scene';
-import {
-  ensureLayersForColors,
-  pushUndo,
-  type MutationResult,
-  type StateSlice,
-} from './scene-mutations';
+import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
 
 // The default drawn-vector cut color (draw-tool parity): panels join the
 // black line layer, auto-created when the scene has none. Kept local — the
@@ -40,10 +38,15 @@ export function applyInsertBoxPanels(
   s: StateSlice,
   panels: ReadonlyArray<InsertablePart>,
 ): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
-  const objects = panels.map(panelObject);
-  let scene = s.project.scene;
+  const sourceObjects = panels.map(panelObject);
+  const firstSource = sourceObjects[0];
+  if (firstSource === undefined) return null;
+  const created = createArtworkOperation(s.project.scene, firstSource, { name: 'Box panels' });
+  const objects = sourceObjects.map((object) =>
+    bindSceneObjectToOperations(object, [created.operation.id]),
+  );
+  let scene = addLayer(s.project.scene, created.operation);
   for (const object of objects) scene = addObject(scene, object);
-  scene = ensureLayersForColors(scene, [{ color: BOX_PANEL_COLOR }]);
   const [head, ...rest] = objects;
   if (head === undefined) return null;
   return {

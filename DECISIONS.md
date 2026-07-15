@@ -81,6 +81,7 @@
 | ADR-208 | 2026-07-15 | Accepted | Remove obstructive 4040 and advisory machine policies |
 | ADR-209 | 2026-07-15 | Accepted | Remove universal CNC expiry, depth, override, and spin-up policies |
 | ADR-210 | 2026-07-15 | Accepted | Enforce explicit machine output capability at every project entry point |
+| ADR-211 | 2026-07-15 | Accepted | Artwork binds explicitly to named process operations |
 
 ---
 
@@ -8628,3 +8629,80 @@ store calls, **New Project**, file open, autosave recovery, or Machine Setup per
 machines retain ordinary two-way switching. Older projects remain usable until the operator records
 an explicit physical-output choice, while contradictory current files recover visibly without
 discarding reusable CNC configuration.
+
+---
+
+## ADR-211 - Artwork binds explicitly to named process operations
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+The original color-driven layer model made one field do three jobs: artwork appearance, operation
+identity, and process settings. Two independent black artworks therefore shared settings
+accidentally. Laser-only per-object overrides partly hid that coupling, while CNC still edited the
+shared color layer and additional operations lived in a nested Sub-layers box. Selection could not
+answer the operator's basic question: “Which settings will this artwork use?”
+
+The product needs artwork-first editing for both laser and CNC: selecting Johann must show Johann's
+operation, selecting the surrounding box must show the box operation, and selecting both must offer
+an explicit way to use one shared operation. Shared operations must remain useful and visible, not
+be inferred from matching source colors.
+
+### Decision
+
+1. `Scene.layers` remains the persisted ordered collection during the staged migration, but every
+   row is a named **process operation** with a stable ID and presentation color. Geometry color no
+   longer identifies an operation.
+2. Project schema v3 adds explicit `operationIds` bindings to whole `SceneObject`s and, when an
+   imported vector contains independently assigned paths, to `ColoredPath`s. Multiple IDs bind the
+   same artwork to additional operations without duplicating or recoloring its geometry.
+3. The v2-to-v3 migration preserves output: legacy color membership becomes explicit operation IDs;
+   legacy per-object overrides become named cloned operations; and legacy sub-layers become adjacent
+   first-class operations bound to the same artwork. Source artwork colors stay unchanged.
+4. Fresh artwork receives its own named operation. New operation presentation colors come from a
+   deterministic high-contrast palette so the operation list, canvas selection, and preview remain
+   easy to correlate.
+5. Selection is the settings context. A single selection shows its operation. If that operation is
+   shared, the UI says how many artworks it affects and offers **Make unique**. A mixed multi-selection
+   offers **Use one operation**. Grouping remains a separate geometry command.
+6. Laser and CNC use the same binding and selection shell. Machine-kind compatibility is advisory
+   only in this change; it does not add a new blocking guard under ADR-206.
+7. The always-visible Sub-layers editor is retired. **Add operation** creates another ordinary,
+   named, reorderable operation bound to the selected artwork.
+8. `Scene.artworkOrder` persists machine priority independently of `Scene.objects`, so choosing
+   what runs first never changes canvas stacking or hit-testing. Missing IDs fall back
+   deterministically to object order for legacy projects and newly inserted artwork.
+9. Artwork priority is the top-level Laser sequence; operation order decides processes inside each
+   artwork. Artwork intentionally sharing one operation remains one compound machining unit so fill
+   holes/overlaps and CNC pocket/inlay geometry stay correct. CNC honors artwork priority only inside
+   its existing safety schedule: clearing precedes profiles and tool sections stay contiguous.
+
+### Divergence from LightBurn
+
+LightBurn uses color as the primary cut-layer key. KerfDesk deliberately uses explicit operation IDs
+because an artwork-first laser-and-CNC workflow must allow same-colored artwork to have independent
+settings without rewriting its design colors. Presentation colors preserve the familiar visual
+language, while the binding is explicit and inspectable.
+
+### Consequences
+
+Operation sharing becomes intentional. Recoloring artwork cannot silently change machining
+settings, and CNC gains the same per-artwork behavior as laser. Schema v3 projects are not written
+by older builds, so serialization, migration, compiler selection, canvas visibility, undo, and
+round-trip tests all cover the new binding. Operators can move one selection or a stable
+multi-selection first/earlier/later/last without changing visual stacking. Internal `Layer` type
+names may remain temporarily to keep the migration small; user-facing copy says Artwork and
+Operation.
+
+### Verification
+
+- Select two same-colored artworks and prove their independent operations compile differently in
+  both laser and CNC mode.
+- Share one operation across a multi-selection, edit it once, and prove both outputs update.
+- Make one member unique and prove subsequent edits do not affect the other member.
+- Reorder independent artwork, prove Laser and same-phase CNC group order changes, and prove canvas
+  stacking does not. Share one operation and prove it stays one compound machining unit.
+- Reverse operation priority and run path optimization; prove neither can cross artwork priority.
+- Open a schema-v2 fixture containing color layers, an object override, and a sub-layer; prove the
+  migrated schema-v3 output is equivalent and survives save/open.

@@ -23,6 +23,9 @@ function enumPassthrough(
 export function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
+  if (typeof out['name'] !== 'string' || out['name'].trim().length === 0) {
+    out['name'] = 'Operation';
+  }
   normalizeCommonLayerFields(out);
   normalizeFillLayerFields(out);
   normalizeImageLayerFields(out);

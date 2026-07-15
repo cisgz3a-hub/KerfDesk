@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.3 — MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.4 — named artwork operations (ADR-211); MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -8,7 +8,7 @@
 
 ## Product goal
 
-LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered as **both a web app and a Windows desktop app from a single codebase**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns cut, fill, or image operations per layer; previews the toolpath; generates correct G-code; and streams it to the connected machine.
+LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered as **both a web app and a Windows desktop app from a single codebase**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns named cut, fill, image, or CNC operations to artwork; previews the toolpath; generates correct G-code; and streams it to the connected machine.
 
 Naming contract: **KerfDesk** is the user-facing product and release URL. **LaserForge 2.0** remains the repo/package/internal architecture name. The Cloudflare Pages API project is still named `laserforge` for historical reasons.
 
@@ -50,7 +50,7 @@ See `WORKFLOW.md` for granular flows including success, error, empty, and edge s
 1. Open app → workspace at machine bed dimensions.
 2. Add content (Phase A: import SVG. Phase D: type text. Phase E: vectorize image).
 3. Position objects (move, scale, rotate, mirror, align).
-4. Configure Cuts/Layers (per-color: power, speed, passes, visible, output).
+4. Configure named Artwork Operations (per artwork or intentionally shared: process, speed, power/depth, passes, visibility, output).
 5. Preview toolpath.
 6. Generate G-code; save to disk or stream to laser.
 
@@ -360,6 +360,8 @@ Project
       traced-image
       raster-image
       shape
+      name, operationIds[]
+    artworkOrder: string[] (machine priority; independent of canvas stacking)
     layers: Layer[]
       id, color, name
       mode: 'line' | 'fill' | 'image'
@@ -372,8 +374,11 @@ Project
 
 `SceneObject` is an extensible discriminated union (ADR-014) and now covers
 imported SVG paths, editable text, traced vector output, raster-image engrave
-sources, and generated shapes. Layers now represent line, fill, and image
-operations, including sub-layer/pass-through settings where applicable.
+sources, and generated shapes. Explicit operation IDs bind whole artwork, or
+individual imported paths where needed, to named process operations (ADR-211).
+Geometry color remains artwork appearance and a schema-v2 migration fallback;
+it is not the operation identity. Internal `Layer` names remain during the staged
+migration, but these records represent ordered laser or CNC operations.
 
 `Job`, `Plan`, `Output`, and emitted G-code are pure derivations from `Project`.
 Compiled jobs currently contain cut/fill-style vector groups and raster groups.

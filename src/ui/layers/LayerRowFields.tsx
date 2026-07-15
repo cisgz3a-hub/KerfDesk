@@ -27,6 +27,7 @@ const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-fai
 export type LayerOperationControlTarget = {
   readonly settings: LayerOperationSettings;
   readonly selectedObjectCount: number;
+  readonly ariaContext?: string;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 };
 
@@ -51,7 +52,12 @@ export function LayerRowSettingsFields(props: {
       </FieldRow>
       {settings.mode === 'fill' && <FillFields layer={layer} operationTarget={operationTarget} />}
       {settings.mode === 'image' && (
-        <LayerImageFields layer={layer} settings={settings} commit={operationTarget.commit} />
+        <LayerImageFields
+          layer={layer}
+          settings={settings}
+          commit={operationTarget.commit}
+          labelContext={operationTarget.ariaContext ?? layer.name}
+        />
       )}
     </>
   );
@@ -105,7 +111,7 @@ function BidirectionalInput(props: {
       type="checkbox"
       checked={operationTarget.settings.fillBidirectional}
       onChange={(e) => operationTarget.commit({ fillBidirectional: e.target.checked })}
-      aria-label={`Bidirectional fill for ${layer.color}`}
+      aria-label={`Bidirectional fill for ${targetAriaContext(layer, operationTarget)}`}
       title="Scan alternating fill lines in both directions to reduce travel time."
     />
   );
@@ -131,7 +137,7 @@ function HatchAngleInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Hatch angle for ${layer.color}`}
+      aria-label={`Hatch angle for ${targetAriaContext(layer, operationTarget)}`}
       title="Fill scan angle in degrees for this layer."
     />
   );
@@ -157,7 +163,7 @@ function HatchSpacingInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Hatch spacing for ${layer.color}`}
+      aria-label={`Hatch spacing for ${targetAriaContext(layer, operationTarget)}`}
       title="Distance between fill hatch lines. Smaller spacing engraves denser fills."
     />
   );
@@ -183,7 +189,7 @@ function FillOverscanInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Fill overscan for ${layer.color}`}
+      aria-label={`Fill overscan for ${targetAriaContext(layer, operationTarget)}`}
       title="Extra travel beyond fill edges so the laser reaches speed before firing."
     />
   );
@@ -212,7 +218,7 @@ function PowerInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Power for ${layer.color}`}
+      aria-label={`Power for ${targetAriaContext(layer, operationTarget)}`}
       title="Laser power percentage for this layer."
     />
   );
@@ -238,7 +244,7 @@ function SpeedInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={wideInputStyle}
-      aria-label={`Speed for ${layer.color}`}
+      aria-label={`Speed for ${targetAriaContext(layer, operationTarget)}`}
       title="Feed rate in millimeters per minute for this layer."
     />
   );
@@ -263,10 +269,14 @@ function PassesInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Passes for ${layer.color}`}
+      aria-label={`Passes for ${targetAriaContext(layer, operationTarget)}`}
       title="Number of times this layer is repeated in the job."
     />
   );
+}
+
+function targetAriaContext(layer: Layer, target: LayerOperationControlTarget): string {
+  return target.ariaContext ?? layer.name;
 }
 
 function numericValue(s: string, fallback: number): number {

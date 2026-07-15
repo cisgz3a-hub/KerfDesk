@@ -4,20 +4,15 @@
 // shapes land on a line (cut) layer for their colour — LightBurn's default for
 // drawn vectors — auto-created on demand if the colour has no layer yet.
 
-import { addObject, type ShapeObject } from '../../core/scene';
-import {
-  ensureLayersForColors,
-  type MutationResult,
-  pushUndo,
-  type StateSlice,
-} from './scene-mutations';
+import { addLayer, addObject, createArtworkOperation, type ShapeObject } from '../../core/scene';
+import { type MutationResult, pushUndo, type StateSlice } from './scene-mutations';
 
 export function applyDrawShape(
   s: StateSlice,
   shape: ShapeObject,
 ): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
-  let scene = addObject(s.project.scene, shape);
-  scene = ensureLayersForColors(scene, shape.paths);
+  const created = createArtworkOperation(s.project.scene, shape);
+  const scene = addLayer(addObject(s.project.scene, created.object), created.operation);
   return {
     project: { ...s.project, scene },
     selectedObjectId: shape.id,

@@ -1,8 +1,11 @@
 import {
   addLayer,
   addObject,
-  createLayer,
+  createArtworkOperation,
   machineKindOf,
+  operationIdsForObject,
+  remapSceneObjectOperationBindings,
+  sceneObjectUsesOperation,
   type Layer,
   type Scene,
   type SceneObject,
@@ -62,8 +65,9 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         // door (ADR-101 §8 follow-up).
         const pasteable = pasteableClipboardObjects(clipboard.objects, state);
         if (pasteable.length === 0) return state;
-        const pasted = cloneClipboardObjects(pasteable);
-        let scene = ensureClipboardLayers(state.project.scene, clipboard.layers, pasted);
+        const prepared = prepareClipboardPaste(state.project.scene, clipboard.layers, pasteable);
+        const pasted = prepared.objects;
+        let scene = prepared.scene;
         for (const object of pasted) scene = addObject(scene, object);
         const [primary, ...rest] = pasted.map((object) => object.id);
         return {
@@ -116,13 +120,17 @@ function copiedLayersForObjects(
   scene: Scene,
   objects: ReadonlyArray<SceneObject>,
 ): ReadonlyArray<Layer> {
-  const colors = new Set(
-    objects.flatMap((object) => layerSpecsForObject(object).map((s) => s.color)),
+  const operationIds = new Set(
+    objects.flatMap((object) => operationIdsForObject(object, scene.layers)),
   );
-  return scene.layers.filter((layer) => colors.has(layer.color)).map(cloneLayer);
+  return scene.layers.filter((layer) => operationIds.has(layer.id)).map(cloneLayer);
 }
 
-function cloneClipboardObjects(objects: ReadonlyArray<SceneObject>): ReadonlyArray<SceneObject> {
+function cloneClipboardObjects(
+  objects: ReadonlyArray<SceneObject>,
+  sourceOperations: ReadonlyArray<Layer>,
+  operationIdMap: ReadonlyMap<string, string>,
+): ReadonlyArray<SceneObject> {
   const idMap = new Map(objects.map((object) => [object.id, crypto.randomUUID()] as const));
   return objects.map((object) => {
     const clone = {
@@ -134,7 +142,11 @@ function cloneClipboardObjects(objects: ReadonlyArray<SceneObject>): ReadonlyArr
         y: object.transform.y + PASTE_OFFSET_MM,
       },
     } as SceneObject;
-    return remapClipboardReferences(clone, idMap);
+    return remapSceneObjectOperationBindings(
+      remapClipboardReferences(clone, idMap),
+      sourceOperations,
+      operationIdMap,
+    );
   });
 }
 
@@ -147,44 +159,34 @@ function remapClipboardReferences(
   return mapped === undefined ? object : { ...object, imageMaskId: mapped };
 }
 
-function ensureClipboardLayers(
+function prepareClipboardPaste(
   scene: Scene,
   copiedLayers: ReadonlyArray<Layer>,
   objects: ReadonlyArray<SceneObject>,
-): Scene {
+): { readonly scene: Scene; readonly objects: ReadonlyArray<SceneObject> } {
   let out = scene;
-  for (const layer of copiedLayers) {
-    if (!out.layers.some((candidate) => candidate.color === layer.color)) {
-      out = addLayer(out, cloneLayer(layer));
-    }
+  const operationIdMap = new Map<string, string>();
+  for (const source of copiedLayers) {
+    const representative = objects.find((object) => sceneObjectUsesOperation(object, source));
+    if (representative === undefined) continue;
+    const seed = createArtworkOperation(out, representative, {
+      mode: source.mode,
+      name: source.name,
+    }).operation;
+    const operation: Layer = {
+      ...cloneLayer(source),
+      id: seed.id,
+      name: seed.name,
+      color: seed.color,
+      subLayers: [],
+    };
+    operationIdMap.set(source.id, operation.id);
+    out = addLayer(out, operation);
   }
-  for (const object of objects) {
-    for (const spec of layerSpecsForObject(object)) out = ensureLayer(out, spec);
-  }
-  return out;
-}
-
-function ensureLayer(
-  scene: Scene,
-  spec: { readonly color: string; readonly mode: Layer['mode'] },
-): Scene {
-  if (scene.layers.some((layer) => layer.color === spec.color)) return scene;
-  return addLayer(scene, createLayer({ id: spec.color, color: spec.color, mode: spec.mode }));
-}
-
-function layerSpecsForObject(
-  object: SceneObject,
-): ReadonlyArray<{ readonly color: string; readonly mode: Layer['mode'] }> {
-  if (object.kind === 'raster-image') return [{ color: object.color, mode: 'image' }];
-  // Relief layers are CNC-keyed; the laser mode field is inert for them.
-  if (object.kind === 'relief') return [{ color: object.color, mode: 'line' }];
-  const mode =
-    object.kind === 'traced-image' &&
-    object.traceMode !== 'centerline' &&
-    object.traceMode !== 'edge'
-      ? 'fill'
-      : 'line';
-  return object.paths.map((path) => ({ color: path.color, mode }));
+  return {
+    scene: out,
+    objects: cloneClipboardObjects(objects, copiedLayers, operationIdMap),
+  };
 }
 
 function cloneSceneObject(object: SceneObject): SceneObject {

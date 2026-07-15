@@ -83,15 +83,17 @@
    3. Geometry walked out of the sanitized DOM into internal Scene objects.
    4. Object is placed centered on the bed by default, at its natural mm size from the SVG `viewBox`.
    5. Object is auto-selected (selection handles visible).
-   6. Cuts/Layers panel auto-populates: one row per unique stroke color found in the SVG.
-   7. Toast: `Imported design.svg — 1 object, 3 colors`.
+   6. Artwork Operations auto-populates with one named operation for the imported artwork. Its
+      presentation color is assigned from the automatic high-contrast palette; source SVG colors
+      are preserved inside the artwork.
+   7. Toast: `Imported design.svg — 1 artwork`.
 
 #### Success — multiple files at once
 1. User drops 3 SVG files simultaneously.
 2. Each is imported in drop order.
 3. Each is offset 10mm right + 10mm down from the previous to avoid full overlap.
 4. After import, all imported objects are multi-selected.
-5. Toast: `Imported 3 designs · 7 colors total`.
+5. Toast: `Imported 3 designs · 3 artwork operations`.
 
 #### Success — SVG with embedded raster image
 1. Phase A ignores embedded raster (`<image>` elements).
@@ -227,13 +229,27 @@ Identical to F-A3 except:
 
 ---
 
-### F-A7. Cuts/Layers panel
+### F-A7. Artwork Operations panel
 
 #### Layout
-- Vertical **card** stack — one card per Layer (one unique stroke color). Cards use the panel's full height rather than cramming the settings into a horizontal row.
-- Each card's **header strip** carries the colour swatch (the layer's stroke colour), a **Mode** selector (`Line` / `Fill` / `Image` — all three are live), and the **Show** / **Output** toggles; per-card order controls set the card's position in the stack.
-- Below the header, **field rows**: Power (0–100 `%`), Speed (`mm/min`), Passes (integer ≥ 1), and mode-specific fields (e.g. image adjustments in Image mode).
-- The visible card order is the generated output order. (Layer delete semantics — cards auto-appear/disappear with their colour — are covered under the edge cases below.)
+- The top selection inspector is the canonical settings surface. Clicking one artwork shows that
+  artwork's named operation and its laser or CNC fields. The inspector never duplicates the same
+  detailed settings in a second card below it.
+- A compact ordered operation list follows the inspector. Each row shows automatic colour, name,
+  process summary, visibility, output, and order controls. Operation row order decides the processes
+  inside an artwork; artwork run priority is the top-level machine sequence.
+- The inspector shows the selected artwork's persisted run position and **First**, **Earlier**,
+  **Later**, and **Last** controls. This order is independent of canvas stacking.
+- When one selected artwork uses an operation shared by others, the inspector says `Affects N
+  artworks` and offers **Make unique**. This clones the operation and rebinds only the selection.
+- When selected artworks use different operations, the inspector says `Multiple operations` and
+  offers **Use one operation**. Choosing an operation rebinds the whole selection without grouping
+  or changing geometry.
+- **Add operation** binds a second ordinary operation to the selected artwork. It appears in the
+  same ordered list and can be renamed, reordered, shown/hidden, or output-enabled like any other.
+- Artwork intentionally sharing one operation compiles as one machining unit so fill holes,
+  overlaps, Island Fill clustering, pockets, and inlays retain compound-geometry semantics. Use
+  **Make unique** before ordering one member independently.
 
 #### Default values for a new Layer
 - Power: 30 %
@@ -267,8 +283,18 @@ Identical to F-A3 except:
 #### Success - reorder a layer
 1. Click a layer's up or down order control.
 2. The row moves one position in the Cuts/Layers list.
-3. Generated output processes layers in that new list order.
+3. Generated output processes operations in that order inside each artwork run.
 4. Undo restores the previous layer order.
+
+#### Success - choose which artwork runs first
+1. Select one artwork, or select several artworks to move them together.
+2. Click **First**, **Earlier**, **Later**, or **Last** in the selection inspector.
+3. The displayed position updates without changing canvas stacking, selection geometry, operation
+   settings, or automatic colours.
+4. Laser output follows that artwork order exactly. CNC uses the same priority inside its mandatory
+   safe sections: clearing stays before profiles and multi-tool work stays in contiguous tool
+   sections.
+5. Undo restores the previous machine priority.
 
 #### Success — toggle visibility off
 1. Click eye icon.
@@ -299,7 +325,8 @@ Identical to F-A3 except:
 - Tooltip on the disabled button: `Enable Output on at least one layer.`
 
 #### Edge — two SVGs share a color
-- One Layer row covers both. Setting parameters affects both SVGs' geometry of that color.
+- Each imported artwork keeps its own operation by default. Matching source colors do not couple
+  settings. The operator may select both and choose **Use one operation** to share deliberately.
 
 ---
 
@@ -462,7 +489,7 @@ If all applicable checks pass, the save/start proceeds.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v2 stores canonical curve subpaths. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; synthetic v0 fixtures still exercise multi-step migration dispatch (ADR-159).
+> **Current note:** project schema v3 stores canonical curve subpaths plus explicit artwork-to-operation bindings. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations (ADR-159, ADR-211).
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -1116,8 +1143,7 @@ The seven steps are always visible and always ordered:
 or traced image) with at least one closed polyline.
 
 **Success**:
-1. In the Cuts/Layers panel, find the row for the color you want to
-   engrave as fill.
+1. Select the artwork and find its named operation in Artwork Operations.
 2. Click the **Mode** dropdown → choose **Fill**.
 3. The row expands: a sub-row appears underneath showing Fill-specific
    inputs: **° angle**, **mm spacing**, and **Overscan**. Defaults are
@@ -1131,11 +1157,9 @@ or traced image) with at least one closed polyline.
 7. If **Offset Fill** is selected, closed regions emit inward contour-following
    fill paths spaced by the line interval. Offset Fill uses the Fill layer's
    dynamic-power output path but does not use scanline overscan runways.
-8. Use **Sub-layers > Add** to add a second operation for the same color. The
-   primary layer operation emits first, then enabled sub-layers emit in row
-   order using their own mode, power, speed, passes, fill, image, kerf, tab,
-   and air settings. This supports simple LightBurn-style "fill then line"
-   workflows without duplicating artwork.
+8. Use **Add operation** to bind a second operation to the same artwork. Operations emit in list
+   order using their own mode, power, speed, passes, fill, image, kerf, tab, and air settings. This
+   supports fill-then-line workflows without duplicating artwork or opening a nested Sub-layers box.
 
 **Error**:
 - *No closed polylines on this color* — the layer's mode is Fill, but
@@ -1146,8 +1170,8 @@ or traced image) with at least one closed polyline.
 - *Offset Fill on open contours* - Start / Save G-code preflight blocks with
   a specific Offset Fill message. Close the shapes or switch the layer back to
   Scanline Fill.
-- *Sub-layer disabled* - the sub-layer stays saved on the project but does not
-  compile into Preview, Frame, Save G-code, or Start output.
+- *Additional operation disabled* - the operation stays saved on the project but does not compile
+  into Preview, Frame, Save G-code, or Start output.
 
 **Empty**:
 - *No SceneObjects yet* — the Mode dropdown still works, but no
@@ -1839,24 +1863,26 @@ F-CNC19 tiling.
    unknown tools are dropped, a missing active tool falls back to the first
    tool, and malformed values revert to defaults (never a crash).
 
-### F-CNC2. Set per-layer CNC cut settings
+### F-CNC2. Set per-artwork CNC operation settings
 
 #### Success
-1. User expands a layer row in CNC mode and picks a cut type: Outline —
-   outside / inside / on path, Pocket, or Engrave.
+1. User selects artwork, then picks a CNC operation: Outline — outside / inside / on path, Pocket,
+   or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
 2. Depth, depth-per-pass, feed, plunge, and spindle RPM accept typed values;
    Pocket additionally shows stepover %, profile cut types show the tabs
    group (enabled, height, width, count).
 3. Preview and time estimate update to the compiled CNC job (pockets and
    engraves first, then profiles inner-before-outer).
+4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
+   ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
 
 #### Error — depth exceeds stock
 1. Preflight (F-CNC3) reports depth > stock thickness + 1 mm; the save/start
    path is blocked until fixed.
 
 #### Empty
-1. A layer with no geometry on its color compiles to no passes and is
-   skipped; no G-code group is emitted for it.
+1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
+   emitted for it.
 
 #### Edge — open paths on a profile-outside layer
 1. Open polylines cannot be offset; they are cut on-path (documented

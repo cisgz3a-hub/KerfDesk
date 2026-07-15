@@ -7,8 +7,8 @@ export function SelectLayerObjectsButton({ layer }: { readonly layer: Layer }): 
     <button
       type="button"
       onClick={() => selectObjectsOnLayer(layer.id)}
-      aria-label={`Select all objects on ${layer.color}`}
-      title="Select all artwork on this layer"
+      aria-label={`Select all artwork using ${layer.name}`}
+      title="Select all artwork using this operation"
     >
       Select
     </button>

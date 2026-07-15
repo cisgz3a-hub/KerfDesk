@@ -35,7 +35,7 @@ export function CncLayerFields(props: {
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const machine = useStore((s) => s.project.machine);
   const showAdvanced = useUiStore((s) => s.showCncAdvanced);
-  const hasReliefObjects = useLayerHasReliefObjects(layer.color);
+  const hasReliefObjects = useLayerHasReliefObjects(layer);
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const isCnc = machine?.kind === 'cnc';
   const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;

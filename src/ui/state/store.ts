@@ -7,6 +7,8 @@ import type { DeviceProfile } from '../../core/devices';
 import {
   createProject,
   type BoardShape,
+  type CncMachineConfig,
+  type EmbeddedFont,
   type Layer,
   type LayerMoveDirection,
   type MachineConfig,
@@ -27,7 +29,6 @@ import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
 import type { ProjectMachineCapabilityLoadResult } from './project-machine-capability';
 import { projectActions } from './project-actions';
-import type { CncMachineConfig, EmbeddedFont } from '../../core/scene';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
@@ -75,6 +76,7 @@ import {
 } from './saved-libraries-actions';
 import { materialPresetActions, type MaterialPresetActions } from './material-preset-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
+import { operationActions, type OperationActions } from './operation-actions';
 import { imageMaskActions, type ImageMaskActions } from './image-mask-actions';
 import {
   sceneClipboardActions,
@@ -141,6 +143,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 };
 
 export type AppState = ObjectPropertiesActions &
+  OperationActions &
   CncTabActions &
   ArrayActions &
   NestActions &
@@ -280,12 +283,6 @@ export type AppState = ObjectPropertiesActions &
     readonly setLayerColor: (layerId: string, color: string) => void;
     readonly switchIslandFillLayersToScanline: () => void;
     readonly assignSelectionToLayer: (layerId: string) => void;
-    readonly breakApartSelection: () => void;
-    readonly fillSelectionSeparately: () => void;
-    readonly convertSelectionToPath: () => void;
-    readonly weldSelection: () => void;
-    readonly closeSelectedOpenFillContours: () => void;
-    readonly closeSelectedOpenFillContoursWithTolerance: (toleranceMm: number) => void;
     readonly deleteLayerAndObjects: (layerId: string) => void;
     readonly copyLayerSettings: (layerId: string) => void;
     readonly pasteLayerSettings: (layerId: string) => void;
@@ -413,6 +410,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...savedLibrariesActions(set, get),
   ...materialPresetActions(set),
   ...objectPropertiesActions(set),
+  ...operationActions(set),
   ...cncTabActions(set),
   ...imageMaskActions(set),
   ...sceneClipboardActions(set),

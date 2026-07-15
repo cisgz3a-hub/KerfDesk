@@ -56,7 +56,8 @@ describe('serializeProject', () => {
 
 describe('deserializeProject', () => {
   it('roundtrips a populated project', () => {
-    const original = aProject();
+    const base = aProject();
+    const original = { ...base, scene: { ...base.scene, artworkOrder: ['O1'] } };
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
@@ -64,6 +65,7 @@ describe('deserializeProject', () => {
       expect(result.project.scene.objects[0]).toMatchObject({
         paths: [{ curves: [{ segments: [{ kind: 'line' }] }] }],
       });
+      expect(result.project.scene.artworkOrder).toEqual(['O1']);
     }
   });
 
@@ -166,9 +168,11 @@ describe('deserializeProject', () => {
   });
 
   it('reports invalid when scene.objects is not an array (I-5)', () => {
-    const result = deserializeProject(
-      '{"schemaVersion":1,"device":{},"workspace":{},"scene":{"objects":null,"layers":[]}}',
-    );
+    const raw = JSON.parse(serializeProject(createProject())) as {
+      scene: { objects: unknown };
+    };
+    raw.scene.objects = null;
+    const result = deserializeProject(JSON.stringify(raw));
     expect(result.kind).toBe('invalid');
     if (result.kind === 'invalid') {
       expect(result.reason).toMatch(/scene\.objects/);
@@ -292,6 +296,7 @@ describe('deserializeProject', () => {
         layers: [
           {
             id: 'L1',
+            name: 'Legacy line',
             color: '#ff0000',
             mode: 'line',
             power: 30,

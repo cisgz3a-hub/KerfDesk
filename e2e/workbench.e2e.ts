@@ -24,7 +24,9 @@ baseTest(
     await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
     await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();
-    await expect(page.getByRole('complementary', { name: 'Cuts / Layers panel' })).toBeVisible();
+    await expect(
+      page.getByRole('complementary', { name: 'Artwork / Operations panel' }),
+    ).toBeVisible();
     await expect(page.getByLabel('Laser controls')).toHaveCount(0);
 
     const file = page.getByRole('menuitem', { name: 'File' });
@@ -54,7 +56,10 @@ baseTest(
     await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
 
     await page.keyboard.press('Escape');
-    const layerMode = page.getByLabel('Mode for #ff0000');
+    await page.getByRole('button', { name: 'Select all artwork using fixture' }).click();
+    await expect(page.getByRole('region', { name: 'Selected artwork operation' })).toBeVisible();
+
+    const layerMode = page.getByLabel('Mode for selected objects');
     await layerMode.selectOption('fill');
     await expect(layerMode).toHaveValue('fill');
 

@@ -4,6 +4,7 @@ import {
   applyTransform,
   assertNever,
   flattenColoredPathCurves,
+  pathUsesOperation,
   type ColoredPath,
   type Layer,
   type Polyline,
@@ -33,7 +34,7 @@ export function collectLayerContours(
       case 'text':
       case 'traced-image':
       case 'shape':
-        appendObjectContours(object, layer.color, device, out);
+        appendObjectContours(object, layer, device, out);
         break;
       case 'raster-image':
       case 'relief':
@@ -47,12 +48,12 @@ export function collectLayerContours(
 
 function appendObjectContours(
   object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
-  layerColor: string,
+  layer: Layer,
   device: DeviceProfile,
   out: CollectedCncContour[],
 ): void {
   object.paths.forEach((path, pathIndex) => {
-    if (path.color !== layerColor) return;
+    if (!pathUsesOperation(object, path, layer)) return;
     const flattened = flattenColoredPathCurves(path, {
       toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
       segmentBudget: 100_000,
@@ -60,7 +61,13 @@ function appendObjectContours(
     const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
     polylines.forEach((polyline, polylineIndex) => {
       if (polyline.points.length < 2) return;
-      const manualTabPoints = objectTabPoints(object, layerColor, pathIndex, polylineIndex, device);
+      const manualTabPoints = objectTabPoints(
+        object,
+        layer.color,
+        pathIndex,
+        polylineIndex,
+        device,
+      );
       out.push({
         polyline: {
           points: polyline.points.map((point) =>

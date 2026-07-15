@@ -47,7 +47,12 @@ export function drawObjectsFaint(
 ): void {
   ctx.save();
   ctx.globalAlpha = 0.3;
-  const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
+  const layerByColor = new Map(
+    project.scene.layers.flatMap((layer) => [
+      [layer.id, layer] as const,
+      [layer.color, layer] as const,
+    ]),
+  );
   for (const obj of project.scene.objects) {
     if (!hasFaintVectorGeometry(obj)) continue;
     drawObjectPolylinesFaint(ctx, obj, layerByColor, view);
@@ -78,9 +83,13 @@ function drawObjectPolylinesFaint(
 ): void {
   if (!hasFaintVectorGeometry(obj)) return;
   for (const path of obj.paths) {
-    const layer = layerByColor.get(path.color);
+    const operationIds = path.operationIds ?? obj.operationIds;
+    const layer =
+      operationIds === undefined
+        ? layerByColor.get(path.color)
+        : operationIds.flatMap((id) => layerByColor.get(id) ?? [])[0];
     if (layer === undefined || !layer.visible) continue;
-    ctx.strokeStyle = path.color;
+    ctx.strokeStyle = layer.color;
     ctx.lineWidth = layer.output ? 1.5 : 0.75;
     const display = buildDisplayPolylines(path.polylines);
     strokePolylinesBatched(ctx, obj, display.polylines, view);

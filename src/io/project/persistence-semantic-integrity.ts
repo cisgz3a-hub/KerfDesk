@@ -26,7 +26,11 @@ function persistedSemantics(value: unknown): unknown {
     variables: value['variables'],
     embeddedFonts: value['embeddedFonts'],
     printAndCutTargets: value['printAndCutTargets'],
-    scene: { objects: scene['objects'], layers: scene['layers'] },
+    scene: {
+      objects: scene['objects'],
+      layers: scene['layers'],
+      artworkOrder: scene['artworkOrder'],
+    },
   };
 }
 

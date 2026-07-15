@@ -72,13 +72,15 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
-  it('renders nothing in CNC mode — every editor here is laser-only (ADR-101 §3)', async () => {
+  it('shows the selected artwork CNC operation in CNC mode', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().selectObject('O1');
     useStore.getState().setMachineKind('cnc');
     const { host, root } = await render();
     try {
-      expect(host.querySelector('[aria-label="Selected object properties"]')).toBeNull();
+      expect(host.querySelector('[aria-label="Selected object properties"]')).not.toBeNull();
+      expect(host.querySelector('select[aria-label^="Cut type for"]')).not.toBeNull();
+      expect(host.querySelector('input[aria-label="Power scale for selected objects"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -142,7 +144,7 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
-  it('edits operation settings only on the selected object', async () => {
+  it('edits the selected artwork operation without changing same-colored artwork', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
     useStore.getState().selectObject('O2');
@@ -156,64 +158,57 @@ describe('SelectedObjectProperties', () => {
       });
 
       const state = useStore.getState();
-      expect(state.project.scene.layers.find((layer) => layer.color === '#000000')?.mode).toBe(
-        'line',
-      );
-      expect(state.project.scene.objects.map((object) => object.operationOverride)).toEqual([
-        undefined,
-        { mode: 'fill' },
-      ]);
+      expect(state.project.scene.layers.find((layer) => layer.name === 'O1')?.mode).toBe('line');
+      expect(state.project.scene.layers.find((layer) => layer.name === 'O2')?.mode).toBe('fill');
+      expect(
+        state.project.scene.objects.every((object) => object.operationOverride === undefined),
+      ).toBe(true);
     } finally {
       await act(async () => root.unmount());
       host.remove();
     }
   });
 
-  it('shows mixed selected artwork operation values until a field is edited', async () => {
+  it('moves selected artwork to the first machine priority without changing canvas order', async () => {
+    useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
+    useStore.getState().selectObject('Box');
+    const { host, root } = await render();
+    try {
+      expect(host.textContent).toContain('Position 2 of 2');
+      const first = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'First',
+      );
+      if (!(first instanceof HTMLButtonElement)) throw new Error('first priority button missing');
+      await act(async () => first.click());
+
+      const scene = useStore.getState().project.scene;
+      expect(scene.artworkOrder).toEqual(['Box', 'Johann']);
+      expect(scene.objects.map((object) => object.id)).toEqual(['Johann', 'Box']);
+      expect(host.textContent).toContain('Position 1 of 2');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('offers one unified operation when selected artworks have different settings', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
-    useStore.setState((state) => ({
-      project: {
-        ...state.project,
-        scene: {
-          ...state.project.scene,
-          objects: state.project.scene.objects.map((object) =>
-            object.id === 'O2'
-              ? { ...object, operationOverride: { mode: 'fill' as const, power: 55 } }
-              : object,
-          ),
-        },
-      },
-      selectedObjectId: 'O1',
-      additionalSelectedIds: new Set(['O2']),
-    }));
+    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
 
     const { host, root } = await render();
     try {
-      expect(host.querySelector('[aria-label="Selected artwork mixed settings"]')).not.toBeNull();
-
-      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('selected mode control missing');
-      expect(mode.value).toBe('__mixed__');
-
-      const power = host.querySelector('input[aria-label="Power for selected objects"]');
-      if (!(power instanceof HTMLInputElement)) throw new Error('selected power control missing');
-      expect(power.value).toBe('');
-      expect(power.placeholder).toBe('Mixed');
-
-      await act(async () => {
-        power.value = '60';
-        Simulate.change(power);
-      });
-      await act(async () => {
-        Simulate.blur(power);
-      });
-
-      expect(
-        useStore.getState().project.scene.objects.map((object) => object.operationOverride),
-      ).toEqual([
-        { power: 60, minPower: 0 },
-        { mode: 'fill', power: 60, minPower: 0 },
+      expect(host.querySelector('[aria-label="Multiple artwork operations"]')).not.toBeNull();
+      const unify = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Use one operation for selection',
+      );
+      if (!(unify instanceof HTMLButtonElement)) throw new Error('unify button missing');
+      await act(async () => unify.click());
+      const state = useStore.getState();
+      expect(state.project.scene.objects.map((object) => object.operationIds)).toEqual([
+        [state.project.scene.layers[0]?.id],
+        [state.project.scene.layers[0]?.id],
       ]);
     } finally {
       await act(async () => root.unmount());
