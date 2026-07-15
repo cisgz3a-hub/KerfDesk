@@ -47,7 +47,7 @@
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
-- **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers." A header chevron collapses it to a narrow named strip; the same strip expands it.
+- **Cuts/Layers panel**: docked right with **Layers** and **Materials** tabs in Laser mode. Layers is the default and, when empty, shows "Import a design to populate layers." Materials owns reusable preset and saved-library management without displacing the active layer workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the top Live Motion bar.
 - **Live Motion bar**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears directly below the command shell and above the workspace. It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs without covering workspace content.
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
@@ -1698,7 +1698,7 @@ share them as files.
 details directly — name, thickness, then cut settings — without first
 editing a layer.
 
-**Entry.** Material Library rail → **New material...** (or **Edit** on a
+**Entry.** Cuts / Layers rail → **Materials** → **New material...** (or **Edit** on a
 preset row) opens a multi-step `Dialog` wizard. The draft commits only
 on the final Save, so Cancel/Escape at any step discards it.
 
@@ -1745,7 +1745,7 @@ of the active library auto-saves. The legacy single-library slot
 (`laserforge.material-library.v1`, F-ML1) is migrated in once, then
 removed.
 
-**Entry.** Material Library rail → **Saved Libraries...** opens a
+**Entry.** Cuts / Layers rail → **Materials** → **Saved Libraries...** opens a
 `Dialog` listing every saved library: name, device hint, preset count,
 last updated.
 

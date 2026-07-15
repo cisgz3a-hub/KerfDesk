@@ -55,6 +55,7 @@ async function renderPanel(): Promise<{
 afterEach(() => {
   resetStore();
   useUiStore.getState().setRailPanelVisible('layers', true);
+  useUiStore.getState().setCutsLayersView('layers');
 });
 
 describe('CutsLayersPanel layer order controls', () => {
@@ -171,30 +172,6 @@ describe('CutsLayersPanel layer order controls', () => {
       expect(host.querySelector('select[aria-label="Mode for #000000"]')).toBeNull();
       expect(host.querySelector('input[aria-label="Power for #000000"]')).toBeNull();
       expect(host.textContent).toContain('Use Selected Artwork Settings above for this selection.');
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('collapses Material Library but keeps the Layers list open while editing selected artwork [LAY-02]', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
-    useStore.getState().selectObject('O1');
-    const { host, unmount } = await renderPanel();
-    try {
-      expect(host.querySelector('[aria-label="Selected object properties"]')).not.toBeNull();
-
-      const materialSection = host.querySelector('details[aria-label="Material Library section"]');
-      const layerSection = host.querySelector('details[aria-label="Layer management section"]');
-      if (!(materialSection instanceof HTMLDetailsElement)) {
-        throw new Error('material disclosure missing');
-      }
-      if (!(layerSection instanceof HTMLDetailsElement))
-        throw new Error('layer disclosure missing');
-
-      // Material Library stays collapsible/closed; the Layers list stays visible
-      // on selection (LightBurn parity) so cut settings aren't hidden.
-      expect(materialSection.open).toBe(false);
-      expect(layerSection.open).toBe(true);
     } finally {
       await unmount();
     }
@@ -419,17 +396,18 @@ describe('CutsLayersPanel layer order controls', () => {
     }
   });
 
-  it('keeps the Layers list open when an object is selected [LAY-02]', async () => {
+  it('keeps the Layers list visible when an object is selected [LAY-02]', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set() });
     const { host, unmount } = await renderPanel();
     try {
-      const details = host.querySelector('details[aria-label="Layer management section"]');
-      expect(details).not.toBeNull();
-      // LightBurn keeps the Cuts/Layers list visible; the disclosure defaults open
-      // so the layer rows aren't hidden the moment a selection appears.
-      expect((details as HTMLDetailsElement).open).toBe(true);
-      expect(host.querySelector('[aria-label="Layer management section"] button')).not.toBeNull();
+      const panel = host.querySelector('#cuts-layers-layers-panel');
+      expect(panel).not.toBeNull();
+      // The Layers page is the default and remains mounted while selected-object
+      // settings are shown, so selection never hides the layer rows.
+      expect(
+        panel?.querySelector('button[aria-label="Select all objects on #ff0000"]'),
+      ).not.toBeNull();
     } finally {
       await unmount();
     }

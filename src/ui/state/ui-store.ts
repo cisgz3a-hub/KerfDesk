@@ -113,11 +113,14 @@ export type FloatingPanelPosition = {
 export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
 export type RailPanelId = 'layers' | 'machine';
 export type RailPanelVisibility = Readonly<Record<RailPanelId, boolean>>;
+export type CutsLayersView = 'layers' | 'materials';
 
 export type UiState = {
   readonly railPanelVisibility: RailPanelVisibility;
   readonly setRailPanelVisible: (panel: RailPanelId, visible: boolean) => void;
   readonly toggleRailPanel: (panel: RailPanelId) => void;
+  readonly cutsLayersView: CutsLayersView;
+  readonly setCutsLayersView: (view: CutsLayersView) => void;
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
   readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
@@ -297,7 +300,14 @@ function uiDialogSlice(
 
 function uiRailPanelSlice(
   set: UiStateSetter,
-): Pick<UiState, 'railPanelVisibility' | 'setRailPanelVisible' | 'toggleRailPanel'> {
+): Pick<
+  UiState,
+  | 'railPanelVisibility'
+  | 'setRailPanelVisible'
+  | 'toggleRailPanel'
+  | 'cutsLayersView'
+  | 'setCutsLayersView'
+> {
   return {
     railPanelVisibility: { layers: true, machine: true },
     setRailPanelVisible: (panel, visible) =>
@@ -311,6 +321,8 @@ function uiRailPanelSlice(
           [panel]: !state.railPanelVisibility[panel],
         },
       })),
+    cutsLayersView: 'layers',
+    setCutsLayersView: (view) => set({ cutsLayersView: view }),
   };
 }
 
