@@ -1,7 +1,7 @@
 // DeviceProfileFields — reusable per-field editors for a DeviceProfile's
 // identity and geometry (name, bed, origin, feed) plus homing. Granular so the
-// Device Setup wizard can place machine-reported geometry on its "confirm"
-// step and operator-supplied placement on its "safety" step; BasicRows
+// Machine Setup can place identity and geometry on its coordinates step while
+// BasicRows recomposes the same fields for legacy inline editors; BasicRows
 // recomposes them in the original order for the inline Device Profile panel, so
 // that panel renders identical controls. Pure presentational components: each
 // takes a `device` plus an `update` callback and owns no store wiring.

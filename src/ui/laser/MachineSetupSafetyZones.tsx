@@ -12,12 +12,19 @@ import {
   zoneGridStyle,
 } from './MachineSetupStyles';
 
-export function SafetyZonesPanel(): JSX.Element {
+export function SafetyZonesPanel(
+  props: {
+    readonly zones?: ReadonlyArray<NoGoZone>;
+    readonly onChange?: (zones: ReadonlyArray<NoGoZone>) => void;
+  } = {},
+): JSX.Element {
   const device = useStore((s) => s.project.device);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
-  const zones = device.noGoZones;
-  const updateZones = (noGoZones: ReadonlyArray<NoGoZone>): void =>
-    updateDeviceProfile({ noGoZones });
+  const zones = props.zones ?? device.noGoZones;
+  const updateZones = (noGoZones: ReadonlyArray<NoGoZone>): void => {
+    if (props.onChange === undefined) updateDeviceProfile({ noGoZones });
+    else props.onChange(noGoZones);
+  };
   return (
     <div style={stackStyle}>
       <div style={buttonRowStyle}>

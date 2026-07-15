@@ -13,8 +13,7 @@
 // DeviceProfileFields.tsx, the power/air-assist rows in
 // DeviceProfilePowerFields.tsx, and AutofocusEditor + PlannerAdvanced in
 // sibling files, so this file stays a thin composition under the 400-line hard
-// cap and the same controls can be reused by the connect-time Device Setup
-// wizard.
+// cap and the same controls can be reused by the unified Machine Setup flow.
 
 import { useStore } from '../state';
 import { AutofocusEditor } from './AutofocusEditor';
@@ -32,8 +31,8 @@ export function DeviceSettings(): JSX.Element {
   // ($30/$31/$32), air assist, scanning offsets, autofocus command — hide on
   // a router. H.7 CNC machine profiles add the CNC counterparts.
   const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');
-  // Open by default: this panel only appears on the Machine Setup → Overview
-  // tab, which the operator opens precisely to inspect or edit the profile, so
+  // Open by default when this legacy composition is embedded in a profile
+  // surface, because the operator opened it to inspect or edit the profile, so
   // the fields should be visible on arrival rather than one click away — the
   // same directness LightBurn's Device Settings gives. <details> (not React
   // state) still lets the operator collapse it; the browser DOM owns the toggle

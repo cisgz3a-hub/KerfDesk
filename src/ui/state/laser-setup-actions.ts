@@ -1,14 +1,10 @@
-import { CMD_SETTINGS, type SettingsCollectorState } from '../../core/controllers/grbl';
-import { beginSettingsCollection } from './detected-settings-action';
-import { machineKindOf } from '../../core/scene';
+import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
-import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
+import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
-import { useStore } from './store';
 
-const GRBL_LASER_SETUP_LINES = ['$32=1', '$30=1000', '$130=400', '$131=400'];
-const CNC_MODE_BLOCK_MESSAGE =
-  'One-time GRBL setup writes laser firmware values ($32=1); switch the project to Laser mode first.';
+const FIXED_SETUP_REMOVED_MESSAGE =
+  'Fixed GRBL setup batches were removed because machine travel and power values must never be assumed. Use Machine Setup, read/export a backup, and write one verified common setting at a time.';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -22,64 +18,24 @@ export type LaserSetupRefs = {
   settingsCollectorSessionEpoch: number | null;
 };
 
+/**
+ * Compatibility action retained for saved fixtures and older call sites. It is
+ * intentionally inert: the former hard-coded $30/$32/$130/$131 sequence could
+ * overwrite controller-specific travel and power calibration.
+ */
 export function setupActions(
   set: SetFn,
   get: GetFn,
-  refs: LaserSetupRefs,
-  write: WriteLine,
+  _refs: LaserSetupRefs,
+  _write: WriteLine,
 ): Pick<LaserState, 'configureGrblLaserSetup'> {
   return {
     configureGrblLaserSetup: async () => {
-      // $32=1 flips GRBL into laser mode; a router must never receive this
-      // write, so the action refuses while the project machine is CNC even
-      // if some UI path still reaches it.
-      if (machineKindOf(useStore.getState().project.machine) === 'cnc') {
-        set({
-          lastWriteError: CNC_MODE_BLOCK_MESSAGE,
-          log: pushLog(get(), `[lf2] Setup command blocked: ${CNC_MODE_BLOCK_MESSAGE}`),
-        });
-        throw new Error(CNC_MODE_BLOCK_MESSAGE);
-      }
-      assertAutofocusIdle(get());
-      if (refs.driver.capabilities.firmwareSetupPanel !== 'grbl-laser') {
-        const reason = `${refs.driver.label} does not use the GRBL laser setup sequence.`;
-        set({
-          lastWriteError: reason,
-          log: pushLog(get(), `[lf2] Setup command blocked: ${reason}`),
-        });
-        throw new Error(reason);
-      }
-      const blockedMessage = setupCommandBlockMessage(get());
-      if (blockedMessage !== null) {
-        set({
-          lastWriteError: blockedMessage,
-          log: pushLog(get(), `[lf2] Setup command blocked: ${blockedMessage}`),
-        });
-        throw new Error(blockedMessage);
-      }
-      const settingsBlock = settingsBackupBlockMessage(get());
-      if (settingsBlock !== null) {
-        set({
-          lastWriteError: settingsBlock,
-          log: pushLog(get(), `[lf2] Setup command blocked: ${settingsBlock}`),
-        });
-        throw new Error(settingsBlock);
-      }
-      for (const line of GRBL_LASER_SETUP_LINES) {
-        await write(`${line}\n`);
-      }
-      beginSettingsCollection(refs, get().controllerSessionEpoch);
-      await write(`${CMD_SETTINGS}\n`);
       set({
-        log: pushLog(get(), '[lf2] Sent GRBL laser setup ($32=1, $30=1000, $130=400, $131=400).'),
+        lastWriteError: FIXED_SETUP_REMOVED_MESSAGE,
+        log: pushLog(get(), `[lf2] Setup command blocked: ${FIXED_SETUP_REMOVED_MESSAGE}`),
       });
+      throw new Error(FIXED_SETUP_REMOVED_MESSAGE);
     },
   };
-}
-
-function settingsBackupBlockMessage(state: LaserState): string | null {
-  if (state.grblSettingsRows.length === 0 || state.lastSettingsReadAt === null) {
-    return 'Read machine settings ($$) and export a backup before changing GRBL setup.';
-  }
-  return null;
 }

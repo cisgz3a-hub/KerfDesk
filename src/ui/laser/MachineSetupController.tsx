@@ -7,7 +7,6 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
-import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
 import {
   cardStyle,
@@ -25,7 +24,6 @@ export function ControllerSettingsPanel(): JSX.Element {
   const machine = useStore((s) => s.project.machine);
   return (
     <div style={stackStyle}>
-      <GrblSetupSlot />
       <MachineSettingsPanel />
       {machine?.kind === 'cnc' ? (
         <CncDetectedSettingsRow machine={machine} />
@@ -34,25 +32,6 @@ export function ControllerSettingsPanel(): JSX.Element {
       )}
     </div>
   );
-}
-
-function GrblSetupSlot(): JSX.Element | null {
-  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
-  const connection = useLaserStore((s) => s.connection);
-  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
-  const motionOperation = useLaserStore((s) => s.motionOperation);
-  const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const streamer = useLaserStore((s) => s.streamer);
-  const firmwareSetupPanel = useLaserStore((s) => s.capabilities.firmwareSetupPanel);
-  // ADR-094: the $32/$30 setup sequence only exists on GRBL-dollar firmwares.
-  if (machineKind === 'cnc' || firmwareSetupPanel !== 'grbl-laser') return null;
-  const disabled =
-    connection.kind !== 'connected' ||
-    autofocusBusy ||
-    motionOperation !== null ||
-    controllerOperation !== null ||
-    streamer !== null;
-  return <GrblLaserSetupPanel disabled={disabled} />;
 }
 
 export function FirmwareWritesPanel(): JSX.Element {

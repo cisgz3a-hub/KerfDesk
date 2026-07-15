@@ -28,9 +28,15 @@ type ImportReview =
   | { readonly kind: 'lightburn'; readonly review: LightBurnDeviceImportReview }
   | { readonly kind: 'error'; readonly message: string };
 
-export function ImportExportPanel(): JSX.Element {
+export function ImportExportPanel(
+  props: {
+    readonly profile?: DeviceProfile;
+    readonly onApply?: (profile: DeviceProfile) => void;
+  } = {},
+): JSX.Element {
   const platform = usePlatform();
-  const device = useStore((s) => s.project.device);
+  const activeDevice = useStore((s) => s.project.device);
+  const device = props.profile ?? activeDevice;
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const pushToast = useToastStore((s) => s.pushToast);
   const [review, setReview] = useState<ImportReview | null>(null);
@@ -84,7 +90,8 @@ export function ImportExportPanel(): JSX.Element {
         <ImportReviewCard
           review={review}
           onApply={(profile) => {
-            replaceDeviceProfile(profile);
+            if (props.onApply === undefined) replaceDeviceProfile(profile);
+            else props.onApply(profile);
             setReview(null);
             pushToast('Machine profile applied.', 'success');
           }}

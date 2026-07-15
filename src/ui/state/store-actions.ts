@@ -2,6 +2,7 @@ import type { DeviceProfile } from '../../core/devices';
 import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
+  type MachineConfig,
   type Project,
   type Transform,
   updateLayer,
@@ -11,6 +12,7 @@ import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
+import { cncMachineWithCustomTools, sceneWithSpindleCeiling } from './machine-actions';
 
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -18,7 +20,14 @@ type Setter = (
 
 export function sceneActions(
   set: Setter,
-): Pick<AppState, 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile' | 'replaceDeviceProfile'> {
+): Pick<
+  AppState,
+  | 'setLayerParam'
+  | 'moveLayer'
+  | 'updateDeviceProfile'
+  | 'replaceDeviceProfile'
+  | 'replaceMachineSetup'
+> {
   return {
     setLayerParam: (layerId, patch) =>
       set((s) => {
@@ -80,6 +89,55 @@ export function sceneActions(
         redoStack: [],
         dirty: true,
       })),
+    ...replaceMachineSetupAction(set),
+  };
+}
+
+function replaceMachineSetupAction(set: Setter): Pick<AppState, 'replaceMachineSetup'> {
+  return {
+    replaceMachineSetup: (
+      profile: DeviceProfile,
+      machine: MachineConfig,
+      retainedMachine?: MachineConfig,
+    ) =>
+      set((s) => {
+        const nextMachine =
+          machine.kind === 'cnc'
+            ? cncMachineWithCustomTools(machine, s.cncLibrary.customTools)
+            : machine;
+        const retainedCncMachine = retainedMachine?.kind === 'cnc' ? retainedMachine : undefined;
+        const retainedCnc =
+          nextMachine.kind === 'cnc'
+            ? nextMachine
+            : (retainedCncMachine ??
+              (s.project.machine?.kind === 'cnc' ? s.project.machine : s.cachedCncMachine));
+        const nextCachedCnc =
+          retainedCnc === null || retainedCnc === undefined
+            ? null
+            : cncMachineWithCustomTools(retainedCnc, s.cncLibrary.customTools);
+        const scene =
+          nextMachine.kind === 'cnc'
+            ? sceneWithSpindleCeiling(s.project.scene, nextMachine.params.spindleMaxRpm)
+            : s.project.scene;
+        return {
+          project: {
+            ...s.project,
+            scene,
+            device: profile,
+            machine: nextMachine,
+            workspace: {
+              ...s.project.workspace,
+              width: profile.bedWidth,
+              height: profile.bedHeight,
+            },
+          },
+          jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, profile),
+          cachedCncMachine: nextCachedCnc,
+          undoStack: pushUndo(s.project, s.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
   };
 }
 

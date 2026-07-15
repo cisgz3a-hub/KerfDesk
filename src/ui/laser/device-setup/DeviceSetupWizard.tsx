@@ -1,127 +1,82 @@
-// DeviceSetupWizard — the connect-time guided setup surface (ADR-092). A
-// manually-launched, multi-step Dialog that keeps an exact profile draft plus
-// a separate controller $$ observation, walks the operator through confirming
-// explicit changes, and commits only on Finish.
-// The step logic is the pure reducer in device-setup-flow.ts; this file is the
-// shell + footer navigation.
+// Unified Machine Setup dialog. Every step edits a local DeviceProfile +
+// MachineConfig draft and the final action commits both atomically.
 
-import { useEffect, useReducer } from 'react';
-import type { DeviceProfile } from '../../../core/devices';
-import { assertNever, machineKindOf, type MachineConfig } from '../../../core/scene';
+import { useEffect, useReducer, useState } from 'react';
+import type { ControllerKind, DeviceProfile } from '../../../core/devices';
+import { LASER_MACHINE_CONFIG, assertNever } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button, Dialog, DialogActions } from '../../kit';
-import { computeCncDetectedApply } from '../../machine/cnc-detected-apply';
 import { useStore } from '../../state';
-import type { CncMachineSetupPatch } from '../../state/machine-actions';
 import { useLaserStore } from '../../state/laser-store';
+import { useToastStore } from '../../state/toast-store';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
+import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
 import {
   canAdvanceDeviceSetup,
-  deviceSetupStepOrder,
   deviceSetupReducer,
+  deviceSetupStepOrder,
   initDeviceSetup,
   isFirstDeviceSetupStep,
   isLastDeviceSetupStep,
+  machineSetupValidationIssues,
   type DeviceSetupAction,
   type DeviceSetupState,
   type DeviceSetupStep,
 } from './device-setup-flow';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
-import { DeviceSetupProbeStep } from './DeviceSetupProbeStep';
-import { computeSetupReadiness } from './device-setup-readiness';
+import { DeviceSetupMachineStep } from './DeviceSetupMachineStep';
 import { DeviceSetupReviewStep } from './DeviceSetupReviewStep';
 import { DeviceSetupSafetyStep } from './DeviceSetupSafetyStep';
 
 const STEP_TITLES: Record<DeviceSetupStep, string> = {
+  identify: 'Machine & controller',
   connect: 'Connect & read',
-  identify: 'Identify machine',
-  confirm: 'Confirm settings',
-  safety: 'Homing & options',
-  probe: 'Set work zero (probe)',
-  firmware: 'Sync to controller',
-  review: 'Review & finish',
+  confirm: 'Work area & coordinates',
+  machine: 'Machine output',
+  safety: 'Safety & calibration',
+  firmware: 'Firmware review',
+  review: 'Review & hardware handoff',
 };
 
-export function DeviceSetupWizard(props: {
+type DeviceSetupWizardProps = {
   readonly onClose: () => void;
   readonly onConfigured?: (profile: DeviceProfile) => void;
-}): JSX.Element {
-  const device = useStore((s) => s.project.device);
-  const machineKind = useStore((s) => machineKindOf(s.project.machine));
-  const machine = useStore((s) => s.project.machine);
-  const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
-  const applyCncMachineSetup = useStore((s) => s.applyCncMachineSetup);
+};
+
+export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
+  const project = useStore((s) => s.project);
+  const cachedCncMachine = useStore((s) => s.cachedCncMachine);
+  const replaceMachineSetup = useStore((s) => s.replaceMachineSetup);
   const detected = useLaserStore((s) => s.detectedSettings);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const connectionKind = useLaserStore((s) => s.connection.kind);
-  const [state, dispatch] = useReducer(deviceSetupReducer, device, (seed) =>
+  const [state, dispatch] = useReducer(deviceSetupReducer, project.device, (seed) =>
     initDeviceSetup(seed, detected, {
       detectedControllerKind,
       controllerRead: lastReadAt !== null,
-      machineKind,
-      ...(machine?.kind === 'cnc' ? { spindleMaxRpm: machine.params.spindleMaxRpm } : {}),
+      machine: project.machine ?? LASER_MACHINE_CONFIG,
+      ...(cachedCncMachine === null ? {} : { fallbackCncMachine: cachedCncMachine }),
     }),
   );
   useDetectedSetupSync(dispatch, detected, detectedControllerKind, {
     controllerRead: lastReadAt !== null,
     connected: connectionKind === 'connected',
   });
-  // Readiness scores against state.detected (kept in sync by the effect above),
-  // so the footer's Finish gate matches the committed draft.
-  const ready = computeSetupReadiness(state.draft, state.detected, state.machineKind, {
-    maxRpm: state.spindleMaxRpm,
-    confirmed: state.spindleConfirmed,
-  }).ready;
-  const stepOrder = deviceSetupStepOrder(state.machineKind);
-  const stepNumber = stepOrder.indexOf(state.step) + 1;
-  const onFinish = (): void => {
-    commitDeviceSetup(state, machine, replaceDeviceProfile, applyCncMachineSetup);
-    props.onConfigured?.(state.draft);
-    props.onClose();
-  };
+  const save = useMachineSetupSave(state, props, replaceMachineSetup);
   return (
-    <Dialog title="Device Setup" size="lg" onClose={props.onClose}>
-      <p style={stepHintStyle}>
-        Step {stepNumber} of {stepOrder.length} — {STEP_TITLES[state.step]}
-      </p>
-      <div style={bodyStyle}>{renderStep(state, dispatch)}</div>
-      <DialogActions>
-        <Button onClick={props.onClose} {...helpProps('control:laser.device-setup.cancel')}>
-          Cancel
-        </Button>
-        <Button
-          onClick={() => dispatch({ kind: 'back' })}
-          disabled={isFirstDeviceSetupStep(state.step, state.machineKind)}
-          {...helpProps('control:laser.device-setup.back')}
-        >
-          Back
-        </Button>
-        {isLastDeviceSetupStep(state.step, state.machineKind) ? (
-          <Button
-            variant="primary"
-            onClick={onFinish}
-            disabled={!ready}
-            {...helpProps(
-              'control:laser.device-setup.finish',
-              ready ? undefined : 'Resolve the flagged items before finishing.',
-            )}
-          >
-            Finish setup
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
-            onClick={() => dispatch({ kind: 'next' })}
-            disabled={!canAdvanceDeviceSetup(state)}
-            {...helpProps('control:laser.device-setup.next')}
-          >
-            Next
-          </Button>
-        )}
-      </DialogActions>
+    <Dialog title="Machine Setup" size="xl" onClose={save.saving ? () => undefined : props.onClose}>
+      <SetupLayout state={state} dispatch={dispatch} />
+      <SetupActions
+        state={state}
+        dispatch={dispatch}
+        onClose={props.onClose}
+        onSave={save.onSave}
+        saving={save.saving}
+        firmwareWriteCount={save.firmwareWriteCount}
+      />
     </Dialog>
   );
 }
@@ -129,7 +84,7 @@ export function DeviceSetupWizard(props: {
 function useDetectedSetupSync(
   dispatch: React.Dispatch<DeviceSetupAction>,
   detected: Partial<DeviceProfile> | null,
-  detectedControllerKind: DeviceProfile['controllerKind'] | null,
+  detectedControllerKind: ControllerKind | null,
   syncState: { readonly controllerRead: boolean; readonly connected: boolean },
 ): void {
   const { connected, controllerRead } = syncState;
@@ -145,29 +100,154 @@ function useDetectedSetupSync(
   }, [connected, controllerRead, detected, detectedControllerKind, dispatch]);
 }
 
-function commitDeviceSetup(
+function useMachineSetupSave(
   state: DeviceSetupState,
-  machine: MachineConfig | null | undefined,
-  replaceDeviceProfile: (profile: DeviceProfile) => void,
-  applyCncMachineSetup: (patch: CncMachineSetupPatch) => void,
-): void {
-  if (machine?.kind !== 'cnc') {
-    replaceDeviceProfile(state.draft);
-    return;
-  }
-  const detectedApply = state.detectedAccepted
-    ? computeCncDetectedApply(state.detected, machine, state.draft)
-    : null;
-  const confirmedSpindlePatch =
-    state.spindleConfirmed && state.spindleMaxRpm !== null
-      ? { spindleMaxRpm: state.spindleMaxRpm }
-      : {};
-  const paramsPatch = { ...(detectedApply?.paramsPatch ?? {}), ...confirmedSpindlePatch };
-  applyCncMachineSetup({
-    deviceProfile: state.draft,
-    ...(Object.keys(paramsPatch).length === 0 ? {} : { paramsPatch }),
-    ...(detectedApply === null ? {} : { devicePatch: detectedApply.devicePatch }),
-  });
+  props: DeviceSetupWizardProps,
+  replaceMachineSetup: ReturnType<typeof useStore.getState>['replaceMachineSetup'],
+): { readonly saving: boolean; readonly firmwareWriteCount: number; readonly onSave: () => void } {
+  const [saving, setSaving] = useState(false);
+  const rows = useLaserStore((s) => s.grblSettingsRows);
+  const writeGrblSetting = useLaserStore((s) => s.writeGrblSetting);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const writes = queuedFirmwareDiffs(state, rows);
+  const onSave = (): void => {
+    if (saving) return;
+    setSaving(true);
+    void saveAndSync().catch((error: unknown) => {
+      pushToast(`Machine Setup could not save: ${errorMessage(error)}`, 'error');
+      setSaving(false);
+    });
+  };
+  const saveAndSync = async (): Promise<void> => {
+    replaceMachineSetup(state.draft, state.draftMachine, state.cncDraft);
+    props.onConfigured?.(state.draft);
+    try {
+      for (const write of writes) await writeGrblSetting(write.id, write.desired);
+      if (writes.length > 0) {
+        pushToast(
+          `Firmware sync complete: ${writes.map((write) => write.code).join(', ')} exactly verified.`,
+          'success',
+        );
+      }
+    } catch (error: unknown) {
+      pushToast(
+        `Software setup was saved, but firmware sync stopped: ${errorMessage(error)} Reopen Machine Setup after checking the controller.`,
+        'error',
+      );
+    }
+    props.onClose();
+  };
+  return { saving, firmwareWriteCount: writes.length, onSave };
+}
+
+function queuedFirmwareDiffs(
+  state: DeviceSetupState,
+  rows: ReturnType<typeof useLaserStore.getState>['grblSettingsRows'],
+): ReadonlyArray<FirmwareDiff> {
+  return computeFirmwareDiffs(state.draft, rows, state.draftMachine).filter(
+    (diff) => diff.differs && diff.writable && state.queuedFirmwareWriteIds.includes(diff.id),
+  );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function SetupLayout(props: {
+  readonly state: DeviceSetupState;
+  readonly dispatch: React.Dispatch<DeviceSetupAction>;
+}): JSX.Element {
+  const stepOrder = deviceSetupStepOrder(props.state.machineKind);
+  const stepNumber = stepOrder.indexOf(props.state.step) + 1;
+  return (
+    <div className="lf-machine-setup-layout" style={layoutStyle}>
+      <SetupStepper state={props.state} stepOrder={stepOrder} />
+      <div style={contentStyle}>
+        <p style={stepHintStyle}>
+          Step {stepNumber} of {stepOrder.length} — {STEP_TITLES[props.state.step]}
+        </p>
+        <div style={bodyStyle}>{renderStep(props.state, props.dispatch)}</div>
+      </div>
+    </div>
+  );
+}
+
+function SetupStepper(props: {
+  readonly state: DeviceSetupState;
+  readonly stepOrder: ReadonlyArray<DeviceSetupStep>;
+}): JSX.Element {
+  return (
+    <nav className="lf-machine-setup-stepper" aria-label="Machine Setup steps" style={stepperStyle}>
+      {props.stepOrder.map((step, index) => (
+        <div
+          key={step}
+          aria-current={step === props.state.step ? 'step' : undefined}
+          style={{ ...stepStyle, ...(step === props.state.step ? activeStepStyle : {}) }}
+        >
+          <span style={stepNumberStyle}>{index + 1}</span>
+          <span>{STEP_TITLES[step]}</span>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function SetupActions(props: {
+  readonly state: DeviceSetupState;
+  readonly dispatch: React.Dispatch<DeviceSetupAction>;
+  readonly onClose: () => void;
+  readonly onSave: () => void;
+  readonly saving: boolean;
+  readonly firmwareWriteCount: number;
+}): JSX.Element {
+  const finalStep = isLastDeviceSetupStep(props.state.step, props.state.machineKind);
+  const ready = machineSetupValidationIssues(props.state).length === 0;
+  return (
+    <DialogActions>
+      <Button
+        onClick={props.onClose}
+        disabled={props.saving}
+        {...helpProps('control:laser.device-setup.cancel')}
+      >
+        Cancel without saving
+      </Button>
+      <Button
+        onClick={() => props.dispatch({ kind: 'back' })}
+        disabled={props.saving || isFirstDeviceSetupStep(props.state.step, props.state.machineKind)}
+        {...helpProps('control:laser.device-setup.back')}
+      >
+        Back
+      </Button>
+      {finalStep ? (
+        <Button
+          variant="primary"
+          onClick={props.onSave}
+          disabled={!ready || props.saving}
+          {...helpProps(
+            'control:laser.device-setup.finish',
+            ready ? undefined : 'Resolve the flagged software configuration items before saving.',
+          )}
+        >
+          {saveButtonLabel(props.saving, props.firmwareWriteCount)}
+        </Button>
+      ) : (
+        <Button
+          variant="primary"
+          onClick={() => props.dispatch({ kind: 'next' })}
+          disabled={!canAdvanceDeviceSetup(props.state)}
+          {...helpProps('control:laser.device-setup.next')}
+        >
+          Next
+        </Button>
+      )}
+    </DialogActions>
+  );
+}
+
+function saveButtonLabel(saving: boolean, firmwareWriteCount: number): string {
+  if (saving) return 'Saving and verifying…';
+  if (firmwareWriteCount === 0) return 'Save machine setup';
+  return `Save setup and write ${firmwareWriteCount} setting${firmwareWriteCount === 1 ? '' : 's'}`;
 }
 
 function renderStep(
@@ -175,18 +255,18 @@ function renderStep(
   dispatch: React.Dispatch<DeviceSetupAction>,
 ): JSX.Element {
   switch (state.step) {
-    case 'connect':
-      return <DeviceSetupConnectStep state={state} dispatch={dispatch} />;
     case 'identify':
       return <DeviceSetupIdentifyStep state={state} dispatch={dispatch} />;
+    case 'connect':
+      return <DeviceSetupConnectStep state={state} dispatch={dispatch} />;
     case 'confirm':
       return <DeviceSetupConfirmStep state={state} dispatch={dispatch} />;
+    case 'machine':
+      return <DeviceSetupMachineStep state={state} dispatch={dispatch} />;
     case 'safety':
       return <DeviceSetupSafetyStep state={state} dispatch={dispatch} />;
-    case 'probe':
-      return <DeviceSetupProbeStep />;
     case 'firmware':
-      return <DeviceSetupFirmwareStep state={state} />;
+      return <DeviceSetupFirmwareStep state={state} dispatch={dispatch} />;
     case 'review':
       return <DeviceSetupReviewStep state={state} dispatch={dispatch} />;
     default:
@@ -195,9 +275,52 @@ function renderStep(
 }
 
 const stepHintStyle: React.CSSProperties = {
-  margin: '0 0 8px 0',
+  margin: '0 0 8px',
   fontSize: 12,
   fontWeight: 600,
   color: 'var(--lf-text-muted)',
 };
-const bodyStyle: React.CSSProperties = { minHeight: 220 };
+const layoutStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '190px minmax(0, 1fr)',
+  gap: 16,
+  minHeight: 520,
+};
+const stepperStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  borderRight: '1px solid var(--lf-border)',
+  paddingRight: 12,
+};
+const stepStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '24px minmax(0, 1fr)',
+  gap: 7,
+  alignItems: 'center',
+  padding: '7px 6px',
+  borderRadius: 5,
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+};
+const activeStepStyle: React.CSSProperties = {
+  background: 'var(--lf-bg-2)',
+  color: 'var(--lf-text)',
+  fontWeight: 600,
+};
+const stepNumberStyle: React.CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
+  width: 22,
+  height: 22,
+  border: '1px solid var(--lf-border)',
+  borderRadius: '50%',
+  fontSize: 11,
+};
+const contentStyle: React.CSSProperties = { minWidth: 0, overflow: 'hidden' };
+const bodyStyle: React.CSSProperties = {
+  minHeight: 440,
+  maxHeight: 560,
+  overflowY: 'auto',
+  paddingRight: 6,
+};

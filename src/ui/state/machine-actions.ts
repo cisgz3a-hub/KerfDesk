@@ -68,7 +68,7 @@ export type MachineActions = {
 
 // Library bits the session's tool list doesn't already carry are appended
 // (id-keyed), so a saved custom bit is selectable in every CNC project.
-function withCustomTools(
+export function cncMachineWithCustomTools(
   machine: CncMachineConfig,
   customTools: ReadonlyArray<CncTool>,
 ): CncMachineConfig {
@@ -89,7 +89,7 @@ export function machineActions(set: MachineSet): MachineActions {
         const machine =
           kind === 'laser'
             ? LASER_MACHINE_CONFIG
-            : withCustomTools(
+            : cncMachineWithCustomTools(
                 state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG,
                 state.cncLibrary.customTools,
               );
@@ -189,7 +189,7 @@ function cncMachineSetupStatePatch(
 
 // Clamp layer spindle RPMs to a new machine ceiling, preserving identity
 // when nothing changes so no-op preset applies stay cheap.
-function sceneWithSpindleCeiling(scene: Scene, spindleMaxRpm: number): Scene {
+export function sceneWithSpindleCeiling(scene: Scene, spindleMaxRpm: number): Scene {
   let changed = false;
   const layers = scene.layers.map((layer) => {
     const cnc = layer.cnc;

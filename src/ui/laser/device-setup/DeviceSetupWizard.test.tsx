@@ -15,7 +15,6 @@ import { DeviceSetupWizard } from './DeviceSetupWizard';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const FALCON_ID = 'creality-falcon-a1-pro-grblhal';
 const IDLE_STATUS = {
   state: 'Idle',
   subState: null,
@@ -30,10 +29,7 @@ function mockPlatform(serialSupported = true): PlatformAdapter {
   return {
     id: 'mock',
     pickFilesForOpen: vi.fn(async (_request: FileOpenRequest) => []),
-    pickFileForSave: vi.fn(async (_request: FileSaveRequest) => ({
-      displayName: 'mock.json',
-      write: vi.fn(async () => undefined),
-    })),
+    pickFileForSave: vi.fn(async (_request: FileSaveRequest) => null),
     serial: { isSupported: () => serialSupported, requestPort: async () => null },
   };
 }
@@ -41,10 +37,7 @@ function mockPlatform(serialSupported = true): PlatformAdapter {
 async function renderWizard(
   onClose: () => void = () => undefined,
   adapter: PlatformAdapter = mockPlatform(),
-): Promise<{
-  readonly host: HTMLDivElement;
-  readonly unmount: () => Promise<void>;
-}> {
+): Promise<{ readonly host: HTMLDivElement; readonly unmount: () => Promise<void> }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
@@ -71,6 +64,7 @@ afterEach(() => {
     connection: { kind: 'disconnected' },
     detectedSettings: null,
     detectedControllerKind: null,
+    activeControllerKind: 'grbl-v1.1',
     statusReport: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -78,360 +72,314 @@ afterEach(() => {
 });
 
 describe('DeviceSetupWizard', () => {
-  it('opens on the connect step', async () => {
-    const { host, unmount } = await renderWizard();
+  it('opens controller-first and shows one seven-step setup sequence', async () => {
+    const view = await renderWizard();
     try {
-      expect(host.textContent).toContain('Step 1 of 6');
-      expect(host.textContent).toContain('Connect & read');
+      expect(view.host.textContent).toContain('Step 1 of 7 — Machine & controller');
+      expect(view.host.textContent).toContain('Start here before connecting.');
+      expect(view.host.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+      expect(view.host.textContent).not.toContain('ready to cut');
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  // The wizard is the documented connect-time setup path (ADR-092): its
-  // Connect must bind the draft profile's firmware and baud rate exactly like
-  // the rail's ConnectionBar does — a bare connect() drives a Marlin box with
-  // the GRBL driver at 115200.
-  it('connects with the draft profile controller kind and baud rate', async () => {
+  it('connects only after using the selected controller and baud', async () => {
     const originalConnect = useLaserStore.getState().connect;
     const connect = vi.fn(async () => undefined);
     useLaserStore.setState({ connect });
-    useStore.getState().updateDeviceProfile({ controllerKind: 'marlin', baudRate: 250000 });
-    const { host, unmount } = await renderWizard();
+    const view = await renderWizard();
     try {
+      await changeSelect(view.host, 'Controller firmware', 'marlin');
+      await act(async () => button(view.host, 'Next').click());
       await act(async () => {
-        button(host, 'Connect…').click();
+        button(view.host, 'Connect…').click();
         await Promise.resolve();
       });
-      expect(connect).toHaveBeenCalledTimes(1);
       expect(connect).toHaveBeenCalledWith(expect.anything(), {
         controllerKind: 'marlin',
         baudRate: 250000,
       });
     } finally {
-      await unmount();
+      await view.unmount();
       useLaserStore.setState({ connect: originalConnect });
     }
   });
 
-  it('disables the wizard Connect button when Web Serial is unsupported', async () => {
-    const { host, unmount } = await renderWizard(undefined, mockPlatform(false));
+  it('keeps detected identity observational until the operator explicitly adopts it', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grblhal',
+      detectedSettings: {},
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const view = await renderWizard();
     try {
-      expect(button(host, 'Connect…').disabled).toBe(true);
+      expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
+      await act(async () => button(view.host, 'Next').click());
+      expect(view.host.textContent).toContain('Connection does not match the setup draft');
+      await act(async () => button(view.host, 'Use detected grblHAL in draft').click());
+      await act(async () => button(view.host, 'Back').click());
+      expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('exposes help metadata on the wizard navigation buttons', async () => {
-    const { host, unmount } = await renderWizard();
+  it('disables serial connection when the platform does not support it', async () => {
+    const view = await renderWizard(undefined, mockPlatform(false));
     try {
-      const nav: ReadonlyArray<readonly [string, string]> = [
-        ['Cancel', 'control:laser.device-setup.cancel'],
-        ['Back', 'control:laser.device-setup.back'],
-        ['Next', 'control:laser.device-setup.next'],
-      ];
-      for (const [label, helpId] of nav) {
-        const target = button(host, label);
-        expect(target.dataset.helpId).toBe(helpId);
-        expect(target.title.length).toBeGreaterThan(30);
-      }
-      await advanceUntil(host, 'Finish setup');
-      const finish = button(host, 'Finish setup');
-      expect(finish.dataset.helpId).toBe('control:laser.device-setup.finish');
-      expect(finish.title.length).toBeGreaterThan(30);
+      await act(async () => button(view.host, 'Next').click());
+      expect(button(view.host, 'Connect…').disabled).toBe(true);
+      expect(view.host.textContent).toContain('Web Serial is unavailable');
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('applies a preset to the draft and commits only on Finish', async () => {
-    const { host, unmount } = await renderWizard();
+  it('keeps all edits in a draft and discards them on cancel', async () => {
+    const onClose = vi.fn();
+    const view = await renderWizard(onClose);
     try {
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      expect(host.textContent).toContain('Step 3 of 6');
-      expect(host.textContent).toContain('Confirm settings');
-      // The preset edits the draft; the live profile is untouched until Finish.
-      expect(useStore.getState().project.device.profileId).toBe(DEFAULT_DEVICE_PROFILE.profileId);
-
-      await advanceUntil(host, 'Finish setup');
-      const finish = button(host, 'Finish setup');
-      expect(finish.disabled).toBe(false);
-      await act(async () => finish.click());
-
-      expect(useStore.getState().project.device.profileId).toBe(FALCON_ID);
+      await changeSelect(view.host, 'Controller firmware', 'marlin');
+      await act(async () => button(view.host, 'Cancel without saving').click());
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(useStore.getState().project.device.controllerKind).not.toBe('marlin');
+      expect(useStore.getState().dirty).toBe(false);
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('keeps a selected preset exact when detection arrives after the wizard opened', async () => {
-    const { host, unmount } = await renderWizard();
+  it('atomically saves a laser profile and workspace at the end', async () => {
+    const view = await renderWizard();
     try {
-      // Opened with no detection; the controller reports a 363×273 bed afterwards.
-      await act(async () => {
-        useLaserStore.setState({
-          connection: { kind: 'connected' },
-          detectedSettings: { bedWidth: 363, bedHeight: 273 },
-          lastSettingsReadAt: 1,
-        } as Partial<ReturnType<typeof useLaserStore.getState>>);
-      });
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click()); // a 400×400 preset
-      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
-      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
-      // Detected 363 must win over the preset's nominal 400.
-      expect(bed.value).toBe('400');
+      await act(async () => button(view.host, 'Next').click()); // connect
+      await act(async () => button(view.host, 'Next').click()); // workspace
+      await changeInput(view.host, 'Device name', 'Beginner laser');
+      await changeInput(view.host, 'Bed width (mm)', '510');
+      await advanceToReview(view.host);
+      expect(view.host.textContent).toContain('Software configuration is internally consistent');
+      expect(view.host.textContent).toContain('Hardware commissioning');
+      await act(async () => button(view.host, 'Save machine setup').click());
+
+      const store = useStore.getState();
+      expect(store.project.device.name).toBe('Beginner laser');
+      expect(store.project.device.bedWidth).toBe(510);
+      expect(store.project.workspace.width).toBe(510);
+      expect(store.undoStack).toHaveLength(1);
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('commits detected grblHAL identity and controller-tuned frame feed after choosing Falcon', async () => {
-    useStore.getState().updateDeviceProfile({
-      framingFeedMmPerMin: 10000,
-      maxFeed: 10000,
-      controllerKind: 'grbl-v1.1',
-    });
+  it('keeps a selected catalog profile exact instead of overlaying controller observations', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       detectedControllerKind: 'grblhal',
-      detectedSettings: {
-        bedWidth: 400,
-        bedHeight: 400,
-        maxFeed: 10000,
-        minPowerS: 0,
-        maxPowerS: 1000,
-      },
-      lastSettingsReadAt: 1718600000000,
+      detectedSettings: { bedWidth: 363, bedHeight: 273 },
+      lastSettingsReadAt: 1,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
-    const { host, unmount } = await renderWizard();
+    const view = await renderWizard();
     try {
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      const firstCard = host.querySelector('article');
-      expect(firstCard?.textContent).toContain('Creality Falcon A1 Pro');
-      expect(firstCard?.textContent).toContain('Possible match');
-      expect(firstCard?.textContent).toContain('Detected grblHAL firmware.');
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      await advanceUntil(host, 'Finish setup');
-      await act(async () => button(host, 'Finish setup').click());
-
-      expect(useStore.getState().project.device).toMatchObject({
-        profileId: FALCON_ID,
-        controllerKind: 'grblhal',
-        maxFeed: 10000,
-        framingFeedMmPerMin: 10000,
-      });
+      await act(async () => button(view.host, 'Use Creality Falcon A1 Pro').click());
+      expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
+      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click());
+      expect(input(view.host, 'Bed width (mm)').value).toBe('400');
+      expect(useStore.getState().project.device).toEqual(DEFAULT_DEVICE_PROFILE);
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('applies detected values visibly by jumping to the confirm step', async () => {
-    const { host, unmount } = await renderWizard();
+  it('shows CNC-only machine settings and commits them with the profile', async () => {
+    const view = await renderWizard();
     try {
-      await act(async () => {
-        useLaserStore.setState({
-          connection: { kind: 'connected' },
-          detectedSettings: { bedWidth: 363, bedHeight: 273, zTravelMm: 33 },
-          lastSettingsReadAt: 1,
-        } as Partial<ReturnType<typeof useLaserStore.getState>>);
-      });
+      const radios = view.host.querySelectorAll('input[name="machine-kind"]');
+      const cncRadio = radios.item(1);
+      if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
+      await act(async () => cncRadio.click());
+      await changeSelect(view.host, 'Built-in CNC machine', 'genmitsu-3018');
+      await act(async () => button(view.host, 'Load into draft').click());
+      await act(async () => button(view.host, 'Next').click()); // connect
+      await act(async () => button(view.host, 'Next').click()); // workspace
+      await act(async () => button(view.host, 'Next').click()); // machine output
+      expect(view.host.textContent).toContain('CNC clearance and spindle contract');
+      expect(view.host.textContent).not.toContain('Laser output and accessories');
+      expect(input(view.host, 'Spindle maximum').value).toBe('10000');
+      await changeInput(view.host, 'Safe Z', '9');
+      await advanceToReview(view.host);
+      await act(async () => button(view.host, 'Save machine setup').click());
 
-      await act(async () => button(host, 'Apply detected').click());
+      const machine = useStore.getState().project.machine;
+      expect(machine?.kind).toBe('cnc');
+      if (machine?.kind === 'cnc') expect(machine.params.safeZMm).toBe(9);
+      expect(useStore.getState().project.device.bedWidth).toBe(300);
+      expect(useStore.getState().project.device.bedHeight).toBe(180);
+      expect(useStore.getState().cachedCncMachine?.params.safeZMm).toBe(9);
+    } finally {
+      await view.unmount();
+    }
+  });
 
-      expect(host.textContent).toContain('Step 3 of 6');
-      expect(host.textContent).toContain('Confirm settings');
-      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
-      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
-      expect(bed.value).toBe('363');
+  it('blocks a controller that cannot run the selected CNC output contract', async () => {
+    const view = await renderWizard();
+    try {
+      const cncRadio = view.host.querySelectorAll('input[name="machine-kind"]').item(1);
+      if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
+      await act(async () => cncRadio.click());
+      await changeSelect(view.host, 'Controller firmware', 'marlin');
+      expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
+      expect(button(view.host, 'Next').disabled).toBe(true);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('lets the operator apply detected values without mutating the project early', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedSettings: { bedWidth: 363, bedHeight: 273 },
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const view = await renderWizard();
+    try {
+      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Use detected values').click());
+      await act(async () => button(view.host, 'Next').click());
+      expect(input(view.host, 'Bed width (mm)').value).toBe('363');
       expect(useStore.getState().project.device.bedWidth).toBe(DEFAULT_DEVICE_PROFILE.bedWidth);
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('does not overlay a prior detection when a preset is picked during a re-read', async () => {
-    const { host, unmount } = await renderWizard();
+  it('uses external configuration guidance for Marlin instead of firmware writes', async () => {
+    const view = await renderWizard();
     try {
-      await act(async () => {
-        useLaserStore.setState({
-          connection: { kind: 'connected' },
-          detectedSettings: { bedWidth: 363, bedHeight: 273 },
-          lastSettingsReadAt: 1,
-        } as Partial<ReturnType<typeof useLaserStore.getState>>);
-      });
-      // A re-read clears detectedSettings to null before the $$ reply repopulates it.
-      await act(async () => {
-        useLaserStore.setState({
-          detectedSettings: null,
-          lastSettingsReadAt: null,
-        } as Partial<ReturnType<typeof useLaserStore.getState>>);
-      });
-      // Picking a preset during that window must still overlay the last detected bed.
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
-      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
-      expect(bed.value).toBe('400');
+      await changeSelect(view.host, 'Controller firmware', 'marlin');
+      await advanceToFirmware(view.host);
+      expect(view.host.textContent).toContain('Marlin configuration is not written from KerfDesk');
+      expect(view.host.textContent).toContain('M503, M114, M400');
+      expect(view.host.textContent).not.toContain('Write and verify');
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('keeps Finish disabled on the untouched generic default', async () => {
-    const { host, unmount } = await renderWizard();
+  it('hides serial streaming and G-code controls for file-only Ruida setup', async () => {
+    const view = await renderWizard();
     try {
-      await advanceUntil(host, 'Finish setup');
-      expect(button(host, 'Finish setup').disabled).toBe(true);
-      expect(useStore.getState().project.device.profileId).toBe(DEFAULT_DEVICE_PROFILE.profileId);
+      await changeSelect(view.host, 'Controller firmware', 'ruida');
+      expect(view.host.textContent).toContain('File export');
+      expect(view.host.querySelector('[aria-label="Serial baud rate"]')).toBeNull();
+      expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
+      expect(view.host.querySelector('[aria-label="Streaming mode"]')).toBeNull();
+      await act(async () => button(view.host, 'Next').click());
+      expect(view.host.textContent).toContain('No live connection is used for this controller');
     } finally {
-      await unmount();
+      await view.unmount();
     }
   });
 
-  it('discards the draft and does not commit when cancelled', async () => {
-    const onClose = vi.fn();
-    const { host, unmount } = await renderWizard(onClose);
-    try {
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      await act(async () => button(host, 'Cancel').click());
-      expect(onClose).toHaveBeenCalled();
-      expect(useStore.getState().project.device.profileId).toBe(DEFAULT_DEVICE_PROFILE.profileId);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('commits edits made through the reused field editors', async () => {
-    const { host, unmount } = await renderWizard();
-    try {
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
-      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
-      await act(async () => {
-        bed.value = '555';
-        Simulate.change(bed);
-      });
-      // The clearable field commits on blur (as a real Next-click does), not on
-      // every keystroke — separate act so the draft re-renders before blur.
-      await act(async () => Simulate.blur(bed));
-      await advanceUntil(host, 'Finish setup');
-      await act(async () => button(host, 'Finish setup').click());
-      expect(useStore.getState().project.device.bedWidth).toBe(555);
-      expect(useStore.getState().project.device.profileId).toBe(FALCON_ID);
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('commits Safety-step edits (machine name) through the wizard draft', async () => {
-    const { host, unmount } = await renderWizard();
-    try {
-      await act(async () => button(host, 'Next').click()); // connect -> identify
-      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
-      await advanceUntil(host, 'Homing'); // reach the safety step
-      const name = host.querySelector('input[aria-label="Device name"]');
-      if (!(name instanceof HTMLInputElement)) throw new Error('name input missing on safety step');
-      await act(async () => {
-        name.value = 'Shopfloor Falcon';
-        Simulate.change(name);
-      });
-      await advanceUntil(host, 'Finish setup');
-      await act(async () => button(host, 'Finish setup').click());
-      expect(useStore.getState().project.device.name).toBe('Shopfloor Falcon');
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('routes a readiness item directly back to its editor', async () => {
-    const { host, unmount } = await renderWizard();
-    try {
-      await advanceUntil(host, 'Finish setup');
-      const editWorkArea = host.querySelector('button[aria-label="Edit Work area"]');
-      if (!(editWorkArea instanceof HTMLButtonElement)) {
-        throw new Error('Edit Work area button missing');
-      }
-      await act(async () => editWorkArea.click());
-      expect(host.textContent).toContain('Step 3 of 6');
-      expect(host.textContent).toContain('Confirm settings');
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('offers a guarded firmware write when the controller differs from the draft', async () => {
+  it('queues only confirmed common GRBL writes for final Save and keeps travel review-only', async () => {
     const originalWrite = useLaserStore.getState().writeGrblSetting;
     const writeGrblSetting = vi.fn(async () => undefined);
     useLaserStore.setState({
       connection: { kind: 'connected' },
+      activeControllerKind: 'grbl-v1.1',
       statusReport: IDLE_STATUS,
-      grblSettingsRows: settingsMapToRows(new Map<number, string>([[30, '255']])),
-      lastSettingsReadAt: 1718600000000,
+      grblSettingsRows: settingsMapToRows(
+        new Map([
+          [30, '900'],
+          [130, '350'],
+        ]),
+      ),
+      lastSettingsReadAt: Date.now(),
       writeGrblSetting,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
-    const { host, unmount } = await renderWizard();
+    const view = await renderWizard();
     try {
-      await advanceUntil(host, 'Sync to controller');
-      const confirm = host.querySelector('input[aria-label="Confirm write $30"]');
-      if (!(confirm instanceof HTMLInputElement)) throw new Error('confirm checkbox missing');
-      const write = button(host, 'Write $30');
-      expect(write.disabled).toBe(true); // disabled until confirmed
-
+      await advanceToFirmware(view.host);
+      expect(view.host.textContent).toContain('Queue $30 for Save');
+      expect(view.host.textContent).toContain('$130');
+      expect(view.host.textContent).toContain('never batch-written');
+      expect(view.host.textContent).not.toContain('Queue $130 for Save');
+      const queue = button(view.host, 'Queue $30 for Save');
+      expect(queue.disabled).toBe(true);
+      const backup = input(view.host, 'Confirm controller backup exported');
+      await act(async () => {
+        backup.checked = true;
+        Simulate.change(backup);
+      });
+      const confirm = input(view.host, 'Confirm write $30');
       await act(async () => {
         confirm.checked = true;
         Simulate.change(confirm);
       });
-      expect(write.disabled).toBe(false);
-
+      expect(queue.disabled).toBe(false);
       await act(async () => {
-        write.click();
+        queue.click();
         await Promise.resolve();
-        await Promise.resolve();
-        await new Promise((resolve) => setTimeout(resolve, 0));
       });
-      // The draft's $30 (1000) is written, not the controller's current 255.
+      expect(writeGrblSetting).not.toHaveBeenCalled();
+      expect(view.host.textContent).toContain('Remove queued $30');
+      await act(async () => button(view.host, 'Next').click());
+      expect(view.host.textContent).toContain('Firmware after save');
+      expect(view.host.textContent).toContain('$30=1000; exact re-read required');
+      await act(async () => {
+        button(view.host, 'Save setup and write 1 setting').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
       expect(writeGrblSetting).toHaveBeenCalledWith(30, '1000');
     } finally {
-      await unmount();
-      await act(async () => {
-        useLaserStore.setState({ writeGrblSetting: originalWrite });
-      });
-    }
-  });
-
-  it('never offers a firmware write for machine-critical settings (bed travel)', async () => {
-    useLaserStore.setState({
-      connection: { kind: 'connected' },
-      statusReport: IDLE_STATUS,
-      grblSettingsRows: settingsMapToRows(new Map<number, string>([[130, '500']])),
-      lastSettingsReadAt: 1718600000000,
-    } as Partial<ReturnType<typeof useLaserStore.getState>>);
-    const { host, unmount } = await renderWizard();
-    try {
-      await advanceUntil(host, 'Sync to controller');
-      // $130 (machine-critical) is surfaced read-only — never with a Write button.
-      expect(host.textContent).toContain('$130');
-      const writeButtons = [...host.querySelectorAll('button')].filter((candidate) =>
-        candidate.textContent?.includes('Write'),
-      );
-      expect(writeButtons).toEqual([]);
-    } finally {
-      await unmount();
+      await view.unmount();
+      useLaserStore.setState({ writeGrblSetting: originalWrite });
     }
   });
 });
 
-async function advanceUntil(host: HTMLElement, text: string): Promise<void> {
-  for (let guard = 0; guard < 8; guard += 1) {
-    if (host.textContent?.includes(text) === true) return;
+async function advanceToFirmware(host: HTMLElement): Promise<void> {
+  while (!host.textContent?.includes('Step 6 of 7 — Firmware review')) {
     await act(async () => button(host, 'Next').click());
   }
-  throw new Error(`did not reach: ${text}`);
+}
+
+async function advanceToReview(host: HTMLElement): Promise<void> {
+  while (!host.textContent?.includes('Step 7 of 7 — Review & hardware handoff')) {
+    await act(async () => button(host, 'Next').click());
+  }
+}
+
+async function changeSelect(host: HTMLElement, ariaLabel: string, value: string): Promise<void> {
+  const field = select(host, ariaLabel);
+  await act(async () => {
+    field.value = value;
+    Simulate.change(field);
+  });
+}
+
+function select(host: HTMLElement, ariaLabel: string): HTMLSelectElement {
+  const field = host.querySelector(`select[aria-label="${ariaLabel}"]`);
+  if (!(field instanceof HTMLSelectElement)) throw new Error(`Select missing: ${ariaLabel}`);
+  return field;
+}
+
+async function changeInput(host: HTMLElement, ariaLabel: string, value: string): Promise<void> {
+  const field = input(host, ariaLabel);
+  await act(async () => {
+    field.value = value;
+    Simulate.change(field);
+  });
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+}
+
+function input(host: HTMLElement, ariaLabel: string): HTMLInputElement {
+  const field = host.querySelector(`input[aria-label="${ariaLabel}"]`);
+  if (!(field instanceof HTMLInputElement)) throw new Error(`Input missing: ${ariaLabel}`);
+  return field;
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {

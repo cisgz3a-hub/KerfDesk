@@ -1,87 +1,83 @@
-// Step 3 of the Device Setup wizard: confirm the controller-reported settings.
-// Renders the shared bed, feed, and laser-power rows bound to the wizard draft;
-// operator-supplied fields (name, origin, air assist) live on the safety step.
+// Step 3: establish the software coordinate model used by the workspace,
+// bounds checks, framing, jogging, and output transforms.
 
-import type { DeviceProfile } from '../../../core/devices';
-import { NumberInput } from '../../kit';
-import { BedRows, FeedRows } from '../DeviceProfileFields';
-import { LaserPowerRows } from '../DeviceProfilePowerFields';
+import type { DeviceProfile, Origin } from '../../../core/devices';
+import { BedRows, FeedRows, NameRow, OriginCornerRow, OriginSelect } from '../DeviceProfileFields';
+import { Row } from '../device-settings-shared';
 import type { DeviceSetupStepProps } from './device-setup-flow';
+import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
 export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
+  const guide = machineSetupControllerGuide(state.draft.controllerKind ?? 'grbl-v1.1');
+  const sourceText = state.controllerRead
+    ? 'Controller observations remain separate until you explicitly choose Use detected values.'
+    : 'No controller values were imported, so confirm each value from the machine manual.';
   return (
     <section style={sectionStyle}>
-      <p style={hintStyle}>
-        {state.machineKind === 'cnc'
-          ? 'These are the values your controller reported via $$. Confirm the router work area and feed limits. GRBL $30 is applied as the spindle RPM ceiling.'
-          : 'These are the values your controller reported via $$. Confirm the work area, feed, and power scale, and fix anything that does not match your laser.'}
-      </p>
+      <div style={calloutStyle}>
+        <strong>Work area and coordinates</strong>
+        <span>
+          These values drive the canvas size, bounds checks, origin transforms, jog direction,
+          framing feed, and every generated job. {sourceText}
+        </span>
+      </div>
+      <NameRow device={state.draft} update={update} />
       <BedRows device={state.draft} update={update} />
       <FeedRows device={state.draft} update={update} />
-      {state.machineKind === 'cnc' ? (
-        <div style={spindleStyle}>
-          <label style={spindleInputStyle}>
-            <span>Spindle maximum ($30)</span>
-            <NumberInput
-              aria-label="Spindle maximum RPM"
-              value={state.spindleMaxRpm ?? ''}
-              min={1}
-              max={100_000}
-              step={100}
-              onChange={(event) => {
-                const parsed = Number(event.target.value);
-                dispatch({
-                  kind: 'edit-spindle',
-                  spindleMaxRpm:
-                    event.target.value === '' || !Number.isFinite(parsed) || parsed <= 0
-                      ? null
-                      : Math.min(100_000, parsed),
-                });
-              }}
-            />
-            <span>RPM</span>
-          </label>
-          <label style={confirmStyle}>
-            <input
-              type="checkbox"
-              title="Confirm that this spindle RPM ceiling matches the router."
-              checked={state.spindleConfirmed}
-              disabled={state.spindleMaxRpm === null}
-              onChange={(event) =>
-                dispatch({ kind: 'confirm-spindle', confirmed: event.target.checked })
-              }
-            />
-            I confirm this spindle ceiling matches the router.
-          </label>
-          <span style={reportedStyle}>
-            Controller report:{' '}
-            {state.detected.maxPowerS === undefined
-              ? 'not reported'
-              : `${state.detected.maxPowerS} RPM`}
+      <OriginCornerRow device={state.draft} update={update} />
+      <Row label="Homing">
+        <label style={inlineStyle}>
+          <input
+            type="checkbox"
+            checked={state.draft.homing.enabled}
+            disabled={guide.homeCommand === null}
+            onChange={(event) =>
+              update({ homing: { ...state.draft.homing, enabled: event.target.checked } })
+            }
+            aria-label="Homing enabled"
+            title="Enable Home only after physical switches, axis direction, and the homing corner are verified."
+          />
+          <span>
+            {guide.homeCommand === null
+              ? 'Not available for this controller'
+              : `Enable Home (${guide.homeCommand})`}
           </span>
-        </div>
-      ) : (
-        <LaserPowerRows device={state.draft} update={update} />
-      )}
+        </label>
+        {state.draft.homing.enabled ? (
+          <OriginSelect
+            value={state.draft.homing.direction}
+            onChange={(direction: Origin) =>
+              update({ homing: { ...state.draft.homing, direction } })
+            }
+          />
+        ) : null}
+      </Row>
+      <p style={warningStyle}>
+        Do not enable homing until the physical switches, axis direction, and homing corner have
+        been checked with a hand on the emergency stop. Saving this setup does not run Home.
+      </p>
     </section>
   );
 }
 
 const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
-const hintStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-  lineHeight: 1.4,
-};
-const spindleStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
-const spindleInputStyle: React.CSSProperties = {
+const calloutStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) 120px auto',
+  gap: 4,
+  fontSize: 12,
+  lineHeight: 1.45,
+  marginBottom: 2,
+};
+const inlineStyle: React.CSSProperties = {
+  display: 'inline-flex',
   alignItems: 'center',
-  gap: 8,
+  gap: 5,
   fontSize: 12,
 };
-const confirmStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
-const reportedStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-muted)' };
+const warningStyle: React.CSSProperties = {
+  margin: '4px 0 0',
+  fontSize: 12,
+  color: 'var(--lf-warning)',
+  lineHeight: 1.45,
+};
