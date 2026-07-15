@@ -15,6 +15,7 @@ export interface KerfDeskFixture {
   readonly events: () => Promise<readonly FixtureEvent[]>;
   readonly savedFiles: () => Promise<Readonly<Record<string, string>>>;
   readonly emitSerialLine: (line: string) => Promise<void>;
+  readonly setSerialSetting: (id: number, value: string) => Promise<void>;
   readonly acknowledgeSerial: (count: number) => Promise<void>;
   readonly disconnectSerial: () => Promise<void>;
   readonly setAutoAcknowledge: (enabled: boolean) => Promise<void>;
@@ -72,6 +73,19 @@ function createFixtureControl(page: Page, pageErrors: readonly Error[]): KerfDes
           }
         ).__KERFDESK_E2E__.emitSerialLine(value);
       }, line),
+    setSerialSetting: (id, value) =>
+      page.evaluate(
+        ([settingId, settingValue]) => {
+          (
+            window as typeof window & {
+              __KERFDESK_E2E__: {
+                setSerialSetting: (id: number, value: string) => void;
+              };
+            }
+          ).__KERFDESK_E2E__.setSerialSetting(settingId, settingValue);
+        },
+        [id, value] as const,
+      ),
     acknowledgeSerial: (count) =>
       page.evaluate((value) => {
         (
