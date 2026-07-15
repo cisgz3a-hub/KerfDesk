@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
-import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import {
   createLayer,
   createProject,
@@ -9,9 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { prepareOutput } from '../../io/gcode';
 import type { JobPlacementSettings } from '../job-placement';
-import type { FrameVerification } from '../state/frame-verification';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -66,54 +63,29 @@ function project(): Project {
   };
 }
 
-function verification(input: Project): FrameVerification {
-  const prepared = prepareOutput(input, {
-    jobOrigin: {
-      startFrom: 'current-position',
-      anchor: 'center',
-      currentPosition: headPosition,
-    },
-  });
-  if (!prepared.ok) throw new Error('test setup: prepareOutput failed');
-  const bounds = computeJobBounds(prepared.job);
-  if (bounds === null) throw new Error('test setup: no bounds');
-  return { boundsSignature: frameBoundsSignature(bounds), wco: null, workOriginActive: false };
-}
-
-function machine(
-  position: { readonly x: number; readonly y: number },
-  frame: FrameVerification | null,
-) {
+function machine(position: { readonly x: number; readonly y: number }) {
   return {
     statusReport: { ...idleStatus, mPos: { ...position, z: 0 } },
     alarmCode: null,
     hasActiveStreamer: false,
-    frameVerification: frame,
+    frameVerification: null,
   };
 }
 
-describe('no-homing relative Frame gate (ADR-192)', () => {
-  it('blocks Current Position Start before Frame', () => {
+describe('no-homing relative Frame policy', () => {
+  it('allows Current Position Start without Frame', () => {
     const result = prepareStartJob(
       project(),
       readyController,
-      machine(headPosition, null),
+      machine(headPosition),
       currentPosition,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok)
-      expect(result.messages.join('\n')).toMatch(/no-homing placement needs a Frame/i);
+    expect(result.ok).toBe(true);
   });
 
-  it('allows Start after a matching Frame and re-blocks after a jog', () => {
-    const input = project();
-    const frame = verification(input);
+  it('continues to allow Current Position Start after a jog without Frame', () => {
     expect(
-      prepareStartJob(input, readyController, machine(headPosition, frame), currentPosition).ok,
+      prepareStartJob(project(), readyController, machine({ x: 130, y: 80 }), currentPosition).ok,
     ).toBe(true);
-    expect(
-      prepareStartJob(input, readyController, machine({ x: 130, y: 80 }, frame), currentPosition)
-        .ok,
-    ).toBe(false);
   });
 });

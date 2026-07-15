@@ -1344,10 +1344,10 @@ panel shows **Position job** with two paths:
 
 1. **Jog with controls (recommended).** The guide shows this mode as **Selected**
    when Current Position is active; it does not present a capture-style action.
-   The operator jogs to the chosen 9-dot job anchor, clicks Frame, then Start.
+   The operator jogs to the chosen 9-dot job anchor, may click Frame to inspect
+   the perimeter, then clicks Start. Frame remains available but is not required.
    Set origin is not required. If another placement mode was chosen, **Choose
-   jog positioning** restores Current Position. Start remains blocked until the
-   current job and live head position have a matching completed Frame.
+   jog positioning** restores Current Position.
 2. **Move head by hand.** The operator selects **Release motors to move by hand**,
    confirms Release motors, and physically moves the head. The guide then exposes
    **Use this position**, which sends Wake and waits for controller recovery.
@@ -1359,7 +1359,8 @@ panel shows **Position job** with two paths:
 Errors remain recoverable in place. A rejected Release, Wake, Unlock, or Set
 origin displays its controller-derived reason and does not advance the guide.
 Disconnect cancels the local guide state. An alarm, reset, disconnect, origin
-change, job change, or subsequent jog invalidates the applicable Frame proof.
+change, or job change invalidates a Verified Origin Frame proof. Current Position
+and User Origin do not create or require a Frame proof.
 The raw placement dropdown and advanced origin controls remain available for
 fixtures and deliberately manually-homed Absolute Coordinates workflows.
 

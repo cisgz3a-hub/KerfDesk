@@ -97,7 +97,7 @@ function useGuideActions(connected: boolean, status: string | null): GuideAction
       setJobPlacement({ startFrom: 'current-position' });
       setPhase('idle');
       setError(null);
-      pushToast('Current Position selected. Jog, Frame, then Start.', 'success');
+      pushToast('Current Position selected. Jog to place the job; Frame is optional.', 'success');
     },
     onRelease: () => {
       if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;
