@@ -5639,7 +5639,7 @@ Two existing pillars make a cheap, correct fix possible:
 - **Clear-on-done only.** A checkpoint survives Stop, error, disconnect,
   and crash; only a run reaching `done` (all lines acked) clears it —
   a deliberately stopped job is still resumable, and the banner's
-  Dismiss is the explicit discard.
+  **Discard recovery record…** action is the explicit discard.
 - **Resume path is the EXISTING one, gated by the fingerprint.** The
   recovery banner (Laser window, shown when a checkpoint with progress
   exists and no job is active) calls `runCheckpointResumeFlow`: it
@@ -5677,7 +5677,9 @@ Two existing pillars make a cheap, correct fix possible:
   (the existing confirm says it).
 - localStorage writes on the ack path are throttled (25 lines) and
   ~200 bytes; failures (quota, private mode) are swallowed — a
-  checkpoint is best-effort protection, never a reason to block a job.
+  persistence failure never blocks a job. Once a meaningful checkpoint is
+  successfully stored, the 2026-07-15 amendment deliberately blocks ordinary
+  Start until the operator chooses resume, full restart, or explicit discard.
 
 ### Verification
 
@@ -5697,6 +5699,32 @@ The original checkpoint stored only the fingerprint + acked counts. But resume r
 ### Amendment â€” schema v3: store the RESOLVED job origin, not the placement settings (2026-07-11, R1)
 
 PST-02 (v2) stored the placement SETTINGS (`{startFrom, anchor}`). That is byte-deterministic for Absolute / User Origin / Verified Origin, but NOT for `current-position`: `resolveCurrentPosition` freezes the live head XY into `JobOriginPlacement.currentPosition` at compile time, and on resume it re-resolved against the (moved) post-crash head, translating the job to a different origin and renumbering every line â€” reopening the exact false "it was edited" refusal for a normal placement mode (Codex re-audit R1). The checkpoint now stores the RESOLVED `jobOrigin` (a `JobOriginPlacement`, so a current-position run carries its frozen XY); `JOB_CHECKPOINT_SCHEMA_VERSION` is bumped 2 â†’ 3 (older slots read null and are discarded). `prepareStartJob` gained an optional `resolvedJobOrigin` override: a resume re-validates the live machine through the frozen origin's MODE (a vanished custom origin / unknown position still refuses) but COMPILES with the frozen origin so the bytes match the fingerprint. `prepareStartJob` surfaces the resolved `jobOrigin` on its ok result so the write site can capture it. An absent `jobOrigin` = Absolute (no translation).
+
+### Amendment — transport-aware incident recovery and protected Start intent (2026-07-15)
+
+The original safety banner offered the same **Recover controller** Ctrl-X action for every incident,
+including a physically absent USB transport. That action could create another write-failure notice and
+claim the global recovery operation while the only useful action—reconnect—was disabled. It also made
+controller reset look like job recovery even though the durable checkpoint is a separate record.
+
+- A lost/failed transport now offers **Reconnect controller…** and **I made the machine safe**. Ctrl-X
+  is offered only for a connected controller that explicitly reports `Sleep`, and is labeled **Reset
+  controller (does not resume job)**. Store-level defense refuses soft reset before mutating recovery
+  state when no live transport exists. Connect/reconnect no longer clears the incident notice; only the
+  operator acknowledgment does. None of these actions reads, clears, or advances the job checkpoint.
+- Connection management remains an escape hatch during recovery and startup-handshake ownership. Other
+  motion and job controls remain gated until the link and controller state are settled.
+- Ordinary Start (including Ctrl+Return) now fails closed before `startJob` can write to the controller
+  whenever a meaningful interrupted-job record exists. The banner presents three distinct intents:
+  fingerprint-verified **Review safe recovery**, strongly confirmed **Restart entire job from
+  beginning…**, and strongly confirmed **Discard recovery record…**. A line-1 restart may replace the
+  checkpoint only when the current project still compiles to the checkpointed fingerprint and the slot
+  has not changed; the old record survives any refused/failed start.
+- Checkpoint resume verifies that the same storage record still exists both before compilation and
+  immediately before streaming. Manual Start-from-line stamps `resumeInFlight` only when its compiled
+  program owns the stored fingerprint. The replay program is tested to end with the original G-code
+  sliced at `rawResumeLine(ackedLines)`, proving that the tail begins at the exact first unconfirmed raw
+  line rather than line 1.
 
 ## ADR-119 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
 

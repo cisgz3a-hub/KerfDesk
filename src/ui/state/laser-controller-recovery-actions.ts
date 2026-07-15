@@ -20,16 +20,29 @@ type SetFn = (
 type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type DriverFn = () => ControllerDriver;
+type RecoveryRefs = ControllerLifecycleRefs & { readonly connection: unknown | null };
 
 export function controllerRecoveryActions(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: RecoveryRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'wakeController'> {
   return {
     wakeController: async () => {
+      // Soft reset is a live-transport operation, not a reconnect mechanism.
+      // Guard before invalidating evidence or claiming the global recovery
+      // operation so USB loss cannot deadlock the remaining controls.
+      if (get().connection.kind !== 'connected' || refs.connection === null) {
+        const message =
+          'Controller is not connected. Reconnect the controller before sending a soft reset.';
+        set((state) => ({
+          lastWriteError: message,
+          log: pushLog(state, `[lf2] Controller recovery blocked: ${message}`),
+        }));
+        throw new Error(message);
+      }
       const softReset = driver().realtime.softReset;
       if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
       cancelControllerLifecycleRefs(refs, 'Controller recovery started.');

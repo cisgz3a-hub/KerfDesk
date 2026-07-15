@@ -10,11 +10,20 @@ import {
 } from '../../core/recovery';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 
 vi.mock('./start-job-flow', () => ({
   runCheckpointResumeFlow: vi.fn(async () => undefined),
+}));
+
+vi.mock('./start-job-restart-flow', () => ({
+  runRestartInterruptedJobFlow: vi.fn(async () => undefined),
+}));
+
+vi.mock('../state/job-aware-dialogs', () => ({
+  jobAwareConfirm: vi.fn(() => true),
 }));
 
 (
@@ -58,6 +67,22 @@ function storedDisconnectedCncCheckpoint(): void {
     withJobInterruption(
       advanceJobCheckpoint(cp, 2, NOW),
       { kind: 'disconnect', message: 'USB connection was lost during the router job.' },
+      NOW,
+    ),
+  );
+}
+
+function storedDisconnectedLaserCheckpointBeforeAck(): void {
+  const cp = createJobCheckpoint({
+    gcode: GCODE,
+    machineKind: 'laser',
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    nowIso: NOW,
+  });
+  writeJobCheckpoint(
+    withJobInterruption(
+      cp,
+      { kind: 'disconnect', message: 'USB connection was lost before an acknowledgement.' },
       NOW,
     ),
   );
@@ -124,7 +149,7 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.textContent).toContain('select the first uncertain native contour segment');
     expect([...(host?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
       'Review supervised recovery',
-      'Dismiss',
+      'Discard recovery record…',
     ]);
   });
 
@@ -151,7 +176,16 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.textContent).toContain('cannot start another recovery');
     expect(
       [...(host?.querySelectorAll('button') ?? [])].map((button) => button.textContent),
-    ).toEqual(['Dismiss']);
+    ).toEqual(['Discard recovery record…']);
+  });
+
+  it('retains a laser recovery record when disconnect happened before the first ack', () => {
+    storedDisconnectedLaserCheckpointBeforeAck();
+    render();
+
+    expect(host?.textContent).toContain('Interrupted laser job');
+    expect(host?.textContent).toContain('0 of 4 G-code lines acknowledged');
+    expect(host?.textContent).toContain('Recorded cause:');
   });
 
   it('shows the persisted interruption cause after reconnect or reload', () => {
@@ -170,11 +204,11 @@ describe('CheckpointResumeBanner', () => {
     expect(host?.textContent).toBe('');
   });
 
-  it('dismiss clears the stored checkpoint and hides the banner', () => {
+  it('explicit discard confirmation clears the stored checkpoint and hides the banner', () => {
     storedCheckpoint(3);
     render();
     const dismiss = [...(host?.querySelectorAll('button') ?? [])].find(
-      (b) => b.textContent === 'Dismiss',
+      (b) => b.textContent === 'Discard recovery record…',
     );
     expect(dismiss).toBeDefined();
 
@@ -184,6 +218,7 @@ describe('CheckpointResumeBanner', () => {
 
     expect(readJobCheckpoint()).toBeNull();
     expect(host?.textContent).toBe('');
+    expect(jobAwareConfirm).toHaveBeenCalledWith(expect.stringContaining('Discard this'));
   });
 
   it('resume hands the checkpoint to runCheckpointResumeFlow', async () => {
@@ -197,6 +232,23 @@ describe('CheckpointResumeBanner', () => {
 
     expect(runCheckpointResumeFlow).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runCheckpointResumeFlow).mock.calls[0]?.[0]).toMatchObject({
+      ackedLines: 2,
+    });
+  });
+
+  it('hands deliberate line-1 restart to the separate restart flow', async () => {
+    const { runRestartInterruptedJobFlow } = await import('./start-job-restart-flow');
+    storedCheckpoint(2);
+    render();
+
+    act(() => {
+      [...(host?.querySelectorAll('button') ?? [])]
+        .find((button) => button.textContent === 'Restart entire job from beginning…')
+        ?.click();
+    });
+
+    expect(runRestartInterruptedJobFlow).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runRestartInterruptedJobFlow).mock.calls[0]?.[0]).toMatchObject({
       ackedLines: 2,
     });
   });

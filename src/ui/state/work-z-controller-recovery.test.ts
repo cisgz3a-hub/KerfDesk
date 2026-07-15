@@ -81,6 +81,7 @@ describe('owned controller Work-Z recovery', () => {
     await flush();
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
 
     await useLaserStore.getState().recoverWorkZFromController({
       activeToolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,

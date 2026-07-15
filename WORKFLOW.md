@@ -874,30 +874,48 @@ run that finishes cleanly clears it.
    restores the project (F-C3).
 2. The Laser window shows the banner: "Interrupted laser job from
    <time>: N of M G-code lines acknowledged by the controller."
-3. Operator connects, homes, and confirms the work zero is unchanged
-   (same contract as manual Start-from-line).
-4. For laser jobs, **Review safe recovery** re-compiles the project, verifies
+3. If a red machine-safety notice is present, a lost/failed transport offers
+   **Reconnect controller…**, never Ctrl-X. The operator physically makes the
+   machine safe, reconnects, then uses **I made the machine safe** to acknowledge
+   the incident. Reconnect/acknowledge do not clear or resume the checkpoint.
+4. Operator homes when position may have been lost and confirms the work zero is
+   unchanged (same contract as manual Start-from-line).
+5. For laser jobs, **Review safe recovery** re-compiles the project, verifies
    the fingerprint, and maps the acknowledged count to the first unconfirmed
    raw line.
-5. For router jobs, the acknowledged count remains diagnostic only. A retained
+6. For router jobs, the acknowledged count remains diagnostic only. A retained
    checkpoint may open **Review supervised recovery**, where the operator—not
    the count—selects the first uncertain native contour segment. Execution is
    available only after the cutter is clear, the spindle is stopped, position/
    WCS/Z zero and tool/workholding are requalified, all earlier machining and
    the displayed tangent runway are confirmed, and a machine-specific air-cut
    or scrap-test qualification record is entered.
-6. The router flow recompiles the exact checkpointed source, generates a new
+7. The router flow recompiles the exact checkpointed source, generates a new
    recovery job, SHA-256 binds the source/recovery bytes, semantic segment,
    runway profile, and review proofs, then repeats the ordinary CNC Start and
    setup-attestation gates before streaming. It never streams the old program
    from an acknowledged line.
-7. The checkpoint records the terminal safety reason when one is available
+8. The checkpoint records the terminal safety reason when one is available
    (disconnect, controller error/rejected line, reboot, write failure, or
    cancellation) and shows it after reload/reconnect.
-8. The checkpoint clears only after the controller reports connected,
+9. The checkpoint clears only after the controller reports connected,
    physical Idle; the final GRBL `ok` alone is not physical completion.
-9. A CNC checkpoint with zero acknowledgements still shows the diagnostic review; it never implies
+10. A CNC checkpoint with zero acknowledgements still shows the diagnostic review; it never implies
    that no physical motion occurred.
+
+#### Start, resume, restart, and discard are separate intents
+1. Ordinary **Start job** and Ctrl+Return are blocked before any controller write
+   while a meaningful interrupted-job checkpoint exists; they cannot silently
+   replace the record.
+2. **Review safe recovery** is the only automatic laser continuation path. It
+   re-validates the same storage record and streams a resume preamble followed by
+   the original program at the exact first unconfirmed raw line.
+3. **Restart entire job from beginning…** is a separate, strongly confirmed laser
+   action. It warns that completed areas may burn again, requires the current
+   compiled fingerprint and checkpoint identity to match, and replaces the old
+   record only after line-1 streaming starts successfully.
+4. **Discard recovery record…** requires confirmation and only deletes the local
+   recovery record; it does not stop, reset, reconnect, or move the machine.
 
 #### Error — project changed since the run
 1. Fingerprint mismatch → alert explains the project no longer produces
@@ -924,7 +942,7 @@ run that finishes cleanly clears it.
 
 #### Edge — deliberate software Abort
 1. Abort keeps the checkpoint (an aborted job still requires recovery review);
-   **Dismiss** on the banner is the explicit discard.
+   **Discard recovery record…** on the banner is the explicit discard.
 
 ---
 

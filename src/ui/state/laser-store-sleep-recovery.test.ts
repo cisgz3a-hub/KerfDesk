@@ -76,6 +76,25 @@ afterEach(async () => {
 });
 
 describe('laser-store Sleep recovery', () => {
+  it('refuses soft reset before claiming recovery when no serial transport exists', async () => {
+    await useLaserStore.getState().disconnect();
+    useLaserStore.setState({
+      connection: { kind: 'disconnected' },
+      statusReport: null,
+      safetyNotice: null,
+      controllerOperation: null,
+      lastWriteError: null,
+    });
+
+    await expect(useLaserStore.getState().wakeController()).rejects.toThrow(
+      'Reconnect the controller before sending a soft reset',
+    );
+
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(useLaserStore.getState().lastWriteError).toContain('not connected');
+  });
+
   it('wakes a sleeping controller with soft reset without disconnecting', async () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);

@@ -70,7 +70,13 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
-  await Promise.resolve();
+  await flush();
+  connection.emitLine('ok');
+  await flush();
+}
+
+async function flush(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {

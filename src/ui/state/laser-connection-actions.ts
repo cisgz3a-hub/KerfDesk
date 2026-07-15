@@ -89,22 +89,7 @@ export function connectionActions(
           teardown(refs);
           set(buildPortClosePatch);
         });
-        set({
-          connection: { kind: 'connected' },
-          alarmCode: null,
-          lastWriteError: null,
-          safetyNotice: null,
-          airAssistOn: false,
-          fireActive: false,
-          controllerOperation: {
-            kind: 'connection-handshake',
-            phase: 'waiting-controller',
-          },
-          probeBusy: false,
-          homingState: 'unknown',
-          pendingUntrackedAcks: 0,
-          pendingTransportWrites: 0,
-        });
+        set(connectedControllerStatePatch);
         void runHandshake(set, get, refs, safeWrite, baudRate)
           .catch((err: unknown) => {
             if (refs.connection !== conn) return;
@@ -156,6 +141,28 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     activeControllerKind: refs.driver.kind,
     detectedControllerKind: null,
     mpgActive: null,
+  };
+}
+
+// A successful serial open does not acknowledge a prior machine-safety
+// incident. Preserve it explicitly so reconnect and operator acknowledgment
+// remain separate actions.
+export function connectedControllerStatePatch(state: LaserState): Partial<LaserState> {
+  return {
+    connection: { kind: 'connected' },
+    alarmCode: null,
+    lastWriteError: null,
+    safetyNotice: state.safetyNotice,
+    airAssistOn: false,
+    fireActive: false,
+    controllerOperation: {
+      kind: 'connection-handshake',
+      phase: 'waiting-controller',
+    },
+    probeBusy: false,
+    homingState: 'unknown',
+    pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
   };
 }
 
