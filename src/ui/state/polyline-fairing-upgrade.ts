@@ -23,7 +23,14 @@ export function upgradeProjectPolylineFairing(project: Project): PolylineFairing
 
 function upgradePolylineObject(object: SceneObject): SceneObject {
   if (object.kind !== 'shape' || object.spec.kind !== 'polyline') return object;
-  if (hasAuthoredCurve(object)) return object;
+  const legacy = createPolyline({
+    id: object.id,
+    color: object.color,
+    spec: object.spec,
+    transform: object.transform,
+    fairingMode: 'corner-preserving',
+  });
+  if (hasAuthoredCurve(object) && !hasSameCurves(object, legacy)) return object;
   const rematerialized = createPolyline({
     id: object.id,
     color: object.color,
@@ -31,6 +38,7 @@ function upgradePolylineObject(object: SceneObject): SceneObject {
     transform: object.transform,
   });
   if (!hasAuthoredCurve(rematerialized)) return object;
+  if (hasSameCurves(object, rematerialized)) return object;
   return { ...object, bounds: rematerialized.bounds, paths: rematerialized.paths };
 }
 
@@ -38,4 +46,12 @@ function hasAuthoredCurve(object: ShapeObject): boolean {
   return object.paths.some((path) =>
     path.curves?.some((curve) => curve.segments.some((segment) => segment.kind !== 'line')),
   );
+}
+
+function hasSameCurves(left: ShapeObject, right: ShapeObject): boolean {
+  if (left.paths.length !== right.paths.length) return false;
+  return left.paths.every((path, index) => {
+    const other = right.paths[index];
+    return other !== undefined && JSON.stringify(path.curves) === JSON.stringify(other.curves);
+  });
 }

@@ -51,6 +51,32 @@ describe('upgradeProjectPolylineFairing', () => {
     expect(result.upgradedCount).toBe(0);
     expect(result.project).toBe(project);
   });
+
+  it('refits cubic drawings produced by the previous corner-preserving adapter', () => {
+    const points = alternatingBends();
+    const previous = createPolyline({
+      id: 'previous-fairing',
+      color: '#000000',
+      spec: { points, closed: false },
+      fairingMode: 'corner-preserving',
+    });
+    const project = projectWith(previous);
+
+    const result = upgradeProjectPolylineFairing(project);
+    const upgraded = result.project.scene.objects[0];
+
+    expect(result.upgradedCount).toBe(1);
+    if (upgraded?.kind !== 'shape') throw new Error('Expected an upgraded shape.');
+    expect(upgraded.paths).toEqual(
+      createPolyline({
+        id: previous.id,
+        color: previous.color,
+        spec: { points, closed: false },
+        transform: previous.transform,
+      }).paths,
+    );
+    expect(upgraded.paths).not.toEqual(previous.paths);
+  });
 });
 
 function legacyPolyline(points: ReadonlyArray<Vec2>, closed: boolean): ShapeObject {
@@ -71,6 +97,16 @@ function arcPoints(): Vec2[] {
     const angle = (index / 12) * Math.PI;
     return { x: 50 + 50 * Math.cos(angle), y: 50 * Math.sin(angle) };
   });
+}
+
+function alternatingBends(): Vec2[] {
+  return [
+    { x: 0, y: 80 },
+    { x: 30, y: 20 },
+    { x: 60, y: 80 },
+    { x: 90, y: 20 },
+    { x: 120, y: 80 },
+  ];
 }
 
 function projectWith(...objects: ReadonlyArray<ShapeObject>): Project {

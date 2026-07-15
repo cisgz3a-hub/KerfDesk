@@ -19,20 +19,25 @@ import {
 import { fairLineCurvePath } from '../geometry';
 import { polylineToPolylines, type PolylineSpec } from './polyline';
 import { boundsOfPolylines } from './polyline-bounds';
+import { roundPolylineCurve } from './round-polyline-curve';
 
 const DRAWING_FIT_TOLERANCE_RATIO = 0.02;
 const MIN_DRAWING_FIT_TOLERANCE_MM = 0.25;
 const MAX_DRAWING_FIT_TOLERANCE_MM = 3;
+const MIN_OPEN_FAIRING_POINTS = 4;
 const MIN_CLOSED_FAIRING_POINTS = 5;
+type DrawingFairingMode = 'round' | 'corner-preserving';
 
 export function createPolyline(args: {
   readonly id: string;
   readonly color: string;
   readonly spec: PolylineSpec;
   readonly transform?: Transform;
+  readonly fairingMode?: DrawingFairingMode;
 }): ShapeObject {
   const sourcePolylines = polylineToPolylines(args.spec);
-  const geometry = sourcePolylines.map(fairDrawingPolyline);
+  const fairingMode = args.fairingMode ?? 'round';
+  const geometry = sourcePolylines.map((polyline) => fairDrawingPolyline(polyline, fairingMode));
   const curves = geometry.map((item) => item.curve);
   const polylines = geometry.map((item) => item.polyline);
   const paths: ReadonlyArray<ColoredPath> = [{ color: args.color, polylines, curves }];
@@ -47,15 +52,16 @@ export function createPolyline(args: {
   };
 }
 
-function fairDrawingPolyline(polyline: Polyline): { curve: CurveSubpath; polyline: Polyline } {
-  const source = polylineToCurveSubpath(polyline);
+function fairDrawingPolyline(
+  polyline: Polyline,
+  fairingMode: DrawingFairingMode,
+): { curve: CurveSubpath; polyline: Polyline } {
   const pointCount = polyline.points.length - (polyline.closed ? 1 : 0);
-  if (polyline.closed && pointCount < MIN_CLOSED_FAIRING_POINTS) {
-    return { curve: source, polyline };
+  const minimumPoints = polyline.closed ? MIN_CLOSED_FAIRING_POINTS : MIN_OPEN_FAIRING_POINTS;
+  if (pointCount < minimumPoints) {
+    return { curve: polylineToCurveSubpath(polyline), polyline };
   }
-  const curve = fairLineCurvePath(source, {
-    fitToleranceUnits: drawingFitTolerance(polyline.points),
-  });
+  const curve = materializeDrawingCurve(polyline, fairingMode);
   const flattened = flattenCurveSubpath(curve, {
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   });
@@ -64,6 +70,16 @@ function fairDrawingPolyline(polyline: Polyline): { curve: CurveSubpath; polylin
     polyline:
       flattened.kind === 'ok' ? { ...flattened.polyline, closed: polyline.closed } : polyline,
   };
+}
+
+function materializeDrawingCurve(
+  polyline: Polyline,
+  fairingMode: DrawingFairingMode,
+): CurveSubpath {
+  if (fairingMode === 'round') return roundPolylineCurve(polyline);
+  return fairLineCurvePath(polylineToCurveSubpath(polyline), {
+    fitToleranceUnits: drawingFitTolerance(polyline.points),
+  });
 }
 
 function drawingFitTolerance(
