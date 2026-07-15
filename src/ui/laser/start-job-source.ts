@@ -13,6 +13,10 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import {
+  captureLaserModeStartSnapshot,
+  type LaserModeStartSnapshot,
+} from '../state/laser-mode-start-evidence';
 import type { ExecutionArtifactV1 } from '../state/recovery';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
@@ -24,6 +28,7 @@ export type PreparedRecoverySource = {
   readonly canvasPlan: CanvasMotionPlan;
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly warnings: ReadonlyArray<string>;
+  readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
 };
@@ -143,6 +148,7 @@ function prepareRecoveryProjectSource(
     canvasPlan: prepared.canvasPlan,
     prepared: prepared.prepared,
     warnings: prepared.warnings,
+    laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     ...(prepared.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: prepared.preflightMotionOffset }),

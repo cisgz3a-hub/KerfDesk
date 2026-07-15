@@ -166,6 +166,89 @@ describe('untracked-ack start guard', () => {
     expect(writesWhileFencing).toEqual([]);
   });
 
+  it('rechecks reported laser mode after the queue fence before writing job bytes', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    const state = useLaserStore.getState();
+    const settingsObservation = {
+      sessionEpoch: state.controllerSessionEpoch,
+      observedAt: 1,
+    };
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
+      controllerSettingsObservation: settingsObservation,
+    });
+    await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
+    writes.length = 0;
+
+    const started = useLaserStore.getState().startJob(JOB_GCODE, {
+      machineKind: 'laser',
+      laserModeStartEvidence: {
+        controllerSessionEpoch: state.controllerSessionEpoch,
+        settingsCapability: state.capabilities.settings,
+        settingsObservation,
+        laserModeEnabled: true,
+        maxPowerS: 1000,
+        unverifiedAcknowledged: false,
+      },
+    });
+    await flush();
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 1000, laserModeEnabled: false },
+      controllerSettingsObservation: {
+        sessionEpoch: state.controllerSessionEpoch,
+        observedAt: 2,
+      },
+    });
+    connection.emitLine('ok');
+
+    await expect(started).rejects.toThrow(/reports \$32=0/i);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(writes.some((write) => write.includes(LONG_LINE))).toBe(false);
+  });
+
+  it('refuses a changed settings observation even when the new dump still reports $32=1', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    const state = useLaserStore.getState();
+    const settingsObservation = {
+      sessionEpoch: state.controllerSessionEpoch,
+      observedAt: 1,
+    };
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
+      controllerSettingsObservation: settingsObservation,
+    });
+    await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
+
+    const started = useLaserStore.getState().startJob(JOB_GCODE, {
+      machineKind: 'laser',
+      laserModeStartEvidence: {
+        controllerSessionEpoch: state.controllerSessionEpoch,
+        settingsCapability: state.capabilities.settings,
+        settingsObservation,
+        laserModeEnabled: true,
+        maxPowerS: 1000,
+        unverifiedAcknowledged: false,
+      },
+    });
+    await flush();
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
+      controllerSettingsObservation: {
+        sessionEpoch: state.controllerSessionEpoch,
+        observedAt: 2,
+      },
+    });
+    connection.emitLine('ok');
+
+    await expect(started).rejects.toThrow(/settings changed while Start was being prepared/i);
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
   it('an alarm clears the pending-ack counter', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
@@ -325,10 +408,10 @@ describe('stop-path ack attribution', () => {
 
   // GRBL stop: the soft reset wipes the firmware's RX buffer, so the
   // in-flight lines will never be acked and the streamer drops them at stop
-  // time. The M9 beam-off cleanup is deferred until the boot banner (audit
-  // F2) so its ok can neither be swallowed mid-boot nor orphaned by the
+  // time. M5/M9 fail-dark cleanup is deferred until the boot banner (audit
+  // F2) so its oks can neither be swallowed mid-boot nor orphaned by the
   // banner's ledger reset.
-  it('GRBL stop defers M9 to the boot banner; its ok settles the ledger, not the stream', async () => {
+  it('GRBL stop defers M5/M9 to the boot banner; their oks settle the ledger', async () => {
     const written: string[] = [];
     const connection = makeConnection(async (data) => {
       written.push(data);
@@ -343,16 +426,19 @@ describe('stop-path ack attribution', () => {
     const stopped = useLaserStore.getState().streamer;
     expect(stopped?.status).toBe('cancelled');
     expect(stopped?.inFlight).toEqual([]);
-    // M9 is armed, not written: no untracked ack owed yet, nothing to jam.
+    // Cleanup is armed, not written: no untracked ack owed yet, nothing to jam.
+    expect(written).not.toContain('M5\n');
     expect(written).not.toContain('M9\n');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
 
     connection.emitLine('Grbl 1.1f'); // boot banner after the soft reset
     await flush();
+    expect(written).toContain('M5\n');
     expect(written).toContain('M9\n');
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
 
-    connection.emitLine('ok'); // M9 cleanup ack — post-boot, unambiguous
+    connection.emitLine('ok'); // M5 cleanup ack
+    connection.emitLine('ok'); // M9 cleanup ack
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(useLaserStore.getState().streamer?.completed).toBe(0);

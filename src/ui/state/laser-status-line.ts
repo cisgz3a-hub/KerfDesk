@@ -22,6 +22,7 @@ import type { LaserState } from './laser-store';
 import type { SafeWriteFn, SetFn } from './laser-line-shared';
 import { hasCustomXyOrigin } from './origin-actions';
 import { liveCanvasStatusPatch } from './live-canvas-run';
+import { observeFreshControllerStatus } from './laser-controller-status-wait';
 
 export function handleStatusLine(
   set: SetFn,
@@ -75,6 +76,11 @@ export function handleStatusLine(
     ...liveCanvasStatusPatch(state, report, streamer),
   });
   observeControllerIdleWait(set, refs, report);
+  observeFreshControllerStatus(
+    refs,
+    { sessionEpoch: state.controllerSessionEpoch, sequence: nextSequence },
+    report,
+  );
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
 }

@@ -5,6 +5,9 @@ import { join } from 'node:path';
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect x="5" y="5" width="30" height="20" fill="none" stroke="#ff0000"/></svg>';
+const GRBL_SAFETY_DOOR_BYTE = 0x84;
+const GRBL_RESUME_BYTE = 0x7e;
+const GRBL_STATUS_QUERY_BYTE = 0x3f;
 const PNG_BASE64 = readFileSync(
   join(
     process.cwd(),
@@ -332,16 +335,35 @@ kerfDeskTest(
     await expect(probe).toHaveAttribute('data-reported-head-y', trustedHeadY ?? '');
     expect((await canvasPixels(page)).motion).toBe(pixelsAfterStatus.motion);
 
+    const pauseBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
     await page.getByRole('button', { name: 'Pause', exact: true }).first().click();
+    await expect
+      .poll(async () =>
+        hasSerialByteSequence(serialWriteBytes(await kerfdesk.events()).slice(pauseBytesBefore), [
+          GRBL_SAFETY_DOOR_BYTE,
+          GRBL_STATUS_QUERY_BYTE,
+        ]),
+      )
+      .toBe(true);
     const atPause = Number(await probe.getAttribute('data-confirmed-route-mm'));
     await kerfdesk.emitSerialLine(
-      `<Hold:0|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:0,0>`,
+      `<Hold:0|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>`,
     );
     await expect(probe).toHaveAttribute('data-lifecycle', 'paused');
+    await expect(page.getByTestId('canvas-motion-status')).toContainText('Hold');
     expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBe(atPause);
+    const resumeBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
     await page.getByRole('button', { name: 'Resume', exact: true }).first().click();
+    await expect
+      .poll(async () =>
+        hasSerialByteSequence(serialWriteBytes(await kerfdesk.events()).slice(resumeBytesBefore), [
+          GRBL_RESUME_BYTE,
+          GRBL_STATUS_QUERY_BYTE,
+        ]),
+      )
+      .toBe(true);
     await kerfdesk.emitSerialLine(
-      `<Run|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0>`,
+      `<Run|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|WCO:0.000,0.000,0.000|FS:1500,0|Ov:100,100,100>`,
     );
     await expect
       .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
@@ -354,7 +376,7 @@ kerfDeskTest(
   },
 );
 
-baseTest('an interrupted-job checkpoint surfaces recovery before normal work', async ({ page }) => {
+baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       'laserforge.job-checkpoint.v1',
@@ -376,8 +398,11 @@ baseTest('an interrupted-job checkpoint surfaces recovery before normal work', a
     );
   });
   await page.goto('/');
-  await expect(page.getByText('Interrupted laser job', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Review safe recovery' })).toBeVisible();
+  await expect(page.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('It is isolated from the current canvas', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
 
 async function installFileSystemMocks(page: Page): Promise<void> {
@@ -452,6 +477,22 @@ function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): str
     .filter((event) => event['kind'] === 'serial-write')
     .map((event) => String(event['text']))
     .join('');
+}
+
+function serialWriteBytes(events: readonly Readonly<Record<string, unknown>>[]): number[] {
+  return events.flatMap((event) => {
+    if (event['kind'] !== 'serial-write') return [];
+    const bytes = event['bytes'];
+    if (!Array.isArray(bytes)) return [];
+    return bytes.filter((value): value is number => typeof value === 'number');
+  });
+}
+
+function hasSerialByteSequence(bytes: readonly number[], sequence: readonly number[]): boolean {
+  for (let index = 0; index <= bytes.length - sequence.length; index += 1) {
+    if (sequence.every((byte, offset) => bytes[index + offset] === byte)) return true;
+  }
+  return false;
 }
 
 function serialWriteLineCount(events: readonly Readonly<Record<string, unknown>>[]): number {

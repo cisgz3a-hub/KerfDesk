@@ -3,7 +3,10 @@ import {
   type GrblSettingRow,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
+import { grblSettingMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
+import { machineKindOf, type MachineKind } from '../../core/scene';
+import { useStore } from './store';
 import { beginSettingsCollection } from './detected-settings-action';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import {
@@ -116,7 +119,13 @@ async function writeGrblSettingAction(
       `${refs.driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`,
     );
   }
-  const blocked = machineSettingsWriteBlockReason(get(), refs, id, value);
+  const blocked = machineSettingsWriteBlockReason(
+    get(),
+    refs,
+    machineKindOf(useStore.getState().project.machine),
+    id,
+    value,
+  );
   if (blocked !== null) return blockWrite(set, get, blocked);
   const trimmed = value.trim();
   set({
@@ -253,6 +262,7 @@ function machineSettingsReadBlockReason(
 function machineSettingsWriteBlockReason(
   state: LaserState,
   refs: GrblSettingsActionRefs,
+  machineKind: MachineKind,
   id: number,
   value: string,
 ): string | null {
@@ -268,6 +278,8 @@ function machineSettingsWriteBlockReason(
   if (row === undefined || row.writeRisk === 'unknown' || row.writeRisk === 'read-only') {
     return `Cannot write unknown or read-only GRBL setting $${id}.`;
   }
+  const machineKindIssue = grblSettingMachineKindIssue(machineKind, id, value);
+  if (machineKindIssue !== null) return machineKindIssue;
   return validateSettingValue(row, value);
 }
 

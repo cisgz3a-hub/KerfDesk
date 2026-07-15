@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { settingsMapToRows } from './grbl-settings';
-import { buildGrblSettingWrite } from './grbl-setting-write';
+import {
+  buildGrblSettingWrite,
+  grblSettingCommandMachineKindIssue,
+  grblSettingMachineKindIssue,
+} from './grbl-setting-write';
 
 const rows = settingsMapToRows(
   new Map<number, string>([
@@ -13,12 +17,50 @@ const rows = settingsMapToRows(
 );
 
 describe('guarded GRBL setting writes', () => {
+  it('blocks $32=0 for a laser while retaining laser-on and router-off writes', () => {
+    expect(grblSettingMachineKindIssue('laser', 32, '0')).toContain(
+      'Laser machine setup cannot write $32=0',
+    );
+    expect(grblSettingMachineKindIssue('laser', 32, '1')).toBeNull();
+    expect(grblSettingMachineKindIssue('cnc', 32, '0')).toBeNull();
+    expect(grblSettingCommandMachineKindIssue('laser', '$32=0.0')).toContain(
+      'Laser machine setup cannot write $32=0',
+    );
+    expect(grblSettingCommandMachineKindIssue('cnc', '$32=0.0')).toBeNull();
+    for (const command of ['$32=0.5', '$32=.5', '$32=1.0', '$32=2', '$32=256']) {
+      expect(grblSettingCommandMachineKindIssue('laser', command)).toContain(
+        'Laser machine setup cannot write $32=0',
+      );
+    }
+    expect(grblSettingCommandMachineKindIssue('laser', '$32=1')).toBeNull();
+
+    const confirmed = {
+      rows,
+      id: 32,
+      confirmation: { commonSettingChecked: true },
+      backupFresh: true,
+    } as const;
+    expect(buildGrblSettingWrite({ ...confirmed, machineKind: 'laser', value: '0' })).toEqual({
+      kind: 'blocked',
+      reason: expect.stringContaining('Laser machine setup cannot write $32=0'),
+    });
+    expect(buildGrblSettingWrite({ ...confirmed, machineKind: 'laser', value: '1' })).toEqual({
+      kind: 'ok',
+      command: '$32=1',
+    });
+    expect(buildGrblSettingWrite({ ...confirmed, machineKind: 'cnc', value: '0' })).toEqual({
+      kind: 'ok',
+      command: '$32=0',
+    });
+  });
+
   it('allows common laser settings with checkbox confirmation and a current backup', () => {
     expect(
       buildGrblSettingWrite({
         rows,
         id: 32,
         value: '1',
+        machineKind: 'laser',
         confirmation: { commonSettingChecked: true },
         backupFresh: true,
       }),
@@ -30,6 +72,7 @@ describe('guarded GRBL setting writes', () => {
       rows,
       id: 100,
       value: '80',
+      machineKind: 'laser',
       confirmation: { typedCommand: '$100 = 80' },
       backupFresh: true,
     });
@@ -37,6 +80,7 @@ describe('guarded GRBL setting writes', () => {
       rows,
       id: 100,
       value: '80',
+      machineKind: 'laser',
       confirmation: { typedCommand: '$100=80' },
       backupFresh: true,
     });
@@ -51,6 +95,7 @@ describe('guarded GRBL setting writes', () => {
         rows,
         id: 999,
         value: '1',
+        machineKind: 'laser',
         confirmation: { typedCommand: '$999=1' },
         backupFresh: true,
       }).kind,
@@ -60,6 +105,7 @@ describe('guarded GRBL setting writes', () => {
         rows,
         id: 32,
         value: 'not-a-number',
+        machineKind: 'laser',
         confirmation: { commonSettingChecked: true },
         backupFresh: true,
       }).kind,
@@ -69,6 +115,7 @@ describe('guarded GRBL setting writes', () => {
         rows,
         id: 32,
         value: '1',
+        machineKind: 'laser',
         confirmation: { commonSettingChecked: true },
         backupFresh: false,
       }).kind,
@@ -82,6 +129,7 @@ describe('guarded GRBL setting writes', () => {
           rows,
           id: 30,
           value,
+          machineKind: 'laser',
           confirmation: { commonSettingChecked: true },
           backupFresh: true,
         }),
@@ -93,6 +141,7 @@ describe('guarded GRBL setting writes', () => {
         rows,
         id: 32,
         value: '1.0',
+        machineKind: 'laser',
         confirmation: { commonSettingChecked: true },
         backupFresh: true,
       }),

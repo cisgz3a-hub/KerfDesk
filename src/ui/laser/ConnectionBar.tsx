@@ -91,12 +91,22 @@ function QualificationNotice(props: {
     <div role="alert" style={qualificationErrorStyle}>
       <strong>Controller qualification failed.</strong> {qualification.message}{' '}
       {props.onRetry !== undefined && (
-        <button type="button" onClick={props.onRetry} disabled={props.disabled}>
+        <button
+          type="button"
+          onClick={props.onRetry}
+          disabled={props.disabled}
+          title="Retry the owned controller settings read for this connection."
+        >
           Retry reading controller settings
         </button>
       )}
       {props.onReconnect !== undefined && (
-        <button type="button" onClick={props.onReconnect} disabled={props.disabled}>
+        <button
+          type="button"
+          onClick={props.onReconnect}
+          disabled={props.disabled}
+          title="Close this controller connection and reconnect for fresh qualification."
+        >
           Reconnect controller
         </button>
       )}

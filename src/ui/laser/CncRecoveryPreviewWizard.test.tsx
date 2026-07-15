@@ -219,4 +219,65 @@ describe('CncRecoveryPreviewWizard', () => {
     expect(host?.textContent).toContain('Available straight tangent:');
     expect(selector.value).toMatch(/cut-2$/);
   });
+
+  it('requires fresh event-specific confirmations after changing the uncertainty segment', () => {
+    renderWizard(previewProject());
+    act(() => wizardButton('Next: Geometry').click());
+    chooseUncertaintyEvent('cut-2');
+    act(() => wizardButton('Next: Physical checks').click());
+    completePhysicalQualification('AIR-CUT-2026-07-15');
+    act(() => wizardButton('Next: Final review').click());
+
+    act(() => wizardButton('Back').click());
+    act(() => wizardButton('Back').click());
+    chooseUncertaintyEvent('cut-3');
+    act(() => wizardButton('Next: Physical checks').click());
+
+    const checks = [...(host?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])];
+    expect(checks.slice(0, 5).every((checkbox) => checkbox.checked)).toBe(true);
+    expect(checks.slice(5).map((checkbox) => checkbox.checked)).toEqual([false, false]);
+    expect(wizardButton('Next: Final review').disabled).toBe(true);
+  });
+
+  it('blocks duplicate Start, Close, Escape, and Back while startup is in flight', async () => {
+    const { onClose } = renderWizard(previewProject());
+    act(() => wizardButton('Next: Geometry').click());
+    chooseUncertaintyEvent();
+    act(() => wizardButton('Next: Physical checks').click());
+    completePhysicalQualification('AIR-CUT-2026-07-15');
+    act(() => wizardButton('Next: Final review').click());
+
+    let resolveStart: ((started: boolean) => void) | undefined;
+    vi.mocked(runCncSupervisedRecoveryFlow).mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
+    const start = wizardButton('Start supervised recovery');
+    act(() => {
+      start.click();
+      start.click();
+    });
+
+    expect(runCncSupervisedRecoveryFlow).toHaveBeenCalledTimes(1);
+    expect(wizardButton('Starting recovery…').disabled).toBe(true);
+    expect(wizardButton('Close').disabled).toBe(true);
+    expect(wizardButton('Back').disabled).toBe(true);
+    act(() => {
+      host
+        ?.querySelector('[role="dialog"]')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveStart?.(false);
+      await Promise.resolve();
+    });
+    expect(wizardButton('Start supervised recovery').disabled).toBe(false);
+    expect(wizardButton('Close').disabled).toBe(false);
+    act(() => wizardButton('Close').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

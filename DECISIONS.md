@@ -82,6 +82,7 @@
 | ADR-209 | 2026-07-15 | Accepted | Remove universal CNC expiry, depth, override, and spin-up policies |
 | ADR-210 | 2026-07-15 | Accepted | Enforce explicit machine output capability at every project entry point |
 | ADR-211 | 2026-07-15 | Accepted | Artwork binds explicitly to named process operations |
+| ADR-212 | 2026-07-15 | Accepted | Make laser pause, recovery, disconnect, and laser-mode boundaries fail-dark |
 
 ---
 
@@ -5698,6 +5699,9 @@ controller reset look like job recovery even though the durable checkpoint is a 
   with a unique attempt ID, validates the live controller, stages a new attempt artifact, and replaces
   recovery state only after transport acceptance. Pre-acceptance failure releases the claim; an
   uncertain post-write failure is itself the newest capsule.
+- Laser recovery treats archived G-code as immutable source input but generates a fail-dark re-entry:
+  `M5`/`S0` precede unpowered positioning, positive power returns only on burn motion, and session-bound
+  live `$32` evidence is confirmed before the capsule claim and checked again at the wire boundary.
 - Controller readiness is epoch-bound: disconnected → qualifying (response/reset cleanup/settings
   read) → qualified or failed. GRBL-family reset/reconnect/wake/probe/settings-write paths own one `$$`
   read after fresh Idle; late replies from prior epochs cannot qualify Start. Failure is shown inline
@@ -8513,8 +8517,9 @@ Work-Z matching.
   overscan runways use the same rapid travel.
 - Remove the machine-profile zero-overscan Island Fill preflight refusal. Fine-detail heat analysis,
   its non-blocking warning, and the one-click Scanline recovery action remain available.
-- Display Start readiness warnings as non-blocking warning toasts. They do not add a second
-  acknowledgement before a valid laser or CNC job can proceed.
+- Display general Start readiness warnings as non-blocking warning toasts. ADR-210's explicitly
+  approved exception requires one focused acknowledgement when a laser controller's `$32` state
+  cannot be verified; a reported `$32=0` remains a hard refusal.
 - Classify Console effects by what a command can change. Accessory-only commands, dwell, and
   non-positional setting writes still invalidate their own stale observations, but preserve homing,
   frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
@@ -8694,3 +8699,60 @@ Operation.
 - Reverse operation priority and run path optimization; prove neither can cross artwork priority.
 - Open a schema-v2 fixture containing color layers, an object override, and a sub-layer; prove the
   migrated schema-v3 output is equivalent and survives save/open.
+
+---
+
+## ADR-212 - Laser pause, recovery, disconnect, and laser-mode boundaries are fail-dark
+
+**Status:** Accepted | **Date:** 2026-07-15
+
+### Context
+
+A live laser job exposed two independent failures. Pause wrote ordinary GRBL feed hold before
+freezing the host stream, and Resume wrote cycle start then immediately refilled G-code without
+proving that the controller left Hold. Acknowledgements prove that GRBL parsed buffered commands;
+they do not prove physical execution. Separately, unplugging the CH340 USB transport stopped new
+bytes but left no channel through which the application could send `M5`, safety door, or reset. The
+machine stopped after its buffered motion drained while the laser output remained asserted.
+
+The maintainer explicitly requires Pause and Resume to remain usable, and requires every detected
+connection failure to request motion and beam shutdown. Removing either control is not an accepted
+containment strategy.
+
+### Decision
+
+- GRBL-family laser Pause freezes host refill before any wire write, sends resumable realtime Safety
+  Door (`0x84`), and remains in a `pausing` transition until a fresh report from the same controller
+  session proves a settled Door state and controller-commanded spindle/laser output off.
+- Resume keeps host refill frozen, sends cycle start (`~`), and remains in a `resuming` transition
+  until a fresh post-command `Run` or completed `Idle` report arrives. Only then may the streamer
+  advance or write more G-code. Acknowledged-line counts never substitute for this status proof.
+- `done` means that every line was acknowledged, not that planner motion physically finished. While
+  a fresh controller report still says `Run`, the Live Motion bar keeps laser Pause available; Resume
+  returns that exhausted stream to `done` without replaying G-code.
+- A connected stream-heartbeat failure or active-job transport-write rejection freezes the sender
+  and requests realtime reset before any reconnect or port close. Initial Start, acknowledgement
+  refill, and tool-change Continue failures all join this path. Intentional Disconnect and live
+  connection replacement synchronously cancel host refill, invalidate stale controller evidence,
+  then use the same reset-before-close boundary. A real port-close remains terminal ownership; a
+  later rejected write cannot resurrect it as an active stream.
+- Recovery re-entry is hard-off: `M5`/`S0` precedes positioning, rapid repositioning is explicitly
+  unpowered, and positive power is restored only on the first burn-motion line.
+- A laser Start whose controller cannot report `$32` requires one explicit Start-anyway
+  acknowledgement. A reported `$32=0` is still refused, and neither Machine Setup nor the confirmed
+  Console setting lane may write `$32=0` while the active project is a laser. Ordinary Start,
+  start-from-line/recovery, and camera-marker burns all carry the same session-bound evidence to the
+  final wire boundary. CNC/router projects retain their required `$32=0` path.
+- Physical cable removal remains a controller boundary. A desktop application cannot transmit a
+  shutdown byte after the transport disappears. A product claim that cable loss always stops motion
+  and beam therefore requires a proven controller heartbeat timeout or fail-safe hardware interlock;
+  UI state and sender tests cannot stand in for that evidence.
+
+### Consequences
+
+Pause and Resume stay available; while confirmation is pending, the host remains in its visible
+paused state and sends no job refill. A timeout or transport failure leaves the host stream frozen,
+preserves the interrupted-job record, and keeps software Abort visible. Simulator coverage models
+the Safety Door state separately from ordinary Hold. KerfDesk can contain a degraded-but-live link,
+but the Falcon/CH340 cable-yank guarantee remains hardware- or firmware-gated until that independent
+shutdown path is installed and verified.

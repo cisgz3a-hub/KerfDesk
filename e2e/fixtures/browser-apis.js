@@ -39,7 +39,7 @@ function installSerial() {
     port.writable = new WritableStream({
       write(chunk) {
         const text = decoder.decode(chunk);
-        record('serial-write', { text });
+        record('serial-write', { text, bytes: Array.from(chunk) });
         respondToSerialWrite(text, emitLine, () => currentStatus, settings);
       },
     });

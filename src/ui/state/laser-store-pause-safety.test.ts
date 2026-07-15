@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_HOLD, RT_RESUME } from '../../core/controllers/grbl';
+import { RT_SAFETY_DOOR } from '../../core/controllers/grbl/commands';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
@@ -79,20 +80,27 @@ afterEach(async () => {
 });
 
 describe('laser-store pause safety', () => {
-  it('refuses feed-hold pause when GRBL laser mode is not confirmed on', async () => {
+  it('uses Safety Door when GRBL laser mode is not yet known', async () => {
     const writes: string[] = [];
+    let liveConnection: FakeConnection | null = null;
     const connection = makeConnection(async (data) => {
       writes.push(data);
+      if (data === '?') {
+        setTimeout(() => {
+          liveConnection?.emitLine('<Door:1|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+        }, 0);
+      }
     });
+    liveConnection = connection;
     await connectWith(connection);
     await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
     writes.length = 0;
 
-    await expect(useLaserStore.getState().pauseJob()).rejects.toThrow(/\$32=1/);
+    await useLaserStore.getState().pauseJob();
 
+    expect(writes).toContain(RT_SAFETY_DOOR);
     expect(writes).not.toContain(RT_HOLD);
-    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
-    expect(useLaserStore.getState().lastWriteError).toMatch(/\$32=1/);
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
   it('allows feed-hold pause for a CNC job with laser mode off ($32=0 is router-correct)', async () => {
@@ -180,30 +188,87 @@ describe('laser-store pause safety', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
-  it('refuses feed-hold pause when GRBL reports laser mode disabled', async () => {
+  it('uses Safety Door when GRBL reports laser mode disabled', async () => {
     const writes: string[] = [];
+    let liveConnection: FakeConnection | null = null;
     const connection = makeConnection(async (data) => {
       writes.push(data);
+      if (data === '?') {
+        setTimeout(() => {
+          liveConnection?.emitLine('<Door:1|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+        }, 0);
+      }
     });
+    liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });
     await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
     writes.length = 0;
 
-    await expect(useLaserStore.getState().pauseJob()).rejects.toThrow(/\$32=1/);
+    await useLaserStore.getState().pauseJob();
 
+    expect(writes).toContain(RT_SAFETY_DOOR);
     expect(writes).not.toContain(RT_HOLD);
-    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 });
 
 describe('laser-store pause at end of stream', () => {
+  it('uses Safety Door after all lines are acknowledged while physical Run continues', async () => {
+    const writes: string[] = [];
+    let stateLine = '<Run|MPos:1.000,0.000,0.000|FS:1000,100|Ov:100,100,100|A:C>';
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === RT_SAFETY_DOOR) {
+        stateLine = '<Door:0|MPos:1.000,0.000,0.000|FS:0,0|Ov:100,100,100>';
+      }
+      if (data === RT_RESUME) {
+        stateLine = '<Run|MPos:1.000,0.000,0.000|FS:1000,100|Ov:100,100,100|A:C>';
+      }
+      if (data === '?') connection.emitLine(stateLine);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
+    await useLaserStore.getState().startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5');
+    for (let index = 0; index < 5; index += 1) connection.emitLine('ok');
+    connection.emitLine(stateLine);
+    await flushConnect();
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    writes.length = 0;
+
+    await useLaserStore.getState().pauseJob();
+
+    expect(writes).toContain(RT_SAFETY_DOOR);
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+
+    writes.length = 0;
+    await useLaserStore.getState().resumeJob();
+
+    expect(writes).toContain(RT_RESUME);
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(writes.some((data) => data.includes('G1 X'))).toBe(false);
+  });
+
   // GRBL keeps acking held-but-parsed lines during a feed hold. Pausing near
   // the end of a job drains every ack while the machine still holds
   // unexecuted motion — the job must stay paused (Resume mounted), and Resume
   // must complete it through the normal Idle release.
   it('stays paused when the held tail acks out; resume completes the job at Idle', async () => {
-    const connection = makeConnection(async () => undefined);
+    let resumed = false;
+    let liveConnection: FakeConnection | null = null;
+    const connection = makeConnection(async (data) => {
+      if (data === RT_RESUME) resumed = true;
+      if (data === '?') {
+        setTimeout(() => {
+          liveConnection?.emitLine(
+            resumed
+              ? '<Idle|MPos:1.000,0.000,0.000|FS:0,0|Ov:100,100,100>'
+              : '<Door:1|MPos:1.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+          );
+        }, 0);
+      }
+    });
+    liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
     await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');

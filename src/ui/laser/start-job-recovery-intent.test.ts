@@ -15,12 +15,10 @@ import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import {
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
-  RecoveryRepository,
-  type LegacyCheckpointStorage,
-} from '../state/recovery';
+import { RecoveryRepository } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import type { LegacyCheckpointStorage } from '../state/recovery/legacy-checkpoint-migration';
 import { resetStore } from '../state/test-helpers';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
@@ -135,6 +133,7 @@ beforeEach(() => {
       minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
+    controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
     startJob: vi.fn(async () => undefined),
   });
   vi.mocked(jobAwareAlert).mockClear();
@@ -224,7 +223,7 @@ describe('interrupted laser job intent separation', () => {
     expect(resumeProgram.endsWith(exactTail)).toBe(true);
   });
 
-  it('manual start-from-line never stamps an unrelated legacy checkpoint', async () => {
+  it('manual start-from-line invalidates an unrelated legacy recovery record after acceptance', async () => {
     const unrelated = advanceJobCheckpoint(
       createJobCheckpoint({
         gcode: 'G21\nG1 X999 S999\nM5',
@@ -239,7 +238,6 @@ describe('interrupted laser job intent separation', () => {
 
     await runStartFromLineFlow(2);
 
-    expect(readJobCheckpoint()).toEqual(unrelated);
-    expect(readJobCheckpoint()?.resumeInFlight).toBe(false);
+    expect(readJobCheckpoint()).toBeNull();
   });
 });

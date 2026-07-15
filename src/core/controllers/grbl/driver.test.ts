@@ -11,6 +11,7 @@ describe('grblDriver', () => {
     expect(grblDriver.realtime).toEqual({
       statusQuery: '?',
       hold: '!',
+      safetyDoor: '\x84',
       resume: '~',
       softReset: '\x18',
       jogCancel: '\x85',

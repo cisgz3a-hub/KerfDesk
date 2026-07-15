@@ -21,11 +21,11 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import {
   createExecutionArtifact,
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
   RecoveryRepository,
   type RecoveryCapsule,
 } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';

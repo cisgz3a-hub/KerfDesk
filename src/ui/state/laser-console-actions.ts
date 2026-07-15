@@ -1,5 +1,7 @@
 import type { SettingsCollectorState } from '../../core/controllers/grbl';
+import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
+import { machineKindOf } from '../../core/scene';
 import { beginSettingsCollection } from './detected-settings-action';
 import {
   hasAccessoryCommand,
@@ -18,6 +20,7 @@ import {
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { appendTranscript, systemTranscriptEntry, type TranscriptSource } from './laser-transcript';
+import { useStore } from './store';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -50,17 +53,8 @@ export function consoleActions(
     sendConsoleCommand: async (input, options = {}) => {
       const prepared = refs.driver.prepareConsoleCommand(input);
       if (!prepared.ok) return block(set, get, refs, prepared.reason);
-      if (
-        prepared.command.kind === 'setting-write' &&
-        refs.driver.capabilities.settings !== 'grbl-dollar'
-      ) {
-        return block(
-          set,
-          get,
-          refs,
-          `${refs.driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`,
-        );
-      }
+      const settingWriteBlocked = consoleSettingWriteBlockReason(refs.driver, prepared.command);
+      if (settingWriteBlocked !== null) return block(set, get, refs, settingWriteBlocked);
       const blocked = consoleCommandBlockReason(get(), prepared.command, false);
       if (blocked !== null) return block(set, get, refs, blocked);
       if (prepared.command.requiresConfirmation && options.confirmed !== true) {
@@ -93,6 +87,21 @@ export function consoleActions(
     },
     clearTranscript: () => set({ transcript: [] }),
   };
+}
+
+function consoleSettingWriteBlockReason(
+  driver: ControllerDriver,
+  command: { readonly kind: string; readonly normalized: string },
+): string | null {
+  const machineKindIssue = grblSettingCommandMachineKindIssue(
+    machineKindOf(useStore.getState().project.machine),
+    command.normalized,
+  );
+  if (machineKindIssue !== null) return machineKindIssue;
+  if (command.kind !== 'setting-write' || driver.capabilities.settings === 'grbl-dollar') {
+    return null;
+  }
+  return `${driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`;
 }
 
 function consoleCommandBlockReason(

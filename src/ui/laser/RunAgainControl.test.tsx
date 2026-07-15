@@ -9,12 +9,9 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import {
-  createExecutionArtifact,
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
-  RecoveryRepository,
-} from '../state/recovery';
+import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
 import { currentReplayExecutionSignature, RunAgainControl } from './RunAgainControl';
 
 (

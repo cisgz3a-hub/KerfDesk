@@ -9,12 +9,9 @@ import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
-import {
-  createExecutionArtifact,
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
-  RecoveryRepository,
-} from '../state/recovery';
+import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 
 vi.mock('../state/job-aware-dialogs', () => ({

@@ -8,12 +8,9 @@ import {
 import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
-import {
-  createExecutionArtifact,
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
-  RecoveryRepository,
-} from '../state/recovery';
+import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { installJobCheckpointTracking } from './use-job-checkpoint';

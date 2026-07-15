@@ -28,7 +28,7 @@ export function CheckpointResumeBanner(props: {
   return (
     <>
       <details style={bannerStyle} aria-label="Interrupted job recovery">
-        <summary style={summaryStyle}>
+        <summary style={summaryStyle} title="Expand the isolated interrupted-job recovery options.">
           <strong>Interrupted job saved</strong>
           <span style={summaryDetailStyle}>
             {' '}

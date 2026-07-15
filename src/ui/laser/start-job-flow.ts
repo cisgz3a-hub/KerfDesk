@@ -18,19 +18,17 @@ import {
   rawResumeLine,
   type JobCheckpoint,
 } from '../../core/recovery';
-import { machineKindOf, type MachineKind, type OutputScope } from '../../core/scene';
+import { machineKindOf, type MachineKind } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
 import {
-  createExecutionArtifact,
   createRunId,
   recoveryRepository,
   type LastCompletedReceipt,
   type RecoveryRepository,
-  type RunId,
 } from '../state/recovery';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
@@ -50,6 +48,17 @@ import {
 } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
+import {
+  activateAcceptedFreshRun,
+  completedReceiptIsCurrent,
+  replayCompilationMatches,
+  stageFreshExecutionArtifact,
+} from './start-job-execution-tracking';
+import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
+import {
+  captureLaserModeStartSnapshot,
+  type LaserModeStartEvidence,
+} from '../state/laser-mode-start-evidence';
 
 export async function runStartJobFlow(
   repository: RecoveryRepository = recoveryRepository,
@@ -88,6 +97,7 @@ async function runStartJobFlowWithCheckpoint(
   }
   const app = useStore.getState();
   const { project } = app;
+  const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
   const prepared = await prepareCurrentStartJob(app, laser, camera);
   if (!prepared.ok) {
@@ -112,6 +122,12 @@ async function runStartJobFlowWithCheckpoint(
     useToastStore.getState().pushToast(prepared.warnings.join('\n'), 'warning');
   }
   const machineKind = machineKindOf(project.machine);
+  const laserModeStartEvidence = confirmLaserModeStartEvidence(
+    project,
+    laserModeStartSnapshot,
+    jobAwareConfirm,
+  );
+  if (laserModeStartEvidence === null) return;
   const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
   if (cncSetupAttestation === null) return;
   const currentLaser = await currentLaserForAuthorizedStart({
@@ -127,6 +143,7 @@ async function runStartJobFlowWithCheckpoint(
     laser: currentLaser,
     prepared,
     machineKind,
+    laserModeStartEvidence,
     cncSetupAttestation,
     repository,
   });
@@ -219,6 +236,7 @@ async function streamPreparedStart(args: {
   readonly laser: ReturnType<typeof useLaserStore.getState>;
   readonly prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>;
   readonly machineKind: MachineKind;
+  readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
   readonly repository: RecoveryRepository;
 }): Promise<void> {
@@ -239,6 +257,9 @@ async function streamPreparedStart(args: {
       ),
       rxBufferBytes: args.project.device.rxBufferBytes,
       machineKind: args.machineKind,
+      ...(args.laserModeStartEvidence === undefined
+        ? {}
+        : { laserModeStartEvidence: args.laserModeStartEvidence }),
       ...(args.prepared.cncToolPlan === undefined
         ? {}
         : { cncToolPlan: args.prepared.cncToolPlan }),
@@ -255,96 +276,6 @@ async function streamPreparedStart(args: {
     useStartBlockerStore.getState().report([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
-}
-
-function replayCompilationMatches(
-  prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>,
-  receipt: LastCompletedReceipt,
-): boolean {
-  return (
-    prepared.canvasPlan.retentionKey === receipt.artifact.executionSignature &&
-    fingerprintsEqual(fingerprintGcode(prepared.gcode), receipt.artifact.fingerprint)
-  );
-}
-
-async function completedReceiptIsCurrent(
-  receipt: LastCompletedReceipt,
-  repository: RecoveryRepository,
-): Promise<boolean> {
-  const refreshed = await repository.refresh();
-  const current = refreshed.ok ? refreshed.value.lastCompletedReceipt : null;
-  if (current?.runId === receipt.runId) return true;
-  useToastStore
-    .getState()
-    .pushToast(
-      'The completed-job replay offer changed. Review the current job controls.',
-      'warning',
-    );
-  return false;
-}
-
-async function stageFreshExecutionArtifact(args: {
-  readonly runId: RunId;
-  readonly prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>;
-  readonly outputScope: OutputScope;
-  readonly laser: ReturnType<typeof useLaserStore.getState>;
-  readonly repository: RecoveryRepository;
-}): Promise<boolean> {
-  try {
-    const artifact = createExecutionArtifact({
-      runId: args.runId,
-      gcode: args.prepared.gcode,
-      prepared: args.prepared.prepared,
-      outputScope: args.outputScope,
-      ...(args.prepared.jobOrigin === undefined ? {} : { jobOrigin: args.prepared.jobOrigin }),
-      canvasPlan: args.prepared.canvasPlan,
-      ...(args.prepared.cncToolPlan === undefined
-        ? {}
-        : { cncToolPlan: args.prepared.cncToolPlan }),
-      controllerSettings: args.laser.controllerSettings,
-      controllerObservation: {
-        statusReport: args.laser.statusReport,
-        wco: args.laser.wcoCache,
-        overrides: args.laser.ovCache,
-        accessories: args.laser.accessoryCache ?? null,
-        workZZeroEvidence: args.laser.workZZeroEvidence,
-        activeControllerKind: args.laser.activeControllerKind,
-        detectedControllerKind: args.laser.detectedControllerKind,
-        controllerSessionEpoch: args.laser.controllerSessionEpoch,
-      },
-      createdAtIso: new Date().toISOString(),
-    });
-    const staged = await args.repository.stageArtifact(artifact);
-    if (staged.ok) return true;
-  } catch {
-    // Artifact construction/storage is best-effort. A current job must never
-    // be refused because recovery persistence is unavailable.
-  }
-  return false;
-}
-
-async function activateAcceptedFreshRun(
-  runId: RunId,
-  staged: boolean,
-  repository: RecoveryRepository,
-): Promise<void> {
-  if (staged) {
-    const activated = await repository.activateFreshRun(runId);
-    if (activated.ok && activated.value) return;
-  }
-  // The controller accepted a new stream, so an older capsule no longer
-  // describes the machine even when this run could not be persisted.
-  await repository.noteUntrackedRunAccepted();
-  reportRecoveryUnavailable();
-}
-
-function reportRecoveryUnavailable(): void {
-  useToastStore
-    .getState()
-    .pushToast(
-      'Job recovery is unavailable for this run. The job can continue normally.',
-      'warning',
-    );
 }
 
 function reportBlockedStart(message: string): void {
@@ -381,7 +312,13 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
   }
   const prepared = prepareRecoverySource();
   if (prepared === null) return;
-  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine, prepared.canvasPlan);
+  await streamResumeFromRawLine(
+    prepared.project,
+    prepared.gcode,
+    fromLine,
+    prepared.canvasPlan,
+    prepared.laserModeStartSnapshot,
+  );
 }
 
 // Resume the checkpointed interrupted job (ADR-118): re-compile the project,
@@ -425,13 +362,7 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
     prepared.gcode,
     fromLine,
     prepared.canvasPlan,
+    prepared.laserModeStartSnapshot,
     checkpoint,
   );
 }
-
-// Shared resume front half: readiness gate + re-compile. Same gate as a
-// fresh start (minus the settings-capability warning, matching the original
-// Start-from-line behavior). A checkpoint resume passes the scope + placement
-// the ORIGINAL run used so the recompiled bytes match its fingerprint even
-// after a crash reset the live values (PST-02); the manual Start-from-line path
-// passes nothing and uses current app state, as before.

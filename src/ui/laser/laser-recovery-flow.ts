@@ -4,6 +4,7 @@ import { fingerprintGcode, fingerprintsEqual, rawResumeLine } from '../../core/r
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import {
   createExecutionArtifact,
   createRunId,
@@ -17,6 +18,7 @@ import {
   type PreparedRecoverySource,
 } from './start-job-source';
 import { resumeConfirmation } from './resume-confirmation';
+import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 
 const LASER_RESUME_PLUNGE_MM_PER_MIN = 300;
 
@@ -38,6 +40,7 @@ type PlannedLaserRecovery = {
   readonly capsule: RecoveryCapsule;
   readonly source: PreparedRecoverySource;
   readonly resumeGcode: string;
+  readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
 };
 
 type ClaimedLaserRecovery = {
@@ -71,8 +74,19 @@ function planLaserRecovery(capsule: RecoveryCapsule): PlannedLaserRecovery | nul
     return null;
   }
   if (!confirmWarnings(source.warnings)) return null;
+  const laserModeStartEvidence = confirmLaserModeStartEvidence(
+    source.project,
+    source.laserModeStartSnapshot,
+    jobAwareConfirm,
+  );
+  if (laserModeStartEvidence === null) return null;
   if (!jobAwareConfirm(resumeConfirmation('laser', fromLine, resume.fromLine))) return null;
-  return { capsule, source, resumeGcode: resume.lines.join('\n') };
+  return {
+    capsule,
+    source,
+    resumeGcode: resume.lines.join('\n'),
+    laserModeStartEvidence,
+  };
 }
 
 async function claimLaserRecovery(
@@ -145,6 +159,9 @@ async function streamLaserRecoveryAttempt(
       ),
       rxBufferBytes: attempt.source.project.device.rxBufferBytes,
       machineKind: 'laser',
+      ...(attempt.laserModeStartEvidence === undefined
+        ? {}
+        : { laserModeStartEvidence: attempt.laserModeStartEvidence }),
       canvasPlan: attempt.canvasPlan,
     });
   } catch (error) {

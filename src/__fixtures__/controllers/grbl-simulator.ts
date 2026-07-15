@@ -17,7 +17,7 @@ import {
 import { defaultGrblSimSettings } from './grbl-sim-settings';
 import type { PlatformAdapter } from '../../platform/types';
 
-const REALTIME_BYTES = new Set(['?', '!', '~', '\x18', '\x85']);
+const REALTIME_BYTES = new Set(['?', '!', '~', '\x18', '\x84', '\x85']);
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   /** Override or extend the default $$ settings table. */

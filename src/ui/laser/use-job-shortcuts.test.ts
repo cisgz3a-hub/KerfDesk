@@ -139,7 +139,12 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
 
   it('Ctrl+Enter claims the event when connected and idle', async () => {
     const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
-    patchLaserStore({ streamer: null, connection: { kind: 'connected' } });
+    patchLaserStore({
+      streamer: null,
+      connection: { kind: 'connected' },
+      controllerSessionEpoch: 4,
+      controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+    });
     const uninstall = installJobShortcuts(window);
 
     const event = new KeyboardEvent('keydown', {

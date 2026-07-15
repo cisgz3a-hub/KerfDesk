@@ -19,13 +19,10 @@ import {
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import {
-  createExecutionArtifact,
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
-  RecoveryRepository,
-  type LegacyCheckpointStorage,
-} from '../state/recovery';
+import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
+import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import type { LegacyCheckpointStorage } from '../state/recovery/legacy-checkpoint-migration';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useStartBlockerStore } from './start-blocker-store';
@@ -171,6 +168,7 @@ beforeEach(() => {
       minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
+    controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
     startJob: vi.fn(async () => undefined),
   });
   vi.mocked(jobAwareAlert).mockClear();
@@ -200,6 +198,11 @@ describe('runStartJobFlow', () => {
         streamingMode: 'ping-pong',
         rxBufferBytes: 96,
         machineKind: 'laser',
+        laserModeStartEvidence: expect.objectContaining({
+          controllerSessionEpoch: CONTROLLER_EPOCH,
+          laserModeEnabled: true,
+          unverifiedAcknowledged: false,
+        }),
         canvasPlan: expect.objectContaining({ capability: 'realtime' }),
       }),
     );
