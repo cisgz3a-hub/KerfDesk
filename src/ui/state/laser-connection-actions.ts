@@ -5,6 +5,8 @@
 // cycle (same pattern as the sibling action modules).
 
 import { selectControllerDriver } from '../../core/controllers';
+import { runConnectAction } from './laser-connect-action';
+import { cancelConnectAttempt } from './laser-connect-attempt';
 import {
   closeConnectionOnce,
   connectionForgetRequested,
@@ -26,7 +28,16 @@ import {
   streamStalledNotice,
   writeFailedNotice,
   type LaserSafetyAction,
+  type LaserSafetyNotice,
 } from './laser-safety-notice';
+import {
+  retainedDisconnectSafetyNotice,
+  retainedUnavailableTransportSafetyNotice,
+  safetyNoticeLeavesPhysicalStopUncertain,
+  unconfirmedDisconnectStopNotice,
+  withRetainedDisconnectSafety,
+} from './laser-disconnect-safety';
+import { disconnectedStatePatch } from './laser-disconnected-state';
 import {
   assertAutofocusIdle,
   buildPortClosePatch,
@@ -37,7 +48,6 @@ import {
   isActiveJob,
   pushLog,
 } from './laser-store-helpers';
-import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment';
 import type { LaserState, LiveRefs } from './laser-store';
 import { useToastStore } from './toast-store';
@@ -65,69 +75,60 @@ export function connectionActions(
   safeWrite: SafeWriteFn,
 ): Pick<LaserState, 'connect' | 'disconnect' | 'forgetDevice'> {
   return {
-    connect: async (adapter, options = {}) => {
-      const previousConnection = refs.connection;
-      if (previousConnection !== null) {
-        try {
-          if (isGrblFamilyDriver(refs.driver)) {
-            await runGrblDisconnectTransaction(set, refs, safeWrite);
-          }
-        } catch {
-          set({ safetyNotice: writeFailedNotice('disconnect') });
-        }
-        if (refs.connection === previousConnection) teardownConnectionRefs(refs);
-        await closeConnectionOnce(refs, previousConnection).catch(() => undefined);
-      }
-      refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
-      refs.nextTranscriptId = 1;
-      refs.driver = selectControllerDriver(options.controllerKind);
-      set((state) => connectingStatePatch(state, refs));
-      try {
-        // Inside the try: requestPort throws on browsers without Web Serial
-        // (TypeError) and on Chromium policy/concurrency errors. Thrown
-        // outside, the store stayed at 'connecting' forever with both
-        // Connect buttons disabled.
-        const portRef = await adapter.serial.requestPort();
-        if (portRef === null) {
-          set((state) => ({
-            connection: { kind: 'disconnected' },
-            controllerQualification: disconnectedControllerQualification(
-              state.controllerSessionEpoch,
-            ),
-          }));
-          return;
-        }
-        const baudRate = options.baudRate ?? refs.driver.defaultBaudRate;
-        const conn = await portRef.open({ baudRate });
-        refs.connection = conn;
-        // Pass safeWrite through whole: the line handler attaches action and
-        // source metadata to its writes (post-error stop escalation, frame
-        // dispatch, job refills) — a bare (out) => safeWrite(out) wrapper
-        // silently drops both.
-        refs.unsubscribeLine = conn.onLine((line) => {
-          if (refs.connection !== conn) return;
-          handleLine(set, get, refs, safeWrite, line);
-        });
-        refs.unsubscribeClose = conn.onClose(() => {
-          if (refs.connection !== conn) return;
-          teardownConnectionRefs(refs);
-          set(buildPortClosePatch);
-        });
-        set(connectedControllerStatePatch);
-        startConnectedControllerHandshake(set, get, refs, safeWrite, conn, baudRate);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        set((state) => ({
-          connection: { kind: 'failed', error: message },
-          controllerQualification: disconnectedControllerQualification(
-            state.controllerSessionEpoch,
-          ),
-        }));
-      }
+    connect: (adapter, options = {}) =>
+      runConnectAction(
+        set,
+        refs,
+        adapter,
+        options,
+        (connection) => closeConnectionForReplacement(set, get, refs, safeWrite, connection),
+        connectingStatePatch,
+        (connection, baudRate) =>
+          attachConnectedController(set, get, refs, safeWrite, connection, baudRate),
+      ),
+    disconnect: () => {
+      cancelConnectAttempt(refs, false);
+      return runDisconnect(set, get, refs, safeWrite, false);
     },
-    disconnect: () => runDisconnect(set, get, refs, safeWrite, false),
-    forgetDevice: () => runDisconnect(set, get, refs, safeWrite, true),
+    forgetDevice: () => {
+      cancelConnectAttempt(refs, true);
+      return runDisconnect(set, get, refs, safeWrite, true);
+    },
   };
+}
+
+async function closeConnectionForReplacement(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: LiveConnection,
+): Promise<void> {
+  await runIntentionalDisconnectOnce(refs, connection, false, (request) =>
+    runOwnedIntentionalDisconnect(set, get, refs, safeWrite, connection, request),
+  ).catch(() => undefined);
+}
+
+function attachConnectedController(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: LiveConnection,
+  baudRate: number,
+): void {
+  refs.connection = connection;
+  refs.unsubscribeLine = connection.onLine((line) => {
+    if (refs.connection !== connection) return;
+    handleLine(set, get, refs, safeWrite, line);
+  });
+  refs.unsubscribeClose = connection.onClose(() => {
+    if (refs.connection !== connection) return;
+    teardownConnectionRefs(refs);
+    set(buildPortClosePatch);
+  });
+  set(connectedControllerStatePatch);
+  startConnectedControllerHandshake(set, get, refs, safeWrite, connection, baudRate);
 }
 
 function startConnectedControllerHandshake(
@@ -230,7 +231,14 @@ async function runDisconnect(
   const connection = refs.connection;
   if (connection === null) {
     teardownConnectionRefs(refs);
-    if (forgetDevice) await finalizeForgottenController(set, get, refs, false);
+    if (forgetDevice) {
+      await finalizeForgottenController(
+        set,
+        get,
+        refs,
+        retainedUnavailableTransportSafetyNotice(get()),
+      );
+    }
     return;
   }
   await runIntentionalDisconnectOnce(
@@ -239,45 +247,14 @@ async function runDisconnect(
     forgetDevice,
     (request) => runOwnedIntentionalDisconnect(set, get, refs, safeWrite, connection, request),
     () =>
-      finalizeForgottenControllerOnce(connection, set, get, refs, disconnectStopIsUncertain(get())),
+      finalizeForgottenControllerOnce(
+        connection,
+        set,
+        get,
+        refs,
+        retainedDisconnectSafetyNotice(get()),
+      ),
   );
-}
-
-function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
-  return {
-    connection: { kind: 'disconnected' },
-    statusReport: null,
-    controllerSessionEpoch: state.controllerSessionEpoch + 1,
-    statusObservation: null,
-    detectedSettings: null,
-    detectedControllerKind: null,
-    controllerSettings: null,
-    controllerSettingsObservation: null,
-    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
-    grblSettingsRows: [],
-    lastSettingsReadAt: null,
-    streamer: null,
-    airAssistOn: false,
-    fireActive: false,
-    wcoCache: null,
-    accessoryCache: null,
-    mpgActive: null,
-    workOriginActive: false,
-    workOriginSource: 'none',
-    workZZeroEvidence: null,
-    frameVerification: null,
-    motionOperation: null,
-    controllerOperation: null,
-    probeBusy: false,
-    homingState: 'unknown',
-    homingProof: null,
-    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-    workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    lastWriteError: null,
-    pendingUntrackedAcks: 0,
-    pendingTransportWrites: 0,
-    ...liveCanvasLifecyclePatch(state, 'disconnected'),
-  };
 }
 
 async function runOwnedIntentionalDisconnect(
@@ -288,12 +265,12 @@ async function runOwnedIntentionalDisconnect(
   connection: LiveConnection,
   request: IntentionalDisconnectRequest,
 ): Promise<void> {
-  let stopCouldNotBeConfirmed = false;
+  let retainedSafetyNotice = unconfirmedDisconnectStopNotice(get(), refs.driver);
   try {
     await stopBeforeDisconnect(set, get, refs, safeWrite);
   } catch {
-    set({ safetyNotice: writeFailedNotice('disconnect') });
-    stopCouldNotBeConfirmed = true;
+    retainedSafetyNotice = writeFailedNotice('disconnect');
+    set({ safetyNotice: retainedSafetyNotice });
   }
   if (refs.connection === connection) quarantineConnectionRefs(refs);
   let closeError: unknown = null;
@@ -301,16 +278,18 @@ async function runOwnedIntentionalDisconnect(
     await closeConnectionOnce(refs, connection, request.forgetRequested);
   } catch (error) {
     closeError = error;
-    stopCouldNotBeConfirmed = true;
-    set({ safetyNotice: writeFailedNotice('disconnect') });
+    retainedSafetyNotice = writeFailedNotice('disconnect');
+    set({ safetyNotice: retainedSafetyNotice });
   }
   const ownsFinalState = refs.connection === connection;
   if (ownsFinalState) refs.connection = null;
   const forgetWasRequested = request.forgetRequested || connectionForgetRequested(refs, connection);
   if (forgetWasRequested) {
-    await finalizeForgottenControllerOnce(connection, set, get, refs, stopCouldNotBeConfirmed);
+    await finalizeForgottenControllerOnce(connection, set, get, refs, retainedSafetyNotice);
   } else if (ownsFinalState) {
-    set(disconnectedStatePatch);
+    set((state) =>
+      withRetainedDisconnectSafety(disconnectedStatePatch(state), retainedSafetyNotice),
+    );
   }
   if (closeError !== null) {
     throw closeError instanceof Error ? closeError : new Error(String(closeError));
@@ -327,7 +306,18 @@ async function stopBeforeDisconnect(
     await runGrblDisconnectTransaction(set, refs, safeWrite);
     return;
   }
-  for (const stopCommand of disconnectStopCommands(get(), refs.driver)) {
+  const state = get();
+  const ordinaryStopCommands = disconnectStopCommands(state, refs.driver);
+  const stopCommands =
+    ordinaryStopCommands.length === 0 &&
+    state.safetyNotice !== null &&
+    safetyNoticeLeavesPhysicalStopUncertain(state.safetyNotice)
+      ? [
+          ...(refs.driver.realtime.softReset === null ? [] : [refs.driver.realtime.softReset]),
+          ...refs.driver.commands.stopLaserLines.map((line) => `${line}\n`),
+        ]
+      : ordinaryStopCommands;
+  for (const stopCommand of stopCommands) {
     await safeWrite(stopCommand, 'disconnect');
   }
 }
@@ -337,11 +327,11 @@ function finalizeForgottenControllerOnce(
   set: SetFn,
   get: GetFn,
   refs: LiveRefs,
-  stopCouldNotBeConfirmed: boolean,
+  retainedSafetyNotice: LaserSafetyNotice | null,
 ): Promise<void> {
   const existing = refs.forgetFinalizations.get(connection);
   if (existing !== undefined) return existing;
-  const finalization = finalizeForgottenController(set, get, refs, stopCouldNotBeConfirmed);
+  const finalization = finalizeForgottenController(set, get, refs, retainedSafetyNotice);
   refs.forgetFinalizations.set(connection, finalization);
   return finalization;
 }
@@ -350,9 +340,9 @@ async function finalizeForgottenController(
   set: SetFn,
   get: GetFn,
   refs: LiveRefs,
-  stopCouldNotBeConfirmed: boolean,
+  retainedSafetyNotice: LaserSafetyNotice | null,
 ): Promise<void> {
-  const retainDisconnectWarning = stopCouldNotBeConfirmed || disconnectStopIsUncertain(get());
+  const safetyNotice = retainedSafetyNotice ?? retainedDisconnectSafetyNotice(get());
   // purgeControllerData clears its published recovery snapshot and writes the
   // deletion generation before its first await. Start it, then reset the live
   // controller state immediately so a slow IndexedDB delete cannot leave a
@@ -365,7 +355,7 @@ async function finalizeForgottenController(
     controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    safetyNotice: retainDisconnectWarning ? writeFailedNotice('disconnect') : null,
+    safetyNotice,
   }));
 
   let purgeWarning: string | null = null;
@@ -383,10 +373,6 @@ async function finalizeForgottenController(
         'warning',
       );
   }
-}
-
-function disconnectStopIsUncertain(state: LaserState): boolean {
-  return state.safetyNotice?.kind === 'write-failed' && state.safetyNotice.action === 'disconnect';
 }
 
 function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: SafeWriteFn): void {

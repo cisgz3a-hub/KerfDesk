@@ -30,6 +30,7 @@ import { consumeSettingsResponse, type DetectedSettingsResult } from './detected
 import {
   cancelControllerLifecycleRefs,
   consumeControllerCommandResponse,
+  consumeOwnedControllerIdentityResponse,
   observeControllerResetBoundary,
 } from './laser-interactive-command';
 import { handleErrorLine, handleResendLine } from './laser-error-line';
@@ -55,6 +56,11 @@ export function handleLine(
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   publishDetectedSettings(set, get, refs, cls);
+  // Marlin answers an operator-owned M115 with the same FIRMWARE_NAME line it
+  // may emit as a spontaneous startup banner. Let the command owner consume
+  // only that expected identity response; an unowned FIRMWARE_NAME or a real
+  // `start` banner must still cross the controller-reset boundary below.
+  if (consumeOwnedControllerIdentityResponse(refs, cls, line)) return;
   const bannerRaw = bannerCandidateRaw(cls);
   if (bannerRaw !== null) {
     handleWelcomeLine(set, get, refs, safeWrite, bannerRaw);

@@ -275,6 +275,36 @@ describe('RecoveryRepository', () => {
     expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
   });
 
+  it('compensates a committed claim when post-commit hydration fails', async () => {
+    const first = harness();
+    await activeThenInterrupted(first.repository, 'run-claim-refresh-failure');
+    const offered = first.repository.getSnapshot().recoveryCapsule;
+    expect(offered).not.toBeNull();
+    first.backend.failNext('get-artifact');
+
+    expect(
+      await first.repository.claimRecovery({
+        runId: offered?.runId ?? '',
+        revision: offered?.revision ?? -1,
+        attemptId: 'failed-hydration-attempt',
+      }),
+    ).toEqual({ ok: false, error: 'storage-unavailable' });
+
+    const reopened = harness({ backend: first.backend, generation: first.generation });
+    expect((await reopened.repository.initialize()).ok).toBe(true);
+    const retryable = reopened.repository.getSnapshot().recoveryCapsule;
+    expect(retryable?.claim).toBeUndefined();
+    expect(
+      (
+        await reopened.repository.claimRecovery({
+          runId: retryable?.runId ?? '',
+          revision: retryable?.revision ?? -1,
+          attemptId: 'retry-attempt',
+        })
+      ).ok,
+    ).toBe(true);
+  });
+
   it('allows only one transactional claim across repository instances', async () => {
     const first = harness();
     await activeThenInterrupted(first.repository, 'run-shared');

@@ -118,6 +118,32 @@ describe('laser-store machine settings', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
+  it('does not let an earlier console acknowledgement terminate a new settings read', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    await useLaserStore.getState().sendConsoleCommand('$I');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    await expect(useLaserStore.getState().readMachineSettings()).rejects.toThrow(
+      /previous controller write and acknowledgement/i,
+    );
+    expect(writes).toEqual(['$I\n']);
+
+    connection.emitLine('ok');
+    const read = useLaserStore.getState().readMachineSettings();
+    await flush();
+    connection.emitLine('$30=1000');
+    connection.emitLine('$32=1');
+    connection.emitLine('ok');
+    await read;
+
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+  });
+
   it('populates known and unknown settings rows when the $$ dump completes', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);

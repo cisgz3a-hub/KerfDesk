@@ -29,6 +29,27 @@ describe('checkpointInterruption', () => {
     expect(checkpointInterruption('disconnected', notice)?.kind).toBe('disconnect');
   });
 
+  it('maps an unconfirmed disconnect stop to a disconnect interruption', () => {
+    const notice: LaserSafetyNotice = {
+      kind: 'disconnect-stop-unconfirmed',
+      message: 'Buffered motion may still be active.',
+    };
+
+    expect(checkpointInterruption('disconnected', notice)?.kind).toBe('disconnect');
+  });
+
+  it('keeps an unconfirmed connected Abort classified as cancelled', () => {
+    const notice: LaserSafetyNotice = {
+      kind: 'disconnect-stop-unconfirmed',
+      message: 'Buffered motion may still be active.',
+    };
+
+    expect(checkpointInterruption('cancelled', notice)).toEqual({
+      kind: 'cancelled',
+      message: notice.message,
+    });
+  });
+
   it('returns null when the streamer stopped cleanly', () => {
     expect(checkpointInterruption('idle', null)).toBeNull();
   });

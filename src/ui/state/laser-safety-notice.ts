@@ -51,6 +51,10 @@ export type LaserSafetyNotice =
       readonly message: string;
     }
   | {
+      readonly kind: 'disconnect-stop-unconfirmed';
+      readonly message: string;
+    }
+  | {
       readonly kind: 'controller-error';
       readonly code: number | null;
       readonly raw?: string;
@@ -114,6 +118,16 @@ export const DISCONNECT_DURING_FIRE_MESSAGE =
 
 export function disconnectDuringFireNotice(): LaserSafetyNotice {
   return { kind: 'disconnect-during-fire', message: DISCONNECT_DURING_FIRE_MESSAGE };
+}
+
+export const DISCONNECT_STOP_UNCONFIRMED_MESSAGE =
+  'This controller has no realtime reset, so KerfDesk could only stop sending and queue ' +
+  'beam-off commands. Buffered motion or laser output may still be active. ' +
+  'Use the physical E-stop or power cutoff now if unsafe, and confirm the machine is physically ' +
+  'stopped before reconnecting.';
+
+export function disconnectStopUnconfirmedNotice(): LaserSafetyNotice {
+  return { kind: 'disconnect-stop-unconfirmed', message: DISCONNECT_STOP_UNCONFIRMED_MESSAGE };
 }
 
 // ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the

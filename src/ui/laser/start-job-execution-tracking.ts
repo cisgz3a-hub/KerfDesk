@@ -1,5 +1,8 @@
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
+import type { SimilarityTransform } from '../../core/registration';
 import type { OutputScope } from '../../core/scene';
+import { currentOutputScope, useStore } from '../state';
+import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
 import {
   createExecutionArtifact,
@@ -8,6 +11,7 @@ import {
   type RunId,
 } from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
+import { currentPrintCutOutputRegistration } from './print-cut-output';
 import type { prepareCurrentStartJob } from './start-job-source';
 
 type PreparedCurrentStart = Extract<
@@ -22,6 +26,20 @@ export function replayCompilationMatches(
   return (
     prepared.canvasPlan.retentionKey === receipt.artifact.executionSignature &&
     fingerprintsEqual(fingerprintGcode(prepared.gcode), receipt.artifact.fingerprint)
+  );
+}
+
+export function currentReplayExecutionSignature(
+  app: ReturnType<typeof useStore.getState> = useStore.getState(),
+  registration: SimilarityTransform | null | undefined = currentPrintCutOutputRegistration(
+    app.project,
+  ),
+): string {
+  return canvasPlanRetentionKey(
+    app.project,
+    currentOutputScope(app),
+    app.jobPlacement,
+    registration,
   );
 }
 

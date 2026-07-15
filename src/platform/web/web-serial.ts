@@ -64,6 +64,13 @@ function makePortRef(port: SerialPort): SerialPortRef {
       await openWithRetry(port, req.baudRate);
       return makeConnection(port);
     },
+    forget: async () => {
+      try {
+        await port.forget?.();
+      } catch (err) {
+        console.warn('port.forget() rejected:', err);
+      }
+    },
   };
 }
 

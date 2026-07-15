@@ -58,6 +58,9 @@ export type SerialPortRef = {
   // Open the port at the requested baud rate. The returned SerialConnection
   // is the active duplex stream until close() is called or the port drops.
   readonly open: (req: SerialOpenRequest) => Promise<SerialConnection>;
+  // Revoke a permission granted by the picker before the port was opened.
+  // Used when an in-flight Connect is cancelled by Forget Controller.
+  readonly forget?: () => Promise<void>;
 };
 
 export type SerialAdapter = {

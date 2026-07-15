@@ -7,6 +7,7 @@ import {
   recoverySnapshotReferencesRun,
 } from './recovery-artifact-cleanup';
 import { insertLegacyRecoveryCapsule } from './recovery-legacy-insert';
+import { compensateFailedRecoveryClaim } from './recovery-claim-compensation';
 import {
   UNLOADED_RECOVERY_SNAPSHOT,
   validRecoverySlots,
@@ -210,7 +211,25 @@ export class RecoveryRepository {
         claimedAtIso: args.claimedAtIso ?? this.nowIso(),
       }),
     );
-    if (!result.ok) return result;
+    if (!result.ok) {
+      // mutateSlots resolves only after its transaction commits, but the
+      // hydration that follows can still fail. Compensate by attempt ID so an
+      // API failure before controller acceptance never strands a durable
+      // claim, while a different window's claim remains untouched.
+      const compensated = await compensateFailedRecoveryClaim({
+        backend: this.options.backend,
+        minimumGeneration: this.currentGeneration(),
+        runId: args.runId,
+        attemptId: args.attemptId,
+        updatedAtIso: this.nowIso(),
+      });
+      if (compensated.ok) {
+        await this.refresh();
+      } else {
+        this.warn('release failed interrupted job recovery claim', errorMessage(compensated.error));
+      }
+      return result;
+    }
     const capsule = this.snapshot.recoveryCapsule;
     return result.value && capsule?.claim?.attemptId === args.attemptId
       ? ok(capsule)
