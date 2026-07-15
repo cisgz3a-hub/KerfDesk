@@ -14,7 +14,9 @@ export function rasterRow(group: RasterGroup, y: number): Uint16Array {
     return row;
   }
   const start = y * group.pixelWidth;
-  return group.sValues.slice(start, start + group.pixelWidth);
+  // Consumers treat compiled Job data as immutable. A view avoids copying the
+  // complete raster once per preflight/preview/estimate scan.
+  return group.sValues.subarray(start, start + group.pixelWidth);
 }
 
 export function rasterValue(group: RasterGroup, x: number, y: number): number {
