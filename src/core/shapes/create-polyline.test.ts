@@ -44,4 +44,56 @@ describe('createPolyline', () => {
     expect(shape.paths[0]?.polylines).toEqual([]);
     expect(shape.paths[0]?.curves).toEqual([]);
   });
+
+  it('fairs a faceted drawn arc with the shared tracer cubic fitter', () => {
+    const points = Array.from({ length: 13 }, (_, index) => {
+      const angle = (index / 12) * Math.PI;
+      return { x: 50 + 50 * Math.cos(angle), y: 50 * Math.sin(angle) };
+    });
+
+    const shape = createPolyline({
+      id: 'PL4',
+      color: '#000000',
+      spec: { points, closed: false },
+    });
+    const curve = shape.paths[0]?.curves?.[0];
+
+    expect(shape.spec).toEqual({ kind: 'polyline', points, closed: false });
+    expect(curve?.closed).toBe(false);
+    expect(curve?.segments.every((segment) => segment.kind === 'cubic')).toBe(true);
+    expect(curve?.segments.length).toBeLessThan(points.length - 1);
+    expect(shape.paths[0]?.polylines[0]?.points.length).toBeGreaterThan(points.length);
+  });
+
+  it('fairs a dense closed loop but preserves a deliberate triangle', () => {
+    const loop = Array.from({ length: 12 }, (_, index) => {
+      const angle = (index / 12) * Math.PI * 2;
+      return { x: 30 * Math.cos(angle), y: 30 * Math.sin(angle) };
+    });
+    const rounded = createPolyline({
+      id: 'PL5',
+      color: '#000000',
+      spec: { points: loop, closed: true },
+    });
+    const triangle = createPolyline({
+      id: 'PL6',
+      color: '#000000',
+      spec: {
+        points: [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+          { x: 10, y: 15 },
+        ],
+        closed: true,
+      },
+    });
+
+    expect(rounded.paths[0]?.curves?.[0]?.closed).toBe(true);
+    expect(
+      rounded.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'cubic'),
+    ).toBe(true);
+    expect(
+      triangle.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'line'),
+    ).toBe(true);
+  });
 });

@@ -13,6 +13,15 @@ function linePath(points: ReadonlyArray<Vec2>): CurveSubpath {
   };
 }
 
+function closedLinePath(points: ReadonlyArray<Vec2>): CurveSubpath {
+  const start = points[0] ?? { x: 0, y: 0 };
+  return {
+    start,
+    closed: true,
+    segments: [...points.slice(1), start].map((to) => ({ kind: 'line' as const, to })),
+  };
+}
+
 describe('polishStrokePath', () => {
   it('fits a faceted bowl into fewer smooth cubic segments', () => {
     const points = Array.from({ length: 25 }, (_, index) => {
@@ -53,6 +62,21 @@ describe('polishStrokePath', () => {
     });
 
     expect(polished.segments.some((segment) => segment.to === corner)).toBe(true);
+  });
+
+  it('fairs a closed faceted loop without breaking its closing seam', () => {
+    const points = Array.from({ length: 16 }, (_, index) => {
+      const angle = (index / 16) * Math.PI * 2;
+      return { x: 40 * Math.cos(angle), y: 40 * Math.sin(angle) };
+    });
+    const original = closedLinePath(points);
+    const polished = polishStrokePath(original, {
+      fitToleranceUnits: FIT_TOLERANCE_UNITS,
+    });
+
+    expect(polished.closed).toBe(true);
+    expect(polished.segments.every((segment) => segment.kind === 'cubic')).toBe(true);
+    expect(polished.segments.at(-1)?.to).toEqual(polished.start);
   });
 
   it('leaves already-authored cubics and underspecified short strokes unchanged', () => {

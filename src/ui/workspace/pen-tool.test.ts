@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLayer, createProject, type Project } from '../../core/scene';
+import { createLayer, createProject, type PathSegment, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { constrainPenPoint, finishPen, penClickOutcome } from './pen-tool';
@@ -191,6 +191,21 @@ describe('finishPen', () => {
     expect(useStore.getState().project.scene.objects).toHaveLength(1);
     expect(useStore.getState().undoStack).toHaveLength(1);
     expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
+  it('commits dense pen drawings as tracer-faired cubic geometry', () => {
+    const drawShape = vi.fn();
+    const vertices = Array.from({ length: 11 }, (_, index) => {
+      const angle = (index / 10) * Math.PI;
+      return { x: 40 + 40 * Math.cos(angle), y: 40 * Math.sin(angle) };
+    });
+    useUiStore.getState().setPenDraft({ vertices, cursor: null });
+
+    expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(true);
+
+    const curve = drawShape.mock.calls[0]?.[0]?.paths[0]?.curves?.[0];
+    expect(curve?.segments.every((segment: PathSegment) => segment.kind === 'cubic')).toBe(true);
+    expect(curve?.segments.length).toBeLessThan(vertices.length - 1);
   });
 });
 
