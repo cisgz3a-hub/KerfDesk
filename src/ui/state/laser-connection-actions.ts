@@ -20,7 +20,7 @@ import {
   failedControllerQualificationPatch,
   qualifyingController,
 } from './laser-controller-qualification';
-import { runControllerHandshake } from './laser-controller-handshake';
+import { controllerHandshakeOwnership, runControllerHandshake } from './laser-controller-handshake';
 import { recoveryRepository } from './recovery';
 import {
   streamStalledNotice,
@@ -138,17 +138,15 @@ function startConnectedControllerHandshake(
   connection: LiveConnection,
   baudRate: number,
 ): void {
-  let qualificationEpoch = get().controllerSessionEpoch;
-  void runControllerHandshake(set, get, refs, safeWrite, baudRate, (epoch) => {
-    qualificationEpoch = epoch;
-  })
+  const ownership = controllerHandshakeOwnership(get, refs, connection);
+  void runControllerHandshake(set, get, refs, safeWrite, baudRate, ownership.adopt)
     .catch((error: unknown) => {
-      if (refs.connection !== connection) return;
+      if (!ownership.isCurrent()) return;
       const message = error instanceof Error ? error.message : String(error);
       set((state) =>
-        state.controllerSessionEpoch === qualificationEpoch
+        state.controllerSessionEpoch === ownership.qualificationEpoch
           ? {
-              ...failedControllerQualificationPatch(state, qualificationEpoch, message),
+              ...failedControllerQualificationPatch(state, ownership.qualificationEpoch, message),
               lastWriteError: message,
               log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
             }
@@ -156,9 +154,7 @@ function startConnectedControllerHandshake(
       );
     })
     .finally(() => {
-      if (refs.connection !== connection || get().controllerSessionEpoch !== qualificationEpoch) {
-        return;
-      }
+      if (!ownership.isCurrent()) return;
       // A reset transaction replaces the handshake and owns subsequent polling.
       if (get().controllerOperation?.kind !== 'connection-handshake') return;
       set({ controllerOperation: null });

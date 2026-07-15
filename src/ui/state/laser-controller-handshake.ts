@@ -39,6 +39,28 @@ type HandshakeEpochGuard = {
 
 type ControllerResponse = 'line' | 'timeout' | 'stale';
 
+export function controllerHandshakeOwnership(
+  get: GetFn,
+  refs: LiveRefs,
+  connection: NonNullable<LiveRefs['connection']>,
+) {
+  let qualificationEpoch = get().controllerSessionEpoch;
+  let writeEpoch = refs.writeEpoch ?? 0;
+  return {
+    get qualificationEpoch(): number {
+      return qualificationEpoch;
+    },
+    adopt: (epoch: number): void => {
+      qualificationEpoch = epoch;
+      writeEpoch = refs.writeEpoch ?? 0;
+    },
+    isCurrent: (): boolean =>
+      refs.connection === connection &&
+      (refs.writeEpoch ?? 0) === writeEpoch &&
+      get().controllerSessionEpoch === qualificationEpoch,
+  };
+}
+
 export async function runControllerHandshake(
   set: SetFn,
   get: GetFn,
