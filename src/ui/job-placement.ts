@@ -97,6 +97,36 @@ export function resolveJobPlacement(
   }
 }
 
+// Save G-code is a file export, not a motion command: for every mode except
+// Current Position the emitted bytes are independent of the live machine
+// state (user/verified origin translate the job anchor to work (0,0);
+// absolute passes coordinates through). When the live resolution succeeds we
+// keep it — a connected machine still contributes its WCO to the absolute
+// bounds preflight — but a failed live resolution must not block the export.
+// Falling back drops only the motion offset, so preflight degrades to the
+// size-only relative mode that Verified Origin starts already use (ADR-053).
+// Current Position is the one mode whose bytes bake in the live head
+// position, so it alone keeps its live-machine requirement at export time.
+export function resolveExportJobPlacement(
+  settings: JobPlacementSettings,
+  machine: MachinePlacementSnapshot,
+): ResolvedJobPlacement {
+  const live = resolveJobPlacement(settings, machine);
+  if (live.ok) return live;
+  switch (settings.startFrom) {
+    case 'absolute':
+      return { ok: true };
+    case 'user-origin':
+      return { ok: true, jobOrigin: { startFrom: 'user-origin', anchor: settings.anchor } };
+    case 'verified-origin':
+      return { ok: true, jobOrigin: { startFrom: 'verified-origin', anchor: settings.anchor } };
+    case 'current-position':
+      return live;
+    default:
+      return assertNeverStartMode(settings.startFrom);
+  }
+}
+
 export function trustedMotionOffsetForPreflight(
   device: DeviceProfile,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
