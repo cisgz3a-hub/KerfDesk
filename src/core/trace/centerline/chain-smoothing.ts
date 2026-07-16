@@ -64,8 +64,9 @@ export function smoothChainCurvature(
 
 // Anchor = pinned exactly. Classification uses the ORIGINAL geometry so it is
 // stable across passes (a point flagged a corner up front never becomes
-// smoothable as its neighbours move).
-function classifyAnchors(
+// smoothable as its neighbours move). Exported so the arc-length fairing
+// stage pins the identical vertex set (corners, hard turns, open endpoints).
+export function classifyAnchors(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   anchors: ReadonlySet<Vec2>,
