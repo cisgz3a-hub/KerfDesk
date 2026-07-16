@@ -143,6 +143,56 @@ describe('emitCncJobWithPassSpans', () => {
     expect(m0Raw).toBeLessThan(spans[2]?.firstRawLine ?? Number.NaN);
   });
 
+  it('covers arc and helical passes with their own spans', () => {
+    const job: Job = {
+      groups: [
+        testGroup([
+          {
+            kind: 'arc',
+            start: { x: 10, y: 0 },
+            end: { x: 0, y: 10 },
+            center: { x: 0, y: 0 },
+            clockwise: false,
+            zMm: -1,
+            closed: false,
+          },
+          {
+            kind: 'helical-contour',
+            start: { x: 13, y: 10 },
+            center: { x: 10, y: 10 },
+            clockwise: true,
+            startZMm: 0,
+            zMm: -2,
+            revolutions: 2,
+            polyline: [
+              { x: 13, y: 10 },
+              { x: 10, y: 13 },
+              { x: 7, y: 10 },
+              { x: 10, y: 7 },
+              { x: 13, y: 10 },
+            ],
+            closed: true,
+          },
+        ]),
+      ],
+    };
+    const { gcode, spans } = emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE);
+    expect(gcode).toBe(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE));
+    expect(spans.map(({ groupIndex, passIndex }) => [groupIndex, passIndex])).toEqual([
+      [0, 0],
+      [0, 1],
+    ]);
+    const lines = gcode.split('\n');
+    const arcSpan = spans[0];
+    const helixSpan = spans[1];
+    if (arcSpan === undefined || helixSpan === undefined) throw new Error('missing spans');
+    // The native G2/G3 arc motion lives inside its pass span.
+    const arcLines = lines.slice(arcSpan.firstRawLine - 1, arcSpan.lastRawLine);
+    expect(arcLines.some((line) => line.startsWith('G3 '))).toBe(true);
+    const helixLines = lines.slice(helixSpan.firstRawLine - 1, helixSpan.lastRawLine);
+    expect(helixLines.some((line) => line.startsWith('G2 ') || line.startsWith('G3 '))).toBe(true);
+  });
+
   it('skips degenerate passes without disturbing later spans', () => {
     const job: Job = {
       groups: [

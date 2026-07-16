@@ -16,7 +16,7 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import { cncGrblStrategy, selectOutputStrategy } from '../../core/output';
+import { emitCncJobWithPassSpans, selectOutputStrategy, type CncPassSpan } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
 import {
   gcodeMetadataHeader,
@@ -61,7 +61,24 @@ export function emitPreparedGcode(
   prepared: PreparedOutput,
   options: EmitGcodeOptions = {},
 ): EmitGcodeResult {
-  if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
+  const { gcode, preflight } = emitPreparedGcodeWithCncPassSpans(prepared, options);
+  return { gcode, preflight };
+}
+
+export type EmitPreparedCncGcodeResult = EmitGcodeResult & {
+  /** Raw-line span of every emitted CNC pass (ADR-215). Null for non-CNC
+   * projects, refused emissions, and metadata-headed output (a prepended
+   * header shifts raw line numbers, so spans would not describe `gcode`). */
+  readonly spans: ReadonlyArray<CncPassSpan> | null;
+};
+
+/** emitPreparedGcode plus the CNC pass-span sidecar. The G-code is
+ * byte-identical to emitPreparedGcode for the same inputs. */
+export function emitPreparedGcodeWithCncPassSpans(
+  prepared: PreparedOutput,
+  options: EmitGcodeOptions = {},
+): EmitPreparedCncGcodeResult {
+  if (!prepared.ok) return { gcode: '', preflight: prepared.preflight, spans: null };
   const machine = prepared.project.machine;
   // Scale Y at the last moment so design previews stay surface-true. Raster
   // remains fail-closed unless the caller proves the Labs gate.
@@ -70,13 +87,19 @@ export function emitPreparedGcode(
     prepared.job,
     options.allowRotaryRaster === true,
   );
-  if (rotaryStage.kind === 'refused') return { gcode: '', preflight: rotaryStage.preflight };
+  if (rotaryStage.kind === 'refused') {
+    return { gcode: '', preflight: rotaryStage.preflight, spans: null };
+  }
   const job = rotaryStage.job;
   // CNC router projects always emit through the Z-aware GRBL strategy; laser
   // projects pick their controller dialect via the ADR-094 driver seam.
-  const body =
+  const cncEmission =
     machine !== undefined && machine.kind === 'cnc'
-      ? cncGrblStrategy.emit(job, prepared.project.device)
+      ? emitCncJobWithPassSpans(job, prepared.project.device)
+      : null;
+  const body =
+    cncEmission !== null
+      ? cncEmission.gcode
       : selectOutputStrategy(prepared.project.device).emit(
           job,
           prepared.project.device,
@@ -89,7 +112,8 @@ export function emitPreparedGcode(
   const gcode = options.metadata
     ? gcodeMetadataHeader(options.metadata, headerAssumptionsFor(prepared.project)) + body
     : body;
-  return { gcode, preflight };
+  const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
+  return { gcode, preflight, spans };
 }
 
 function currentPositionFinishOptions(jobOrigin: JobOriginPlacement | undefined): {

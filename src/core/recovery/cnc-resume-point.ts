@@ -22,15 +22,18 @@ import { countSendableLines, rawResumeLine } from './job-checkpoint';
 
 // Assumed upper bounds on acked-but-unexecuted lines, in sendable lines.
 // These are conservative safety margins (≥2x the firmware family's planner
-// block buffer plus stepper-segment prefetch), NOT firmware claims. Ruida is
-// never a CNC target; it gets the most conservative placeholder.
+// block buffer plus stepper-segment prefetch), NOT firmware claims. grblHAL
+// planner sizes are driver-configurable and can be large on 32-bit MCUs, so
+// its reserve is generous; the operator's "everything before the boundary is
+// complete" confirmation remains the load-bearing check on such rigs. Ruida
+// is never a CNC target; it gets the most conservative placeholder.
 export const CNC_RESUME_PLANNER_RESERVE_LINES: Readonly<Record<ControllerKind, number>> = {
   'grbl-v1.1': 32,
-  grblhal: 128,
+  grblhal: 256,
   fluidnc: 64,
   marlin: 64,
   smoothieware: 64,
-  ruida: 128,
+  ruida: 256,
 };
 
 export type CncResumePointArgs = {
