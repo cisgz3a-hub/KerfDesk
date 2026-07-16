@@ -758,7 +758,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    counter is omitted rather than estimated.
 9. While any job is running, the status badge also shows the live
    controller-reported feed rate (`N mm/min`, inch reports normalized),
-   taken from each status frame's `FS:` field (ADR-217). It appears only
+   taken from each status frame's `FS:` field (ADR-218). It appears only
    while running and only when the controller reports feed; a held machine
    or a controller that omits `FS:` shows no rate.
 
@@ -1961,7 +1961,11 @@ F-CNC19 tiling.
    or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
 2. Depth, depth-per-pass, feed, plunge, and spindle RPM accept typed values;
    Pocket additionally shows stepover %, profile cut types show the tabs
-   group (enabled, height, width, count).
+   group (enabled, height, width, count). Outline and Engrave operations show
+   a **Line art** selector (inner / outer / both, default inner): a traced
+   double-line ring — a nested closed pair tighter than the bit diameter —
+   machines only the chosen edge, while wider nesting and lone contours
+   always cut (ADR-218).
 3. Preview and time estimate update to the compiled CNC job (pockets and
    engraves first, then profiles inner-before-outer).
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile

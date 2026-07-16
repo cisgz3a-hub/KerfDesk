@@ -50,9 +50,12 @@ describe('CNC layer clarity', () => {
       const selectLabels = [...view.host.querySelectorAll('select')].map((select) =>
         select.getAttribute('aria-label'),
       );
-      expect(selectLabels.slice(0, 3)).toEqual([
+      expect(selectLabels.slice(0, 4)).toEqual([
         'Material for #000000',
         'Cut type for #000000',
+        // ADR-218: the line-art side qualifies the cut type, so it sits
+        // directly under it (default cut type is profile-outside → shown).
+        'Line art contours for #000000',
         'Bit for #000000',
       ]);
       expect(view.host.textContent).toContain('Manual values are active');

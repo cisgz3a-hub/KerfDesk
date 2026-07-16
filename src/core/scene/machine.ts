@@ -146,6 +146,12 @@ export type CncLayerSettings = {
   // profile-on-path, and relief are out of scope). 0 / absent = off (no
   // finishing pass; output is byte-identical to pre-allowance jobs).
   readonly finishAllowanceMm?: number;
+  // Traced double-line handling (ADR-218): a boundary trace emits a stroked
+  // drawing as nested contour PAIRS one stroke-width apart. For pairs tighter
+  // than the bit diameter, machine only the inner edge, only the outer, or
+  // both. Absent = 'inner' (the traced-shape reading); 'both' restores the
+  // cut-every-contour behavior. Outline + engrave cuts only.
+  readonly lineArtContours?: 'inner' | 'outer' | 'both';
 };
 
 // Machine-wide flood/mist coolant for the whole CNC job (a router setting,
@@ -258,6 +264,9 @@ export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
 // Easel's recommended settings.
 export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   cutType: 'profile-outside',
+  // ADR-218: literal must match DEFAULT_LINE_ART_CONTOURS in core/cnc
+  // (scene cannot import cnc without a cycle).
+  lineArtContours: 'inner',
   // A new layer starts as a shallow profiling/engraving pass. Reaching stock
   // bottom is an explicit operator edit, where the no-tabs warning still fires.
   depthMm: 1,
