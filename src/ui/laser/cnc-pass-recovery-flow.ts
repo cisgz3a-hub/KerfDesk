@@ -36,7 +36,7 @@ import {
   streamCncRecoveryProgram,
   type CncRecoveryStreamPlan,
 } from './cnc-supervised-recovery-stream';
-import { prepareArchivedRecoverySource } from './start-job-source';
+import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
 export async function runCncPassRecoveryFlow(
   capsule: RecoveryCapsule,
@@ -119,10 +119,20 @@ function planPassRecovery(
   }
   if (!confirmWarnings(source.warnings)) return null;
   if (!confirmPlan(review, resume)) return null;
+  return passRecoveryStreamPlan(capsule, review, source, resume, emitted.gcode);
+}
+
+function passRecoveryStreamPlan(
+  capsule: RecoveryCapsule,
+  review: CncPassRecoveryReview,
+  source: PreparedRecoverySource,
+  resume: Extract<ReturnType<typeof buildCncPassResumeJob>, { kind: 'resume-job' }>,
+  gcode: string,
+): CncRecoveryStreamPlan {
   return {
     source,
     recovery: { job: resume.job },
-    gcode: emitted.gcode,
+    gcode,
     ...(review.position.kind === 'retained-confirmed'
       ? { assertFinalStartConditions: () => assertRetainedPositionStillConfirmed(capsule) }
       : {}),
