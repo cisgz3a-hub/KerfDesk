@@ -14,20 +14,9 @@ export function drawArtworkRunFocus(
   const boxes = active.map(transformedBBox);
   const minX = Math.min(...boxes.map((box) => box.minX));
   const minY = Math.min(...boxes.map((box) => box.minY));
-  const maxX = Math.max(...boxes.map((box) => box.maxX));
-  const maxY = Math.max(...boxes.map((box) => box.maxY));
   const x = view.offsetX + minX * view.scale;
   const y = view.offsetY + minY * view.scale;
-  const width = Math.max(1, (maxX - minX) * view.scale);
-  const height = Math.max(1, (maxY - minY) * view.scale);
   ctx.save();
-  ctx.strokeStyle = focus.color;
-  ctx.lineWidth = 7;
-  ctx.globalAlpha = 0.22;
-  ctx.strokeRect(x - 4, y - 4, width + 8, height + 8);
-  ctx.globalAlpha = 1;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
   drawNumberBadge(ctx, x - 2, y - 2, focus.position, focus.color);
   ctx.restore();
 }
@@ -42,6 +31,7 @@ function drawNumberBadge(
   const label = `#${position}`;
   const width = Math.max(28, 14 + label.length * 7);
   const badgeY = y - 25;
+  drawOpenAccent(ctx, x + width + 6, badgeY + 10.5, color);
   ctx.fillStyle = color;
   ctx.fillRect(x, badgeY, width, 21);
   ctx.fillStyle = canvasTheme.selectionHandleFill;
@@ -49,4 +39,22 @@ function drawNumberBadge(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x + width / 2, badgeY + 10.5);
+}
+
+function drawOpenAccent(ctx: CanvasRenderingContext2D, x: number, y: number, color: string): void {
+  ctx.strokeStyle = color;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.22;
+  ctx.lineWidth = 7;
+  drawAccentLine(ctx, x, y);
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 2;
+  drawAccentLine(ctx, x, y);
+}
+
+function drawAccentLine(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + 24, y);
+  ctx.stroke();
 }

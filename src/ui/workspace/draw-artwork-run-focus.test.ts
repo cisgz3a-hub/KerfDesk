@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import { createRectangle } from '../../core/shapes';
+import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawScene } from './draw-scene';
 
 describe('artwork run focus canvas treatment', () => {
-  it('dims only non-active artwork and draws the active run badge without mutating the project', () => {
+  it('dims only non-active artwork without mutating the project', () => {
     const project = focusProject();
     const before = JSON.stringify(project);
     const recording = recordingContext();
@@ -16,9 +17,27 @@ describe('artwork run focus canvas treatment', () => {
     });
 
     expect(recording.globalAlphaValues).toContain(0.24);
-    expect(recording.labels).toContain('#1');
-    expect(recording.strokeRects).toBeGreaterThanOrEqual(2);
     expect(JSON.stringify(project)).toBe(before);
+  });
+
+  it('draws an open callout beside the run badge instead of outlining the artwork', () => {
+    const project = focusProject();
+    const recording = recordingContext();
+
+    drawArtworkRunFocus(
+      recording.ctx,
+      project.scene.objects,
+      { objectIds: ['A'], position: 1, color: '#2563eb' },
+      { scale: 2, offsetX: 10, offsetY: 20 },
+    );
+
+    expect(recording.labels).toEqual(['#1']);
+    expect(recording.strokeRects).toBe(0);
+    expect(recording.strokeCalls).toBe(2);
+    expect(recording.lineSegments).toHaveLength(2);
+    expect(recording.lineSegments.every(({ from, to }) => from.y === to.y && to.x > from.x)).toBe(
+      true,
+    );
   });
 });
 
@@ -47,16 +66,40 @@ function recordingContext(): {
   readonly ctx: CanvasRenderingContext2D;
   readonly globalAlphaValues: number[];
   readonly labels: string[];
+  readonly lineSegments: Array<{
+    readonly from: { readonly x: number; readonly y: number };
+    readonly to: { readonly x: number; readonly y: number };
+  }>;
+  readonly strokeCalls: number;
   readonly strokeRects: number;
 } {
   const globalAlphaValues: number[] = [];
   const labels: string[] = [];
+  const lineSegments: Array<{
+    readonly from: { readonly x: number; readonly y: number };
+    readonly to: { readonly x: number; readonly y: number };
+  }> = [];
+  let currentPoint: { readonly x: number; readonly y: number } | null = null;
+  let strokeCalls = 0;
   let strokeRects = 0;
   const ctx = new Proxy(
     {},
     {
       get(_target, property) {
         if (property === 'fillText') return (label: string) => labels.push(label);
+        if (property === 'moveTo')
+          return (x: number, y: number) => {
+            currentPoint = { x, y };
+          };
+        if (property === 'lineTo')
+          return (x: number, y: number) => {
+            if (currentPoint !== null) lineSegments.push({ from: currentPoint, to: { x, y } });
+            currentPoint = { x, y };
+          };
+        if (property === 'stroke')
+          return () => {
+            strokeCalls += 1;
+          };
         if (property === 'strokeRect')
           return () => {
             strokeRects += 1;
@@ -74,6 +117,10 @@ function recordingContext(): {
     ctx,
     globalAlphaValues,
     labels,
+    lineSegments,
+    get strokeCalls() {
+      return strokeCalls;
+    },
     get strokeRects() {
       return strokeRects;
     },

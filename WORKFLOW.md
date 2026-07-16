@@ -308,16 +308,17 @@ Identical to F-A3 except:
 #### Success - number a large job from the canvas
 1. Open **Run order** and click **Number on canvas**.
 2. The canvas prompt says `Click artwork for run #1`. Click the desired first artwork, then the
-   desired second, and continue. The clicked run receives a thin colour halo and number badge; other
-   artwork is dimmed while the bed, grid, stock, no-go zones, camera, rulers, and motion markers stay
-   fully visible.
+   desired second, and continue. The clicked run receives a number badge with a short, open colour
+   callout; other artwork is dimmed while the bed, grid, stock, no-go zones, camera, rulers, and
+   motion markers stay fully visible. The callout never encloses the artwork, so it cannot resemble
+   geometry that will be cut, carved, or burned.
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
 4. Numbering ends automatically after every run unit has been assigned.
 
 #### Success - inspect a job from either surface
 1. Click a run row: its complete run unit is selected on the canvas, highlighted with its operation
-   colour and `#N` badge, and all other artwork is visually de-emphasized.
+   colour in an open callout beside its `#N` badge, and all other artwork is visually de-emphasized.
 2. With Run order open, click artwork on the canvas: the matching row becomes active and scrolls
    into view.
 3. Focus/dimming is UI-only. It is not persisted, is not undoable, and cannot affect preview,

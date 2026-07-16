@@ -8746,8 +8746,10 @@ cannot reliably match an abstract position to crowded canvas geometry.
    one unit; empty or partially shared bindings remain independent. The persisted
    `Scene.artworkOrder` stays a flattened object-ID list, so no schema migration is required.
 4. Row focus and canvas focus are bidirectional. The active unit keeps full opacity and receives a
-   thin operation-colour halo plus `#N` badge; other artwork is dimmed. This focus is ephemeral UI
-   state and never changes geometry, presentation colours, visibility, output, preview, or G-code.
+   short, open operation-colour callout beside its `#N` badge; other artwork is dimmed. A closed
+   focus outline is intentionally avoided because it can resemble output geometry. This focus is
+   ephemeral UI state and never changes geometry, presentation colours, visibility, output,
+   preview, or G-code.
 5. **Number on canvas** assigns #1, #2, and onward by hit-testing clicks. A session uses one pending
    project snapshot: Done creates one undo entry, Undo last rewinds within the session, and Cancel
    restores the original order.
