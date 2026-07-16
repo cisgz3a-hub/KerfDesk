@@ -61,11 +61,15 @@ describe('canvasPlanRetentionKey', () => {
   });
 });
 
-function prepared(controllerKind: 'grbl-v1.1' | 'marlin' | 'ruida' = 'grbl-v1.1') {
+function prepared(
+  controllerKind: 'grbl-v1.1' | 'marlin' | 'ruida' = 'grbl-v1.1',
+  homingEnabled = false,
+) {
   const project = createProject({
     ...DEFAULT_DEVICE_PROFILE,
     controllerKind,
     origin: 'rear-left',
+    homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: homingEnabled },
   });
   return {
     ok: true,
@@ -227,6 +231,45 @@ describe('CanvasMotionPlan', () => {
     expect(markers.framePerimeter).toEqual(full.framePerimeter);
     expect(markers.coordinateFrame).toEqual(full.coordinateFrame);
     expect(markers.manifest.blocks).toEqual([]);
+  });
+
+  it('renders an origin-anchored start artwork-relative when the bed position is unverified', () => {
+    // Live repro (2026-07-17): no-homing router, User Origin start. GRBL
+    // reports a numeric WCO, but MPos is power-on-relative — the "machine"
+    // frame drew the job-relative program at a meaningless bed corner,
+    // offset from the artwork.
+    const plan = buildCanvasMotionPlan({
+      gcode: 'G21\nG90\nM3 S0\nG0 X0 Y0\nG1 X20 S500',
+      prepared: { ...prepared('grbl-v1.1', false), jobOriginOffset: { x: -10, y: -20 } },
+      machine: {
+        ...machine,
+        workOriginActive: true,
+        wcoCache: { x: 5, y: 5, z: 0 },
+        homingState: 'unknown' as const,
+      },
+      statusQuery: 'realtime-report',
+      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    });
+    expect(plan.coordinateFrame.kind).toBe('relative');
+  });
+
+  it('keeps the truthful machine frame for an origin-anchored start on a homed machine', () => {
+    const plan = buildCanvasMotionPlan({
+      gcode: 'G21\nG90\nM3 S0\nG0 X0 Y0\nG1 X20 S500',
+      prepared: prepared('grbl-v1.1', true),
+      machine: {
+        ...machine,
+        workOriginActive: true,
+        wcoCache: { x: 5, y: 5, z: 0 },
+        homingState: 'confirmed' as const,
+      },
+      statusQuery: 'realtime-report',
+      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    });
+    expect(plan.coordinateFrame).toEqual({
+      kind: 'machine',
+      workOffsetMm: { x: 5, y: 5, z: 0 },
+    });
   });
 
   it('labels verified-origin plans as relative and keeps the marker artwork-relative', () => {

@@ -329,16 +329,37 @@ function canvasCoordinateFrame(
 ): CanvasMotionPlan['coordinateFrame'] {
   // A missing physical WCO is exactly the Verified-Origin contract: retain a
   // truthful artwork-relative view and label that the bed position is unknown.
+  // The same contract covers an origin-anchored start on a machine whose bed
+  // position is unverified (no homing, or not homed this connection): GRBL
+  // still reports a numeric WCO, but MPos is power-on-relative, so drawing
+  // the job-relative program at those "bed" coordinates lands it offset from
+  // the artwork at a physically meaningless position (live repro 2026-07-17).
   const wcoRaw = machine.statusReport?.wco ?? machine.wcoCache ?? null;
   if (
     relativeView ||
     jobOrigin?.startFrom === 'verified-origin' ||
-    (machine.workOriginActive === true && wcoRaw === null)
+    (machine.workOriginActive === true && wcoRaw === null) ||
+    (isOriginAnchoredStart(jobOrigin) && !bedPositionVerified(prepared, machine))
   ) {
     return { kind: 'relative', jobOriginOffset: prepared.jobOriginOffset };
   }
   const workOffsetMm = wcoRaw === null ? { x: 0, y: 0, z: 0 } : normalized(wcoRaw, reportInches);
   return { kind: 'machine', workOffsetMm };
+}
+
+// User Origin and Current Position anchor the program to the operator's
+// origin, not to a bed location the canvas can trust.
+function isOriginAnchoredStart(jobOrigin: JobOriginPlacement | undefined): boolean {
+  return jobOrigin?.startFrom === 'user-origin' || jobOrigin?.startFrom === 'current-position';
+}
+
+// Bed coordinates are trustworthy only on a homing machine that has homed in
+// the current connection — the same evidence Absolute placement requires.
+function bedPositionVerified(
+  prepared: Extract<PreparedOutput, { readonly ok: true }>,
+  machine: MachineStartSnapshot,
+): boolean {
+  return prepared.project.device.homing.enabled && machine.homingState === 'confirmed';
 }
 
 function normalized(point: MotionPoint, reportInches: boolean): MotionPoint {
