@@ -3,6 +3,7 @@ import { controlHelp } from '../help/help-topics';
 import { type JobPlacementSettings } from '../job-placement';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
+import { sectionCaptionStyle } from './JobControls.styles';
 
 const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
   absolute: 'Absolute Coordinates',
@@ -36,28 +37,32 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
   const busy = props.streaming;
   return (
     <div style={placementStackStyle}>
-      <div style={placementRowStyle}>
-        <label style={placementLabelStyle}>
-          <span>Start from</span>
-          <select
-            aria-label="Start from"
-            value={placement.startFrom}
-            disabled={busy || cameraPlacementActive}
-            title={
-              cameraPlacementActive
-                ? 'Camera placement is aligned to the physical bed, so Absolute Coordinates is required. Exit camera placement in the Camera panel to use another origin mode.'
-                : 'Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin (ordinary no-homing placement is size-checked; Frame remains optional).'
-            }
-            onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
-          >
-            {Object.entries(START_FROM_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <span style={sectionCaptionStyle}>Placement</span>
+      <label style={placementLabelStyle}>
+        <span style={fieldNameStyle}>Start from</span>
+        <select
+          aria-label="Start from"
+          className="lf-select"
+          style={startFromSelectStyle}
+          value={placement.startFrom}
+          disabled={busy || cameraPlacementActive}
+          title={
+            cameraPlacementActive
+              ? 'Camera placement is aligned to the physical bed, so Absolute Coordinates is required. Exit camera placement in the Camera panel to use another origin mode.'
+              : 'Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin (ordinary no-homing placement is size-checked; Frame remains optional).'
+          }
+          onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
+        >
+          {Object.entries(START_FROM_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div style={anchorRowStyle}>
         <AnchorPicker placement={placement} disabled={busy || placement.startFrom === 'absolute'} />
+        <span style={fieldNameStyle}>Job origin</span>
       </div>
       {cameraPlacementActive ? (
         <div role="status" style={cameraPlacementNoteStyle}>
@@ -81,6 +86,7 @@ function OutputScopeControls(props: {
       <label style={scopeLabelStyle}>
         <input
           type="checkbox"
+          className="lf-checkbox"
           aria-label="Selected artwork only"
           checked={scope.cutSelectedGraphics}
           disabled={props.disabled}
@@ -94,6 +100,7 @@ function OutputScopeControls(props: {
         <label style={scopeLabelStyle}>
           <input
             type="checkbox"
+            className="lf-checkbox"
             aria-label="Anchor from selected artwork"
             checked={scope.useSelectionOrigin}
             disabled={props.disabled}
@@ -119,12 +126,13 @@ function AnchorPicker(props: {
         <button
           key={anchor}
           type="button"
+          className="lf-btn"
           aria-label={`Job origin ${anchor}`}
           aria-pressed={props.placement.anchor === anchor}
           disabled={props.disabled}
           title={`Job origin: ${anchor}`}
           onClick={() => setJobPlacement({ anchor })}
-          style={anchorButtonStyle(props.placement.anchor === anchor)}
+          style={anchorButtonStyle}
         >
           {ANCHOR_LABELS[anchor]}
         </button>
@@ -133,21 +141,29 @@ function AnchorPicker(props: {
   );
 }
 
-const placementRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  flexWrap: 'wrap',
-};
 const placementStackStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 6,
 };
 const placementLabelStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
+};
+// The select stretches to the rail edge so the placement block forms one
+// column of aligned controls instead of a short field floating mid-row.
+const startFromSelectStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const fieldNameStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+// Caption sits beside the grid — without it the nine two-letter buttons read
+// as a mystery keypad instead of LightBurn's job-origin anchor picker.
+const anchorRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
 };
 const scopeRowStyle: React.CSSProperties = {
   display: 'flex',
@@ -170,14 +186,12 @@ const anchorGridStyle: React.CSSProperties = {
   gap: 2,
 };
 
-function anchorButtonStyle(active: boolean): React.CSSProperties {
-  return {
-    width: 26,
-    height: 22,
-    padding: 0,
-    fontSize: 10,
-    fontVariantNumeric: 'tabular-nums',
-    background: active ? 'var(--lf-accent)' : undefined,
-    color: active ? 'var(--lf-on-fill)' : undefined,
-  };
-}
+// Fixed compact cells; the pressed (active) fill comes from the design-system
+// rule .lf-btn[aria-pressed='true'] so hover/disabled states stay consistent.
+const anchorButtonStyle: React.CSSProperties = {
+  width: 26,
+  height: 22,
+  padding: 0,
+  fontSize: 10,
+  fontVariantNumeric: 'tabular-nums',
+};

@@ -4,6 +4,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
+import { sectionCaptionStyle } from './JobControls.styles';
 import { NoHomingPositionChoices } from './NoHomingPositionChoices';
 
 type GuidePhase =
@@ -42,7 +43,7 @@ export function NoHomingPositionGuide(props: {
   const normalBusy = props.disabled || props.streaming || status !== 'Idle';
   return (
     <section aria-label="Position job" style={guideStyle}>
-      <strong>Position job</strong>
+      <strong style={guideCaptionStyle}>Position job</strong>
       <GuideBody
         actions={actions}
         phase={phase}
@@ -199,6 +200,8 @@ function PositioningStep(props: {
       </p>
       <button
         type="button"
+        className="lf-btn"
+        style={guideButtonStyle}
         disabled={!props.controllerSleeping}
         onClick={props.onUseHandPosition}
         title="Wake the controller, set this position as origin, then require a Frame."
@@ -220,6 +223,8 @@ function RecoveringStep(props: {
         <p style={messageStyle}>GRBL is awake but locked. Confirm the head is safely positioned.</p>
         <button
           type="button"
+          className="lf-btn"
+          style={guideButtonStyle}
           disabled={!props.canUnlock}
           onClick={props.onUnlock}
           title="Unlock only after confirming the hand-positioned head is safe."
@@ -238,10 +243,26 @@ function RecoveringStep(props: {
   return <p style={messageStyle}>Waking controller...</p>;
 }
 
+// One bordered card for the whole flow — the previous box-in-a-box nesting
+// (guide border + inner method border) fragmented a narrow rail into slivers.
 const guideStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 6,
   padding: 8,
-  background: 'var(--lf-bg-1)',
+  background: 'var(--lf-bg-2)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
 };
-const messageStyle: React.CSSProperties = { margin: '4px 0 6px', fontSize: 12 };
+// Shared caption, darkened one step: faint text on this card's tinted
+// background loses too much contrast at 11px.
+const guideCaptionStyle: React.CSSProperties = {
+  ...sectionCaptionStyle,
+  color: 'var(--lf-text-muted)',
+};
+const guideButtonStyle: React.CSSProperties = { width: '100%' };
+const messageStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};

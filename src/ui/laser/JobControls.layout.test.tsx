@@ -32,6 +32,16 @@ describe('JobControls action hierarchy', () => {
     }
   });
 
+  it('leads with Start job, then Frame, then Home — primary action first', async () => {
+    const view = await renderControls();
+    try {
+      expect(precedes(button(view.host, 'Start job'), button(view.host, 'Frame'))).toBe(true);
+      expect(precedes(button(view.host, 'Frame'), button(view.host, 'Home'))).toBe(true);
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('places passive frame status before placement details while framing', async () => {
     useLaserStore.setState({
       motionOperation: {

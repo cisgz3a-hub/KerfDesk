@@ -22,25 +22,27 @@ export function NoHomingPositionChoices(props: {
 }): JSX.Element {
   return (
     <>
-      <div style={methodStyle}>
-        <div style={methodHeadingStyle}>
-          <strong>{JOG_METHOD_LABEL}</strong>
-          {props.isJogPositioning && <span style={selectedStyle}>{SELECTED_LABEL}</span>}
-        </div>
-        <p style={messageStyle}>{JOG_INSTRUCTION}</p>
-        {!props.isJogPositioning && (
-          <button
-            type="button"
-            disabled={props.disabled}
-            onClick={props.onChooseJog}
-            title={CHOOSE_JOG_TITLE}
-          >
-            {CHOOSE_JOG_LABEL}
-          </button>
-        )}
+      <div style={methodHeadingStyle}>
+        <strong style={methodNameStyle}>{JOG_METHOD_LABEL}</strong>
+        {props.isJogPositioning && <span style={selectedStyle}>{SELECTED_LABEL}</span>}
       </div>
+      <p style={messageStyle}>{JOG_INSTRUCTION}</p>
+      {!props.isJogPositioning && (
+        <button
+          type="button"
+          className="lf-btn"
+          style={choiceButtonStyle}
+          disabled={props.disabled}
+          onClick={props.onChooseJog}
+          title={CHOOSE_JOG_TITLE}
+        >
+          {CHOOSE_JOG_LABEL}
+        </button>
+      )}
       <button
         type="button"
+        className="lf-btn"
+        style={choiceButtonStyle}
         disabled={props.disabled || !props.canSleep}
         onClick={props.onRelease}
         title={props.canSleep ? RELEASE_MOTORS_TITLE : NO_SLEEP_COMMAND_TITLE}
@@ -52,20 +54,24 @@ export function NoHomingPositionChoices(props: {
   );
 }
 
-const messageStyle: React.CSSProperties = { margin: '4px 0 6px', fontSize: 12 };
-const errorStyle: React.CSSProperties = { ...messageStyle, color: 'var(--lf-danger-fg)' };
-const methodStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: 6,
-  margin: '4px 0 6px',
+const messageStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
 };
+const errorStyle: React.CSSProperties = { ...messageStyle, color: 'var(--lf-danger-fg)' };
+// Both entry points render as identical full-width rows: the two ways to
+// position the head read as parallel choices, not a boxed card plus a stray
+// button (the old layout's shape).
+const choiceButtonStyle: React.CSSProperties = { width: '100%' };
 const methodHeadingStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 6,
+  marginTop: 2,
 };
+const methodNameStyle: React.CSSProperties = { fontSize: 12 };
 const selectedStyle: React.CSSProperties = {
   color: 'var(--lf-success-fg)',
   fontSize: 11,
