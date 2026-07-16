@@ -8928,8 +8928,10 @@ laser recovery so nothing can corrupt the controller, and the laser feature must
 
 - CNC recovery generates a NEW ordinary Job that starts at the beginning of a pass and keeps every
   later pass and group in source order (`core/recovery/cnc-pass-resume-job.ts`). A pass boundary is
-  a physically safe re-entry point: each stepdown is its own constant-Z pass, so the boundary
-  pass's start point is already-cut kerf, and the ordinary emitter preamble (safe-Z retract ->
+  a physically safe re-entry point: each stepdown is its own constant-Z pass, so the plunge at
+  the boundary is either through already-cut kerf or is exactly the pass's own designed first
+  plunge (a boundary pass that never started; a group's first pass into virgin stock) — never a
+  mid-material spindle start. The ordinary emitter preamble (safe-Z retract ->
   `M3 S` -> `G4` spin-up dwell -> rapid -> plunge at plunge feed) has the spindle at full speed
   before any material contact. Recutting the already-cut part of one pass is the accepted cost;
   the boundary can never skip uncut material.

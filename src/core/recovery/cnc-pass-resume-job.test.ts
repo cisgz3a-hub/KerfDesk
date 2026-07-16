@@ -206,4 +206,34 @@ describe('buildCncPassResumeJob', () => {
       'G4 P3.000',
     ]);
   });
+
+  it('re-enables machine-wide coolant after the spin-up dwell and closes it at job end', () => {
+    const coolantJob: Job = {
+      groups: [
+        { ...testGroup([contour(-1, line(0)), contour(-2, line(0))]), coolant: 'flood' as const },
+      ],
+    };
+    const result = buildCncPassResumeJob(coolantJob, 0, 1);
+    if (result.kind !== 'resume-job') throw new Error(result.reason);
+    const lines = emitCncJobWithPassSpans(result.job, DEFAULT_DEVICE_PROFILE).gcode.split('\n');
+    expect(lines.indexOf('M8')).toBe(lines.indexOf('G4 P3.000') + 1);
+    expect(lines.indexOf('M9')).toBe(lines.indexOf('M5') + 1);
+  });
+
+  it('re-emits later groups byte-identically after a mid-group boundary', () => {
+    const original = emitCncJobWithPassSpans(source, DEFAULT_DEVICE_PROFILE);
+    const result = buildCncPassResumeJob(source, 0, 1);
+    if (result.kind !== 'resume-job') throw new Error(result.reason);
+    const resume = emitCncJobWithPassSpans(result.job, DEFAULT_DEVICE_PROFILE);
+    for (const span of resume.spans) {
+      if (span.groupIndex === 0) continue;
+      const originalSpan = original.spans.find(
+        (candidate) =>
+          candidate.groupIndex === span.groupIndex && candidate.passIndex === span.passIndex,
+      );
+      expect(originalSpan).toBeDefined();
+      if (originalSpan === undefined) continue;
+      expect(spanText(resume.gcode, span)).toBe(spanText(original.gcode, originalSpan));
+    }
+  });
 });

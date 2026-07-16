@@ -1,5 +1,5 @@
 import { streamingModeForController } from '../../core/devices';
-import type { CncSupervisedRecoveryJob } from '../../core/recovery/cnc-supervised-recovery-job';
+import type { Job } from '../../core/job';
 import { cncToolPlan } from '../state/cnc-tool-plan';
 import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
@@ -15,9 +15,12 @@ import type { PreparedRecoverySource } from './start-job-source';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 
+// `recovery.job` is the newly generated recovery Job — the runway flow passes
+// its richer CncSupervisedRecoveryJob, the pass-boundary flow (ADR-215) a bare
+// job; streaming only needs the job itself.
 export type CncRecoveryStreamPlan = {
   readonly source: PreparedRecoverySource;
-  readonly recovery: CncSupervisedRecoveryJob;
+  readonly recovery: { readonly job: Job };
   readonly gcode: string;
   // Operator's qualification attestation, archived into the recovery artifact
   // for auditability (audit A1).
@@ -168,7 +171,7 @@ function recoveryCanvasPlan(
   );
 }
 
-function toolPlanOption(recovery: CncSupervisedRecoveryJob) {
+function toolPlanOption(recovery: { readonly job: Job }) {
   const plan = cncToolPlan(recovery.job);
   return plan.length === 0 ? {} : { cncToolPlan: plan };
 }
