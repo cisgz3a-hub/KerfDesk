@@ -1,4 +1,4 @@
-import { createPolyline } from '../../core/shapes';
+import { createPolyline, CURRENT_POLYLINE_FAIRING_VERSION } from '../../core/shapes';
 import type {
   CurveSubpath,
   PathSegment,
@@ -31,6 +31,16 @@ export function upgradeProjectPolylineFairing(project: Project): PolylineFairing
 
 function upgradePolylineObject(object: SceneObject): SceneObject {
   if (object.kind !== 'shape' || object.spec.kind !== 'polyline') return object;
+  // A drawing stamped at the current fairing version was produced by this
+  // engine version — trust the stamp instead of re-deriving fitter output and
+  // comparing JSON, which a future fitter change would silently break (ADR-214).
+  // A newer stamp (a file from a future build) is likewise left untouched.
+  if (
+    object.fairingVersion !== undefined &&
+    object.fairingVersion >= CURRENT_POLYLINE_FAIRING_VERSION
+  ) {
+    return object;
+  }
   const legacy = createPolyline({
     id: object.id,
     color: object.color,
@@ -53,7 +63,12 @@ function upgradePolylineObject(object: SceneObject): SceneObject {
   });
   if (!hasAuthoredCurve(rematerialized)) return object;
   if (hasSameCurves(object, rematerialized)) return object;
-  return { ...object, bounds: rematerialized.bounds, paths: rematerialized.paths };
+  return {
+    ...object,
+    bounds: rematerialized.bounds,
+    paths: rematerialized.paths,
+    fairingVersion: CURRENT_POLYLINE_FAIRING_VERSION,
+  };
 }
 
 function hasAuthoredCurve(object: ShapeObject): boolean {

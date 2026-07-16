@@ -8863,3 +8863,45 @@ New and edited text uses the original outline rendering path. Saved objects reta
 geometry, but a removed bundled font key is treated as unavailable when the operator tries to
 regenerate it and must be replaced with an available bundled or embedded font. The application no
 longer ships or advertises the removed single-line writing assets.
+
+---
+
+## ADR-214 - Version-stamp pen-drawing fairing instead of re-deriving fitter output
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+### Context
+
+The pen-drawing fairing migration (`upgradeProjectPolylineFairing`, from the #188-#197 series) decides
+whether a stored drawing needs re-fairing by re-running `createPolyline` and comparing the result to
+the stored curves with `JSON.stringify` byte-for-byte, plus a byte-identical match against a
+reproduced legacy-adapter curve. Recognition therefore depends on the fitter producing exactly the
+same serialized output it did when the drawing was saved. Any later change to `roundPolylineCurve`,
+`fairLineCurvePath`, `fitLegacyCentripetalCubics`, or the fit-tolerance constants silently breaks that
+match: an already-migrated drawing stops being recognized and could be re-faired (or a genuinely
+legacy one skipped). A claim-verification audit (2026-07-16, finding F5) flagged this as latent
+migration fragility - correct today, but a trap for the next fitter change.
+
+### Decision
+
+- Add an optional `fairingVersion?: number` to `ShapeObject`, persisted in `.lf2` like `provenance`
+  (structural serialize passthrough plus an `optionalNonNegativeNumber` validator entry). A file from
+  a future build carrying a higher version is tolerated, never downgraded.
+- `createPolyline` stamps the current version (`CURRENT_POLYLINE_FAIRING_VERSION`, in `core/shapes`)
+  on every drawing it produces, so new and re-faired drawings are born marked.
+- The migration first checks the stamp: a drawing at or above the current version is recognized by the
+  stamp alone and skipped, with no re-derivation. Only unstamped (pre-marker) drawings fall back to the
+  existing structural recognition, and when the migration upgrades one it stamps the current version on
+  the result.
+- Bump `CURRENT_POLYLINE_FAIRING_VERSION` whenever the fairing engine changes in a way that should
+  re-fair existing drawings; the version comparison then performs an explicit, deterministic migration
+  instead of a fragile output-equality guess.
+
+### Consequences
+
+Recognition of an already-faired drawing no longer depends on reproducing byte-identical fitter output,
+so a future fitter or tolerance change is safe: stamped drawings are skipped, and a version bump
+re-fairs them deterministically. Pre-ADR-214 drawings carry no stamp and are still recognized
+structurally on their first load, gaining a stamp only if the migration upgrades them (unchanged
+already-current legacy drawings stay unstamped and are re-evaluated harmlessly each load until edited).
+This is a purely additive schema field; older builds ignore the unknown key.

@@ -13,7 +13,7 @@ export {
 } from './rematerialize-shape';
 export { polylineToPolylines } from './polyline';
 export type { PolylineSpec } from './polyline';
-export { createPolyline } from './create-polyline';
+export { createPolyline, CURRENT_POLYLINE_FAIRING_VERSION } from './create-polyline';
 export { shapeFromDrag, isDrawDragSignificant, MIN_DRAW_SIZE_MM } from './shape-from-drag';
 export type { DrawShapeKind, DrawShapeModifiers } from './shape-from-drag';
 export {
