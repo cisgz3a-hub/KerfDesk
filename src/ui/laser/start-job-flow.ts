@@ -109,6 +109,7 @@ async function runStartJobFlowWithCheckpoint(
     laser,
     camera,
     externalEnvironment.rotaryRasterAllowed,
+    completedReceipt?.artifact.jobOrigin,
   );
   if (!prepared.ok) {
     useStartBlockerStore.getState().report(prepared.messages);

@@ -1,4 +1,4 @@
-import type { Project } from '../../core/scene';
+import { machineKindOf, type Project } from '../../core/scene';
 import {
   resolveJobPlacement,
   type JobPlacementSettings,
@@ -9,6 +9,7 @@ import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import { useCameraStore } from '../state/camera-store';
 import type { HomingState } from '../state/laser-store';
+import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 
 type CameraFrameMachineSnapshot = MachinePlacementSnapshot & {
   readonly homingState: HomingState;
@@ -34,7 +35,14 @@ export function resolveCameraSafeFramePlacement(
       camera.surfaceHeightMm,
     ),
   });
-  return issue === null
+  if (issue !== null) return { ok: false, messages: [issue] };
+  const absoluteHomeIssue = absoluteCoordinatesHomeIssue({
+    machineKind: machineKindOf(project.machine),
+    startFrom: jobPlacement.startFrom,
+    homingEnabled: project.device.homing.enabled,
+    homingState: machine.homingState,
+  });
+  return absoluteHomeIssue === null
     ? resolveJobPlacement(jobPlacement, machine)
-    : { ok: false, messages: [issue] };
+    : { ok: false, messages: [absoluteHomeIssue] };
 }

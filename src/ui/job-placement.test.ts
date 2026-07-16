@@ -4,6 +4,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../core/devices';
 import {
   defaultJobPlacementForDevice,
   jobPlacementAfterDeviceChange,
+  jobPlacementAfterProfileSelection,
   resolveJobPlacement,
   trustedMotionOffsetForPreflight,
 } from './job-placement';
@@ -58,6 +59,36 @@ describe('profile-aware placement defaults', () => {
         { startFrom: 'user-origin', anchor: 'center' },
         homing,
         noHoming,
+      ),
+    ).toEqual({ startFrom: 'user-origin', anchor: 'center' });
+  });
+
+  it('restores Absolute Coordinates when a homing profile is explicitly selected', () => {
+    const homing = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+
+    expect(
+      jobPlacementAfterProfileSelection(
+        { startFrom: 'current-position', anchor: 'center' },
+        homing,
+        homing,
+      ),
+    ).toEqual({ startFrom: 'absolute', anchor: 'center' });
+  });
+
+  it('preserves deliberate origin modes across homing profile selection', () => {
+    const homing = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+
+    expect(
+      jobPlacementAfterProfileSelection(
+        { startFrom: 'user-origin', anchor: 'center' },
+        homing,
+        homing,
       ),
     ).toEqual({ startFrom: 'user-origin', anchor: 'center' });
   });

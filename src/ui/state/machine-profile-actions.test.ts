@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -26,5 +26,20 @@ describe('machine profile store actions', () => {
     state.undo();
 
     expect(useStore.getState().project.device.name).not.toBe('Imported 500x300');
+  });
+
+  it('selects Absolute Coordinates when a homing-capable profile replaces Current Position', () => {
+    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'center' } });
+
+    useStore.getState().replaceDeviceProfile({
+      ...DEFAULT_DEVICE_PROFILE,
+      name: 'Homing laser',
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    });
+
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'absolute',
+      anchor: 'center',
+    });
   });
 });

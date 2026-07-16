@@ -25,7 +25,7 @@ import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
-import type { OutputStrategy } from './output-strategy';
+import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -77,13 +77,18 @@ function preamble(dialect: GrblGcodeDialect): string {
   );
 }
 
-function postamble(laserAlreadyOff: boolean, dialect: GrblGcodeDialect): string {
+function postamble(
+  laserAlreadyOff: boolean,
+  dialect: GrblGcodeDialect,
+  finishPosition: OutputEmitOptions['finishPosition'],
+): string {
   // M5: definitively turn the spindle/laser off at end of job, then park. When
   // the last group was raster it already emitted its trailing M5, so skip the
   // redundant one; the park move still carries S0, so the laser-off invariant
   // holds either way.
   const lines = laserAlreadyOff ? [] : ['M5'];
-  if (dialect.parkAtOriginAfterJob) lines.push(travelLine(0, 0, dialect));
+  const park = finishPosition ?? (dialect.parkAtOriginAfterJob ? { x: 0, y: 0 } : null);
+  if (park !== null) lines.push(travelLine(park.x, park.y, dialect));
   return lines.join(LINE_END) + LINE_END;
 }
 
@@ -344,7 +349,7 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
 // emitted ONLY when the required mode actually changes, so cut-only jobs stay
 // byte-identical. Under M4 the diode is also dark whenever the head is stopped
 // (dynamic power → 0 at 0 feed), so fill is now strictly safer on travel/pause.
-function emitJob(job: Job, device: DeviceProfile): string {
+function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   const dialect = resolveGrblDialect(device);
   const parts: string[] = [];
   parts.push(preamble(dialect));
@@ -373,7 +378,7 @@ function emitJob(job: Job, device: DeviceProfile): string {
   parts.push(coolantTransition(coolant, 'off'));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
-  parts.push(postamble(mode === 'off', dialect));
+  parts.push(postamble(mode === 'off', dialect, options.finishPosition));
   return parts.join('');
 }
 

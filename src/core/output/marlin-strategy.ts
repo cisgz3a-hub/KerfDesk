@@ -10,11 +10,12 @@ import { resolveMarlinDialect } from '../devices';
 import type { Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
 import { toMarlinFanGcode } from './marlin-fan-transform';
+import type { OutputEmitOptions } from './output-strategy';
 
 export const marlinStrategy = {
   id: 'marlin' as const,
-  emit: (job: Job, device: DeviceProfile): string => {
-    const body = grblStrategy.emit(job, device);
+  emit: (job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string => {
+    const body = grblStrategy.emit(job, device, options);
     const dialect = resolveMarlinDialect(device);
     return dialect.powerMode === 'fan' ? toMarlinFanGcode(body, device.maxPowerS) : body;
   },
