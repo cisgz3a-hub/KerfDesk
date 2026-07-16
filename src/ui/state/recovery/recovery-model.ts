@@ -22,6 +22,25 @@ export type RecoveryClaim = {
   readonly claimedAtIso: string;
 };
 
+// A recovery claim is a LEASE, not a permanent lock. It exists to stop a second
+// recovery attempt (and the read-only Review) from racing an in-flight one. A
+// crash between claiming and arming the start would otherwise strand the claim
+// forever, permanently blocking Review of a still-valid record (audit B4). An
+// unreleased claim older than this lease is treated as abandoned: a fresh
+// attempt may supersede it and Review re-opens. The window is far longer than
+// the seconds an attempt needs to arm or fail, so it never expires a genuinely
+// active attempt; the live recovery Start is independently re-authorized before
+// any motion regardless (recovery-start-authorization, #203).
+export const RECOVERY_CLAIM_LEASE_MS = 5 * 60 * 1000;
+
+export function recoveryClaimIsExpired(claim: RecoveryClaim, nowMs: number): boolean {
+  const claimedMs = Date.parse(claim.claimedAtIso);
+  // An unparseable timestamp fails closed — keep the claim active so a corrupt
+  // record never silently unlocks recovery.
+  if (Number.isNaN(claimedMs)) return false;
+  return nowMs - claimedMs >= RECOVERY_CLAIM_LEASE_MS;
+}
+
 export type RecoveryCapsuleRecord = {
   readonly runId: RunId;
   readonly artifactKind: RecoveryArtifactV1['kind'];

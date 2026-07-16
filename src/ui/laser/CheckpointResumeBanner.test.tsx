@@ -9,7 +9,11 @@ import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
-import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import {
+  createExecutionArtifact,
+  RECOVERY_CLAIM_LEASE_MS,
+  RecoveryRepository,
+} from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
@@ -39,6 +43,7 @@ afterEach(() => {
   host = null;
   useStore.getState().newProject();
   useLaserStore.setState(initialLaserState());
+  vi.restoreAllMocks();
   vi.clearAllMocks();
 });
 
@@ -117,6 +122,41 @@ describe('CheckpointResumeBanner', () => {
     render(repository);
 
     expect(host?.textContent).toBe('');
+  });
+
+  // B4: a claim blocks Review only while its lease is live. A crash between
+  // claiming and arming leaves a stale claim; the post-crash reload must not
+  // permanently strand Review.
+  it('keeps Review disabled while a recovery claim lease is active', async () => {
+    const repository = await interruptedRepository();
+    const capsule = repository.getSnapshot().recoveryCapsule;
+    await repository.claimRecovery({
+      runId: capsule?.runId ?? '',
+      revision: capsule?.revision ?? -1,
+      attemptId: 'active-attempt',
+      claimedAtIso: LATER,
+    });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse(LATER) + 1_000);
+    render(repository);
+
+    expect(button('Review recovery').disabled).toBe(true);
+    expect(host?.textContent).toContain('another recovery cannot start');
+  });
+
+  it('re-enables Review once the recovery claim lease has expired', async () => {
+    const repository = await interruptedRepository();
+    const capsule = repository.getSnapshot().recoveryCapsule;
+    await repository.claimRecovery({
+      runId: capsule?.runId ?? '',
+      revision: capsule?.revision ?? -1,
+      attemptId: 'crashed-attempt',
+      claimedAtIso: LATER,
+    });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse(LATER) + RECOVERY_CLAIM_LEASE_MS + 1_000);
+    render(repository);
+
+    expect(button('Review recovery').disabled).toBe(false);
+    expect(host?.textContent).not.toContain('another recovery cannot start');
   });
 
   it('does not offer the older capsule while a newer Start handoff is pending', async () => {

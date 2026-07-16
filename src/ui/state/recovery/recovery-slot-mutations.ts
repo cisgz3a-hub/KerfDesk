@@ -1,6 +1,6 @@
 import type { JobInterruption } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RunId } from './execution-artifact';
-import type { PersistedRecoverySlots } from './recovery-model';
+import { recoveryClaimIsExpired, type PersistedRecoverySlots } from './recovery-model';
 
 export type SlotMutation<T> = {
   readonly slots: PersistedRecoverySlots;
@@ -181,11 +181,16 @@ export function claimRecoveryMutation(
   },
 ): SlotMutation<boolean> {
   const capsule = slots.recoveryCapsule;
+  if (capsule === null || capsule.runId !== args.runId || capsule.revision !== args.revision) {
+    return unchanged(slots, false);
+  }
+  // An existing claim blocks a fresh one only while its lease is still active.
+  // A crash between claiming and arming leaves an abandoned claim; once it has
+  // outlived the lease (relative to this new claim's time) a fresh attempt may
+  // supersede it, so recovery is never permanently stranded (audit B4).
   if (
-    capsule === null ||
-    capsule.runId !== args.runId ||
-    capsule.revision !== args.revision ||
-    capsule.claim !== undefined
+    capsule.claim !== undefined &&
+    !recoveryClaimIsExpired(capsule.claim, Date.parse(args.claimedAtIso))
   ) {
     return unchanged(slots, false);
   }
