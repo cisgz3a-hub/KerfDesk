@@ -14,7 +14,8 @@ import { importLightBurnProject } from '../../io/lightburn';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import { handleSalvageExportProject } from './salvage-export';
 import type { ImportOutcome } from '../state/store';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { ToastVariant } from '../state/toast-store';
@@ -260,6 +261,11 @@ export async function handleSaveProject(
   const prepared = prepareProjectForPersistence(ctx.project);
   if (prepared.kind !== 'ok') {
     ctx.pushToast(`Could not save project: ${prepared.reason}`, 'error');
+    // The canonical save is refused (ADR-204), but the session must not be a
+    // dead end — offer a raw recovery copy to a SEPARATE file (A7). The
+    // outcome stays 'error': the real project was not saved, so callers like
+    // the discard-before-close flow must not treat this as a clean save.
+    await offerSalvageExport(ctx);
     return 'error';
   }
   const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
@@ -288,6 +294,24 @@ export async function handleSaveProject(
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
     return 'error';
   }
+}
+
+// jobAwareConfirm fails closed during an active job (returns false), so a
+// mid-job discard-save that is refused will not prompt — correct, since the
+// recovery copy needs an idle picker anyway.
+async function offerSalvageExport(ctx: SaveProjectCtx): Promise<void> {
+  const wantsSalvage = jobAwareConfirm(
+    'This project cannot be saved as-is without changing its machine or output settings. ' +
+      'Export a raw recovery copy to a new file instead? It preserves your work but may need ' +
+      'repair before it reopens cleanly.',
+  );
+  if (!wantsSalvage) return;
+  await handleSalvageExportProject({
+    platform: ctx.platform,
+    project: ctx.project,
+    savedName: ctx.savedName,
+    pushToast: ctx.pushToast,
+  });
 }
 
 export type OpenProjectCtx = {
