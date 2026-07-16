@@ -36,8 +36,11 @@ import type {
   CncPath3dPass,
   Job,
 } from '../job';
-import { assertNever, type CncCoolantMode } from '../scene';
+import { assertNever } from '../scene';
+import { appendCoolantStart } from './cnc-grbl-coolant';
 import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-helical';
+import { collectIndexedCncGroups } from './cnc-grbl-job-groups';
+import type { CncPassSpan, CncPassSpanEmission, CncPassSpanRecorder } from './cnc-pass-spans';
 import type { OutputStrategy } from './output-strategy';
 import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
 
@@ -59,29 +62,36 @@ function fmtFeed(feedMmPerMin: number): number {
   return Math.max(MIN_FEED_MM_PER_MIN, Math.round(feedMmPerMin));
 }
 
-function emitJob(job: Job, _device: DeviceProfile): string {
-  const cncGroups: CncGroup[] = [];
-  for (const group of job.groups) {
-    switch (group.kind) {
-      case 'cnc':
-        cncGroups.push(group);
-        break;
-      case 'cut':
-      case 'fill':
-      case 'raster':
-        // Laser groups never belong in a CNC job; emit-gcode routes them to
-        // grblStrategy. Reaching here means a pipeline bug — drop loudly.
-        break;
-      default:
-        assertNever(group, 'Group');
-    }
-  }
-  const firstGroup = cncGroups[0];
+function emitJob(job: Job, device: DeviceProfile): string {
+  return emitCncProgram(job, device, undefined);
+}
+
+/** Emit the ordinary deterministic CNC program while also reporting, for every
+ * pass that produced at least one line, its raw-line span in that program.
+ * Recording is observation only: the G-code is byte-identical to
+ * `cncGrblStrategy.emit` for the same job (ADR-215). */
+export function emitCncJobWithPassSpans(job: Job, device: DeviceProfile): CncPassSpanEmission {
+  const spans: CncPassSpan[] = [];
+  const gcode = emitCncProgram(job, device, (span) => {
+    spans.push(span);
+  });
+  return { gcode, spans };
+}
+
+function emitCncProgram(
+  job: Job,
+  _device: DeviceProfile,
+  onPassSpan: CncPassSpanRecorder | undefined,
+): string {
+  // Groups keep their Job.groups indices: pass spans must speak the job's own
+  // indices so recovery can slice the same Job it reviewed.
+  const cncGroups = collectIndexedCncGroups(job);
+  const firstGroup = cncGroups[0]?.group;
   if (firstGroup === undefined) return '';
 
   // Multi-tool jobs (H.7) get M0 change blocks between bit sections; a
   // single-tool job emits byte-identically to pre-H.7 output.
-  const isMultiTool = new Set(cncGroups.map((group) => group.toolId ?? '')).size > 1;
+  const isMultiTool = new Set(cncGroups.map(({ group }) => group.toolId ?? '')).size > 1;
 
   const lines: string[] = [];
   const head: Head = { x: null, y: null, z: null };
@@ -117,12 +127,12 @@ function emitJob(job: Job, _device: DeviceProfile): string {
     currentToolKey: firstGroup.toolId ?? '',
     maxSafeZ: 0,
   };
-  for (const group of cncGroups) {
+  for (const { group, jobGroupIndex } of cncGroups) {
     appendGroupTransition(lines, head, group, state);
-    appendGroup(lines, head, group);
+    appendGroup(lines, head, group, jobGroupIndex, onPassSpan);
   }
 
-  appendPostamble(lines, head, state.maxSafeZ, cncGroups[cncGroups.length - 1], coolantIsOn);
+  appendPostamble(lines, head, state.maxSafeZ, cncGroups[cncGroups.length - 1]?.group, coolantIsOn);
   return lines.join(LINE_END) + LINE_END;
 }
 
@@ -140,32 +150,6 @@ function appendPostamble(
   lines.push('M5');
   if (coolantIsOn) lines.push('M9');
   lines.push(parkLine(lastGroup));
-}
-
-// Emit the coolant-on command for the machine's mode and report whether one was
-// emitted (so the postamble knows to close it with M9). 'off'/absent emits
-// nothing and returns false — byte-identical to a job with no coolant.
-function appendCoolantStart(lines: string[], mode: CncCoolantMode | undefined): boolean {
-  const command = cncCoolantOnCommand(mode);
-  if (command === null) return false;
-  lines.push(command);
-  return true;
-}
-
-// Coolant-on command for the machine's mode: mist runs the mist-coolant
-// relay (M7), flood the flood-coolant relay (M8). 'off'/absent ⇒ null.
-function cncCoolantOnCommand(mode: CncCoolantMode | undefined): 'M7' | 'M8' | null {
-  switch (mode) {
-    case 'mist':
-      return 'M7';
-    case 'flood':
-      return 'M8';
-    case 'off':
-    case undefined:
-      return null;
-    default:
-      return assertNever(mode, 'CncCoolantMode');
-  }
 }
 
 // H.9 parking parity: the configured park position, or the machine origin
@@ -245,7 +229,13 @@ function appendSpindleStart(
   if (spinupSec > 0) lines.push(`G4 P${fmt(spinupSec)}`);
 }
 
-function appendGroup(lines: string[], head: Head, group: CncGroup): void {
+function appendGroup(
+  lines: string[],
+  head: Head,
+  group: CncGroup,
+  jobGroupIndex: number,
+  onPassSpan: CncPassSpanRecorder | undefined,
+): void {
   const feed = fmtFeed(group.feedMmPerMin);
   const plunge = fmtFeed(group.plungeMmPerMin);
   lines.push(
@@ -253,8 +243,14 @@ function appendGroup(lines: string[], head: Head, group: CncGroup): void {
       `feed ${feed} plunge ${plunge} spindle ${Math.round(group.spindleRpm)} rpm ` +
       `passes ${group.passes.length}`,
   );
-  for (const pass of group.passes) {
+  for (const [passIndex, pass] of group.passes.entries()) {
+    const firstRawLine = lines.length + 1;
     appendPass(lines, head, pass, group.safeZMm, feed, plunge);
+    // A degenerate pass (under two distinct points at emit precision) emits
+    // nothing and gets no span; resume mapping treats it as zero-length.
+    if (onPassSpan !== undefined && lines.length >= firstRawLine) {
+      onPassSpan({ groupIndex: jobGroupIndex, passIndex, firstRawLine, lastRawLine: lines.length });
+    }
   }
 }
 
