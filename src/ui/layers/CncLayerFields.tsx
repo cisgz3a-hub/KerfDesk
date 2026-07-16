@@ -22,6 +22,7 @@ import {
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
+import { CncLineArtContoursField } from './CncLineArtContoursField';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
@@ -74,6 +75,7 @@ export function CncLayerFields(props: {
           ))}
         </select>
       </Row>
+      <CncLineArtContoursField layer={layer} settings={settings} onCommit={commit} />
       <LayerBitSelect
         layer={layer}
         settings={settings}

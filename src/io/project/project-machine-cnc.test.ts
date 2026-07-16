@@ -267,13 +267,31 @@ describe('.lf2 machine / cnc round-trip', () => {
     ).toBeUndefined();
   });
 
+  it('round-trips the line-art contour side and drops an unknown value (ADR-218)', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
+    const layer = scene.layers[0] as Record<string, unknown>;
+    layer['cnc'] = { ...DEFAULT_CNC_LAYER_SETTINGS, lineArtContours: 'outer' };
+    expect(deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc?.lineArtContours).toBe(
+      'outer',
+    );
+
+    layer['cnc'] = { ...DEFAULT_CNC_LAYER_SETTINGS, lineArtContours: 'middle' };
+    expect(
+      deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc?.lineArtContours,
+    ).toBeUndefined();
+  });
+
   it('replaces a malformed layer cnc block with defaults and drops non-objects', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
     const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
     const layer = scene.layers[0] as Record<string, unknown>;
     layer['cnc'] = { cutType: 'zigzag', depthMm: 0, feedMmPerMin: 'quick' };
     const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
-    expect(loaded.scene.layers[0]?.cnc).toEqual(DEFAULT_CNC_LAYER_SETTINGS);
+    // Optional-with-compile-default fields (ADR-218 lineArtContours) stay
+    // absent after normalization — the compile fallback supplies 'inner'.
+    const { lineArtContours: _lineArt, ...structuralDefaults } = DEFAULT_CNC_LAYER_SETTINGS;
+    expect(loaded.scene.layers[0]?.cnc).toEqual(structuralDefaults);
 
     layer['cnc'] = 'garbage';
     const dropped = deserializeOk(`${JSON.stringify(raw)}\n`);

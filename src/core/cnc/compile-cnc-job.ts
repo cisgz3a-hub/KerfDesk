@@ -38,6 +38,11 @@ import { zPassDepths } from './depth-passes';
 import { planHelicalPocketPasses } from './helical-entry';
 import { finishingProfilePasses, profileFinishAllowanceMm } from './finish-allowance';
 import { compileStraightInlayGroups } from './inlay-pair-operation';
+import {
+  DEFAULT_LINE_ART_CONTOURS,
+  lineArtSelectionApplies,
+  selectLineArtContours,
+} from './line-art-contours';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
@@ -206,6 +211,7 @@ function passesForLayer(
 ): ReadonlyArray<CncPass> {
   const specialized = specializedPassesForLayer(polylines, settings, tool);
   if (specialized !== null) return specialized;
+  const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm);
   // Finish allowance: roughing toolpaths stay `allowanceMm` proud of the wall
   // (0 for every non-profile cut and for profile cuts without an allowance, so
   // the offset — and therefore the output — is byte-identical to before).
@@ -215,7 +221,7 @@ function passesForLayer(
   const raw =
     restOperation.kind === 'ok'
       ? restOperation.restToolpaths
-      : xyToolpathsForCutType(polylines, settings, tool.diameterMm, allowanceMm);
+      : xyToolpathsForCutType(contours, settings, tool.diameterMm, allowanceMm);
   // H.9 (opt-in): climb/conventional enforcement + mid-segment entry points.
   const toolpaths =
     settings.cutDirection === undefined
@@ -240,13 +246,31 @@ function passesForLayer(
     allowanceMm > 0
       ? [
           ...roughing,
-          ...finishingProfilePasses(polylines, settings, tool.diameterMm, toolpaths, tabSources),
+          ...finishingProfilePasses(contours, settings, tool.diameterMm, toolpaths, tabSources),
         ]
       : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.
   return settings.rampEntryDeg === undefined
     ? passes
     : applyRampEntry(passes, settings.rampEntryDeg);
+}
+
+// ADR-218: pick which edge of a traced double-line ring is machined BEFORE
+// any offsetting, so the surviving contour offsets as a lone shape. Only
+// edge-following cut types select; pocket reaches passesForLayer too but its
+// toolpaths come from resolveRestPocketOperation / pocketToolpathsForSettings
+// on the unfiltered contours (a ring's band needs both edges).
+function lineArtContoursForLayer(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  toolDiameterMm: number,
+): ReadonlyArray<Polyline> {
+  if (!lineArtSelectionApplies(settings.cutType)) return polylines;
+  return selectLineArtContours(
+    polylines,
+    settings.lineArtContours ?? DEFAULT_LINE_ART_CONTOURS,
+    toolDiameterMm,
+  );
 }
 
 function helicalPocketPasses(

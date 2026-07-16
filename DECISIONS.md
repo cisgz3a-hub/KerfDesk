@@ -9056,3 +9056,53 @@ Operators see the actual controller-reported feed rate while a job runs, alongsi
 position, Z, and pass readouts, sourced from the same status frame as the rest of the badge. The
 change is display-only: no new field is emitted, no G-code, streaming, or controller behavior
 changes, and controllers that do not report feed simply omit the number.
+
+---
+
+## ADR-218 - CNC line-art contour side selection (inner / outer / both)
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+> **Numbering note.** ADR-217 (live feed-rate canvas badge) was the last used; **ADR-218** is the next free.
+
+### Context
+
+A boundary trace (the Line Art preset) vectorizes a stroked drawing as rings:
+every drawn line arrives as an outer edge plus an inner edge one stroke-width
+apart, wound in opposite directions (fill-rule convention). The CNC compiler
+machines every closed contour on a layer — correct for filled silhouettes, but
+for a traced line drawing it cuts the same groove twice: the inner edge
+completes its full depth ladder (freeing the part), then the outer edge starts
+a fresh shallow ladder traversed the opposite way. Observed in the field
+(job111.gcode, 2026-07-16) as "the job finished, then started a new reversed
+job slightly outside the finished path" — with a 3.175 mm bit and a 0.72 mm
+gap, the second ladder re-cuts a kerf the first already destroyed, on a freed
+workpiece.
+
+### Decision
+
+- New optional per-layer `lineArtContours: 'inner' | 'outer' | 'both'` on
+  `CncLayerSettings` (CNC-only UI, shown for the outline cut types plus
+  engrave). Absent = 'inner' at compile time (`DEFAULT_LINE_ART_CONTOURS`).
+- Selection runs in `passesForLayer` BEFORE tool-radius offsetting, so the
+  surviving edge offsets as a lone shape. Band-based cut types (pocket,
+  v-carve, inlay-pair, drill, relief) never select — their geometry needs both
+  edges of a ring.
+- A pair qualifies only under direct containment with per-side bounding-box
+  gaps at or below the layer's bit diameter (`selectLineArtContours`,
+  `core/cnc/line-art-contours.ts`). Wider nesting (washer walls, real ring
+  parts), lone contours, open paths, and crossing geometry always cut.
+
+### Consequences
+
+- 'both' — and any scene without tight double-line pairs — compiles
+  byte-identically to the pre-ADR pipeline.
+- The default is 'inner' by explicit maintainer decision (2026-07-16):
+  existing projects whose artwork contains sub-bit-diameter double lines
+  change output on their next compile — they stop double-cutting. That is the
+  point; 'both' restores the old behavior per layer.
+- The bit-diameter threshold means changing the layer's bit can change whether
+  a pair is treated as line art; the field tooltip documents this.
+- kerf-offset.ts and profile-ordering.ts still carry local point-in-polygon
+  copies; migrating them onto the new shared core/geometry/point-in-polygon.ts
+  is deferred tidy-first work.

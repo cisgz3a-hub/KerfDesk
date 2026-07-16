@@ -9,6 +9,7 @@ import {
 } from '../../core/scene';
 
 const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'adaptive']);
+const LINE_ART_CONTOUR_SIDES = new Set<string>(['inner', 'outer', 'both']);
 
 // Keep a raw string field only when it is one of a known set of values —
 // used for the closed-union optional CNC layer keys.
@@ -100,6 +101,9 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(isNonNegativeNumber(raw['finishAllowanceMm'])
       ? { finishAllowanceMm: raw['finishAllowanceMm'] }
       : {}),
+    // ADR-218 traced double-line side; unknown values are dropped so the
+    // compile default ('inner') applies by omission.
+    ...enumPassthrough('lineArtContours', raw['lineArtContours'], LINE_ART_CONTOUR_SIDES),
   };
 }
 
