@@ -3,9 +3,8 @@
 // position is unknown, so bounds checking degrades to a SPAN check: the job's
 // total X/Y motion extent must fit the bed even at the worst-case placement.
 import { arcAabb } from '../invariants/arc-bounds';
-import { isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
+import { asGcodeLines, isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
 import {
-  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,

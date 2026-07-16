@@ -14,7 +14,6 @@ export type { CncMotionIssue } from './cnc-motion';
 export { findPlungedTravelIssues } from './cnc-motion';
 export { findNonFiniteCoords } from './non-finite-coords';
 export {
-  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,

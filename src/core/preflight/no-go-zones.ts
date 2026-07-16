@@ -1,8 +1,7 @@
 import type { MachineBounds, NoGoZone } from '../devices';
 import { arcIntersectsRect } from '../invariants/arc-rect-intersection';
-import { isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
+import { asGcodeLines, isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
 import {
-  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,
