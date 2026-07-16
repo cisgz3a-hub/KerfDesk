@@ -5,6 +5,7 @@ import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { actionGridStyle, gridFullRowStyle, sectionCaptionStyle } from './JobControls.styles';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
@@ -60,47 +61,53 @@ export function OriginRow(props: {
     pushToast,
   });
   return (
-    <div style={originRowStyle}>
-      <button
-        type="button"
-        onClick={onSet}
-        disabled={busy}
-        title="Declare the current head position as the workpiece (0, 0). Cleared on alarm or stop."
-      >
-        Set origin here
-      </button>
-      <button
-        type="button"
-        onClick={onReset}
-        disabled={busy || !hasCustom || persistentOrUnknown}
-        title={
-          persistentOrUnknown
-            ? 'This origin may be stored in G54. Use Clear persistent origin.'
-            : hasCustom
-              ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
-              : 'No custom origin active. Set one with "Set origin here" first.'
-        }
-      >
-        Reset origin
-      </button>
-      <GoToWorkZeroButton busy={busy} hasCustom={hasCustom} />
-      {wcs === 'g92-and-g10' && (
-        <AdvancedOriginControls
-          busy={busy}
-          hasCustom={hasCustom}
-          persistentOriginReady={persistentOriginReady}
-        />
-      )}
-      {canSleep && homingEnabled && (
+    <div style={originSectionStyle}>
+      <span style={sectionCaptionStyle}>Origin</span>
+      <div style={actionGridStyle}>
         <button
           type="button"
-          onClick={onRelease}
+          className="lf-btn"
+          onClick={onSet}
           disabled={busy}
-          title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward."
+          title="Declare the current head position as the workpiece (0, 0). Cleared on alarm or stop."
         >
-          Release motors
+          Set origin here
         </button>
-      )}
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={onReset}
+          disabled={busy || !hasCustom || persistentOrUnknown}
+          title={
+            persistentOrUnknown
+              ? 'This origin may be stored in G54. Use Clear persistent origin.'
+              : hasCustom
+                ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
+                : 'No custom origin active. Set one with "Set origin here" first.'
+          }
+        >
+          Reset origin
+        </button>
+        <GoToWorkZeroButton busy={busy} hasCustom={hasCustom} />
+        {canSleep && homingEnabled && (
+          <button
+            type="button"
+            className="lf-btn"
+            onClick={onRelease}
+            disabled={busy}
+            title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward."
+          >
+            Release motors
+          </button>
+        )}
+        {wcs === 'g92-and-g10' && (
+          <AdvancedOriginControls
+            busy={busy}
+            hasCustom={hasCustom}
+            persistentOriginReady={persistentOriginReady}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -173,6 +180,7 @@ function GoToWorkZeroButton(props: {
   return (
     <button
       type="button"
+      className="lf-btn"
       onClick={onGo}
       disabled={!ready}
       title={
@@ -224,6 +232,7 @@ function AdvancedOriginControls(props: {
       <div style={advancedButtonRowStyle}>
         <button
           type="button"
+          className="lf-btn"
           onClick={onSetPersistent}
           disabled={persistentDisabled}
           title={setTitle}
@@ -232,6 +241,7 @@ function AdvancedOriginControls(props: {
         </button>
         <button
           type="button"
+          className="lf-btn"
           onClick={onClearPersistent}
           disabled={persistentDisabled || !props.hasCustom}
           title={clearTitle}
@@ -243,24 +253,24 @@ function AdvancedOriginControls(props: {
   );
 }
 
-const originRowStyle: React.CSSProperties = {
+const originSectionStyle: React.CSSProperties = {
   display: 'flex',
-  flexWrap: 'wrap',
+  flexDirection: 'column',
   gap: 6,
   minWidth: 0,
 };
 
 const advancedDetailsStyle: React.CSSProperties = {
+  ...gridFullRowStyle,
   display: 'block',
-  flexBasis: '100%',
   maxWidth: '100%',
   minWidth: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
 };
 
 const advancedButtonRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
+  ...actionGridStyle,
   marginTop: 6,
   minWidth: 0,
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rowStyle, runningSafetyStyle } from './JobControls.styles';
+import { actionGridStyle, rowStyle, runningSafetyStyle } from './JobControls.styles';
 
 // Regression guard for the machine-rail button-clipping bug: the job-action rows
 // live in a fixed-width side rail whose ancestors set overflow-x:hidden with no
@@ -15,5 +15,9 @@ describe('JobControls rail styles', () => {
 
   it('drops the running safety text onto its own line so it never pushes Abort off-screen', () => {
     expect(runningSafetyStyle.flexBasis).toBe('100%');
+  });
+
+  it('sizes action-grid columns with minmax(0, …) so long labels shrink instead of clipping', () => {
+    expect(actionGridStyle.gridTemplateColumns).toContain('minmax(0, 1fr)');
   });
 });

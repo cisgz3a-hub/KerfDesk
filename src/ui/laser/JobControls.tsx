@@ -8,12 +8,14 @@ import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { jobTimeNoun } from '../machine/machine-labels';
 import {
+  actionGridStyle,
   containerStyle,
   estimateStyle,
+  gridFullRowStyle,
+  primaryActionStyle,
   progressContainerStyle,
   progressFillStyle,
   progressLabelStyle,
-  rowStyle,
 } from './JobControls.styles';
 import { JobPlacementControls } from './JobPlacementControls';
 import { OriginRow } from './OriginRow';
@@ -166,47 +168,65 @@ function SetupRow(props: {
   // setup entry instead of a disabled control that leaves users hunting for
   // the vendor-specific command field.
   const noAutofocus = autofocusCommand.trim() === '';
+  // Start leads the grid full-width — it is the panel's primary action and the
+  // first control in LightBurn's Laser window; setup helpers rank below it.
   return (
-    <div style={rowStyle}>
-      <button
-        type="button"
-        onClick={() => void home()}
-        disabled={busy || !homingEnabled}
-        title={
-          homingEnabled
-            ? 'Send $H — home all axes'
-            : 'Homing is disabled in Device settings. Enable "$H supported" first.'
-        }
-      >
-        Home
-      </button>
-      {!isCncMachine && (
-        <AutofocusButton
-          needsSetup={noAutofocus}
-          busy={busy}
-          streaming={props.streaming}
-          onConfigure={props.onConfigureAutofocus}
-          onRun={onAutofocus}
-        />
-      )}
-      <button
-        type="button"
-        onClick={onFrame}
-        disabled={frameControl.disabled}
-        title={frameControl.title}
-      >
-        Frame
-      </button>
-      <button
-        type="button"
-        onClick={props.onStartJob}
-        disabled={startControl.disabled}
-        title={startControl.title}
-      >
-        Start job
-      </button>
+    <>
+      <div style={actionGridStyle}>
+        <button
+          type="button"
+          className="lf-btn lf-btn--primary"
+          style={primaryActionStyle}
+          onClick={props.onStartJob}
+          disabled={startControl.disabled}
+          title={startControl.title}
+        >
+          Start job
+        </button>
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={onFrame}
+          disabled={frameControl.disabled}
+          title={frameControl.title}
+        >
+          Frame
+        </button>
+        <HomeButton onHome={() => void home()} busy={busy} homingEnabled={homingEnabled} />
+        {!isCncMachine && (
+          <AutofocusButton
+            needsSetup={noAutofocus}
+            busy={busy}
+            streaming={props.streaming}
+            onConfigure={props.onConfigureAutofocus}
+            onRun={onAutofocus}
+          />
+        )}
+      </div>
       <EstimateBadge estimate={estimate} />
-    </div>
+    </>
+  );
+}
+
+function HomeButton(props: {
+  readonly onHome: () => void;
+  readonly busy: boolean;
+  readonly homingEnabled: boolean;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="lf-btn"
+      onClick={props.onHome}
+      disabled={props.busy || !props.homingEnabled}
+      title={
+        props.homingEnabled
+          ? 'Send $H — home all axes'
+          : 'Homing is disabled in Device settings. Enable "$H supported" first.'
+      }
+    >
+      Home
+    </button>
   );
 }
 
@@ -220,6 +240,8 @@ function AutofocusButton(props: {
   return (
     <button
       type="button"
+      className="lf-btn"
+      style={gridFullRowStyle}
       onClick={props.needsSetup ? props.onConfigure : props.onRun}
       disabled={props.needsSetup ? props.streaming : props.busy}
       title={
