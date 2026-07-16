@@ -7,6 +7,7 @@ import {
   type PathSegment,
   type Vec2,
 } from '../../core/scene';
+import { fairLineCurvePath } from '../../core/geometry';
 import { traceCenterlineStrokePaths, type TraceOptions } from '../../core/trace';
 import type { TextRenderResult } from '../../core/text';
 import {
@@ -33,6 +34,7 @@ type ScriptCanvasContext = CanvasRenderingContext2D & {
 const BASE_FONT_PX = 220;
 const PADDING_PX = 180;
 const MAX_CANVAS_EDGE_PX = 8192;
+const CURVE_FIT_TOLERANCE_PX = 1.15;
 // eslint-disable-next-line no-restricted-syntax -- Raster scene input requires literal palette colors.
 const TRACE_BACKGROUND = '#ffffff';
 // eslint-disable-next-line no-restricted-syntax -- Raster scene input requires literal palette colors.
@@ -42,8 +44,8 @@ const CENTERLINE_OPTIONS: TraceOptions = {
   traceMode: 'centerline',
   numberOfColors: 2,
   pathOmit: 0,
-  lineTolerance: 1.5,
-  quadraticTolerance: 1.5,
+  lineTolerance: 0.65,
+  quadraticTolerance: 0.65,
   blurRadius: 0,
   blurDelta: 0,
   lineFilter: true,
@@ -76,7 +78,14 @@ export async function traceScriptText(input: TraceScriptTextInput): Promise<Text
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
   const traced = traceCenterlineStrokePaths(pixels, CENTERLINE_OPTIONS);
   return normalizedResult(
-    traced.flatMap((path) => path.curves ?? []),
+    traced
+      .flatMap((path) => path.curves ?? [])
+      .map((curve) =>
+        fairLineCurvePath(curve, {
+          fitToleranceUnits: CURVE_FIT_TOLERANCE_PX,
+          hardCornerDeg: 175,
+        }),
+      ),
     input.sizeMm / fontPx,
     input.color,
   );
