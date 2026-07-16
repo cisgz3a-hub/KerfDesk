@@ -19,6 +19,7 @@
 
 import type { Issue } from './predicates';
 import {
+  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,
@@ -32,11 +33,11 @@ export type BlankFeedOptions = { readonly thresholdMm: number };
 const DISTANCE_EPS_MM = 1e-6;
 
 export function findLongBlankFeedMoves(
-  gcode: string,
+  gcode: string | ReadonlyArray<string>,
   options: BlankFeedOptions,
 ): readonly BlankFeedIssue[] {
   const threshold = options.thresholdMm;
-  const lines = gcode.split('\n');
+  const lines = asGcodeLines(gcode);
   const issues: BlankFeedIssue[] = [];
   // The controller starts parked at the origin; X/Y/S are modal thereafter.
   let x = 0;

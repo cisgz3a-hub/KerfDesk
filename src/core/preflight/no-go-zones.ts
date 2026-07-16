@@ -2,6 +2,7 @@ import type { MachineBounds, NoGoZone } from '../devices';
 import { arcIntersectsRect } from '../invariants/arc-rect-intersection';
 import { isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
 import {
+  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,
@@ -45,7 +46,7 @@ export function firstZoneCrossedBySegment(
 }
 
 export function findNoGoZoneCollisions(
-  gcode: string,
+  gcode: string | ReadonlyArray<string>,
   zones: ReadonlyArray<NoGoZone>,
   bed: MachineBounds,
   options: {
@@ -64,7 +65,7 @@ export function findNoGoZoneCollisions(
   let current: Point | null = options.initialMachinePosition ?? null;
   let absolute = true;
 
-  for (const [index, raw] of gcode.split('\n').entries()) {
+  for (const [index, raw] of asGcodeLines(gcode).entries()) {
     const stripped = stripComment(raw);
     if (stripped === '') continue;
     absolute = absoluteModeAfterLine(stripped, absolute);

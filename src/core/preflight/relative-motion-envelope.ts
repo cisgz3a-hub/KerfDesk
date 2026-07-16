@@ -5,6 +5,7 @@
 import { arcAabb } from '../invariants/arc-bounds';
 import { isArcMotion, isClockwiseArc } from '../invariants/gcode-words';
 import {
+  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,
@@ -16,7 +17,7 @@ type Point = { readonly x: number; readonly y: number };
 type MotionEnvelope = { readonly next: Point; readonly arcBounds?: Bounds };
 
 export function findRelativeMotionEnvelopeIssues(
-  gcode: string,
+  gcode: string | ReadonlyArray<string>,
   bed: { readonly width: number; readonly height: number },
 ): ReadonlyArray<string> {
   const bounds = collectRelativeMotionEnvelope(gcode);
@@ -37,7 +38,7 @@ export function findRelativeMotionEnvelopeIssues(
   return issues;
 }
 
-function collectRelativeMotionEnvelope(gcode: string): Bounds | null {
+function collectRelativeMotionEnvelope(gcode: string | ReadonlyArray<string>): Bounds | null {
   const bounds: Bounds = {
     minX: Number.POSITIVE_INFINITY,
     minY: Number.POSITIVE_INFINITY,
@@ -47,7 +48,7 @@ function collectRelativeMotionEnvelope(gcode: string): Bounds | null {
   let current: Point = { x: 0, y: 0 };
   let absolute = true;
   let any = false;
-  for (const raw of gcode.split('\n')) {
+  for (const raw of asGcodeLines(gcode)) {
     const stripped = stripGcodeComment(raw);
     absolute = absoluteModeAfterLine(stripped, absolute);
     const motion = motionEnvelopeForLine(stripped, current, absolute);

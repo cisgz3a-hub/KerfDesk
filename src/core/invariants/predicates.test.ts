@@ -12,6 +12,13 @@ describe('findLaserOnTravelIssues', () => {
     expect(findLaserOnTravelIssues('G0 X10 Y20 S0')).toEqual([]);
   });
 
+  // A8: preflight splits the body once and hands the lines to every scanner.
+  // Passing pre-split lines must be identical to passing the raw string.
+  it('gives identical results for a string and its pre-split lines', () => {
+    const gcode = 'G1 X0 Y0 S500\nG0 X10 Y20\nM5\nG0 X30 Y40';
+    expect(findLaserOnTravelIssues(gcode.split('\n'))).toEqual(findLaserOnTravelIssues(gcode));
+  });
+
   it('accepts lowercase travel commands and signed S0 words', () => {
     expect(findLaserOnTravelIssues('g0 x10 y20 s+0')).toEqual([]);
   });

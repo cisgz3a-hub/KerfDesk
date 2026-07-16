@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  asGcodeLines,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,
@@ -39,5 +40,17 @@ describe('G-code word parsing', () => {
     expect(parseGcodeWord(stripped, 'Y')).toBe(6);
     expect(parseGcodeWord(stripped, 'S')).toBeNull();
     expect(stripGcodeComment('G1 X5 (unterminated S0')).toBe('G1 X5');
+  });
+});
+
+describe('asGcodeLines', () => {
+  it('splits a string on newlines', () => {
+    expect(asGcodeLines('G1 X0\nG0 Z5\n')).toEqual(['G1 X0', 'G0 Z5', '']);
+  });
+
+  it('returns a pre-split array unchanged so scanners can share one split (A8)', () => {
+    const lines = ['G1 X0', 'G0 Z5'];
+
+    expect(asGcodeLines(lines)).toBe(lines);
   });
 });

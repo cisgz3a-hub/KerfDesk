@@ -10,6 +10,7 @@
 // tolerated. This means they can validate G-code from external tools too, not
 // just GrblStrategy's output.
 import {
+  asGcodeLines,
   isArcMotion,
   isClockwiseArc,
   isGcodeCommand,
@@ -50,8 +51,8 @@ type BoundsRect = {
 //       Marlin fan-mode dialect — ADR-095),
 //   (c) the most recent S value seen is 0 (sticky firmware state; `M107`
 //       counts as S0 because it zeroes the fan-laser PWM).
-export function findLaserOnTravelIssues(gcode: string): readonly Issue[] {
-  const lines = gcode.split('\n');
+export function findLaserOnTravelIssues(gcode: string | ReadonlyArray<string>): readonly Issue[] {
+  const lines = asGcodeLines(gcode);
   const issues: Issue[] = [];
   let lastEffective = '';
   let stickyS: number | null = null;
@@ -85,11 +86,11 @@ export function findLaserOnTravelIssues(gcode: string): readonly Issue[] {
 // Every X / Y emitted by a motion command (G0/G1/G2/G3) must fall inside the
 // rectangle [0, width] × [0, height], in machine coordinates.
 export function findOutOfBoundsCoords(
-  gcode: string,
+  gcode: string | ReadonlyArray<string>,
   bed: BoundsRect,
   options: OutOfBoundsCoordOptions = {},
 ): readonly Issue[] {
-  const lines = gcode.split('\n');
+  const lines = asGcodeLines(gcode);
   const issues: Issue[] = [];
   const offset = options.motionOffset ?? { x: 0, y: 0 };
   const limits = {
