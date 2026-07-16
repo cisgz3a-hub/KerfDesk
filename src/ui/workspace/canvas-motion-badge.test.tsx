@@ -118,3 +118,57 @@ describe('CanvasMotionBadge pass progress (ADR-216)', () => {
     }
   });
 });
+
+function feedOverlay(
+  feedMmPerMin: number | null,
+  lifecycle: 'running' | 'paused' = 'running',
+): CanvasMotionOverlay {
+  const plan = cncPlan();
+  return {
+    plan,
+    run: {
+      ...startLiveCanvasRun(plan),
+      reportedHead: { x: 5, y: 0, z: -1 },
+      route: { confirmedRouteMm: 5, candidates: [], uncertain: false },
+      controllerState: lifecycle === 'running' ? 'Run' : 'Hold',
+      lifecycle,
+      reportedFeedMmPerMin: feedMmPerMin,
+    },
+  };
+}
+
+describe('CanvasMotionBadge feed rate (ADR-217)', () => {
+  it('shows the rounded live feed rate in mm/min while running', async () => {
+    const { host, unmount } = await renderBadge(feedOverlay(1499.6));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain('1500 mm/min');
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-reported-feed')).toBe('1499.6');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('omits the feed rate when the controller reports no FS sample', async () => {
+    const { host, unmount } = await renderBadge(feedOverlay(null));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).not.toContain('mm/min');
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-reported-feed')).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('hides the feed rate while paused (a held machine reports zero)', async () => {
+    const { host, unmount } = await renderBadge(feedOverlay(0, 'paused'));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).not.toContain('mm/min');
+    } finally {
+      await unmount();
+    }
+  });
+});

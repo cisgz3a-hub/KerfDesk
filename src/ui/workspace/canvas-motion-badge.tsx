@@ -24,20 +24,59 @@ function CanvasMotionProbe(props: {
   readonly overlay: CanvasMotionOverlay;
   readonly passes: CncPassPosition | null;
 }): JSX.Element {
-  const run = props.overlay.run;
+  const attrs = probeAttrs(props.overlay, props.passes);
   return (
     <span
       data-testid="canvas-motion-probe"
-      data-lifecycle={run?.lifecycle ?? 'idle'}
-      data-confirmed-route-mm={run?.route.confirmedRouteMm ?? 0}
-      data-reported-head-x={run?.reportedHead?.x}
-      data-reported-head-y={run?.reportedHead?.y}
-      data-pass-current={props.passes?.current}
-      data-pass-total={props.passes?.total}
+      data-lifecycle={attrs.lifecycle}
+      data-confirmed-route-mm={attrs.confirmedRouteMm}
+      data-reported-head-x={attrs.headX}
+      data-reported-head-y={attrs.headY}
+      data-pass-current={attrs.passCurrent}
+      data-pass-total={attrs.passTotal}
+      data-reported-feed={attrs.feed}
       aria-label={markerDescription(props.overlay)}
       style={visuallyHiddenStyle}
     />
   );
+}
+
+type ProbeAttrs = {
+  readonly lifecycle: string;
+  readonly confirmedRouteMm: number;
+  readonly headX: number | undefined;
+  readonly headY: number | undefined;
+  readonly passCurrent: number | undefined;
+  readonly passTotal: number | undefined;
+  readonly feed: number | undefined;
+};
+
+// One null-branch instead of an optional chain per attribute keeps the probe
+// component flat and under the complexity cap as readouts accumulate.
+function probeAttrs(overlay: CanvasMotionOverlay, passes: CncPassPosition | null): ProbeAttrs {
+  const passCurrent = passes?.current;
+  const passTotal = passes?.total;
+  const run = overlay.run;
+  if (run === null) {
+    return {
+      lifecycle: 'idle',
+      confirmedRouteMm: 0,
+      headX: undefined,
+      headY: undefined,
+      passCurrent,
+      passTotal,
+      feed: undefined,
+    };
+  }
+  return {
+    lifecycle: run.lifecycle,
+    confirmedRouteMm: run.route.confirmedRouteMm,
+    headX: run.reportedHead?.x,
+    headY: run.reportedHead?.y,
+    passCurrent,
+    passTotal,
+    feed: run.reportedFeedMmPerMin ?? undefined,
+  };
 }
 
 // Pass progress follows the same confirmed-route truth as the trail: it
@@ -52,6 +91,14 @@ function passBadgeText(passes: CncPassPosition | null): string {
   if (passes === null) return '';
   const remaining = passes.remaining > 0 ? ` • ${passes.remaining} remaining` : '';
   return ` • Pass ${passes.current} of ${passes.total}${remaining}`;
+}
+
+// Feed is only meaningful while the machine is actively cutting: a held or
+// finished run reports 0, and a stopped/disconnected run's last sample is
+// stale. Restricting to 'running' keeps the readout live, never misleading.
+function feedBadgeText(run: NonNullable<CanvasMotionOverlay['run']>): string {
+  if (run.lifecycle !== 'running' || run.reportedFeedMmPerMin === null) return '';
+  return ` • ${Math.round(run.reportedFeedMmPerMin)} mm/min`;
 }
 
 function markerDescription(overlay: CanvasMotionOverlay): string {
@@ -77,7 +124,7 @@ function badgeMessage(overlay: CanvasMotionOverlay, passes: CncPassPosition | nu
       : '';
   const reason = run.accuracyReason === null ? '' : ` • ${run.accuracyReason}`;
   const relativeLabel = relative ? ' • relative view — physical bed position unverified' : '';
-  return `${truth} • ${state}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
+  return `${truth} • ${state}${feedBadgeText(run)}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

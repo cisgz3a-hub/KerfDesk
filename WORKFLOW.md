@@ -756,6 +756,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    program and advancing only with route-reconciled motion (ADR-216). When
    the mapping cannot be derived (e.g. a supervised recovery stream), the
    counter is omitted rather than estimated.
+9. While any job is running, the status badge also shows the live
+   controller-reported feed rate (`N mm/min`, inch reports normalized),
+   taken from each status frame's `FS:` field (ADR-217). It appears only
+   while running and only when the controller reports feed; a held machine
+   or a controller that omits `FS:` shows no rate.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.

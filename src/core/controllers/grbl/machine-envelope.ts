@@ -39,6 +39,18 @@ export function normalizeReportedMPosToMm(
   return [position[0] * scale, position[1] * scale, position[2] * scale];
 }
 
+// GRBL's $13 reports the `FS:` feed rate in the same unit system as position,
+// so an inch-configured controller reports inch/min. Unlike MPos this returns
+// null (never throws) for a missing or non-finite sample: feed is an optional
+// live readout, and a bad frame must not break the status pipeline.
+export function normalizeReportedFeedRateToMm(
+  feed: number | null,
+  reportInches: boolean,
+): number | null {
+  if (feed === null || !Number.isFinite(feed)) return null;
+  return feed * (reportInches ? MM_PER_INCH : 1);
+}
+
 export function validateEnvelopeSettings(
   settings: EnvelopeSettings,
 ): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
