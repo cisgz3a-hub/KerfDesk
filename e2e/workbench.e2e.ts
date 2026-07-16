@@ -72,13 +72,13 @@ baseTest(
     await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible();
     await preview.click();
 
-    // A fresh no-homing project intentionally defaults to Current Position,
-    // which cannot be exported offline without live head coordinates. This
+    // A fresh no-homing project intentionally defaults to User Origin, which
+    // needs a set origin (with a known work offset) before it can export. This
     // fixture is file-only, so deliberately choose Absolute before Save.
     await page.getByRole('tab', { name: 'Machine' }).click();
     await page.getByRole('button', { name: 'Expand Laser panel' }).click();
     const startFrom = page.getByLabel('Start from');
-    await expect(startFrom).toHaveValue('current-position');
+    await expect(startFrom).toHaveValue('user-origin');
     await startFrom.selectOption('absolute');
     await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
 
