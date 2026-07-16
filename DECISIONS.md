@@ -84,6 +84,7 @@
 | ADR-211 | 2026-07-15 | Amended | Artwork binds explicitly to named process operations |
 | ADR-212 | 2026-07-15 | Accepted | Make laser pause, recovery, disconnect, and laser-mode boundaries fail-dark |
 | ADR-213 | 2026-07-16 | Accepted | Remove bundled single-line writing and retain the original four outline fonts |
+| ADR-215 | 2026-07-16 | Accepted | CNC recovery rewinds to a pass boundary and re-enters as a new sealed job |
 
 ---
 
@@ -8905,3 +8906,67 @@ re-fairs them deterministically. Pre-ADR-214 drawings carry no stamp and are sti
 structurally on their first load, gaining a stamp only if the migration upgrades them (unchanged
 already-current legacy drawings stay unstamped and are re-evaluated harmlessly each load until edited).
 This is a purely additive schema field; older builds ignore the unknown key.
+
+## ADR-215 - CNC recovery rewinds to a pass boundary and re-enters as a new sealed job
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+### Context
+
+Laser interruption recovery (ADR-118 and its 2026-07-15 amendment) resumes automatically from the
+first un-acked line with a fail-dark re-entry. CNC kept refusing every executable path: ADR-143
+disabled checkpoint/line resume because acknowledgements do not prove physical cuts, and the
+ADR-200 supervised runway flow is too narrow for daily use — single-tool native contour segments
+only, a straight >= 5 mm tangent runway (a rectangle interrupted just after a corner has none), no
+mapping from acked lines to geometry (the operator picks one segment from a flat list of all of
+them), and an evidence layer whose policy check is fed all-green literals derived from its own
+checkboxes. The maintainer approved the pass-rewind plan on 2026-07-16 ("yes to all four"), with
+two standing constraints: the recovery program must live in the same sealed artifact sandbox as
+laser recovery so nothing can corrupt the controller, and the laser feature must remain untouched.
+
+### Decision
+
+- CNC recovery generates a NEW ordinary Job that starts at the beginning of a pass and keeps every
+  later pass and group in source order (`core/recovery/cnc-pass-resume-job.ts`). A pass boundary is
+  a physically safe re-entry point: each stepdown is its own constant-Z pass, so the boundary
+  pass's start point is already-cut kerf, and the ordinary emitter preamble (safe-Z retract ->
+  `M3 S` -> `G4` spin-up dwell -> rapid -> plunge at plunge feed) has the spindle at full speed
+  before any material contact. Recutting the already-cut part of one pass is the accepted cost;
+  the boundary can never skip uncut material.
+- The CNC emitter reports a per-pass raw-line span sidecar (`emitCncJobWithPassSpans`). Recording
+  is observation only: the emitted bytes are identical to the ordinary strategy, property-verified.
+- `resolveCncResumePoint` maps the checkpoint's acked count onto a default boundary pass with
+  honest bounds: a per-controller planner reserve below (acked lines may sit unexecuted in the
+  planner when power is lost) and an RX-buffer byte walk above ('char-counted'; a single in-flight
+  line for 'ping-pong'). Reserves deliberately overestimate — the safe failure direction is an
+  earlier boundary and extra recut time.
+- The operator may pick any pass; picking later than the computed default warns and never blocks.
+- Position requalification splits by evidence: a session-continuous interruption (no controller
+  reboot observed, live WCO matching the archived observation) may be confirmed as retained
+  instead of forcibly re-zeroed; a lost-position interruption still requires re-establishing zero.
+  This supersedes the unconditional re-home/requalify wording of ADR-200's 2026-07-15 amendment.
+- The physical checklist keeps the load-bearing confirmations — cutter physically clear, spindle
+  stopped, workholding unchanged, tool intact, position path — and drops the free-text air-cut
+  qualification record and the decorative all-green `assessCncRecovery` evidence feed for this
+  path. The runway machinery is retained but demoted from the default flow; whether to delete it
+  is a separate later decision.
+- Sandbox and isolation invariants: the recovery program is staged as a new attempt artifact in
+  the ADR-118 repository before any wire byte, uses the durable Start handoff and the final
+  wire-boundary drift authorization, and archived controller observations are never replayed to
+  firmware. Laser paths are untouched: `buildResumeProgram` continues to refuse CNC, ADR-143's
+  refusal of line-based executable CNC resume stands (a pass-boundary job is compiled from the
+  sealed semantic Job, never from a G-code line jump), and same-session CNC Resume stays disabled
+  (ADR-180).
+
+### Consequences
+
+The first PR is pure core with no UI or flow wiring: the span sidecar, the pass-resume job
+builder, and the resume-point mapper. Property coverage: byte-identity over fuzzed jobs, the
+plunged-travel invariant on emitted resume programs, byte-identical re-emission of every kept pass
+after the boundary, and boundary-never-after-the-first-unacknowledged-line. Later phases add the
+artifact span field, the pass-based recovery flow on the existing sealed-capsule streaming
+skeleton, and the reworked wizard (interruption narrative, extraction guidance, canvas progress
+preview, pass picker, trimmed checklist). Long `path3d` relief passes recut whole for now;
+mid-pass re-entry is a future refinement. Multi-tool jobs become recoverable with an explicit
+load-tool/re-zero wizard step. Simulator and unit evidence only: physical air-cut/scrap validation
+on the real router remains release-acceptance work, and no hardware claim is made here.
