@@ -1,6 +1,5 @@
 // cubic-fit — least-squares G1 cubic Bézier fitting over measured points.
-// The fitter started in the tracer, where it averages sub-pixel boundary
-// noise; stroke fonts now use the same fairing in font-coordinate units.
+// The fitter averages sub-pixel boundary noise from traced geometry.
 // It avoids chord-replacement joints and per-vertex facets. Algorithm follows Schneider's
 // published Graphics Gems method (permissive license; math re-derived here):
 // chord-length parameterization → tangent-constrained least squares for the

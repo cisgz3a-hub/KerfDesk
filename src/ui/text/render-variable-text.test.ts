@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./font-loader', () => ({
-  isTracedScriptFontKey: () => false,
   loadFont: mocks.loadFont,
 }));
 vi.mock('../../core/text', async (importOriginal) => ({

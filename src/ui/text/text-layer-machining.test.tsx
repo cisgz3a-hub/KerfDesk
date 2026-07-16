@@ -29,7 +29,6 @@ const textMocks = vi.hoisted(() => ({
 vi.mock('./font-loader', () => ({
   cssFamilyForFont: (key: string) => `lf2-${key}`,
   ensureFontCss: vi.fn(async () => undefined),
-  isTracedScriptFontKey: () => false,
   loadFont: vi.fn(async () => new ArrayBuffer(8)),
 }));
 

@@ -1,7 +1,6 @@
-import { findFontEntry, textToPolylines, type TextRenderResult } from '../../core/text';
+import { textToPolylines, type TextRenderResult } from '../../core/text';
 import type { EmbeddedFont, TextAlignment } from '../../core/scene';
-import { isTracedScriptFontKey, loadFont } from './font-loader';
-import { canTraceScriptText, traceScriptText } from './trace-script-text';
+import { loadFont } from './font-loader';
 
 export type RenderTextGeometryInput = {
   readonly fontKey: string;
@@ -14,7 +13,7 @@ export type RenderTextGeometryInput = {
   readonly color: string;
 };
 
-/** Routes editable text to either the outline-font or CNC single-line renderer. */
+/** Renders editable text with a bundled or project outline font. */
 export async function renderTextGeometry(
   input: RenderTextGeometryInput,
 ): Promise<TextRenderResult> {
@@ -26,12 +25,6 @@ export async function renderTextGeometry(
     letterSpacing: input.letterSpacing,
     color: input.color,
   };
-  if (isTracedScriptFontKey(input.fontKey) && canTraceScriptText()) {
-    return traceScriptText({ ...shared, fontKey: input.fontKey });
-  }
-  if (findFontEntry(input.fontKey)?.geometry === 'single-line') {
-    return textToPolylines({ ...shared, geometry: 'single-line', fontKey: input.fontKey });
-  }
   return textToPolylines({
     ...shared,
     fontBuffer: await loadFont(input.fontKey, input.embeddedFonts),
