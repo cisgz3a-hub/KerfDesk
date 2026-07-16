@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
@@ -242,6 +242,79 @@ describe('CanvasMotionBadge spindle RPM (ADR-220)', () => {
     try {
       const status = host.querySelector('[data-testid="canvas-motion-status"]');
       expect(status?.textContent).not.toContain('rpm');
+    } finally {
+      await unmount();
+    }
+  });
+});
+
+function timedOverlay(opts: {
+  readonly startedAtMs: number;
+  readonly endedAtMs?: number | null;
+  readonly lifecycle?: 'running' | 'finished';
+}): CanvasMotionOverlay {
+  const plan = cncPlan();
+  return {
+    plan,
+    run: {
+      ...startLiveCanvasRun(plan, opts.startedAtMs),
+      reportedHead: { x: 5, y: 0, z: -1 },
+      route: { confirmedRouteMm: 5, candidates: [], uncertain: false },
+      controllerState: 'Run',
+      lifecycle: opts.lifecycle ?? 'running',
+      endedAtMs: opts.endedAtMs ?? null,
+    },
+  };
+}
+
+describe('CanvasMotionBadge elapsed time (ADR-221)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows wall-clock elapsed time for a stamped running run and ticks it', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const { host, unmount } = await renderBadge(timedOverlay({ startedAtMs: 40_000 }));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain('1m 0s');
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-elapsed-seconds')).toBe('60');
+
+      // advanceTimersByTime also advances the mocked Date.now() clock.
+      await act(async () => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(host.querySelector('[data-testid="canvas-motion-status"]')?.textContent).toContain(
+        '1m 3s',
+      );
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('freezes the elapsed readout at the terminal end stamp', async () => {
+    const { host, unmount } = await renderBadge(
+      timedOverlay({ startedAtMs: 1_000, endedAtMs: 63_500, lifecycle: 'finished' }),
+    );
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain('1m 3s');
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-elapsed-seconds')).toBe('63');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('shows no elapsed time for a run without a real start stamp', async () => {
+    const { host, unmount } = await renderBadge(timedOverlay({ startedAtMs: 0 }));
+    try {
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-elapsed-seconds')).toBeNull();
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).not.toMatch(/ \d+s| \d+h /);
     } finally {
       await unmount();
     }
