@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cutTypeLabel,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_CNC_STOCK,
@@ -60,6 +61,17 @@ describe('DEFAULT_CNC_TOOLS', () => {
         expect(tool.tipAngleDeg).toBeUndefined();
       }
     }
+  });
+});
+
+describe('cutTypeLabel', () => {
+  // The three profile cuts read as a plain outside/inside/on-path trio. The
+  // old 'Outline — …' prefix duplicated the 'Cut type' row header and forced
+  // the reader to weigh two nouns against each other (maintainer feedback).
+  it('names the profile cuts by where the bit runs, with no redundant prefix', () => {
+    expect(cutTypeLabel('profile-outside')).toBe('Outside path');
+    expect(cutTypeLabel('profile-inside')).toBe('Inside path');
+    expect(cutTypeLabel('profile-on-path')).toBe('On path');
   });
 });
 
