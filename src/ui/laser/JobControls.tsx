@@ -16,6 +16,7 @@ import {
   progressContainerStyle,
   progressFillStyle,
   progressLabelStyle,
+  sectionCaptionStyle,
 } from './JobControls.styles';
 import { JobPlacementControls } from './JobPlacementControls';
 import { OriginRow } from './OriginRow';
@@ -73,8 +74,14 @@ export function JobControls({
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
+  // Positioning first, job actions second — maintainer-directed order for the
+  // no-homing workflow (jog/hand-move the head, set the origin, then run).
+  // Deliberate divergence from LightBurn's Start-first Laser window.
   return (
     <div style={containerStyle}>
+      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
+      <OriginRow disabled={disabled} streaming={controlsBusy} />
+      <span style={sectionCaptionStyle}>Job</span>
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}
@@ -103,8 +110,6 @@ export function JobControls({
         />
       )}
       <JobPlacementControls streaming={controlsBusy} />
-      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
-      <OriginRow disabled={disabled} streaming={controlsBusy} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />

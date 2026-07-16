@@ -52,8 +52,16 @@ test.describe('workspace shell acceptance', () => {
     await page.keyboard.press('Enter');
     await expect(consoleDetails).toHaveAttribute('open', '');
 
-    await expectInsideViewport(page, page.getByRole('button', { name: 'Frame', exact: true }));
-    await expectInsideViewport(page, page.getByRole('button', { name: 'Start job', exact: true }));
+    // Positioning controls lead the machine rail (maintainer-directed
+    // no-homing order: jog → origin → job), so Frame/Start can sit below the
+    // 720p fold inside the rail's own scrollbar. Assert they stay reachable by
+    // scrolling the rail, not that they render above the fold.
+    const frameButton = page.getByRole('button', { name: 'Frame', exact: true });
+    await frameButton.scrollIntoViewIfNeeded();
+    await expectInsideViewport(page, frameButton);
+    const startJobButton = page.getByRole('button', { name: 'Start job', exact: true });
+    await startJobButton.scrollIntoViewIfNeeded();
+    await expectInsideViewport(page, startJobButton);
     await expectInsideViewport(page, page.getByRole('contentinfo', { name: 'Status bar' }));
     await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
   });
