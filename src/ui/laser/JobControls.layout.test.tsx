@@ -20,19 +20,22 @@ afterEach(() => {
 });
 
 describe('JobControls action hierarchy', () => {
-  it('places Frame and Start before placement and origin details', async () => {
+  // Maintainer-directed order for the no-homing workflow: positioning controls
+  // (origin, position-job guide) sit directly under the jog pad, job actions
+  // below them, placement details last.
+  it('places origin controls before the job actions and placement details', async () => {
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Frame'), startFrom(view.host))).toBe(true);
-      expect(precedes(button(view.host, 'Start job'), button(view.host, 'Set origin here'))).toBe(
+      expect(precedes(button(view.host, 'Set origin here'), button(view.host, 'Start job'))).toBe(
         true,
       );
+      expect(precedes(button(view.host, 'Frame'), startFrom(view.host))).toBe(true);
     } finally {
       await view.unmount();
     }
   });
 
-  it('leads with Start job, then Frame, then Home — primary action first', async () => {
+  it('leads the job cluster with Start job, then Frame, then Home', async () => {
     const view = await renderControls();
     try {
       expect(precedes(button(view.host, 'Start job'), button(view.host, 'Frame'))).toBe(true);
