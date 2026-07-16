@@ -28,6 +28,13 @@ const MIN_OPEN_FAIRING_POINTS = 4;
 const MIN_CLOSED_FAIRING_POINTS = 5;
 type DrawingFairingMode = 'round' | 'corner-preserving';
 
+// Bump when the drawing fairing engine (roundPolylineCurve / fairLineCurvePath
+// / the fit tolerances above) changes in a way that should re-fair existing
+// drawings. The migration re-fairs any drawing stamped below this and skips any
+// stamped at it, so recognition never depends on re-deriving byte-identical
+// fitter output (ADR-214).
+export const CURRENT_POLYLINE_FAIRING_VERSION = 1;
+
 export function createPolyline(args: {
   readonly id: string;
   readonly color: string;
@@ -49,6 +56,7 @@ export function createPolyline(args: {
     bounds: boundsOfCurves(curves, polylines),
     transform: args.transform ?? IDENTITY_TRANSFORM,
     paths,
+    fairingVersion: CURRENT_POLYLINE_FAIRING_VERSION,
   };
 }
 

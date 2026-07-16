@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createPolyline, polylineToPolylines } from '../../core/shapes';
+import {
+  createPolyline,
+  CURRENT_POLYLINE_FAIRING_VERSION,
+  polylineToPolylines,
+} from '../../core/shapes';
 import {
   createLayer,
   createProject,
@@ -56,12 +60,14 @@ describe('upgradeProjectPolylineFairing', () => {
 
   it('refits cubic drawings produced by the previous corner-preserving adapter', () => {
     const points = alternatingBends();
-    const previous = createPolyline({
-      id: 'previous-fairing',
-      color: '#000000',
-      spec: { points, closed: false },
-      fairingMode: 'corner-preserving',
-    });
+    const previous = preMarker(
+      createPolyline({
+        id: 'previous-fairing',
+        color: '#000000',
+        spec: { points, closed: false },
+        fairingMode: 'corner-preserving',
+      }),
+    );
     const project = projectWith(previous);
 
     const result = upgradeProjectPolylineFairing(project);
@@ -78,6 +84,26 @@ describe('upgradeProjectPolylineFairing', () => {
       }).paths,
     );
     expect(upgraded.paths).not.toEqual(previous.paths);
+    // The refit stamps the current version so future loads skip it (ADR-214).
+    expect(upgraded.fairingVersion).toBe(CURRENT_POLYLINE_FAIRING_VERSION);
+  });
+
+  it('skips a drawing already stamped at the current fairing version', () => {
+    // A born-marked drawing (createPolyline stamps the current version) must be
+    // recognized by its stamp alone, never re-faired — even if its curves would
+    // no longer match a re-derivation.
+    const drawing = createPolyline({
+      id: 'stamped',
+      color: '#000000',
+      spec: { points: alternatingBends(), closed: false },
+    });
+    expect(drawing.fairingVersion).toBe(CURRENT_POLYLINE_FAIRING_VERSION);
+    const input = projectWith(drawing);
+
+    const result = upgradeProjectPolylineFairing(input);
+
+    expect(result.upgradedCount).toBe(0);
+    expect(result.project).toBe(input);
   });
 
   it('refits drawings produced by the PR #194 per-chord adapter', () => {
@@ -88,7 +114,7 @@ describe('upgradeProjectPolylineFairing', () => {
       spec: { points, closed: false },
     });
     const cubics = fitLegacyCentripetalCubics(points, false);
-    const previous: ShapeObject = {
+    const previous: ShapeObject = preMarker({
       ...current,
       paths: [
         {
@@ -107,7 +133,7 @@ describe('upgradeProjectPolylineFairing', () => {
           ],
         },
       ],
-    };
+    });
 
     const result = upgradeProjectPolylineFairing(projectWith(previous));
     const upgraded = result.project.scene.objects[0];
@@ -119,17 +145,25 @@ describe('upgradeProjectPolylineFairing', () => {
   });
 });
 
+// A pre-marker drawing: real drawings saved before ADR-214 carry no
+// fairingVersion, so the synthetic "legacy" fixtures must drop the field that
+// createPolyline now stamps, or the migration would rightly skip them.
+function preMarker(object: ShapeObject): ShapeObject {
+  const { fairingVersion: _fairingVersion, ...rest } = object;
+  return rest;
+}
+
 function legacyPolyline(points: ReadonlyArray<Vec2>, closed: boolean): ShapeObject {
   const spec = { points, closed };
   const polylines = polylineToPolylines(spec);
   const current = createPolyline({ id: `legacy-${closed}`, color: '#000000', spec });
-  return {
+  return preMarker({
     ...current,
     locked: true,
     powerScale: 72,
     operationOverride: { mode: 'line', power: 18 },
     paths: [{ color: '#000000', polylines, curves: polylines.map(polylineToCurveSubpath) }],
-  };
+  });
 }
 
 function arcPoints(): Vec2[] {

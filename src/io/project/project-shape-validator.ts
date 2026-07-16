@@ -304,6 +304,7 @@ function validateShapeObject(obj: Record<string, unknown>, path: string): string
     validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     optionalLiteral(obj, `${path}.provenance`, ['captured-board', 'jig']),
+    optionalNonNegativeNumber(obj, `${path}.fairingVersion`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     validateColoredPaths(obj['paths'], `${path}.paths`),

@@ -105,8 +105,11 @@ function legacyPolyline(): ShapeObject {
   const spec = { points, closed: false };
   const current = createPolyline({ id: 'legacy', color: '#000000', spec });
   const polylines = polylineToPolylines(spec);
+  // Drop the fairing stamp createPolyline now adds so this represents a real
+  // pre-ADR-214 drawing the migration must still upgrade.
+  const { fairingVersion: _fairingVersion, ...rest } = current;
   return {
-    ...current,
+    ...rest,
     paths: [{ color: current.color, polylines, curves: polylines.map(polylineToCurveSubpath) }],
   };
 }

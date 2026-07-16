@@ -341,6 +341,14 @@ export type ShapeObject = ObjectPowerScale & {
   // tag lets the jig panel refuse to unlock/replace a captured board, whose
   // canvas position encodes the physical work origin. Absent → jig (back-compat).
   readonly provenance?: 'captured-board' | 'jig';
+  // Pen-drawing fairing version (ADR-214). Stamped by createPolyline and by the
+  // fairing migration so a drawing faired by a known engine version is
+  // recognized by that version alone, instead of re-deriving the fitter output
+  // and comparing JSON byte-for-byte (which any future fitter/tolerance change
+  // silently breaks). Absent → pre-marker drawing; the migration falls back to
+  // structural recognition for those. Newer-than-current values are tolerated
+  // (a file from a future build), never downgraded.
+  readonly fairingVersion?: number;
 };
 
 // 3D relief for CNC carving, Phase H.4 (ADR-098). Carries the parsed
