@@ -32,7 +32,8 @@ import {
 } from '../state/recovery/testing';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
-import { cncPassRecoveryDefaultPoint, runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
+import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
+import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
 import { prepareCurrentStartJob } from './start-job-source';
 

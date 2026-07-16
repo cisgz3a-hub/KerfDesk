@@ -6,7 +6,6 @@
 // controller. Streaming reuses cnc-supervised-recovery-stream.ts unchanged.
 
 import { buildCncPassResumeJob } from '../../core/recovery/cnc-pass-resume-job';
-import { resolveCncResumePoint, type CncResumePoint } from '../../core/recovery/cnc-resume-point';
 import { emitPreparedGcode } from '../../io/gcode';
 import { reducedOverrideAcknowledgement } from '../state/cnc-accessory-readiness';
 import {
@@ -23,6 +22,7 @@ import {
   type RecoveryCapsule,
   type RecoveryRepository,
 } from '../state/recovery';
+import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import {
   cncPassRecoveryReviewIssue,
   isLaterThanDefault,
@@ -31,7 +31,6 @@ import {
   retainedPositionIssue,
   type CncPassRecoveryReview,
 } from './cnc-pass-recovery-review';
-import { deriveCncArtifactPassSpans } from './cnc-pass-span-derivation';
 import {
   claimCncRecoveryCapsule,
   streamCncRecoveryProgram,
@@ -54,23 +53,6 @@ export async function runCncPassRecoveryFlow(
   const claimed = await claimCncRecoveryCapsule(capsule, repository);
   if (claimed === null) return false;
   return streamCncRecoveryProgram(planned, attestation, claimed, repository);
-}
-
-/** The sealed-artifact default boundary, for the wizard's preselection and
- * progress display. Null when spans cannot be derived (manual selection). */
-export function cncPassRecoveryDefaultPoint(capsule: RecoveryCapsule): CncResumePoint | null {
-  const artifact = capsule.artifact;
-  if (artifact.kind !== 'exact-execution' || artifact.machineKind !== 'cnc') return null;
-  const spans = deriveCncArtifactPassSpans(artifact);
-  if (spans === null) return null;
-  return resolveCncResumePoint({
-    gcode: artifact.gcode,
-    ackedLines: capsule.ackedLines,
-    spans,
-    controllerKind: artifact.controller.kind,
-    streamingMode: artifact.controller.streamingMode,
-    rxBufferBytes: artifact.controller.rxBufferBytes,
-  });
 }
 
 function sealedCncArtifact(capsule: RecoveryCapsule): ExecutionArtifactV1 | null {
