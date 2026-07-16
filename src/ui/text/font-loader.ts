@@ -45,14 +45,14 @@ export const TRACED_SCRIPT_FONT_KEYS = [
 export type TracedScriptFontKey = (typeof TRACED_SCRIPT_FONT_KEYS)[number];
 
 const TRACE_SOURCE_URL_BY_KEY: Readonly<Record<TracedScriptFontKey, string>> = {
-  'forge-signature': sacramentoUrl,
+  'forge-signature': dancingScriptUrl,
   'forge-romantic': greatVibesUrl,
   'forge-copperplate': alexBrushUrl,
   'forge-casual': caveatUrl,
-  'forge-friendly': dancingScriptUrl,
+  'forge-friendly': pacificoUrl,
   'forge-signwriter': kaushanScriptUrl,
   'forge-parisian': parisienneUrl,
-  'forge-personal': pacificoUrl,
+  'forge-personal': sacramentoUrl,
 };
 
 export function isTracedScriptFontKey(key: string): key is TracedScriptFontKey {
