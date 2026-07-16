@@ -6,11 +6,16 @@ export function inferCurrentMachinePosition(
   wcoCache: WorkCoordinateOffset | null,
 ): WorkCoordinateOffset | null {
   if (report?.mPos !== null && report?.mPos !== undefined) return report.mPos;
-  if (report?.wPos !== null && report?.wPos !== undefined && wcoCache !== null) {
+  if (report?.wPos !== null && report?.wPos !== undefined) {
+    // Prefer THIS frame's own WCO over the cache: a just-applied G92/G10 can
+    // leave wcoCache a report behind the fresh WPos (C7). Mirrors
+    // currentWorkPosition in job-placement.ts so the two never diverge.
+    const offset = report.wco ?? wcoCache;
+    if (offset === null) return null;
     return {
-      x: report.wPos.x + wcoCache.x,
-      y: report.wPos.y + wcoCache.y,
-      z: report.wPos.z + wcoCache.z,
+      x: report.wPos.x + offset.x,
+      y: report.wPos.y + offset.y,
+      z: report.wPos.z + offset.z,
     };
   }
   return null;
