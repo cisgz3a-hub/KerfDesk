@@ -394,7 +394,9 @@ describe('JobControls running safety copy', () => {
         if (button === undefined) throw new Error(`${text} button not rendered`);
         return button;
       };
-      expect(host.textContent).toContain('Frame motion is active. Use ABORT MOTION in the top bar');
+      expect(host.textContent).toContain(
+        'Frame motion is active. Use ABORT MOTION in the Live Motion bar',
+      );
       expect(
         [...host.querySelectorAll('button')].map((button) => button.textContent),
       ).not.toContain('Cancel frame');

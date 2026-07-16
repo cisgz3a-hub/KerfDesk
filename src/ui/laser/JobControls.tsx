@@ -57,7 +57,7 @@ export function JobControls({
   // (isActiveJob) until a later Idle status
   // clears the streamer — laser-store-helpers keeps 'done' busy so the user
   // can't jog into a head still physically finishing motion — and an errored job
-  // needs an explicit Abort. The top bar remains mounted through that 'done'
+  // needs an explicit Abort. The Live Motion bar remains mounted through that 'done'
   // window, and through a tool-change hold, independently of this rail.
   const jobNeedsRecovery =
     status !== undefined &&

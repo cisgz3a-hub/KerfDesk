@@ -55,7 +55,6 @@ export function App(): JSX.Element {
   return (
     <div style={shellStyle}>
       <CommandShell />
-      <LiveMotionBar />
       <main style={mainStyle}>
         <ToolStrip />
         <div style={canvasAreaStyle}>
@@ -68,6 +67,7 @@ export function App(): JSX.Element {
         <Cnc3DPane />
         <WorkspaceSidePanels />
       </main>
+      <LiveMotionBar />
       <StatusBar />
       <Toasts />
       <PwaUpdatePromptGate />
