@@ -17,7 +17,6 @@ import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedLayerFromStockMaterial } from './cnc-project-material';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
-import { applyLayerDraft } from './layer-draft';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -61,7 +60,6 @@ type LayerActionSet = (
 
 export type LayerActions = {
   readonly createManualLayer: (color: string) => void;
-  readonly commitLayerDraft: (layer: Layer) => void;
   readonly setLayerColor: (layerId: string, color: string) => void;
   readonly switchIslandFillLayersToScanline: () => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
@@ -81,7 +79,6 @@ export type LayerActions = {
 export function layerActions(set: LayerActionSet): LayerActions {
   return {
     createManualLayer: createManualLayerAction(set),
-    commitLayerDraft: layerDraftCommitter(set),
     setLayerColor: layerColorSetter(set),
     switchIslandFillLayersToScanline: () =>
       set((state) => {
@@ -163,14 +160,6 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
       const layer = machine?.kind === 'cnc' ? seedLayerFromStockMaterial(base, machine) : base;
       const scene = addLayer(state.project.scene, layer);
       return mutation(state, { ...state.project, scene });
-    });
-}
-
-function layerDraftCommitter(set: LayerActionSet): LayerActions['commitLayerDraft'] {
-  return (draft) =>
-    set((state) => {
-      const scene = applyLayerDraft(state.project.scene, draft);
-      return scene === state.project.scene ? {} : mutation(state, { ...state.project, scene });
     });
 }
 

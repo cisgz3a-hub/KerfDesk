@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  createLayer,
-  IDENTITY_TRANSFORM,
-  operationIdsForObject,
-  type RasterImage,
-} from '../../core/scene';
+import { IDENTITY_TRANSFORM, operationIdsForObject, type RasterImage } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -43,45 +38,6 @@ describe('layer store actions', () => {
 
     useStore.getState().undo();
     expect(useStore.getState().project.scene.layers).toHaveLength(0);
-  });
-
-  it('commitLayerDraft creates a configured empty output in one undo step', () => {
-    const draft = { ...createLayer({ id: '#00ff00', color: '#00ff00' }), power: 55, passes: 2 };
-
-    useStore.getState().commitLayerDraft(draft);
-
-    expect(useStore.getState().project.scene.layers).toEqual([draft]);
-    expect(useStore.getState().project.scene.objects).toHaveLength(0);
-    expect(useStore.getState().undoStack).toHaveLength(1);
-    useStore.getState().undo();
-    expect(useStore.getState().project.scene.layers).toHaveLength(0);
-  });
-
-  it('commitLayerDraft updates operation settings and presentation color without recoloring artwork', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const current = useStore.getState().project.scene.layers[0];
-    if (current === undefined) throw new Error('layer missing');
-    const undoBefore = useStore.getState().undoStack.length;
-
-    useStore.getState().commitLayerDraft({
-      ...current,
-      color: '#00ff00',
-      mode: 'fill',
-      power: 64,
-    });
-
-    const state = useStore.getState();
-    expect(state.project.scene.layers[0]).toMatchObject({
-      id: current.id,
-      color: '#00ff00',
-      mode: 'fill',
-      power: 64,
-    });
-    const object = state.project.scene.objects[0];
-    expect(object?.kind).toBe('imported-svg');
-    if (object?.kind !== 'imported-svg') throw new Error('expected imported svg');
-    expect(object.paths[0]?.color).toBe('#ff0000');
-    expect(state.undoStack).toHaveLength(undoBefore + 1);
   });
 
   it('setLayerColor changes only the automatic operation color and is undoable', () => {
