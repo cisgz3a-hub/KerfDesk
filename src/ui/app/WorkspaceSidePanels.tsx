@@ -1,29 +1,21 @@
 import { useEffect, useState } from 'react';
+import { COLLAPSED_RAIL_WIDTH_PX } from '../common';
 import { CutsLayersPanel } from '../layers';
 import { LaserWindow } from '../laser';
 import { Icon, type IconName } from '../kit';
 import { useUiStore } from '../state/ui-store';
+import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 
 type PanelId = 'cuts' | 'machine';
 
 export function WorkspaceSidePanels(): JSX.Element {
-  const [compact, setCompact] = useState(false);
+  const compact = useCompactWorkspace();
   const [active, setActive] = useState<PanelId>('cuts');
   const [cutsOpen, setCutsOpen] = useState(true);
   const [machineOpen, setMachineOpen] = useState(true);
+  const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
+  const machinePanel = useMachineRailVisibility();
   const runOrderOpen = useUiStore((state) => state.cutsLayersView === 'run-order');
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') {
-      setCompact(window.innerWidth <= 1199);
-      return;
-    }
-    const query = window.matchMedia('(max-width: 1199px)');
-    const update = (): void => setCompact(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
 
   if (compact) {
     return (
@@ -76,18 +68,34 @@ export function WorkspaceSidePanels(): JSX.Element {
       </div>
       <div style={desktopPanelsStyle}>
         {cutsOpen ? (
-          <ResizablePanel label="Cuts / Layers" wide={runOrderOpen}>
+          <ResizablePanel label="Cuts / Layers" wide={runOrderOpen} collapsed={!layersExpanded}>
             <CutsLayersPanel />
           </ResizablePanel>
         ) : null}
         {machineOpen ? (
-          <ResizablePanel label="Machine controls">
+          <ResizablePanel label="Machine controls" collapsed={!machinePanel.isExpanded}>
             <LaserWindow />
           </ResizablePanel>
         ) : null}
       </div>
     </section>
   );
+}
+
+function useCompactWorkspace(): boolean {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      setCompact(window.innerWidth <= 1199);
+      return;
+    }
+    const query = window.matchMedia('(max-width: 1199px)');
+    const update = (): void => setCompact(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return compact;
 }
 
 function PanelTab(props: {
@@ -137,15 +145,18 @@ function PanelToggle(props: {
 function ResizablePanel(props: {
   readonly label: string;
   readonly wide?: boolean;
+  readonly collapsed: boolean;
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
     <div
       aria-label={`${props.label} resizable panel`}
       style={
-        props.wide === true
-          ? { ...resizablePanelStyle, width: 400, minWidth: 320 }
-          : resizablePanelStyle
+        props.collapsed
+          ? collapsedResizablePanelStyle
+          : props.wide === true
+            ? { ...resizablePanelStyle, width: 400, minWidth: 320 }
+            : resizablePanelStyle
       }
     >
       {props.children}
@@ -180,6 +191,13 @@ const resizablePanelStyle: React.CSSProperties = {
   minHeight: 0,
   resize: 'horizontal',
   overflow: 'hidden',
+};
+const collapsedResizablePanelStyle: React.CSSProperties = {
+  ...resizablePanelStyle,
+  width: COLLAPSED_RAIL_WIDTH_PX,
+  minWidth: COLLAPSED_RAIL_WIDTH_PX,
+  maxWidth: COLLAPSED_RAIL_WIDTH_PX,
+  resize: 'none',
 };
 const compactShellStyle: React.CSSProperties = {
   display: 'flex',

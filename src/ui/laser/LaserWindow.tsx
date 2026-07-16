@@ -6,13 +6,12 @@ import { describeAlarm } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
-import { useUiStore } from '../state/ui-store';
 import { useLaserStore } from '../state/laser-store';
 import {
-  isActiveJob,
   jogFrameCommandBlockMessage,
   setupBlockingJobCommandBlockMessage,
 } from '../state/laser-store-helpers';
+import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
@@ -32,7 +31,7 @@ import { useToastStore } from '../state/toast-store';
 
 export function LaserWindow(): JSX.Element {
   const [machineSetupRequest, setMachineSetupRequest] = useState<DeviceSetupOpenRequest>();
-  const machinePanel = useMachinePanelVisibility();
+  const machinePanel = useMachineRailVisibility();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
   const control = useControllerActions();
@@ -41,18 +40,16 @@ export function LaserWindow(): JSX.Element {
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const controllerQualification = useLaserStore((s) => s.controllerQualification);
   const controllerSessionEpoch = useLaserStore((s) => s.controllerSessionEpoch);
-  const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   // ADR-101 §7: shared chrome re-labels machine-aware; behavior is identical.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
   // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
-  const jobActive = isActiveJob(streamer);
   const jogBlocked = useJogBlocked();
   const controllerDisplay = controllerDisplayState(statusReport, alarmCode);
   const connected = connection.kind === 'connected';
-  if (!machinePanel.requestedVisible && !jobActive) {
+  if (!machinePanel.isExpanded) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
 
@@ -61,7 +58,7 @@ export function LaserWindow(): JSX.Element {
       <DetectedSettingsToast />
       <MachineRailHeading
         machineKind={machineKind}
-        jobActive={jobActive}
+        jobActive={machinePanel.isJobActive}
         onCollapse={machinePanel.toggle}
       />
       <ControllerConnectionControls
@@ -134,15 +131,6 @@ function useJogBlocked(): boolean {
   const jobBlocked = useLaserStore((s) => setupBlockingJobCommandBlockMessage(s) !== null);
   const controllerBlocked = useLaserStore((s) => jogFrameCommandBlockMessage(s) !== null);
   return jobBlocked || controllerBlocked;
-}
-
-function useMachinePanelVisibility(): {
-  readonly requestedVisible: boolean;
-  readonly toggle: () => void;
-} {
-  const requestedVisible = useUiStore((s) => s.railPanelVisibility.machine);
-  const togglePanel = useUiStore((s) => s.toggleRailPanel);
-  return { requestedVisible, toggle: () => togglePanel('machine') };
 }
 
 function useControllerActions(): {
