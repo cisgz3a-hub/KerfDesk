@@ -19,6 +19,7 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner } from '../../core/controllers';
+import { observeActiveWcsReport } from './active-wcs-observation';
 import { flushResetCleanup } from './laser-reset-cleanup';
 import {
   qualifiedController,
@@ -56,6 +57,9 @@ export function handleLine(
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   publishDetectedSettings(set, get, refs, cls);
+  // Observed BEFORE command-owner consumption so owned $G readbacks update
+  // the active-WCS picture exactly like unowned modal reports (C6).
+  observeActiveWcsReport(set, cls);
   // Marlin answers an operator-owned M115 with the same FIRMWARE_NAME line it
   // may emit as a spontaneous startup banner. Let the command owner consume
   // only that expected identity response; an unowned FIRMWARE_NAME or a real

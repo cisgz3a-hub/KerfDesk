@@ -210,6 +210,24 @@ async function qualifyConnectedController(
           'The controller settings response was empty. Retry reading controller settings.',
         ),
   );
+  probeActiveWcsAfterQualification(get, refs, safeWrite, qualificationEpoch);
+}
+
+// C6 follow-up: GRBL only reveals the active WCS in a $G modal report, so a
+// $N startup block or a previous external session leaving G55-G59 active is
+// invisible until something asks. Ask once per qualified connection —
+// fire-and-forget: the [GC:...] response is parsed passively by the line
+// pipeline, the trailing ok settles through the untracked-ack ledger, and a
+// missing answer just leaves the WCS unknown. Never blocks the handshake.
+function probeActiveWcsAfterQualification(
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  qualificationEpoch: number,
+): void {
+  const modalQuery = refs.driver.commands.modalStateQuery;
+  if (modalQuery === null || !qualificationCompleted(get(), qualificationEpoch)) return;
+  void safeWrite(`${modalQuery}\n`, undefined, 'system').catch(() => undefined);
 }
 
 function qualificationCompleted(state: LaserState, expectedEpoch: number): boolean {

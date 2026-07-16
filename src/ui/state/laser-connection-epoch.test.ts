@@ -129,6 +129,13 @@ describe('serial connection epoch guards', () => {
     connection.emitLine('ok');
     await vi.advanceTimersByTimeAsync(0);
 
+    // Qualification fires the owned $G active-WCS probe; answer it like a
+    // real controller so the untracked-ack ledger settles back to zero.
+    expect(writes).toContain('$G\n');
+    connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+    connection.emitLine('ok');
+    await vi.advanceTimersByTimeAsync(0);
+
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
@@ -152,6 +159,12 @@ describe('serial connection epoch guards', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
     connection.emitLine('$0=10');
+    connection.emitLine('ok');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Answer the qualified handshake's owned $G probe before asserting the
+    // ledger — a real controller acks it immediately.
+    connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
     connection.emitLine('ok');
     await vi.advanceTimersByTimeAsync(0);
 

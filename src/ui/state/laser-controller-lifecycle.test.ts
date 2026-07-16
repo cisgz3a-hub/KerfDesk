@@ -172,6 +172,24 @@ describe('laser controller lifecycle operations', () => {
     expect(useLaserStore.getState().activeWcs).toBe('G54');
   });
 
+  it('learns the active WCS from any modal report and skips the $G probe when unqualified', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    // This harness answers $$ with an empty dump, so qualification fails and
+    // the owned connect probe must not have been written.
+    expect(writes).not.toContain('$G\n');
+    expect(useLaserStore.getState().activeWcs).toBeNull();
+
+    // A [GC:...] modal report (operator-typed $G, an owned readback, or the
+    // connect probe) names the active WCS — the pipeline must observe it.
+    connection.emitLine('[GC:G0 G55 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+    await flush();
+    expect(useLaserStore.getState().activeWcs).toBe('G55');
+  });
+
   it('keeps a completed job locked until the internal settle marker and stable Idle finish', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

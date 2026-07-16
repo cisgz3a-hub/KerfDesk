@@ -72,7 +72,14 @@ describe('ordinary controller terminal responses', () => {
     connection.emitLine('$30=1000');
     connection.emitLine('ok');
     await flush();
+    // Qualification fires the owned $G active-WCS probe; answer it like a
+    // real controller so the untracked-ack ledger settles back to zero.
+    expect(writes).toContain('$G\n');
+    connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+    connection.emitLine('ok');
+    await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().activeWcs).toBe('G54');
   });
 
   it('ignores an unsolicited ok without invalidating setup or blocking jog', async () => {

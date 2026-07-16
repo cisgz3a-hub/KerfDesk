@@ -19,7 +19,7 @@ export function parseOwnedWorkOffsetReadback(
   if (modalBodies.length !== 1) {
     return { ok: false, reason: 'Expected exactly one GC modal report from the owned $G query.' };
   }
-  const activeWcs = activeWcsFromModal(modalBodies[0] ?? '');
+  const activeWcs = activeWcsFromModalBody(modalBodies[0] ?? '');
   if (activeWcs === null) {
     return {
       ok: false,
@@ -49,7 +49,9 @@ function matchingBodies(lines: ReadonlyArray<string>, pattern: RegExp): string[]
   });
 }
 
-function activeWcsFromModal(body: string): ActiveWorkCoordinateSystem | null {
+/** The single active G54-G59 WCS named by a [GC:...] modal-report body, or
+ * null when the body names none or several (never a guess). */
+export function activeWcsFromModalBody(body: string): ActiveWorkCoordinateSystem | null {
   const matches = body
     .split(/\s+/)
     .filter((word): word is ActiveWorkCoordinateSystem => ACTIVE_WCS_RE.test(word));

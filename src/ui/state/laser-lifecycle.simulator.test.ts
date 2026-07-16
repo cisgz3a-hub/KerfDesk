@@ -95,6 +95,13 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(sim.port.openRequests()).toEqual([{ baudRate: 115200 }]);
   });
 
+  it('probes the active WCS with an owned $G once qualified and stores the report', async () => {
+    const sim = await connectSim();
+    await pump(20);
+    expect(sim.outbound()).toContain('$G\n');
+    expect(useLaserStore.getState().activeWcs).toBe('G54');
+  });
+
   it('polls ? on the idle cadence and stores the parsed status report', async () => {
     const sim = await connectIdle();
     expect(sim.outbound()).toContain('?');

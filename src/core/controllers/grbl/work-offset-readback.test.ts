@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseOwnedWorkOffsetReadback } from './work-offset-readback';
+import { activeWcsFromModalBody, parseOwnedWorkOffsetReadback } from './work-offset-readback';
 
 describe('owned GRBL work-offset readback', () => {
   it('selects the active modal WCS and its exact XYZ offset', () => {
@@ -38,5 +38,17 @@ describe('owned GRBL work-offset readback', () => {
     const result = parseOwnedWorkOffsetReadback(modal, offsets);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toMatch(reason);
+  });
+});
+
+describe('activeWcsFromModalBody', () => {
+  it('names the single active WCS in a modal-report body', () => {
+    expect(activeWcsFromModalBody('G0 G55 G17 G21 G90 G94 M5 M9 T0 F0 S0')).toBe('G55');
+  });
+
+  it('returns null when the body names no or several G54-G59 words', () => {
+    expect(activeWcsFromModalBody('G0 G17 G21')).toBeNull();
+    expect(activeWcsFromModalBody('G54 G55')).toBeNull();
+    expect(activeWcsFromModalBody('')).toBeNull();
   });
 });

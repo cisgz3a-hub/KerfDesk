@@ -6,9 +6,12 @@
 // the wrong physical position. Warn rather than block: reselecting G54 clears
 // it, and blocking a valid multi-WCS workflow would be an unapproved guard.
 //
-// Scope: only the operator's console selection is tracked. A $N startup block
-// or an external session that leaves G55-G59 active is not detected here (that
-// needs an owned $G parser-state readback at connect).
+// Scope: the selection is learned from the operator's console commands and
+// from every [GC:...] modal report crossing the line pipeline — including the
+// owned $G probe sent once per qualified connection — so a $N startup block
+// or an earlier external session leaving G55-G59 active is detected shortly
+// after connect. Until that first report arrives the WCS is unknown (null)
+// and intentionally un-warned.
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 
