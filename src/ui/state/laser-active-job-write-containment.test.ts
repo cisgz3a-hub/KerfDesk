@@ -84,6 +84,12 @@ function handleProtocolWrite(
   }
   if (data === 'G4 P0.01\n') setTimeout(() => connection.emitLine('ok'), 0);
   if (data === '?') setTimeout(() => connection.emitLine(IDLE), 0);
+  // Real GRBL answers the connect-time $G modal query (C6) with its state then
+  // ok; model it so the ackless query settles during connect.
+  if (data === '$G\n') {
+    connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+    connection.emitLine('ok');
+  }
 }
 
 function adapterFor(connection: SerialConnection): PlatformAdapter {

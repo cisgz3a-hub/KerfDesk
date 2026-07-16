@@ -181,6 +181,37 @@ describe('safe-write transport epochs', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
+  it('reserves no owed terminal ack for an ackless query write', async () => {
+    let release: () => void = () => undefined;
+    const refs: SafeWriteRefs = {
+      connection: deferredConnection((resolve) => {
+        release = resolve;
+      }),
+      driver: grblDriver,
+      nextTranscriptId: 1,
+      writeEpoch: 0,
+    };
+    const write = createSafeWrite(useLaserStore.setState, useLaserStore.getState, refs);
+
+    // A normal newline-terminated $G owes exactly one terminal ack — the fence
+    // Start/commands gate on (see the reads above).
+    const normal = write('$G\n');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    useLaserStore.setState({ pendingUntrackedAcks: 0 });
+    release();
+    await normal;
+
+    // The same line sent ackless reserves NONE, so the connect-time modal read
+    // (C6) never fences: transport is still tracked, but no ack is owed.
+    const query = write('$G\n', undefined, 'system', { ackless: true });
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    release();
+    await query;
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
   it('does not reassert work-Z evidence when a reset overtakes deferred G92 Z0', async () => {
     let releaseZero: () => void = () => undefined;
     const connection = zeroZConnection((release) => {

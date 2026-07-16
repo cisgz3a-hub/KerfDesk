@@ -19,10 +19,19 @@ function makeConnection(
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
     write: async (data) => {
       writes.push(data);
       await writeOverride?.(data);
+      // Real GRBL answers the connect-time $G modal query (C6) with its state
+      // then ok; model it so the ackless query settles during connect.
+      if (data === '$G\n') {
+        emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        emit('ok');
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -33,9 +42,7 @@ function makeConnection(
       return () => closeHandlers.delete(handler);
     },
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: (line) => emit(line),
     emitClose: () => {
       for (const handler of closeHandlers) handler();
     },
@@ -74,6 +81,9 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await flushPromises();
   connection.emitLine('$32=1');
   connection.emitLine('ok');
+  await flushPromises();
+  // Let the detached handshake issue its post-qualification $G (C6) and the
+  // fake connection auto-reply settle before the test drives more I/O.
   await flushPromises();
 }
 

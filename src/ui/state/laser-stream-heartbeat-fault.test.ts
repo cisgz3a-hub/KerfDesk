@@ -27,6 +27,12 @@ function makeConnection(
       if (data === '\x18' && options.autoResetBanner !== false) {
         setTimeout(() => connection.emitLine('Grbl 1.1f'), 0);
       }
+      // Real GRBL answers the connect-time $G modal query (C6) with its state
+      // then ok; model it so the ackless query settles during connect.
+      if (data === '$G\n') {
+        connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        connection.emitLine('ok');
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -70,6 +76,9 @@ async function connectReady(connection: FakeConnection): Promise<void> {
   await flush();
   connection.emitLine('$32=1');
   connection.emitLine('ok');
+  await flush();
+  // Let the detached handshake issue its post-qualification $G (C6) and the
+  // fake connection auto-reply settle before the test drives more I/O.
   await flush();
 }
 

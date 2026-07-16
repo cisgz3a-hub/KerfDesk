@@ -19,6 +19,7 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner } from '../../core/controllers';
+import { parseActiveWcsFromModalResponses } from '../../core/controllers/grbl/work-offset-readback';
 import { flushResetCleanup } from './laser-reset-cleanup';
 import {
   qualifiedController,
@@ -55,6 +56,7 @@ export function handleLine(
   const cls = refs.driver.classifyLine(line);
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
+  captureActiveWcsFromModalReport(set, line);
   publishDetectedSettings(set, get, refs, cls);
   // Marlin answers an operator-owned M115 with the same FIRMWARE_NAME line it
   // may emit as a spontaneous startup banner. Let the command owner consume
@@ -94,6 +96,19 @@ export function handleLine(
   if (cls.kind === 'ok' && ackOwner === 'stream') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
+}
+
+// GRBL answers $G with `[GC:...]` (the connect-time modal read, an operator
+// console $G, or Work-Z recovery). Surface the active WCS so the placement
+// mismatch advisory (C6) sees a G55-G59 frame left active by a $N startup block
+// or an external session. Additive: an owned command, if any, still consumes
+// the line separately for its own logic; a non-`[GC:]` line parses to null.
+function captureActiveWcsFromModalReport(set: SetFn, line: string): void {
+  // Runs for every inbound line (incl. the job-stream ok flood); cheap
+  // substring reject before the anchored regex keeps the hot path clear.
+  if (!line.includes('[GC:')) return;
+  const activeWcs = parseActiveWcsFromModalResponses([line]);
+  if (activeWcs !== null) set({ activeWcs });
 }
 
 function recordInboundLine(
