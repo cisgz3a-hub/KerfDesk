@@ -8,7 +8,7 @@
 // distinguishes a *malformed present* coordinate word from an *absent* one and
 // flags it at the text boundary, catching every producer (kerf, tabs, trace,
 // text, offset-fill) regardless of which one emitted the non-finite value.
-import { isGcodeMotionCommand, stripGcodeComment } from './gcode-words';
+import { asGcodeLines, isGcodeMotionCommand, stripGcodeComment } from './gcode-words';
 import type { Issue } from './predicates';
 
 // X/Y/Z motion coordinates and I/J arc-centre offsets. Feed (F) and power (S)
@@ -20,8 +20,8 @@ import type { Issue } from './predicates';
 const NON_FINITE_COORD =
   /(?:^|[^A-Za-z])([XYZIJ])\s*([+-]?(?:NaN|Infinity|Inf))(?=$|\s|[A-Za-z;])/gi;
 
-export function findNonFiniteCoords(gcode: string): readonly Issue[] {
-  const lines = gcode.split('\n');
+export function findNonFiniteCoords(gcode: string | ReadonlyArray<string>): readonly Issue[] {
+  const lines = asGcodeLines(gcode);
   const issues: Issue[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];

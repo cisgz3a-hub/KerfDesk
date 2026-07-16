@@ -29,6 +29,17 @@ export function isClockwiseArc(line: string): boolean {
   return /^G2(?=$|\s|[A-Za-z])/i.test(line);
 }
 
+// A single materialized G-code body is scanned by several independent
+// invariant predicates in one preflight pass. Splitting the whole string per
+// predicate re-allocates a line array of the entire (up to ~96 MB) output each
+// time — the redundant-materialization half of the raster-preflight freeze
+// (A8). Predicates accept the already-split lines so the caller splits ONCE
+// and threads the array through every scan; a bare string still works for the
+// property tests and external callers.
+export function asGcodeLines(gcode: string | ReadonlyArray<string>): ReadonlyArray<string> {
+  return typeof gcode === 'string' ? gcode.split('\n') : gcode;
+}
+
 export function stripGcodeComment(line: string): string {
   const semi = line.indexOf(';');
   const head = semi >= 0 ? line.slice(0, semi) : line;
