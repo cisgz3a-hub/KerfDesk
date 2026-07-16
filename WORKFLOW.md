@@ -750,6 +750,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    visibility changes, released when the job ends). If the platform
    refuses the lock, one LaserLog line warns the operator to disable
    system sleep before long burns — the job itself always proceeds.
+8. During a CNC job the canvas motion overlay's head label and status badge
+   add the running depth pass and the passes remaining (`Pass k of N •
+   m remaining`), derived from the ADR-215 pass spans of the exact started
+   program and advancing only with route-reconciled motion (ADR-216). When
+   the mapping cannot be derived (e.g. a supervised recovery stream), the
+   counter is omitted rather than estimated.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.

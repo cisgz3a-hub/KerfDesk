@@ -27,6 +27,7 @@ import {
 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
+import { cncPassRouteSpans, type CncPassRouteSpan } from './canvas-pass-progress';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
 
@@ -46,6 +47,9 @@ export type CanvasMotionPlan = {
   readonly unavailableReason: string | null;
   readonly resumed: boolean;
   readonly positionEpoch: number;
+  /** CNC only: each depth pass's route range (ADR-216). Absent whenever the
+   * started program is not the plain strategy emission of the prepared job. */
+  readonly cncPassSpans?: ReadonlyArray<CncPassRouteSpan>;
 };
 
 export type LiveCanvasLifecycle =
@@ -150,6 +154,7 @@ function assembleCanvasPlan(
         : map(controllerStart)
       : mapRelativeSurfacePoint(surfaceStart, args.prepared);
   return {
+    ...cncPassSpansOption(args, machineKind, manifest, fingerprintSource),
     manifest,
     fingerprint: fingerprintGcode(fingerprintSource),
     retentionKey: args.retentionKey ?? JSON.stringify(fingerprintGcode(fingerprintSource)),
@@ -164,6 +169,24 @@ function assembleCanvasPlan(
     resumed: args.resumed === true,
     positionEpoch: args.machine.trustedPositionEpoch ?? 0,
   };
+}
+
+// Marker plans pass an empty program; only a real started program can be
+// byte-checked against the sidecar re-emission (ADR-216).
+function cncPassSpansOption(
+  args: CanvasPlanBuildContext,
+  machineKind: MachineKind,
+  manifest: MotionManifest,
+  fingerprintSource: string,
+): { readonly cncPassSpans?: ReadonlyArray<CncPassRouteSpan> } {
+  if (machineKind !== 'cnc' || fingerprintSource === '') return {};
+  const spans = cncPassRouteSpans(
+    args.prepared.job,
+    args.prepared.project.device,
+    fingerprintSource,
+    manifest,
+  );
+  return spans === undefined ? {} : { cncPassSpans: spans };
 }
 
 export function canvasPlanRetentionKey(
@@ -222,8 +245,11 @@ export function rebuildCanvasPlanForGcode(
     manifest.firstProcessPoint === null
       ? null
       : mapControllerPointToScene(manifest.firstProcessPoint, plan);
+  // A resume program renumbers every line, so the original run's pass spans
+  // no longer describe it. Dropping them beats displaying a wrong pass.
+  const { cncPassSpans: _stale, ...base } = plan;
   return {
-    ...plan,
+    ...base,
     manifest,
     fingerprint: fingerprintGcode(gcode),
     jobStart,
