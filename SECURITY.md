@@ -39,4 +39,6 @@ first and representative hardware validation before the fix is considered comple
 
 Never test a suspected machine-control vulnerability with an energized spindle or laser unless the
 machine is physically supervised, the work area is clear, and an immediate independent stop is
-available.
+available. Tests that sever the transport (USB unplug, controller power loss) must run with laser
+output physically disabled: after the link is gone the application has no channel to command the
+beam off, and the controller can hold the last power level until buffered motion drains (ADR-212).

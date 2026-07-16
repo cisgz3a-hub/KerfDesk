@@ -30,6 +30,7 @@ Record failures as evidence. Never repeat a failed motion or Fire case until the
 5. Keep all Labs features disabled except the single feature under test.
 6. Save the project and exported output before Start. Hash both files in `result.md`.
 7. A run is invalid if firmware, steps/mm, rotary parameters, camera position, material placement, or KerfDesk commit changes mid-run.
+8. Any case that severs the transport (USB unplug, controller power loss) runs with laser output physically disabled — beam source unpowered, its enable line disconnected, or an aperture-blocking interlock engaged. A severed transport leaves KerfDesk no channel to command the beam off (`M5`, reset, or Safety Door), and the controller can hold the last power level until buffered motion drains (ADR-212). Never sever an energized laser's link; a hardware interlock or watchdog is the only guaranteed stop for that fault.
 
 ## Measurement rules
 
@@ -65,8 +66,8 @@ Use the supported Creality Falcon profile selected through the complete setup wi
 | FAL-04 Raster | Engrave a 100 x 40 mm bidirectional raster with visible seam markers. | Coupon photos, G-code, CSV | Dimensions meet raster limits; no silent clipping, banding from travel, or unexpected seam. |
 | FAL-05 Pause | Pause during vector and raster motion, wait five seconds, then resume. | Continuous video and transcript | No uncontrolled beam dwell; resume continues from the held job without replay or skipped geometry. |
 | FAL-06 Alarm recovery | Trigger a safe controller alarm or limit simulation, then Home. | Video and transcript | Job terminates, Start remains blocked, trusted position invalidates, successful Home clears the alarm and restores readiness. |
-| FAL-07 Disconnect | Disconnect USB during a low-power air motion test. | Video and transcript | Streaming stops, hard-off commands are attempted, position becomes unknown, and Start remains blocked until recovery. |
-| FAL-08 Fire | Hold Fire at the configured cap, then release, blur, navigate, alarm, disconnect, and unmount in separate runs. | Optical trace and transcript | Fire is idle-only and diode-only; measured power never exceeds the cap; every exit reaches baseline within 250 ms. |
+| FAL-07 Disconnect | With laser output physically disabled (prerequisite 8), disconnect USB during an air motion test. | Video and transcript | Streaming stops, hard-off write attempts are logged as failed, position becomes unknown, a physical-stop-uncertain notice is shown, and Start remains blocked until recovery. |
+| FAL-08 Fire | Hold Fire at the configured cap, then release, blur, navigate, alarm, and unmount in separate runs. Disconnect-during-Fire runs only under prerequisite 8 (output disabled) and passes on transcript evidence, not an optical trace — after a yank no software path can force the beam to baseline (ADR-212). | Optical trace and transcript | Fire is idle-only and diode-only; measured power never exceeds the cap; every link-intact exit reaches baseline within 250 ms. |
 
 ## GRB series: second GRBL-family machine
 
