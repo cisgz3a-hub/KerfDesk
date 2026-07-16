@@ -23,7 +23,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { repairedMachineCapabilityMessage } from '../machine/machine-capability-messages';
 import {
   DEFAULT_JOB_PLACEMENT,
-  resolveJobPlacement,
+  resolveExportJobPlacement,
   trustedMotionOffsetForPreflight,
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
@@ -150,7 +150,10 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // Saved exports carry a provenance header (build / commit / emitter) so a
   // stale file is obvious later. The streamed Start path intentionally omits it
   // for now (roadmap P0-A open Q2 — streamer comment handling unverified).
-  const placement = resolveJobPlacement(ctx.jobPlacement ?? DEFAULT_JOB_PLACEMENT, {
+  // Export placement, not Start placement: a file save must stay possible
+  // with no connected machine or active origin (only Current Position bakes
+  // live state into the bytes — see resolveExportJobPlacement).
+  const placement = resolveExportJobPlacement(ctx.jobPlacement ?? DEFAULT_JOB_PLACEMENT, {
     statusReport: null,
     workOriginActive: false,
     wcoCache: null,

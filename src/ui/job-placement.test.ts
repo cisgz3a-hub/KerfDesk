@@ -5,6 +5,7 @@ import {
   defaultJobPlacementForDevice,
   jobPlacementAfterDeviceChange,
   jobPlacementAfterProfileSelection,
+  resolveExportJobPlacement,
   resolveJobPlacement,
   trustedMotionOffsetForPreflight,
 } from './job-placement';
@@ -276,6 +277,56 @@ describe('verified-origin placement (ADR-053)', () => {
     expect(
       resolveJobPlacement({ startFrom: 'user-origin', anchor: 'front-left' }, machine).ok,
     ).toBe(false);
+  });
+});
+
+describe('resolveExportJobPlacement (Save G-code)', () => {
+  const noMachine = { statusReport: null, workOriginActive: false, wcoCache: null };
+
+  it('resolves user-origin with no machine data — no motion offset, size-only preflight', () => {
+    expect(
+      resolveExportJobPlacement({ startFrom: 'user-origin', anchor: 'center' }, noMachine),
+    ).toEqual({ ok: true, jobOrigin: { startFrom: 'user-origin', anchor: 'center' } });
+  });
+
+  it('resolves verified-origin with no machine data', () => {
+    expect(
+      resolveExportJobPlacement({ startFrom: 'verified-origin', anchor: 'front-left' }, noMachine),
+    ).toEqual({ ok: true, jobOrigin: { startFrom: 'verified-origin', anchor: 'front-left' } });
+  });
+
+  it('keeps the live WCO bounds offset when the machine resolution succeeds', () => {
+    const machine = {
+      statusReport: idleAtMachinePosition(120, 80),
+      workOriginActive: true,
+      wcoCache: { x: 120, y: 80, z: 0 },
+    };
+    expect(
+      resolveExportJobPlacement({ startFrom: 'user-origin', anchor: 'center' }, machine),
+    ).toEqual(resolveJobPlacement({ startFrom: 'user-origin', anchor: 'center' }, machine));
+  });
+
+  it('still refuses current-position exports without a live position (bytes depend on it)', () => {
+    const resolved = resolveExportJobPlacement(
+      { startFrom: 'current-position', anchor: 'front-left' },
+      noMachine,
+    );
+    expect(resolved.ok).toBe(false);
+    if (!resolved.ok) expect(resolved.messages.join('\n')).toMatch(/Current Position/);
+  });
+
+  it('exports absolute even while a custom origin is active (Start still refuses)', () => {
+    const machine = {
+      statusReport: idleAtMachinePosition(120, 80),
+      workOriginActive: true,
+      wcoCache: { x: 120, y: 80, z: 0 },
+    };
+    expect(
+      resolveExportJobPlacement({ startFrom: 'absolute', anchor: 'front-left' }, machine),
+    ).toEqual({ ok: true });
+    expect(resolveJobPlacement({ startFrom: 'absolute', anchor: 'front-left' }, machine).ok).toBe(
+      false,
+    );
   });
 });
 
