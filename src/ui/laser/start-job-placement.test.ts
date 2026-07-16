@@ -148,6 +148,8 @@ describe('prepareStartJob job placement', () => {
     if (result.ok) {
       expect(result.gcode).toContain('X95.000 Y95.000');
       expect(result.gcode).toContain('X145.000 Y95.000');
+      expect(result.gcode.trimEnd()).toMatch(/G0 X120\.000 Y80\.000 S0$/);
+      expect(result.gcode.trimEnd()).not.toMatch(/G0 X0\.000 Y0\.000 S0$/);
     }
   });
 

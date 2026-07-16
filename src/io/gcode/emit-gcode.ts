@@ -77,7 +77,11 @@ export function emitPreparedGcode(
   const body =
     machine !== undefined && machine.kind === 'cnc'
       ? cncGrblStrategy.emit(job, prepared.project.device)
-      : selectOutputStrategy(prepared.project.device).emit(job, prepared.project.device);
+      : selectOutputStrategy(prepared.project.device).emit(
+          job,
+          prepared.project.device,
+          currentPositionFinishOptions(options.jobOrigin),
+        );
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
@@ -86,6 +90,14 @@ export function emitPreparedGcode(
     ? gcodeMetadataHeader(options.metadata, headerAssumptionsFor(prepared.project)) + body
     : body;
   return { gcode, preflight };
+}
+
+function currentPositionFinishOptions(jobOrigin: JobOriginPlacement | undefined): {
+  readonly finishPosition?: { readonly x: number; readonly y: number };
+} {
+  return jobOrigin?.startFrom === 'current-position'
+    ? { finishPosition: jobOrigin.currentPosition }
+    : {};
 }
 
 function runEmitPreflight(

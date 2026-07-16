@@ -8,14 +8,15 @@
 import type { DeviceProfile } from '../devices';
 import type { Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
+import type { OutputEmitOptions } from './output-strategy';
 
 const VIRTUAL_MAX_S = 1000;
 const S_WORD_RE = /\bS(\d+(?:\.\d+)?)/g;
 
 export const smoothiewareStrategy = {
   id: 'smoothieware' as const,
-  emit: (job: Job, device: DeviceProfile): string => {
-    const body = grblStrategy.emit(job, { ...device, maxPowerS: VIRTUAL_MAX_S });
+  emit: (job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string => {
+    const body = grblStrategy.emit(job, { ...device, maxPowerS: VIRTUAL_MAX_S }, options);
     return rescaleSWords(body, device.maxPowerS);
   },
 };

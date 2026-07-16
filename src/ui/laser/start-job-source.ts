@@ -39,6 +39,7 @@ export async function prepareCurrentStartJob(
   laser: ReturnType<typeof useLaserStore.getState>,
   camera: ReturnType<typeof useCameraStore.getState>,
   allowRotaryRaster = resolveRotaryRasterAllowed(app.project),
+  resolvedJobOrigin?: JobOriginPlacement,
 ) {
   const { project, jobPlacement } = app;
   const registration = currentPrintCutOutputRegistration(project);
@@ -53,6 +54,7 @@ export async function prepareCurrentStartJob(
       clock: () => new Date(),
       renderVariableText,
       ...(registration === undefined ? {} : { registration }),
+      ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
     },
   );
 }

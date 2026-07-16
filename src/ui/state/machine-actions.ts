@@ -21,7 +21,11 @@ import {
 import type { CncMachinePreset } from '../../core/cnc';
 import type { DeviceProfile } from '../../core/devices';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
-import { jobPlacementAfterDeviceChange, type JobPlacementSettings } from '../job-placement';
+import {
+  jobPlacementAfterDeviceChange,
+  jobPlacementAfterProfileSelection,
+  type JobPlacementSettings,
+} from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
@@ -212,11 +216,14 @@ function cncMachineSetupStatePatch(
   };
   return {
     project,
-    jobPlacement: jobPlacementAfterDeviceChange(
-      state.jobPlacement,
-      state.project.device,
-      deviceWithCnc,
-    ),
+    jobPlacement:
+      patch.deviceProfile === undefined
+        ? jobPlacementAfterDeviceChange(state.jobPlacement, state.project.device, deviceWithCnc)
+        : jobPlacementAfterProfileSelection(
+            state.jobPlacement,
+            state.project.device,
+            deviceWithCnc,
+          ),
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,

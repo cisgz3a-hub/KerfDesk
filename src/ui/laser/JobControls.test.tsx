@@ -113,6 +113,7 @@ afterEach(() => {
   useLaserStore.setState({
     streamer: null,
     statusReport: null,
+    homingState: 'unknown',
     workOriginActive: false,
     wcoCache: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);

@@ -34,6 +34,21 @@ export function jobPlacementAfterDeviceChange(
   };
 }
 
+export function jobPlacementAfterProfileSelection(
+  current: JobPlacementSettings,
+  previousDevice: Pick<DeviceProfile, 'homing'>,
+  nextDevice: Pick<DeviceProfile, 'homing'>,
+): JobPlacementSettings {
+  // A full profile selection establishes a new physical machine context.
+  // Never carry the head-relative Current Position mode onto a homing-capable
+  // machine implicitly; the operator may still choose it again deliberately.
+  // User/Verified Origin are explicit setup workflows, so preserve them.
+  if (nextDevice.homing.enabled && current.startFrom === 'current-position') {
+    return { ...current, startFrom: 'absolute' };
+  }
+  return jobPlacementAfterDeviceChange(current, previousDevice, nextDevice);
+}
+
 export type MachinePlacementSnapshot = {
   readonly statusReport: StatusReport | null;
   readonly workOriginActive?: boolean;

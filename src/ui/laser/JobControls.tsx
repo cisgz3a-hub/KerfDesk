@@ -29,6 +29,7 @@ import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
 import { RunAgainControl } from './RunAgainControl';
+import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 
 type Props = {
   readonly disabled: boolean;
@@ -142,11 +143,25 @@ function SetupRow(props: {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const isCncMachine = machineKind === 'cnc';
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const startFrom = useStore((s) => s.jobPlacement.startFrom);
   const statusReport = useLaserStore((s) => s.statusReport);
+  const homingState = useLaserStore((s) => s.homingState);
   const home = useLaserStore((s) => s.home);
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
-  const frameReady = statusReport?.state === 'Idle';
+  const absoluteHomeIssue = absoluteCoordinatesHomeIssue({
+    machineKind,
+    startFrom,
+    homingEnabled,
+    homingState,
+  });
+  const frameControl = frameControlProps(busy, statusReport?.state);
+  const startControl = startControlProps(
+    busy,
+    props.startDisabledReason,
+    absoluteHomeIssue,
+    startJobTitle(estimate, jobTimeNoun(machineKind)),
+  );
   // No portable autofocus G-code exists, so an empty command becomes a direct
   // setup entry instead of a disabled control that leaves users hunting for
   // the vendor-specific command field.
@@ -177,20 +192,16 @@ function SetupRow(props: {
       <button
         type="button"
         onClick={onFrame}
-        disabled={busy || !frameReady}
-        title={
-          frameReady
-            ? "Trace the job's bounding box with the laser off to check placement"
-            : frameBlockedTitle(statusReport?.state)
-        }
+        disabled={frameControl.disabled}
+        title={frameControl.title}
       >
         Frame
       </button>
       <button
         type="button"
         onClick={props.onStartJob}
-        disabled={busy || props.startDisabledReason != null}
-        title={props.startDisabledReason ?? startJobTitle(estimate, jobTimeNoun(machineKind))}
+        disabled={startControl.disabled}
+        title={startControl.title}
       >
         Start job
       </button>
@@ -223,6 +234,31 @@ function AutofocusButton(props: {
 }
 
 const doNothing = (): void => undefined;
+
+type ControlButtonProps = {
+  readonly disabled: boolean;
+  readonly title: string;
+};
+
+function frameControlProps(busy: boolean, state: string | undefined): ControlButtonProps {
+  const ready = state === 'Idle';
+  return {
+    disabled: busy || !ready,
+    title: ready
+      ? "Trace the job's bounding box with the laser off to check placement"
+      : frameBlockedTitle(state),
+  };
+}
+
+function startControlProps(
+  busy: boolean,
+  startDisabledReason: string | null | undefined,
+  absoluteHomeIssue: string | null,
+  fallbackTitle: string,
+): ControlButtonProps {
+  const blocker = startDisabledReason ?? absoluteHomeIssue;
+  return { disabled: busy || blocker != null, title: blocker ?? fallbackTitle };
+}
 
 function frameBlockedTitle(state: string | undefined): string {
   if (state === undefined) {

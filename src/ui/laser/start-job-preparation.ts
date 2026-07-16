@@ -87,3 +87,12 @@ export function resolveStartPlacement(
       : { preflightMotionOffset: live.preflightMotionOffset }),
   };
 }
+
+export function placementForResolvedOrigin(
+  jobPlacement: JobPlacementSettings,
+  resolvedJobOrigin: JobOriginPlacement | undefined,
+): JobPlacementSettings {
+  return resolvedJobOrigin === undefined
+    ? jobPlacement
+    : { startFrom: resolvedJobOrigin.startFrom, anchor: resolvedJobOrigin.anchor };
+}

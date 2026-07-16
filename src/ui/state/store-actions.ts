@@ -10,7 +10,11 @@ import {
   type Transform,
   updateLayer,
 } from '../../core/scene';
-import { jobPlacementAfterDeviceChange, type JobPlacementSettings } from '../job-placement';
+import {
+  jobPlacementAfterDeviceChange,
+  jobPlacementAfterProfileSelection,
+  type JobPlacementSettings,
+} from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
@@ -91,7 +95,7 @@ export function sceneActions(
             height: profile.bedHeight,
           },
         },
-        jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, profile),
+        jobPlacement: jobPlacementAfterProfileSelection(s.jobPlacement, s.project.device, profile),
         undoStack: pushUndo(s.project, s.undoStack),
         redoStack: [],
         dirty: true,
@@ -142,7 +146,7 @@ function replacementMachineSetupState(
         height: nextProfile.bedHeight,
       },
     },
-    jobPlacement: jobPlacementAfterDeviceChange(
+    jobPlacement: jobPlacementAfterProfileSelection(
       state.jobPlacement,
       state.project.device,
       nextProfile,

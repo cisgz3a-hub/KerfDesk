@@ -6,8 +6,8 @@ import { useCameraStore } from '../state/camera-store';
 
 const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
   absolute: 'Absolute Coordinates',
-  'current-position': 'Current Position',
   'user-origin': 'User Origin',
+  'current-position': 'Current Position',
   'verified-origin': 'Verified Origin',
 };
 

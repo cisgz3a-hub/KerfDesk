@@ -17,6 +17,14 @@ describe('grblStrategy preamble/postamble', () => {
       ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'),
     );
   });
+
+  it('uses an explicit beam-off finish position instead of the dialect park position', () => {
+    const out = grblStrategy.emit(EMPTY_JOB, dev, { finishPosition: { x: 120, y: 80 } });
+
+    expect(out).toBe(
+      ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X120.000 Y80.000 S0', ''].join('\n'),
+    );
+  });
 });
 
 describe('grblStrategy single-segment job', () => {

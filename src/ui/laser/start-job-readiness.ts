@@ -39,6 +39,7 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
+import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
@@ -47,6 +48,7 @@ import {
   controllerReportsInches,
   initialMachinePositionOption,
   okPreparation,
+  placementForResolvedOrigin,
   resolveStartPlacement,
   withControllerReportUnits,
 } from './start-job-preparation';
@@ -171,7 +173,8 @@ export function prepareStartJob(
   resolvedJobOrigin?: JobOriginPlacement,
   allowRotaryRaster?: boolean,
 ): StartJobPreparation {
-  const gateIssues = findStartGateIssues(project, machine, jobPlacement);
+  const effectivePlacement = placementForResolvedOrigin(jobPlacement, resolvedJobOrigin);
+  const gateIssues = findStartGateIssues(project, machine, effectivePlacement);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
   const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
@@ -229,7 +232,7 @@ export function prepareStartJob(
     machine,
     motionOffset,
     controllerReportsInches(controllerSettings),
-    canvasPlanRetentionKey(project, outputScope, jobPlacement),
+    canvasPlanRetentionKey(project, outputScope, effectivePlacement),
   );
 }
 
@@ -244,13 +247,19 @@ export async function prepareStartJobSnapshot(
     readonly clock: () => Date;
     readonly renderVariableText: VariableTextRenderer;
     readonly registration?: SimilarityTransform | null;
+    readonly resolvedJobOrigin?: JobOriginPlacement;
   },
 ): Promise<StartJobPreparation> {
-  const gateIssues = findStartGateIssues(project, machine, jobPlacement);
+  const effectivePlacement = placementForResolvedOrigin(jobPlacement, options.resolvedJobOrigin);
+  const gateIssues = findStartGateIssues(project, machine, effectivePlacement);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
   const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
-  const placement = resolveStartPlacement(jobPlacement, machineWithReportUnits, undefined);
+  const placement = resolveStartPlacement(
+    jobPlacement,
+    machineWithReportUnits,
+    options.resolvedJobOrigin,
+  );
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
 
@@ -306,7 +315,7 @@ export async function prepareStartJobSnapshot(
     machine,
     motionOffset,
     controllerReportsInches(controllerSettings),
-    canvasPlanRetentionKey(project, outputScope, jobPlacement, options.registration),
+    canvasPlanRetentionKey(project, outputScope, effectivePlacement, options.registration),
   );
 }
 
@@ -425,5 +434,12 @@ function findStartGateIssues(
   const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return machineIssues;
   const cameraIssue = findCameraPlacementIssue(project, machine, jobPlacement);
-  return cameraIssue === null ? [] : [cameraIssue];
+  if (cameraIssue !== null) return [cameraIssue];
+  const absoluteHomeIssue = absoluteCoordinatesHomeIssue({
+    machineKind: machineKindOf(project.machine),
+    startFrom: jobPlacement.startFrom,
+    homingEnabled: project.device.homing.enabled,
+    homingState: machine.homingState ?? 'unknown',
+  });
+  return absoluteHomeIssue === null ? [] : [absoluteHomeIssue];
 }
