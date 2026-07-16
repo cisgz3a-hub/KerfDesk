@@ -13,6 +13,7 @@
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
 import { sceneObjectUsesOperation, type Layer, type Project } from '../../core/scene';
+import { reportedAxisFeedLimit } from './reported-axis-feed-limit';
 
 // A profile within float-noise / rounding of the reported travel must not nag.
 const BED_TRAVEL_TOLERANCE_MM = 1;
@@ -68,18 +69,6 @@ function speedVsMax(project: Project, limits: ControllerSettingsSnapshot): Reado
       `${axisLimit} mm/min — the controller clamps to its limit, so the job ` +
       'runs slower than planned.',
   ];
-}
-
-// The SLOWER of the two reported axis rates ($110/$111): a job at that feed is
-// firmware-clamped on the slow axis even if the fast axis could keep up. Falls
-// back to the collapsed maxFeed (the GREATER of the pair) only when per-axis
-// rates aren't reported (Codex re-audit R4).
-function reportedAxisFeedLimit(limits: ControllerSettingsSnapshot): number | null {
-  const axisRates = [limits.maxFeedX, limits.maxFeedY].filter(
-    (rate): rate is number => rate !== undefined,
-  );
-  if (axisRates.length > 0) return Math.min(...axisRates);
-  return limits.maxFeed ?? null;
 }
 
 // The fastest speed the job actually emits: output-layer base speeds AND any

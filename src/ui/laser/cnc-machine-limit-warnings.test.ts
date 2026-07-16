@@ -11,10 +11,13 @@ import {
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 
-// Default CNC stock is 400 × 400 mm; the default layer feed is 1000 mm/min.
+// Default CNC stock is 400 × 400 mm; the default layer feed is 1000 mm/min,
+// plunge 300 mm/min, spindle 12000 RPM.
 function cncProject(args: {
   readonly stock?: Partial<CncStock>;
   readonly feedMmPerMin?: number;
+  readonly plungeMmPerMin?: number;
+  readonly spindleRpm?: number;
   readonly output?: boolean;
 }): Project {
   const layer: Layer = {
@@ -23,6 +26,8 @@ function cncProject(args: {
     cnc: {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       ...(args.feedMmPerMin === undefined ? {} : { feedMmPerMin: args.feedMmPerMin }),
+      ...(args.plungeMmPerMin === undefined ? {} : { plungeMmPerMin: args.plungeMmPerMin }),
+      ...(args.spindleRpm === undefined ? {} : { spindleRpm: args.spindleRpm }),
     },
   };
   return {
@@ -89,6 +94,68 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
   it('cannot warn about feed when the snapshot has no max rate', () => {
     const limits: ControllerSettingsSnapshot = { bedWidth: 400, bedHeight: 400 };
     expect(detectCncMachineLimitWarnings(cncProject({ feedMmPerMin: 9000 }), limits)).toEqual([]);
+  });
+
+  it('warns against the SLOWER reported axis rate on an asymmetric machine', () => {
+    const limits: ControllerSettingsSnapshot = {
+      maxFeed: 10000,
+      maxFeedX: 10000,
+      maxFeedY: 6000,
+    };
+    const [warning, ...rest] = detectCncMachineLimitWarnings(
+      cncProject({ feedMmPerMin: 8000 }),
+      limits,
+    );
+    expect(rest).toEqual([]);
+    expect(warning).toContain('8000 mm/min');
+    expect(warning).toContain('6000 mm/min');
+  });
+
+  it('is silent when the feed fits under the slower reported axis rate', () => {
+    const limits: ControllerSettingsSnapshot = {
+      maxFeed: 10000,
+      maxFeedX: 10000,
+      maxFeedY: 6000,
+    };
+    expect(detectCncMachineLimitWarnings(cncProject({ feedMmPerMin: 6000 }), limits)).toEqual([]);
+  });
+
+  it('warns when a layer plunge exceeds the reported Z max rate ($112)', () => {
+    const limits: ControllerSettingsSnapshot = { zMaxFeed: 200 };
+    const [warning, ...rest] = detectCncMachineLimitWarnings(
+      cncProject({ plungeMmPerMin: 300 }),
+      limits,
+    );
+    expect(rest).toEqual([]);
+    expect(warning).toContain('plunge 300 mm/min');
+    expect(warning).toContain('200 mm/min');
+  });
+
+  it('is silent about plunge when the snapshot has no Z max rate', () => {
+    const limits: ControllerSettingsSnapshot = { maxFeed: 5000 };
+    expect(detectCncMachineLimitWarnings(cncProject({ plungeMmPerMin: 9000 }), limits)).toEqual([]);
+  });
+
+  it('warns when a layer spindle RPM exceeds the reported $30 max', () => {
+    const limits: ControllerSettingsSnapshot = { maxPowerS: 10000 };
+    const [warning, ...rest] = detectCncMachineLimitWarnings(
+      cncProject({ spindleRpm: 12000 }),
+      limits,
+    );
+    expect(rest).toEqual([]);
+    expect(warning).toContain('12000 RPM');
+    expect(warning).toContain('10000 RPM');
+  });
+
+  it('is silent when the spindle RPM equals the reported $30 max', () => {
+    const limits: ControllerSettingsSnapshot = { maxPowerS: 12000 };
+    expect(detectCncMachineLimitWarnings(cncProject({ spindleRpm: 12000 }), limits)).toEqual([]);
+  });
+
+  it('ignores plunge and spindle on layers that do not output', () => {
+    const limits: ControllerSettingsSnapshot = { zMaxFeed: 100, maxPowerS: 5000 };
+    const project = cncProject({ plungeMmPerMin: 900, spindleRpm: 24000, output: false });
+    expect(detectCncMachineLimitWarnings(project, limits)).toEqual([]);
   });
 
   it('emits both a stock and a feed advisory together', () => {
