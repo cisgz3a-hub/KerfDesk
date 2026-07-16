@@ -5,7 +5,11 @@
 // controller acknowledgements cannot establish physical execution or cutter
 // clearance after an interruption.
 
-import { rewriteLaserResumeTail, type LaserResumeModalState } from './laser-resume-reentry';
+import {
+  rewriteLaserResumeTail,
+  type LaserResumeModalState,
+  type LaserResumeMotion,
+} from './laser-resume-reentry';
 
 export type ResumeProgram = {
   readonly kind: 'ok';
@@ -60,6 +64,7 @@ export function buildResumeProgram(
     units: 'G21',
     spindle: 'M5',
     motion: null,
+    wcs: 'G54',
     sValue: null,
     feed: null,
     x: null,
@@ -112,21 +117,40 @@ function applyWord(state: LaserResumeModalState, letter: string, value: number):
 }
 
 function applyGWord(state: LaserResumeModalState, value: number): string | null {
+  const refusal = unsupportedGWordReason(value);
+  if (refusal !== null) return refusal;
+  applyModalGWord(state, value);
+  return null;
+}
+
+// G-words the beam-off replay cannot reconstruct. Machine-coordinate and
+// predefined-position moves change the position without updating the tracked
+// X/Y modal words, so the re-entry would target the wrong point. KerfDesk's own
+// emitters never produce them; imported external G-code can (audit F11).
+function unsupportedGWordReason(value: number): string | null {
   if (value === 91) return 'relative positioning (G91) — resume needs absolute programs';
-  // Machine-coordinate and predefined-position moves change the position
-  // without updating the tracked X/Y modal words, so the replayed re-entry
-  // would target the wrong point. KerfDesk's own emitters never produce
-  // them; imported external G-code can (audit F11).
   if (value === 53) return 'machine-coordinate motion (G53) — resume tracks work coordinates only';
   if (value === 28 || value === 30) {
     return `predefined-position move (G${value}) — resume cannot track its endpoint`;
   }
+  return null;
+}
+
+function applyModalGWord(state: LaserResumeModalState, value: number): void {
   if (value === 20) state.units = 'G20';
-  if (value === 21) state.units = 'G21';
-  if (value === 0) state.motion = 'G0';
-  if (value === 1) state.motion = 'G1';
-  if (value === 2) state.motion = 'G2';
-  if (value === 3) state.motion = 'G3';
+  else if (value === 21) state.units = 'G21';
+  else if (value >= 54 && value <= 59 && Number.isInteger(value)) {
+    state.wcs = `G${value}` as LaserResumeModalState['wcs'];
+  }
+  const motion = motionForGWord(value);
+  if (motion !== null) state.motion = motion;
+}
+
+function motionForGWord(value: number): LaserResumeMotion {
+  if (value === 0) return 'G0';
+  if (value === 1) return 'G1';
+  if (value === 2) return 'G2';
+  if (value === 3) return 'G3';
   return null;
 }
 
@@ -141,11 +165,14 @@ function buildPreamble(state: LaserResumeModalState): ReadonlyArray<string> {
   // does (grbl-strategy.ts): a resume re-executes from a mid-program line, and a
   // stale modal G55-G59 would send the re-entry move — and the rest of the job —
   // to the wrong frame, while a stale G93 would misread every feed (F10/F41/F50).
+  // Re-select the WCS the program actually had active (G54 for KerfDesk's own
+  // jobs; the program's own G55-G59 for imported programs — C8) rather than
+  // hard-pinning G54, which would reframe a G55 program's whole tail.
   return [
     '; KerfDesk resume preamble',
     state.units,
     'G90',
-    'G54',
+    state.wcs,
     'G94',
     ...laserResumeBody(state),
   ];

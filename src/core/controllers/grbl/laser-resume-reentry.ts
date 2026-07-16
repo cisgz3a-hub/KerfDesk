@@ -1,11 +1,18 @@
 /** Motion mode known at the laser recovery boundary. */
 export type LaserResumeMotion = 'G0' | 'G1' | 'G2' | 'G3' | null;
 
+/** Active work coordinate system at the recovery boundary. */
+export type LaserResumeWcs = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
+
 /** Modal values needed to rebuild a beam-off laser recovery boundary. */
 export type LaserResumeModalState = {
   units: 'G20' | 'G21';
   spindle: 'M3' | 'M4' | 'M5';
   motion: LaserResumeMotion;
+  // The program's active WCS at the resume line. KerfDesk's own jobs always run
+  // in G54, but an imported program may select G55-G59; the resume preamble must
+  // re-select whatever was active or the replayed tail runs in the wrong frame.
+  wcs: LaserResumeWcs;
   sValue: number | null;
   feed: number | null;
   x: number | null;
