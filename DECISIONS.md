@@ -84,7 +84,13 @@
 | ADR-211 | 2026-07-15 | Amended | Artwork binds explicitly to named process operations |
 | ADR-212 | 2026-07-15 | Accepted | Make laser pause, recovery, disconnect, and laser-mode boundaries fail-dark |
 | ADR-213 | 2026-07-16 | Accepted | Remove bundled single-line writing and retain the original four outline fonts |
+| ADR-214 | 2026-07-16 | Accepted | Version-stamp pen-drawing fairing instead of re-deriving fitter output |
 | ADR-215 | 2026-07-16 | Accepted | CNC recovery rewinds to a pass boundary and re-enters as a new sealed job |
+| ADR-216 | 2026-07-16 | Accepted | Show CNC pass progress on the live canvas from the ADR-215 span sidecar |
+| ADR-217 | 2026-07-16 | Accepted | Show the live controller feed rate on the canvas motion badge |
+| ADR-218 | 2026-07-16 | Accepted | CNC line-art contour side selection (inner / outer / both) |
+| ADR-219 | 2026-07-16 | Accepted | Centerline arc-length quadratic fairing (anti-wobble stage) |
+| ADR-220 | 2026-07-16 | Accepted | Show the live spindle RPM on the CNC canvas motion badge |
 
 ---
 
