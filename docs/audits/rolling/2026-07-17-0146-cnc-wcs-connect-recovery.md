@@ -58,3 +58,16 @@ Likelihood is very low — the window is one controller round-trip immediately a
 
 - No hardware or live-controller behavior; both PRs are themselves flagged "not hardware-verified".
 - Test suite not run this iteration (static audit only); no lint/size checks run.
+
+---
+
+## Addendum (2026-07-17 04:45, discovered while implementing the approved P2-1 fix, PR #260)
+
+### P3-4 — the `ackless` option is silently dropped by the production safeWrite wiring
+
+- `laser-connection-actions.ts:60-64` declares its own 3-param `SafeWriteFn` (no `options`), and the store wires every action group with 3-arg lambdas (`src/ui/state/laser-store.ts:456-457`) over a 3-param `safeWrite` wrapper (`laser-store.ts:297-305`). TypeScript permits narrower-arity assignment, so the handshake's `safeWrite(line, undefined, 'system', { ackless: true })` compiles — and the 4th argument evaporates before reaching `createSafeWrite`.
+- **Production consequence:** the `$G` modal read is written as a normal owed-ack line (1 reserved, 1 settled — accounting stays balanced), so behavior is benign; but the merged #241 ackless design — and the quiescent-ledger guard motivating it — is inert in production. PR #260's re-qualification readback inherits the same dropped option (deliberately, to match).
+- **Test blind spot:** `laser-controller-lifecycle.test.ts:175-209` exercises the real store and asserts only the *settled* ledger (`pendingUntrackedAcks === 0` after the ok), which an owed-and-settled ack also satisfies — the test cannot distinguish ackless from owed, so it stays green either way. `laser-safe-write-epoch.test.ts:184-213` tests the ackless mechanics but calls `createSafeWrite` directly, bypassing the store wiring.
+- **Decision for the maintainer** (both are small):
+  1. Plumb `options` through the store wrapper and the action-module `SafeWriteFn` types so the ackless design actually holds — noting this *activates* finding P3-2's write-time-only race window; or
+  2. Delete the ackless mechanism and let the `$G` owe its ack normally — the fence handles it, no F1 class exists at all, and the quiescent-ledger comments go away. (Simpler; recommended.)
