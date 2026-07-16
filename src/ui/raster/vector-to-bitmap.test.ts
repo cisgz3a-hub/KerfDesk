@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runPreflight } from '../../core/preflight';
 import { evaluateRasterBudget, type VectorRaster } from '../../core/raster';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,

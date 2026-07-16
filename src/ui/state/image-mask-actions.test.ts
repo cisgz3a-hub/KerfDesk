@@ -6,7 +6,7 @@ import {
   type RasterImage,
   type Project,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 

@@ -12,8 +12,8 @@ import {
   REGISTRATION_LAYER_ID,
   type ShapeObject,
 } from '../scene';
-import { createEllipse } from './create-ellipse';
-import { createRectangle } from './create-rectangle';
+import { createEllipse } from './primitives/create-ellipse';
+import { createRectangle } from './primitives/create-rectangle';
 
 export const REGISTRATION_BOX_OBJECT_ID = 'registration-box';
 

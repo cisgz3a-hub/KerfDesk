@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { addLayer, addObject, createLayer, EMPTY_SCENE } from '../scene';
-import { compileJob } from '../job';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { addLayer, addObject, createLayer, EMPTY_SCENE } from '../../scene';
+import { compileJob } from '../../job';
+import { DEFAULT_DEVICE_PROFILE } from '../../devices';
 import { createRectangle } from './create-rectangle';
 
 describe('createRectangle', () => {

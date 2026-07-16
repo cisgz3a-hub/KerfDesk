@@ -4,7 +4,7 @@
 // lives in positive local space; the factory derives bounds from the vertices
 // (a polygon's box depends on side count + orientation).
 
-import type { Polyline, Vec2 } from '../scene';
+import type { Polyline, Vec2 } from '../../scene';
 
 export type PolygonSpec = {
   readonly sides: number; // clamped to [3, 64]

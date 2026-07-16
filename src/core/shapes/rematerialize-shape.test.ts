@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM } from '../scene';
-import { createRectangle } from './create-rectangle';
+import { createRectangle } from './primitives/create-rectangle';
 import { rematerializeParametricShape, sanitizeParametricShapeSpec } from './rematerialize-shape';
 
 describe('rematerializeParametricShape', () => {

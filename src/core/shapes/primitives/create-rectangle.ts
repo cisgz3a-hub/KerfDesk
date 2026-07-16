@@ -10,7 +10,7 @@ import {
   type ColoredPath,
   type ShapeObject,
   type Transform,
-} from '../scene';
+} from '../../scene';
 import { rectangleToCurve, rectangleToPolylines, type RectangleSpec } from './rectangle';
 
 export function createRectangle(args: {

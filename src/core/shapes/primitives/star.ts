@@ -1,4 +1,4 @@
-import type { Polyline, Vec2 } from '../scene';
+import type { Polyline, Vec2 } from '../../scene';
 
 export type StarSpec = {
   readonly points: number; // clamped to [3, 64]

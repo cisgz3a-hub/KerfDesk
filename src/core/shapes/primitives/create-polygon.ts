@@ -8,8 +8,8 @@ import {
   type ColoredPath,
   type ShapeObject,
   type Transform,
-} from '../scene';
-import { boundsOfPolylines } from './polyline-bounds';
+} from '../../scene';
+import { boundsOfPolylines } from '../polyline-bounds';
 import { polygonToPolylines, type PolygonSpec } from './polygon';
 
 export function createPolygon(args: {

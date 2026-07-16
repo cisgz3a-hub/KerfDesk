@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawScene } from './draw-scene';
 

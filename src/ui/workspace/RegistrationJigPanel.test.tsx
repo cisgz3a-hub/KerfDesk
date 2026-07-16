@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { findRegistrationBoxes, IDENTITY_TRANSFORM, REGISTRATION_LAYER_ID } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { RegistrationJigPanel } from './RegistrationJigPanel';

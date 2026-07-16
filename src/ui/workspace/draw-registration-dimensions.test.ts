@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, createRegistrationLayer, type Project } from '../../core/scene';
-import {
-  createRectangle,
-  createRegistrationBox,
-  createRegistrationCircle,
-} from '../../core/shapes';
+import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { drawScene } from './draw-scene';
 
 // Mock context that records every fillText call so we can assert the size label

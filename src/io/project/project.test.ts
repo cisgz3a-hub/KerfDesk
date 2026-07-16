@@ -9,7 +9,8 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { createEllipse, createPolygon, createPolyline, createRectangle } from '../../core/shapes';
+import { createPolyline } from '../../core/shapes';
+import { createEllipse, createPolygon, createRectangle } from '../../core/shapes/primitives';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 

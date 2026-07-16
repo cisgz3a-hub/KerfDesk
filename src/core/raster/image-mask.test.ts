@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createPolyline, createRectangle } from '../shapes';
+import { createPolyline } from '../shapes';
+import { createRectangle } from '../shapes/primitives';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../scene';
 import { applyImageMaskToLuma, hasClosedImageMaskGeometry } from './image-mask';
 

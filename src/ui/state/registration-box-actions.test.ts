@@ -9,7 +9,8 @@ import {
   registrationRunState,
   type Project,
 } from '../../core/scene';
-import { createRectangle, createRegistrationBox } from '../../core/shapes';
+import { createRegistrationBox } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import {
   applyAddRegistrationBox,
   registrationBoxDefaultPosition,

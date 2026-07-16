@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { resetStore } from './test-helpers';
 import { useStore } from './store';
 

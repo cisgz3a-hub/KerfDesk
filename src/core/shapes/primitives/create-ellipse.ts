@@ -7,7 +7,7 @@ import {
   type ColoredPath,
   type ShapeObject,
   type Transform,
-} from '../scene';
+} from '../../scene';
 import { ellipseToCurve, ellipseToPolylines, type EllipseSpec } from './ellipse';
 
 export function createEllipse(args: {

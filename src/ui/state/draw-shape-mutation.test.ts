@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, primaryOperationForObject } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { applyDrawShape } from './draw-shape-mutation';
 
 function emptySlice() {

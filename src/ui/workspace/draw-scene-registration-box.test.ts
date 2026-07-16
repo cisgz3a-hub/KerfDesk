@@ -5,7 +5,8 @@ import {
   createRegistrationLayer,
   type Project,
 } from '../../core/scene';
-import { createRectangle, createRegistrationBox } from '../../core/shapes';
+import { createRegistrationBox } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { drawScene } from './draw-scene';
 
 // Mock context that records every setLineDash call so we can assert the jig box
