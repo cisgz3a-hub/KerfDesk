@@ -1,5 +1,7 @@
 import { Icon, IconButton } from '../kit';
 
+export const COLLAPSED_RAIL_WIDTH_PX = 48;
+
 export function RailPanelHeading(props: {
   readonly title: string;
   readonly onCollapse: () => void;
@@ -56,9 +58,10 @@ const headingRowStyle: React.CSSProperties = {
 };
 const headingStyle: React.CSSProperties = { margin: 0 };
 const collapsedRailStyle: React.CSSProperties = {
-  width: 40,
+  width: COLLAPSED_RAIL_WIDTH_PX,
   flexShrink: 0,
   padding: 4,
+  boxSizing: 'border-box',
   overflow: 'hidden',
 };
 const expandButtonStyle: React.CSSProperties = {
