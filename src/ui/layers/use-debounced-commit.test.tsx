@@ -74,7 +74,7 @@ describe('useDebouncedCommit clamp feedback (M25)', () => {
     await unmount();
   });
 
-  it('snaps the displayed text after the debounce commit', async () => {
+  it('commits the clamped value on the debounce timer but leaves the visible text alone', async () => {
     const commit = vi.fn();
     const unmount = await renderProbe(1500, commit);
 
@@ -85,8 +85,38 @@ describe('useDebouncedCommit clamp feedback (M25)', () => {
       vi.advanceTimersByTime(400);
     });
 
+    // The store gets the enforced value (F-A7 undo-batching still fires on the
+    // timer)...
     expect(commit).toHaveBeenCalledWith(6000);
-    expect(probe.current?.displayValue).toBe('6000');
+    // ...but the field keeps the user's in-progress text until they leave it.
+    // The timer can't distinguish "done" from a mid-number reading pause, so it
+    // must never rewrite the box; blur reconciles (see the test above).
+    expect(probe.current?.displayValue).toBe('9999');
+
+    await unmount();
+  });
+
+  // Bug (2026-07-16): a reading pause >=300ms mid-number let the timer commit a
+  // partial value and snap the box to the clamped result under the user. Typing
+  // "0.5" into a min-clamped field, pausing after "0", jumped the field to the
+  // minimum and the remaining keystrokes landed in the wrong place. The timer
+  // commit must touch only the store, never the draft.
+  it('does not rewrite an in-progress value when the debounce fires mid-typing', async () => {
+    const commit = vi.fn();
+    const unmount = await renderProbe(1500, commit);
+
+    // "0" is a transient on the way to e.g. "0.5"; parseSpeed clamps it to the
+    // min (1), which differs from the current value so the commit actually fires.
+    await act(async () => {
+      typeText('0');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(commit).toHaveBeenCalledWith(1);
+    // The box still shows what the user typed — not the clamped "1".
+    expect(probe.current?.displayValue).toBe('0');
 
     await unmount();
   });
