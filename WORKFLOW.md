@@ -1234,7 +1234,11 @@ The seven steps are always visible and always ordered:
 
 - F-D1. Add text object
 - F-D2. Edit text content
-- F-D3. Choose font
+- F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
+  SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
+  open center strokes, so use **Engrave** or **Profile on path**; V-carve,
+  Pocket, and Fill require an outline font with closed regions. Fresh CNC
+  stroke-text operations default to Engrave even when a V-bit is mounted.
 - F-D4. Adjust character spacing / line height
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 

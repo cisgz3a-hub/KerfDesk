@@ -33,25 +33,32 @@ domain under the Unlicense.
 
 ---
 
-## Bundled fonts (`src/ui/text/fonts/` TTF assets)
+## Bundled fonts and stroke-font data
 
 Per PROJECT.md / ADR-017 these are MIT-*compatible* permissive font licenses
-(Apache-2.0 + SIL Open Font License 1.1) — **not** MIT. OFL-1.1 requires its
+(Apache-2.0 + SIL Open Font License 1.1). OFL-1.1 requires its
 copyright notice and license to accompany the font in any distribution.
 
-| Font | License | Copyright |
+| Font | License | Copyright / source attribution |
 |---|---|---|
 | Roboto Regular | Apache-2.0 | Copyright 2011 Google Inc. |
 | Inconsolata Regular | OFL-1.1 | Copyright The Inconsolata Project Authors (Raph Levien) |
 | Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
 | Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
+| Relief SingleLine | OFL-1.1 | Copyright 2021/2022 The Relief SingleLine Project Authors; François Chastanet, Noëlie Dayma, Élisa Garzelli |
+| EMS Nixish | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Nixie One by Jovanny Lemonad |
+| EMS Decorous Script | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Petit Formal Script by Impallari Type |
+| EMS Casual Hand | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Covered By Your Grace by Kimberly Geswein |
 
 - **Apache-2.0** (Roboto): full text at https://www.apache.org/licenses/LICENSE-2.0 —
   the license and any `NOTICE` file must accompany the distribution.
-- **SIL Open Font License 1.1** (Inconsolata, Pacifico, and Dancing Script): full text at
-  https://openfontlicense.org — the above copyright notice and this license must be
-  bundled with the fonts; the fonts may be redistributed but not sold on their own,
-  and the Reserved Font Names must not be reused for modified versions.
+- **SIL Open Font License 1.1** (the seven OFL fonts): full text at
+  https://openfontlicense.org — the above copyright/source notices and this
+  license must be bundled with the fonts; the fonts may be redistributed but
+  not sold on their own, and Reserved Font Names must not be reused for
+  modified versions. The four CNC sources, pinned commits, canonical source
+  hashes, and complete metadata attribution ship in
+  `public/third-party-notices.txt`.
 
 > Maintainer follow-up (recommended for belt-and-suspenders): verify the exact
 > copyright strings against each `.ttf`'s `name` table and, ideally, ship the

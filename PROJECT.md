@@ -86,11 +86,11 @@ Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `fla
 
 Type text on canvas in selectable bundled fonts; result flows through the existing Line pipeline. See ADR-012.
 
-- Bundled MIT-compatible fonts only (Apache-2.0 + OFL-1.1; see THIRD_PARTY_NOTICES.md).
+- Bundled permissive fonts only (Apache-2.0 + OFL-1.1; see THIRD_PARTY_NOTICES.md).
 - Text-to-path via `opentype.js` (MIT).
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
-- Four bundled outline fonts cover sans, monospace, handwritten, and calligraphic text. Text can be assigned independently to CNC machining layers, including variable-depth V-carving.
+- Four bundled outline fonts cover sans, monospace, handwritten, and calligraphic text. Four reviewed OFL native-stroke fonts add technical, display, calligraphic, and casual-hand centerline writing for CNC engraving. Text can be assigned independently to CNC machining layers; outline text supports variable-depth V-carving, while open stroke text defaults to Engrave/on-path.
 - Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields; live databases, barcode/QR generation, and automatic imposition remain deferred (ADR-164).
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
@@ -320,7 +320,7 @@ phase; tracked here so they don't get lost.
 - **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the main-process desktop (Electron) code lives in the top-level `electron/` folder, and `src/platform/electron/` holds the renderer-side Electron detection (`isElectronRenderer`, imported by `ui/app/main.tsx`) plus the release-workflow gate.
 - **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
-- **Text (Phase D):** `opentype.js` (MIT). Bundled MIT-compatible fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script OFL-1.1).
+- **Text (Phase D):** `opentype.js` (MIT) for outlines. Bundled permissive fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
 - **Build:** Vite → web bundle; Vite + electron-builder → Windows `.exe` (unsigned in v1 — ADR-024 §5; code signing is secret-gated and a no-op until the certs exist).
@@ -454,7 +454,7 @@ an assumption that every folder must have an `index.ts`.
 
 - **Imported SVG is untrusted.** Parsed via native `DOMParser`, sanitized via **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters: true }` and a custom hook removing external `xlink:href` and non-image data URIs.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
-- **Bundled fonts (Phase D)** parsed with `opentype.js` only. Never passed to native font APIs.
+- **Bundled fonts (Phase D)** stay in managed code: TTF outlines use `opentype.js`; pinned SVG centerline glyph data uses the pure TypeScript stroke parser. They are never passed to native font APIs.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.

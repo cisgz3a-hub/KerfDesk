@@ -32,6 +32,39 @@ This Font Software is licensed under the SIL Open Font License, Version 1.1. Thi
 License URL: http://scripts.sil.org/OFL
 Full license text: see the OFL-1.1 section at the end of this file.
 
+--- Font: Relief SingleLine (OFL-1.1) ---
+Source file: ReliefSingleLineSVG-Regular.svg
+Source SVG notice: Copyright 2021 The Relief SingleLine Project Authors
+OFL distribution notice: Copyright 2022 The Relief SingleLine Project Authors
+Authors: François Chastanet, Noëlie Dayma, Élisa Garzelli
+Pinned source snapshot: https://github.com/isdat-type/Relief-SingleLine/tree/01dfc5779ec1e9e4b288d96c6c96c23bfccbaf9d
+Canonical source SHA-256: 75f05a5b64ed6039c9816628ee051d98e16c19148a8268c63f5eccf8382479e2
+Full license text: see the OFL-1.1 section at the end of this file.
+
+--- Font: EMS Nixish (OFL-1.1) ---
+Source file: EMSNixish.svg
+Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay
+Derivative of Nixie One; designer Jovanny Lemonad
+Pinned source snapshot: https://gitlab.com/oskay/svg-fonts/-/tree/8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS
+Canonical source SHA-256: 418b9986220ebce947396af4f918d20266cd42d22d4d141fdd52c8ea20980ec6
+Full license text: see the OFL-1.1 section at the end of this file.
+
+--- Font: EMS Decorous Script (OFL-1.1) ---
+Source file: EMSDecorousScript.svg
+Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay
+Derivative of Petit Formal Script; designer Impallari Type
+Pinned source snapshot: https://gitlab.com/oskay/svg-fonts/-/tree/8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS
+Canonical source SHA-256: 131fc9b7cead71f7a907aa793b7a862be2acef041209e7a2dedc233a2d53ebfc
+Full license text: see the OFL-1.1 section at the end of this file.
+
+--- Font: EMS Casual Hand (OFL-1.1) ---
+Source file: EMSCasualHand.svg
+Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay
+Derivative of Covered By Your Grace; designer Kimberly Geswein
+Pinned source snapshot: https://gitlab.com/oskay/svg-fonts/-/tree/8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS
+Canonical source SHA-256: e8c64afb9739ff78b3cd0ae1bfb95d21fb1077eda569e0eef5d262b64da38041
+Full license text: see the OFL-1.1 section at the end of this file.
+
 == npm packages ==
 
 --- Package: clipper2-ts@2.0.1-17 (BSL-1.0) ---

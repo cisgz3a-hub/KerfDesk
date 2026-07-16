@@ -4,8 +4,9 @@
 // not the closed-state label, and we want both to render in the
 // font being picked.
 //
-// The picker registers every bundled font with the browser's
-// FontFace API on first mount (lazy / fire-and-forget). Once a
+// The picker registers every bundled outline font with the browser's
+// FontFace API on first mount (lazy / fire-and-forget). CNC stroke fonts
+// draw their actual open paths instead of pretending to be CSS fonts. Once a
 // FontFace finishes loading, document.fonts auto-fires a refresh
 // of any element using that family — the dropdown labels animate
 // from system fallback to the real typeface as fonts arrive.
@@ -14,10 +15,11 @@
 // presentational state (open/closed) lives in local useState; the
 // selected fontKey is owned by the parent dialog.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FONT_REGISTRY, type FontEntry, type KnownFontKey } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
+import { SingleLineFontPreview } from './SingleLineFontPreview';
 
 type Props = {
   readonly value: string;
@@ -34,8 +36,9 @@ function isOutlineFontKey(key: KnownFontKey): key is OutlineFontKey {
 export function FontPicker(props: Props): JSX.Element {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
   useFontCssRegistration();
-  useOutsideClickToClose(rootRef, open, () => setOpen(false));
+  useOutsideClickToClose(rootRef, open, close);
   const selected = FONT_REGISTRY.find((f) => f.key === props.value);
   const selectedEmbedded = props.embeddedFonts?.find((font) => font.key === props.value);
   if (selected === undefined && props.value === '' && FONT_REGISTRY.length === 0) {
@@ -113,8 +116,13 @@ export function FontPicker(props: Props): JSX.Element {
   );
 }
 
-function FontOptionName(props: { readonly font: FontEntry }): JSX.Element {
-  return <span style={optionNameStyle}>{props.font.displayName}</span>;
+function FontOptionName({ font }: { readonly font: FontEntry }): JSX.Element {
+  return (
+    <span style={optionNameStyle}>
+      <span>{font.displayName}</span>
+      {font.geometry === 'single-line' ? <SingleLineFontPreview fontKey={font.key} /> : null}
+    </span>
+  );
 }
 
 function EmbeddedFontOptions(props: {

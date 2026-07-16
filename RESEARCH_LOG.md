@@ -1065,3 +1065,34 @@ proof exists.
 - This slice adds parsers, math, observation stamps, and invalidation only. It
   deliberately does not send `$I`, `$$`, `$H`, or a new status query and does
   not make corner probing machine-envelope-qualified.
+
+---
+
+## License-safe CNC single-line fonts — 2026-07-17 (ADR-226)
+
+- **Need:** attractive native centerline writing fonts for CNC engraving,
+  without retracing an outline font or restoring the exact bundle removed by
+  ADR-213.
+- **Rejected provenance route:** four visually acceptable Borland BGI `.CHR`
+  files were initially prototyped from a package declaring MIT. Direct asset
+  inspection found retained Borland copyright strings and no authoritative
+  license grant for those binaries. The prototype was never committed or
+  shipped and is not represented as MIT.
+- **Approved sources:** Relief SingleLine at commit
+  `01dfc5779ec1e9e4b288d96c6c96c23bfccbaf9d`; EMS Nixish, EMS Decorous
+  Script, and EMS Casual Hand at commit
+  `8c71f2d9e1a5292047bb88e5595a766241b82cc6`. Relief's repository carries a
+  project-specific OFL notice; every selected EMS SVG identifies itself as SIL
+  Open Font License and names its source designer, creator, and converter.
+- **Visual decision:** the four real path renderings were shown together and
+  explicitly approved. This selection supersedes ADR-213's quality rejection
+  only for these reviewed faces, not for the old bundle as a whole.
+- **Reproducibility:** the generator pins canonical remote-byte SHA-256 values
+  for all four SVGs and both license sources, verifies identity/license markers,
+  and rejects unsupported path commands or missing space/fallback glyphs.
+- **Geometry boundary:** source centerlines are kept as open paths. Relief's
+  native cubic curves are preserved; EMS authored segments remain unchanged.
+  Unsupported Unicode uses the visible `?` fallback rather than disappearing.
+- **No runtime dependency added.** The generated data is lazy-loaded and the
+  complete OFL text, source metadata, revisions, and hashes ship in the
+  generated third-party notices.

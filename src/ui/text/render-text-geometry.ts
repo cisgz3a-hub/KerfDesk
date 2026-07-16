@@ -1,4 +1,4 @@
-import { textToPolylines, type TextRenderResult } from '../../core/text';
+import { findFontEntry, textToPolylines, type TextRenderResult } from '../../core/text';
 import type { EmbeddedFont, TextAlignment } from '../../core/scene';
 import { loadFont } from './font-loader';
 
@@ -13,7 +13,7 @@ export type RenderTextGeometryInput = {
   readonly color: string;
 };
 
-/** Renders editable text with a bundled or project outline font. */
+/** Routes editable text to the outline-font or native CNC stroke renderer. */
 export async function renderTextGeometry(
   input: RenderTextGeometryInput,
 ): Promise<TextRenderResult> {
@@ -25,6 +25,13 @@ export async function renderTextGeometry(
     letterSpacing: input.letterSpacing,
     color: input.color,
   };
+  if (findFontEntry(input.fontKey)?.geometry === 'single-line') {
+    return textToPolylines({
+      ...shared,
+      geometry: 'single-line',
+      fontKey: input.fontKey,
+    });
+  }
   return textToPolylines({
     ...shared,
     fontBuffer: await loadFont(input.fontKey, input.embeddedFonts),

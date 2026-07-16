@@ -1,9 +1,9 @@
 // Font loader — fetches the bundled .ttf files via Vite's URL import
 // pipeline and caches the resulting ArrayBuffers. The core/text layer
 // owns the rendering algorithm (textToPolylines) and the font
-// catalog (FONT_REGISTRY); this UI module owns the binary loading
-// and caching so pure-core stays free of Vite-specific imports and
-// fetch I/O.
+// catalog (FONT_REGISTRY); this UI module owns outline binary loading
+// and caching so pure-core stays free of Vite-specific imports and fetch I/O.
+// Native OFL stroke data is handled by the core single-line renderer.
 //
 // Caching: once a font is fetched, the ArrayBuffer is kept for the
 // session. opentype.js parses ~5ms per typical TTF; the cache makes
@@ -41,6 +41,9 @@ export async function loadFont(
     const buffer = embeddedFontBuffer(embedded);
     cache.set(key, buffer);
     return buffer;
+  }
+  if (known.geometry !== 'outline') {
+    throw new Error(`Font "${key}" uses native stroke geometry and has no outline file.`);
   }
   const url = URL_BY_KEY[known.key];
   const res = await fetch(url);

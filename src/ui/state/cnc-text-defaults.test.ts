@@ -59,6 +59,18 @@ describe('CNC text defaults (H.6c)', () => {
     expect(textLayerCutType()).toBe('v-carve');
   });
 
+  it.each(['relief-single-line', 'ems-nixish', 'ems-decorous-script', 'ems-casual-hand'])(
+    'a fresh %s single-line layer engraves even when a v-bit is active',
+    (fontKey) => {
+      useStore.getState().setMachineKind('cnc');
+      useStore.getState().updateCncMachine({ toolId: 'vb-60' });
+
+      useStore.getState().upsertTextObject(textObject({ fontKey }));
+
+      expect(textLayerCutType()).toBe('engrave');
+    },
+  );
+
   it('a fresh text layer in CNC mode with an end mill defaults to on-path engrave', () => {
     useStore.getState().setMachineKind('cnc');
 
