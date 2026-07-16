@@ -9021,3 +9021,38 @@ resolve conservatively (the counter can briefly lag, never overstate). Pass prog
 programs that are not the plain strategy emission - supervised recovery streams keep their own
 ADR-215 presentation until they carry spans of their own. The feature is display-only: it changes
 no G-code bytes, no streaming behavior, and no controller commands.
+
+---
+
+## ADR-217 - Show the live controller feed rate on the canvas motion badge
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+### Context
+
+GRBL-family controllers report the current feed rate in the `FS:`/`F:` field of every real-time
+status frame, and the parser already surfaces it as `StatusReport.feed`, but nothing displayed it.
+During a job the operator could see position, Z, and (for CNC) the pass counter on the canvas motion
+badge, but not how fast the machine was actually moving - which is what reveals feed-override effects,
+acceleration ramps, and a controller clamping to its max rate.
+
+### Decision
+
+- Thread the reported feed onto `LiveCanvasRun` as `reportedFeedMmPerMin`, captured once per status
+  frame in `liveCanvasStatusPatch` exactly like `controllerState` and the reconciled head. It is
+  normalized to mm/min by a core helper symmetric with the position normalizer: an inch-configured
+  controller (`$13=1`) reports the feed in inch/min, so it is scaled by 25.4 to match the badge's
+  mm-committed readouts (Z, position).
+- The badge appends `N mm/min` (rounded) after the controller state, but only while the run
+  lifecycle is `running`. A held run reports 0 and a stopped/disconnected run's last sample is
+  stale, so restricting to `running` keeps the number live and never misleading.
+- When the frame carries no feed sample (feed-less `F:` builds, Marlin queued-poll, non-GRBL) the
+  readout is omitted rather than guessed.
+- Applies to both laser and CNC jobs; unlike the pass counter it is not machine-kind specific.
+
+### Consequences
+
+Operators see the actual controller-reported feed rate while a job runs, alongside the existing
+position, Z, and pass readouts, sourced from the same status frame as the rest of the badge. The
+change is display-only: no new field is emitted, no G-code, streaming, or controller behavior
+changes, and controllers that do not report feed simply omit the number.

@@ -114,6 +114,27 @@ describe('live canvas status reconciliation', () => {
     expect(finished?.route.confirmedRouteMm).toBe(finished?.plan.manifest.totalRouteMm);
   });
 
+  it('captures the controller feed rate, normalizing inch reports to mm/min', () => {
+    const current = state();
+    const mm = liveCanvasStatusPatch(current, report(5), acceptedStreamer()).liveCanvasRun;
+    expect(mm?.reportedFeedMmPerMin).toBe(1000);
+
+    const inchState = { ...current, controllerSettings: { reportInches: true } } as LaserState;
+    const inch = liveCanvasStatusPatch(
+      inchState,
+      { ...report(5), feed: 10 },
+      acceptedStreamer(),
+    ).liveCanvasRun;
+    expect(inch?.reportedFeedMmPerMin).toBeCloseTo(254);
+
+    const noFeed = liveCanvasStatusPatch(
+      current,
+      { ...report(5), feed: null },
+      acceptedStreamer(),
+    ).liveCanvasRun;
+    expect(noFeed?.reportedFeedMmPerMin).toBeNull();
+  });
+
   it('preserves the last confirmed prefix when a run stops or errors', () => {
     const current = state();
     const advanced = liveCanvasStatusPatch(current, report(5), acceptedStreamer()).liveCanvasRun;

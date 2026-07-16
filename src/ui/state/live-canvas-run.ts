@@ -3,6 +3,7 @@ import {
   type RouteReconciliationState,
 } from '../../core/job/live-route-reconciliation';
 import type { StatusReport, StreamerState } from '../../core/controllers/grbl';
+import { normalizeReportedFeedRateToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { LaserState } from './laser-store';
 import {
   reportedWorkPositionMm,
@@ -29,7 +30,12 @@ export function liveCanvasStatusPatch(
     },
     reportInches,
   );
-  return { liveCanvasRun: updatedRun(state, run, report, streamer, lifecycle, reportedHead) };
+  // Feed is a fresh scalar sample each frame, independent of route
+  // reconciliation, so it overrides uniformly on top of the reconciled run;
+  // the badge only surfaces it while the job is actually running.
+  const reportedFeedMmPerMin = normalizeReportedFeedRateToMm(report.feed, reportInches);
+  const updated = updatedRun(state, run, report, streamer, lifecycle, reportedHead);
+  return { liveCanvasRun: { ...updated, reportedFeedMmPerMin } };
 }
 
 function updatedRun(

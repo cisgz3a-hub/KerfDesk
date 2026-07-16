@@ -68,6 +68,9 @@ export type LiveCanvasRun = {
   readonly lifecycle: LiveCanvasLifecycle;
   readonly controllerState: string | null;
   readonly accuracyReason: string | null;
+  /** Last controller-reported feed rate normalized to mm/min, or null when the
+   * status frame carried no `FS:`/`F:` sample (ADR-217). */
+  readonly reportedFeedMmPerMin: number | null;
 };
 
 const retentionKeyCache = new WeakMap<Project, Map<string, string>>();
@@ -229,6 +232,7 @@ export function startLiveCanvasRun(plan: CanvasMotionPlan): LiveCanvasRun {
     lifecycle: 'running',
     controllerState: null,
     accuracyReason: plan.unavailableReason,
+    reportedFeedMmPerMin: null,
   };
 }
 

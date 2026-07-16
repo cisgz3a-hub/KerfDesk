@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   deriveMachineEnvelope,
+  normalizeReportedFeedRateToMm,
   normalizeReportedMPosToMm,
   validateEnvelopeSettings,
   type EnvelopeSettings,
@@ -56,6 +57,21 @@ describe('normalizeReportedMPosToMm', () => {
 
   it('rejects non-finite coordinates', () => {
     expect(() => normalizeReportedMPosToMm([0, Number.NaN, 0], false)).toThrow();
+  });
+});
+
+describe('normalizeReportedFeedRateToMm', () => {
+  it('leaves a millimetre feed rate unchanged', () => {
+    expect(normalizeReportedFeedRateToMm(1500, false)).toBe(1500);
+  });
+
+  it('converts an inch/min feed rate when $13 enables inches', () => {
+    expect(normalizeReportedFeedRateToMm(10, true)).toBeCloseTo(254);
+  });
+
+  it('returns null for a missing or non-finite sample instead of throwing', () => {
+    expect(normalizeReportedFeedRateToMm(null, false)).toBeNull();
+    expect(normalizeReportedFeedRateToMm(Number.NaN, true)).toBeNull();
   });
 });
 
