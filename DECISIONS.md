@@ -9228,3 +9228,43 @@ Operators see live elapsed time next to the machine state for both laser and CNC
 its final value when the run ends however it ends. The readout is display-only and wall-clock —
 it makes no claim about cutting time vs held time. Fixtures and archived runs without a start
 stamp simply omit it.
+
+---
+
+## ADR-222 - Single-artwork scenes keep the artwork selected
+
+**Status:** Accepted | **Date:** 2026-07-17
+
+> **Numbering note.** ADR-221 (wall-clock elapsed badge, #247) landed during this PR's CI run;
+> this ADR renumbered 219 -> 220 -> 221 -> 222 as the fleet landed.
+
+### Context
+
+The dominant workflow is one design on the bed. A fresh import already selects its artwork
+(F-A3), but Open project, New, undo/redo, deleting down to the last object, and every deselect
+(Escape, empty-canvas click, marquee miss) landed on "Nothing selected". The Selected-artwork
+inspector and the per-operation settings hang off the selection, so the panel blanked out and
+the operator had to click the only object in the scene to get its settings back. Maintainer
+direction (2026-07-16): "artwork should always be marked; if there is only one artwork it
+should be selected by default."
+
+### Decision
+
+An App-mounted store subscription (`useSingleArtworkSelection`, the same hook pattern as the
+ADR-214 fairing upgrade) re-selects the scene's only artwork whenever the selection is empty.
+`loneSelectableArtworkId` defines "only artwork": exactly one scene object that is not the
+registration jig / captured-board outline (ADR-057 / ADR-124 placement aids, never counted and
+never auto-selected). The lone artwork must also be selectable - locked artwork stays
+unselected (Lock Selection deliberately clears the selection), as does artwork on a hidden
+layer. Scenes with zero or two-plus artworks keep normal deselect semantics.
+
+### Consequences
+
+- Deliberate divergence from LightBurn, which allows an empty selection with a single object;
+  maintainer-directed 2026-07-16.
+- While a scene's only artwork is selectable, an empty selection is unreachable: Escape and
+  empty-canvas clicks re-mark it, and the status bar does not show "Nothing selected". Arrow-key
+  nudges therefore always have a target in that state (already true immediately after import).
+- "Selected artwork only" output scope cannot be armed with an empty selection in a
+  single-artwork scene.
+- The re-mark changes selection state only - no undo entry, no dirty flag.
