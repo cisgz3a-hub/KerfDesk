@@ -10,6 +10,7 @@
 //     the vertex count without moving the line visibly.
 
 import type { Polyline, Vec2 } from '../../scene';
+import { fairChainAlongArc } from './arc-fairing';
 import { smoothChainCurvature } from './chain-smoothing';
 import { refineChainForOutput } from './curve-refine';
 import type { InkMask } from './distance-field';
@@ -157,7 +158,11 @@ function finalizeChains(
     // sampled vertex inherits a slightly-wrong tangent and the curve facets
     // (the angular-bowl defect). Corners stay exact objects for output pinning.
     const evened = smoothChainCurvature(sharpened.points, chain.closed, sharpened.corners);
-    const simplified = simplifyChain(evened, chain.closed, simplifyEpsilonPx);
+    // The Taubin passes are blind to the multi-pixel lattice beat that reads
+    // as wobble on smooth turns; the bounded arc-length quadratic fit removes
+    // it before Douglas-Peucker can anchor vertices on its extremes.
+    const faired = fairChainAlongArc(evened, chain.closed, sharpened.corners);
+    const simplified = simplifyChain(faired, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({
