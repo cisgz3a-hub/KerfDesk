@@ -5,6 +5,7 @@
 // anywhere.
 
 import { selectControllerDriver } from '../../core/controllers';
+import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { emitGcodeSnapshot } from '../../io/gcode';
@@ -121,6 +122,9 @@ export type SaveGcodeCtx = {
   // null = never connected this session; a snapshot = run the $30/$32
   // comparison before saving (M11). Omitted = caller doesn't track it.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  // Operator-selected active WCS (C6): a non-G54 value warns the saved job's
+  // G54 emission will mismatch a placement measured from the active offset.
+  readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly allowRotaryRaster?: boolean;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
@@ -207,7 +211,11 @@ function advanceExportVariables(ctx: SaveGcodeCtx): void {
 // risk) — non-blocking, since the export itself succeeded. CNC mode has
 // its own advisory set (stock footprint, H.2) via the machine-aware selector.
 function pushPostSaveAdvisories(ctx: SaveGcodeCtx): void {
-  for (const warning of detectMachineJobWarnings(ctx.project, ctx.controllerSettings)) {
+  for (const warning of detectMachineJobWarnings(
+    ctx.project,
+    ctx.controllerSettings,
+    ctx.activeWcs ?? null,
+  )) {
     ctx.pushToast(warning, 'warning');
   }
   if (ctx.controllerSettings === null && machineKindOf(ctx.project.machine) !== 'cnc') {

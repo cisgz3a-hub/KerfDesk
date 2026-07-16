@@ -145,6 +145,33 @@ describe('laser controller lifecycle operations', () => {
     expect(useLaserStore.getState().alarmCode).toBeNull();
   });
 
+  it('tracks the operator-selected active WCS from console commands (C6)', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    expect(useLaserStore.getState().activeWcs).toBeNull();
+
+    const idle = (): void => {
+      connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    };
+    idle();
+    await flush();
+    const selectG55 = useLaserStore.getState().sendConsoleCommand('G55');
+    await flush();
+    connection.emitLine('ok');
+    idle();
+    await selectG55;
+    expect(useLaserStore.getState().activeWcs).toBe('G55');
+
+    idle();
+    await flush();
+    const selectG54 = useLaserStore.getState().sendConsoleCommand('G54');
+    await flush();
+    connection.emitLine('ok');
+    idle();
+    await selectG54;
+    expect(useLaserStore.getState().activeWcs).toBe('G54');
+  });
+
   it('keeps a completed job locked until the internal settle marker and stable Idle finish', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

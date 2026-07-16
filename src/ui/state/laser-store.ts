@@ -14,6 +14,7 @@ import {
   type ControllerCapabilities,
   type ControllerDriver,
 } from '../../core/controllers';
+import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { MachineKind } from '../../core/scene';
@@ -163,6 +164,14 @@ export type LaserState = LaserStoreActions & {
    * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
    */
   readonly wcoCache: WorkCoordinateOffset | null;
+  // The work coordinate system the operator has selected via the console
+  // (G54-G59). Null = never selected one this session (KerfDesk's own flows
+  // always run in G54). GRBL status frames never report which WCS is active,
+  // only the active WCS's offset, so this is tracked from console commands;
+  // job/save advisories warn when it is non-G54 because emission pins G54 while
+  // placement is computed from the active offset (audit C6). Not populated for
+  // $N startup blocks or external-session selections — those need a $G readback.
+  readonly activeWcs: ActiveWorkCoordinateSystem | null;
   // ADR-103 G3 - last-seen Ov: feed/rapid/spindle override percentages,
   // cached across frames exactly like wcoCache.
   readonly ovCache: OverrideValues | null;

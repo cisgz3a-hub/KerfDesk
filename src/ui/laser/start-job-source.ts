@@ -180,6 +180,7 @@ function machineSnapshot(
     workZReferenceEpoch: laser.workZReferenceEpoch,
     controllerSessionEpoch: laser.controllerSessionEpoch,
     wcoCache: laser.wcoCache,
+    activeWcs: laser.activeWcs,
     ovCache: laser.ovCache,
     accessoryCache: laser.accessoryCache ?? null,
     frameVerification: laser.frameVerification,

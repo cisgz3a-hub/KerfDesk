@@ -336,6 +336,7 @@ type InitialLaserState = Pick<
   | 'grblSettingsRows'
   | 'lastSettingsReadAt'
   | 'wcoCache'
+  | 'activeWcs'
   | 'ovCache'
   | 'accessoryCache'
   | 'mpgActive'
@@ -389,6 +390,7 @@ export function initialLaserState(): InitialLaserState {
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
+    activeWcs: null,
     ovCache: null,
     accessoryCache: null,
     mpgActive: null,
@@ -429,6 +431,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // G54 can survive, but the cached WCO is no longer trustworthy until a
     // fresh status frame arrives.
     wcoCache: null,
+    activeWcs: null,
     ovCache: null,
     accessoryCache: null,
     mpgActive: null,
