@@ -7,6 +7,7 @@
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { Project } from '../../core/scene';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
+import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
@@ -25,6 +26,7 @@ export function detectMachineJobWarnings(
     ? [
         ...detectCncStockWarnings(project),
         ...detectCncThroughCutTabWarnings(project),
+        ...detectCncFullTabCoverageWarnings(project),
         ...detectCncDefaultFeedWarnings(project),
         ...detectCncMachineLimitWarnings(project, controllerSettings),
         ...detectCncRasterWarnings(project),

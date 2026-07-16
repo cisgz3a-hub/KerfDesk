@@ -104,6 +104,58 @@ describe('automatic tabs / bridges geometry', () => {
   });
 });
 
+describe('full-perimeter tab coverage', () => {
+  // AUDIT A5: the old degenerate fallback returned the ORIGINAL closed loop,
+  // so a deep pass cut the part completely free — the exact hazard tabs exist
+  // to prevent. Requested-but-unsatisfiable tabs must cut nothing: the whole
+  // loop stays one bridge and the pass is skipped.
+  const smallSquare: Polyline = { closed: true, points: squarePoints(0, 0, 10) }; // perimeter 40
+
+  it('cuts nothing when the automatic tab windows cover the whole perimeter', () => {
+    const result = applyAutomaticTabsToPolylines([smallSquare], {
+      tabsEnabled: true,
+      tabSizeMm: 9, // 6 windows × 9 mm = 54 mm > 40 mm perimeter
+      tabsPerShape: 6,
+      tabSkipInnerShapes: false,
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it('cuts nothing when a single tab window is at least the whole perimeter', () => {
+    const result = applyAutomaticTabsToPolylines([smallSquare], {
+      tabsEnabled: true,
+      tabSizeMm: 40,
+      tabsPerShape: 1,
+      tabSkipInnerShapes: false,
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it('cuts nothing when manual tab windows cover the whole perimeter', () => {
+    expect(applyManualTabsToPolyline(smallSquare, [0.125, 0.375, 0.625, 0.875], 12)).toEqual([]);
+  });
+
+  it('cuts nothing when projected anchor windows cover the whole perimeter', () => {
+    const anchors = automaticTabAnchorPoints(smallSquare, 6);
+
+    expect(splitClosedPolylineForTabsAtAnchors(smallSquare, anchors, 9)).toEqual([]);
+  });
+
+  it('keeps cutting shapes whose geometry is too degenerate for tabs', () => {
+    const degenerate: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+    };
+
+    expect(applyAutomaticTabsToPolylines([degenerate], SETTINGS)).toEqual([degenerate]);
+  });
+});
+
 function squarePoints(x: number, y: number, size: number): ReadonlyArray<{ x: number; y: number }> {
   return [
     { x, y },
