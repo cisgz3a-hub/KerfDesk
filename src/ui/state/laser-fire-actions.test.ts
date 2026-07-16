@@ -132,6 +132,28 @@ describe('momentary low-power Fire action', () => {
     expect(test.get().fireActive).toBe(false);
   });
 
+  it('keeps the OFF latch when the M5 write fails and resends M5 on retry', async () => {
+    let failNextOff = true;
+    const write = vi.fn(async (line: string) => {
+      if (line === 'M5\n' && failNextOff) {
+        failNextOff = false;
+        throw new Error('Port write failed.');
+      }
+    });
+    const test = harness(write);
+    await test.setFireActive(true);
+    expect(test.get().fireActive).toBe(true);
+
+    await expect(test.setFireActive(false)).rejects.toThrow('Port write failed.');
+    // The beam may still be on: the latch (and the LASER OFF affordance keyed
+    // on it) must survive until an M5 write actually succeeds.
+    expect(test.get().fireActive).toBe(true);
+
+    await test.setFireActive(false);
+    expect(write.mock.calls.filter(([line]) => line === 'M5\n')).toHaveLength(2);
+    expect(test.get().fireActive).toBe(false);
+  });
+
   it('includes M5 in disconnect cleanup and treats a dropped Fire link as unsafe', async () => {
     const test = harness();
     await test.setFireActive(true);

@@ -44,10 +44,13 @@ async function deactivateFire(
   runtime.requestToken += 1;
   const shouldWriteOff = runtime.activationPending || get().fireActive;
   set((state) => ({
-    fireActive: false,
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
   }));
+  // Drop the latch only after the controller accepts M5. Clearing it first
+  // hid the LASER OFF affordance while the beam could still be on, and a
+  // retry skipped M5 entirely because the latch already read false.
   if (shouldWriteOff) await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console');
+  set({ fireActive: false });
 }
 
 async function activateFire(
@@ -82,8 +85,13 @@ async function activateFire(
   try {
     await safeWrite(`M3 S${powerS}\n`, 'fire', 'console');
     if (token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null) {
-      await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console').catch(() => undefined);
-      set({ fireActive: false });
+      // Same latch rule as deactivateFire: this compensating M5 may race a
+      // failed release write, so only a successful write may clear the latch.
+      const offAccepted = await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console').then(
+        () => true,
+        () => false,
+      );
+      if (offAccepted) set({ fireActive: false });
       return;
     }
     set({
