@@ -46,7 +46,6 @@ import {
   translateTextOutline,
   type TextOutlineGeometry,
 } from './text-outline-path';
-import { singleLineTextToPolylines } from './single-line-text';
 
 // Module surface we actually use. Lets the loader narrow the dynamic-
 // import result to something callable without a sprawling cast.
@@ -86,11 +85,9 @@ type TextRenderSharedInput = {
   readonly color: string;
 };
 
-export type TextRenderInput = TextRenderSharedInput &
-  (
-    | { readonly geometry?: 'outline'; readonly fontBuffer: ArrayBuffer }
-    | { readonly geometry: 'single-line'; readonly fontKey: string }
-  );
+export type TextRenderInput = TextRenderSharedInput & {
+  readonly fontBuffer: ArrayBuffer;
+};
 
 export type TextRenderResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -98,7 +95,6 @@ export type TextRenderResult = {
 };
 
 export async function textToPolylines(input: TextRenderInput): Promise<TextRenderResult> {
-  if (input.geometry === 'single-line') return singleLineTextToPolylines(input);
   const ot = await loadOpentype();
   const font = ot.parse(input.fontBuffer);
   const lines = input.content.split('\n');

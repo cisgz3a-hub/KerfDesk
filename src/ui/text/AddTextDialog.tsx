@@ -21,7 +21,6 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
-import { FontUsageHint } from './FontUsageHint';
 import { renderTextGeometry } from './render-text-geometry';
 import { PathTextFields } from './PathTextFields';
 import { VariableTextFields } from './VariableTextFields';
@@ -177,7 +176,6 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           onChange={setFontKey}
         />
         <FontImportButton importFont={props.fields.importFont} />
-        <FontUsageHint fontKey={values.fontKey} />
       </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />

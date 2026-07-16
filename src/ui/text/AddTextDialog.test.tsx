@@ -27,7 +27,7 @@ const textMocks = vi.hoisted(() => ({
 
 // Keep this large legacy test within the repository line cap.
 // prettier-ignore
-vi.mock('./font-loader', () => ({ cssFamilyForFont: (key: string) => `lf2-${key}`, ensureFontCss: vi.fn(async () => undefined), isTracedScriptFontKey: () => false, loadFont: textMocks.loadFont }));
+vi.mock('./font-loader', () => ({ cssFamilyForFont: (key: string) => `lf2-${key}`, ensureFontCss: vi.fn(async () => undefined), loadFont: textMocks.loadFont }));
 vi.mock('../../core/text', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreText>();
   return {

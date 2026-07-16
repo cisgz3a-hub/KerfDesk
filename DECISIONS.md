@@ -64,12 +64,12 @@
 | ADR-191 | 2026-07-14 | Accepted | CNC 3D result pane is drag-resizable with a persisted width |
 | ADR-192 | 2026-07-14 | Accepted | CNC frame retracts to safe Z, traces, then restores the pre-frame Z |
 | ADR-193 | 2026-07-14 | Accepted | No-homing placement defaults to guided relative positioning |
-| ADR-194 | 2026-07-14 | Accepted | Add native Hershey single-line CNC text without a runtime dependency |
+| ADR-194 | 2026-07-14 | Superseded | Add native Hershey single-line CNC text without a runtime dependency (see ADR-213) |
 | ADR-195 | 2026-07-14 | Accepted | Make the CNC layer card guided, honest, and narrow-panel safe |
 | ADR-196 | 2026-07-14 | Accepted | Separate selection movement from ordinary geometry picking |
 | ADR-197 | 2026-07-15 | Accepted | Let operators hide static canvas start markers without hiding live motion |
-| ADR-198 | 2026-07-14 | Accepted | Add a pinned OFL EMS stroke-font family with lazy data loading |
-| ADR-199 | 2026-07-14 | Accepted | Fair decorative stroke fonts with the shared trace cubic fitter |
+| ADR-198 | 2026-07-14 | Superseded | Add a pinned OFL EMS stroke-font family with lazy data loading (see ADR-213) |
+| ADR-199 | 2026-07-14 | Superseded | Fair decorative stroke fonts with the shared trace cubic fitter (see ADR-213) |
 | ADR-200 | 2026-07-14 | Accepted | CNC recovery is evidence-gated and software Abort is not an E-stop |
 | ADR-201 | 2026-07-15 | Amended | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
@@ -83,6 +83,7 @@
 | ADR-210 | 2026-07-15 | Accepted | Enforce explicit machine output capability at every project entry point |
 | ADR-211 | 2026-07-15 | Amended | Artwork binds explicitly to named process operations |
 | ADR-212 | 2026-07-15 | Accepted | Make laser pause, recovery, disconnect, and laser-mode boundaries fail-dark |
+| ADR-213 | 2026-07-16 | Accepted | Remove bundled single-line writing and retain the original four outline fonts |
 
 ---
 
@@ -7949,7 +7950,7 @@ Frame action and relative size/envelope preflight remain available; only the Sta
 
 ## ADR-194 - Add native Hershey single-line CNC text without a runtime dependency
 
-**Status:** Accepted | **Date:** 2026-07-14
+**Status:** Superseded by ADR-213 | **Date:** 2026-07-14
 
 ### Context
 
@@ -8083,7 +8084,7 @@ frame verification, job placement, or controller behavior.
 
 ## ADR-198 - Add a pinned OFL EMS stroke-font family with lazy data loading
 
-**Status:** Accepted | **Date:** 2026-07-14
+**Status:** Superseded by ADR-213 | **Date:** 2026-07-14
 
 ### Context
 
@@ -8117,7 +8118,7 @@ remains an operator choice rather than an invented universal cutoff.
 
 ## ADR-199 - Fair decorative stroke fonts with the shared trace cubic fitter
 
-**Status:** Accepted | **Date:** 2026-07-14
+**Status:** Superseded by ADR-213 | **Date:** 2026-07-14
 
 ### Context
 
@@ -8833,3 +8834,32 @@ preserves the interrupted-job record, and keeps software Abort visible. Simulato
 the Safety Door state separately from ordinary Hold. KerfDesk can contain a degraded-but-live link,
 but the Falcon/CH340 cable-yank guarantee remains hardware- or firmware-gated until that independent
 shutdown path is installed and verified.
+
+---
+
+## ADR-213 - Remove bundled single-line writing and retain the original four outline fonts
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+### Context
+
+The bundled Hershey, EMS, Forge, and traced-script additions did not meet the requested writing
+quality. Keeping them in the picker also made the text workflow harder to judge because the added
+single-line geometry behaved differently from the original outline fonts.
+
+### Decision
+
+- Remove every bundled single-line font entry, renderer, preview, generated glyph dataset, source
+  font binary, generator, test, and license notice.
+- Keep only the original bundled Roboto, Inconsolata, Pacifico, and Dancing Script outline fonts.
+- Preserve project-embedded font import and the independent text-to-layer machining controls,
+  including V-carve, pocket, profile, and engrave choices.
+- Keep historical ADR-194, ADR-198, and ADR-199 as superseded records rather than erasing why the
+  removed implementation existed.
+
+### Consequences
+
+New and edited text uses the original outline rendering path. Saved objects retain their materialized
+geometry, but a removed bundled font key is treated as unavailable when the operator tries to
+regenerate it and must be replaced with an available bundled or embedded font. The application no
+longer ships or advertises the removed single-line writing assets.

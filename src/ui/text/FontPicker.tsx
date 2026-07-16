@@ -18,7 +18,6 @@ import { useEffect, useRef, useState } from 'react';
 import { FONT_REGISTRY, type FontEntry, type KnownFontKey } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
-import { SingleLineFontPreview } from './SingleLineFontPreview';
 
 type Props = {
   readonly value: string;
@@ -115,12 +114,7 @@ export function FontPicker(props: Props): JSX.Element {
 }
 
 function FontOptionName(props: { readonly font: FontEntry }): JSX.Element {
-  return (
-    <span style={optionNameStyle}>
-      <span>{props.font.displayName}</span>
-      {props.font.geometry === 'single-line' && <SingleLineFontPreview fontKey={props.font.key} />}
-    </span>
-  );
+  return <span style={optionNameStyle}>{props.font.displayName}</span>;
 }
 
 function EmbeddedFontOptions(props: {
