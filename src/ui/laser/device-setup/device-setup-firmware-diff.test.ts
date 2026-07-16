@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
-import { DEFAULT_CNC_MACHINE_CONFIG } from '../../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../../core/scene';
 import { settingsMapToRows, type GrblSettingRow } from '../../../core/controllers/grbl';
 import { computeFirmwareDiffs } from './device-setup-firmware-diff';
 
@@ -18,10 +18,13 @@ describe('computeFirmwareDiffs', () => {
 
   it('marks matching settings as not differing and $30 as writable', () => {
     const draft = { ...DEFAULT_DEVICE_PROFILE, maxPowerS: 1000, laserModeEnabled: true };
-    const diffs = computeFirmwareDiffs(draft, rows({ 30: '1000', 32: '1' }));
+    const diffs = computeFirmwareDiffs(draft, rows({ 30: '1000', 32: '1' }), {
+      machineKinds: ['laser'],
+    });
     const d30 = diffs.find((diff) => diff.id === 30);
     expect(d30?.differs).toBe(false);
     expect(d30?.writable).toBe(true);
+    expect(d30?.label).toBe('Laser S maximum');
   });
 
   it('flags a writable mismatch on $30 with current and desired values', () => {
@@ -52,6 +55,7 @@ describe('computeFirmwareDiffs', () => {
     const diffs = computeFirmwareDiffs(
       DEFAULT_DEVICE_PROFILE,
       rows({ 30: '1000', 31: '0', 32: '1' }),
+      { machineKinds: ['laser'] },
     );
     for (const id of [30, 31, 32]) {
       expect(diffs.find((diff) => diff.id === id)?.writable).toBe(true);
@@ -66,7 +70,7 @@ describe('computeFirmwareDiffs', () => {
       const diffs = computeFirmwareDiffs(
         { ...DEFAULT_DEVICE_PROFILE, laserModeEnabled: true, maxPowerS: 1000 },
         rows({ 30: '12000', 32: '0' }),
-        DEFAULT_CNC_MACHINE_CONFIG,
+        { machine: DEFAULT_CNC_MACHINE_CONFIG, machineKinds: ['cnc'] },
       );
       expect(diffs.find((diff) => diff.id === 32)?.differs).toBe(false);
       expect(diffs.find((diff) => diff.id === 30)?.differs).toBe(false);
@@ -76,21 +80,47 @@ describe('computeFirmwareDiffs', () => {
       const diffs = computeFirmwareDiffs(
         { ...DEFAULT_DEVICE_PROFILE, laserModeEnabled: true },
         rows({ 32: '1' }),
-        DEFAULT_CNC_MACHINE_CONFIG,
+        { machine: DEFAULT_CNC_MACHINE_CONFIG, machineKinds: ['cnc'] },
       );
       const d32 = diffs.find((diff) => diff.id === 32);
       expect(d32?.differs).toBe(true);
       expect(d32?.desired).toBe('0');
+      expect(d32?.label).toBe('Spindle output mode');
     });
 
     it('flags a laser-scale $30 on a router with the spindle RPM as desired', () => {
       const d30 = computeFirmwareDiffs(
         { ...DEFAULT_DEVICE_PROFILE, maxPowerS: 1000 },
         rows({ 30: '1000' }),
-        DEFAULT_CNC_MACHINE_CONFIG,
+        { machine: DEFAULT_CNC_MACHINE_CONFIG, machineKinds: ['cnc'] },
       ).find((diff) => diff.id === 30);
       expect(d30?.differs).toBe(true);
       expect(d30?.desired).toBe('12000');
+      expect(d30?.label).toBe('Maximum spindle speed');
     });
+
+    it('does not borrow the laser-only $31 profile value for CNC', () => {
+      const diffs = computeFirmwareDiffs(
+        { ...DEFAULT_DEVICE_PROFILE, minPowerS: 7 },
+        rows({ 30: '1000', 31: '0', 32: '1' }),
+        { machine: DEFAULT_CNC_MACHINE_CONFIG, machineKinds: ['cnc'] },
+      );
+
+      expect(diffs.some((diff) => diff.id === 31)).toBe(false);
+    });
+  });
+
+  it('labels hybrid settings with both meanings and the active contract first', () => {
+    const laserDiff = computeFirmwareDiffs(DEFAULT_DEVICE_PROFILE, rows({ 30: '900' }), {
+      machine: LASER_MACHINE_CONFIG,
+      machineKinds: ['laser', 'cnc'],
+    }).find((diff) => diff.id === 30);
+    const cncDiff = computeFirmwareDiffs(DEFAULT_DEVICE_PROFILE, rows({ 30: '900' }), {
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+      machineKinds: ['laser', 'cnc'],
+    }).find((diff) => diff.id === 30);
+
+    expect(laserDiff?.label).toBe('Laser S maximum / spindle maximum');
+    expect(cncDiff?.label).toBe('Spindle maximum / laser S maximum');
   });
 });

@@ -152,7 +152,10 @@ function queuedFirmwareDiffs(
   state: DeviceSetupState,
   rows: ReturnType<typeof useLaserStore.getState>['grblSettingsRows'],
 ): ReadonlyArray<FirmwareDiff> {
-  return computeFirmwareDiffs(state.draft, rows, state.draftMachine).filter(
+  return computeFirmwareDiffs(state.draft, rows, {
+    machine: state.draftMachine,
+    machineKinds: state.machineKinds,
+  }).filter(
     (diff) => diff.differs && diff.writable && state.queuedFirmwareWriteIds.includes(diff.id),
   );
 }

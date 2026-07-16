@@ -6,7 +6,9 @@ import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useLaserStore } from '../state/laser-store';
+import { resetStore } from '../state/test-helpers';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
+import type { MachineSettingsPresentationContext } from './machine-settings-presentation';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -27,6 +29,7 @@ function makePlatform(
 }
 
 afterEach(() => {
+  resetStore();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,
@@ -99,7 +102,8 @@ describe('MachineSettingsPanel', () => {
     const { host, cleanup } = await renderPanel();
     try {
       expect(host.textContent).toContain('$30');
-      expect(host.textContent).toContain('Max spindle speed');
+      expect(host.textContent).toContain('Laser S maximum');
+      expect(host.textContent).not.toMatch(/spindle|CNC|RPM/i);
       expect(host.textContent).toContain('$999');
       expect(host.textContent).toContain('Unknown GRBL setting');
     } finally {
@@ -120,7 +124,7 @@ describe('MachineSettingsPanel', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const { host, cleanup } = await renderPanel();
     try {
-      expect(host.textContent).toContain('Laser');
+      expect(host.textContent).toContain('Laser output');
       expect(host.textContent).toContain('Motion');
       expect(host.textContent).toContain('Unknown');
 
@@ -134,6 +138,65 @@ describe('MachineSettingsPanel', () => {
       expect(host.textContent).toContain('$30');
       expect(host.textContent).not.toContain('$100');
       expect(host.textContent).not.toContain('$999');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('uses CNC-only labels and does not leak laser terms into search', async () => {
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(
+        new Map<number, string>([
+          [30, '12000'],
+          [31, '1000'],
+          [32, '0'],
+        ]),
+      ),
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel(makePlatform(), CNC_CONTEXT);
+    try {
+      expect(host.textContent).toContain('CNC spindle output');
+      expect(host.textContent).toContain('Maximum spindle speed');
+      expect(host.textContent).toContain('RPM');
+      expect(host.textContent).not.toMatch(/laser/i);
+
+      const search = host.querySelector('input[aria-label="Search controller settings"]');
+      if (!(search instanceof HTMLInputElement)) throw new Error('Search input missing');
+      await act(async () => {
+        search.value = 'laser';
+        Simulate.change(search);
+      });
+      expect(host.textContent).toContain('No settings match.');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('shows both contracts and the active mode for a hybrid profile', async () => {
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel(makePlatform(), HYBRID_CONTEXT);
+    try {
+      expect(host.textContent).toContain('Laser + CNC output (Laser active)');
+      expect(host.textContent).toContain('Laser S maximum / spindle maximum');
+      expect(host.textContent).toContain('switching workspace mode does not write');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('uses combined labels when the saved profile capability is unspecified', async () => {
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel(makePlatform(), null);
+    try {
+      expect(host.textContent).toContain('Laser + CNC output (capability not set)');
+      expect(host.textContent).toContain('Laser S maximum / spindle maximum');
     } finally {
       await cleanup();
     }
@@ -172,7 +235,12 @@ describe('MachineSettingsPanel', () => {
       });
 
       expect(JSON.parse(written).settings).toEqual([
-        expect.objectContaining({ code: '$30', rawValue: '1000' }),
+        expect.objectContaining({
+          code: '$30',
+          rawValue: '1000',
+          name: 'Max spindle speed / laser S max',
+          category: 'laser',
+        }),
       ]);
     } finally {
       await cleanup();
@@ -193,7 +261,23 @@ describe('MachineSettingsPanel', () => {
   });
 });
 
-async function renderPanel(platform = makePlatform()): Promise<{
+const LASER_CONTEXT: MachineSettingsPresentationContext = {
+  machineKinds: ['laser'],
+  activeMachineKind: 'laser',
+};
+const CNC_CONTEXT: MachineSettingsPresentationContext = {
+  machineKinds: ['cnc'],
+  activeMachineKind: 'cnc',
+};
+const HYBRID_CONTEXT: MachineSettingsPresentationContext = {
+  machineKinds: ['laser', 'cnc'],
+  activeMachineKind: 'laser',
+};
+
+async function renderPanel(
+  platform = makePlatform(),
+  context: MachineSettingsPresentationContext | null = LASER_CONTEXT,
+): Promise<{
   readonly host: HTMLElement;
   readonly cleanup: () => Promise<void>;
 }> {
@@ -204,7 +288,7 @@ async function renderPanel(platform = makePlatform()): Promise<{
     root = createRoot(host);
     root.render(
       <PlatformProvider adapter={platform}>
-        <MachineSettingsPanel />
+        {context === null ? <MachineSettingsPanel /> : <MachineSettingsPanel context={context} />}
       </PlatformProvider>,
     );
   });
