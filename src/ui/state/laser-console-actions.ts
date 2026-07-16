@@ -1,4 +1,5 @@
 import type { SettingsCollectorState } from '../../core/controllers/grbl';
+import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf } from '../../core/scene';
@@ -88,6 +89,9 @@ export function consoleActions(
       if (stateEffect !== 'read-only') {
         set((state) => consoleStateEffectPatch(state, stateEffect, prepared.command.normalized));
       }
+      // Track the operator's active WCS selection so save/start advisories can
+      // warn when it is not the G54 that emission pins (audit C6).
+      trackConsoleWcsSelection(set, prepared.command.normalized);
     },
     clearTranscript: () => set({ transcript: [] }),
   };
@@ -181,6 +185,20 @@ function consoleCommandBlockReason(
 
 function actionForConsoleCommand(kind: string): LaserSafetyAction {
   return kind === 'unlock' ? 'unlock' : 'console';
+}
+
+function trackConsoleWcsSelection(set: SetFn, normalized: string): void {
+  const wcsSelection = consoleWcsSelection(normalized);
+  if (wcsSelection !== null) set({ activeWcs: wcsSelection });
+}
+
+// The last G54-G59 word in a console command is the WCS it leaves active. GRBL
+// status never reports which WCS is active, so this console echo is how the app
+// learns the operator selected a non-G54 frame.
+function consoleWcsSelection(normalized: string): ActiveWorkCoordinateSystem | null {
+  const matches = normalized.toUpperCase().match(/\bG5[4-9]\b/g);
+  const last = matches?.at(-1);
+  return last === undefined ? null : (last as ActiveWorkCoordinateSystem);
 }
 
 function consoleStateEffectPatch(

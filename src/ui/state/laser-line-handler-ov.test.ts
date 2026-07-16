@@ -44,6 +44,7 @@ function makeLaserState(): LaserState {
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
+    activeWcs: null,
     ovCache: null,
     accessoryCache: null,
     workOriginActive: false,

@@ -186,6 +186,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
     wcoCache: null,
+    activeWcs: null,
     ovCache: null,
     accessoryCache: null,
     mpgActive: null,

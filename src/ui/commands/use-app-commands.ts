@@ -353,6 +353,7 @@ function saveGcodeAction(
         wcoCache: laser.wcoCache,
       },
       controllerSettings: laser.controllerSettings,
+      activeWcs: laser.activeWcs,
       allowRotaryRaster:
         useExperimentalLaserFeatures.getState().features.rotaryRaster &&
         profileSupportsCapability(app.project.device, 'rotary'),

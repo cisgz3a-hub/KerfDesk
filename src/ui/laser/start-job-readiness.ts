@@ -27,6 +27,7 @@ import {
   type PreparedOutput,
   type VariableTextRenderer,
 } from '../../io/gcode';
+import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { FrameVerification } from '../state/frame-verification';
 import { cncToolPlan, type CncToolPlanEntry } from '../state/cnc-tool-plan';
@@ -93,6 +94,10 @@ export type MachineStartSnapshot = {
   readonly workZReferenceEpoch?: number;
   readonly controllerSessionEpoch?: number;
   readonly wcoCache?: WorkCoordinateOffset | null;
+  // Operator-selected active WCS (G54-G59) tracked from console commands. A
+  // non-G54 value warns that placement (measured from the active offset) will
+  // not match the G54 the job emits (C6).
+  readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   // Last live GRBL Ov: field, cached across intermittent status frames.
   // A known non-default value changes physical feed/RPM independently of the
   // prepared G-code, so CNC Start requires the compiled 100/100/100 baseline.
@@ -222,6 +227,7 @@ export function prepareStartJob(
     controllerSettings,
     controller.warnings.map((i) => i.message),
     machine.ovCache,
+    machine.activeWcs,
   );
   return okPreparation(
     gcode,
@@ -305,6 +311,7 @@ export async function prepareStartJobSnapshot(
     controllerSettings,
     controller.warnings.map((issue) => issue.message),
     machine.ovCache,
+    machine.activeWcs,
   );
   return okPreparation(
     gcode,
