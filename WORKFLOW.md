@@ -1952,7 +1952,7 @@ F-CNC19 tiling.
 ### F-CNC2. Set per-artwork CNC operation settings
 
 #### Success
-1. User selects artwork, then picks a CNC operation: Outline — outside / inside / on path, Pocket,
+1. User selects artwork, then picks a CNC operation: Outside / Inside / On path, Pocket,
    or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
 2. Depth, depth-per-pass, feed, plunge, and spindle RPM accept typed values;
    Pocket additionally shows stepover %, profile cut types show the tabs

@@ -315,11 +315,11 @@ export function layerCncTool(
 export function cutTypeLabel(cutType: CncCutType): string {
   switch (cutType) {
     case 'profile-outside':
-      return 'Outline — outside path';
+      return 'Outside path';
     case 'profile-inside':
-      return 'Outline — inside path';
+      return 'Inside path';
     case 'profile-on-path':
-      return 'Outline — on path';
+      return 'On path';
     case 'pocket':
       return 'Pocket (clear inside)';
     case 'engrave':
