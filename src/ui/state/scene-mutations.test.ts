@@ -3,7 +3,7 @@
 // store.test.ts and duplicate.test.ts.
 
 import { describe, expect, it } from 'vitest';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import {
   applyTransform,
   createLayer,

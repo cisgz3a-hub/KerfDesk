@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { lumaToBase64, type BitmapFields } from './luma-bitmap';
 import { cropMaskedRasterImage } from './crop-image';
 

@@ -47,7 +47,7 @@ import {
   type Project,
   type TextObject,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';

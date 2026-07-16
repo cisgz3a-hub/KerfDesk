@@ -4,7 +4,7 @@ import {
   primaryOperationForObject,
   REGISTRATION_LAYER_ID,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 

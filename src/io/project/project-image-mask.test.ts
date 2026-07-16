@@ -7,7 +7,7 @@ import {
   type Project,
   type RasterImage,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 

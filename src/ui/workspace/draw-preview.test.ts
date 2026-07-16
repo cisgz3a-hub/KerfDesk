@@ -7,7 +7,7 @@ import {
   type Project,
   type Vec2,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import type { Toolpath } from '../../core/job';
 import { canvasTheme } from '../theme/canvas-theme';
 import { drawObjectsFaint, drawPreview } from './draw-preview';

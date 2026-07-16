@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../scene';
-import { createRectangle } from '../shapes';
+import { createRectangle } from '../shapes/primitives';
 import { compileJob } from './compile-job';
 
 function raster(overrides: Partial<RasterImage> = {}): RasterImage {

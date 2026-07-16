@@ -12,7 +12,8 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../scene';
-import { createRectangle, createRegistrationBox } from '../shapes';
+import { createRegistrationBox } from '../shapes';
+import { createRectangle } from '../shapes/primitives';
 import { runPreEmitPreflight } from './pre-emit';
 
 it('rejects canonical curve geometry above the bounded machine segment budget', () => {

@@ -8,7 +8,7 @@ import {
   type Project,
   type Vec2,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { resetStore } from '../state/test-helpers';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLayer, createProject, type Project } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { drawScene } from './draw-scene';
 
 function countingContext(): {

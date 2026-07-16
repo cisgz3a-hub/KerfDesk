@@ -4,8 +4,8 @@
 // bounds). Segment count is adaptive: it scales with the larger radius to keep
 // the chord-height facet under ELLIPSE_TOLERANCE_MM at any laser scale.
 
-import { parametricEllipseCurve } from '../geometry';
-import type { CurveSubpath, Polyline, Vec2 } from '../scene';
+import { parametricEllipseCurve } from '../../geometry';
+import type { CurveSubpath, Polyline, Vec2 } from '../../scene';
 
 export type EllipseSpec = {
   readonly widthMm: number;

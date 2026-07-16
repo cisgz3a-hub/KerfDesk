@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from '../workspace/snapping';
 import { useUiStore } from './ui-store';
 

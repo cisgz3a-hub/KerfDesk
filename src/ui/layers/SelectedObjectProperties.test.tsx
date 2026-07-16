@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { SelectedObjectProperties } from './SelectedObjectProperties';

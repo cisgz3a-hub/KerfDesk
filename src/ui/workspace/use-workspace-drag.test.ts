@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { useUiStore } from '../state/ui-store';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 

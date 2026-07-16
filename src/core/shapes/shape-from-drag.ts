@@ -4,10 +4,10 @@
 // Pure: the caller supplies the id and colour so core stays free of UI/RNG.
 
 import { IDENTITY_TRANSFORM, type ShapeObject, type Transform, type Vec2 } from '../scene';
-import { createEllipse } from './create-ellipse';
-import { createPolygon } from './create-polygon';
-import { createRectangle } from './create-rectangle';
-import { createStar } from './create-star';
+import { createEllipse } from './primitives/create-ellipse';
+import { createPolygon } from './primitives/create-polygon';
+import { createRectangle } from './primitives/create-rectangle';
+import { createStar } from './primitives/create-star';
 
 export type DrawShapeKind = 'rect' | 'ellipse' | 'polygon' | 'star';
 export type DrawShapeModifiers = {

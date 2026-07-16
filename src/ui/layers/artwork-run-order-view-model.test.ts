@@ -9,7 +9,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createRectangle } from '../../core/shapes/primitives';
 import { artworkRunOrderRows } from './artwork-run-order-view-model';
 
 describe('artwork run order view model', () => {

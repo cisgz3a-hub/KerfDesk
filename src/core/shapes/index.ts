@@ -1,19 +1,11 @@
 // core/shapes — pure geometry for the on-canvas drawing primitives (ADR-051,
 // Phase G). Shape factories preserve canonical curves and retain deterministic
 // compatibility polylines for subsystems still migrating to schema-v2 geometry.
+//
+// The parametric primitives (rectangle/ellipse/polygon/star) live in the
+// ./primitives sub-barrel (core/shapes/primitives) — split out to keep this
+// barrel under the public-export cap (ADR-015).
 
-export { rectangleToCurve, rectangleToPolylines } from './rectangle';
-export type { RectangleSpec } from './rectangle';
-export { createRectangle } from './create-rectangle';
-export { ellipseSegmentCount, ellipseToCurve, ellipseToPolylines } from './ellipse';
-export type { EllipseSpec } from './ellipse';
-export { createEllipse } from './create-ellipse';
-export { polygonToPolylines } from './polygon';
-export type { PolygonSpec } from './polygon';
-export { createPolygon } from './create-polygon';
-export { starToPolylines } from './star';
-export type { StarSpec } from './star';
-export { createStar } from './create-star';
 export {
   rematerializeParametricShape,
   sanitizeParametricShapeSpec,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRectangle } from '../shapes';
+import { createRectangle } from '../shapes/primitives';
 import { buildBoxAnchorAlign } from './box-anchor-align';
 import { IDENTITY_TRANSFORM, type ShapeObject } from './scene-object';
 

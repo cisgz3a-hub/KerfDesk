@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ShapeObject } from '../../core/scene';
-import { createEllipse, createPolygon, createStar } from '../../core/shapes';
+import { createEllipse, createPolygon, createStar } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { SelectedObjectProperties } from './SelectedObjectProperties';

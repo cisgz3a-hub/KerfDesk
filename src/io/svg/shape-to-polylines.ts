@@ -9,7 +9,7 @@
 // patterns — these are walked transparently in parse-svg.ts where applicable.
 
 import type { Vec2 } from '../../core/scene';
-import { ellipseSegmentCount } from '../../core/shapes';
+import { ellipseSegmentCount } from '../../core/shapes/primitives';
 import { DEFAULT_FLATNESS_MM } from './flatten-curves';
 import { parsePathD, type SubPath } from './parse-path-d';
 import { SVG_IMPORT_LIMITS } from './svg-import-budget';

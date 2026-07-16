@@ -4,8 +4,8 @@
 // geometry). The kind:'shape' SceneObject variant places it via bounds +
 // transform, so this module owns geometry only — no scene, no color, no I/O.
 
-import { parametricEllipseCurve } from '../geometry';
-import { polylineToCurveSubpath, type CurveSubpath, type Polyline, type Vec2 } from '../scene';
+import { parametricEllipseCurve } from '../../geometry';
+import { polylineToCurveSubpath, type CurveSubpath, type Polyline, type Vec2 } from '../../scene';
 
 export type RectangleSpec = {
   readonly widthMm: number;

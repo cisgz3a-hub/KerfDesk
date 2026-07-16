@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createRectangle, createRegistrationBox } from '../shapes';
+import { createRegistrationBox } from '../shapes';
+import { createRectangle } from '../shapes/primitives';
 import { createLayer, type Layer } from './layer';
 import {
   REGISTRATION_LAYER_COLOR,

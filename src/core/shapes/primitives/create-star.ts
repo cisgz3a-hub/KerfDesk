@@ -4,8 +4,8 @@ import {
   type ColoredPath,
   type ShapeObject,
   type Transform,
-} from '../scene';
-import { boundsOfPolylines } from './polyline-bounds';
+} from '../../scene';
+import { boundsOfPolylines } from '../polyline-bounds';
 import { starToPolylines, type StarSpec } from './star';
 
 export function createStar(args: {

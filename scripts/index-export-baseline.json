@@ -9,7 +9,6 @@
   "src/core/raster/index.ts": 32,
   "src/core/relief/index.ts": 25,
   "src/core/trace/centerline/index.ts": 25,
-  "src/core/shapes/index.ts": 29,
   "src/core/controllers/index.ts": 23,
   "src/core/controllers/ruida/index.ts": 23,
   "src/core/material-library/index.ts": 21,
