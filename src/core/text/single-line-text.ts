@@ -3,6 +3,11 @@ import { refineChainForOutput } from '../trace/centerline/curve-refine';
 import { parseHersheyJhf } from './hershey-font';
 import { HERSHEY_SIMPLEX_JHF } from './hershey-simplex-data';
 import {
+  forgeStrokeFont,
+  isForgeStrokeFontKey,
+  type ForgeStrokeFontKey,
+} from './forge-stroke-font';
+import {
   renderStrokeFontText,
   type StrokeFont,
   type StrokeTextRenderInput,
@@ -14,6 +19,7 @@ const HERSHEY_CAP_HEIGHT_UNITS = 21;
 const FIRST_PRINTABLE_ASCII = 32;
 const HERSHEY_SIMPLEX_FONT = hersheySimplexFont();
 const emsFontCache = new Map<string, StrokeFont>();
+const forgeFontCache = new Map<ForgeStrokeFontKey, StrokeFont>();
 const EMS_FIT_TOLERANCE_RATIO: Readonly<Record<string, number>> = {
   'ems-allure': 0.006,
   'ems-delight': 0.005,
@@ -29,8 +35,20 @@ export async function singleLineTextToPolylines(
   input: SingleLineTextRenderInput,
 ): Promise<TextRenderResult> {
   const font =
-    input.fontKey === 'hershey-simplex' ? HERSHEY_SIMPLEX_FONT : await loadEmsFont(input.fontKey);
+    input.fontKey === 'hershey-simplex'
+      ? HERSHEY_SIMPLEX_FONT
+      : isForgeStrokeFontKey(input.fontKey)
+        ? loadForgeFont(input.fontKey)
+        : await loadEmsFont(input.fontKey);
   return renderStrokeFontText(input, font);
+}
+
+function loadForgeFont(fontKey: ForgeStrokeFontKey): StrokeFont {
+  const cached = forgeFontCache.get(fontKey);
+  if (cached !== undefined) return cached;
+  const compiled = forgeStrokeFont(fontKey);
+  forgeFontCache.set(fontKey, compiled);
+  return compiled;
 }
 
 function hersheySimplexFont(): StrokeFont {

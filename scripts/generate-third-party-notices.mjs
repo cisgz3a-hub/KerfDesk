@@ -26,6 +26,12 @@ const FONTS = [
   { file: 'src/ui/text/fonts/Inconsolata-Regular.ttf', name: 'Inconsolata', spdx: 'OFL-1.1' },
   { file: 'src/ui/text/fonts/Pacifico-Regular.ttf', name: 'Pacifico', spdx: 'OFL-1.1' },
   { file: 'src/ui/text/fonts/DancingScript-Regular.ttf', name: 'Dancing Script', spdx: 'OFL-1.1' },
+  { file: 'src/ui/text/fonts/Sacramento-Regular.ttf', name: 'Sacramento', spdx: 'OFL-1.1' },
+  { file: 'src/ui/text/fonts/GreatVibes-Regular.ttf', name: 'Great Vibes', spdx: 'OFL-1.1' },
+  { file: 'src/ui/text/fonts/AlexBrush-Regular.ttf', name: 'Alex Brush', spdx: 'OFL-1.1' },
+  { file: 'src/ui/text/fonts/Caveat.ttf', name: 'Caveat', spdx: 'OFL-1.1' },
+  { file: 'src/ui/text/fonts/KaushanScript-Regular.ttf', name: 'Kaushan Script', spdx: 'OFL-1.1' },
+  { file: 'src/ui/text/fonts/Parisienne-Regular.ttf', name: 'Parisienne', spdx: 'OFL-1.1' },
 ];
 
 const EMS_STROKE_FONTS = [

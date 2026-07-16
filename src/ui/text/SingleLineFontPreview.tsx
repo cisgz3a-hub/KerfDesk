@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { textToPolylines, type FontEntry } from '../../core/text';
+import { isTracedScriptFontKey } from './font-loader';
+import { canTraceScriptText, traceScriptText } from './trace-script-text';
 
 type SingleLineFontKey = Extract<FontEntry, { readonly geometry: 'single-line' }>['key'];
 
@@ -46,15 +48,17 @@ export function SingleLineFontPreview(props: { readonly fontKey: SingleLineFontK
 }
 
 async function renderPreview(fontKey: SingleLineFontKey): Promise<PreviewGeometry> {
-  const rendered = await textToPolylines({
-    geometry: 'single-line',
-    fontKey,
+  const shared = {
     content: 'Aa',
     sizeMm: 10,
-    alignment: 'left',
+    alignment: 'left' as const,
     lineHeight: 1,
     color: 'currentColor',
-  });
+  };
+  const rendered =
+    isTracedScriptFontKey(fontKey) && canTraceScriptText()
+      ? await traceScriptText({ ...shared, fontKey })
+      : await textToPolylines({ geometry: 'single-line', fontKey, ...shared });
   const pathData = rendered.paths[0]?.polylines.map(polylinePath).join(' ') ?? '';
   return {
     pathData,

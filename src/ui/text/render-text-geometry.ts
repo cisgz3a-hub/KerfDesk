@@ -1,6 +1,7 @@
 import { findFontEntry, textToPolylines, type TextRenderResult } from '../../core/text';
 import type { EmbeddedFont, TextAlignment } from '../../core/scene';
-import { loadFont } from './font-loader';
+import { isTracedScriptFontKey, loadFont } from './font-loader';
+import { canTraceScriptText, traceScriptText } from './trace-script-text';
 
 export type RenderTextGeometryInput = {
   readonly fontKey: string;
@@ -25,6 +26,9 @@ export async function renderTextGeometry(
     letterSpacing: input.letterSpacing,
     color: input.color,
   };
+  if (isTracedScriptFontKey(input.fontKey) && canTraceScriptText()) {
+    return traceScriptText({ ...shared, fontKey: input.fontKey });
+  }
   if (findFontEntry(input.fontKey)?.geometry === 'single-line') {
     return textToPolylines({ ...shared, geometry: 'single-line', fontKey: input.fontKey });
   }

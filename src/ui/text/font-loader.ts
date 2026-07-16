@@ -15,6 +15,12 @@ import robotoUrl from './fonts/Roboto-Regular.ttf?url';
 import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
 import dancingScriptUrl from './fonts/DancingScript-Regular.ttf?url';
+import sacramentoUrl from './fonts/Sacramento-Regular.ttf?url';
+import greatVibesUrl from './fonts/GreatVibes-Regular.ttf?url';
+import alexBrushUrl from './fonts/AlexBrush-Regular.ttf?url';
+import caveatUrl from './fonts/Caveat.ttf?url';
+import kaushanScriptUrl from './fonts/KaushanScript-Regular.ttf?url';
+import parisienneUrl from './fonts/Parisienne-Regular.ttf?url';
 
 const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
   'roboto-regular': robotoUrl,
@@ -25,7 +31,36 @@ const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
 
 type OutlineFontKey = Extract<FontEntry, { readonly geometry: 'outline' }>['key'];
 
+export const TRACED_SCRIPT_FONT_KEYS = [
+  'forge-signature',
+  'forge-romantic',
+  'forge-copperplate',
+  'forge-casual',
+  'forge-friendly',
+  'forge-signwriter',
+  'forge-parisian',
+  'forge-personal',
+] as const;
+
+export type TracedScriptFontKey = (typeof TRACED_SCRIPT_FONT_KEYS)[number];
+
+const TRACE_SOURCE_URL_BY_KEY: Readonly<Record<TracedScriptFontKey, string>> = {
+  'forge-signature': sacramentoUrl,
+  'forge-romantic': greatVibesUrl,
+  'forge-copperplate': alexBrushUrl,
+  'forge-casual': caveatUrl,
+  'forge-friendly': dancingScriptUrl,
+  'forge-signwriter': kaushanScriptUrl,
+  'forge-parisian': parisienneUrl,
+  'forge-personal': pacificoUrl,
+};
+
+export function isTracedScriptFontKey(key: string): key is TracedScriptFontKey {
+  return (TRACED_SCRIPT_FONT_KEYS as ReadonlyArray<string>).includes(key);
+}
+
 const cache = new Map<string, ArrayBuffer>();
+const traceSourceCache = new Map<TracedScriptFontKey, ArrayBuffer>();
 
 export async function loadFont(
   key: string,
@@ -69,10 +104,15 @@ export function cssFamilyForFont(key: OutlineFontKey): string {
   return `lf2-${key}`;
 }
 
+export function cssFamilyForTracedScript(key: TracedScriptFontKey): string {
+  return `lf2-traced-${key}`;
+}
+
 // Tracks which font keys have already been added to document.fonts.
 // FontFace.load() is idempotent but adding the same FontFace twice
 // would still leak — keep one entry per key.
 const cssRegistered = new Set<OutlineFontKey>();
+const tracedCssRegistered = new Set<TracedScriptFontKey>();
 
 // Register a bundled .ttf with the browser's font system so CSS
 // `font-family: lf2-<key>` works. Pulls from the same in-memory
@@ -93,4 +133,22 @@ export async function ensureFontCss(key: OutlineFontKey): Promise<void> {
   await face.load();
   document.fonts.add(face);
   cssRegistered.add(key);
+}
+
+/** Registers the real handwriting master used as input to centerline tracing. */
+export async function ensureTracedScriptFontCss(key: TracedScriptFontKey): Promise<void> {
+  if (tracedCssRegistered.has(key)) return;
+  if (typeof document === 'undefined' || typeof FontFace === 'undefined') return;
+  let buffer = traceSourceCache.get(key);
+  if (buffer === undefined) {
+    const response = await fetch(TRACE_SOURCE_URL_BY_KEY[key]);
+    if (!response.ok)
+      throw new Error(`Failed to fetch trace source font ${key}: ${response.status}`);
+    buffer = await response.arrayBuffer();
+    traceSourceCache.set(key, buffer);
+  }
+  const face = new FontFace(cssFamilyForTracedScript(key), buffer);
+  await face.load();
+  document.fonts.add(face);
+  tracedCssRegistered.add(key);
 }

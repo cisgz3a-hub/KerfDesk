@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { FORGE_SCRIPT_STYLE_KEYS, forgeStrokeFont } from './forge-stroke-font';
 import { singleLineTextToPolylines } from './single-line-text';
+
+const FORGE_FONT_KEYS = [
+  'forge-soft',
+  'forge-soft-cursive',
+  'forge-compact',
+  'forge-sign',
+  'forge-swing',
+  'forge-grace',
+  'forge-grace-flourish',
+  ...FORGE_SCRIPT_STYLE_KEYS,
+] as const;
 
 const BASE_INPUT = {
   content: 'IO',
@@ -89,6 +101,162 @@ describe('singleLineTextToPolylines', () => {
     },
   );
 
+  it.each(FORGE_FONT_KEYS)(
+    'renders the complete Forge family as open cubic machining geometry: %s',
+    async (fontKey) => {
+      const rendered = await singleLineTextToPolylines({
+        ...BASE_INPUT,
+        content: 'Aa–Zz 09 & Café',
+        fontKey,
+      });
+      const path = rendered.paths[0];
+
+      expect(path?.polylines.length).toBeGreaterThan(0);
+      expect(path?.polylines.every((polyline) => !polyline.closed)).toBe(true);
+      expect(path?.curves?.every((curve) => !curve.closed)).toBe(true);
+      expect(
+        path?.curves
+          ?.flatMap((curve) => curve.segments)
+          .some((segment) => segment.kind === 'cubic'),
+      ).toBe(true);
+    },
+  );
+
+  it.each(FORGE_FONT_KEYS)(
+    'covers printable ASCII plus the text-dialog accents in %s',
+    async (fontKey) => {
+      const printableAscii = Array.from({ length: 95 }, (_, index) =>
+        String.fromCharCode(32 + index),
+      ).join('');
+      const characters = `${printableAscii}éèêëáàâäíóúñçü`;
+      const font = forgeStrokeFont(fontKey);
+      const rendered = await singleLineTextToPolylines({
+        ...BASE_INPUT,
+        content: characters,
+        fontKey,
+      });
+
+      expect(Array.from(characters).every((character) => font.glyphs.has(character))).toBe(true);
+      expect(rendered.bounds.maxX).toBeGreaterThan(0);
+      expect(rendered.paths[0]?.polylines.every((polyline) => !polyline.closed)).toBe(true);
+    },
+  );
+
+  it('joins adjacent Forge Soft Cursive lowercase bodies without a visible gap', async () => {
+    const rendered = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'so',
+      fontKey: 'forge-soft-cursive',
+    });
+    const curves = rendered.paths[0]?.curves ?? [];
+    const first = curves[0];
+    const second = curves[1];
+    const firstEnd = first?.segments.at(-1)?.to;
+
+    expect(firstEnd).toEqual(second?.start);
+  });
+
+  it('keeps the approved Compact and Sign width directions distinct', async () => {
+    const compact = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'MACHINE 04',
+      fontKey: 'forge-compact',
+    });
+    const soft = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'MACHINE 04',
+      fontKey: 'forge-soft',
+    });
+    const sign = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'MACHINE 04',
+      fontKey: 'forge-sign',
+    });
+
+    expect(compact.bounds.maxX).toBeLessThan(soft.bounds.maxX);
+    expect(sign.bounds.maxX).toBeGreaterThan(soft.bounds.maxX);
+  });
+
+  it('keeps Forge Swing lowercase connected and gives its capitals sweeping cubic strokes', async () => {
+    const lowercase = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'made',
+      fontKey: 'forge-swing',
+    });
+    const capital = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'MCS',
+      fontKey: 'forge-swing',
+    });
+    const lowercaseCurves = lowercase.paths[0]?.curves ?? [];
+    const firstEnd = lowercaseCurves[0]?.segments.at(-1)?.to;
+
+    expect(firstEnd).toEqual(lowercaseCurves[1]?.start);
+    expect(
+      capital.paths[0]?.curves
+        ?.flatMap((curve) => curve.segments)
+        .some((segment) => segment.kind === 'cubic'),
+    ).toBe(true);
+  });
+
+  it.each(['forge-grace', 'forge-grace-flourish'] as const)(
+    'keeps the elegant lowercase rhythm connected in %s',
+    async (fontKey) => {
+      const rendered = await singleLineTextToPolylines({
+        ...BASE_INPUT,
+        content: 'grace',
+        fontKey,
+      });
+      const curves = rendered.paths[0]?.curves ?? [];
+      expectCurveJoinsToMeet(curves);
+    },
+  );
+
+  it.each(FORGE_SCRIPT_STYLE_KEYS)(
+    'keeps every approved cursive direction continuously joined in %s',
+    async (fontKey) => {
+      const rendered = await singleLineTextToPolylines({
+        ...BASE_INPUT,
+        content: 'madebyhand',
+        fontKey,
+      });
+      expectCurveJoinsToMeet(rendered.paths[0]?.curves ?? []);
+    },
+  );
+
+  it('keeps the eight approved cursive directions metrically distinct', async () => {
+    const widths = await Promise.all(
+      FORGE_SCRIPT_STYLE_KEYS.map(async (fontKey) => {
+        const rendered = await singleLineTextToPolylines({
+          ...BASE_INPUT,
+          content: 'Johann Made by Hand',
+          fontKey,
+        });
+        return Math.round((rendered.bounds.maxX - rendered.bounds.minX) * 1000) / 1000;
+      }),
+    );
+
+    expect(new Set(widths).size).toBe(FORGE_SCRIPT_STYLE_KEYS.length);
+  });
+
+  it('gives Forge Grace Flourish wider ornamental capitals than Forge Grace', async () => {
+    const grace = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'M',
+      fontKey: 'forge-grace',
+    });
+    const flourish = await singleLineTextToPolylines({
+      ...BASE_INPUT,
+      content: 'M',
+      fontKey: 'forge-grace-flourish',
+    });
+
+    expect(flourish.bounds.maxX - flourish.bounds.minX).toBeGreaterThan(
+      grace.bounds.maxX - grace.bounds.minX,
+    );
+    expect(flourish.paths[0]?.curves?.every((curve) => !curve.closed)).toBe(true);
+  });
+
   it('keeps EMS accented glyphs and substitutes unsupported characters visibly', async () => {
     const accented = await singleLineTextToPolylines({
       ...BASE_INPUT,
@@ -145,4 +313,20 @@ function maxInteriorTurnDeg(points: ReadonlyArray<{ readonly x: number; readonly
     maximum = Math.max(maximum, turn);
   }
   return maximum;
+}
+
+function expectCurveJoinsToMeet(
+  curves: ReadonlyArray<{
+    readonly start: { readonly x: number; readonly y: number };
+    readonly segments: ReadonlyArray<{ readonly to: { readonly x: number; readonly y: number } }>;
+  }>,
+): void {
+  for (let index = 0; index + 1 < curves.length; index += 1) {
+    const current = curves[index];
+    const next = curves[index + 1];
+    if (current === undefined || next === undefined) continue;
+    const currentEnd = current.segments.at(-1)?.to;
+    expect(currentEnd?.x).toBeCloseTo(next.start.x, 10);
+    expect(currentEnd?.y).toBeCloseTo(next.start.y, 10);
+  }
 }
