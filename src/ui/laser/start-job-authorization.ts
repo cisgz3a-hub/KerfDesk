@@ -63,7 +63,7 @@ export function currentLaserForAuthorizedStartNow(
   if (qualificationIssue !== null) {
     return { ok: false, refusal: { kind: 'blocked', message: qualificationIssue } };
   }
-  if (startPreparationStillCurrent(args.preparedAgainst, current)) {
+  if (controllerStartPreparationStillCurrent(args.preparedAgainst, current)) {
     return { ok: true, laser: current };
   }
   return {
@@ -76,7 +76,7 @@ export function currentLaserForAuthorizedStartNow(
   };
 }
 
-function startPreparationStillCurrent(
+export function controllerStartPreparationStillCurrent(
   preparedAgainst: ReturnType<typeof useLaserStore.getState>,
   current: ReturnType<typeof useLaserStore.getState>,
 ): boolean {

@@ -1,8 +1,10 @@
 import type { RecoveryRepository } from '../state/recovery';
 
 export type RecoveryAttemptCleanup = {
+  readonly pendingStartCancelled: boolean;
   readonly claimReleased: boolean;
   readonly stagedRunDiscarded: boolean;
+  readonly retryable: boolean;
 };
 
 type RecoveryAttemptCleanupArgs = {
@@ -17,6 +19,7 @@ type RecoveryAttemptCleanupArgs = {
 export async function cleanupRejectedRecoveryAttempt(
   args: RecoveryAttemptCleanupArgs,
 ): Promise<RecoveryAttemptCleanup> {
+  const pendingStartCancelled = await cancelPendingStartWithRetry(args);
   const claimReleased = await releaseClaimWithRetry(args);
   let stagedRunDiscarded = false;
   try {
@@ -25,7 +28,30 @@ export async function cleanupRejectedRecoveryAttempt(
   } catch {
     stagedRunDiscarded = false;
   }
-  return { claimReleased, stagedRunDiscarded };
+  return {
+    pendingStartCancelled,
+    claimReleased,
+    stagedRunDiscarded,
+    retryable: pendingStartCancelled && claimReleased,
+  };
+}
+
+async function cancelPendingStartWithRetry(args: RecoveryAttemptCleanupArgs): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const cancelled = await args.repository.cancelPendingStart(args.stagedRunId);
+      if (cancelled.ok && cancelled.value) return true;
+    } catch {
+      // Reconcile below, then make one bounded retry.
+    }
+    try {
+      const refreshed = await args.repository.refresh();
+      if (refreshed.ok && refreshed.value.pendingStart?.runId !== args.stagedRunId) return true;
+    } catch {
+      // Retry once; the final false result keeps wording fail-closed.
+    }
+  }
+  return false;
 }
 
 async function releaseClaimWithRetry(

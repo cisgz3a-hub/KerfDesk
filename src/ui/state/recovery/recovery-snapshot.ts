@@ -32,6 +32,7 @@ export async function hydrateRecoverySnapshot(
       slots.lastCompletedReceipt !== null && isExecutionArtifact(completedArtifact)
         ? { ...slots.lastCompletedReceipt, artifact: completedArtifact }
         : null,
+    pendingStart: slots.pendingStart,
   };
 }
 
@@ -45,6 +46,7 @@ async function artifactMap(
       slots.activeRun?.runId,
       slots.recoveryCapsule?.runId,
       slots.lastCompletedReceipt?.runId,
+      slots.pendingStart?.runId,
     ].filter((value): value is string => value !== undefined),
   );
   await Promise.all(

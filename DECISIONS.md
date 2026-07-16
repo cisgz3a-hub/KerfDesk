@@ -5619,6 +5619,10 @@ from the live editor/controller state.
   zero or one clean `lastCompletedReceipt`. Immutable artifacts are keyed by a
   unique `runId`; progress and terminal writes must own that identity, so jobs
   with equal line counts cannot update one another.
+- Repository schema v2 also owns one short-lived `pendingStart` write-ahead slot.
+  It names the exact staged candidate before any controller Start can reach the
+  wire, while retaining the older capsule until transport acceptance commits the
+  candidate as `activeRun`.
 - An exact artifact contains emitted G-code and fingerprint, materialized output,
   output scope, resolved origin, streaming/device configuration, canvas/tool
   plans, and (for CNC) the prepared semantic job and recovery manifest. Archived
@@ -5628,6 +5632,12 @@ from the live editor/controller state.
   older capsule. Only transport acceptance activates the new run and supersedes
   the older capsule. A refused preflight, operator cancellation, settings error,
   or failed first write deletes the staged artifact and preserves the capsule.
+- Startup reconciles an unresolved `pendingStart` as the newest interrupted
+  candidate with zero diagnostic acknowledgements. This deliberately prefers a
+  possible false-positive recovery prompt over offering an obsolete source after
+  a newer program may have begun. A short owner lease prevents a second live tab
+  from classifying an in-progress handoff as a crash. Schema-v1 slots migrate
+  without dropping their active, recovery, or replay ownership.
 - The App-mounted tracker advances only the live `activeRunId`, throttles ordinary
   progress writes, and moves terminal streams to the capsule. Clean completion
   requires all acknowledgements, controller-specific settlement, and fresh stable
@@ -5655,6 +5665,11 @@ from the live editor/controller state.
 - A claim is revision- and attempt-ID-bound across windows. Pre-acceptance failure
   releases it for retry; uncertainty after transmission begins becomes the newest
   interrupted attempt rather than poisoning the source capsule.
+- Laser and CNC recovery pass a recovery-specific final authorization callback to
+  the store's existing wire boundary. After all queue/live-state awaits and before
+  streamer creation, it compares the prepared controller session, qualification,
+  settings observation, position/status, WCO/origin, and Work Z evidence. Drift
+  sends no recovery-program bytes, cancels `pendingStart`, and releases the claim.
 - Ordinary **Start current job** always compiles the current canvas from line 1.
   Cleanly completed, still-exact work separately offers **Run same job again from
   start**, which recompiles, rechecks the signature/fingerprint, and creates a new
@@ -5664,7 +5679,8 @@ from the live editor/controller state.
 
 Repository tests cover multi-megabyte round trips, immutable run ownership,
 newest-only replacement, claim conflicts, legacy/corrupt/quota handling, deletion
-generation, garbage collection, and completion/interruption before activation.
+generation, schema-v1 migration, pending-Start crash reconciliation, garbage
+collection, and completion/interruption before activation.
 Flow/UI tests cover nonblocking ordinary Start, read-only Review/Cancel, retryable
 failed recovery, exact replay invalidation, and PWA independence. Hardware crash,
 air-cut recovery, and physical CNC qualification remain release acceptance work.
@@ -8215,6 +8231,13 @@ alarm/controller compatibility/work-zero/override/
 accessory/bounds/no-go checks and exact-program setup attestation run again. These software gates do
 not sense the physical setup or make the host Abort an E-stop; the operator must supervise re-entry
 with the physical E-stop reachable.
+
+The executable path also writes a durable pending-attempt record before entering the controller
+Start boundary. After the boundary's asynchronous queue and live-state checks, a final synchronous
+comparison binds the same controller session, settings observation, WCO/origin, position, and Work
+Z evidence that the operator reviewed. Any drift refuses before recovery-program bytes. If the app
+dies while the durable handoff is unresolved, startup conservatively offers the new attempt—not the
+older source—as acceptance-unknown recovery.
 
 Opening or cancelling review is read-only. Only **Start supervised recovery** claims the capsule by
 run ID, revision, and attempt ID. Failure before controller acceptance releases that claim and leaves

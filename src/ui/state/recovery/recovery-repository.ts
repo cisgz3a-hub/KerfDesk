@@ -1,17 +1,13 @@
 import type { JobInterruption } from '../../../core/recovery';
-import { isExecutionArtifact, type ExecutionArtifactV1, type RunId } from './execution-artifact';
+import type { ExecutionArtifactV1, RunId } from './execution-artifact';
 import { legacyArtifact, readLegacyCheckpoint } from './legacy-checkpoint-migration';
-import { matchesStoredArtifact } from './recovery-artifact-identity';
-import {
-  cleanupDisplacedRecoveryArtifacts,
-  recoverySnapshotReferencesRun,
-} from './recovery-artifact-cleanup';
+import { cleanupDisplacedRecoveryArtifacts } from './recovery-artifact-cleanup';
+import { RecoveryArtifactStore } from './recovery-artifact-store';
 import { insertLegacyRecoveryCapsule } from './recovery-legacy-insert';
 import { compensateFailedRecoveryClaim } from './recovery-claim-compensation';
 import {
   UNLOADED_RECOVERY_SNAPSHOT,
   validRecoverySlots,
-  validStoredArtifact,
   type PersistedRecoverySlots,
   type RecoveryCapsule,
   type RecoveryRepositoryResult,
@@ -42,6 +38,7 @@ import {
   type PendingRecoveryTerminal,
 } from './recovery-terminal-coordinator';
 import type { RecoveryRepositoryOptions } from './recovery-repository-options';
+import { RecoveryStartHandoff } from './recovery-start-handoff';
 
 export type {
   RecoveryRepositoryOptions,
@@ -57,9 +54,27 @@ export class RecoveryRepository {
   private readonly nowIso: () => string;
   private initialization: Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> | null =
     null;
+  private readonly artifactStore: RecoveryArtifactStore;
+  private readonly startHandoff: RecoveryStartHandoff;
 
   constructor(private readonly options: RecoveryRepositoryOptions) {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString());
+    this.artifactStore = new RecoveryArtifactStore({
+      backend: options.backend,
+      currentGeneration: () => this.currentGeneration(),
+      ensureLoaded: () => this.ensureLoaded(),
+      snapshot: this.getSnapshot,
+      noteStaged: (runId) => this.terminalCoordinator.noteStaged(runId),
+      discardStaged: (runId) => this.terminalCoordinator.discardStaged(runId),
+      storageFailure: (operation, error) => this.storageFailure(operation, error),
+    });
+    this.startHandoff = new RecoveryStartHandoff({
+      nowIso: this.nowIso,
+      getSnapshot: this.getSnapshot,
+      exactArtifactRecord: (runId) => this.exactArtifactRecord(runId),
+      mutate: (operation, mutate) => this.mutateAndRefresh(operation, mutate),
+      refresh: this.refresh.bind(this),
+    });
   }
 
   getSnapshot = (): RecoveryRepositorySnapshot => this.snapshot;
@@ -88,37 +103,32 @@ export class RecoveryRepository {
   }
 
   async stageArtifact(artifact: ExecutionArtifactV1): Promise<RecoveryRepositoryResult<RunId>> {
-    if (!isExecutionArtifact(artifact)) return failure('conflict');
-    const ready = await this.ensureLoaded();
-    if (!ready.ok) return ready;
-    try {
-      const inserted = await this.options.backend.putArtifact({
-        runId: artifact.runId,
-        generation: this.currentGeneration(),
-        artifact,
-      });
-      if (
-        !inserted &&
-        !(await matchesStoredArtifact(this.options.backend, this.currentGeneration(), artifact))
-      ) {
-        return failure('conflict');
-      }
-      this.terminalCoordinator.noteStaged(artifact.runId);
-      return ok(artifact.runId);
-    } catch (error) {
-      return this.storageFailure('stage job recovery artifact', error);
-    }
+    return this.artifactStore.stage(artifact);
   }
 
   async discardStagedRun(runId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
-    this.terminalCoordinator.discardStaged(runId);
-    try {
-      if (recoverySnapshotReferencesRun(this.snapshot, runId)) return ok(false);
-      await this.options.backend.deleteArtifact(runId);
-      return ok(true);
-    } catch (error) {
-      return this.storageFailure('discard staged recovery artifact', error);
-    }
+    return this.artifactStore.discard(runId);
+  }
+
+  async armFreshStart(
+    runId: RunId,
+    armedAtIso = this.nowIso(),
+  ): Promise<RecoveryRepositoryResult<boolean>> {
+    return this.startHandoff.armFreshStart(runId, armedAtIso);
+  }
+
+  async armClaimedRecoveryStart(args: {
+    readonly sourceRunId: RunId;
+    readonly sourceRevision: number;
+    readonly attemptId: string;
+    readonly recoveryRunId: RunId;
+    readonly armedAtIso?: string;
+  }): Promise<RecoveryRepositoryResult<boolean>> {
+    return this.startHandoff.armClaimedRecoveryStart(args);
+  }
+
+  async cancelPendingStart(runId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
+    return this.startHandoff.cancel(runId);
   }
 
   async activateFreshRun(
@@ -297,6 +307,7 @@ export class RecoveryRepository {
 
   async purgeControllerData(): Promise<RecoveryRepositoryResult<number>> {
     this.terminalCoordinator.clear();
+    this.startHandoff.clearTimer();
     const generation = Math.max(this.snapshot.generation, this.options.generationStore.read()) + 1;
     const markerWritten = this.options.generationStore.write(generation);
     this.options.legacyStorage.clear();
@@ -306,6 +317,7 @@ export class RecoveryRepository {
       activeRun: null,
       recoveryCapsule: null,
       lastCompletedReceipt: null,
+      pendingStart: null,
     });
     try {
       await this.options.backend.purge(generation);
@@ -321,6 +333,8 @@ export class RecoveryRepository {
   private async initializeOnce(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
     const loaded = await this.refresh();
     if (!loaded.ok) return loaded;
+    const reconciled = await this.startHandoff.reconcile();
+    if (!reconciled.ok) return reconciled;
     const promoted = await this.promoteStaleActiveRun();
     if (!promoted.ok) return promoted;
     const migrated = await this.migrateLegacyCheckpoint();
@@ -345,21 +359,7 @@ export class RecoveryRepository {
   private async exactArtifactRecord(
     runId: RunId,
   ): Promise<RecoveryRepositoryResult<StoredRecoveryArtifact>> {
-    const ready = await this.ensureLoaded();
-    if (!ready.ok) return ready;
-    try {
-      const record = validStoredArtifact(await this.options.backend.getArtifact(runId));
-      if (
-        record === null ||
-        record.generation !== this.currentGeneration() ||
-        !isExecutionArtifact(record.artifact)
-      ) {
-        return failure('not-found');
-      }
-      return ok(record);
-    } catch (error) {
-      return this.storageFailure('read job recovery artifact', error);
-    }
+    return this.artifactStore.exact(runId);
   }
 
   private async mutateAndRefresh<T>(
@@ -417,6 +417,7 @@ export class RecoveryRepository {
   };
 
   private publish(snapshot: RecoveryRepositorySnapshot): void {
+    if (snapshot.pendingStart === null) this.startHandoff.clearTimer();
     this.snapshot = snapshot;
     for (const listener of this.listeners) listener();
   }

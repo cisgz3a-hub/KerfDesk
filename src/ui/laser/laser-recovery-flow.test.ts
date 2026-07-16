@@ -10,7 +10,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
 import {
@@ -174,6 +174,26 @@ describe('exact laser recovery activation', () => {
     expect(recoveryStart).toHaveBeenCalledTimes(2);
     expect(repository.getSnapshot().activeRun?.artifact.laserResumeChain).toHaveLength(2);
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
+  });
+
+  it('refuses WCO drift at the final wire boundary and releases the capsule for retry', async () => {
+    const repository = recoveryHarness();
+    const capsule = await interruptedCapsule(repository);
+    const recoveryStart = vi.fn(async (_gcode: string, options?: StartJobOptions) => {
+      useLaserStore.setState({ wcoCache: { x: 1, y: 0, z: 0 } });
+      options?.assertFinalStartAuthorized?.();
+    });
+    useLaserStore.setState({ startJob: recoveryStart });
+
+    expect(await runLaserRecoveryCapsuleFlow(capsule, repository)).toBe(false);
+
+    expect(repository.getSnapshot().activeRun).toBeNull();
+    expect(repository.getSnapshot().pendingStart).toBeNull();
+    expect(repository.getSnapshot().recoveryCapsule).toMatchObject({ runId: capsule.runId });
+    expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
+    expect(jobAwareAlert).toHaveBeenCalledWith(
+      expect.stringContaining('No recovery G-code was sent'),
+    );
   });
 
   it('retries claim release before cleanup and remains retryable when staged discard fails', async () => {

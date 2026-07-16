@@ -118,6 +118,27 @@ describe('CheckpointResumeBanner', () => {
 
     expect(host?.textContent).toBe('');
   });
+
+  it('does not offer the older capsule while a newer Start handoff is pending', async () => {
+    const repository = await interruptedRepository();
+    const project = useStore.getState().project;
+    const candidate = createExecutionArtifact({
+      runId: 'run-pending-start',
+      gcode: GCODE,
+      prepared: preparedProject(project),
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      canvasPlan: { retentionKey: 'pending-signature' } as CanvasMotionPlan,
+      controllerSettings: null,
+      createdAtIso: LATER,
+    });
+    await repository.stageArtifact(candidate);
+    await repository.armFreshStart(candidate.runId, LATER);
+    render(repository);
+
+    expect(repository.getSnapshot().recoveryCapsule?.runId).toBe('run-interrupted-laser');
+    expect(repository.getSnapshot().pendingStart?.runId).toBe('run-pending-start');
+    expect(host?.textContent).toBe('');
+  });
 });
 
 function render(repository: RecoveryRepository, busy = false): void {
