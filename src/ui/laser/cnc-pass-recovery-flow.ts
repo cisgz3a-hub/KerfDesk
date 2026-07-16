@@ -36,7 +36,7 @@ import {
   streamCncRecoveryProgram,
   type CncRecoveryStreamPlan,
 } from './cnc-supervised-recovery-stream';
-import { prepareArchivedRecoverySource } from './start-job-source';
+import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
 export async function runCncPassRecoveryFlow(
   capsule: RecoveryCapsule,
@@ -119,7 +119,36 @@ function planPassRecovery(
   }
   if (!confirmWarnings(source.warnings)) return null;
   if (!confirmPlan(review, resume)) return null;
-  return { source, recovery: { job: resume.job }, gcode: emitted.gcode };
+  return passRecoveryStreamPlan(capsule, review, source, resume, emitted.gcode);
+}
+
+function passRecoveryStreamPlan(
+  capsule: RecoveryCapsule,
+  review: CncPassRecoveryReview,
+  source: PreparedRecoverySource,
+  resume: Extract<ReturnType<typeof buildCncPassResumeJob>, { kind: 'resume-job' }>,
+  gcode: string,
+): CncRecoveryStreamPlan {
+  return {
+    source,
+    recovery: { job: resume.job },
+    gcode,
+    ...(review.position.kind === 'retained-confirmed'
+      ? { assertFinalStartConditions: () => assertRetainedPositionStillConfirmed(capsule) }
+      : {}),
+  };
+}
+
+// The Start-click WCO validation goes stale while the operator reads the
+// confirmation dialogs and the recovery claim awaits storage: status frames
+// keep updating wcoCache in that window without bumping any epoch the final
+// gate compares. Re-validate against the ARCHIVED offset at the wire boundary
+// so a retained-position recovery never streams against a moved work offset.
+function assertRetainedPositionStillConfirmed(capsule: RecoveryCapsule): void {
+  const issue = retainedPositionIssue(capsule, useLaserStore.getState().wcoCache);
+  if (issue !== null) {
+    throw new Error(`Retained position is no longer confirmed:\n\n${issue}`);
+  }
 }
 
 function confirmPlan(

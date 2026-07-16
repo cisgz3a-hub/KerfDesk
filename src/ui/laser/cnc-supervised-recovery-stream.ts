@@ -25,6 +25,10 @@ export type CncRecoveryStreamPlan = {
   // Operator's qualification attestation, archived into the recovery artifact
   // for auditability (audit A1).
   readonly recoveryQualification?: string;
+  // Flow-specific synchronous re-validation composed into the final
+  // wire-boundary authorization (e.g. the pass flow's retained-WCO re-check).
+  // Throws to refuse; runs after the generic recovery assertion.
+  readonly assertFinalStartConditions?: () => void;
 };
 
 export async function claimCncRecoveryCapsule(
@@ -62,10 +66,14 @@ export async function streamCncRecoveryProgram(
   );
   if (!staged) return false;
 
+  const assertRecoveryStartAuthorized = finalRecoveryStartAssertion(laser);
   try {
     await laser.startJob(planned.gcode, {
       runId: recoveryRunId,
-      assertFinalStartAuthorized: finalRecoveryStartAssertion(laser),
+      assertFinalStartAuthorized: () => {
+        assertRecoveryStartAuthorized();
+        planned.assertFinalStartConditions?.();
+      },
       streamingMode: streamingModeForController(
         planned.source.project.device.controllerKind,
         planned.source.project.device.streamingMode,
