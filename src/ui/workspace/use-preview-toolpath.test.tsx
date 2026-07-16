@@ -115,6 +115,26 @@ describe('usePreviewToolpath', () => {
     expect(scheduleBuild.mock.calls.length).toBeGreaterThan(afterMount);
   });
 
+  it('builds a User Origin preview before the machine origin is set', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    act(() => useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } }));
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+
+    expect(previewMocks.buildPreviewToolpath).toHaveBeenCalledWith(
+      project,
+      expect.objectContaining({
+        jobOrigin: { startFrom: 'user-origin', anchor: 'center' },
+      }),
+    );
+    expect(probe.current).toBe(builtToolpath);
+  });
+
   it('cancels stale scheduled preparation when preview exits', async () => {
     let scheduled: (() => void) | null = null;
     const scheduleBuild: PreviewBuildScheduler = (work) => {
