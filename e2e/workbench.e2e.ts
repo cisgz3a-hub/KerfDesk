@@ -327,6 +327,7 @@ kerfDeskTest(
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
     const writesBefore = serialWrites(await kerfdesk.events()).length;
     await page.getByRole('button', { name: 'Start job' }).click();
+    await confirmJobReview(page);
     await expect(probe).toHaveAttribute('data-lifecycle', 'running');
     const pixelsBeforeStatus = await canvasPixels(page);
     const initial = Number(await probe.getAttribute('data-confirmed-route-mm'));
@@ -438,6 +439,15 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
+
+// ADR-224: every Start now opens the Job Review dialog; its single Start
+// button is the acknowledgement that absorbed the old native confirms.
+async function confirmJobReview(page: Page): Promise<void> {
+  await page
+    .getByRole('dialog', { name: 'Review job before starting' })
+    .getByRole('button', { name: 'Start job' })
+    .click();
+}
 
 async function installFileSystemMocks(page: Page): Promise<void> {
   await page.addInitScript(

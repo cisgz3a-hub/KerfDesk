@@ -19,6 +19,11 @@ type PreparedCurrentStart = Extract<
   { readonly ok: true }
 >;
 
+// Shared by the pre-review discard toast (start-job-flow) and the in-dialog
+// replay blocker (job-review gate) so the operator reads one message.
+export const COMPLETED_REPLAY_CHANGED_MESSAGE =
+  'The completed job changed. Use Start job to run the current canvas.';
+
 export function replayCompilationMatches(
   prepared: PreparedCurrentStart,
   receipt: LastCompletedReceipt,

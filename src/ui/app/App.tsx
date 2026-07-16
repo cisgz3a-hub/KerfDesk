@@ -7,6 +7,7 @@ import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { BoardCapturePanel } from '../laser/board-capture';
+import { JobReviewDialog } from '../laser/job-review';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
@@ -77,6 +78,7 @@ export function App(): JSX.Element {
       <DesignLibraryDialog />
       <ImportImageDialog />
       <ConfirmSaveDialog />
+      <JobReviewDialog />
     </div>
   );
 }

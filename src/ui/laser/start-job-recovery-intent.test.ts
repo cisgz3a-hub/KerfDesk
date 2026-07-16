@@ -24,6 +24,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -33,6 +34,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 const originalStartJob = useLaserStore.getState().startJob;
 const CONTROLLER_EPOCH = 7;
+let uninstallAutoReview: () => void = () => undefined;
 const idleStatus: StatusReport = {
   state: 'Idle',
   subState: null,
@@ -161,9 +163,13 @@ beforeEach(() => {
   useExperimentalLaserFeatures.getState().resetFeatures();
   vi.mocked(jobAwareAlert).mockClear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+  useJobReviewStore.getState().close();
+  uninstallAutoReview = installAutoJobReview('confirm');
 });
 
 afterEach(() => {
+  uninstallAutoReview();
+  useJobReviewStore.getState().close();
   localStorage.clear();
   useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
   vi.restoreAllMocks();

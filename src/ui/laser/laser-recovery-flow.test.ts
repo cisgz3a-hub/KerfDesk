@@ -19,6 +19,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 import { runStartJobFlow } from './start-job-flow';
@@ -30,6 +31,9 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 const originalStartJob = useLaserStore.getState().startJob;
 const CONTROLLER_EPOCH = 9;
+// The ordinary Start that seeds each interrupted capsule now passes through
+// the ADR-224 review gate; the recovery flows themselves keep native confirms.
+let uninstallAutoReview: () => void = () => undefined;
 const idleStatus: StatusReport = {
   state: 'Idle',
   subState: null,
@@ -96,9 +100,13 @@ describe('exact laser recovery activation', () => {
     });
     vi.mocked(jobAwareAlert).mockClear();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+    useJobReviewStore.getState().close();
+    uninstallAutoReview = installAutoJobReview('confirm');
   });
 
   afterEach(() => {
+    uninstallAutoReview();
+    useJobReviewStore.getState().close();
     useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
     vi.restoreAllMocks();
   });

@@ -22,6 +22,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
@@ -32,6 +33,10 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 const originalStartJob = useLaserStore.getState().startJob;
 const CONTROLLER_EPOCH = 7;
+// ADR-224: ordinary Starts route their acknowledgement through the review
+// dialog; recovery flows below keep the native confirm.
+let reviewChoice: 'confirm' | 'cancel' = 'confirm';
+let uninstallAutoReview: () => void = () => undefined;
 
 function recoveryHarness(): RecoveryRepository {
   const legacyStorage: LegacyCheckpointStorage = {
@@ -135,6 +140,9 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     });
     vi.mocked(jobAwareAlert).mockClear();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+    reviewChoice = 'confirm';
+    useJobReviewStore.getState().close();
+    uninstallAutoReview = installAutoJobReview(() => reviewChoice);
   });
 
   it('passes verified evidence and active profile streaming settings into Start', async () => {
@@ -157,6 +165,8 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
   });
 
   afterEach(() => {
+    uninstallAutoReview();
+    useJobReviewStore.getState().close();
     localStorage.clear();
     useLaserStore.setState({
       ...initialLaserState(),
@@ -167,10 +177,16 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
 
   it('requires informed acknowledgement before an ordinary Start with unknown $32', async () => {
     makeLaserModeUnknown();
+    const review = captureJobReviewModels();
 
     await runStartJobFlow(recoveryHarness());
 
-    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
+    review.stop();
+    expect(review.models.at(-1)?.acknowledgement).toEqual({
+      kind: 'laser-unverified',
+      prompt: LASER_MODE_UNVERIFIED_START_PROMPT,
+    });
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
     expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
@@ -183,13 +199,15 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     );
   });
 
-  it('sends no ordinary job when the unknown-$32 acknowledgement is declined', async () => {
+  it('sends no ordinary job when the unknown-$32 review is cancelled', async () => {
     makeLaserModeUnknown();
-    vi.mocked(jobAwareConfirm).mockReturnValueOnce(false);
+    reviewChoice = 'cancel';
+    const review = captureJobReviewModels();
 
     await runStartJobFlow(recoveryHarness());
 
-    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
+    review.stop();
+    expect(review.models.at(-1)?.acknowledgement).toMatchObject({ kind: 'laser-unverified' });
     expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
     expect(readJobCheckpoint()).toBeNull();
   });

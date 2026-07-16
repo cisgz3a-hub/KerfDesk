@@ -12,6 +12,7 @@ import {
 } from '../state/recovery/testing';
 import { RecoveryRepository } from '../state/recovery';
 import { resetStore } from '../state/test-helpers';
+import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -21,6 +22,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 const CONTROLLER_EPOCH = 7;
 const originalStartJob = useLaserStore.getState().startJob;
+let uninstallAutoReview: () => void = () => undefined;
 const idleStatus: StatusReport = {
   state: 'Idle',
   subState: null,
@@ -102,9 +104,13 @@ beforeEach(() => {
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
     startJob: vi.fn(async () => undefined),
   });
+  useJobReviewStore.getState().close();
+  uninstallAutoReview = installAutoJobReview('confirm');
 });
 
 afterEach(() => {
+  uninstallAutoReview();
+  useJobReviewStore.getState().close();
   localStorage.clear();
   useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
   vi.restoreAllMocks();

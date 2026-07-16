@@ -9,7 +9,6 @@
 // startJob-failed alert in the catch arm can fire after streaming began,
 // and a native dialog there would freeze the ack pump and Abort button.
 
-import type { OverrideValues } from '../../core/controllers/grbl';
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import {
   fingerprintGcode,
@@ -17,9 +16,9 @@ import {
   rawResumeLine,
   type JobCheckpoint,
 } from '../../core/recovery';
-import { machineKindOf, type MachineKind } from '../../core/scene';
+import { machineKindOf } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
-import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
@@ -29,15 +28,8 @@ import {
   type LastCompletedReceipt,
   type RecoveryRepository,
 } from '../state/recovery';
-import {
-  CNC_SETUP_ATTESTATION_PROMPT,
-  cncControllerEpochOf,
-  createCncSetupAttestation,
-  type CncSetupAttestation,
-} from '../state/cnc-setup-attestation';
 import { useCameraStore } from '../state/camera-store';
 import { useStartBlockerStore } from './start-blocker-store';
-import { reducedOverrideAcknowledgement } from '../state/cnc-accessory-readiness';
 import { useToastStore } from '../state/toast-store';
 import {
   checkpointProgramIssue,
@@ -51,6 +43,7 @@ import {
   type StartExternalEnvironment,
 } from './start-job-external-environment';
 import {
+  COMPLETED_REPLAY_CHANGED_MESSAGE,
   completedReceiptIsCurrent,
   replayCompilationMatches,
   stageFreshExecutionArtifact,
@@ -61,7 +54,7 @@ import {
   reportStartAuthorizationRefusal,
 } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
-import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
+import { runJobReviewGate } from './job-review';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 
 export async function runStartJobFlow(
@@ -119,9 +112,7 @@ async function runStartJobFlowWithCheckpoint(
   }
   if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
     await repository.discardCompletedReceipt(completedReceipt.runId);
-    useToastStore
-      .getState()
-      .pushToast('The completed job changed. Use Start job to run the current canvas.', 'warning');
+    useToastStore.getState().pushToast(COMPLETED_REPLAY_CHANGED_MESSAGE, 'warning');
     return;
   }
   const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
@@ -129,38 +120,38 @@ async function runStartJobFlowWithCheckpoint(
     reportBlockedStart(programIssue);
     return;
   }
-  if (prepared.warnings.length > 0) {
-    useToastStore.getState().pushToast(prepared.warnings.join('\n'), 'warning');
-  }
-  const machineKind = machineKindOf(project.machine);
-  const laserModeStartEvidence = confirmLaserModeStartEvidence(
-    project,
-    laserModeStartSnapshot,
-    jobAwareConfirm,
-  );
-  if (laserModeStartEvidence === null) return;
-  const cncSetupAttestation = confirmCncSetup(machineKind, prepared.gcode, laser.ovCache);
-  if (cncSetupAttestation === null) return;
-  const currentLaser = await currentLaserForAuthorizedStart({
-    preparedAgainst: laser,
+  // ADR-224: the Job Review dialog replaces the warnings toast and the two
+  // native start confirms here. It returns the exact bundle that must stream
+  // — re-prepared if the operator edited settings inside the review — plus
+  // the same evidence/attestation objects the confirms used to produce.
+  const review = await runJobReviewGate({
+    initial: { app, project, laser, prepared, laserModeStartSnapshot, externalEnvironment },
     checkpointToReplace,
     completedReceipt,
-    expectedExecutionSignature: prepared.canvasPlan.retentionKey,
-    externalEnvironment,
+  });
+  if (review === null) return;
+  const { bundle, laserModeStartEvidence, cncSetupAttestation } = review;
+  const machineKind = machineKindOf(bundle.project.machine);
+  const currentLaser = await currentLaserForAuthorizedStart({
+    preparedAgainst: bundle.laser,
+    checkpointToReplace,
+    completedReceipt,
+    expectedExecutionSignature: bundle.prepared.canvasPlan.retentionKey,
+    externalEnvironment: bundle.externalEnvironment,
     repository,
   });
   if (currentLaser === null) return;
   await streamPreparedStart({
-    app,
-    project,
+    app: bundle.app,
+    project: bundle.project,
     laser: currentLaser,
-    prepared,
+    prepared: bundle.prepared,
     machineKind,
     laserModeStartEvidence,
     cncSetupAttestation,
     checkpointToReplace,
     completedReceipt,
-    externalEnvironment,
+    externalEnvironment: bundle.externalEnvironment,
     repository,
   });
 }
@@ -267,25 +258,6 @@ async function armFreshStartHandoff(
     .getState()
     .report(['Another job Start is already being prepared. Wait for it to finish and try again.']);
   return { staged: false, armed: false, blocked: true };
-}
-
-function confirmCncSetup(
-  machineKind: MachineKind,
-  gcode: string,
-  overrides: OverrideValues | null,
-): CncSetupAttestation | null | undefined {
-  if (machineKind !== 'cnc') return undefined;
-  const overrideAcknowledgement = reducedOverrideAcknowledgement(overrides);
-  const prompt =
-    overrideAcknowledgement === undefined
-      ? CNC_SETUP_ATTESTATION_PROMPT
-      : `${CNC_SETUP_ATTESTATION_PROMPT}\n\nConfirm these exact reduced controller overrides: feed ${overrideAcknowledgement.feed}%, rapid ${overrideAcknowledgement.rapid}%, spindle ${overrideAcknowledgement.spindle}%.`;
-  if (!jobAwareConfirm(prompt)) return null;
-  return createCncSetupAttestation(
-    gcode,
-    cncControllerEpochOf(useLaserStore.getState()),
-    overrideAcknowledgement,
-  );
 }
 
 // Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC
