@@ -17,7 +17,7 @@ import {
   type CncSetupAttestation,
 } from '../state/cnc-setup-attestation';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import {
   createExecutionArtifact,
@@ -285,6 +285,28 @@ describe('runCncSupervisedRecoveryFlow', () => {
     expect(startJob).toHaveBeenCalledTimes(2);
     expect(repo.getSnapshot().recoveryCapsule).toBeNull();
     expect(repo.getSnapshot().activeRun?.runId).not.toBe(capsule.runId);
+  });
+
+  it('refuses controller-settings drift at the final wire boundary before recovery streaming', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(async (_gcode: string, options?: StartJobOptions) => {
+      useLaserStore.setState((state) => ({
+        controllerSettings: { ...state.controllerSettings, maxPowerS: 1_000 },
+      }));
+      options?.assertFinalStartAuthorized?.();
+    });
+    useLaserStore.setState({ startJob });
+
+    expect(await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo)).toBe(false);
+
+    expect(repo.getSnapshot().activeRun).toBeNull();
+    expect(repo.getSnapshot().pendingStart).toBeNull();
+    expect(repo.getSnapshot().recoveryCapsule).toMatchObject({ runId: capsule.runId });
+    expect(repo.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
+    expect(jobAwareAlert).toHaveBeenCalledWith(
+      expect.stringContaining('No recovery G-code was sent'),
+    );
   });
 
   it('releases the claim even when rejected-attempt artifact cleanup fails', async () => {

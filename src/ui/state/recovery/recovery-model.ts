@@ -6,7 +6,8 @@ import type {
   RunId,
 } from './execution-artifact';
 
-export const RECOVERY_REPOSITORY_SCHEMA_VERSION = 1;
+export const RECOVERY_REPOSITORY_SCHEMA_VERSION = 2;
+const LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION = 1;
 
 export type ActiveRunRecord = {
   readonly runId: RunId;
@@ -37,6 +38,18 @@ export type LastCompletedReceiptRecord = {
   readonly completedAtIso: string;
 };
 
+export type PendingStartRecord = {
+  readonly runId: RunId;
+  readonly kind: 'fresh' | 'supervised-recovery';
+  readonly sendableLines: number;
+  readonly armedAtIso: string;
+  readonly sourceRecovery?: {
+    readonly runId: RunId;
+    readonly revision: number;
+    readonly attemptId: string;
+  };
+};
+
 export type PersistedRecoverySlots = {
   readonly schemaVersion: typeof RECOVERY_REPOSITORY_SCHEMA_VERSION;
   readonly generation: number;
@@ -44,6 +57,7 @@ export type PersistedRecoverySlots = {
   readonly activeRun: ActiveRunRecord | null;
   readonly recoveryCapsule: RecoveryCapsuleRecord | null;
   readonly lastCompletedReceipt: LastCompletedReceiptRecord | null;
+  readonly pendingStart: PendingStartRecord | null;
 };
 
 export type StoredRecoveryArtifact = {
@@ -64,6 +78,7 @@ export type RecoveryRepositorySnapshot = {
   readonly activeRun: ActiveRun | null;
   readonly recoveryCapsule: RecoveryCapsule | null;
   readonly lastCompletedReceipt: LastCompletedReceipt | null;
+  readonly pendingStart: PendingStartRecord | null;
 };
 
 export type RecoveryRepositoryError = 'storage-unavailable' | 'not-found' | 'conflict';
@@ -77,6 +92,7 @@ export const UNLOADED_RECOVERY_SNAPSHOT: RecoveryRepositorySnapshot = {
   activeRun: null,
   recoveryCapsule: null,
   lastCompletedReceipt: null,
+  pendingStart: null,
 };
 
 export function emptyRecoverySlots(generation: number): PersistedRecoverySlots {
@@ -87,6 +103,7 @@ export function emptyRecoverySlots(generation: number): PersistedRecoverySlots {
     activeRun: null,
     recoveryCapsule: null,
     lastCompletedReceipt: null,
+    pendingStart: null,
   };
 }
 
@@ -95,7 +112,11 @@ export function validRecoverySlots(
   minimumGeneration: number,
 ): PersistedRecoverySlots {
   if (!isRecord(value)) return emptyRecoverySlots(minimumGeneration);
-  if (value['schemaVersion'] !== RECOVERY_REPOSITORY_SCHEMA_VERSION) {
+  const schemaVersion = value['schemaVersion'];
+  if (
+    schemaVersion !== RECOVERY_REPOSITORY_SCHEMA_VERSION &&
+    schemaVersion !== LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION
+  ) {
     return emptyRecoverySlots(minimumGeneration);
   }
   const generation = value['generation'];
@@ -107,10 +128,15 @@ export function validRecoverySlots(
   const activeRun = parseActiveRun(value['activeRun']);
   const recoveryCapsule = parseRecoveryCapsule(value['recoveryCapsule']);
   const lastCompletedReceipt = parseCompletedReceipt(value['lastCompletedReceipt']);
+  const pendingStart =
+    schemaVersion === LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION
+      ? null
+      : parsePendingStart(value['pendingStart']);
   if (
     activeRun === undefined ||
     recoveryCapsule === undefined ||
-    lastCompletedReceipt === undefined
+    lastCompletedReceipt === undefined ||
+    pendingStart === undefined
   ) {
     return emptyRecoverySlots(generation);
   }
@@ -121,6 +147,7 @@ export function validRecoverySlots(
     activeRun,
     recoveryCapsule,
     lastCompletedReceipt,
+    pendingStart,
   };
 }
 
@@ -166,6 +193,59 @@ function parseCompletedReceipt(value: unknown): LastCompletedReceiptRecord | nul
     return undefined;
   }
   return value as LastCompletedReceiptRecord;
+}
+
+function parsePendingStart(value: unknown): PendingStartRecord | null | undefined {
+  if (value === null) return null;
+  if (!isRecord(value)) return undefined;
+  const base = parsePendingStartBase(value);
+  if (base === undefined) return undefined;
+  if (base.kind === 'fresh') {
+    return value['sourceRecovery'] === undefined ? base : undefined;
+  }
+  return parseRecoveryPendingStart(base, value['sourceRecovery']);
+}
+
+function parsePendingStartBase(
+  value: unknown,
+): Omit<PendingStartRecord, 'sourceRecovery'> | undefined {
+  if (!isRecord(value)) return undefined;
+  const runId = value['runId'];
+  const kind = value['kind'];
+  const sendableLines = value['sendableLines'];
+  const armedAtIso = value['armedAtIso'];
+  if (
+    typeof runId !== 'string' ||
+    (kind !== 'fresh' && kind !== 'supervised-recovery') ||
+    !isNonNegativeInteger(sendableLines) ||
+    typeof armedAtIso !== 'string'
+  ) {
+    return undefined;
+  }
+  return { runId, kind, sendableLines, armedAtIso };
+}
+
+function parseRecoveryPendingStart(
+  base: Omit<PendingStartRecord, 'sourceRecovery'>,
+  sourceRecovery: unknown,
+): PendingStartRecord | undefined {
+  if (!isRecord(sourceRecovery)) return undefined;
+  const sourceRunId = sourceRecovery['runId'];
+  const revision = sourceRecovery['revision'];
+  const attemptId = sourceRecovery['attemptId'];
+  if (
+    typeof sourceRunId !== 'string' ||
+    !isNonNegativeInteger(revision) ||
+    typeof attemptId !== 'string' ||
+    attemptId.length === 0
+  ) {
+    return undefined;
+  }
+  return {
+    ...base,
+    kind: 'supervised-recovery',
+    sourceRecovery: { runId: sourceRunId, revision, attemptId },
+  };
 }
 
 function isProgressRecord(value: Record<string, unknown>): boolean {

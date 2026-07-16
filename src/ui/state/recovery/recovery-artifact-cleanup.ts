@@ -32,5 +32,9 @@ function referencedRunIds(snapshot: RecoveryRepositorySnapshot): Set<RunId> {
   if (snapshot.activeRun !== null) runIds.add(snapshot.activeRun.runId);
   if (snapshot.recoveryCapsule !== null) runIds.add(snapshot.recoveryCapsule.runId);
   if (snapshot.lastCompletedReceipt !== null) runIds.add(snapshot.lastCompletedReceipt.runId);
+  if (snapshot.pendingStart !== null) runIds.add(snapshot.pendingStart.runId);
+  if (snapshot.pendingStart?.sourceRecovery !== undefined) {
+    runIds.add(snapshot.pendingStart.sourceRecovery.runId);
+  }
   return runIds;
 }

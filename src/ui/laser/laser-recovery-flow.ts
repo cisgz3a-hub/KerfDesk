@@ -20,6 +20,7 @@ import { resumeConfirmation } from './resume-confirmation';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { buildLaserResumeProgram } from './laser-resume-program';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
+import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 
 /** Final, explicit activation for the sealed laser recovery dialog. Review and
  * cancellation never call this function and therefore cannot claim a capsule. */
@@ -140,9 +141,28 @@ async function stageLaserRecoveryAttempt(
       attemptId: claim.attemptId,
       stagedRunId: recoveryRunId,
     });
-    const message = cleanup.claimReleased
+    const message = cleanup.retryable
       ? 'The recovery attempt could not be stored safely. The saved job remains available and no controller command was sent.'
-      : 'No controller command was sent, but the recovery-storage claim could not be released. Reload after recovery storage is available; do not assume this capsule is retryable yet.';
+      : 'No controller command was sent, but the durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available; do not assume this capsule is retryable yet.';
+    jobAwareAlert(`Cannot start supervised recovery:\n\n${message}`);
+    return null;
+  }
+  const armed = await repository.armClaimedRecoveryStart({
+    sourceRunId: planned.capsule.runId,
+    sourceRevision: claim.capsule.revision,
+    attemptId: claim.attemptId,
+    recoveryRunId,
+  });
+  if (!armed.ok || !armed.value) {
+    const cleanup = await cleanupRejectedRecoveryAttempt({
+      repository,
+      sourceRunId: planned.capsule.runId,
+      attemptId: claim.attemptId,
+      stagedRunId: recoveryRunId,
+    });
+    const message = cleanup.retryable
+      ? 'The recovery attempt could not reserve a durable Start handoff. The saved job remains available and no controller command was sent.'
+      : 'No controller command was sent, but recovery ownership could not be released safely. Reload before trying again.';
     jobAwareAlert(`Cannot start supervised recovery:\n\n${message}`);
     return null;
   }
@@ -156,6 +176,7 @@ async function streamLaserRecoveryAttempt(
   try {
     await attempt.laser.startJob(attempt.resumeGcode, {
       runId: attempt.recoveryRunId,
+      assertFinalStartAuthorized: finalRecoveryStartAssertion(attempt.laser),
       streamingMode: streamingModeForController(
         attempt.source.project.device.controllerKind,
         attempt.source.project.device.streamingMode,
@@ -227,9 +248,9 @@ async function resolveFailedAttempt(args: {
       attemptId: args.attemptId,
       stagedRunId: args.recoveryRunId,
     });
-    const cleanupMessage = cleanup.claimReleased
+    const cleanupMessage = cleanup.retryable
       ? message
-      : `${message}\n\nNo controller command was accepted, but the recovery-storage claim could not be released. Reload after recovery storage is available.`;
+      : `${message}\n\nNo controller command was accepted, but the durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available.`;
     jobAwareAlert(`Could not start laser recovery:\n\n${cleanupMessage}`);
     return;
   }

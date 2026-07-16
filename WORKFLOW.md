@@ -997,8 +997,12 @@ separate exact replay receipt.
    (disconnect, controller error/rejected line, reboot, write failure, or
    cancellation) and shows it after reload/reconnect.
 9. Only final **Start supervised recovery** claims the current run/revision.
-   Failure before controller acceptance releases the claim for retry. Once
-   transmission may have begun, an interrupted attempt becomes the newest capsule.
+   The attempt is durably armed before the controller Start boundary, then the
+   controller session, settings observation, status/position, WCO/origin, and
+   Work Z evidence are compared again immediately before streamer creation.
+   Failure before controller acceptance cancels the durable handoff and releases
+   the claim for retry. Once transmission may have begun, an interrupted attempt
+   becomes the newest capsule.
    A rejected recovery write remains fail-dark and Abort-visible while the
    transport is reset and quarantined.
 10. A CNC capsule with zero acknowledgements still shows diagnostic review; it never implies
@@ -1014,7 +1018,9 @@ separate exact replay receipt.
    archived controller values into the current profile or firmware.
 3. A failed ordinary Start leaves the old capsule untouched. Once a fresh current
    job is accepted by the transport, its staged artifact becomes `activeRun` and
-   supersedes the old capsule because machine state has changed.
+   supersedes the old capsule because machine state has changed. Before the wire
+   boundary a schema-v2 `pendingStart` record names the candidate without granting
+   it recovery authority or removing the older capsule.
 4. **Discard** deletes only the capsule. It does not stop, reset, reconnect, move,
    or modify the current job.
 5. Recovery storage/quota/schema failure shows a nonblocking warning. Current Start
@@ -1036,6 +1042,12 @@ separate exact replay receipt.
 1. The recovery attempt receives a new run ID. If interrupted after transmission
    may have begun, that attempt becomes the newest capsule and the source is no
    longer offered. The operator must inspect and requalify before another review.
+2. If the app restarts while `pendingStart` is unresolved, the candidate becomes
+   the newest capsule with zero diagnostic acknowledgements and an explicit
+   acceptance-unknown reason. It may be a conservative false positive when the
+   app died before the first program byte, but the older source is never offered
+   after a newer Start may have changed machine state. A short owner lease lets a
+   still-live tab commit or cancel without another tab misclassifying it as a crash.
 
 #### Edge — deliberate software Abort
 1. Abort keeps the run as the newest capsule (an aborted job still requires
@@ -2744,6 +2756,9 @@ F-CNC19 tiling.
 1. A pre-acceptance failure releases the attempt claim, so the same capsule remains
    retryable. If transmission may have begun and the run fails or the app crashes,
    the attempt becomes the newest capsule; the source no longer represents current work.
+2. Recovery performs a final synchronous comparison after its controller queue and
+   live-state awaits. Drift in controller session/qualification, `$30`/`$32`
+   evidence, WCO/origin, position, tool, or Work Z refuses before recovery G-code.
 
 ### F-CNC28. Watch the live 3D result while designing — ADR-105 G9
 

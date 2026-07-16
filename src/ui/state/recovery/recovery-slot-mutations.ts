@@ -14,6 +14,9 @@ export function activateFreshRunMutation(
   acceptedAtIso: string,
 ): SlotMutation<boolean> {
   if (artifactGeneration !== slots.generation) return unchanged(slots, false);
+  if (slots.pendingStart !== null && slots.pendingStart.runId !== artifact.runId) {
+    return unchanged(slots, false);
+  }
   // A very short stream can settle before the post-write Start continuation
   // activates its staged artifact. Terminal tracking is authoritative in that
   // race: a late activation must not turn a completed/interrupted run back into
@@ -38,6 +41,7 @@ export function activateFreshRunMutation(
       },
       recoveryCapsule: null,
       lastCompletedReceipt: null,
+      pendingStart: null,
     },
     value: true,
   };
@@ -118,7 +122,8 @@ export function noteUntrackedRunAcceptedMutation(
   if (
     slots.activeRun === null &&
     slots.recoveryCapsule === null &&
-    slots.lastCompletedReceipt === null
+    slots.lastCompletedReceipt === null &&
+    slots.pendingStart === null
   ) {
     return unchanged(slots, true);
   }
@@ -129,6 +134,7 @@ export function noteUntrackedRunAcceptedMutation(
       activeRun: null,
       recoveryCapsule: null,
       lastCompletedReceipt: null,
+      pendingStart: null,
     },
     value: true,
   };
@@ -232,6 +238,9 @@ export function activateClaimedRecoveryMutation(
   },
 ): SlotMutation<boolean> {
   if (args.artifactGeneration !== slots.generation) return unchanged(slots, false);
+  if (slots.pendingStart !== null && slots.pendingStart.runId !== args.artifact.runId) {
+    return unchanged(slots, false);
+  }
   // Recovery transmission can settle before the post-write activation
   // continuation runs, or another window can finish the same claimed
   // activation first. Never resurrect that already-owned target run.
@@ -259,6 +268,7 @@ export function activateClaimedRecoveryMutation(
       },
       recoveryCapsule: null,
       lastCompletedReceipt: null,
+      pendingStart: null,
     },
     value: true,
   };

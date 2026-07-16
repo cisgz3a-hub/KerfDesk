@@ -13,6 +13,7 @@ import {
 } from '../state/recovery';
 import type { PreparedRecoverySource } from './start-job-source';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
+import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 
 export type CncRecoveryStreamPlan = {
   readonly source: PreparedRecoverySource;
@@ -58,6 +59,7 @@ export async function streamCncRecoveryProgram(
   try {
     await laser.startJob(planned.gcode, {
       runId: recoveryRunId,
+      assertFinalStartAuthorized: finalRecoveryStartAssertion(laser),
       streamingMode: streamingModeForController(
         planned.source.project.device.controllerKind,
         planned.source.project.device.streamingMode,
@@ -111,7 +113,15 @@ async function stageRecoveryAttempt(
       createdAtIso: new Date().toISOString(),
     }),
   );
-  if (staged.ok && staged.value === recoveryRunId) return true;
+  if (staged.ok && staged.value === recoveryRunId) {
+    const armed = await repository.armClaimedRecoveryStart({
+      sourceRunId: claimedCapsule.runId,
+      sourceRevision: claimedCapsule.revision,
+      attemptId: claimedCapsule.claim?.attemptId ?? '',
+      recoveryRunId,
+    });
+    if (armed.ok && armed.value) return true;
+  }
 
   const cleanup = await cleanupRejectedRecoveryAttempt({
     repository,
@@ -120,9 +130,9 @@ async function stageRecoveryAttempt(
     stagedRunId: recoveryRunId,
   });
   jobAwareAlert(
-    cleanup.claimReleased
-      ? 'Cannot start CNC recovery:\n\nThe recovery attempt could not be stored safely. The saved job remains retryable and no controller command was sent.'
-      : 'Cannot start CNC recovery:\n\nNo controller command was sent, but the recovery-storage claim could not be released. Reload after recovery storage is available; do not assume this capsule is retryable yet.',
+    cleanup.retryable
+      ? 'Cannot start CNC recovery:\n\nThe recovery attempt could not be stored or durably armed. The saved job remains retryable and no controller command was sent.'
+      : 'Cannot start CNC recovery:\n\nNo controller command was sent, but the durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available; do not assume this capsule is retryable yet.',
   );
   return false;
 }
@@ -177,9 +187,9 @@ async function resolveFailedRecoveryAttempt(
       stagedRunId: recoveryRunId,
     });
     jobAwareAlert(
-      cleanup.claimReleased
+      cleanup.retryable
         ? `Could not start CNC recovery:\n\n${message}`
-        : `Could not start CNC recovery:\n\n${message}\n\nNo controller command was accepted, but the recovery-storage claim could not be released. Reload after recovery storage is available.`,
+        : `Could not start CNC recovery:\n\n${message}\n\nNo controller command was accepted, but the durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available.`,
     );
     return;
   }

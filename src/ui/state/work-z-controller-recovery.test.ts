@@ -89,7 +89,11 @@ describe('owned controller Work-Z recovery', () => {
       controllerOffsetRepresentsStockTop: true,
     });
 
-    expect(writes).toEqual(expect.arrayContaining(['$G\n', '$#\n']));
+    const workZReads = writes.filter((command) => command === '$G\n' || command === '$#\n');
+    expect(workZReads).toEqual(['$G\n', '$#\n', '$G\n']);
+    expect(writes).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^(?:G0|G1|G2|G3|G10|G38|G92|\$\d+=)/i)]),
+    );
     expect(useLaserStore.getState().workZZeroEvidence).toMatchObject({
       source: 'controller-readback',
       activeWcs: 'G55',

@@ -20,10 +20,14 @@ export function CheckpointResumeBanner(props: {
   readonly repository?: RecoveryRepository;
 }): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
-  const capsule = useRecoveryRepositorySnapshot(repository).recoveryCapsule;
+  const snapshot = useRecoveryRepositorySnapshot(repository);
+  const capsule = snapshot.recoveryCapsule;
   const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
   const [reviewOpen, setReviewOpen] = useState(false);
-  if (jobActive || capsule === null) return null;
+  // A pending Start may already have reached the controller. Never offer the
+  // older capsule during the short owner lease; it returns only if arming is
+  // cancelled, otherwise the candidate commits or reconciles as newest.
+  if (jobActive || snapshot.pendingStart !== null || capsule === null) return null;
 
   return (
     <>
