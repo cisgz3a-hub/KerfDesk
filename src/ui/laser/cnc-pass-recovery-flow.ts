@@ -119,7 +119,26 @@ function planPassRecovery(
   }
   if (!confirmWarnings(source.warnings)) return null;
   if (!confirmPlan(review, resume)) return null;
-  return { source, recovery: { job: resume.job }, gcode: emitted.gcode };
+  return {
+    source,
+    recovery: { job: resume.job },
+    gcode: emitted.gcode,
+    ...(review.position.kind === 'retained-confirmed'
+      ? { assertFinalStartConditions: () => assertRetainedPositionStillConfirmed(capsule) }
+      : {}),
+  };
+}
+
+// The Start-click WCO validation goes stale while the operator reads the
+// confirmation dialogs and the recovery claim awaits storage: status frames
+// keep updating wcoCache in that window without bumping any epoch the final
+// gate compares. Re-validate against the ARCHIVED offset at the wire boundary
+// so a retained-position recovery never streams against a moved work offset.
+function assertRetainedPositionStillConfirmed(capsule: RecoveryCapsule): void {
+  const issue = retainedPositionIssue(capsule, useLaserStore.getState().wcoCache);
+  if (issue !== null) {
+    throw new Error(`Retained position is no longer confirmed:\n\n${issue}`);
+  }
 }
 
 function confirmPlan(

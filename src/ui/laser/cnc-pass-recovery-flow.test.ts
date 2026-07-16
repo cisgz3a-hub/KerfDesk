@@ -333,6 +333,38 @@ describe('runCncPassRecoveryFlow', () => {
     expect(startJob).toHaveBeenCalledTimes(1);
   });
 
+  it('refuses when the live work offset drifts from the archive during the claim', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    // The real startJob runs this assertion synchronously at the wire
+    // boundary, immediately before streamer creation.
+    const startJob = vi.fn(
+      async (_gcode: string, options?: { assertFinalStartAuthorized?: () => void }) => {
+        options?.assertFinalStartAuthorized?.();
+      },
+    );
+    useLaserStore.setState({ startJob, wcoCache: { ...ARCHIVED_WCO } });
+    const claim = repo.claimRecovery.bind(repo);
+    vi.spyOn(repo, 'claimRecovery').mockImplementation(async (args) => {
+      // A status frame lands while the operator reads the confirmation
+      // dialogs or while the claim awaits storage: the live WCO no longer
+      // matches the archived run, and no epoch records the change.
+      useLaserStore.setState({ wcoCache: { x: 0, y: 0.2, z: 0 } });
+      return claim(args);
+    });
+
+    const started = await runCncPassRecoveryFlow(
+      capsule,
+      { ...baseReview, position: { kind: 'retained-confirmed' } },
+      repo,
+    );
+
+    expect(started).toBe(false);
+    const alerts = vi.mocked(jobAwareAlert).mock.calls.map(([message]) => String(message));
+    expect(alerts.some((message) => message.includes('differs'))).toBe(true);
+    expect(repo.getSnapshot().recoveryCapsule).not.toBeNull();
+  });
+
   it('refuses retained position when the live work offset differs', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
