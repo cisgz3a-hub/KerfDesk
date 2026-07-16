@@ -20,7 +20,9 @@ import {
   createReliefThreeScene,
   type ReliefSceneHandle,
 } from '../relief-viewer/relief-three-scene';
+import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
 import { buildPreviewToolpath } from './draw-preview';
+import { useCncCanvasFocus } from './use-cnc-canvas-focus';
 import { useCncPaneWidth } from './use-cnc-pane-width';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
@@ -37,7 +39,7 @@ export function Cnc3DPane(): JSX.Element | null {
   // directly returned a fresh object each store update, so the removal-grid
   // useMemo below recompiled the ~500×500 grid on every pointer move (PRF-01).
   const outputScope = useOutputScope();
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, toggleCollapsed } = useCncCanvasFocus();
   const resize = useCncPaneWidth();
   const deferredProject = useDeferredValue(project);
   const grid = useDesignRemovalGrid(deferredProject, outputScope, collapsed);
@@ -46,6 +48,7 @@ export function Cnc3DPane(): JSX.Element | null {
     <aside
       aria-label="3D result pane"
       className="lf-rail"
+      data-cnc-layout-mode={collapsed ? 'canvas-focus' : 'split-view'}
       style={paneStyle(collapsed, resize.widthPx)}
     >
       {!collapsed && (
@@ -60,20 +63,9 @@ export function Cnc3DPane(): JSX.Element | null {
           onKeyDown={resize.onHandleKeyDown}
         />
       )}
-      <div style={headerStyle}>
+      <div style={collapsed ? collapsedHeaderStyle : headerStyle}>
         {!collapsed && <span style={titleStyle}>3D result</span>}
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-label={collapsed ? 'Expand 3D result pane' : 'Collapse 3D result pane'}
-          title={
-            collapsed
-              ? 'Show the live 3D view of the simulated cut.'
-              : 'Hide the 3D pane to widen the canvas.'
-          }
-        >
-          {collapsed ? '◂ 3D' : '▸'}
-        </button>
+        <Cnc3DPaneToggle collapsed={collapsed} onToggle={toggleCollapsed} />
       </div>
       {!collapsed && <PaneScene grid={grid} stockThicknessMm={stockThicknessMm(project)} />}
       {!collapsed && grid === null && (
@@ -207,11 +199,12 @@ function paneStyle(collapsed: boolean, widthPx: number): React.CSSProperties {
     // adjacent fixed columns so their content stops clipping off the right edge
     // when the machine rail and Cuts/Layers are held open on a laptop window.
     width: collapsed ? 44 : widthPx,
+    boxSizing: 'border-box',
     flexShrink: 0,
     position: 'relative', // anchors the absolutely-positioned resize handle
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: '8px 8px',
+    padding: collapsed ? 4 : 8,
     fontFamily: 'system-ui, sans-serif',
     fontSize: 12,
     display: 'flex',
@@ -235,6 +228,11 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 6,
+};
+const collapsedHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  flex: 1,
+  minHeight: 0,
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const canvasStyle: React.CSSProperties = {
