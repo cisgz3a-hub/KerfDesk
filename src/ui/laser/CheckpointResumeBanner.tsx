@@ -12,7 +12,7 @@ import {
   type RecoveryRepository,
 } from '../state/recovery';
 import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
-import { CncRecoveryPreviewWizard } from './CncRecoveryPreviewWizard';
+import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 
@@ -59,7 +59,7 @@ export function CheckpointResumeBanner(props: {
         />
       </details>
       {reviewOpen && capsule.artifact.machineKind === 'cnc' ? (
-        <CncRecoveryPreviewWizard capsule={capsule} onClose={() => setReviewOpen(false)} />
+        <CncPassRecoveryWizard capsule={capsule} onClose={() => setReviewOpen(false)} />
       ) : null}
       {reviewOpen && capsule.artifact.machineKind === 'laser' ? (
         <LaserRecoveryReviewDialog
