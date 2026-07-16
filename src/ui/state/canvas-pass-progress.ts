@@ -10,7 +10,11 @@
 import type { DeviceProfile } from '../../core/devices';
 import type { Job } from '../../core/job';
 import type { MotionBlock, MotionManifest } from '../../core/job/motion-manifest';
-import { emitCncJobWithPassSpans, type CncPassSpan } from '../../core/output';
+import {
+  emitCncJobWithPassSpans,
+  type CncPassSpan,
+  type OutputEmitOptions,
+} from '../../core/output';
 
 export type CncPassRouteSpan = {
   /** Index into Job.groups, as recorded by the emission sidecar. */
@@ -37,14 +41,19 @@ export type CncPassPosition = {
  * trail speaks. Returns undefined when the started program is not the plain
  * strategy emission of this job (headers, resume rewrites) or when the spans
  * and manifest disagree — callers must then omit the pass display.
+ *
+ * `emitOptions` must be the run's OWN emit options: a current-position job's
+ * finishPosition changes its park lines, so an option-less re-emission would
+ * never reproduce the started program byte-for-byte (ADR-215/216).
  */
 export function cncPassRouteSpans(
   job: Job,
   device: DeviceProfile,
   startedGcode: string,
   manifest: MotionManifest,
+  emitOptions: OutputEmitOptions = {},
 ): ReadonlyArray<CncPassRouteSpan> | undefined {
-  const emission = emitCncJobWithPassSpans(job, device);
+  const emission = emitCncJobWithPassSpans(job, device, emitOptions);
   if (emission.gcode !== startedGcode) return undefined;
   if (!spansAscend(emission.spans)) return undefined;
   const mapped = mapSpansToRoute(emission.spans, manifest.blocks);

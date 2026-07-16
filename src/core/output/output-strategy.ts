@@ -4,7 +4,7 @@
 // tools took the Phase G slot — see PROJECT.md "Anything past Phase F".)
 
 import type { DeviceProfile } from '../devices';
-import type { Job } from '../job';
+import type { Job, JobOriginPlacement } from '../job';
 import type { Vec2 } from '../scene';
 
 export type OutputEmitOptions = {
@@ -12,6 +12,18 @@ export type OutputEmitOptions = {
    * device dialect keeps its normal finish policy. */
   readonly finishPosition?: Vec2;
 };
+
+/** The emit options a job's origin placement implies. A current-position job
+ * finishes back at its own start (work zero is arbitrary on no-homing
+ * machines), so its emission — and any byte-identity re-emission, like the
+ * ADR-216 pass-span mapping — must carry the same finish position. */
+export function finishOptionsForJobOrigin(
+  jobOrigin: JobOriginPlacement | undefined,
+): OutputEmitOptions {
+  return jobOrigin?.startFrom === 'current-position'
+    ? { finishPosition: jobOrigin.currentPosition }
+    : {};
+}
 
 export type OutputStrategy = {
   // Discriminator on the strategy union (ADR-095 added 'marlin'; the CNC

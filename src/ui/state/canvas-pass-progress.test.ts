@@ -69,6 +69,22 @@ describe('cncPassRouteSpans', () => {
     ]);
   });
 
+  it("maps a current-position program only when given the run's own emit options", () => {
+    const job = threePassJob();
+    const finishPosition = { x: 25, y: 40 };
+    const emission = emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE, { finishPosition });
+    const manifest = buildMotionManifest(emission.gcode, { machineKind: 'cnc' });
+    // An option-less re-emission parks elsewhere, so the byte check refuses…
+    expect(
+      cncPassRouteSpans(job, DEFAULT_DEVICE_PROFILE, emission.gcode, manifest),
+    ).toBeUndefined();
+    // …while the run's own options reproduce the program and map every pass.
+    const spans = cncPassRouteSpans(job, DEFAULT_DEVICE_PROFILE, emission.gcode, manifest, {
+      finishPosition,
+    });
+    expect(spans?.length).toBe(3);
+  });
+
   it('refuses a program that is not the plain strategy emission of the job', () => {
     const job = threePassJob();
     const emission = emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE);

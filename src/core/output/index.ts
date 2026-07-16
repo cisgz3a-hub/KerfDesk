@@ -1,4 +1,8 @@
-export type { OutputEmitOptions, OutputStrategy } from './output-strategy';
+export {
+  finishOptionsForJobOrigin,
+  type OutputEmitOptions,
+  type OutputStrategy,
+} from './output-strategy';
 export { grblStrategy } from './grbl-strategy';
 export { cncGrblStrategy, emitCncJobWithPassSpans } from './cnc-grbl-strategy';
 export type { CncPassSpan, CncPassSpanEmission } from './cnc-pass-spans';

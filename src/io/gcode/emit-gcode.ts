@@ -16,7 +16,12 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import { emitCncJobWithPassSpans, selectOutputStrategy, type CncPassSpan } from '../../core/output';
+import {
+  emitCncJobWithPassSpans,
+  finishOptionsForJobOrigin,
+  selectOutputStrategy,
+  type CncPassSpan,
+} from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
 import {
   gcodeMetadataHeader,
@@ -100,7 +105,7 @@ export function emitPreparedGcodeWithCncPassSpans(
       ? emitCncJobWithPassSpans(
           job,
           prepared.project.device,
-          currentPositionFinishOptions(options.jobOrigin),
+          finishOptionsForJobOrigin(options.jobOrigin),
         )
       : null;
   const body =
@@ -109,7 +114,7 @@ export function emitPreparedGcodeWithCncPassSpans(
       : selectOutputStrategy(prepared.project.device).emit(
           job,
           prepared.project.device,
-          currentPositionFinishOptions(options.jobOrigin),
+          finishOptionsForJobOrigin(options.jobOrigin),
         );
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
@@ -120,14 +125,6 @@ export function emitPreparedGcodeWithCncPassSpans(
     : body;
   const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
   return { gcode, preflight, spans };
-}
-
-function currentPositionFinishOptions(jobOrigin: JobOriginPlacement | undefined): {
-  readonly finishPosition?: { readonly x: number; readonly y: number };
-} {
-  return jobOrigin?.startFrom === 'current-position'
-    ? { finishPosition: jobOrigin.currentPosition }
-    : {};
 }
 
 function runEmitPreflight(

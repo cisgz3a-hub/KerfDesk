@@ -17,6 +17,7 @@ import {
   INITIAL_ROUTE_RECONCILIATION,
   type RouteReconciliationState,
 } from '../../core/job/live-route-reconciliation';
+import { finishOptionsForJobOrigin } from '../../core/output';
 import { fingerprintGcode, type GcodeFingerprint } from '../../core/recovery';
 import {
   machineKindOf,
@@ -175,7 +176,10 @@ function assembleCanvasPlan(
 }
 
 // Marker plans pass an empty program; only a real started program can be
-// byte-checked against the sidecar re-emission (ADR-216).
+// byte-checked against the sidecar re-emission (ADR-216). The re-emission
+// carries the run's own finish options — a current-position start parks at
+// its own start (#226), and dropping that option would fail the byte check
+// and silently omit the pass display for every such job.
 function cncPassSpansOption(
   args: CanvasPlanBuildContext,
   machineKind: MachineKind,
@@ -188,6 +192,7 @@ function cncPassSpansOption(
     args.prepared.project.device,
     fingerprintSource,
     manifest,
+    finishOptionsForJobOrigin(args.jobOrigin),
   );
   return spans === undefined ? {} : { cncPassSpans: spans };
 }

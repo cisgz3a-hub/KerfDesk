@@ -8,7 +8,7 @@ import {
   DEFAULT_OUTPUT_SCOPE,
   type Project,
 } from '../../core/scene';
-import type { PreparedOutput } from '../../io/gcode';
+import { emitPreparedGcode, type PreparedOutput } from '../../io/gcode';
 import {
   buildCanvasMotionPlan,
   buildCanvasMarkerPlan,
@@ -91,6 +91,47 @@ const machine = {
   wcoCache: null,
   trustedPositionEpoch: 4,
 };
+
+function twoPassCncPrepared() {
+  const cncGroup: CncGroup = {
+    kind: 'cnc',
+    layerId: 'L1',
+    color: '#ff0000',
+    cutType: 'engrave',
+    toolDiameterMm: 3.175,
+    feedMmPerMin: 1000,
+    plungeMmPerMin: 300,
+    spindleRpm: 12000,
+    spindleSpinupSec: 3,
+    safeZMm: 3.81,
+    passes: [
+      {
+        kind: 'contour',
+        zMm: -1,
+        polyline: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+        ],
+        closed: false,
+      },
+      {
+        kind: 'contour',
+        zMm: -2,
+        polyline: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+        ],
+        closed: false,
+      },
+    ],
+  };
+  const job: Job = { groups: [cncGroup] };
+  const project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+  return { ok: true, project, job, jobOriginOffset: { x: 0, y: 0 } } satisfies Extract<
+    PreparedOutput,
+    { readonly ok: true }
+  >;
+}
 
 describe('CanvasMotionPlan', () => {
   it('normalizes MPos/WCO inch reports into work millimetres', () => {
@@ -201,40 +242,7 @@ describe('CanvasMotionPlan', () => {
   });
 
   it('attaches CNC pass spans for the plain strategy emission and drops them on rebuild', () => {
-    const cncGroup: CncGroup = {
-      kind: 'cnc',
-      layerId: 'L1',
-      color: '#ff0000',
-      cutType: 'engrave',
-      toolDiameterMm: 3.175,
-      feedMmPerMin: 1000,
-      plungeMmPerMin: 300,
-      spindleRpm: 12000,
-      spindleSpinupSec: 3,
-      safeZMm: 3.81,
-      passes: [
-        {
-          kind: 'contour',
-          zMm: -1,
-          polyline: [
-            { x: 0, y: 0 },
-            { x: 10, y: 0 },
-          ],
-          closed: false,
-        },
-        {
-          kind: 'contour',
-          zMm: -2,
-          polyline: [
-            { x: 0, y: 0 },
-            { x: 10, y: 0 },
-          ],
-          closed: false,
-        },
-      ],
-    };
-    const job: Job = { groups: [cncGroup] };
-    const project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+    const { project, job } = twoPassCncPrepared();
     const emission = emitCncJobWithPassSpans(job, project.device);
     const plan = buildCanvasMotionPlan({
       gcode: emission.gcode,
@@ -247,6 +255,26 @@ describe('CanvasMotionPlan', () => {
 
     const resumed = rebuildCanvasPlanForGcode(plan, 'G21\nG90\nG1 Z-2.000 F300');
     expect(resumed.cncPassSpans).toBeUndefined();
+  });
+
+  it('keeps CNC pass spans when a current-position start adds park lines', () => {
+    const preparedCnc = twoPassCncPrepared();
+    // #226 threads finishPosition into a current-position job's emission, so
+    // the started program's park lines differ from an option-less re-emission.
+    const jobOrigin = {
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 25, y: 40 },
+    } as const;
+    const { gcode } = emitPreparedGcode(preparedCnc, { jobOrigin });
+    const plan = buildCanvasMotionPlan({
+      gcode,
+      prepared: preparedCnc,
+      machine,
+      statusQuery: 'realtime-report',
+      jobOrigin,
+    });
+    expect(plan.cncPassSpans?.map(({ passIndex }) => passIndex)).toEqual([0, 1]);
   });
 
   it('rebuilds a resumed approach from the controller position captured for that run', () => {
