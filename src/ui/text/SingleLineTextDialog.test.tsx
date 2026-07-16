@@ -61,6 +61,177 @@ describe('single-line text dialog flow', () => {
       host.remove();
     }
   });
+
+  it('offers Forge Soft Cursive and stores it as open engraving geometry', async () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().updateCncMachine({ toolId: 'vb-60' });
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<AddTextDialog />));
+      await act(async () => {
+        const content = requireTextarea(host);
+        content.value = 'soft cursive';
+        Simulate.change(content);
+        requireButton(host, 'Open the font picker and choose the text typeface.').click();
+      });
+      await act(async () => {
+        requireButton(host, 'Use Forge Soft Cursive for this text object.').click();
+      });
+
+      expect(host.textContent).toContain('CNC single-line font');
+      await act(async () => {
+        Simulate.submit(requireForm(host));
+        await waitForTextObject();
+      });
+
+      const text = useStore
+        .getState()
+        .project.scene.objects.find((object) => object.kind === 'text');
+      expect(text).toMatchObject({ kind: 'text', fontKey: 'forge-soft-cursive' });
+      expect(text?.kind === 'text' && text.paths[0]?.polylines.every((line) => !line.closed)).toBe(
+        true,
+      );
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('engrave');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('offers the three approved directions and stores Forge Swing as open engraving geometry', async () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().updateCncMachine({ toolId: 'vb-60' });
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<AddTextDialog />));
+      await act(async () => {
+        const content = requireTextarea(host);
+        content.value = 'Made by hand';
+        Simulate.change(content);
+        requireButton(host, 'Open the font picker and choose the text typeface.').click();
+      });
+
+      expect(requireButton(host, 'Use Forge Compact for this text object.')).toBeTruthy();
+      expect(requireButton(host, 'Use Forge Sign for this text object.')).toBeTruthy();
+      await act(async () => {
+        requireButton(host, 'Use Forge Swing for this text object.').click();
+      });
+
+      expect(host.textContent).toContain('verify the text size and bit diameter');
+      await act(async () => {
+        Simulate.submit(requireForm(host));
+        await waitForTextObject();
+      });
+
+      const text = useStore
+        .getState()
+        .project.scene.objects.find((object) => object.kind === 'text');
+      expect(text).toMatchObject({ kind: 'text', fontKey: 'forge-swing' });
+      expect(text?.kind === 'text' && text.paths[0]?.polylines.every((line) => !line.closed)).toBe(
+        true,
+      );
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('engrave');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('offers Forge Grace editions and stores the Flourish edition as open engraving geometry', async () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().updateCncMachine({ toolId: 'vb-60' });
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<AddTextDialog />));
+      await act(async () => {
+        const content = requireTextarea(host);
+        content.value = 'Cedar & Steel';
+        Simulate.change(content);
+        requireButton(host, 'Open the font picker and choose the text typeface.').click();
+      });
+
+      expect(requireButton(host, 'Use Forge Grace for this text object.')).toBeTruthy();
+      await act(async () => {
+        requireButton(host, 'Use Forge Grace Flourish for this text object.').click();
+      });
+      await act(async () => {
+        Simulate.submit(requireForm(host));
+        await waitForTextObject();
+      });
+
+      const text = useStore
+        .getState()
+        .project.scene.objects.find((object) => object.kind === 'text');
+      expect(text).toMatchObject({ kind: 'text', fontKey: 'forge-grace-flourish' });
+      expect(text?.kind === 'text' && text.paths[0]?.polylines.every((line) => !line.closed)).toBe(
+        true,
+      );
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('engrave');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('offers all eight approved cursive directions and stores the chosen style as engraving geometry', async () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().updateCncMachine({ toolId: 'vb-60' });
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<AddTextDialog />));
+      await act(async () => {
+        const content = requireTextarea(host);
+        content.value = 'Johann Made by Hand';
+        Simulate.change(content);
+        requireButton(host, 'Open the font picker and choose the text typeface.').click();
+      });
+
+      const styles = [
+        'Forge Signature',
+        'Forge Romantic',
+        'Forge Copperplate',
+        'Forge Casual',
+        'Forge Friendly',
+        'Forge Signwriter',
+        'Forge Parisian',
+        'Forge Personal',
+      ];
+      styles.forEach((style) => {
+        expect(requireButton(host, `Use ${style} for this text object.`)).toBeTruthy();
+      });
+      await act(async () => {
+        requireButton(host, 'Use Forge Personal for this text object.').click();
+      });
+      await act(async () => {
+        Simulate.submit(requireForm(host));
+        await waitForTextObject();
+      });
+
+      const text = useStore
+        .getState()
+        .project.scene.objects.find((object) => object.kind === 'text');
+      expect(text).toMatchObject({ kind: 'text', fontKey: 'forge-personal' });
+      expect(text?.kind === 'text' && text.paths[0]?.polylines.every((line) => !line.closed)).toBe(
+        true,
+      );
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('engrave');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 function requireTextarea(host: HTMLElement): HTMLTextAreaElement {

@@ -1,12 +1,26 @@
 import { describe, expect, it } from 'vitest';
+import { FORGE_SCRIPT_STYLE_KEYS } from './forge-stroke-font';
 import { singleLineTextToPolylines } from './single-line-text';
 
-const FONT_KEYS = ['ems-allure', 'ems-delight', 'ems-tech', 'ems-osmotron'] as const;
+const FONT_KEYS = [
+  'ems-allure',
+  'ems-delight',
+  'ems-tech',
+  'ems-osmotron',
+  'forge-soft',
+  'forge-soft-cursive',
+  'forge-compact',
+  'forge-sign',
+  'forge-swing',
+  'forge-grace',
+  'forge-grace-flourish',
+  ...FORGE_SCRIPT_STYLE_KEYS,
+] as const;
 const SIZES_MM = [5, 10, 20] as const;
 const MAX_SAMPLE_TOOLPATH_POINTS = 1_000;
 const CASES = FONT_KEYS.flatMap((fontKey) => SIZES_MM.map((sizeMm) => ({ fontKey, sizeMm })));
 
-describe('EMS stroke font machining sizes', () => {
+describe('decorative stroke font machining sizes', () => {
   it.each(CASES)('$fontKey at $sizeMm mm stays open, finite, and bounded', async (sample) => {
     const result = await singleLineTextToPolylines({
       content: 'CNC Bowl',

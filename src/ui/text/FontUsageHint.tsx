@@ -5,7 +5,7 @@ export function FontUsageHint(props: { readonly fontKey: string }): JSX.Element 
   return (
     <small style={hintStyle}>
       CNC single-line font: use an Engrave/on-path layer. V-carve requires closed outline text.
-      {props.fontKey.startsWith('ems-') && (
+      {(props.fontKey.startsWith('ems-') || DECORATIVE_FORGE_FONTS.has(props.fontKey)) && (
         <span style={detailStyle}>
           Decorative strokes can have tight turns; verify the text size and bit diameter in Preview.
         </span>
@@ -13,6 +13,21 @@ export function FontUsageHint(props: { readonly fontKey: string }): JSX.Element 
     </small>
   );
 }
+
+const DECORATIVE_FORGE_FONTS = new Set([
+  'forge-soft-cursive',
+  'forge-swing',
+  'forge-grace',
+  'forge-grace-flourish',
+  'forge-signature',
+  'forge-romantic',
+  'forge-copperplate',
+  'forge-casual',
+  'forge-friendly',
+  'forge-signwriter',
+  'forge-parisian',
+  'forge-personal',
+]);
 
 const hintStyle: React.CSSProperties = {
   display: 'block',

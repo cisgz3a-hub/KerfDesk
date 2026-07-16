@@ -11,7 +11,10 @@ const mocks = vi.hoisted(() => ({
   bendTextRender: vi.fn((rendered: unknown) => rendered),
 }));
 
-vi.mock('./font-loader', () => ({ loadFont: mocks.loadFont }));
+vi.mock('./font-loader', () => ({
+  isTracedScriptFontKey: () => false,
+  loadFont: mocks.loadFont,
+}));
 vi.mock('../../core/text', async (importOriginal) => ({
   ...(await importOriginal<typeof CoreText>()),
   textToPolylines: mocks.textToPolylines,
