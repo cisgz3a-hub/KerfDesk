@@ -1,7 +1,8 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { helpProps } from '../help/help-topics';
+import { useStore } from '../state';
 import {
   controllerOperationCommandBlockMessage,
   type LaserControllerOperation,
@@ -10,9 +11,27 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
+import {
+  machineSettingsContextForProfile,
+  machineSettingsContextNotice,
+  presentGrblSetting,
+  type GrblSettingPresentation,
+  type MachineSettingsPresentationContext,
+} from './machine-settings-presentation';
 
-export function MachineSettingsPanel(props: { readonly defaultOpen?: boolean } = {}): JSX.Element {
+type MachineSettingsPanelProps = {
+  readonly defaultOpen?: boolean;
+  readonly context?: MachineSettingsPresentationContext;
+};
+
+type PresentedSettingRow = {
+  readonly row: GrblSettingRow;
+  readonly presentation: GrblSettingPresentation;
+};
+
+export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX.Element {
   const platform = usePlatform();
+  const project = useStore((s) => s.project);
   const connection = useLaserStore((s) => s.connection);
   const streamer = useLaserStore((s) => s.streamer);
   const motionOperation = useLaserStore((s) => s.motionOperation);
@@ -22,6 +41,8 @@ export function MachineSettingsPanel(props: { readonly defaultOpen?: boolean } =
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
   const pushToast = useToastStore((s) => s.pushToast);
+  const context =
+    props.context ?? machineSettingsContextForProfile(project.device, project.machine);
   const readDisabledReason = machineSettingsReadDisabledReason({
     connected: connection.kind === 'connected',
     activeJob: isActiveJob(streamer),
@@ -31,14 +52,6 @@ export function MachineSettingsPanel(props: { readonly defaultOpen?: boolean } =
   });
   const exportDisabledReason =
     rows.length === 0 ? 'Read machine settings before exporting a backup.' : null;
-  const readHelp = helpProps(
-    'control:laser.machine-settings.read',
-    readDisabledReason ?? undefined,
-  );
-  const exportHelp = helpProps(
-    'control:laser.machine-settings.export',
-    exportDisabledReason ?? undefined,
-  );
   const panelHelp = helpProps('control:laser.machine-settings');
 
   const handleRead = (): void => {
@@ -66,49 +79,84 @@ export function MachineSettingsPanel(props: { readonly defaultOpen?: boolean } =
       >
         Read / Backup Controller Settings
       </summary>
-      <MachineSettingsNotice />
-      <div style={buttonRowStyle}>
-        <button
-          type="button"
-          onClick={handleRead}
-          disabled={readDisabledReason !== null}
-          title={readHelp.title}
-          data-help-id={readHelp['data-help-id']}
-        >
-          Read ($$)
-        </button>
-        <button
-          type="button"
-          onClick={handleExport}
-          disabled={exportDisabledReason !== null}
-          title={exportHelp.title}
-          data-help-id={exportHelp['data-help-id']}
-        >
-          Export backup
-        </button>
-      </div>
+      <MachineSettingsNotice context={context} />
+      <MachineSettingsActions
+        onRead={handleRead}
+        onExport={handleExport}
+        readDisabledReason={readDisabledReason}
+        exportDisabledReason={exportDisabledReason}
+      />
       {lastSettingsReadAt !== null ? (
         <div style={readAtStyle}>Last read: {new Date(lastSettingsReadAt).toLocaleString()}</div>
       ) : null}
-      <SettingsTable rows={rows} />
+      <SettingsTable rows={rows} context={context} />
     </details>
   );
 }
 
-function MachineSettingsNotice(): JSX.Element {
+function MachineSettingsActions(props: {
+  readonly onRead: () => void;
+  readonly onExport: () => void;
+  readonly readDisabledReason: string | null;
+  readonly exportDisabledReason: string | null;
+}): JSX.Element {
+  const readHelp = helpProps(
+    'control:laser.machine-settings.read',
+    props.readDisabledReason ?? undefined,
+  );
+  const exportHelp = helpProps(
+    'control:laser.machine-settings.export',
+    props.exportDisabledReason ?? undefined,
+  );
+  return (
+    <div style={buttonRowStyle}>
+      <button
+        type="button"
+        onClick={props.onRead}
+        disabled={props.readDisabledReason !== null}
+        title={readHelp.title}
+        data-help-id={readHelp['data-help-id']}
+      >
+        Read ($$)
+      </button>
+      <button
+        type="button"
+        onClick={props.onExport}
+        disabled={props.exportDisabledReason !== null}
+        title={exportHelp.title}
+        data-help-id={exportHelp['data-help-id']}
+      >
+        Export backup
+      </button>
+    </div>
+  );
+}
+
+function MachineSettingsNotice(props: {
+  readonly context: MachineSettingsPresentationContext;
+}): JSX.Element {
   return (
     <p style={noticeStyle}>
       Reads live controller settings with <code>$$</code>. Read-only in this version; export a
       backup before changing firmware.
+      <br />
+      {machineSettingsContextNotice(props.context)}
     </p>
   );
 }
 
-function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> }): JSX.Element {
+function SettingsTable(props: {
+  readonly rows: ReadonlyArray<GrblSettingRow>;
+  readonly context: MachineSettingsPresentationContext;
+}): JSX.Element {
   const [search, setSearch] = useState('');
   const tableHelp = helpProps('control:laser.machine-settings.table');
-  const filteredRows = useMemo(() => filterRows(rows, search), [rows, search]);
-  if (rows.length === 0) {
+  const presentedRows = props.rows.map((row) => ({
+    row,
+    presentation: presentGrblSetting(row, props.context),
+  }));
+  const filteredRows = filterRows(presentedRows, search);
+  if (props.rows.length === 0) {
     return <p style={emptyStyle}>No settings read yet.</p>;
   }
   return (
@@ -145,20 +193,20 @@ function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> 
                 <Fragment key={group.category}>
                   <tr>
                     <th colSpan={5} style={groupCellStyle}>
-                      {CATEGORY_LABELS[group.category]}
+                      {group.rows[0]?.presentation.categoryLabel}
                     </th>
                   </tr>
-                  {group.rows.map((row) => (
+                  {group.rows.map(({ row, presentation }) => (
                     <tr key={row.code}>
                       <td style={cellStyle}>{row.code}</td>
                       <td style={cellStyle}>{row.rawValue}</td>
-                      <td style={cellStyle}>{row.unit ?? '-'}</td>
+                      <td style={cellStyle}>{presentation.unit ?? '-'}</td>
                       <td style={cellStyle}>
                         <span style={riskBadgeStyle}>{riskLabel(row.writeRisk)}</span>
                       </td>
                       <td style={cellStyle}>
-                        <strong>{row.name}</strong>
-                        <span style={descriptionStyle}> {row.description}</span>
+                        <strong>{presentation.name}</strong>
+                        <span style={descriptionStyle}> {presentation.description}</span>
                       </td>
                     </tr>
                   ))}
@@ -181,37 +229,35 @@ const CATEGORY_ORDER = [
   'system',
   'unknown',
 ] as const;
-const CATEGORY_LABELS: Readonly<Record<GrblSettingRow['category'], string>> = {
-  laser: 'Laser',
-  motion: 'Motion',
-  homing: 'Homing',
-  limits: 'Limits',
-  reporting: 'Reporting',
-  system: 'System',
-  unknown: 'Unknown',
-};
 
 function filterRows(
-  rows: ReadonlyArray<GrblSettingRow>,
+  rows: ReadonlyArray<PresentedSettingRow>,
   search: string,
-): ReadonlyArray<GrblSettingRow> {
+): ReadonlyArray<PresentedSettingRow> {
   const needle = search.trim().toLowerCase();
   if (needle === '') return rows;
-  return rows.filter((row) =>
-    [row.code, row.rawValue, row.name, row.unit ?? '', row.category]
+  return rows.filter(({ row, presentation }) =>
+    [
+      row.code,
+      row.rawValue,
+      presentation.name,
+      presentation.unit ?? '',
+      presentation.description,
+      presentation.categoryLabel,
+    ]
       .join(' ')
       .toLowerCase()
       .includes(needle),
   );
 }
 
-function groupRows(rows: ReadonlyArray<GrblSettingRow>): ReadonlyArray<{
+function groupRows(rows: ReadonlyArray<PresentedSettingRow>): ReadonlyArray<{
   readonly category: GrblSettingRow['category'];
-  readonly rows: ReadonlyArray<GrblSettingRow>;
+  readonly rows: ReadonlyArray<PresentedSettingRow>;
 }> {
   return CATEGORY_ORDER.map((category) => ({
     category,
-    rows: rows.filter((row) => row.category === category),
+    rows: rows.filter(({ row }) => row.category === category),
   })).filter((group) => group.rows.length > 0);
 }
 
@@ -235,7 +281,7 @@ function machineSettingsReadDisabledReason(state: {
   readonly controllerOperation: LaserControllerOperation | null;
   readonly autofocusBusy: boolean;
 }): string | null {
-  if (!state.connected) return 'Connect to the laser before reading machine settings.';
+  if (!state.connected) return 'Connect to the controller before reading machine settings.';
   if (state.activeJob) return 'A job is active. Request ABORT before reading machine settings.';
   if (state.motionOperationActive) {
     return 'A jog or frame operation is active. Wait for it to finish before reading settings.';

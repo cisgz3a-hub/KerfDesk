@@ -11,7 +11,10 @@ import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const issues = machineSetupValidationIssues(state);
   const rows = useLaserStore((store) => store.grblSettingsRows);
-  const queuedFirmwareWrites = computeFirmwareDiffs(state.draft, rows, state.draftMachine).filter(
+  const queuedFirmwareWrites = computeFirmwareDiffs(state.draft, rows, {
+    machine: state.draftMachine,
+    machineKinds: state.machineKinds,
+  }).filter(
     (diff) => diff.differs && diff.writable && state.queuedFirmwareWriteIds.includes(diff.id),
   );
   return (

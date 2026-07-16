@@ -3,10 +3,12 @@
 // 'common'-risk are writable here, matching the existing FirmwareWrites guard;
 // machine-critical ones (bed travel) are surfaced read-only for awareness.
 
-import type { DeviceProfile } from '../../../core/devices';
 import type { GrblSettingRow } from '../../../core/controllers/grbl';
-import type { CncMachineConfig, MachineConfig } from '../../../core/scene';
+import type { DeviceProfile } from '../../../core/devices';
+import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
+import type { CncMachineConfig, MachineConfig, MachineKind } from '../../../core/scene';
 import { numbersClose } from '../../../core/util';
+import { presentGrblSetting } from '../machine-settings-presentation';
 
 export type FirmwareDiff = {
   readonly id: number;
@@ -23,46 +25,41 @@ export type FirmwareDiff = {
 
 type DiffedSetting = {
   readonly id: number;
-  readonly label: string;
-  readonly desired: (draft: DeviceProfile, cnc: CncMachineConfig | null) => number;
+  readonly label?: string;
+  readonly desired: number;
 };
 
-// The settings the wizard reconciles. $30/$31/$32 are 'common'-risk and
-// writable through the existing guard; $130/$131 are machine-critical and
-// included read-only so a bed mismatch is visible without offering a risky
-// write here (use the controller manufacturer's backed-up procedure). On a router the desired
-// values invert: $32 must be 0 (laser mode zeroes spindle power during
-// rapids) and $30 is the spindle max RPM, never the laser S scale.
-const DIFFED_SETTINGS: ReadonlyArray<DiffedSetting> = [
-  { id: 30, label: 'Max power (S)', desired: (d, cnc) => cnc?.params.spindleMaxRpm ?? d.maxPowerS },
-  { id: 31, label: 'Min power (S)', desired: (d) => d.minPowerS },
-  {
-    id: 32,
-    label: 'Laser mode',
-    desired: (d, cnc) => (cnc === null && d.laserModeEnabled ? 1 : 0),
-  },
-  { id: 130, label: 'Bed width', desired: (d) => d.bedWidth },
-  { id: 131, label: 'Bed height', desired: (d) => d.bedHeight },
-];
+export type ComputeFirmwareDiffOptions = {
+  readonly machine?: MachineConfig;
+  readonly machineKinds?: ReadonlyArray<MachineKind>;
+};
 
 export function computeFirmwareDiffs(
   draft: DeviceProfile,
   rows: ReadonlyArray<GrblSettingRow>,
-  machine?: MachineConfig,
+  options: ComputeFirmwareDiffOptions = {},
 ): ReadonlyArray<FirmwareDiff> {
-  const cnc = machine !== undefined && machine.kind === 'cnc' ? machine : null;
-  return DIFFED_SETTINGS.flatMap((setting) => {
+  const cnc = options.machine?.kind === 'cnc' ? options.machine : null;
+  const activeMachineKind = cnc === null ? 'laser' : 'cnc';
+  const context = {
+    machineKinds: options.machineKinds ?? explicitMachineKindsForProfile(draft),
+    activeMachineKind,
+  } satisfies {
+    readonly machineKinds: ReadonlyArray<MachineKind>;
+    readonly activeMachineKind: MachineKind;
+  };
+  return diffedSettings(draft, cnc).flatMap((setting) => {
     const row = rows.find((candidate) => candidate.id === setting.id);
     // Only diff settings the controller actually reported; an unread setting
     // is not something we can confidently reconcile.
     if (row === undefined) return [];
-    const desired = setting.desired(draft, cnc);
+    const desired = setting.desired;
     const current = row.numericValue;
     return [
       {
         id: setting.id,
         code: row.code,
-        label: setting.label,
+        label: setting.label ?? presentGrblSetting(row, context).name,
         current: row.rawValue,
         desired: String(desired),
         differs: current !== null && !numbersClose(current, desired),
@@ -70,4 +67,20 @@ export function computeFirmwareDiffs(
       },
     ];
   });
+}
+
+// $30/$31/$32 share one controller PWM block, but the profile only has a
+// trustworthy $31 source for Laser output. CNC profiles currently define a
+// spindle maximum, not a minimum, so CNC review must not borrow laser minPowerS.
+function diffedSettings(
+  draft: DeviceProfile,
+  cnc: CncMachineConfig | null,
+): ReadonlyArray<DiffedSetting> {
+  return [
+    { id: 30, desired: cnc?.params.spindleMaxRpm ?? draft.maxPowerS },
+    ...(cnc === null ? [{ id: 31, desired: draft.minPowerS }] : []),
+    { id: 32, desired: cnc === null && draft.laserModeEnabled ? 1 : 0 },
+    { id: 130, label: 'Bed width', desired: draft.bedWidth },
+    { id: 131, label: 'Bed height', desired: draft.bedHeight },
+  ];
 }

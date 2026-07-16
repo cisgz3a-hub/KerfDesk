@@ -7,6 +7,10 @@ import { Button } from '../../kit';
 import { isActiveJob } from '../../state/laser-store-helpers';
 import { useLaserStore } from '../../state/laser-store';
 import { MachineSettingsPanel } from '../MachineSettingsPanel';
+import {
+  machineSettingsFirmwareNotice,
+  type MachineSettingsPresentationContext,
+} from '../machine-settings-presentation';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
@@ -18,6 +22,7 @@ export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProp
   const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
   const controllerKind = state.draft.controllerKind ?? 'grbl-v1.1';
   const guide = machineSetupControllerGuide(controllerKind);
+  const settingsContext = machineSettingsContext(state);
 
   if (guide.writePolicy !== 'guarded-single-setting') {
     return <ExternalConfigurationNotice guide={guide} />;
@@ -49,7 +54,7 @@ export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProp
           Read and export a controller backup before any write. You can skip this step and save the
           software profile without changing firmware.
         </p>
-        <MachineSettingsPanel defaultOpen />
+        <MachineSettingsPanel defaultOpen context={settingsContext} />
       </section>
     );
   }
@@ -62,17 +67,27 @@ function ComparedFirmware(props: {
   readonly rows: ReturnType<typeof useLaserStore.getState>['grblSettingsRows'];
 }): JSX.Element {
   const { state, dispatch, rows } = props;
-  const diffs = computeFirmwareDiffs(state.draft, rows, state.draftMachine);
+  const settingsContext = machineSettingsContext(state);
+  const diffs = computeFirmwareDiffs(state.draft, rows, {
+    machine: state.draftMachine,
+    machineKinds: state.machineKinds,
+  });
   const writable = diffs.filter((diff) => diff.differs && diff.writable);
   const infoOnly = diffs.filter((diff) => diff.differs && !diff.writable);
+  const firmwareNotice = machineSettingsFirmwareNotice(settingsContext);
   return (
     <section style={sectionStyle}>
       <p style={hintStyle}>
-        Export the current settings first. Only common power settings can be queued below. Final
-        Save commits the software profile first, then writes each queued value and verifies it by
-        exact re-read. Cancel sends no firmware command.
+        Export the current settings first. Only output settings backed by the active profile can be
+        queued below. Final Save commits the software profile first, then writes each queued value
+        and verifies it by exact re-read. Cancel sends no firmware command.
       </p>
-      <MachineSettingsPanel defaultOpen />
+      {firmwareNotice === null ? null : (
+        <p role="note" style={warningStyle}>
+          {firmwareNotice}
+        </p>
+      )}
+      <MachineSettingsPanel defaultOpen context={settingsContext} />
       <label style={backupStyle}>
         <input
           type="checkbox"
@@ -116,6 +131,15 @@ function ComparedFirmware(props: {
       ) : null}
     </section>
   );
+}
+
+function machineSettingsContext(
+  state: DeviceSetupStepProps['state'],
+): MachineSettingsPresentationContext {
+  return {
+    machineKinds: state.machineKinds,
+    activeMachineKind: state.machineKind,
+  };
 }
 
 function ExternalConfigurationNotice(props: {
