@@ -1482,15 +1482,17 @@ Shipped" and update the hardware verification inventory.
 #### No-homing positioning guide (ADR-193)
 
 For a device profile with Homing disabled, a newly created or opened project
-starts in **Current Position** rather than Absolute Coordinates. The machine
+starts in **User Origin** (2026-07-16 maintainer amendment; previously Current
+Position): Start refuses until an origin exists, so the default flow is
+position the head, **Set origin here**, then Start. The machine
 panel shows **Position job** with two paths:
 
-1. **Jog with controls (recommended).** The guide shows this mode as **Selected**
-   when Current Position is active; it does not present a capture-style action.
-   The operator jogs to the chosen 9-dot job anchor, may click Frame to inspect
-   the perimeter, then clicks Start. Frame remains available but is not required.
-   Set origin is not required. If another placement mode was chosen, **Choose
-   jog positioning** restores Current Position.
+1. **Jog with controls.** The operator clicks **Choose jog positioning** to
+   select Current Position; the guide then shows this mode as **Selected** and
+   does not present a capture-style action. The operator jogs to the chosen
+   9-dot job anchor, may click Frame to inspect the perimeter, then clicks
+   Start. Frame remains available but is not required. Set origin is not
+   required while Current Position is active.
 2. **Move head by hand.** The operator selects **Release motors to move by hand**,
    confirms Release motors, and physically moves the head. The guide then exposes
    **Use this position**, which sends Wake and waits for controller recovery.

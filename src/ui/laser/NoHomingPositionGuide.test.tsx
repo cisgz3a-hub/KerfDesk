@@ -45,7 +45,7 @@ async function renderGuide(host: HTMLElement): Promise<Root> {
 afterEach(() => {
   useStore.setState({
     project: createProject(),
-    jobPlacement: { startFrom: 'current-position', anchor: 'front-left' },
+    jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' },
   });
   useLaserStore.setState({
     ...originalLaser,
@@ -58,12 +58,32 @@ afterEach(() => {
 });
 
 describe('NoHomingPositionGuide', () => {
-  it('shows jog positioning as already selected without a capture-style action', async () => {
+  it('offers jog positioning unselected under the User Origin default', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: status('Idle'),
       capabilities: { ...originalLaser.capabilities, sleep: true },
     });
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
+    const host = document.createElement('div');
+    const root = await renderGuide(host);
+    try {
+      expect(host.textContent).toContain('Jog with controls');
+      expect(host.textContent).not.toContain('Selected');
+      expect(button(host, 'Choose jog positioning')).toHaveProperty('disabled', false);
+      expect(button(host, 'Release motors to move by hand')).toHaveProperty('disabled', false);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('shows jog positioning as selected without a capture-style action', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Idle'),
+      capabilities: { ...originalLaser.capabilities, sleep: true },
+    });
+    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
     const host = document.createElement('div');
     const root = await renderGuide(host);
     try {

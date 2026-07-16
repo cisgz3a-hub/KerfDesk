@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { findPlungedTravelIssues } from '../invariants';
 import type { CncGroup, Job } from '../job';
-import { cncGrblStrategy } from './cnc-grbl-strategy';
+import { cncGrblStrategy, emitCncJobWithPassSpans } from './cnc-grbl-strategy';
 
 const dev = DEFAULT_DEVICE_PROFILE;
 
@@ -83,6 +83,51 @@ describe('cncGrblStrategy', () => {
   it('ends with retract, spindle off, and XY park', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
     expect(gcode.endsWith('G0 Z3.810\nM5\nG0 X0.000 Y0.000\n')).toBe(true);
+  });
+
+  describe('explicit finish position (current-position placement)', () => {
+    it('parks the postamble at the finish position instead of work zero', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev, {
+        finishPosition: { x: 120, y: 80 },
+      });
+      expect(gcode.endsWith('G0 Z3.810\nM5\nG0 X120.000 Y80.000\n')).toBe(true);
+      expect(gcode).not.toContain('G0 X0.000 Y0.000');
+    });
+
+    it('parks tool-change holds at the finish position instead of work zero', () => {
+      const gcode = cncGrblStrategy.emit(
+        {
+          groups: [
+            group({ toolId: 't1' }),
+            group({
+              toolId: 't2',
+              layerId: 'L2',
+              passes: [{ kind: 'contour', zMm: -1.5, polyline: squareLoop(40, 20), closed: true }],
+            }),
+          ],
+        },
+        dev,
+        { finishPosition: { x: 120, y: 80 } },
+      );
+      const beforeHold = gcode.slice(0, gcode.indexOf('M0'));
+      expect(beforeHold).toContain('M5\nG0 X120.000 Y80.000');
+      expect(gcode).not.toContain('G0 X0.000 Y0.000');
+    });
+
+    it('keeps an explicitly configured park position over the finish position', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [group({ parkXMm: 5, parkYMm: 405 })] }, dev, {
+        finishPosition: { x: 120, y: 80 },
+      });
+      expect(gcode.endsWith('M5\nG0 X5.000 Y405.000\n')).toBe(true);
+    });
+
+    it('emits pass spans byte-identically to emit under the same finish position', () => {
+      const job: Job = { groups: [group()] };
+      const options = { finishPosition: { x: 120, y: 80 } };
+      expect(emitCncJobWithPassSpans(job, dev, options).gcode).toBe(
+        cncGrblStrategy.emit(job, dev, options),
+      );
+    });
   });
 
   it('never travels XY with the bit below the safe height', () => {

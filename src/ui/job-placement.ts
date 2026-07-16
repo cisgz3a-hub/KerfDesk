@@ -15,9 +15,13 @@ export const DEFAULT_JOB_PLACEMENT: JobPlacementSettings = {
 export function defaultJobPlacementForDevice(
   device: Pick<DeviceProfile, 'homing'>,
 ): JobPlacementSettings {
+  // No-homing machines have no trusted machine position, so the default flow
+  // is position the head, Set origin here, then Start — User Origin refuses to
+  // start until an origin exists. Current Position stays selectable through the
+  // guide for one-off head-relative jobs (ADR-193, 2026-07-16 amendment).
   return {
     ...DEFAULT_JOB_PLACEMENT,
-    startFrom: device.homing.enabled ? 'absolute' : 'current-position',
+    startFrom: device.homing.enabled ? 'absolute' : 'user-origin',
   };
 }
 

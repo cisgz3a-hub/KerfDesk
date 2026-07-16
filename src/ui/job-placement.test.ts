@@ -20,13 +20,13 @@ const idleAtMachinePosition = (x: number, y: number): StatusReport => ({
 });
 
 describe('profile-aware placement defaults', () => {
-  it('defaults no-homing profiles to Current Position', () => {
+  it('defaults no-homing profiles to User Origin so the operator sets origin first', () => {
     const device = {
       ...DEFAULT_DEVICE_PROFILE,
       homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: false },
     };
     expect(defaultJobPlacementForDevice(device)).toEqual({
-      startFrom: 'current-position',
+      startFrom: 'user-origin',
       anchor: 'front-left',
     });
   });
@@ -53,14 +53,32 @@ describe('profile-aware placement defaults', () => {
     };
     expect(
       jobPlacementAfterDeviceChange({ startFrom: 'absolute', anchor: 'center' }, homing, noHoming),
-    ).toEqual({ startFrom: 'current-position', anchor: 'center' });
+    ).toEqual({ startFrom: 'user-origin', anchor: 'center' });
     expect(
       jobPlacementAfterDeviceChange(
-        { startFrom: 'user-origin', anchor: 'center' },
+        { startFrom: 'current-position', anchor: 'center' },
         homing,
         noHoming,
       ),
-    ).toEqual({ startFrom: 'user-origin', anchor: 'center' });
+    ).toEqual({ startFrom: 'current-position', anchor: 'center' });
+  });
+
+  it('keeps an explicit Current Position choice when a no-homing profile is selected', () => {
+    const noHoming = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: false },
+    };
+    const homing = {
+      ...DEFAULT_DEVICE_PROFILE,
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+    expect(
+      jobPlacementAfterProfileSelection(
+        { startFrom: 'current-position', anchor: 'center' },
+        homing,
+        noHoming,
+      ),
+    ).toEqual({ startFrom: 'current-position', anchor: 'center' });
   });
 
   it('restores Absolute Coordinates when a homing profile is explicitly selected', () => {

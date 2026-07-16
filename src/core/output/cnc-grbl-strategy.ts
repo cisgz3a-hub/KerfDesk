@@ -13,13 +13,19 @@
 // S maps to spindle RPM — GRBL $30 should equal the machine's max RPM.
 //
 // Preamble:  G21, G90, G54, G94, G0 Z<safe>, M3 S<rpm>, G4 P<spinup>, [M7/M8].
-// Postamble: G0 Z<safe>, M5, [M9], G0 X0 Y0 (park, still at safe Z).
+// Postamble: G0 Z<safe>, M5, [M9], G0 X<park> Y<park> (park, still at safe Z;
+// the configured park position, a current-position job's own start, or X0 Y0).
 // The M7/M8/M9 coolant lines appear only when the machine's coolant is on.
 //
 // Optimization kept deliberately simple and safe: when the next pass plunges
 // at the SAME XY the head is already at (successive depth passes of a closed
 // contour), the retract + rapid pair is skipped and the bit feeds straight
 // down to the next level.
+//
+// The non-cutting transitions (spindle start, tool-change holds, park-target
+// resolution) live in cnc-grbl-transitions.ts and the shared emit-head
+// primitives in cnc-grbl-emit-head.ts (ADR-015 size cap); coolant is in
+// cnc-grbl-coolant.ts.
 
 import type { DeviceProfile } from '../devices';
 import {
@@ -38,43 +44,44 @@ import type {
 } from '../job';
 import { assertNever } from '../scene';
 import { appendCoolantStart } from './cnc-grbl-coolant';
+import { appendRetract, fmt, fmtFeed, type Head } from './cnc-grbl-emit-head';
 import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-helical';
 import { collectIndexedCncGroups } from './cnc-grbl-job-groups';
+import {
+  appendGroupTransition,
+  appendSpindleStart,
+  parkTarget,
+  type EmitState,
+} from './cnc-grbl-transitions';
 import type { CncPassSpan, CncPassSpanEmission, CncPassSpanRecorder } from './cnc-pass-spans';
-import type { OutputStrategy } from './output-strategy';
-import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
+import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 
-const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
-const MIN_FEED_MM_PER_MIN = 1;
 
-type Head = {
-  x: string | null; // formatted coords — compared at emit precision
-  y: string | null;
-  z: string | null;
-};
-
-function fmt(n: number): string {
-  return n.toFixed(DECIMAL_PLACES);
-}
-
-function fmtFeed(feedMmPerMin: number): number {
-  return Math.max(MIN_FEED_MM_PER_MIN, Math.round(feedMmPerMin));
-}
-
-function emitJob(job: Job, device: DeviceProfile): string {
-  return emitCncProgram(job, device, undefined);
+function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
+  return emitCncProgram(job, device, undefined, options);
 }
 
 /** Emit the ordinary deterministic CNC program while also reporting, for every
  * pass that produced at least one line, its raw-line span in that program.
  * Recording is observation only: the G-code is byte-identical to
- * `cncGrblStrategy.emit` for the same job (ADR-215). */
-export function emitCncJobWithPassSpans(job: Job, device: DeviceProfile): CncPassSpanEmission {
+ * `cncGrblStrategy.emit` for the same job AND the same emit options — a
+ * current-position job's finishPosition changes its park lines, so resume
+ * mapping must re-emit with the run's own options (ADR-215). */
+export function emitCncJobWithPassSpans(
+  job: Job,
+  device: DeviceProfile,
+  options: OutputEmitOptions = {},
+): CncPassSpanEmission {
   const spans: CncPassSpan[] = [];
-  const gcode = emitCncProgram(job, device, (span) => {
-    spans.push(span);
-  });
+  const gcode = emitCncProgram(
+    job,
+    device,
+    (span) => {
+      spans.push(span);
+    },
+    options,
+  );
   return { gcode, spans };
 }
 
@@ -82,6 +89,7 @@ function emitCncProgram(
   job: Job,
   _device: DeviceProfile,
   onPassSpan: CncPassSpanRecorder | undefined,
+  options: OutputEmitOptions,
 ): string {
   // Groups keep their Job.groups indices: pass spans must speak the job's own
   // indices so recovery can slice the same Job it reviewed.
@@ -126,13 +134,14 @@ function emitCncProgram(
     currentRpm: firstGroup.spindleRpm,
     currentToolKey: firstGroup.toolId ?? '',
     maxSafeZ: 0,
+    finish: options.finishPosition,
   };
   for (const { group, jobGroupIndex } of cncGroups) {
     appendGroupTransition(lines, head, group, state);
     appendGroup(lines, head, group, jobGroupIndex, onPassSpan);
   }
 
-  appendPostamble(lines, head, state.maxSafeZ, cncGroups[cncGroups.length - 1]?.group, coolantIsOn);
+  appendPostamble(lines, head, state, cncGroups[cncGroups.length - 1]?.group, coolantIsOn);
   return lines.join(LINE_END) + LINE_END;
 }
 
@@ -142,91 +151,15 @@ function emitCncProgram(
 function appendPostamble(
   lines: string[],
   head: Head,
-  maxSafeZ: number,
+  state: EmitState,
   lastGroup: CncGroup | undefined,
   coolantIsOn: boolean,
 ): void {
-  appendRetract(lines, head, maxSafeZ);
+  appendRetract(lines, head, state.maxSafeZ);
   lines.push('M5');
   if (coolantIsOn) lines.push('M9');
-  lines.push(parkLine(lastGroup));
-}
-
-// H.9 parking parity: the configured park position, or the machine origin
-// (the pre-H.9 default — keeps existing output byte-identical).
-function parkLine(group: CncGroup | undefined): string {
-  return `G0 X${fmt(group?.parkXMm ?? 0)} Y${fmt(group?.parkYMm ?? 0)}`;
-}
-
-type EmitState = {
-  isMultiTool: boolean;
-  currentRpm: number;
-  currentToolKey: string;
-  maxSafeZ: number;
-};
-
-// Between-group transitions: an M0 tool-change block when the bit changes
-// (multi-tool jobs only), else a spindle re-start when only the RPM does.
-function appendGroupTransition(
-  lines: string[],
-  head: Head,
-  group: CncGroup,
-  state: EmitState,
-): void {
-  state.maxSafeZ = Math.max(state.maxSafeZ, group.safeZMm);
-  if (state.isMultiTool && (group.toolId ?? '') !== state.currentToolKey) {
-    appendToolChange(lines, head, group, state.maxSafeZ);
-    state.currentToolKey = group.toolId ?? '';
-    state.currentRpm = group.spindleRpm;
-    return;
-  }
-  if (group.spindleRpm !== state.currentRpm) {
-    appendSpindleStart(lines, head, group.safeZMm, group.spindleRpm, group.spindleSpinupSec);
-    state.currentRpm = group.spindleRpm;
-  }
-}
-
-// The manual GRBL tool-change flow (F-CNC14/15): retract, spindle off,
-// park at the front for bit access, M0 pause. The operator swaps the bit,
-// re-zeros Z on the stock top (the new bit's length differs), and
-// continues. Touch-off leaves the new bit at Z0 on the stock, so the first
-// resumed command lifts to safe Z with the spindle off; only then may M3 run.
-function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm: number): void {
-  appendRetract(lines, head, safeZMm);
-  lines.push('M5');
-  lines.push(parkLine(group));
-  head.x = fmt(group.parkXMm ?? 0);
-  head.y = fmt(group.parkYMm ?? 0);
-  lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${group.toolName ?? 'next tool'}`);
-  lines.push('; re-zero Z on the stock top, then cycle-start to resume');
-  lines.push('M0');
-  // The operator physically moves the head during the pause: jogging XY over the
-  // stock to touch off the new bit, and Z down onto the stock top. None of those
-  // positions are the emitter's tracked park/height any more, so void all three.
-  // Voiding X/Y forces the next pass to emit its repositioning G0 X Y even when
-  // that pass happens to start at the park XY — otherwise the alreadyAtStartXy
-  // shortcut would skip it and the spinning bit would plunge at the touch-off
-  // location and drag to the start (F23).
-  head.x = head.y = head.z = null;
-  appendSpindleStart(lines, head, safeZMm, group.spindleRpm, group.spindleSpinupSec);
-}
-
-// Central spindle-start invariant: every native CNC M3 is preceded by a known
-// safe-Z retract. This is especially important after a manual tool touch-off,
-// where the new cutter is resting on the stock when Continue is pressed.
-function appendSpindleStart(
-  lines: string[],
-  head: Head,
-  safeZMm: number,
-  rpm: number,
-  spinupSec: number,
-): void {
-  appendRetract(lines, head, safeZMm);
-  lines.push(`M3 S${Math.max(0, Math.round(rpm))}`);
-  // This is deliberately time-based. Stock GRBL's FS value reflects its
-  // commanded/limited spindle output, not tachometer-backed physical RPM.
-  // CNC preflight rejects non-positive durations before output can be written.
-  if (spinupSec > 0) lines.push(`G4 P${fmt(spinupSec)}`);
+  const park = parkTarget(lastGroup, state.finish);
+  lines.push(`G0 X${fmt(park.x)} Y${fmt(park.y)}`);
 }
 
 function appendGroup(
@@ -491,13 +424,6 @@ function appendCutMoves(lines: string[], head: Head, pass: CncContourPass, feed:
     head.x = x;
     head.y = y;
   }
-}
-
-function appendRetract(lines: string[], head: Head, safeZMm: number): void {
-  const safeZ = fmt(Math.max(0, safeZMm));
-  if (head.z === safeZ) return;
-  lines.push(`G0 Z${safeZ}`);
-  head.z = safeZ;
 }
 
 export const cncGrblStrategy: OutputStrategy = { id: 'grbl-cnc', emit: emitJob };

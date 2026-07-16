@@ -92,10 +92,16 @@ export function emitPreparedGcodeWithCncPassSpans(
   }
   const job = rotaryStage.job;
   // CNC router projects always emit through the Z-aware GRBL strategy; laser
-  // projects pick their controller dialect via the ADR-094 driver seam.
+  // projects pick their controller dialect via the ADR-094 driver seam. Both
+  // receive the current-position finish so a head-relative job parks back at
+  // its own start instead of rapiding to work zero (arbitrary on no-homing).
   const cncEmission =
     machine !== undefined && machine.kind === 'cnc'
-      ? emitCncJobWithPassSpans(job, prepared.project.device)
+      ? emitCncJobWithPassSpans(
+          job,
+          prepared.project.device,
+          currentPositionFinishOptions(options.jobOrigin),
+        )
       : null;
   const body =
     cncEmission !== null
