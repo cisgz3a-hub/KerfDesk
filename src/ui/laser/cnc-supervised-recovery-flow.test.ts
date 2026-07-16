@@ -239,6 +239,21 @@ describe('runCncSupervisedRecoveryFlow', () => {
     ).toBe(true);
   });
 
+  it('archives the operator qualification attestation into the recovery artifact (A1)', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    useLaserStore.setState({
+      startJob: vi.fn<(gcode: string, options?: object) => Promise<void>>(async () => undefined),
+    });
+    const stageArtifact = vi.spyOn(repo, 'stageArtifact');
+
+    const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
+
+    expect(started).toBe(true);
+    const staged = stageArtifact.mock.calls[0]?.[0];
+    expect(staged?.recoveryQualification).toBe('air-cut-2026-07-15');
+  });
+
   it('refuses recovery when physical cutter-clear review is incomplete', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);

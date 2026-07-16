@@ -19,6 +19,9 @@ export type CncRecoveryStreamPlan = {
   readonly source: PreparedRecoverySource;
   readonly recovery: CncSupervisedRecoveryJob;
   readonly gcode: string;
+  // Operator's qualification attestation, archived into the recovery artifact
+  // for auditability (audit A1).
+  readonly recoveryQualification?: string;
 };
 
 export async function claimCncRecoveryCapsule(
@@ -90,6 +93,31 @@ export async function streamCncRecoveryProgram(
   return true;
 }
 
+function buildRecoveryArtifact(
+  planned: CncRecoveryStreamPlan,
+  claimedCapsule: RecoveryCapsule,
+  recoveryRunId: string,
+  canvasPlan: ReturnType<typeof recoveryCanvasPlan>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+) {
+  const toolPlan = cncToolPlan(planned.recovery.job);
+  return createExecutionArtifact({
+    runId: recoveryRunId,
+    gcode: planned.gcode,
+    prepared: { ...planned.source.prepared, job: planned.recovery.job },
+    outputScope: claimedCapsule.artifact.outputScope,
+    ...(planned.source.jobOrigin === undefined ? {} : { jobOrigin: planned.source.jobOrigin }),
+    canvasPlan,
+    ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
+    controllerSettings: laser.controllerSettings,
+    controllerObservation: controllerObservation(laser),
+    ...(planned.recoveryQualification === undefined
+      ? {}
+      : { recoveryQualification: planned.recoveryQualification }),
+    createdAtIso: new Date().toISOString(),
+  });
+}
+
 async function stageRecoveryAttempt(
   planned: CncRecoveryStreamPlan,
   claimedCapsule: RecoveryCapsule,
@@ -98,20 +126,8 @@ async function stageRecoveryAttempt(
   laser: ReturnType<typeof useLaserStore.getState>,
   repository: RecoveryRepository,
 ): Promise<boolean> {
-  const toolPlan = cncToolPlan(planned.recovery.job);
   const staged = await repository.stageArtifact(
-    createExecutionArtifact({
-      runId: recoveryRunId,
-      gcode: planned.gcode,
-      prepared: { ...planned.source.prepared, job: planned.recovery.job },
-      outputScope: claimedCapsule.artifact.outputScope,
-      ...(planned.source.jobOrigin === undefined ? {} : { jobOrigin: planned.source.jobOrigin }),
-      canvasPlan,
-      ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
-      controllerSettings: laser.controllerSettings,
-      controllerObservation: controllerObservation(laser),
-      createdAtIso: new Date().toISOString(),
-    }),
+    buildRecoveryArtifact(planned, claimedCapsule, recoveryRunId, canvasPlan, laser),
   );
   if (staged.ok && staged.value === recoveryRunId) {
     const armed = await repository.armClaimedRecoveryStart({

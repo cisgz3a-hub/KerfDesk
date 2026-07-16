@@ -79,7 +79,14 @@ export async function runCncSupervisedRecoveryFlow(
   if (attestation === null) return false;
   const claimed = await claimCncRecoveryCapsule(capsule, repository);
   if (claimed === null) return false;
-  return streamCncRecoveryProgram(planned, attestation, claimed, repository);
+  // Archive the operator's qualification attestation verbatim with the run so
+  // it is auditable, not just checked non-empty at review time (audit A1).
+  return streamCncRecoveryProgram(
+    { ...planned, recoveryQualification: planned.profile.qualificationId.trim() },
+    attestation,
+    claimed,
+    repository,
+  );
 }
 
 function prepareRecoveryContext(
