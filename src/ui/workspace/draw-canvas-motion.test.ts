@@ -129,6 +129,32 @@ describe('drawCanvasMotionOverlay', () => {
     expect(recording.dashes).toContainEqual([6, 4]);
   });
 
+  it('labels the CNC head with Z and the running pass ordinal (ADR-216)', () => {
+    const gcode = 'G21\nG90\nM3 S12000\nG1 Z-1 F300\nG1 X10 F1000\nG1 Z-2 F300\nG1 X0 F1000';
+    const canvasPlan: CanvasMotionPlan = {
+      ...plan(),
+      manifest: buildMotionManifest(gcode, { machineKind: 'cnc' }),
+      machineKind: 'cnc',
+      cncPassSpans: [
+        { groupIndex: 0, passIndex: 0, routeStartMm: 0, routeEndMm: 11 },
+        { groupIndex: 0, passIndex: 1, routeStartMm: 11, routeEndMm: 22 },
+      ],
+    };
+    const run = {
+      ...startLiveCanvasRun(canvasPlan),
+      reportedHead: { x: 5, y: 0, z: -2 },
+      route: { confirmedRouteMm: 15, candidates: [], uncertain: false },
+      controllerState: 'Run',
+    };
+    const recording = recordingContext();
+    drawCanvasMotionOverlay(
+      recording.ctx,
+      { plan: canvasPlan, run },
+      { scale: 1, offsetX: 0, offsetY: 0 },
+    );
+    expect(recording.labels).toContain('Run • Z -2.00 mm • Pass 2/2');
+  });
+
   it('hides only static start markers while retaining the approach route', () => {
     const recording = recordingContext();
     drawCanvasMotionOverlay(

@@ -1,3 +1,4 @@
+import { cncPassPosition, type CncPassPosition } from '../state/canvas-pass-progress';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 
 export function CanvasMotionBadge(props: {
@@ -5,18 +6,11 @@ export function CanvasMotionBadge(props: {
 }): JSX.Element | null {
   const overlay = props.overlay;
   if (overlay === null) return null;
-  const message = badgeMessage(overlay);
+  const passes = overlayPassPosition(overlay);
+  const message = badgeMessage(overlay, passes);
   return (
     <>
-      <span
-        data-testid="canvas-motion-probe"
-        data-lifecycle={overlay.run?.lifecycle ?? 'idle'}
-        data-confirmed-route-mm={overlay.run?.route.confirmedRouteMm ?? 0}
-        data-reported-head-x={overlay.run?.reportedHead?.x}
-        data-reported-head-y={overlay.run?.reportedHead?.y}
-        aria-label={markerDescription(overlay)}
-        style={visuallyHiddenStyle}
-      />
+      <CanvasMotionProbe overlay={overlay} passes={passes} />
       {message === null ? null : (
         <div role="status" data-testid="canvas-motion-status" style={badgeStyle}>
           {message}
@@ -24,6 +18,40 @@ export function CanvasMotionBadge(props: {
       )}
     </>
   );
+}
+
+function CanvasMotionProbe(props: {
+  readonly overlay: CanvasMotionOverlay;
+  readonly passes: CncPassPosition | null;
+}): JSX.Element {
+  const run = props.overlay.run;
+  return (
+    <span
+      data-testid="canvas-motion-probe"
+      data-lifecycle={run?.lifecycle ?? 'idle'}
+      data-confirmed-route-mm={run?.route.confirmedRouteMm ?? 0}
+      data-reported-head-x={run?.reportedHead?.x}
+      data-reported-head-y={run?.reportedHead?.y}
+      data-pass-current={props.passes?.current}
+      data-pass-total={props.passes?.total}
+      aria-label={markerDescription(props.overlay)}
+      style={visuallyHiddenStyle}
+    />
+  );
+}
+
+// Pass progress follows the same confirmed-route truth as the trail: it
+// advances only with reconciled motion and freezes with an uncertain route.
+function overlayPassPosition(overlay: CanvasMotionOverlay): CncPassPosition | null {
+  const spans = overlay.plan.cncPassSpans;
+  if (spans === undefined || overlay.run === null) return null;
+  return cncPassPosition(spans, overlay.run.route.confirmedRouteMm);
+}
+
+function passBadgeText(passes: CncPassPosition | null): string {
+  if (passes === null) return '';
+  const remaining = passes.remaining > 0 ? ` • ${passes.remaining} remaining` : '';
+  return ` • Pass ${passes.current} of ${passes.total}${remaining}`;
 }
 
 function markerDescription(overlay: CanvasMotionOverlay): string {
@@ -34,7 +62,7 @@ function markerDescription(overlay: CanvasMotionOverlay): string {
   return `${frameText}; ${jobText}`;
 }
 
-function badgeMessage(overlay: CanvasMotionOverlay): string | null {
+function badgeMessage(overlay: CanvasMotionOverlay, passes: CncPassPosition | null): string | null {
   const run = overlay.run;
   const relative = overlay.plan.coordinateFrame.kind === 'relative';
   if (run === null) {
@@ -49,7 +77,7 @@ function badgeMessage(overlay: CanvasMotionOverlay): string | null {
       : '';
   const reason = run.accuracyReason === null ? '' : ` • ${run.accuracyReason}`;
   const relativeLabel = relative ? ' • relative view — physical bed position unverified' : '';
-  return `${truth} • ${state}${z}${reason}${relativeLabel}`;
+  return `${truth} • ${state}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

@@ -6,6 +6,7 @@ import {
   type CanvasMotionPlan,
   type LiveCanvasRun,
 } from '../state/canvas-motion-plan';
+import { cncPassPosition } from '../state/canvas-pass-progress';
 import type { ViewTransform } from './view-transform';
 import { drawCanvasMotionRoute } from './draw-canvas-motion-route';
 
@@ -130,8 +131,22 @@ function drawHead(
   ctx.arc(at.x, at.y, 5, 0, Math.PI * 2);
   ctx.fill();
   const z = run.plan.machineKind === 'cnc' ? ` • Z ${run.reportedHead?.z.toFixed(2)} mm` : '';
-  drawLabel(ctx, at.x + 9, at.y + 18, `${run.controllerState ?? run.lifecycle}${z}`);
+  drawLabel(
+    ctx,
+    at.x + 9,
+    at.y + 18,
+    `${run.controllerState ?? run.lifecycle}${z}${passLabel(run)}`,
+  );
   ctx.restore();
+}
+
+// CNC depth passes retrace the same XY route, so after the first pass the
+// trail stops changing — the pass ordinal is the only visible progress.
+function passLabel(run: LiveCanvasRun): string {
+  const spans = run.plan.cncPassSpans;
+  if (spans === undefined) return '';
+  const passes = cncPassPosition(spans, run.route.confirmedRouteMm);
+  return passes === null ? '' : ` • Pass ${passes.current}/${passes.total}`;
 }
 
 function drawLabel(

@@ -8981,3 +8981,43 @@ preview, pass picker, trimmed checklist). Long `path3d` relief passes recut whol
 mid-pass re-entry is a future refinement. Multi-tool jobs become recoverable with an explicit
 load-tool/re-zero wizard step. Simulator and unit evidence only: physical air-cut/scrap validation
 on the real router remains release-acceptance work, and no hardware claim is made here.
+
+---
+
+## ADR-216 - Show CNC pass progress on the live canvas from the ADR-215 span sidecar
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+### Context
+
+The live canvas overlay (planned route, confirmed trail, controller-reported head, status badge) is
+machine-agnostic and already reconciles CNC runs in three dimensions. But CNC depth passes retrace
+the same XY route, so after the first pass the confirmed trail stops changing visibly - the head dot
+is the only remaining sign of motion, and the operator cannot tell which depth pass is cutting or
+how many are left. The maintainer asked for the CNC canvas to show job movement like the laser side
+and to display the passes remaining. ADR-215 already records, as a byte-neutral emission sidecar,
+each pass's raw-line span in the exact emitted program.
+
+### Decision
+
+- At Start-plan build time a CNC plan re-derives the pass spans by re-running the span-recording
+  emission of the prepared job and requiring byte-identity with the program actually started, then
+  projects each span onto the motion manifest's route distances. Any disagreement (a header, a
+  resume rewrite, a span/manifest mismatch, no motion) omits the pass data entirely - a missing
+  counter is honest, a wrong one is not.
+- The live head label appends `Pass k/N` and the status badge appends `Pass k of N - m remaining`,
+  both derived from the same confirmed-route frontier as the trail: the counter advances only with
+  route-reconciled motion and freezes whenever the route is uncertain or the run is not advancing.
+- Pass ordinals are job-wide (every recorded span counts once, across groups), matching the preview
+  scrubber's pass stepper (WORKFLOW F-CNC4) rather than per-layer numbering.
+- Resume and recovery programs renumber every line, so `rebuildCanvasPlanForGcode` drops the
+  original run's spans instead of letting them describe a different program.
+
+### Consequences
+
+Operators watching a CNC run can see which depth pass is cutting and how many passes remain,
+sourced from controller-confirmed progress rather than acknowledged lines, so reporting gaps
+resolve conservatively (the counter can briefly lag, never overstate). Pass progress is absent for
+programs that are not the plain strategy emission - supervised recovery streams keep their own
+ADR-215 presentation until they carry spans of their own. The feature is display-only: it changes
+no G-code bytes, no streaming behavior, and no controller commands.
