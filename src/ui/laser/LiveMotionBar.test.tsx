@@ -17,6 +17,7 @@ const realActions = {
   pauseJob: useLaserStore.getState().pauseJob,
   resumeJob: useLaserStore.getState().resumeJob,
   stopJob: useLaserStore.getState().stopJob,
+  setFireActive: useLaserStore.getState().setFireActive,
 };
 
 function streamingStreamer(): NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']> {
@@ -58,6 +59,7 @@ afterEach(() => {
     pendingToolLabel: null,
     pendingToolId: null,
     workZZeroEvidence: null,
+    fireActive: false,
     ...realActions,
   });
   document.body.innerHTML = '';
@@ -214,6 +216,36 @@ describe('LiveMotionBar', () => {
     const { host, root } = await render(<LiveMotionBar />);
     try {
       expect(host.firstElementChild).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // AUDIT A6: the momentary Fire button turns the beam off on release, but a
+  // latched fireActive had NO persistent top-level off control — the bar
+  // ignored it. While the beam is on, the bar must show a LASER OFF action.
+  it('shows a persistent LASER OFF control while momentary Fire is latched', async () => {
+    const setFireActive = vi.fn(async () => undefined);
+    useLaserStore.setState({ fireActive: true, setFireActive });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent).toContain('LASER FIRING');
+      const offButton = buttonByText(host, 'LASER OFF');
+      expect(offButton).toBeDefined();
+      expect(offButton?.title).toContain('not a safety-rated stop');
+      await act(async () => offButton?.click());
+      expect(setFireActive).toHaveBeenCalledWith(false);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('keeps the job description when a job is active, even if fire were latched', async () => {
+    useLaserStore.setState({ streamer: streamingStreamer(), fireActive: true });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(buttonsByText(host, 'ABORT JOB')).toHaveLength(1);
+      expect(buttonByText(host, 'LASER OFF')).toBeUndefined();
     } finally {
       await act(async () => root.unmount());
     }

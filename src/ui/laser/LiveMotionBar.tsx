@@ -18,16 +18,24 @@ type MotionOperation = NonNullable<LaserSnapshot['motionOperation']>;
 type MotionDescription = {
   readonly heading: string;
   readonly detail: string;
-  readonly abortLabel: 'ABORT JOB' | 'ABORT MOTION';
+  readonly abortLabel: 'ABORT JOB' | 'ABORT MOTION' | 'LASER OFF';
 };
 
 export function LiveMotionBar(): JSX.Element | null {
   const streamer = useLaserStore((state) => state.streamer);
   const controllerOperation = useLaserStore((state) => state.controllerOperation);
   const motionOperation = useLaserStore((state) => state.motionOperation);
+  const fireActive = useLaserStore((state) => state.fireActive);
   const stopJob = useLaserStore((state) => state.stopJob);
-  const description = describeLiveMotion(streamer, controllerOperation, motionOperation);
+  const setFireActive = useLaserStore((state) => state.setFireActive);
+  const description = describeLiveMotion(
+    streamer,
+    controllerOperation,
+    motionOperation,
+    fireActive,
+  );
   if (description === null) return null;
+  const abort = description.abortLabel === 'LASER OFF' ? () => setFireActive(false) : stopJob;
   return (
     <section aria-label="Live Motion" style={barStyle}>
       <div style={statusStyle} aria-live="polite">
@@ -46,7 +54,7 @@ export function LiveMotionBar(): JSX.Element | null {
           className="lf-btn lf-btn--danger"
           style={abortButtonStyle}
           title={SOFTWARE_ABORT_TITLE}
-          onClick={() => void stopJob().catch(() => undefined)}
+          onClick={() => void abort().catch(() => undefined)}
         >
           {description.abortLabel}
         </button>
@@ -122,6 +130,7 @@ function describeLiveMotion(
   streamer: Streamer | null,
   controllerOperation: ControllerOperation | null,
   motionOperation: MotionOperation | null,
+  fireActive: boolean,
 ): MotionDescription | null {
   if (streamer !== null && isActiveJob(streamer)) {
     return {
@@ -140,6 +149,16 @@ function describeLiveMotion(
   if (motionOperation !== null) {
     const noun = motionOperation.kind === 'frame' ? 'FRAMING' : 'JOGGING';
     return { heading: noun, detail: 'Controller motion is active', abortLabel: 'ABORT MOTION' };
+  }
+  // A latched momentary Fire keeps the beam on with no motion — the bar must
+  // still offer a persistent off control, not only the hold-button's release
+  // (AUDIT A6). Fire is Idle-only, so this never shadows a job or operation.
+  if (fireActive) {
+    return {
+      heading: 'LASER FIRING',
+      detail: 'Momentary Fire is holding the beam on',
+      abortLabel: 'LASER OFF',
+    };
   }
   return null;
 }
