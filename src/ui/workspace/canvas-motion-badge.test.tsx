@@ -172,3 +172,78 @@ describe('CanvasMotionBadge feed rate (ADR-217)', () => {
     }
   });
 });
+
+function laserPlan(): CanvasMotionPlan {
+  const { cncPassSpans: _drop, ...rest } = cncPlan();
+  return { ...rest, machineKind: 'laser', retentionKey: 'badge-laser' };
+}
+
+function spindleOverlay(opts: {
+  readonly spindle: number | null;
+  readonly plan?: CanvasMotionPlan;
+  readonly lifecycle?: 'running' | 'paused';
+}): CanvasMotionOverlay {
+  const plan = opts.plan ?? cncPlan();
+  const lifecycle = opts.lifecycle ?? 'running';
+  return {
+    plan,
+    run: {
+      ...startLiveCanvasRun(plan),
+      reportedHead: { x: 5, y: 0, z: -1 },
+      route: { confirmedRouteMm: 5, candidates: [], uncertain: false },
+      controllerState: lifecycle === 'running' ? 'Run' : 'Hold',
+      lifecycle,
+      reportedSpindleRpm: opts.spindle,
+    },
+  };
+}
+
+describe('CanvasMotionBadge spindle RPM (ADR-220)', () => {
+  it('shows the rounded spindle speed in rpm while a CNC job runs', async () => {
+    const { host, unmount } = await renderBadge(spindleOverlay({ spindle: 12000 }));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain('12000 rpm');
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-reported-spindle')).toBe('12000');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('never labels a laser power value as rpm (spindle is CNC-only)', async () => {
+    const { host, unmount } = await renderBadge(
+      spindleOverlay({ spindle: 500, plan: laserPlan() }),
+    );
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).not.toContain('rpm');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('omits the spindle speed when the controller reports none', async () => {
+    const { host, unmount } = await renderBadge(spindleOverlay({ spindle: null }));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).not.toContain('rpm');
+      const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+      expect(probe?.getAttribute('data-reported-spindle')).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('hides the spindle speed while paused', async () => {
+    const { host, unmount } = await renderBadge(
+      spindleOverlay({ spindle: 12000, lifecycle: 'paused' }),
+    );
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).not.toContain('rpm');
+    } finally {
+      await unmount();
+    }
+  });
+});

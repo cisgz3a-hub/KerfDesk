@@ -30,12 +30,15 @@ export function liveCanvasStatusPatch(
     },
     reportInches,
   );
-  // Feed is a fresh scalar sample each frame, independent of route
-  // reconciliation, so it overrides uniformly on top of the reconciled run;
-  // the badge only surfaces it while the job is actually running.
+  // Feed and spindle are fresh scalar samples each frame, independent of route
+  // reconciliation, so they override uniformly on top of the reconciled run;
+  // the badge only surfaces them while the job is actually running. Spindle is
+  // passed through unscaled — it is an RPM/power value, not a unit distance.
   const reportedFeedMmPerMin = normalizeReportedFeedRateToMm(report.feed, reportInches);
   const updated = updatedRun(state, run, report, streamer, lifecycle, reportedHead);
-  return { liveCanvasRun: { ...updated, reportedFeedMmPerMin } };
+  return {
+    liveCanvasRun: { ...updated, reportedFeedMmPerMin, reportedSpindleRpm: report.spindle },
+  };
 }
 
 function updatedRun(

@@ -135,6 +135,28 @@ describe('live canvas status reconciliation', () => {
     expect(noFeed?.reportedFeedMmPerMin).toBeNull();
   });
 
+  it('captures the spindle speed unscaled, even under inch reporting', () => {
+    const current = state();
+    const run = liveCanvasStatusPatch(current, report(5), acceptedStreamer()).liveCanvasRun;
+    expect(run?.reportedSpindleRpm).toBe(500);
+
+    // Spindle is an RPM/power value, not a distance — inch mode must not scale it.
+    const inchState = { ...current, controllerSettings: { reportInches: true } } as LaserState;
+    const inch = liveCanvasStatusPatch(
+      inchState,
+      { ...report(5), spindle: 12000 },
+      acceptedStreamer(),
+    ).liveCanvasRun;
+    expect(inch?.reportedSpindleRpm).toBe(12000);
+
+    const noSpindle = liveCanvasStatusPatch(
+      current,
+      { ...report(5), spindle: null },
+      acceptedStreamer(),
+    ).liveCanvasRun;
+    expect(noSpindle?.reportedSpindleRpm).toBeNull();
+  });
+
   it('preserves the last confirmed prefix when a run stops or errors', () => {
     const current = state();
     const advanced = liveCanvasStatusPatch(current, report(5), acceptedStreamer()).liveCanvasRun;
