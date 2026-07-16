@@ -159,6 +159,38 @@ describe('resolveJobPlacement', () => {
     });
   });
 
+  // C7: a WPos-only frame that carries its OWN fresh WCO must use that WCO, not
+  // a work-offset cache that a just-applied G92/G10 has left stale. WPos and WCO
+  // from the same frame are internally consistent; the cache may lag by a report.
+  it('prefers a status frame own fresh WCO over a stale work-offset cache', () => {
+    const resolved = resolveJobPlacement(
+      { startFrom: 'current-position', anchor: 'back-right' },
+      {
+        statusReport: {
+          state: 'Idle',
+          subState: null,
+          mPos: null,
+          wPos: { x: 30, y: 10, z: 0 },
+          feed: 0,
+          spindle: 0,
+          wco: { x: 120, y: 80, z: 0 },
+        },
+        workOriginActive: true,
+        wcoCache: { x: 999, y: 999, z: 0 },
+      },
+    );
+
+    expect(resolved).toEqual({
+      ok: true,
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'back-right',
+        currentPosition: { x: 30, y: 10 },
+      },
+      preflightMotionOffset: { x: 120, y: 80 },
+    });
+  });
+
   it('normalizes inch-reported MPos and WCO before resolving placement', () => {
     const resolved = resolveJobPlacement(
       { startFrom: 'current-position', anchor: 'front-left' },

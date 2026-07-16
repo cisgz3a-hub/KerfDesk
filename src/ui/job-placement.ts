@@ -194,10 +194,16 @@ function currentWorkPosition(
   const wco = knownWco(machine);
   if (report.wPos !== null) {
     const work = normalizedAxis(report.wPos, machine.reportInches === true);
+    // Prefer offsets from THIS frame: MPos−WPos, then the frame's own WCO — both
+    // are internally consistent with WPos. Only fall back to the cached WCO when
+    // the frame carries neither, since a just-applied G92/G10 can leave the cache
+    // a report behind the fresh WPos (C7).
+    const sameFrameWco =
+      report.wco !== null ? normalizedAxis(report.wco, machine.reportInches === true) : null;
     const offset =
       report.mPos !== null
         ? subtractAxis(normalizedAxis(report.mPos, machine.reportInches === true), work)
-        : (wco ?? defaultWco(machine));
+        : (sameFrameWco ?? wco ?? defaultWco(machine));
     if (offset === null) return null;
     return { work, offset };
   }
