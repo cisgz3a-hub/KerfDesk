@@ -31,6 +31,14 @@ export type CncPassRecoveryReview = {
   readonly passIndex: number;
 };
 
+/** Wizard draft of the review. Position evidence starts unselected (null) and
+ * must be an explicit operator choice: a pre-selected default would let
+ * recovery motion start without any position attestation. */
+export type CncPassRecoveryChecklistDraft = Omit<
+  CncPassRecoveryReview,
+  'groupIndex' | 'passIndex' | 'position'
+> & { readonly position: CncPassRecoveryPositionEvidence | null };
+
 export function cncPassRecoveryReviewIssue(review: CncPassRecoveryReview): string | null {
   if (!review.cutterClear) return 'Confirm that the cutter is physically clear before any motion.';
   if (!review.spindleStopped) return 'Confirm that the spindle is physically stopped.';

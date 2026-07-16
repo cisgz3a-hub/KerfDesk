@@ -2,18 +2,16 @@
 // (ADR-215) plus the position-evidence choice. These are physical
 // observations KerfDesk cannot infer from controller acknowledgements.
 
-import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
-
-type ChecklistDraft = Omit<CncPassRecoveryReview, 'groupIndex' | 'passIndex'>;
+import type { CncPassRecoveryChecklistDraft } from './cnc-pass-recovery-review';
 
 export function CncPassRecoveryChecklist(props: {
-  readonly checklist: ChecklistDraft;
+  readonly checklist: CncPassRecoveryChecklistDraft;
   /** Null when the retained-position path is available for this incident. */
   readonly retainedPositionIssue: string | null;
-  readonly onChange: (checklist: ChecklistDraft) => void;
+  readonly onChange: (checklist: CncPassRecoveryChecklistDraft) => void;
 }): JSX.Element {
   const { checklist, onChange } = props;
-  const retained = checklist.position.kind === 'retained-confirmed';
+  const retained = checklist.position?.kind === 'retained-confirmed';
   return (
     <div style={sectionStyle}>
       <p style={bodyStyle}>
@@ -65,7 +63,7 @@ export function CncPassRecoveryChecklist(props: {
           <input
             type="radio"
             name="cnc-pass-recovery-position"
-            checked={!retained}
+            checked={checklist.position?.kind === 're-zeroed'}
             title="Position was re-established by hand before recovery."
             onChange={() => onChange({ ...checklist, position: { kind: 're-zeroed' } })}
           />
