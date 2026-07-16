@@ -9190,3 +9190,41 @@ the same status frame. Laser jobs are unaffected - the RPM readout never appears
 change is display-only: no new field is emitted, and no G-code, streaming, or controller behavior
 changes. The `S` value the controller reports depends on the machine's `$30` max-RPM mapping being
 configured correctly; the badge faithfully shows what the controller reports, as with feed.
+
+---
+
+## ADR-221 - Show wall-clock elapsed job time on the canvas motion badge
+
+**Status:** Accepted | **Date:** 2026-07-17
+
+### Context
+
+The canvas motion badge shows what the machine is doing (state, feed, RPM, Z, pass progress) but
+not for how long. The pre-job ETA exists (the live estimate), yet once a job runs the operator has
+no on-canvas answer to "how long has this been cutting?" — the number that matters when deciding
+whether a job is worth aborting or a pass count is plausible.
+
+### Decision
+
+- `LiveCanvasRun` gains `startedAtMs` (stamped by `liveCanvasStartPatch` when the run is created;
+  0 means unknown, as in hand-built fixtures) and `endedAtMs` (stamped once, at the run's FIRST
+  terminal lifecycle transition — stopped, disconnected, errored, or finished — by the status and
+  lifecycle patch functions). Both clocks enter through a `now: number = Date.now()` trailing
+  default parameter, the repo's existing testability idiom; later report churn can never move a
+  frozen end stamp.
+- The badge shows `• <elapsed>` right after the machine state, formatted by the same
+  `formatDuration` the pre-job ETA uses. Elapsed is wall-clock: holds and tool changes keep
+  counting (matching what an operator's watch says), and the readout freezes at the terminal stamp
+  so a finished or aborted job displays its final duration.
+- Status frames alone can be sparse (settle-only controllers report at motion boundaries), so the
+  badge re-renders on a one-second interval — but only while a run with a real start stamp and no
+  end stamp is displayed; idle canvases and terminal runs schedule nothing.
+- A run without a real start stamp (0) shows no elapsed time: a missing timer is honest, a made-up
+  one is not.
+
+### Consequences
+
+Operators see live elapsed time next to the machine state for both laser and CNC jobs, frozen at
+its final value when the run ends however it ends. The readout is display-only and wall-clock —
+it makes no claim about cutting time vs held time. Fixtures and archived runs without a start
+stamp simply omit it.

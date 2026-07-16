@@ -1,16 +1,21 @@
+import { useEffect, useState } from 'react';
+import { formatDuration } from '../../core/job';
 import { cncPassPosition, type CncPassPosition } from '../state/canvas-pass-progress';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
+
+const ELAPSED_TICK_MS = 1_000;
 
 export function CanvasMotionBadge(props: {
   readonly overlay: CanvasMotionOverlay | null;
 }): JSX.Element | null {
   const overlay = props.overlay;
+  const nowMs = useElapsedTick(overlay);
   if (overlay === null) return null;
   const passes = overlayPassPosition(overlay);
-  const message = badgeMessage(overlay, passes);
+  const message = badgeMessage(overlay, passes, nowMs);
   return (
     <>
-      <CanvasMotionProbe overlay={overlay} passes={passes} />
+      <CanvasMotionProbe overlay={overlay} passes={passes} nowMs={nowMs} />
       {message === null ? null : (
         <div role="status" data-testid="canvas-motion-status" style={badgeStyle}>
           {message}
@@ -20,11 +25,29 @@ export function CanvasMotionBadge(props: {
   );
 }
 
+// Status frames alone can be sparse (settle-only controllers report only at
+// motion boundaries), so an active timed run re-renders once a second to keep
+// the elapsed readout moving. The interval exists only while it can change
+// the display: a run with a real start stamp and no frozen end stamp.
+function useElapsedTick(overlay: CanvasMotionOverlay | null): number {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const run = overlay?.run ?? null;
+  const ticking = run !== null && run.startedAtMs > 0 && run.endedAtMs === null;
+  useEffect(() => {
+    if (!ticking) return undefined;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), ELAPSED_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [ticking]);
+  return nowMs;
+}
+
 function CanvasMotionProbe(props: {
   readonly overlay: CanvasMotionOverlay;
   readonly passes: CncPassPosition | null;
+  readonly nowMs: number;
 }): JSX.Element {
-  const attrs = probeAttrs(props.overlay, props.passes);
+  const attrs = probeAttrs(props.overlay, props.passes, props.nowMs);
   return (
     <span
       data-testid="canvas-motion-probe"
@@ -36,6 +59,7 @@ function CanvasMotionProbe(props: {
       data-pass-total={attrs.passTotal}
       data-reported-feed={attrs.feed}
       data-reported-spindle={attrs.spindle}
+      data-elapsed-seconds={attrs.elapsedSeconds}
       aria-label={markerDescription(props.overlay)}
       style={visuallyHiddenStyle}
     />
@@ -51,11 +75,16 @@ type ProbeAttrs = {
   readonly passTotal: number | undefined;
   readonly feed: number | undefined;
   readonly spindle: number | undefined;
+  readonly elapsedSeconds: number | undefined;
 };
 
 // One null-branch instead of an optional chain per attribute keeps the probe
 // component flat and under the complexity cap as readouts accumulate.
-function probeAttrs(overlay: CanvasMotionOverlay, passes: CncPassPosition | null): ProbeAttrs {
+function probeAttrs(
+  overlay: CanvasMotionOverlay,
+  passes: CncPassPosition | null,
+  nowMs: number,
+): ProbeAttrs {
   const passCurrent = passes?.current;
   const passTotal = passes?.total;
   const run = overlay.run;
@@ -69,8 +98,10 @@ function probeAttrs(overlay: CanvasMotionOverlay, passes: CncPassPosition | null
       passTotal,
       feed: undefined,
       spindle: undefined,
+      elapsedSeconds: undefined,
     };
   }
+  const elapsed = elapsedRunSeconds(run, nowMs);
   return {
     lifecycle: run.lifecycle,
     confirmedRouteMm: run.route.confirmedRouteMm,
@@ -80,6 +111,7 @@ function probeAttrs(overlay: CanvasMotionOverlay, passes: CncPassPosition | null
     passTotal,
     feed: run.reportedFeedMmPerMin ?? undefined,
     spindle: run.reportedSpindleRpm ?? undefined,
+    elapsedSeconds: elapsed ?? undefined,
   };
 }
 
@@ -117,6 +149,23 @@ function spindleBadgeText(
   return ` • ${Math.round(run.reportedSpindleRpm)} rpm`;
 }
 
+// Wall-clock elapsed since Start, including holds/tool changes, frozen at the
+// run's first terminal transition. Null without a real start stamp — a
+// missing timer is honest, a made-up one is not (ADR-221).
+function elapsedRunSeconds(
+  run: NonNullable<CanvasMotionOverlay['run']>,
+  nowMs: number,
+): number | null {
+  if (run.startedAtMs <= 0) return null;
+  const endMs = run.endedAtMs ?? nowMs;
+  return Math.max(0, Math.round((endMs - run.startedAtMs) / 1000));
+}
+
+function elapsedBadgeText(run: NonNullable<CanvasMotionOverlay['run']>, nowMs: number): string {
+  const seconds = elapsedRunSeconds(run, nowMs);
+  return seconds === null ? '' : ` • ${formatDuration(seconds)}`;
+}
+
 function markerDescription(overlay: CanvasMotionOverlay): string {
   const frame = overlay.plan.framePerimeter[0];
   const job = overlay.plan.jobStart;
@@ -125,7 +174,11 @@ function markerDescription(overlay: CanvasMotionOverlay): string {
   return `${frameText}; ${jobText}`;
 }
 
-function badgeMessage(overlay: CanvasMotionOverlay, passes: CncPassPosition | null): string | null {
+function badgeMessage(
+  overlay: CanvasMotionOverlay,
+  passes: CncPassPosition | null,
+  nowMs: number,
+): string | null {
   const run = overlay.run;
   const relative = overlay.plan.coordinateFrame.kind === 'relative';
   if (run === null) {
@@ -140,7 +193,7 @@ function badgeMessage(overlay: CanvasMotionOverlay, passes: CncPassPosition | nu
       : '';
   const reason = run.accuracyReason === null ? '' : ` • ${run.accuracyReason}`;
   const relativeLabel = relative ? ' • relative view — physical bed position unverified' : '';
-  return `${truth} • ${state}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
+  return `${truth} • ${state}${elapsedBadgeText(run, nowMs)}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

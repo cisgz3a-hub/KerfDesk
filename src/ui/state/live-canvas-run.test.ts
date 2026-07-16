@@ -11,7 +11,11 @@ import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { INITIAL_ROUTE_RECONCILIATION } from '../../core/job/live-route-reconciliation';
 import { fingerprintGcode } from '../../core/recovery';
 import { startLiveCanvasRun, type CanvasMotionPlan } from './canvas-motion-plan';
-import { liveCanvasLifecyclePatch, liveCanvasStatusPatch } from './live-canvas-run';
+import {
+  liveCanvasLifecyclePatch,
+  liveCanvasStartPatch,
+  liveCanvasStatusPatch,
+} from './live-canvas-run';
 import type { LaserState } from './laser-store';
 
 const gcode = 'G21\nG90\nM3 S0\nG0 X0 Y0\nG1 X10 S500';
@@ -155,6 +159,44 @@ describe('live canvas status reconciliation', () => {
       acceptedStreamer(),
     ).liveCanvasRun;
     expect(noSpindle?.reportedSpindleRpm).toBeNull();
+  });
+
+  it('stamps the start time and freezes the end at the first terminal transition only', () => {
+    const startedRun = liveCanvasStartPatch(plan(), 1_000).liveCanvasRun;
+    expect(startedRun?.startedAtMs).toBe(1_000);
+    expect(startedRun?.endedAtMs).toBeNull();
+
+    const current = { ...state(), liveCanvasRun: startedRun } as LaserState;
+    const paused = liveCanvasLifecyclePatch(current, 'paused', 2_000).liveCanvasRun;
+    expect(paused?.endedAtMs).toBeNull();
+
+    const stopped = liveCanvasLifecyclePatch(current, 'stopped', 3_000).liveCanvasRun;
+    expect(stopped?.endedAtMs).toBe(3_000);
+    const restopped = liveCanvasLifecyclePatch(
+      { ...current, liveCanvasRun: stopped } as LaserState,
+      'stopped',
+      9_000,
+    ).liveCanvasRun;
+    expect(restopped?.endedAtMs).toBe(3_000);
+  });
+
+  it('freezes the end time when a status report finishes the run', () => {
+    const current = {
+      ...state(),
+      liveCanvasRun: liveCanvasStartPatch(plan(), 1_000).liveCanvasRun,
+    } as LaserState;
+    const running = liveCanvasStatusPatch(
+      current,
+      report(5),
+      acceptedStreamer(),
+      4_000,
+    ).liveCanvasRun;
+    expect(running?.endedAtMs).toBeNull();
+
+    const done = { ...acceptedStreamer(), status: 'done' as const };
+    const finished = liveCanvasStatusPatch(current, report(10, 'Idle'), done, 5_000).liveCanvasRun;
+    expect(finished?.lifecycle).toBe('finished');
+    expect(finished?.endedAtMs).toBe(5_000);
   });
 
   it('preserves the last confirmed prefix when a run stops or errors', () => {

@@ -17,6 +17,7 @@ export function liveCanvasStatusPatch(
   state: LaserState,
   report: StatusReport,
   streamer: StreamerState | null,
+  now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
   if (run === null) return {};
@@ -37,7 +38,12 @@ export function liveCanvasStatusPatch(
   const reportedFeedMmPerMin = normalizeReportedFeedRateToMm(report.feed, reportInches);
   const updated = updatedRun(state, run, report, streamer, lifecycle, reportedHead);
   return {
-    liveCanvasRun: { ...updated, reportedFeedMmPerMin, reportedSpindleRpm: report.spindle },
+    liveCanvasRun: {
+      ...updated,
+      reportedFeedMmPerMin,
+      reportedSpindleRpm: report.spindle,
+      endedAtMs: endStampFor(run, updated.lifecycle, now),
+    },
   };
 }
 
@@ -115,17 +121,39 @@ function unreconciledRun(
 
 export function liveCanvasStartPatch(
   plan: CanvasMotionPlan | undefined,
+  now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
-  return plan === undefined ? {} : { liveCanvasRun: startLiveCanvasRun(plan) };
+  return plan === undefined ? {} : { liveCanvasRun: startLiveCanvasRun(plan, now) };
 }
 
 export function liveCanvasLifecyclePatch(
   state: LaserState,
   lifecycle: Exclude<LiveCanvasLifecycle, 'finished'>,
+  now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
   if (run === null || run.lifecycle === 'finished') return {};
-  return { liveCanvasRun: { ...run, lifecycle } };
+  return { liveCanvasRun: { ...run, lifecycle, endedAtMs: endStampFor(run, lifecycle, now) } };
+}
+
+// The first terminal transition freezes the elapsed readout; later report
+// churn (trailing status frames, repeated stop patches) must not move it.
+function endStampFor(
+  run: LiveCanvasRun,
+  lifecycle: LiveCanvasLifecycle,
+  now: number,
+): number | null {
+  if (run.endedAtMs !== null) return run.endedAtMs;
+  return isTerminalCanvasLifecycle(lifecycle) ? now : null;
+}
+
+function isTerminalCanvasLifecycle(lifecycle: LiveCanvasLifecycle): boolean {
+  return (
+    lifecycle === 'stopped' ||
+    lifecycle === 'disconnected' ||
+    lifecycle === 'errored' ||
+    lifecycle === 'finished'
+  );
 }
 
 function mayReconcile(

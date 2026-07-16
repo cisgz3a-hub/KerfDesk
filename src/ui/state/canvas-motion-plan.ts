@@ -76,6 +76,14 @@ export type LiveCanvasRun = {
    * Meaningful as RPM only for CNC; on a laser this field is the power S value
    * (ADR-220), so only the CNC badge surfaces it. */
   readonly reportedSpindleRpm: number | null;
+  /** Wall-clock epoch ms when this run started streaming, or 0 when unknown
+   * (hand-built fixtures). The badge shows elapsed time only for a real
+   * stamp (ADR-221). */
+  readonly startedAtMs: number;
+  /** Wall-clock epoch ms of the first terminal lifecycle transition
+   * (stopped/disconnected/errored/finished), freezing the elapsed readout;
+   * null while the run can still advance. */
+  readonly endedAtMs: number | null;
 };
 
 const retentionKeyCache = new WeakMap<Project, Map<string, string>>();
@@ -233,7 +241,7 @@ export function canvasPlanRetentionKey(
   return key;
 }
 
-export function startLiveCanvasRun(plan: CanvasMotionPlan): LiveCanvasRun {
+export function startLiveCanvasRun(plan: CanvasMotionPlan, startedAtMs = 0): LiveCanvasRun {
   return {
     plan,
     reportedHead: null,
@@ -243,6 +251,8 @@ export function startLiveCanvasRun(plan: CanvasMotionPlan): LiveCanvasRun {
     accuracyReason: plan.unavailableReason,
     reportedFeedMmPerMin: null,
     reportedSpindleRpm: null,
+    startedAtMs,
+    endedAtMs: null,
   };
 }
 

@@ -765,6 +765,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
     speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
     a laser's `FS:` spindle slot is a power value, not RPM — and, like the
     feed rate, appears only while running and only when reported.
+11. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
+    same format as the pre-job ETA), counting through holds and tool
+    changes and freezing at the run's first terminal state — finished,
+    stopped, errored, or disconnected — so the final duration stays
+    readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.
