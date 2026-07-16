@@ -761,6 +761,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    taken from each status frame's `FS:` field (ADR-218). It appears only
    while running and only when the controller reports feed; a held machine
    or a controller that omits `FS:` shows no rate.
+10. For a running CNC job the badge additionally shows the live spindle
+    speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
+    a laser's `FS:` spindle slot is a power value, not RPM — and, like the
+    feed rate, appears only while running and only when reported.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.

@@ -35,6 +35,7 @@ function CanvasMotionProbe(props: {
       data-pass-current={attrs.passCurrent}
       data-pass-total={attrs.passTotal}
       data-reported-feed={attrs.feed}
+      data-reported-spindle={attrs.spindle}
       aria-label={markerDescription(props.overlay)}
       style={visuallyHiddenStyle}
     />
@@ -49,6 +50,7 @@ type ProbeAttrs = {
   readonly passCurrent: number | undefined;
   readonly passTotal: number | undefined;
   readonly feed: number | undefined;
+  readonly spindle: number | undefined;
 };
 
 // One null-branch instead of an optional chain per attribute keeps the probe
@@ -66,6 +68,7 @@ function probeAttrs(overlay: CanvasMotionOverlay, passes: CncPassPosition | null
       passCurrent,
       passTotal,
       feed: undefined,
+      spindle: undefined,
     };
   }
   return {
@@ -76,6 +79,7 @@ function probeAttrs(overlay: CanvasMotionOverlay, passes: CncPassPosition | null
     passCurrent,
     passTotal,
     feed: run.reportedFeedMmPerMin ?? undefined,
+    spindle: run.reportedSpindleRpm ?? undefined,
   };
 }
 
@@ -101,6 +105,18 @@ function feedBadgeText(run: NonNullable<CanvasMotionOverlay['run']>): string {
   return ` • ${Math.round(run.reportedFeedMmPerMin)} mm/min`;
 }
 
+// The `FS:` spindle field is RPM only on a router; a laser reports its power S
+// value in the same slot, so the RPM readout is CNC-only (ADR-220). Shown only
+// while running, mirroring the feed readout.
+function spindleBadgeText(
+  overlay: CanvasMotionOverlay,
+  run: NonNullable<CanvasMotionOverlay['run']>,
+): string {
+  if (overlay.plan.machineKind !== 'cnc') return '';
+  if (run.lifecycle !== 'running' || run.reportedSpindleRpm === null) return '';
+  return ` • ${Math.round(run.reportedSpindleRpm)} rpm`;
+}
+
 function markerDescription(overlay: CanvasMotionOverlay): string {
   const frame = overlay.plan.framePerimeter[0];
   const job = overlay.plan.jobStart;
@@ -124,7 +140,7 @@ function badgeMessage(overlay: CanvasMotionOverlay, passes: CncPassPosition | nu
       : '';
   const reason = run.accuracyReason === null ? '' : ` • ${run.accuracyReason}`;
   const relativeLabel = relative ? ' • relative view — physical bed position unverified' : '';
-  return `${truth} • ${state}${feedBadgeText(run)}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
+  return `${truth} • ${state}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

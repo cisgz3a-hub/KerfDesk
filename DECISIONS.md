@@ -9158,3 +9158,35 @@ simplification in `finalizeChains`:
 - Residual known defect (out of scope here): a 2 px-wide circle stroke still
   fragments into multiple loops before assembly — thin-stroke thinning gaps,
   unrelated to fairing.
+
+---
+
+## ADR-220 - Show the live spindle RPM on the CNC canvas motion badge
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+### Context
+
+GRBL reports the current spindle speed in the second component of the `FS:` status field, already
+parsed as `StatusReport.spindle`. Having added the live feed rate to the canvas motion badge
+(ADR-217), the spindle speed is the natural companion readout for a router operator: it confirms the
+spindle actually reached and holds commanded RPM during the cut. But the same `FS:` slot carries a
+laser's power `S` value, not an RPM, so a naive readout would mislabel laser power as spindle speed.
+
+### Decision
+
+- Thread the reported spindle onto `LiveCanvasRun` as `reportedSpindleRpm`, captured once per status
+  frame alongside the feed rate. It is passed through unscaled: unlike feed and position it is an
+  RPM/power value, not a unit distance, so `$13` inch reporting must not scale it.
+- The badge appends `N rpm` (rounded) after the feed rate, gated on `machineKind === 'cnc'` and,
+  like the feed readout, on the run lifecycle being `running`. A laser never shows an RPM: its
+  `FS:` spindle slot is a power value, so labeling it rpm would be a fidelity bug.
+- When the controller reports no spindle sample the readout is omitted rather than guessed.
+
+### Consequences
+
+Router operators see the live spindle RPM next to the feed rate while a job runs, both sourced from
+the same status frame. Laser jobs are unaffected - the RPM readout never appears for them. The
+change is display-only: no new field is emitted, and no G-code, streaming, or controller behavior
+changes. The `S` value the controller reports depends on the machine's `$30` max-RPM mapping being
+configured correctly; the badge faithfully shows what the controller reports, as with feed.

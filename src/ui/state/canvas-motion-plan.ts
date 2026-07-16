@@ -72,6 +72,10 @@ export type LiveCanvasRun = {
   /** Last controller-reported feed rate normalized to mm/min, or null when the
    * status frame carried no `FS:`/`F:` sample (ADR-217). */
   readonly reportedFeedMmPerMin: number | null;
+  /** Last controller-reported spindle speed from `FS:`, or null when absent.
+   * Meaningful as RPM only for CNC; on a laser this field is the power S value
+   * (ADR-220), so only the CNC badge surfaces it. */
+  readonly reportedSpindleRpm: number | null;
 };
 
 const retentionKeyCache = new WeakMap<Project, Map<string, string>>();
@@ -238,6 +242,7 @@ export function startLiveCanvasRun(plan: CanvasMotionPlan): LiveCanvasRun {
     controllerState: null,
     accuracyReason: plan.unavailableReason,
     reportedFeedMmPerMin: null,
+    reportedSpindleRpm: null,
   };
 }
 
