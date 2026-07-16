@@ -188,6 +188,40 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workOriginSource).toBe('g92');
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
+    // A fresh work offset landed, so the origin is confirmed — no B21 warning.
+    expect(useLaserStore.getState().log.join('\n')).not.toContain('location is unconfirmed');
+  });
+
+  it('warns that the origin is unconfirmed when no work offset arrives (B21)', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const action = useLaserStore
+        .getState()
+        .setOriginHere()
+        .then(() => {
+          settled = true;
+        });
+      await vi.advanceTimersByTimeAsync(0);
+      connection.emitLine('ok'); // G92 acknowledged, but no WCO frame follows
+      // Blow past the 3s work-offset wait without ever reporting a fresh WCO.
+      await vi.advanceTimersByTimeAsync(3_100);
+      await action;
+      expect(settled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+    expect(useLaserStore.getState().log.join('\n')).toContain('location is unconfirmed');
   });
 
   it('keeps a hand-set origin active when its offset is zero (machine 0,0 after Wake)', async () => {

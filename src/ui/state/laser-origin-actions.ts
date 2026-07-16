@@ -114,6 +114,7 @@ async function setOriginHere(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   assertOriginActionReady(set, get, refs);
+  let sawFreshWcoFrame = true;
   await runOriginTransaction(
     set,
     refs,
@@ -131,12 +132,20 @@ async function setOriginHere(
     // controllers never report WCO, so skip the wait there.
     async () => {
       if (usesPrimaryWcs(get())) {
-        await waitForOriginWcoFrame(get);
+        sawFreshWcoFrame = await waitForOriginWcoFrame(get);
       }
       const { statusReport, wcoCache } = get();
       return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
     },
   );
+  // The controller stayed silent past the wait, so the origin is recorded
+  // without a fresh work offset — its machine location is unconfirmed and Start
+  // will refuse it until a jog forces a WCO frame. Say so now, at Set origin
+  // time, instead of only surfacing it later at Start (audit B21). Non-blocking:
+  // the origin is still set; this is a heads-up, not a gate.
+  if (!sawFreshWcoFrame) {
+    set((state) => ({ log: pushLog(state, ORIGIN_WCO_UNCONFIRMED_NOTICE) }));
+  }
 }
 
 async function zeroZHere(
@@ -239,11 +248,20 @@ function usesPrimaryWcs(state: LaserState): boolean {
 const ORIGIN_WCO_WAIT_TIMEOUT_MS = 3_000;
 const ORIGIN_WCO_POLL_MS = 50;
 
-async function waitForOriginWcoFrame(get: GetFn): Promise<void> {
+export const ORIGIN_WCO_UNCONFIRMED_NOTICE =
+  '[lf2] Origin set, but the controller has not reported a fresh work offset. Its machine ' +
+  'location is unconfirmed — jog once to refresh it before Start, which will otherwise refuse ' +
+  'the location-unknown origin.';
+
+// Resolves true once a fresh work offset lands (wcoCache populated), or false if
+// the controller stays silent past the deadline. The caller uses the outcome to
+// warn that the recorded origin's location is unconfirmed.
+async function waitForOriginWcoFrame(get: GetFn): Promise<boolean> {
   const deadline = Date.now() + ORIGIN_WCO_WAIT_TIMEOUT_MS;
   while (get().wcoCache === null && Date.now() <= deadline) {
     await sleep(ORIGIN_WCO_POLL_MS);
   }
+  return get().wcoCache !== null;
 }
 
 function sleep(ms: number): Promise<void> {
