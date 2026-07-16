@@ -177,6 +177,35 @@ body {
   color: #fff;
 }
 
+/* Attention pulse — coaches the one next required step (e.g. "Set origin
+   here" on a no-homing machine before a job can run). Flat colors only, per
+   the performance note above: the pulse animates background/border/color
+   between the neutral and primary looks, no shadows or blur. The CSS
+   animation runs on the compositor clock, independent of React re-renders. */
+@keyframes lf-attention-pulse {
+  0%,
+  100% {
+    background: var(--lf-bg-2);
+    border-color: var(--lf-accent);
+    color: var(--lf-text);
+  }
+  50% {
+    background: var(--lf-accent);
+    border-color: var(--lf-accent);
+    color: var(--lf-on-fill);
+  }
+}
+.lf-btn--attention:not(:disabled) {
+  animation: lf-attention-pulse 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lf-btn--attention:not(:disabled) {
+    animation: none;
+    background: var(--lf-tint-info);
+    border-color: var(--lf-accent);
+  }
+}
+
 .lf-iconbtn {
   display: inline-flex;
   align-items: center;
