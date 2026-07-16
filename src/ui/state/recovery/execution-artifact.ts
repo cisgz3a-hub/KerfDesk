@@ -66,6 +66,11 @@ export type ExecutionArtifactV1 = {
   readonly canvasPlan: CanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncRecoveryManifest?: CncRecoveryEventManifest | undefined;
+  // Operator's machine-specific air-cut/scrap-test qualification record for a
+  // supervised CNC recovery. The recovery policy only checks it is non-empty, so
+  // archiving it verbatim gives the run an audit trail of exactly what was
+  // attested (audit A1). Absent for ordinary starts.
+  readonly recoveryQualification?: string;
   readonly archivedControllerObservation: ArchivedControllerObservationV1;
 };
 
@@ -93,6 +98,7 @@ export function createExecutionArtifact(args: {
   readonly jobOrigin?: JobOriginPlacement;
   readonly canvasPlan: CanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
+  readonly recoveryQualification?: string;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly controllerObservation?: ArchivedControllerObservationInput;
   readonly createdAtIso: string;
@@ -124,6 +130,9 @@ export function createExecutionArtifact(args: {
     canvasPlan: args.canvasPlan,
     ...(args.cncToolPlan === undefined ? {} : { cncToolPlan: args.cncToolPlan }),
     ...(cncRecoveryManifest === undefined ? {} : { cncRecoveryManifest }),
+    ...(args.recoveryQualification === undefined
+      ? {}
+      : { recoveryQualification: args.recoveryQualification }),
     archivedControllerObservation: {
       settings: args.controllerSettings,
       observedAtIso: args.createdAtIso,
