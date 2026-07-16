@@ -6,6 +6,7 @@ import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import {
+  recoveryClaimIsExpired,
   recoveryRepository,
   type RecoveryCapsule,
   type RecoveryRepository,
@@ -29,6 +30,14 @@ export function CheckpointResumeBanner(props: {
   // cancelled, otherwise the candidate commits or reconciles as newest.
   if (jobActive || snapshot.pendingStart !== null || capsule === null) return null;
 
+  // A claim only blocks Review while its lease is live. A crash between claiming
+  // and arming leaves an abandoned claim; once it outlives the lease Review
+  // re-opens rather than stranding the record forever (audit B4). Evaluated at
+  // render: the banner appears on the post-crash reload, when the stale claim is
+  // already old.
+  const claimActive =
+    capsule.claim !== undefined && !recoveryClaimIsExpired(capsule.claim, Date.now());
+
   return (
     <>
       <details style={bannerStyle} aria-label="Interrupted job recovery">
@@ -40,11 +49,12 @@ export function CheckpointResumeBanner(props: {
             of {capsule.sendableLines} lines acknowledged
           </span>
         </summary>
-        <RecoveryDescription capsule={capsule} />
+        <RecoveryDescription capsule={capsule} claimActive={claimActive} />
         <RecoveryActions
           capsule={capsule}
           repository={repository}
           disabled={props.busy}
+          claimActive={claimActive}
           onReview={() => setReviewOpen(true)}
         />
       </details>
@@ -62,7 +72,13 @@ export function CheckpointResumeBanner(props: {
   );
 }
 
-function RecoveryDescription({ capsule }: { readonly capsule: RecoveryCapsule }): JSX.Element {
+function RecoveryDescription({
+  capsule,
+  claimActive,
+}: {
+  readonly capsule: RecoveryCapsule;
+  readonly claimActive: boolean;
+}): JSX.Element {
   const startedAt = formatStartedAt(capsule.artifact.createdAtIso);
   const exact = capsule.artifact.kind === 'exact-execution';
   return (
@@ -83,7 +99,7 @@ function RecoveryDescription({ capsule }: { readonly capsule: RecoveryCapsule })
           ? ''
           : ` Rejected command: ${capsule.interruption.rejectedLine}`}
       </p>
-      {capsule.claim === undefined ? null : (
+      {capsule.claim === undefined || !claimActive ? null : (
         <p style={causeStyle}>
           A recovery attempt was claimed at{' '}
           {formatStartedAt(capsule.claim.claimedAtIso) ?? 'an unknown time'}. Inspect the machine
@@ -98,6 +114,7 @@ function RecoveryActions(props: {
   readonly capsule: RecoveryCapsule;
   readonly repository: RecoveryRepository;
   readonly disabled: boolean;
+  readonly claimActive: boolean;
   readonly onReview: () => void;
 }): JSX.Element {
   const discard = async (): Promise<void> => {
@@ -122,7 +139,7 @@ function RecoveryActions(props: {
     <div style={rowStyle}>
       <button
         type="button"
-        disabled={props.disabled || props.capsule.claim !== undefined}
+        disabled={props.disabled || props.claimActive}
         onClick={props.onReview}
         title="Open a read-only review. No live state changes until final supervised Start."
       >
