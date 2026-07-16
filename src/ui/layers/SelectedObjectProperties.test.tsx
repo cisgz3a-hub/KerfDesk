@@ -169,23 +169,20 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
-  it('moves selected artwork to the first machine priority without changing canvas order', async () => {
+  it('keeps top-level run ordering out of the selected-artwork settings inspector', async () => {
     useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
     useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
     useStore.getState().selectObject('Box');
     const { host, root } = await render();
     try {
-      expect(host.textContent).toContain('Position 2 of 2');
-      const first = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'First',
-      );
-      if (!(first instanceof HTMLButtonElement)) throw new Error('first priority button missing');
-      await act(async () => first.click());
-
-      const scene = useStore.getState().project.scene;
-      expect(scene.artworkOrder).toEqual(['Box', 'Johann']);
-      expect(scene.objects.map((object) => object.id)).toEqual(['Johann', 'Box']);
-      expect(host.textContent).toContain('Position 1 of 2');
+      expect(host.querySelector('[aria-label="Selected artwork operation"]')).not.toBeNull();
+      expect(host.textContent).not.toContain('Artwork run priority');
+      expect(
+        [...host.querySelectorAll('button')].some((button) =>
+          ['First', 'Earlier', 'Later', 'Last'].includes(button.textContent ?? ''),
+        ),
+      ).toBe(false);
+      expect(useStore.getState().project.scene.artworkOrder).toEqual(['Johann', 'Box']);
     } finally {
       await act(async () => root.unmount());
       host.remove();

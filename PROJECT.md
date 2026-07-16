@@ -384,6 +384,11 @@ migration, but these records represent ordered laser or CNC operations.
 Compiled jobs currently contain cut/fill-style vector groups and raster groups.
 They are never persisted as project truth.
 
+The Run order UI derives numbered run units from `scene.artworkOrder` plus explicit operation
+bindings (ADR-211 amendment). Exact shared operation sets form one displayed unit; persisted
+priority remains the flattened object-ID list. Canvas focus, dimming, and numbering session history
+are ephemeral UI state and are never serialized.
+
 ---
 
 ## Module layout

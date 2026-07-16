@@ -37,6 +37,8 @@ beforeEach(() => {
     zoomFactor: 1,
     panX: 0,
     panY: 0,
+    artworkRunFocus: null,
+    artworkNumbering: { kind: 'idle' },
   });
 });
 
@@ -132,6 +134,25 @@ describe('useDragMove hook event pipeline', () => {
     // Canceled — no undo entry, snapshot cleared.
     expect(useStore.getState().pendingUndo).toBeNull();
     expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('assigns canvas clicks to run numbers without starting an artwork drag', async () => {
+    const project = projectWithTwoRectangles();
+    useStore.getState().setProject(project);
+    useStore.getState().beginInteraction();
+    useUiStore.getState().startArtworkNumbering(['A', 'B']);
+    const { canvas } = await renderHarness();
+
+    await dispatchPointer(canvas, 'pointerdown', clientForScenePoint(project, { x: 125, y: 45 }));
+
+    expect(canvas.dataset.dragKind).toBe('');
+    expect(useStore.getState().project.scene.artworkOrder).toEqual(['B', 'A']);
+    expect(useStore.getState().selectedObjectId).toBe('B');
+    expect(useUiStore.getState().artworkNumbering).toMatchObject({
+      kind: 'active',
+      nextPosition: 2,
+      assignedUnitKeys: ['B'],
+    });
   });
 });
 
@@ -241,6 +262,28 @@ function projectWithRectangle(): Project {
     scene: {
       objects: [rect],
       layers: [createLayer({ id: '#000000', color: '#000000' })],
+      groups: [],
+    },
+  };
+}
+
+function projectWithTwoRectangles(): Project {
+  const layerA = createLayer({ id: 'operation-a', name: 'A', color: '#2563eb' });
+  const layerB = createLayer({ id: 'operation-b', name: 'B', color: '#dc2626' });
+  const rectangle = (id: string, operationId: string, x: number) => ({
+    ...createRectangle({
+      id,
+      color: '#000000',
+      spec: { widthMm: 50, heightMm: 50, cornerRadiusMm: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x, y: 20 },
+    }),
+    operationIds: [operationId],
+  });
+  return {
+    ...createProject(),
+    scene: {
+      objects: [rectangle('A', layerA.id, 20), rectangle('B', layerB.id, 100)],
+      layers: [layerA, layerB],
       groups: [],
     },
   };

@@ -34,6 +34,8 @@ import {
   updateDrawDraft,
   updateMeasureDraft,
 } from './workspace-drag-updates';
+import { handleArtworkNumberingPointerDown } from './artwork-numbering-click';
+import { capturePointer, releasePointer } from './pointer-capture';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
 // The canvas binds POINTER events so an in-progress drag can be captured to the
@@ -73,6 +75,8 @@ export function useDragMove(
     useUiStore.getState().closeWorkspaceContextBar();
     deps.setSnapGuides([]);
     if (previewMode) return;
+    if (handleArtworkNumberingPointerDown({ event: e, canvas: ref.current, project, viewState }))
+      return;
     const next = beginWorkspaceDrag({
       e,
       ref,
@@ -178,17 +182,6 @@ function runWorkspaceDragMove(args: {
     setObjectTransform: deps.setObjectTransform,
     setSnapGuides: deps.setSnapGuides,
   });
-}
-
-// Pointer-capture helpers, guarded because jsdom (test env) implements neither
-// setPointerCapture nor hasPointerCapture. releasePointerCapture throws if the
-// element doesn't hold the capture, so gate on hasPointerCapture.
-function capturePointer(canvas: HTMLCanvasElement | null, pointerId: number): void {
-  canvas?.setPointerCapture?.(pointerId);
-}
-
-function releasePointer(canvas: HTMLCanvasElement | null, pointerId: number): void {
-  if (canvas?.hasPointerCapture?.(pointerId) === true) canvas.releasePointerCapture(pointerId);
 }
 
 function beginWorkspaceDrag(args: {

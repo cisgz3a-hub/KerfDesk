@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CutsLayersPanel } from '../layers';
 import { LaserWindow } from '../laser';
 import { Icon, type IconName } from '../kit';
+import { useUiStore } from '../state/ui-store';
 
 type PanelId = 'cuts' | 'machine';
 
@@ -10,6 +11,7 @@ export function WorkspaceSidePanels(): JSX.Element {
   const [active, setActive] = useState<PanelId>('cuts');
   const [cutsOpen, setCutsOpen] = useState(true);
   const [machineOpen, setMachineOpen] = useState(true);
+  const runOrderOpen = useUiStore((state) => state.cutsLayersView === 'run-order');
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') {
@@ -25,7 +27,14 @@ export function WorkspaceSidePanels(): JSX.Element {
 
   if (compact) {
     return (
-      <section aria-label="Workspace side panels" style={compactShellStyle}>
+      <section
+        aria-label="Workspace side panels"
+        style={{
+          ...compactShellStyle,
+          width: runOrderOpen ? 'min(46vw, 430px)' : 'min(38vw, 340px)',
+          minWidth: runOrderOpen ? 320 : 260,
+        }}
+      >
         <div role="tablist" aria-label="Side panel" style={switcherStyle}>
           <PanelTab
             label="Cuts / Layers"
@@ -67,7 +76,7 @@ export function WorkspaceSidePanels(): JSX.Element {
       </div>
       <div style={desktopPanelsStyle}>
         {cutsOpen ? (
-          <ResizablePanel label="Cuts / Layers">
+          <ResizablePanel label="Cuts / Layers" wide={runOrderOpen}>
             <CutsLayersPanel />
           </ResizablePanel>
         ) : null}
@@ -127,10 +136,18 @@ function PanelToggle(props: {
 
 function ResizablePanel(props: {
   readonly label: string;
+  readonly wide?: boolean;
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <div aria-label={`${props.label} resizable panel`} style={resizablePanelStyle}>
+    <div
+      aria-label={`${props.label} resizable panel`}
+      style={
+        props.wide === true
+          ? { ...resizablePanelStyle, width: 400, minWidth: 320 }
+          : resizablePanelStyle
+      }
+    >
       {props.children}
     </div>
   );
@@ -167,8 +184,6 @@ const resizablePanelStyle: React.CSSProperties = {
 const compactShellStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  width: 'min(38vw, 340px)',
-  minWidth: 260,
   flexShrink: 0,
   minHeight: 0,
 };

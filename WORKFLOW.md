@@ -47,7 +47,7 @@
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
-- **Cuts/Layers panel**: docked right with **Layers** and **Materials** tabs in Laser mode. Layers is the default and, when empty, shows "Import a design to populate layers." Materials owns reusable preset and saved-library management without displacing the active layer workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order widens the same docked rail while the canvas remains on the left; it is not a modal or a third sidebar. Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the top Live Motion bar.
 - **Live Motion bar**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears directly below the command shell and above the workspace. It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs without covering workspace content.
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
@@ -238,8 +238,13 @@ Identical to F-A3 except:
 - A compact ordered operation list follows the inspector. Each row shows automatic colour, name,
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence.
-- The inspector shows the selected artwork's persisted run position and **First**, **Earlier**,
-  **Later**, and **Last** controls. This order is independent of canvas stacking.
+- The sibling **Run order** view is the canonical top-level sequence manager. It uses direct
+  one-based numbers rather than First/Earlier/Later/Last controls and supports search,
+  jump-to-number, and a virtualized list for large jobs. This order is independent of canvas
+  stacking.
+- Each run row shows its automatic operation colour, artwork name/type, combined dimensions,
+  operations, core laser/CNC settings, output state, and effective machine step(s). **Edit settings**
+  returns to Settings with that run selected.
 - When one selected artwork uses an operation shared by others, the inspector says `Affects N
   artworks` and offers **Make unique**. This clones the operation and rebinds only the selection.
 - When selected artworks use different operations, the inspector says `Multiple operations` and
@@ -287,14 +292,36 @@ Identical to F-A3 except:
 4. Undo restores the previous layer order.
 
 #### Success - choose which artwork runs first
-1. Select one artwork, or select several artworks to move them together.
-2. Click **First**, **Earlier**, **Later**, or **Last** in the selection inspector.
-3. The displayed position updates without changing canvas stacking, selection geometry, operation
-   settings, or automatic colours.
-4. Laser output follows that artwork order exactly. CNC uses the same priority inside its mandatory
-   safe sections: clearing stays before profiles and multi-tool work stays in contiguous tool
-   sections.
-5. Undo restores the previous machine priority.
+1. Open **Run order** in the docked Artwork / Operations rail.
+2. Enter a one-based **Run** number on any row. The complete run unit moves to that position and all
+   other rows renumber automatically.
+3. For large jobs, search by artwork/operation/settings or enter **Jump to run**; the windowed list
+   scrolls directly to that row without rendering the whole project at once.
+4. The displayed position updates without changing canvas stacking, geometry, operation settings,
+   visibility, output flags, or automatic colours.
+5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s).
+6. CNC preserves clearing-before-profile safety and contiguous tool sections. Each row shows both
+   its requested run number and the exact effective CNC step(s), so any necessary difference is
+   visible before output.
+7. Undo restores the previous machine priority.
+
+#### Success - number a large job from the canvas
+1. Open **Run order** and click **Number on canvas**.
+2. The canvas prompt says `Click artwork for run #1`. Click the desired first artwork, then the
+   desired second, and continue. The clicked run receives a thin colour halo and number badge; other
+   artwork is dimmed while the bed, grid, stock, no-go zones, camera, rulers, and motion markers stay
+   fully visible.
+3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
+   session as one undoable project action. **Cancel** restores the order from before the session.
+4. Numbering ends automatically after every run unit has been assigned.
+
+#### Success - inspect a job from either surface
+1. Click a run row: its complete run unit is selected on the canvas, highlighted with its operation
+   colour and `#N` badge, and all other artwork is visually de-emphasized.
+2. With Run order open, click artwork on the canvas: the matching row becomes active and scrolls
+   into view.
+3. Focus/dimming is UI-only. It is not persisted, is not undoable, and cannot affect preview,
+   compiled jobs, or emitted G-code.
 
 #### Success — toggle visibility off
 1. Click eye icon.
@@ -327,6 +354,14 @@ Identical to F-A3 except:
 #### Edge — two SVGs share a color
 - Each imported artwork keeps its own operation by default. Matching source colors do not couple
   settings. The operator may select both and choose **Use one operation** to share deliberately.
+
+#### Edge - shared and partially shared artwork
+- Artwork with the same complete operation set appears as one run unit with one number, highlight,
+  and settings context.
+- Partial operation sharing stays as separate numbered units. **Make unique** separates a member of
+  a shared operation before independent ordering.
+- `Scene.artworkOrder` keeps flattened object IDs for schema compatibility; run-unit grouping is a
+  deterministic derivation and introduces no project-size cap beyond the existing scene budget.
 
 ---
 

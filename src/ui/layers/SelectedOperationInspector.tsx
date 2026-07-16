@@ -9,7 +9,6 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { CncLayerFields } from './CncLayerFields';
-import { ArtworkRunOrderControls } from './ArtworkRunOrderControls';
 import { LayerRowCutSettings } from './LayerRowCutSettings';
 import { LayerRowSettingsFields } from './LayerRowFields';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
@@ -32,7 +31,6 @@ export function SelectedOperationInspector(props: {
   if (context.common.length === 0) {
     return (
       <section aria-label="Multiple artwork operations" style={inspectorStyle}>
-        <ArtworkRunOrderControls objects={props.objects} machineKind={machineKind} />
         <h3 style={headingStyle}>Multiple operations</h3>
         <p style={hintStyle}>
           {props.objects.length} selected artworks currently keep independent settings.
@@ -83,11 +81,6 @@ function SelectedOperationEditor(props: {
   ).length;
   return (
     <section aria-label="Selected artwork operation" style={inspectorStyle}>
-      <ArtworkRunOrderControls
-        objects={props.objects}
-        machineKind={props.machineKind}
-        sharedOperation={affected > 1}
-      />
       <div style={titleRowStyle}>
         <span style={{ ...swatchStyle, background: props.active.color }} />
         <input
