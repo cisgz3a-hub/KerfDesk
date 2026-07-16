@@ -2662,6 +2662,10 @@ F-CNC19 tiling.
 
 ### F-CNC27. Supervised CNC interruption recovery — Phase H.11 (ADR-200)
 
+> Demoted by ADR-215: the default CNC recovery review is the pass-boundary
+> wizard (F-CNC45); this runway review remains reachable via its
+> **Advanced: mid-pass runway…** action.
+
 #### Success
 1. CNC Job controls show the neutral collapsed **Interrupted job saved** card
    instead of a raw G-code line input. Generic checkpoint resume and arbitrary
@@ -3111,6 +3115,61 @@ F-CNC19 tiling.
 3. Marlin, Smoothieware, and Ruida are excluded until their terminal/queue
    semantics receive a separate audit. Even on monitored families, this guard
    detects anomalies but cannot prove which external sender produced a reply.
+
+### F-CNC45. Pass-boundary CNC recovery review - Phase H.13 (ADR-215)
+
+#### Success
+1. For CNC capsules, the **Interrupted job saved** card's Review opens the
+   pass-boundary recovery wizard. The runway review (F-CNC27) remains reachable
+   via **Advanced: mid-pass runway…**.
+2. The wizard opens with extraction coaching for the recorded interruption
+   cause: after a transport loss it warns the latched spindle may still be
+   spinning and coaches jogging Z up while it spins; a stopped-embedded cutter
+   gets collet / hand-rotation guidance and an explicit instruction never to
+   power the spindle to free it. The app itself never commands extraction motion.
+3. A pass map drawn from the sealed prepared job colors every pass by transport
+   evidence — provably complete, uncertain, or not reached — and marks the
+   selected boundary pass's start point.
+4. The boundary picker preselects the computed default: the pass containing the
+   first line NOT provably executed (acked count minus a per-controller planner
+   reserve). Pass spans are re-derived by replaying the artifact's emitter
+   lineage and trusted only when the re-emission reproduces the sealed bytes.
+5. The operator confirms four physical facts — cutter clear, spindle stopped,
+   workholding unchanged, tool installed/intact/Z-zeroed — and chooses position
+   evidence: **retained** (enabled only with session-continuity evidence: the
+   interruption was not a controller reboot AND the live work offset matches
+   the offset archived with the run) or **re-zeroed**.
+6. Start generates a NEW ordinary job — safe-Z retract → spindle start with its
+   full spin-up dwell → rapid to the boundary pass start → plunge at plunge
+   feed into already-cut kerf → recut that pass → every later pass and
+   operation in source order — then runs the ordinary CNC Start gates and setup
+   attestation again and streams through the sealed-capsule claim/stage/arm
+   path (F-B16 semantics).
+
+#### Error
+1. An incomplete physical checklist, a retained-position choice without its
+   evidence, a boundary pass that does not exist in the sealed job, or a failed
+   preflight refuses with the specific reason; no controller command is sent.
+2. Legacy fingerprint-only capsules cannot use pass recovery and are directed
+   to the legacy review path.
+
+#### Empty
+1. Without a retained CNC capsule no recovery card is shown (unchanged).
+2. When spans cannot be derived (the sealed bytes are not reproduced), no
+   default boundary is computed: the wizard says so and requires manual pass
+   selection — recovery is never refused for a missing sidecar.
+
+#### Edge - later-than-default boundary
+1. Picking a pass after the computed default shows an inline warning, and Start
+   asks for one explicit confirmation that all earlier work is physically
+   complete. The choice is warned, never blocked.
+
+#### Edge - recut
+1. The boundary pass is recut from its start, so already-cleared kerf may be
+   lightly re-engaged where the wood relaxed; recut cost is bounded by one pass
+   per operation. Multi-tool jobs resume with the boundary group's tool loaded
+   and Z-zeroed (confirmed via the tool checklist item); later groups keep
+   their ordinary M0 tool-change blocks.
 
 ## Phase I flows — multi-controller (ADR-094..097)
 

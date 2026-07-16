@@ -33,7 +33,7 @@
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 | ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
-| ADR-143 | 2026-07-13 | Accepted | Disable executable CNC checkpoint and start-from-line recovery |
+| ADR-143 | 2026-07-13 | Accepted (narrowed by ADR-215) | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 | ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
 | ADR-151 | 2026-07-13 | Accepted | Quick Nest uses bounded outline compaction with rectangular fallback |
@@ -70,7 +70,7 @@
 | ADR-197 | 2026-07-15 | Accepted | Let operators hide static canvas start markers without hiding live motion |
 | ADR-198 | 2026-07-14 | Superseded | Add a pinned OFL EMS stroke-font family with lazy data loading (see ADR-213) |
 | ADR-199 | 2026-07-14 | Superseded | Fair decorative stroke fonts with the shared trace cubic fitter (see ADR-213) |
-| ADR-200 | 2026-07-14 | Accepted | CNC recovery is evidence-gated and software Abort is not an E-stop |
+| ADR-200 | 2026-07-14 | Amended (ADR-215) | CNC recovery is evidence-gated and software Abort is not an E-stop |
 | ADR-201 | 2026-07-15 | Amended | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
 | ADR-203 | 2026-07-15 | Amended | Recover Work-Z only from owned controller offset readback (see ADR-209) |
@@ -6804,7 +6804,7 @@ trust constant remains a separate, deliberate release switch.
 
 ## ADR-143 - Disable executable CNC checkpoint and start-from-line recovery
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Accepted; scope narrowed by ADR-215 (a pass-boundary NEW job is the supported recovery; line-based executable resume remains disabled) | **Date:** 2026-07-13
 
 ### Context
 
@@ -8152,7 +8152,7 @@ letterforms; those traits belong to the selected face rather than to polygon fac
 
 ## ADR-200 - CNC recovery is evidence-gated and software Abort is not an E-stop
 
-**Status:** Accepted | **Date:** 2026-07-14
+**Status:** Amended in part by ADR-215 (pass-boundary recovery is the default review; the runway flow is the demoted advanced option; session-continuity evidence may substitute for unconditional requalification) | **Date:** 2026-07-14
 
 ### Context
 
