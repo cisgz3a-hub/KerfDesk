@@ -9106,3 +9106,55 @@ workpiece.
 - kerf-offset.ts and profile-ordering.ts still carry local point-in-polygon
   copies; migrating them onto the new shared core/geometry/point-in-polygon.ts
   is deferred tidy-first work.
+
+---
+
+## ADR-219 - Centerline arc-length quadratic fairing (anti-wobble stage)
+
+**Status:** Accepted | **Date:** 2026-07-16
+
+> **Numbering note.** ADR-218 (line-art contour side) was the last used; **ADR-219** is the next free.
+
+### Context
+
+Centerline traces of smooth curved strokes come out visibly wobbly ("not
+100% smooth on turns" — maintainer field report, 2026-07-16). Measured on an
+ideal-circle stroke fixture (R = 80 px, 4 px stroke): the traced centerline
+deviates up to ±0.71 px (rms 0.29 px) from the true center. Root cause: the
+chain pipeline's 1-ring Taubin passes are a narrow-band filter — they kill
+the adjacent-vertex staircase but pass ripple with wavelengths beyond ~6
+vertices essentially unchanged, and the medial axis of a rasterized curve
+carries exactly that residue (a lattice beat whose wavelength scales with
+sqrt of the curve radius). Douglas-Peucker then anchors its output vertices
+on the beat's extremes, baking the wobble into the final polyline and the
+fitted display curves.
+
+### Decision
+
+A bounded arc-length quadratic fairing stage
+(`core/trace/centerline/arc-fairing.ts`) runs between curvature smoothing and
+simplification in `finalizeChains`:
+
+- Windowed weighted least-squares quadratic fit of x(t), y(t) over arc length
+  (Savitzky–Golay on a curve). A parabola matches a constant-curvature arc to
+  second order, so genuine turns — including small glyph bowls — keep their
+  radius (no Laplacian melt; verified by a no-shrink test on an R = 4 px loop).
+- Window half-width tracks sqrt(local curve radius) (Menger circumradius over
+  ±8 px probes), clamped to [3, 14] px, symmetric, and never crossing a pinned
+  vertex (corners / hard turns / open endpoints via the shared
+  `classifyAnchors`).
+- Two passes; every vertex's TOTAL displacement is capped at 0.45 px from its
+  original position — the same sub-pixel scale `SIMPLIFY_EPSILON_PX` already
+  treats as noise, so no tolerance contract changes.
+
+### Consequences
+
+- Ideal-circle fixture (4 px stroke): max deviation 0.71 → 0.56 px, and the
+  rendered trace loses its visible facets/dents (probe renders under
+  `trace-audit-artifacts/`, harness `_centerline-wobble-probe.test.ts`,
+  gated on CENTERLINE_PROBE=1).
+- Edge Detection shares `assembleStrokePaths`, so its chains are faired the
+  same way; the full trace + perceptual suites pass unchanged.
+- Residual known defect (out of scope here): a 2 px-wide circle stroke still
+  fragments into multiple loops before assembly — thin-stroke thinning gaps,
+  unrelated to fairing.
