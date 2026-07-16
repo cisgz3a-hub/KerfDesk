@@ -176,6 +176,10 @@ Identical to F-A3 except:
 
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
+2. Exception — single-artwork scene (ADR-222): when the scene's only artwork is selectable
+   (unlocked, on a visible layer; the registration jig / board outline is not artwork), deselect
+   immediately re-marks it. The lone artwork is selected by default everywhere: import, Open,
+   New, undo/redo, and deleting down to one artwork all land with it selected.
 
 #### Edge — locked object
 1. Edit menu `Lock Selection` locks selected artwork and clears selection.

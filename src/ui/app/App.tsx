@@ -24,6 +24,7 @@ import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
 import { usePolylineFairingUpgrade } from './use-polyline-fairing-upgrade';
 import { useShortcuts } from './use-shortcuts';
+import { useSingleArtworkSelection } from './use-single-artwork-selection';
 import { useSpacePan } from './use-space-pan';
 import { useUnloadStop } from './use-unload-stop';
 import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
@@ -37,6 +38,7 @@ export function App(): JSX.Element {
   // can't (event-handler throws + unhandled promise rejections).
   useAutosaveRecovery();
   usePolylineFairingUpgrade();
+  useSingleArtworkSelection();
   useAutosave();
   useMaterialLibraryPersistence();
   useCncLibraryPersistence();
