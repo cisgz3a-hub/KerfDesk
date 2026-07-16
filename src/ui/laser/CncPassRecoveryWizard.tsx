@@ -14,15 +14,14 @@ import { CncRecoveryPreviewWizard } from './CncRecoveryPreviewWizard';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
 import { cncExtractionGuidance } from './cnc-pass-recovery-guidance';
 import { buildCncPassRecoveryModel } from './cnc-pass-recovery-model';
-import { isLaterThanDefault, type CncPassRecoveryReview } from './cnc-pass-recovery-review';
+import { isLaterThanDefault, type CncPassRecoveryChecklistDraft } from './cnc-pass-recovery-review';
 
-type ChecklistDraft = Omit<CncPassRecoveryReview, 'groupIndex' | 'passIndex'>;
-const EMPTY_CHECKLIST: ChecklistDraft = {
+const EMPTY_CHECKLIST: CncPassRecoveryChecklistDraft = {
   cutterClear: false,
   spindleStopped: false,
   workholdingConfirmed: false,
   toolConfirmed: false,
-  position: { kind: 're-zeroed' },
+  position: null,
 };
 
 export function CncPassRecoveryWizard(props: {
@@ -38,7 +37,7 @@ export function CncPassRecoveryWizard(props: {
   const [selection, setSelection] = useState<{ groupIndex: number; passIndex: number } | null>(
     model.kind === 'ready' ? model.defaultSelection : null,
   );
-  const [checklist, setChecklist] = useState<ChecklistDraft>(EMPTY_CHECKLIST);
+  const [checklist, setChecklist] = useState<CncPassRecoveryChecklistDraft>(EMPTY_CHECKLIST);
   const [starting, setStarting] = useState(false);
   const startInFlight = useRef(false);
   if (advancedOpen) {
@@ -51,15 +50,21 @@ export function CncPassRecoveryWizard(props: {
     checklist.cutterClear &&
     checklist.spindleStopped &&
     checklist.workholdingConfirmed &&
-    checklist.toolConfirmed;
+    checklist.toolConfirmed &&
+    checklist.position !== null;
   const canStart = model.kind === 'ready' && selection !== null && checklistComplete && !starting;
   const startRecovery = async (): Promise<void> => {
-    if (!canStart || selection === null || startInFlight.current) return;
+    const position = checklist.position;
+    if (!canStart || selection === null || position === null || startInFlight.current) return;
     startInFlight.current = true;
     setStarting(true);
     let started = false;
     try {
-      started = await runCncPassRecoveryFlow(props.capsule, { ...checklist, ...selection });
+      started = await runCncPassRecoveryFlow(props.capsule, {
+        ...checklist,
+        position,
+        ...selection,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       jobAwareAlert(`Cannot start CNC recovery:\n\n${message}`);

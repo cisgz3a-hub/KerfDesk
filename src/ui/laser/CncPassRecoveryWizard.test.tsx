@@ -165,6 +165,14 @@ function completeChecklist(): void {
   });
 }
 
+function rezeroedRadio(): HTMLInputElement {
+  const radio = host?.querySelector<HTMLInputElement>(
+    'input[type="radio"][title^="Position was re-established"]',
+  );
+  if (!(radio instanceof HTMLInputElement)) throw new Error('Expected re-zeroed position radio.');
+  return radio;
+}
+
 describe('CncPassRecoveryWizard', () => {
   it('shows extraction guidance and preselects the computed default boundary', () => {
     renderWizard(exactCapsule());
@@ -175,9 +183,25 @@ describe('CncPassRecoveryWizard', () => {
     expect(wizardButton('Start pass recovery').disabled).toBe(true);
   });
 
+  it('keeps Start disabled until the operator explicitly picks a position option', () => {
+    renderWizard(exactCapsule());
+    const radios = [...(host?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? [])];
+    expect(radios).toHaveLength(2);
+    expect(radios.some((radio) => radio.checked)).toBe(false);
+    completeChecklist();
+    expect(wizardButton('Start pass recovery').disabled).toBe(true);
+    act(() => {
+      rezeroedRadio().click();
+    });
+    expect(wizardButton('Start pass recovery').disabled).toBe(false);
+  });
+
   it('starts the flow with the completed review and closes on success', async () => {
     const { onClose } = renderWizard(exactCapsule());
     completeChecklist();
+    act(() => {
+      rezeroedRadio().click();
+    });
     const start = wizardButton('Start pass recovery');
     expect(start.disabled).toBe(false);
     await act(async () => {
