@@ -61,6 +61,33 @@ describe('buildResumeProgram', () => {
     expect(findLaserOnTravelIssues(result.lines.join('\n'))).toEqual([]);
   });
 
+  // C8: an imported program that selects G55-G59 before the resume line must
+  // resume in THAT frame. The preamble previously hard-pinned G54, so a G55
+  // program would replay the whole tail in the wrong coordinate system. (Unreachable
+  // today — resume is laser-only and imported programs are preview-only — but a
+  // latent wrong-frame-motion hazard the day imported streaming ships.)
+  it('preserves the program-selected work coordinate system in the resume preamble', () => {
+    const laser = 'G21\nG90\nG55\nM3 S0\nG0 X10 Y10 S0\nG1 X20 Y10 F1500 S300\nG1 X20 Y20\nM5';
+    const result = buildResumeProgram(laser, 7, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+    const moveIndex = preamble.findIndex((line) => line.startsWith('G0 X'));
+
+    expect(preamble).toContain('G55');
+    expect(preamble).not.toContain('G54');
+    expect(preamble.indexOf('G55')).toBeLessThan(moveIndex);
+  });
+
+  it('defaults the resume preamble to G54 when the program selects no WCS', () => {
+    const laser = 'G21\nG90\nM3 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F1500 S300\nM5';
+    const result = buildResumeProgram(laser, 5, LASER_OPTIONS);
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+
+    expect(preamble).toContain('G54');
+    expect(preamble.filter((line) => /^G5[4-9]$/.test(line))).toEqual(['G54']);
+  });
+
   it('restores dynamic M4 power only on the first resumed burn move', () => {
     const laser = 'G21\nG90\nM4 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F1500 S300\nG1 X20 Y0\nM5';
     const result = buildResumeProgram(laser, 6, LASER_OPTIONS);
