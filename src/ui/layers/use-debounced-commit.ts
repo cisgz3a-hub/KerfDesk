@@ -51,13 +51,17 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current = createDebouncer<T>({
       initial: value,
       debounceMs,
-      // M25 (AUDIT-2026-06-10): when the commit fires, snap the displayed
-      // text to the value actually committed. parse() clamps silently, so
-      // typing 9999 into Speed (max 6000) used to keep DISPLAYING 9999 while
-      // the store, G-code, and ETA all used 6000 — the field lied.
+      // The debounce timer commits the parsed value to the STORE only (F-A7
+      // undo-batching) — it must NOT rewrite the visible draft. The timer can't
+      // tell "done typing" from a mid-number reading pause, so snapping the text
+      // here yanked characters out from under an active edit (typing 0.5 into a
+      // min-0.05 field, pausing after "0", jumped the box to the min; "12." lost
+      // its decimal). Display reconciliation happens only on the real "done"
+      // signals: blur (onBlur) and external value changes (the effect below).
+      // M25 (AUDIT-2026-06-10) is still satisfied — a clamped field shows the
+      // enforced value (9999 → 6000) once you leave it, instead of lying.
       commit: (next) => {
         commitRef.current(next);
-        setDraft(formatRef.current(next));
       },
     });
   }
