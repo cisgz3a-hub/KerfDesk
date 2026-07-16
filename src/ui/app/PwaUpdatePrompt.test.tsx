@@ -46,6 +46,8 @@ vi.mock('../state/toast-store', () => ({
   useToastStore: (sel: (s: { pushToast: typeof h.pushToast }) => unknown) =>
     sel({ pushToast: h.pushToast }),
 }));
+const promptedReload = vi.hoisted(() => ({ applyPromptedReload: vi.fn() }));
+vi.mock('./pwa-prompted-reload', () => promptedReload);
 
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { loadDismissedUpdateVersion, saveDismissedUpdateVersion } from './pwa-update-dismissal';
@@ -141,12 +143,23 @@ describe('PwaUpdatePrompt', () => {
     expect(host.querySelector(BANNER)).not.toBeNull();
   });
 
-  it('reloads with the new service worker when Reload is clicked', async () => {
+  it('routes Reload through the always-reload prompted-update path', async () => {
+    // Regression (2026-07-17): the click used to call updateServiceWorker(true)
+    // alone, whose reload depends on a `controlling` event that never fires on
+    // an uncontrolled page — the button silently did nothing. The click must go
+    // through applyPromptedReload, which guarantees a reload in every state.
     h.swState.needRefresh = true;
     const { host } = await render();
     await act(async () => {
       host.querySelector('button')?.click();
     });
+    expect(promptedReload.applyPromptedReload).toHaveBeenCalledTimes(1);
+    const hooks = promptedReload.applyPromptedReload.mock.calls[0]?.[0] as {
+      requestSkipWaiting: () => Promise<void>;
+    };
+    // The wired skip-waiting hook must still delegate to the plugin's
+    // updateServiceWorker so the SKIP_WAITING message path is unchanged.
+    await hooks.requestSkipWaiting();
     expect(h.updateServiceWorker).toHaveBeenCalledWith(true);
   });
 

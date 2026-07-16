@@ -3651,6 +3651,15 @@ direct Web Serial control is a genuine gap.
    per-build "Later" dismissal keyed to `__APP_VERSION__` (`pwa-update-dismissal.ts`)
    and clears it on the next `updatefound`, so the same waiting update stays quiet
    while a strictly-newer SW still prompts; it still activates on full close.)
+   (Corrected 2026-07-17: on a page that loads WITHOUT a controller — hard
+   reload, first visit after clearing site data, DevTools network bypass — a
+   freshly installed SW skips `waiting` and activates silently, and the
+   plugin reloads only on a `controlling` event such pages never get, so the
+   banner's Reload was a silent no-op there: SKIP_WAITING posted to an empty
+   waiting slot, no reload, banner left standing. `pwa-prompted-reload.ts`
+   now guarantees the clicked Reload always reloads — via `statechange` once
+   the skip-waited worker activates, or a plain reload when nothing is
+   actually waiting.)
 3. **`injectRegister: false`; register via the `virtual:pwa-register/react`
    hook.** A bundled hook is same-origin, satisfying the strict CSP
    (`script-src 'self'`, `public/_headers`) where the inline registration form is

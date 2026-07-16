@@ -18,6 +18,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
+import { applyPromptedReload } from './pwa-prompted-reload';
 import {
   clearDismissedUpdateVersion,
   loadDismissedUpdateVersion,
@@ -85,7 +86,20 @@ export function PwaUpdatePrompt(): JSX.Element | null {
         type="button"
         className="lf-btn lf-btn--primary"
         title="Reload now to apply the update"
-        onClick={() => void updateServiceWorker(true)}
+        // Not updateServiceWorker alone: its reload path needs a `controlling`
+        // event an uncontrolled page never gets, and its SKIP_WAITING no-ops
+        // once the waiting slot is empty — the click must always reload (see
+        // pwa-prompted-reload).
+        onClick={() =>
+          void applyPromptedReload({
+            getRegistration: () =>
+              'serviceWorker' in navigator
+                ? navigator.serviceWorker.getRegistration()
+                : Promise.resolve(undefined),
+            requestSkipWaiting: () => updateServiceWorker(true),
+            reload: () => window.location.reload(),
+          })
+        }
       >
         Reload
       </button>
