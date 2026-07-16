@@ -84,6 +84,33 @@ describe('NumericEditsBar', () => {
     expect(object?.transform.x).toBe(75);
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
+
+  // Bug (2026-07-16): the aspect lock defaulted ON, so setting width silently
+  // rescaled height (and vice versa) — the operator could never dial in an
+  // independent W and H. LightBurn's W/H fields are independent unless the
+  // operator links them, so the lock must start OFF.
+  it('starts with the aspect-ratio lock off', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    expect(button(container, 'Lock aspect ratio').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('edits width without rescaling height by default', async () => {
+    installProject(); // rect 20 x 10, identity transform
+    const container = await render(<NumericEditsBar />);
+    const width = input(container, 'Selection width');
+
+    await act(async () => {
+      setInputValue(width, '40');
+      width.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      width.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    const object = useStore.getState().project.scene.objects.find((item) => item.id === 'shape-1');
+    // Width doubled (20 -> 40) but height is untouched — no proportional snap.
+    expect(object?.transform.scaleX).toBe(2);
+    expect(object?.transform.scaleY).toBe(1);
+  });
 });
 
 async function render(node: JSX.Element): Promise<HTMLDivElement> {

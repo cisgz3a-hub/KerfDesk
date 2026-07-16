@@ -67,7 +67,10 @@ function useNumericEditModel(): NumericEditModel {
   const pushToast = useToastStore((state) => state.pushToast);
   const anchor = useUiStore((state) => state.selectionAnchor);
   const setAnchor = useUiStore((state) => state.setSelectionAnchor);
-  const [preserveAspect, setPreserveAspect] = useState(true);
+  // Off by default: W and H are independent fields (LightBurn parity). Locking
+  // is opt-in via the AR toggle — a default-on lock silently rescaled the other
+  // dimension on every edit, so the operator could never set W and H apart.
+  const [preserveAspect, setPreserveAspect] = useState(false);
   const objects = useMemo(
     () => selectedObjects(project.scene.objects, selectedObjectId, additionalSelectedIds),
     [project.scene.objects, selectedObjectId, additionalSelectedIds],
