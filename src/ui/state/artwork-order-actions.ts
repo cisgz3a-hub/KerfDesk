@@ -1,3 +1,4 @@
+import { moveArtworkRunUnitsToPosition } from '../../core/artwork-run-units';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import type { Project } from '../../core/scene';
 import { pushUndo, type StateSlice } from './scene-mutations';
@@ -14,25 +15,33 @@ type ArtworkOrderMutation = {
   readonly dirty: true;
 };
 
+type ArtworkOrderInteractionMutation = {
+  readonly project: Project;
+  readonly dirty: true;
+};
+
 type ArtworkOrderSet = (
-  fn: (state: ArtworkOrderActionState) => ArtworkOrderMutation | Record<string, never>,
+  fn: (
+    state: ArtworkOrderActionState,
+  ) => ArtworkOrderMutation | ArtworkOrderInteractionMutation | Record<string, never>,
 ) => void;
 
-export type ArtworkMoveDirection = 'first' | 'earlier' | 'later' | 'last';
-
 export type ArtworkOrderActions = {
-  readonly moveSelectedArtwork: (direction: ArtworkMoveDirection) => void;
+  readonly moveArtworkToPosition: (objectIds: ReadonlyArray<string>, position: number) => void;
+  readonly setArtworkOrderDuringInteraction: (order: ReadonlyArray<string>) => void;
 };
 
 export function artworkOrderActions(set: ArtworkOrderSet): ArtworkOrderActions {
   return {
-    moveSelectedArtwork: (direction) =>
+    moveArtworkToPosition: (objectIds, position) =>
       set((state) => {
-        const selectedIds = selectedIdSet(state);
-        if (selectedIds.size === 0) return {};
-        const current = canonicalArtworkOrder(state.project.scene);
-        const next = moveArtworkIds(current, selectedIds, direction);
-        if (sameStringArray(current, next)) return {};
+        if (!Number.isFinite(position) || objectIds.length === 0) return {};
+        const next = moveArtworkRunUnitsToPosition(
+          state.project.scene,
+          new Set(objectIds),
+          position,
+        );
+        if (sameStringArray(canonicalArtworkOrder(state.project.scene), next)) return {};
         return {
           project: {
             ...state.project,
@@ -43,72 +52,19 @@ export function artworkOrderActions(set: ArtworkOrderSet): ArtworkOrderActions {
           dirty: true,
         };
       }),
+    setArtworkOrderDuringInteraction: (order) =>
+      set((state) =>
+        sameStringArray(canonicalArtworkOrder(state.project.scene), order)
+          ? {}
+          : {
+              project: {
+                ...state.project,
+                scene: { ...state.project.scene, artworkOrder: [...order] },
+              },
+              dirty: true,
+            },
+      ),
   };
-}
-
-function moveArtworkIds(
-  current: ReadonlyArray<string>,
-  selected: ReadonlySet<string>,
-  direction: ArtworkMoveDirection,
-): ReadonlyArray<string> {
-  if (direction === 'first') return moveArtworkToEdge(current, selected, true);
-  if (direction === 'last') return moveArtworkToEdge(current, selected, false);
-  return moveArtworkOneStep(current, selected, direction);
-}
-
-function moveArtworkToEdge(
-  current: ReadonlyArray<string>,
-  selected: ReadonlySet<string>,
-  first: boolean,
-): ReadonlyArray<string> {
-  const moving = current.filter((id) => selected.has(id));
-  const remaining = current.filter((id) => !selected.has(id));
-  return first ? [...moving, ...remaining] : [...remaining, ...moving];
-}
-
-function moveArtworkOneStep(
-  current: ReadonlyArray<string>,
-  selected: ReadonlySet<string>,
-  direction: 'earlier' | 'later',
-): ReadonlyArray<string> {
-  const next = [...current];
-  if (direction === 'earlier') {
-    for (let index = 1; index < next.length; index += 1) {
-      const id = next[index];
-      const previous = next[index - 1];
-      if (
-        id !== undefined &&
-        previous !== undefined &&
-        selected.has(id) &&
-        !selected.has(previous)
-      ) {
-        next[index - 1] = id;
-        next[index] = previous;
-      }
-    }
-    return next;
-  }
-  for (let index = next.length - 2; index >= 0; index -= 1) {
-    const id = next[index];
-    const following = next[index + 1];
-    if (
-      id !== undefined &&
-      following !== undefined &&
-      selected.has(id) &&
-      !selected.has(following)
-    ) {
-      next[index] = following;
-      next[index + 1] = id;
-    }
-  }
-  return next;
-}
-
-function selectedIdSet(state: ArtworkOrderActionState): ReadonlySet<string> {
-  return new Set([
-    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
-    ...state.additionalSelectedIds,
-  ]);
 }
 
 function sameStringArray(left: ReadonlyArray<string>, right: ReadonlyArray<string>): boolean {

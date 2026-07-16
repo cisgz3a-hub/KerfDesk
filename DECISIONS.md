@@ -81,7 +81,7 @@
 | ADR-208 | 2026-07-15 | Accepted | Remove obstructive 4040 and advisory machine policies |
 | ADR-209 | 2026-07-15 | Accepted | Remove universal CNC expiry, depth, override, and spin-up policies |
 | ADR-210 | 2026-07-15 | Accepted | Enforce explicit machine output capability at every project entry point |
-| ADR-211 | 2026-07-15 | Accepted | Artwork binds explicitly to named process operations |
+| ADR-211 | 2026-07-15 | Amended | Artwork binds explicitly to named process operations |
 | ADR-212 | 2026-07-15 | Accepted | Make laser pause, recovery, disconnect, and laser-mode boundaries fail-dark |
 
 ---
@@ -8699,6 +8699,58 @@ Operation.
 - Reverse operation priority and run path optimization; prove neither can cross artwork priority.
 - Open a schema-v2 fixture containing color layers, an object override, and a sub-layer; prove the
   migrated schema-v3 output is equivalent and survives save/open.
+
+---
+
+## ADR-211 Amendment - Numeric docked artwork run manager with UI-only canvas focus
+
+**Status:** Accepted amendment | **Date:** 2026-07-16
+
+### Context
+
+ADR-211 initially exposed artwork priority as First/Earlier/Later/Last buttons inside the selection
+inspector. That interaction does not scale to a production sheet with 50 or more independent jobs,
+hides the full queue, and mixes per-artwork settings with top-level sequencing. Operators also
+cannot reliably match an abstract position to crowded canvas geometry.
+
+### Decision
+
+1. Top-level sequencing lives in a **Run order** view inside the existing right Artwork / Operations
+   rail. The canvas remains on the left; the manager is neither modal nor an additional rail.
+2. Run positions are direct one-based numbers with automatic renumbering, search, jump-to-number,
+   and fixed-row virtualization. The implementation has no priority-specific item cap.
+3. A run unit is derived from ordered artwork. Objects with the same complete operation-ID set are
+   one unit; empty or partially shared bindings remain independent. The persisted
+   `Scene.artworkOrder` stays a flattened object-ID list, so no schema migration is required.
+4. Row focus and canvas focus are bidirectional. The active unit keeps full opacity and receives a
+   thin operation-colour halo plus `#N` badge; other artwork is dimmed. This focus is ephemeral UI
+   state and never changes geometry, presentation colours, visibility, output, preview, or G-code.
+5. **Number on canvas** assigns #1, #2, and onward by hit-testing clicks. A session uses one pending
+   project snapshot: Done creates one undo entry, Undo last rewinds within the session, and Cancel
+   restores the original order.
+6. Laser rows show the exact compiled output steps. CNC rows show requested position alongside the
+   exact compiled CNC steps; clearing-before-profile and contiguous tool sections remain
+   authoritative and visible rather than being weakened to satisfy the requested number.
+7. Per-artwork settings stay in the Settings view. Every run row provides **Edit settings**, and the
+   existing intentional sharing, Make unique, Add operation, and deterministic colour behavior from
+   ADR-211 remains unchanged.
+
+### Consequences
+
+Large queues are inspectable and directly addressable without changing the project model. Canvas
+correlation improves without contaminating machine truth. Compiling effective CNC steps when the
+manager is open is deliberate: the panel reports the same safety/tool schedule the machine output
+uses instead of maintaining a second approximation.
+
+### Verification
+
+- Directly move a run to a numbered position and prove canvas stacking is unchanged and Undo works.
+- Render 50 real jobs and a 1,000-row list fixture; prove only a bounded window mounts.
+- Click row-to-canvas and canvas-to-row; prove dimming/highlight is display-only.
+- Number multiple canvas jobs, Undo last, Cancel, and Done; prove Done contributes one undo entry.
+- Prove exact-shared artwork is one unit while partial sharing stays separate.
+- Prove laser output steps follow requested order and CNC reports clearing-before-profile effective
+  steps when they differ.
 
 ---
 

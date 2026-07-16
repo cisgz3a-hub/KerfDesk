@@ -17,6 +17,7 @@ import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { type CutsLayersView, useUiStore } from '../state/ui-store';
 import { CncAdvancedToggle } from './CncAdvancedToggle';
+import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
 import { LayerRow } from './LayerRow';
 import { DogboneRow } from './DogboneRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
@@ -34,7 +35,8 @@ export function CutsLayersPanel(): JSX.Element {
   // The Material Library stores laser presets (power/speed); it hides in CNC
   // mode where those numbers have no meaning.
   const showMaterialLibrary = machineKind === 'laser';
-  const activeView = showMaterialLibrary ? requestedView : 'layers';
+  const activeView =
+    !showMaterialLibrary && requestedView === 'materials' ? 'layers' : requestedView;
   if (!panelVisible) {
     return (
       <CollapsedRail
@@ -48,41 +50,59 @@ export function CutsLayersPanel(): JSX.Element {
     <aside aria-label="Artwork / Operations panel" className="lf-rail" style={panelStyle}>
       <RailPanelHeading title="Artwork / Operations" onCollapse={() => togglePanel('layers')} />
       <MachineModeToggle />
-      {showMaterialLibrary ? <ViewTabs active={activeView} onSelect={setView} /> : null}
-      {showMaterialLibrary ? (
-        <div
-          id={`cuts-layers-${activeView}-panel`}
-          role="tabpanel"
-          aria-labelledby={`cuts-layers-${activeView}-tab`}
-          style={viewContentStyle}
-        >
-          {activeView === 'materials' ? <MaterialLibraryPanel /> : <LayersView layers={layers} />}
-        </div>
-      ) : (
-        <LayersView layers={layers} />
-      )}
+      <ViewTabs active={activeView} showMaterials={showMaterialLibrary} onSelect={setView} />
+      <div
+        id={`cuts-layers-${activeView}-panel`}
+        role="tabpanel"
+        aria-labelledby={`cuts-layers-${activeView}-tab`}
+        style={viewContentStyle}
+      >
+        {activeView === 'materials' ? (
+          <MaterialLibraryPanel />
+        ) : activeView === 'run-order' ? (
+          <ArtworkRunOrderPanel />
+        ) : (
+          <LayersView layers={layers} />
+        )}
+      </div>
     </aside>
   );
 }
 
 function ViewTabs(props: {
   readonly active: CutsLayersView;
+  readonly showMaterials: boolean;
   readonly onSelect: (view: CutsLayersView) => void;
 }): JSX.Element {
   return (
-    <div role="tablist" aria-label="Cuts and materials" style={viewTabsStyle}>
+    <div
+      role="tablist"
+      aria-label="Artwork panel view"
+      style={{
+        ...viewTabsStyle,
+        gridTemplateColumns: `repeat(${props.showMaterials ? 3 : 2}, minmax(0, 1fr))`,
+      }}
+    >
       <ViewTab
         view="layers"
-        label="Operations"
+        label="Settings"
         selected={props.active === 'layers'}
         onSelect={props.onSelect}
       />
       <ViewTab
-        view="materials"
-        label="Materials"
-        selected={props.active === 'materials'}
+        view="run-order"
+        label="Run order"
+        selected={props.active === 'run-order'}
         onSelect={props.onSelect}
       />
+      {props.showMaterials ? (
+        <ViewTab
+          view="materials"
+          label="Materials"
+          selected={props.active === 'materials'}
+          onSelect={props.onSelect}
+        />
+      ) : null}
     </div>
   );
 }
@@ -156,6 +176,9 @@ const panelStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
   boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
 };
 // Layers remains the default working page; reusable preset management is a
 // sibling page so an empty library cannot push the active job controls down.
@@ -163,7 +186,6 @@ const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyl
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
 const viewTabsStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
   gap: 4,
   margin: '10px 0',
   paddingBottom: 10,
@@ -173,4 +195,10 @@ const viewTabStyle: React.CSSProperties = {
   minWidth: 0,
   minHeight: 32,
 };
-const viewContentStyle: React.CSSProperties = { minHeight: 0 };
+const viewContentStyle: React.CSSProperties = {
+  minHeight: 0,
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  overflowY: 'auto',
+};

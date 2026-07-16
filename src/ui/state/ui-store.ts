@@ -21,6 +21,10 @@ import {
   readCanvasStartMarkersVisible,
   writeCanvasStartMarkersVisible,
 } from './canvas-motion-preferences';
+import { artworkRunOrderUiSlice, type ArtworkRunOrderUiState } from './artwork-run-order-ui';
+import { uiRailPanelSlice, type UiRailPanelState } from './ui-rail-panel';
+
+export type { CutsLayersView, RailPanelId, RailPanelVisibility } from './ui-rail-panel';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 16;
@@ -111,134 +115,127 @@ export type FloatingPanelPosition = {
 };
 
 export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
-export type RailPanelId = 'layers' | 'machine';
-export type RailPanelVisibility = Readonly<Record<RailPanelId, boolean>>;
-export type CutsLayersView = 'layers' | 'materials';
 
-export type UiState = {
-  readonly railPanelVisibility: RailPanelVisibility;
-  readonly setRailPanelVisible: (panel: RailPanelId, visible: boolean) => void;
-  readonly toggleRailPanel: (panel: RailPanelId) => void;
-  readonly cutsLayersView: CutsLayersView;
-  readonly setCutsLayersView: (view: CutsLayersView) => void;
-  readonly dragOverlay: boolean;
-  readonly setDragOverlay: (next: boolean) => void;
-  readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
-  readonly setScrubberT: (next: number) => void;
-  readonly showPreviewTravel: boolean;
-  readonly setShowPreviewTravel: (next: boolean) => void;
-  readonly showCanvasStartMarkers: boolean;
-  readonly setShowCanvasStartMarkers: (next: boolean) => void;
-  readonly previewPlaying: boolean;
-  readonly setPreviewPlaying: (next: boolean) => void;
-  readonly previewPlaybackSpeed: PreviewPlaybackSpeed;
-  readonly setPreviewPlaybackSpeed: (next: PreviewPlaybackSpeed) => void;
-  readonly selectionAnchor: SelectionAnchor;
-  readonly setSelectionAnchor: (next: SelectionAnchor) => void;
-  readonly selectionMarquee: SelectionMarquee | null;
-  readonly setSelectionMarquee: (next: SelectionMarquee | null) => void;
-  readonly workspaceContextBar: WorkspaceContextBarState | null;
-  readonly openWorkspaceContextBar: (next: WorkspaceContextBarState) => void;
-  readonly closeWorkspaceContextBar: () => void;
-  readonly snapSettings: SnapSettings;
-  readonly setSnapSettings: (next: Partial<SnapSettings>) => void;
-  readonly snapGuides: ReadonlyArray<SnapGuide>;
-  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
-  // Current drawing layer color. LightBurn's color/layer palette sets the
-  // target color for subsequently-created vectors; this mirrors that behavior
-  // without making layer selection undoable project data.
-  readonly activeLayerColor: string | null;
-  readonly setActiveLayerColor: (next: string | null) => void;
-  // F-A15 zoom + pan. zoomFactor is multiplicative over the fit-to-bed
-  // baseline scale, so 1.0 = "frame all". panMm shifts the view in scene
-  // millimeters (positive panX shifts the camera right = content left).
-  readonly zoomFactor: number;
-  readonly panX: number;
-  readonly panY: number;
-  readonly setZoom: (next: number) => void;
-  readonly zoomBy: (factor: number) => void;
-  readonly resetView: () => void;
-  readonly panBy: (dx: number, dy: number) => void;
-  readonly setPan: (panX: number, panY: number) => void;
-  // Zoom + pan the viewport so `bounds` (scene-mm) lands centered in
-  // the canvas filling ~70% of either dimension. Used by auto-zoom-
-  // on-import (so a tiny SVG doesn't disappear on a big bed) and by
-  // Shift+F "fit to selection." Padding factor is fixed at 0.7 — wide
-  // enough to see context, tight enough that the object actually fills
-  // the view.
-  readonly zoomToBounds: (bounds: Bounds, bedWidth: number, bedHeight: number) => void;
-  // F-A15 Space-held pan mode. Set by a global keyup/keydown listener so
-  // multiple components (Workspace mouse handlers + cursor styling) can
-  // read the same source of truth.
-  readonly spaceDown: boolean;
-  readonly setSpaceDown: (next: boolean) => void;
-  // Dialogs owned outside this store register here so global shortcuts can
-  // yield while any modal surface is active.
-  readonly modalDepth: number;
-  readonly registerModal: () => void;
-  readonly unregisterModal: () => void;
-  // Phase D text dialog. Toolbar's "Text…" opens with mode='add';
-  // Workspace's double-click-on-text opens with mode='edit' + the
-  // current field values. AddTextDialog renders nothing when null.
-  readonly textDialog: TextDialogState | null;
-  readonly openTextDialog: (next: TextDialogState) => void;
-  readonly closeTextDialog: () => void;
-  // Trace-Image dialog. Holds the bitmap to trace, or null when closed.
-  // LightBurn's model: Trace is a tool run on a SELECTED, already-imported
-  // image — so the dialog is always seeded with the RasterImage the
-  // operator picked (via the toolbar Trace button), never a blank file
-  // picker. Importing an image as a bitmap is a separate, dialog-less path.
-  readonly imageDialog: TraceImageDialogState | null;
-  readonly openImageDialog: (
-    source: RasterImage,
-    options?: { readonly replaceTraceId?: string },
-  ) => void;
-  readonly closeImageDialog: () => void;
-  // ADR-029 Convert to Bitmap dialog. Lives here (not CommandShell-local
-  // state) so the Ctrl/Cmd+Shift+B shortcut — LightBurn's binding, wired in
-  // use-shortcuts — can open it. Callers gate opening on a single
-  // convertible-vector selection; CommandShell renders it only while that
-  // selection holds.
-  readonly convertBitmapDialogOpen: boolean;
-  readonly openConvertBitmapDialog: () => void;
-  readonly closeConvertBitmapDialog: () => void;
-  // Phase G drawing tool-mode (ADR-051).
-  readonly toolMode: ToolMode;
-  readonly setToolMode: (next: ToolMode) => void;
-  readonly resetToolMode: () => void;
-  // Live draft of the shape currently being dragged out (B5). Null when not
-  // drawing. Ephemeral — the canvas renders it as a dashed preview; mouse-up
-  // commits it to the project store (where undo/redo can see it) and clears it.
-  readonly draftShape: ShapeObject | null;
-  readonly setDraftShape: (next: ShapeObject | null) => void;
-  // Pen-tool in-progress polyline (B6). See PenDraft. Cleared by resetToolMode.
-  readonly penDraft: PenDraft | null;
-  readonly setPenDraft: (next: PenDraft | null) => void;
-  // ADR-105 G11 — the bundled design library dialog.
-  readonly libraryDialogOpen: boolean;
-  readonly setLibraryDialogOpen: (open: boolean) => void;
-  // ADR-111 — CNC layer card shows advanced fields (Basic default).
-  readonly showCncAdvanced: boolean;
-  readonly setShowCncAdvanced: (next: boolean) => void;
-  // Temporary Measure tool line. It is UI-only: not saved, not undoable, and
-  // never included in preview or emitted G-code.
-  readonly measureDraft: MeasureDraft | null;
-  readonly setMeasureDraft: (next: MeasureDraft | null) => void;
-  // ADR-057 registration jig panel — a persistent, NON-modal floating panel
-  // (top-right of the canvas). Deliberately NOT part of isModalOpen so canvas
-  // mouse handling and keyboard shortcuts keep working while it is open.
-  readonly registrationPanelOpen: boolean;
-  readonly registrationPanelPosition: FloatingPanelPosition | null;
-  readonly toggleRegistrationPanel: () => void;
-  readonly openRegistrationPanel: () => void;
-  readonly closeRegistrationPanel: () => void;
-  readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
-  // ADR-124 Capture Board Corners panel — same NON-modal floating pattern as the
-  // registration jig, toggled from the toolbar (top-left of the canvas).
-  readonly boardCapturePanelOpen: boolean;
-  readonly toggleBoardCapturePanel: () => void;
-  readonly closeBoardCapturePanel: () => void;
-};
+export type UiState = ArtworkRunOrderUiState &
+  UiRailPanelState & {
+    readonly dragOverlay: boolean;
+    readonly setDragOverlay: (next: boolean) => void;
+    readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
+    readonly setScrubberT: (next: number) => void;
+    readonly showPreviewTravel: boolean;
+    readonly setShowPreviewTravel: (next: boolean) => void;
+    readonly showCanvasStartMarkers: boolean;
+    readonly setShowCanvasStartMarkers: (next: boolean) => void;
+    readonly previewPlaying: boolean;
+    readonly setPreviewPlaying: (next: boolean) => void;
+    readonly previewPlaybackSpeed: PreviewPlaybackSpeed;
+    readonly setPreviewPlaybackSpeed: (next: PreviewPlaybackSpeed) => void;
+    readonly selectionAnchor: SelectionAnchor;
+    readonly setSelectionAnchor: (next: SelectionAnchor) => void;
+    readonly selectionMarquee: SelectionMarquee | null;
+    readonly setSelectionMarquee: (next: SelectionMarquee | null) => void;
+    readonly workspaceContextBar: WorkspaceContextBarState | null;
+    readonly openWorkspaceContextBar: (next: WorkspaceContextBarState) => void;
+    readonly closeWorkspaceContextBar: () => void;
+    readonly snapSettings: SnapSettings;
+    readonly setSnapSettings: (next: Partial<SnapSettings>) => void;
+    readonly snapGuides: ReadonlyArray<SnapGuide>;
+    readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
+    // Current drawing layer color. LightBurn's color/layer palette sets the
+    // target color for subsequently-created vectors; this mirrors that behavior
+    // without making layer selection undoable project data.
+    readonly activeLayerColor: string | null;
+    readonly setActiveLayerColor: (next: string | null) => void;
+    // F-A15 zoom + pan. zoomFactor is multiplicative over the fit-to-bed
+    // baseline scale, so 1.0 = "frame all". panMm shifts the view in scene
+    // millimeters (positive panX shifts the camera right = content left).
+    readonly zoomFactor: number;
+    readonly panX: number;
+    readonly panY: number;
+    readonly setZoom: (next: number) => void;
+    readonly zoomBy: (factor: number) => void;
+    readonly resetView: () => void;
+    readonly panBy: (dx: number, dy: number) => void;
+    readonly setPan: (panX: number, panY: number) => void;
+    // Zoom + pan the viewport so `bounds` (scene-mm) lands centered in
+    // the canvas filling ~70% of either dimension. Used by auto-zoom-
+    // on-import (so a tiny SVG doesn't disappear on a big bed) and by
+    // Shift+F "fit to selection." Padding factor is fixed at 0.7 — wide
+    // enough to see context, tight enough that the object actually fills
+    // the view.
+    readonly zoomToBounds: (bounds: Bounds, bedWidth: number, bedHeight: number) => void;
+    // F-A15 Space-held pan mode. Set by a global keyup/keydown listener so
+    // multiple components (Workspace mouse handlers + cursor styling) can
+    // read the same source of truth.
+    readonly spaceDown: boolean;
+    readonly setSpaceDown: (next: boolean) => void;
+    // Dialogs owned outside this store register here so global shortcuts can
+    // yield while any modal surface is active.
+    readonly modalDepth: number;
+    readonly registerModal: () => void;
+    readonly unregisterModal: () => void;
+    // Phase D text dialog. Toolbar's "Text…" opens with mode='add';
+    // Workspace's double-click-on-text opens with mode='edit' + the
+    // current field values. AddTextDialog renders nothing when null.
+    readonly textDialog: TextDialogState | null;
+    readonly openTextDialog: (next: TextDialogState) => void;
+    readonly closeTextDialog: () => void;
+    // Trace-Image dialog. Holds the bitmap to trace, or null when closed.
+    // LightBurn's model: Trace is a tool run on a SELECTED, already-imported
+    // image — so the dialog is always seeded with the RasterImage the
+    // operator picked (via the toolbar Trace button), never a blank file
+    // picker. Importing an image as a bitmap is a separate, dialog-less path.
+    readonly imageDialog: TraceImageDialogState | null;
+    readonly openImageDialog: (
+      source: RasterImage,
+      options?: { readonly replaceTraceId?: string },
+    ) => void;
+    readonly closeImageDialog: () => void;
+    // ADR-029 Convert to Bitmap dialog. Lives here (not CommandShell-local
+    // state) so the Ctrl/Cmd+Shift+B shortcut — LightBurn's binding, wired in
+    // use-shortcuts — can open it. Callers gate opening on a single
+    // convertible-vector selection; CommandShell renders it only while that
+    // selection holds.
+    readonly convertBitmapDialogOpen: boolean;
+    readonly openConvertBitmapDialog: () => void;
+    readonly closeConvertBitmapDialog: () => void;
+    // Phase G drawing tool-mode (ADR-051).
+    readonly toolMode: ToolMode;
+    readonly setToolMode: (next: ToolMode) => void;
+    readonly resetToolMode: () => void;
+    // Live draft of the shape currently being dragged out (B5). Null when not
+    // drawing. Ephemeral — the canvas renders it as a dashed preview; mouse-up
+    // commits it to the project store (where undo/redo can see it) and clears it.
+    readonly draftShape: ShapeObject | null;
+    readonly setDraftShape: (next: ShapeObject | null) => void;
+    // Pen-tool in-progress polyline (B6). See PenDraft. Cleared by resetToolMode.
+    readonly penDraft: PenDraft | null;
+    readonly setPenDraft: (next: PenDraft | null) => void;
+    // ADR-105 G11 — the bundled design library dialog.
+    readonly libraryDialogOpen: boolean;
+    readonly setLibraryDialogOpen: (open: boolean) => void;
+    // ADR-111 — CNC layer card shows advanced fields (Basic default).
+    readonly showCncAdvanced: boolean;
+    readonly setShowCncAdvanced: (next: boolean) => void;
+    // Temporary Measure tool line. It is UI-only: not saved, not undoable, and
+    // never included in preview or emitted G-code.
+    readonly measureDraft: MeasureDraft | null;
+    readonly setMeasureDraft: (next: MeasureDraft | null) => void;
+    // ADR-057 registration jig panel — a persistent, NON-modal floating panel
+    // (top-right of the canvas). Deliberately NOT part of isModalOpen so canvas
+    // mouse handling and keyboard shortcuts keep working while it is open.
+    readonly registrationPanelOpen: boolean;
+    readonly registrationPanelPosition: FloatingPanelPosition | null;
+    readonly toggleRegistrationPanel: () => void;
+    readonly openRegistrationPanel: () => void;
+    readonly closeRegistrationPanel: () => void;
+    readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
+    // ADR-124 Capture Board Corners panel — same NON-modal floating pattern as the
+    // registration jig, toggled from the toolbar (top-left of the canvas).
+    readonly boardCapturePanelOpen: boolean;
+    readonly toggleBoardCapturePanel: () => void;
+    readonly closeBoardCapturePanel: () => void;
+  };
 
 // The persisted dialog/view toggles (design-library dialog, CNC Basic/Advanced
 // disclosure). Grouped into a slice so the store factory stays under the
@@ -298,36 +295,9 @@ function uiDialogSlice(
   };
 }
 
-function uiRailPanelSlice(
-  set: UiStateSetter,
-): Pick<
-  UiState,
-  | 'railPanelVisibility'
-  | 'setRailPanelVisible'
-  | 'toggleRailPanel'
-  | 'cutsLayersView'
-  | 'setCutsLayersView'
-> {
-  return {
-    railPanelVisibility: { layers: true, machine: true },
-    setRailPanelVisible: (panel, visible) =>
-      set((state) => ({
-        railPanelVisibility: { ...state.railPanelVisibility, [panel]: visible },
-      })),
-    toggleRailPanel: (panel) =>
-      set((state) => ({
-        railPanelVisibility: {
-          ...state.railPanelVisibility,
-          [panel]: !state.railPanelVisibility[panel],
-        },
-      })),
-    cutsLayersView: 'layers',
-    setCutsLayersView: (view) => set({ cutsLayersView: view }),
-  };
-}
-
 export const useUiStore = create<UiState>((set) => ({
   ...uiRailPanelSlice(set),
+  ...artworkRunOrderUiSlice(set),
   dragOverlay: false,
   setDragOverlay: (next) => set({ dragOverlay: next }),
   scrubberT: 1,
