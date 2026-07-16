@@ -12,8 +12,19 @@ type FakeConnection = SerialConnection & {
 
 function makeConnection(writes: string[]): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write: async (data) => void writes.push(data),
+    write: async (data) => {
+      writes.push(data);
+      // Real GRBL answers the connect-time $G modal query (C6) with its state
+      // then ok; model it so the ackless query settles during connect.
+      if (data === '$G\n') {
+        emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
@@ -21,9 +32,7 @@ function makeConnection(writes: string[]): FakeConnection {
     onClose: () => () => undefined,
     close: async () => undefined,
     forget: vi.fn(async () => undefined),
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: (line) => emit(line),
   };
 }
 
@@ -58,6 +67,9 @@ async function connectQualified(
   await flush();
   for (const line of settings) connection.emitLine(line);
   connection.emitLine('ok');
+  await flush();
+  // Let the detached handshake issue its post-qualification $G (C6) and the
+  // fake connection auto-reply settle before the test drives more I/O.
   await flush();
 }
 

@@ -20,10 +20,22 @@ export type SafeWriteRefs = {
   writeEpoch?: number;
 };
 
+// `ackless` marks a read-only controller QUERY (e.g. `$G`) whose terminal ok
+// must NOT be owed on the untracked-ack fence. A normal line owes one ack per
+// newline, so Start/command gates block until the reply lands. A query's reply
+// is instead consumed passively — the informational line by a line-handler
+// parser, the trailing ok as a no-op (settleUntrackedAck routes it to the null
+// streamer at Idle; `$` payloads are blocked during a job, so the ok can never
+// phantom-advance one). Caller MUST issue it only against a quiescent ledger
+// (no other command's terminal ack outstanding) — else the unaccounted ok
+// settles THAT ack instead (F1). Use ONLY for reads whose ok carries no state.
+export type SafeWriteOptions = { readonly ackless?: boolean };
+
 export type SafeWrite = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  options?: SafeWriteOptions,
 ) => Promise<void>;
 
 const MOTION_TRANSCRIPT_ACTIONS: ReadonlyArray<LaserSafetyAction | undefined> = [
@@ -39,7 +51,7 @@ type SetFn = (
 type GetFn = () => LaserState;
 
 export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): SafeWrite {
-  return async (line, action, source) => {
+  return async (line, action, source, options) => {
     // Setup-only lines (GRBL `$` commands) are blocked while a job is active;
     // the active driver decides what counts as setup-only for its firmware.
     const blockedMessage = refs.driver.isSetupOnlyPayload(line)
@@ -67,7 +79,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     }
     const writeSource =
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
-    const owedAcks = owedTerminalAcks(line, writeSource);
+    const owedAcks = options?.ackless === true ? 0 : owedTerminalAcks(line, writeSource);
     const writeEpoch = refs.writeEpoch ?? 0;
     // Reserve both transport and terminal-response ownership before the first
     // await. Some adapters can dispatch an immediate controller reply before

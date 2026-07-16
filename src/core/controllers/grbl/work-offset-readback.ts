@@ -42,6 +42,18 @@ export function parseOwnedWorkOffsetReadback(
     : { ok: true, activeWcs, offset };
 }
 
+// The active WCS alone from an owned `$G` modal report, without also requiring
+// the `$#` offset readback. Used at connect to seed store.activeWcs so a
+// non-G54 WCS left active by a $N startup block or an external session is
+// visible to the placement-mismatch advisory (C6). Null when the response is
+// not exactly one GC report naming exactly one G54-G59 word.
+export function parseActiveWcsFromModalResponses(
+  modalResponses: ReadonlyArray<string>,
+): ActiveWorkCoordinateSystem | null {
+  const modalBodies = matchingBodies(modalResponses, MODAL_REPORT_RE);
+  return modalBodies.length === 1 ? activeWcsFromModal(modalBodies[0] ?? '') : null;
+}
+
 function matchingBodies(lines: ReadonlyArray<string>, pattern: RegExp): string[] {
   return lines.flatMap((line) => {
     const match = pattern.exec(line.trim());

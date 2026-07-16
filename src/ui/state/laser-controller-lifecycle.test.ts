@@ -172,6 +172,42 @@ describe('laser controller lifecycle operations', () => {
     expect(useLaserStore.getState().activeWcs).toBe('G54');
   });
 
+  it('reads the active WCS at connect via an ackless $G that never strands the fence (C6)', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    // A fully-qualifying connect (real settings rows) issues the modal query.
+    await useLaserStore.getState().connect(makeAdapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    connection.emitLine('$30=1000');
+    connection.emitLine('$32=1');
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    await flush();
+
+    // The controller was left in G55 by a $N startup block / another sender.
+    expect(writes).toContain('$G\n');
+    connection.emitLine('[GC:G0 G55 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+    connection.emitLine('ok'); // the $G ok — ackless, so it must NOT owe the fence
+    await flush();
+    expect(useLaserStore.getState().activeWcs).toBe('G55');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+
+    // A later console command still gets its own ok — no stranded fence.
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    const selectG54 = useLaserStore.getState().sendConsoleCommand('G54');
+    await flush();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await selectG54;
+    expect(useLaserStore.getState().activeWcs).toBe('G54');
+  });
+
   it('keeps a completed job locked until the internal settle marker and stable Idle finish', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

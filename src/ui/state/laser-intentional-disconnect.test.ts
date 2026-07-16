@@ -8,6 +8,8 @@ import { initialLaserState } from './laser-store-helpers';
 import { recoveryRepository } from './recovery';
 import { useToastStore } from './toast-store';
 
+const noop = (): void => undefined;
+
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
 };
@@ -26,6 +28,11 @@ function makeConnection(
     write: async (data) => {
       events.push(`${label}:write:${JSON.stringify(data)}`);
       await onWrite?.(data, emitLine);
+      // Model GRBL's reply to the connect-time $G modal query (C6).
+      if (data === '$G\n') {
+        emitLine('[GC:G0 G54]');
+        emitLine('ok');
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -93,10 +100,7 @@ function safetyEvents(events: ReadonlyArray<string>, label: string): ReadonlyArr
 beforeEach(async () => {
   vi.useRealTimers();
   useLaserStore.setState({ autofocusBusy: false });
-  await useLaserStore
-    .getState()
-    .disconnect()
-    .catch(() => undefined);
+  await useLaserStore.getState().disconnect().catch(noop);
   useLaserStore.setState(initialLaserState());
   useToastStore.setState({ toasts: [] });
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -105,10 +109,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.useRealTimers();
   useLaserStore.setState({ autofocusBusy: false, statusReport: null });
-  await useLaserStore
-    .getState()
-    .disconnect()
-    .catch(() => undefined);
+  await useLaserStore.getState().disconnect().catch(noop);
   useLaserStore.setState(initialLaserState());
   useToastStore.setState({ toasts: [] });
   vi.restoreAllMocks();

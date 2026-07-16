@@ -24,6 +24,7 @@ type SafeWriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  options?: { readonly ackless?: boolean },
 ) => Promise<void>;
 
 const PASSIVE_STARTUP_WAIT_MS = 250;
@@ -210,6 +211,34 @@ async function qualifyConnectedController(
           'The controller settings response was empty. Retry reading controller settings.',
         ),
   );
+  await requestActiveWcsAfterQualification(get, refs, safeWrite, connection, guard);
+}
+
+// After qualification, ask the controller for its modal state ($G) so a non-G54
+// frame left active by a $N startup block or an external session becomes visible
+// to the placement-mismatch advisory (C6) with no operator action. Sent as an
+// `ackless` query (see SafeWriteOptions): its reply is captured passively by the
+// line handler (the [GC:...] line -> activeWcs) and its trailing ok is a harmless
+// Idle no-op, so it never fences Start or strands an ack. Non-fatal and never
+// touches qualification — a missing capability or a failed write just leaves
+// activeWcs null (no warning), exactly the prior behavior.
+async function requestActiveWcsAfterQualification(
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: NonNullable<LiveRefs['connection']>,
+  guard: HandshakeEpochGuard,
+): Promise<void> {
+  const modalQuery = refs.driver.commands.modalStateQuery;
+  if (modalQuery === null) return;
+  if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
+  if (!qualificationCompleted(get(), guard.expectedSessionEpoch)) return;
+  // The ackless $G leaves its ok unaccounted, so it must only settle against a
+  // quiescent ledger: if any other command's terminal ack were outstanding, the
+  // $G ok would settle THAT ack instead (F1). Post-qualification the ledger is
+  // empty; skip the read rather than risk a mis-settle if it is not.
+  if (get().pendingUntrackedAcks > 0) return;
+  await safeWrite(`${modalQuery}\n`, undefined, 'system', { ackless: true }).catch(() => undefined);
 }
 
 function qualificationCompleted(state: LaserState, expectedEpoch: number): boolean {

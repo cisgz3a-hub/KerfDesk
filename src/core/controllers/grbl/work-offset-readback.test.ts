@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseOwnedWorkOffsetReadback } from './work-offset-readback';
+import {
+  parseActiveWcsFromModalResponses,
+  parseOwnedWorkOffsetReadback,
+} from './work-offset-readback';
 
 describe('owned GRBL work-offset readback', () => {
   it('selects the active modal WCS and its exact XYZ offset', () => {
@@ -38,5 +41,26 @@ describe('owned GRBL work-offset readback', () => {
     const result = parseOwnedWorkOffsetReadback(modal, offsets);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toMatch(reason);
+  });
+});
+
+describe('parseActiveWcsFromModalResponses', () => {
+  it('reads the active WCS from a lone GC modal report (no $# needed)', () => {
+    expect(parseActiveWcsFromModalResponses(['[GC:G0 G55 G17 G21 G90 G94 M5 M9 T0 F0 S0]'])).toBe(
+      'G55',
+    );
+  });
+
+  it('reads G54 when that is the active frame', () => {
+    expect(parseActiveWcsFromModalResponses(['ok', '[GC:G0 G54 G17 G21 G90]'])).toBe('G54');
+  });
+
+  it.each([
+    { label: 'no GC report', lines: ['ok'] },
+    { label: 'two GC reports', lines: ['[GC:G0 G54]', '[GC:G0 G55]'] },
+    { label: 'no G54-G59 word', lines: ['[GC:G0 G17 G21 G90]'] },
+    { label: 'two WCS words', lines: ['[GC:G0 G54 G55 G17]'] },
+  ])('returns null on $label', ({ lines }) => {
+    expect(parseActiveWcsFromModalResponses(lines)).toBeNull();
   });
 });
