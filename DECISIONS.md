@@ -91,6 +91,9 @@
 | ADR-218 | 2026-07-16 | Accepted | CNC line-art contour side selection (inner / outer / both) |
 | ADR-219 | 2026-07-16 | Accepted | Centerline arc-length quadratic fairing (anti-wobble stage) |
 | ADR-220 | 2026-07-16 | Accepted | Show the live spindle RPM on the CNC canvas motion badge |
+| ADR-221 | 2026-07-17 | Accepted | Show wall-clock elapsed job time on the canvas motion badge |
+| ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes keep the artwork selected |
+| ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
 
 ---
 
@@ -9164,7 +9167,6 @@ simplification in `finalizeChains`:
 - Residual known defect (out of scope here): a 2 px-wide circle stroke still
   fragments into multiple loops before assembly — thin-stroke thinning gaps,
   unrelated to fairing.
-
 ---
 
 ## ADR-220 - Show the live spindle RPM on the CNC canvas motion badge
@@ -9274,3 +9276,49 @@ layer. Scenes with zero or two-plus artworks keep normal deselect semantics.
 - "Selected artwork only" output scope cannot be armed with an empty selection in a
   single-artwork scene.
 - The re-mark changes selection state only - no undo entry, no dirty flag.
+---
+
+## ADR-223 - Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice
+
+**Status:** Accepted | **Date:** 2026-07-17
+
+> **Numbering note.** ADR-222 (single-artwork default selection, #250) was the last merged;
+> **ADR-223** is the next free. This PR's ADR started as 221 and was renumbered as the fleet landed.
+
+### Context
+
+At the audited 1366 x 768 laptop viewport, the CNC 3D result pane, Artwork /
+Operations rail, and Machine rail opened together and left about 444 px for the
+drawing canvas. ADR-191 made the 3D pane resizable and collapsible, but still
+required the operator to diagnose and repair the crowded starting layout.
+
+LightBurn's workspace model keeps docked windows user-configurable and provides
+one-action side-panel hiding. KerfDesk's persistent CNC 3D result has no direct
+LightBurn equivalent, so its responsive default is KerfDesk-specific; preserving
+an explicit operator layout choice follows the same customization principle.
+The maintainer approved the next ranked audit upgrade with "build the next" on
+2026-07-17.
+
+### Decision
+
+- With no saved visibility preference, a CNC viewport matching
+  `(max-width: 1439px)` starts in **Canvas Focus**: the 3D result pane collapses
+  to a named 44 px vertical restore strip. Wider viewports start with 3D open.
+- Clicking the existing 3D collapse/expand control records `collapsed` or
+  `expanded` in `laserforge.cnc-3d-pane-visibility.v1`. That explicit choice
+  overrides responsive defaults across later breakpoint changes and reloads.
+- The persisted width from ADR-191 remains independent. Restoring 3D uses that
+  width, and the drag/keyboard resizing contract is unchanged.
+- Canvas Focus changes UI layout only. It does not change project data, undo,
+  compilation, G-code, controller state, or any machine-safety gate.
+
+### Consequences
+
+- In the audited 1366 px layout, the measured drawing surface grows from about
+  444 px to 677 px while both operational rails remain available.
+- The full-height named strip keeps 3D restoration one click away and keyboard
+  accessible through the same semantic button and `aria-expanded` state.
+- Because the existing removal-grid hook receives the collapsed state, the live
+  3D simulation is not recomputed while Canvas Focus is active.
+- Users who prefer the split view are not repeatedly overridden by viewport
+  changes; their explicit choice wins until they toggle it again.

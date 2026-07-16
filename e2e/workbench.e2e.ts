@@ -200,6 +200,37 @@ baseTest('Machine Setup stays navigable at the narrow breakpoint', async ({ page
   await expect(dialog).toContainText('Step 2 of 7 — Connect & read');
 });
 
+baseTest(
+  'CNC laptop layout starts in Canvas Focus and preserves an explicit 3D restore',
+  async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'CNC', exact: true }).click();
+
+    const workspace = page.getByLabel('KerfDesk workspace', { exact: true });
+    const pane = page.getByRole('complementary', { name: '3D result pane' });
+    const expand = pane.getByRole('button', { name: 'Expand 3D result pane' });
+    await expect(pane).toHaveAttribute('data-cnc-layout-mode', 'canvas-focus');
+    await expect(expand).toHaveAttribute('aria-expanded', 'false');
+    const canvasFocusBox = await workspace.boundingBox();
+
+    await expand.click();
+    await expect(pane).toHaveAttribute('data-cnc-layout-mode', 'split-view');
+    await expect(pane.getByRole('button', { name: 'Collapse 3D result pane' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    const splitViewBox = await workspace.boundingBox();
+    expect(canvasFocusBox).not.toBeNull();
+    expect(splitViewBox).not.toBeNull();
+    expect((canvasFocusBox?.width ?? 0) - (splitViewBox?.width ?? 0)).toBeGreaterThan(180);
+
+    await page.setViewportSize({ width: 1600, height: 768 });
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await expect(pane).toHaveAttribute('data-cnc-layout-mode', 'split-view');
+  },
+);
+
 kerfDeskTest(
   'Machine Setup reads first, queues safely, then writes and verifies after Save',
   async ({ page, kerfdesk }) => {
