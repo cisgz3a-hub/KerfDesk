@@ -48,7 +48,7 @@ export function automaticTabAnchorPoints(
   tabsPerShape: number,
 ): ReadonlyArray<Vec2> {
   if (!polyline.closed) return [];
-  const context = splitContext(polyline, 0);
+  const context = splitContext(polyline);
   if (context === null) return [];
   const count = Math.max(1, Math.floor(tabsPerShape));
   const anchors: Vec2[] = [];
@@ -73,8 +73,9 @@ export function splitClosedPolylineForTabsAtAnchors(
   if (!polyline.closed || anchors.length === 0) return [polyline];
   const normalizedSize = Number.isFinite(sizeMm) ? Math.max(0, sizeMm) : 0;
   if (normalizedSize <= 0) return [polyline];
-  const context = splitContext(polyline, normalizedSize);
+  const context = splitContext(polyline);
   if (context === null) return [polyline];
+  if (normalizedSize >= context.perimeter) return [];
   const half = normalizedSize / 2;
   const skips = mergeIntervals(
     anchors.flatMap((anchor) => {
@@ -82,8 +83,7 @@ export function splitClosedPolylineForTabsAtAnchors(
       return splitModuloInterval(center - half, center + half, context.perimeter);
     }),
   );
-  const segments = burnSegmentsBetweenTabs(context, skips);
-  return segments.length > 0 ? segments : [polyline];
+  return burnSegmentsBetweenTabs(context, skips);
 }
 
 function isTabEligible(
@@ -114,12 +114,12 @@ function splitClosedPolylineForTabs(
   count: number,
   sizeMm: number,
 ): ReadonlyArray<Polyline> {
-  const context = splitContext(polyline, sizeMm);
+  const context = splitContext(polyline);
   if (context === null) return [polyline];
+  if (sizeMm >= context.perimeter) return [];
   const skips = tabSkipIntervals(context.perimeter, count, sizeMm);
   if (skips.length === 0) return [polyline];
-  const segments = burnSegmentsBetweenTabs(context, skips);
-  return segments.length > 0 ? segments : [polyline];
+  return burnSegmentsBetweenTabs(context, skips);
 }
 
 export function applyManualTabsToPolyline(
@@ -127,8 +127,9 @@ export function applyManualTabsToPolyline(
   centers: ReadonlyArray<number>,
   sizeMm: number,
 ): ReadonlyArray<Polyline> {
-  const context = splitContext(polyline, sizeMm);
+  const context = splitContext(polyline);
   if (context === null) return [polyline];
+  if (sizeMm >= context.perimeter) return [];
   const half = sizeMm / 2;
   const intervals = centers.flatMap((center) => {
     const normalized = Number.isFinite(center) ? Math.max(0, Math.min(1, center)) : 0;
@@ -137,16 +138,19 @@ export function applyManualTabsToPolyline(
   });
   const skips = mergeIntervals(intervals);
   if (skips.length === 0) return [polyline];
-  const segments = burnSegmentsBetweenTabs(context, skips);
-  return segments.length > 0 ? segments : [polyline];
+  return burnSegmentsBetweenTabs(context, skips);
 }
 
-function splitContext(polyline: Polyline, sizeMm: number): SplitContext | null {
+// Null only for geometry too degenerate to carry tabs (a "loop" without area).
+// Coverage degeneracy is NOT handled here: when requested tab windows swallow
+// the whole perimeter the split functions return NO segments, so the caller
+// keeps the full loop as one bridge instead of cutting the part free (A5).
+function splitContext(polyline: Polyline): SplitContext | null {
   const points = normalizeClosedPoints(polyline.points);
   if (points.length < MIN_CLOSED_POINTS) return null;
   const cumulative = cumulativeDistances(points);
   const perimeter = cumulative[cumulative.length - 1] ?? 0;
-  return perimeter <= EPS || sizeMm >= perimeter ? null : { points, cumulative, perimeter };
+  return perimeter <= EPS ? null : { points, cumulative, perimeter };
 }
 
 function burnSegmentsBetweenTabs(

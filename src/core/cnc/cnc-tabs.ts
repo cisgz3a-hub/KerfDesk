@@ -6,6 +6,11 @@
 // reusing the laser tab-splitting geometry (skip windows along the perimeter).
 // The skip length adds one tool diameter so the PHYSICAL bridge is the
 // requested width after the bit (radius on each side) eats into the gap.
+//
+// Degenerate coverage: when the requested windows swallow a contour's whole
+// perimeter, the split returns NO pieces — the deep pass is skipped and the
+// loop stays one full bridge. Cutting the unsplit loop instead (the pre-fix
+// fallback) freed the part with the spindle running (AUDIT A5).
 
 import {
   applyAutomaticTabsToPolylines,
