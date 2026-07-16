@@ -7947,6 +7947,15 @@ User Origin was removed by direct maintainer instruction. The gate could invalid
 Frame finishes at the perimeter's lower-left corner, while Current Position resolves the selected
 anchor from the live head again at Start, producing different bounds for eight of nine anchors. The
 Frame action and relative size/envelope preflight remain available; only the Start refusal was removed.
+
+**2026-07-16 maintainer amendment.** The no-homing placement default moves from Current Position to
+**User Origin**, by direct maintainer instruction ("for no homing machines a user should set origin
+first by default not current position"). A fresh or newly opened no-homing project now refuses Start
+until the operator establishes an origin, so the default flow is position the head, Set origin here,
+then Start, instead of silently running head-relative from wherever the head happens to sit. Current
+Position remains fully selectable through the Position job guide's "Choose jog positioning" and the
+Start from dropdown, and an explicit Current Position choice is still preserved across device edits
+and no-homing profile selections. Homing-enabled profiles keep the Absolute Coordinates default.
 ---
 
 ## ADR-194 - Add native Hershey single-line CNC text without a runtime dependency
