@@ -15,7 +15,7 @@
 // 'both' — and every scene without tight double-lines — is byte-identical to
 // the pre-option pipeline.
 
-import { pointInPolygon } from '../geometry/point-in-polygon';
+import { pointInPolygon } from '../geometry';
 import type { CncCutType, CncLayerSettings, Polyline } from '../scene';
 
 export type LineArtContourSide = NonNullable<CncLayerSettings['lineArtContours']>;

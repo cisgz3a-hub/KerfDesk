@@ -6,7 +6,8 @@
 // fully machined before the cut that could let it move. Shared by the roughing
 // and finishing passes so both walk the shapes in the same safe order.
 
-import type { Polyline, Vec2 } from '../scene';
+import { pointInPolygon } from '../geometry';
+import type { Polyline } from '../scene';
 
 const MIN_CLOSED_POINTS = 3;
 
@@ -33,18 +34,4 @@ function containmentDepth(polyline: Polyline, closed: ReadonlyArray<Polyline>): 
     if (pointInPolygon(probe, candidate.points)) depth += 1;
   }
   return depth;
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[i];
-    const b = polygon[j];
-    if (a === undefined || b === undefined) continue;
-    const crossesY = a.y > point.y !== b.y > point.y;
-    if (!crossesY) continue;
-    const xAtY = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-    if (point.x < xAtY) inside = !inside;
-  }
-  return inside;
 }

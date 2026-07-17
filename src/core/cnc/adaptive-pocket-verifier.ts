@@ -1,3 +1,4 @@
+import { pointInPolygon } from '../geometry';
 import type { Polyline, Vec2 } from '../scene';
 import type { AdaptivePocketPlan } from './adaptive-pocket';
 
@@ -291,17 +292,6 @@ function contourBounds(
 function pointInContours(point: Vec2, contours: ReadonlyArray<Polyline>): boolean {
   let inside = false;
   for (const contour of contours) if (pointInPolygon(point, contour.points)) inside = !inside;
-  return inside;
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  let inside = false;
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
-    const a = polygon[index];
-    const b = polygon[previous];
-    if (a === undefined || b === undefined || a.y > point.y === b.y > point.y) continue;
-    if (point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
   return inside;
 }
 
