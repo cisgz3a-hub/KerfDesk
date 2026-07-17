@@ -117,6 +117,23 @@ describe('useDragMove hook event pipeline', () => {
     expect(canvas.setPointerCapture as Mock).toHaveBeenCalledWith(POINTER_ID);
   });
 
+  it('clears selection on a stationary right-click in empty canvas space', async () => {
+    const project = projectWithRectangle();
+    useStore.getState().setProject(project);
+    useStore.getState().selectObject('rect');
+    const { canvas } = await renderHarness();
+    const emptyPoint = clientForScenePoint(project, { x: 300, y: 300 });
+
+    await dispatchPointer(canvas, 'pointerdown', { ...emptyPoint, button: 2 });
+    await dispatchPointer(canvas, 'pointerup', { ...emptyPoint, button: 2 });
+
+    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().additionalSelectedIds.size).toBe(0);
+    expect(useUiStore.getState().workspaceContextBar).toMatchObject({
+      context: 'workspace-empty',
+    });
+  });
+
   it('keeps the drag alive when the pointer leaves and finalizes on pointer up (C1)', async () => {
     const project = projectWithRectangle();
     useStore.getState().setProject(project);

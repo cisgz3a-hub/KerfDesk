@@ -1,34 +1,31 @@
-// ADR-222: a scene whose only artwork is selectable keeps that artwork
-// selected. Deselect (Escape / empty-canvas click / marquee miss), Open, New,
-// undo/redo, and delete-down-to-one all funnel through the store, so one
-// App-mounted subscription re-marks the lone artwork whenever the selection
-// empties — the same pattern usePolylineFairingUpgrade uses.
+// ADR-222: default-select a scene's only selectable artwork when that
+// one-artwork state begins. Manual deselection remains authoritative: Escape,
+// an empty-canvas click, or a marquee miss must not immediately re-mark it.
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
 import { loneSelectableArtworkId } from '../state/lone-selectable-artwork';
 
 /** Select the scene's only artwork when nothing is selected (ADR-222). */
-export function selectLoneArtwork(): void {
+export function selectLoneArtwork(expectedId?: string): void {
   const state = useStore.getState();
   if (state.selectedObjectId !== null || state.additionalSelectedIds.size > 0) return;
   const id = loneSelectableArtworkId(state.project.scene);
-  if (id !== null) state.selectObject(id);
+  if (id !== null && (expectedId === undefined || id === expectedId)) state.selectObject(id);
 }
 
-/** Keep the scene's only artwork marked (selected) by default. */
+/** Select once when the scene enters a one-selectable-artwork state. */
 export function useSingleArtworkSelection(): void {
   useEffect(() => {
     selectLoneArtwork();
     return useStore.subscribe((state, previous) => {
-      const selectionOrSceneChanged =
-        state.project !== previous.project ||
-        state.selectedObjectId !== previous.selectedObjectId ||
-        state.additionalSelectedIds !== previous.additionalSelectedIds;
-      // Microtask so we never setState inside another set's notify cycle
-      // (matches usePolylineFairingUpgrade). Re-entry is bounded: the
-      // follow-up selection change re-notifies once and then no-ops.
-      if (selectionOrSceneChanged) queueMicrotask(selectLoneArtwork);
+      if (state.project === previous.project) return;
+      const id = loneSelectableArtworkId(state.project.scene);
+      const previousId = loneSelectableArtworkId(previous.project.scene);
+      if (id === null || id === previousId) return;
+      // Defer out of the current store notification and guard against a second
+      // scene change landing before this microtask runs.
+      queueMicrotask(() => selectLoneArtwork(id));
     });
   }, []);
 }

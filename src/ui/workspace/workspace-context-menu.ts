@@ -15,13 +15,13 @@ export function openContextBarForRightClick(args: {
   readonly selectObject: (id: string | null) => void;
 }): void {
   if (useStore.getState().previewMode) return;
-  if (args.e.type !== 'mouseup' || !isStationaryRightPanClick(args.drag, args.e)) return;
+  const isRelease = args.e.type === 'mouseup' || args.e.type === 'pointerup';
+  if (!isRelease || !isStationaryRightPanClick(args.drag, args.e)) return;
   const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
   const hitId = point === null ? null : hitTest(args.project.scene, point);
-  if (hitId !== null) args.selectObject(hitId);
+  args.selectObject(hitId);
   const current = useStore.getState();
-  const hasSelection =
-    hitId !== null || current.selectedObjectId !== null || current.additionalSelectedIds.size > 0;
+  const hasSelection = current.selectedObjectId !== null || current.additionalSelectedIds.size > 0;
   useUiStore.getState().openWorkspaceContextBar({
     x: args.e.clientX,
     y: args.e.clientY,
