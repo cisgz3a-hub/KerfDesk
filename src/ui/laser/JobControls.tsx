@@ -74,12 +74,13 @@ export function JobControls({
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
-  // Maintainer-directed rail order (ADR-225): placement above origin, origin
-  // above the job actions, and the hand-positioning guide last as a fallback.
-  // Deliberate divergence from LightBurn's Start-first Laser window.
+  // Maintainer-directed rail order (ADR-225, amended 2026-07-17): origin
+  // directly under the jog pad, job actions next so Start/Frame stay above the
+  // fold on short windows, placement (a set-once compile setting that the Job
+  // Review dialog re-shows at Start, ADR-224) below them, and the
+  // hand-positioning guide last as a fallback.
   return (
     <div style={containerStyle}>
-      <JobPlacementControls streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
       <span style={sectionCaptionStyle}>Job</span>
       <SetupRow
@@ -109,6 +110,7 @@ export function JobControls({
           isToolChange={isToolChange}
         />
       )}
+      <JobPlacementControls streaming={controlsBusy} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
