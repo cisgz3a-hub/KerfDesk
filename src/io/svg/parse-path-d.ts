@@ -354,14 +354,21 @@ function handleSmoothQuadratic(state: State, args: ReadonlyArray<number>, rel: b
   }
 }
 
+// SVG path args are dense numeric tuples; with noUncheckedIndexedAccess a
+// missing slot means a malformed command, so a defaulted 0 mirrors the prior
+// per-read `?? 0`. Extracted so handleArc stays under the complexity cap.
+function argAt(args: ReadonlyArray<number>, index: number): number {
+  return args[index] ?? 0;
+}
+
 function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): void {
   for (let k = 0; k + 7 <= args.length; k += 7) {
-    const rx = args[k] ?? 0;
-    const ry = args[k + 1] ?? 0;
-    const xAxisRotationDeg = args[k + 2] ?? 0;
-    const largeArc = (args[k + 3] ?? 0) !== 0;
-    const sweep = (args[k + 4] ?? 0) !== 0;
-    const end = offset(args[k + 5] ?? 0, args[k + 6] ?? 0, rel, state.cursor);
+    const rx = argAt(args, k);
+    const ry = argAt(args, k + 1);
+    const xAxisRotationDeg = argAt(args, k + 2);
+    const largeArc = argAt(args, k + 3) !== 0;
+    const sweep = argAt(args, k + 4) !== 0;
+    const end = offset(argAt(args, k + 5), argAt(args, k + 6), rel, state.cursor);
     // SVG 1.1 §F.6.2: identical endpoints mean the arc is omitted entirely —
     // no motion, no segment. Skipping here also keeps the degenerate tuple out
     // of the curve channel (it previously survived only by NaN accident).
