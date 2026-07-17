@@ -14,6 +14,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
+import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -23,6 +24,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 const originalStartJob = useLaserStore.getState().startJob;
 const CONTROLLER_EPOCH = 7;
+let uninstallAutoReview: () => void = () => undefined;
 const idleStatus: StatusReport = {
   state: 'Idle',
   subState: null,
@@ -89,20 +91,29 @@ describe('CNC reduced-override Start flow', () => {
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
+    useJobReviewStore.getState().close();
+    uninstallAutoReview = installAutoJobReview('confirm');
   });
 
   afterEach(() => {
+    uninstallAutoReview();
+    useJobReviewStore.getState().close();
     useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
     vi.restoreAllMocks();
   });
 
   it('binds the acknowledged feed/rapid reduction to setup attestation', async () => {
+    const review = captureJobReviewModels();
+
     await runStartJobFlow();
 
-    expect(jobAwareConfirm).toHaveBeenCalledWith(
-      expect.stringMatching(/feed 80%, rapid 50%, spindle 60%/i),
-    );
-    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
+    review.stop();
+    const acknowledgement = review.models.at(-1)?.acknowledgement;
+    expect(acknowledgement?.kind).toBe('cnc');
+    expect(
+      acknowledgement !== undefined && 'prompt' in acknowledgement ? acknowledgement.prompt : '',
+    ).toMatch(/feed 80%, rapid 50%, spindle 60%/i);
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
     const startJob = vi.mocked(useLaserStore.getState().startJob);
     expect(startJob.mock.calls[0]?.[1]?.cncSetupAttestation).toMatchObject({
       acknowledgedReducedOverrides: { feed: 80, rapid: 50, spindle: 60 },

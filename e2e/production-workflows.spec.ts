@@ -454,6 +454,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Start job' }).click();
+  await confirmJobReview(page);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause' }).click();
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
@@ -490,6 +491,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   page.on('dialog', (dialog) => void dialog.accept());
   const writesBefore = serialWrites(await kerfdesk.events()).length;
   await page.getByRole('button', { name: 'Start job' }).click();
+  await confirmJobReview(page);
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
   const beforeAck = Number(await probe.getAttribute('data-confirmed-route-mm'));
 
@@ -542,6 +544,7 @@ test('keeps the finished route and confirms it only after the stream settles Idl
   page.on('dialog', (dialog) => void dialog.accept());
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
   await page.getByRole('button', { name: 'Start job' }).click();
+  await confirmJobReview(page);
   const probe = page.getByTestId('canvas-motion-probe');
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
   await drainHeldSerialWrites(page, kerfdesk, baselineLines);
@@ -561,6 +564,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   page.on('dialog', (dialog) => void dialog.accept());
 
   await page.getByRole('button', { name: 'Start job' }).click();
+  await confirmJobReview(page);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect.poll(async () => serialWriteLineCount(await kerfdesk.events())).toBeGreaterThan(0);
   await kerfdesk.acknowledgeSerial(1);
@@ -612,6 +616,15 @@ test('shares jog speed across buttons, keyboard movement, and return to work zer
 
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
+}
+
+// ADR-224: every Start now opens the Job Review dialog; its single Start
+// button is the acknowledgement that absorbed the old native confirms.
+async function confirmJobReview(page: Page): Promise<void> {
+  await page
+    .getByRole('dialog', { name: 'Review job before starting' })
+    .getByRole('button', { name: 'Start job' })
+    .click();
 }
 
 async function dismissNotifications(page: Page): Promise<void> {

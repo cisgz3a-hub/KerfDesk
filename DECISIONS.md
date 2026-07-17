@@ -94,6 +94,7 @@
 | ADR-221 | 2026-07-17 | Accepted | Show wall-clock elapsed job time on the canvas motion badge |
 | ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes keep the artwork selected |
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
+| ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
 
 ---
 
@@ -9331,3 +9332,72 @@ The maintainer approved the next ranked audit upgrade with "build the next" on
   3D simulation is not recomputed while Canvas Focus is active.
 - Users who prefer the split view are not repeatedly overridden by viewport
   changes; their explicit choice wins until they toggle it again.
+
+---
+
+## ADR-224 - Pre-start Job Review dialog consolidates the Start confirmations
+
+**Status:** Accepted | **Date:** 2026-07-17
+
+### Context
+
+Starting a job fired up to two native `window.confirm` dialogs (the unverified-`$32` laser
+acknowledgement and the CNC setup attestation) while the prepared program's warnings flashed past in
+a toast. The operator had no single place to check what was about to run — power/speed/passes per
+operation, placement and the resolved origin, controller facts ($32, $30 vs profile, travel,
+overrides, WCS), machine/stock setup, estimated time, or the size of the exact G-code — before
+committing material. The maintainer asked for a professional pre-start review window ("a final
+review that can visually help you check all settings in one pop up window … when you press confirm
+it starts", chat request of 2026-07-17). That request is recorded here as the ADR-206 /
+non-negotiable #21 approval for this confirmation gate.
+
+### Decision
+
+- Every Start that goes through the shared flow (`runStartJobFlow`: toolbar button,
+  Cmd/Ctrl+Return, Run again, confirmed checkpoint replacement) opens the Job Review dialog after
+  `prepareCurrentStartJob` succeeds and streams only after the review's **Start job** button.
+  Recovery flows (supervised recovery, start-from-line, checkpoint resume) keep their own review
+  surfaces and native confirms, unchanged.
+- The dialog absorbs the two former native confirms with their exact prompt text; the single
+  Confirm click produces the same `LaserModeStartEvidence` / `CncSetupAttestation` objects the
+  transmission layer already consumed. Net refusal surface is unchanged — prompts that used to
+  appear as `window.confirm` now render as sections of one window (consolidation, not expansion),
+  and the warnings strip is display-only and never disables Confirm.
+- The review is live and editable: the operations table and placement controls commit through the
+  existing store actions (`setLayerParam`, `updateLayerSubLayer`, `setJobPlacement`,
+  `setOutputScopeSettings`), and a flow-owned gate re-runs the full prepare pipeline (debounced)
+  after any project/placement/scope change, swapping the shown model in place. A refused re-prepare
+  surfaces the exact readiness messages as an in-dialog blocker — the same edit would refuse Start
+  today — and editing further recovers in place. Cancel/Escape is side-effect-free: recovery
+  staging and handoff arming still happen only after Confirm.
+- Architecture: a promise-signal store (`useJobReviewStore`, the ConfirmSave precedent) holds the
+  pending request; a flow-owned loop (`runJobReviewGate`, in `src/ui/laser/job-review/`) owns
+  re-preparing and returns the exact reviewed bundle. Only that bundle reaches authorization and
+  streaming, and the unchanged start-authorization gates (execution-signature re-check plus the
+  wire-boundary assertion) backstop any residual staleness between the last shown program and the
+  streamed bytes.
+
+### Alternatives rejected
+
+- A read-only summary — the maintainer explicitly chose inline editing of the core numbers.
+- Stacking the review dialog on top of the existing native confirms — two dialogs for one decision.
+- A store-held `rebuild()` closure instead of the flow-owned loop — it duplicates flow logic inside
+  the state layer and makes the streamed-equals-shown invariant unprovable.
+
+### Consequences
+
+- Operators get one consistent pre-burn checkpoint: exact-program stats (estimate, bounds/motion
+  envelope, operations/cutters, G-code size), editable core numbers, placement with the resolved
+  origin, live controller/machine fact sections, warnings that no longer vanish with a toast, and
+  the safety acknowledgement, in a single `xl` dialog.
+- The Start-path warnings toast is gone (the in-dialog strip replaces it). E2E flows confirm the
+  review after each Start click. Existing flow tests answer the review through a test seam
+  (`installAutoJobReview`); `captureJobReviewModels` lets tests assert exactly what the operator
+  was shown.
+- The dialog reuses `JobPlacementControls` wholesale, so placement UX cannot drift between the job
+  panel and the review.
+
+> **Numbering note.** Drafted as ADR-221, but the fleet landed ADR-221 (elapsed-time badge),
+> ADR-222 (single-artwork selection), and ADR-223 (Canvas Focus layout) on main mid-flight - so
+> this entry is **ADR-224**. Re-verify the tail and open-PR claims before merge.
+

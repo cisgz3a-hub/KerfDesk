@@ -5,17 +5,11 @@ import { fingerprintGcode } from '../../core/recovery';
 import {
   createLayer,
   createProject,
-  DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
-import {
-  CNC_SETUP_ATTESTATION_PROMPT,
-  cncControllerEpochOf,
-  cncSetupAttestationMatches,
-} from '../state/cnc-setup-attestation';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -27,6 +21,7 @@ import {
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
+import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { useStartBlockerStore } from './start-blocker-store';
 import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
 
@@ -37,6 +32,9 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 const originalStartJob = useLaserStore.getState().startJob;
 const CONTROLLER_EPOCH = 7;
+// ADR-224: the review dialog gates every shared-flow Start; these tests
+// auto-confirm it through the seam.
+let uninstallAutoReview: () => void = () => undefined;
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -107,28 +105,6 @@ function recoveryHarness(): RepositoryHarness {
   };
 }
 
-function configureReadyCncStart(): void {
-  useStore.setState((state) => ({
-    project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
-  }));
-  useLaserStore.setState({
-    controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
-    ovCache: { feed: 100, rapid: 100, spindle: 100 },
-    accessoryCache: {
-      spindleCw: false,
-      spindleCcw: false,
-      flood: false,
-      mist: false,
-    },
-    workZReferenceEpoch: CONTROLLER_EPOCH,
-    workZZeroEvidence: {
-      source: 'manual-zero',
-      referenceEpoch: CONTROLLER_EPOCH,
-      toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
-    },
-  });
-}
-
 function startSpy() {
   return vi.mocked(useLaserStore.getState().startJob);
 }
@@ -177,9 +153,13 @@ beforeEach(() => {
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   useStartBlockerStore.getState().clear();
   useToastStore.setState({ toasts: [] });
+  useJobReviewStore.getState().close();
+  uninstallAutoReview = installAutoJobReview('confirm');
 });
 
 afterEach(() => {
+  uninstallAutoReview();
+  useJobReviewStore.getState().close();
   localStorage.clear();
   useLaserStore.setState({
     ...initialLaserState(),
@@ -228,37 +208,8 @@ describe('runStartJobFlow', () => {
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });
 
-  it('requires physical CNC setup confirmation and binds it to the compiled program', async () => {
-    const { repository } = recoveryHarness();
-    configureReadyCncStart();
-
-    await runStartJobFlow(repository);
-
-    expect(jobAwareConfirm).toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
-    expect(startSpy()).toHaveBeenCalledTimes(1);
-    const gcode = startSpy().mock.calls[0]?.[0];
-    const options = startSpy().mock.calls[0]?.[1];
-    if (typeof gcode !== 'string') throw new Error('CNC Start did not compile G-code.');
-    expect(options?.machineKind).toBe('cnc');
-    expect(
-      cncSetupAttestationMatches(
-        options?.cncSetupAttestation,
-        gcode,
-        cncControllerEpochOf(useLaserStore.getState()),
-      ),
-    ).toBe(true);
-  });
-
-  it('does not stream a CNC program when physical setup confirmation is declined', async () => {
-    const { repository } = recoveryHarness();
-    configureReadyCncStart();
-    vi.mocked(jobAwareConfirm).mockReturnValueOnce(false);
-
-    await runStartJobFlow(repository);
-
-    expect(jobAwareConfirm).toHaveBeenCalledWith(CNC_SETUP_ATTESTATION_PROMPT);
-    expect(startSpy()).not.toHaveBeenCalled();
-  });
+  // CNC attestation display/binding and review-cancel behavior live in
+  // src/ui/laser/job-review/job-review-gate.test.ts beside the gate.
 
   it('forces ping-pong for a legacy Marlin profile with char-counted streaming', async () => {
     const { repository } = recoveryHarness();

@@ -743,41 +743,72 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B6. Start job
 
 #### Success
-1. User clicks **Start job** while connected and idle.
+1. User clicks **Start job** while connected and idle (toolbar button or Cmd/Ctrl+Return; Run
+   again and confirmed checkpoint replacement follow the same path).
 2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. A laser controller that reports `$32=0` is refused. If `$32` cannot be verified, one focused
-   prompt explains the cable-loss/latched-output risk and requires **Start anyway** or Cancel.
-4. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
-5. Every `ok` advances the streamer by one line and writes more.
-6. Progress bar reflects `completed / total` lines.
-7. While the job is active the app holds a screen wake lock so OS
+3. A laser controller that reports `$32=0` is refused before the review opens (unchanged).
+4. App compiles the project to G-code via `emitGcode`, then opens the **Job Review** dialog
+   (ADR-224) built from the exact prepared program: stat tiles (estimated time with cut/travel
+   split, job size and motion envelope, operations/cutters, G-code lines and bytes), an amber
+   strip holding every start warning (they no longer flash by as a toast), the output-operations
+   table with the core numbers editable in place (laser: power / speed / passes / air; CNC:
+   depth, depth-per-pass, feed, plunge, spindle RPM), the editable job-placement controls plus
+   resolved-origin and work-origin facts, collapsible read-only Controller ($32, $30 vs profile,
+   travel, homing, units, WCS, overrides, position) and Machine (bed, stock, bit, safe-Z,
+   spindle, coolant, park, rotary, tool plan) sections, and the safety acknowledgement — the
+   unverified-`$32` cable-loss/latched-output prompt or the CNC workholding/exclusive-access
+   attestation, verbatim. Pressing the review's **Start job** records the same evidence objects
+   the previous native confirms produced.
+5. Editing a value inside the review commits through the normal layer/placement store actions and
+   re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
+   the fresh program replaces the shown one — the bytes streamed are always the bytes last shown.
+6. On the review's **Start job**, the app builds a streamer and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
+7. Every `ok` advances the streamer by one line and writes more.
+8. Progress bar reflects `completed / total` lines.
+9. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
    refuses the lock, one LaserLog line warns the operator to disable
    system sleep before long burns — the job itself always proceeds.
-8. During a CNC job the canvas motion overlay's head label and status badge
-   add the running depth pass and the passes remaining (`Pass k of N •
-   m remaining`), derived from the ADR-215 pass spans of the exact started
-   program and advancing only with route-reconciled motion (ADR-216). When
-   the mapping cannot be derived (e.g. a supervised recovery stream), the
-   counter is omitted rather than estimated.
-9. While any job is running, the status badge also shows the live
-   controller-reported feed rate (`N mm/min`, inch reports normalized),
-   taken from each status frame's `FS:` field (ADR-217). It appears only
-   while running and only when the controller reports feed; a held machine
-   or a controller that omits `FS:` shows no rate.
-10. For a running CNC job the badge additionally shows the live spindle
+10. During a CNC job the canvas motion overlay's head label and status badge
+    add the running depth pass and the passes remaining (`Pass k of N •
+    m remaining`), derived from the ADR-215 pass spans of the exact started
+    program and advancing only with route-reconciled motion (ADR-216). When
+    the mapping cannot be derived (e.g. a supervised recovery stream), the
+    counter is omitted rather than estimated.
+11. While any job is running, the status badge also shows the live
+    controller-reported feed rate (`N mm/min`, inch reports normalized),
+    taken from each status frame's `FS:` field (ADR-217). It appears only
+    while running and only when the controller reports feed; a held machine
+    or a controller that omits `FS:` shows no rate.
+12. For a running CNC job the badge additionally shows the live spindle
     speed (`N rpm`) from the same `FS:` field (ADR-220). It is CNC-only —
     a laser's `FS:` spindle slot is a power value, not RPM — and, like the
     feed rate, appears only while running and only when reported.
-11. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
+13. The badge also shows wall-clock elapsed time since Start (`5m 12s`,
     same format as the pre-job ETA), counting through holds and tool
     changes and freezing at the run's first terminal state — finished,
     stopped, errored, or disconnected — so the final duration stays
     readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Error — preflight fails
-1. Modal lists the violations. No bytes sent.
+1. Modal lists the violations. No bytes sent. The review never opens.
+
+#### Error — re-prepare refused inside the review
+1. An in-review edit that makes the job unpreparable (an alarm arrives, bounds are exceeded, the
+   output empties, or program identity is lost under Run again / checkpoint replacement) shows
+   the exact refusal messages in a red banner, keeps the last good stats dimmed, and disables the
+   review's Start button. Fields stay editable — fixing the value recovers in place. No bytes sent.
+
+#### Empty — nothing to warn or acknowledge
+1. With no warnings the amber strip is absent; a laser whose `$32=1` is verified this session
+   shows a one-line verified note instead of an acknowledgement prompt.
+
+#### Edge — cancel the review
+1. **Cancel** or Escape closes the dialog with zero side effects: nothing staged, nothing sent,
+   no Start blocker recorded. Edits already made in the review are ordinary project edits and are
+   kept (undo applies as usual). Recovery flows (supervised recovery, start-from-line, checkpoint
+   resume) are untouched and keep their own review surfaces and confirms.
 
 #### Error — controller in Alarm
 1. Send fails fast; user must `$X` first (F-B9).
