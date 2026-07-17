@@ -201,17 +201,45 @@ function normalizeStockOriginOffset(
   return { x, y };
 }
 
+// Tools are rebuilt field-by-field like stock/params: `diameterMm: 1e999`
+// parses to Infinity and previously rode `> 0` straight into the CNC offset
+// math, then poisoned Save (Infinity serializes to null, the round-trip drops
+// the tool, and the semantic-drift guard refuses without naming it). A tool
+// failing the load-bearing fields is dropped; junk in optional fields drops
+// the field, and an unknown kind degrades to end-mill (same junk-to-default
+// contract as coolantModeOrOff).
+const CNC_TOOL_KINDS = ['end-mill', 'ball-nose', 'v-bit', 'engraving'] as const;
+const MAX_TIP_ANGLE_DEG = 180;
+
 function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
-  const tools = raw.filter(
-    (tool): tool is Record<string, unknown> =>
-      isObject(tool) &&
-      typeof tool['id'] === 'string' &&
-      typeof tool['name'] === 'string' &&
-      typeof tool['diameterMm'] === 'number' &&
-      tool['diameterMm'] > 0,
-  );
+  const tools: Array<Record<string, unknown>> = [];
+  for (const tool of raw) {
+    const normalized = normalizeCncTool(tool);
+    if (normalized !== null) tools.push(normalized);
+  }
   return tools.length > 0 ? tools : DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
+}
+
+function normalizeCncTool(tool: unknown): Record<string, unknown> | null {
+  if (!isObject(tool)) return null;
+  const diameterMm = tool['diameterMm'];
+  if (typeof tool['id'] !== 'string' || typeof tool['name'] !== 'string') return null;
+  if (!isFiniteNumber(diameterMm) || diameterMm <= 0) return null;
+  const tipAngleDeg = tool['tipAngleDeg'];
+  const tipAngleValid =
+    isFiniteNumber(tipAngleDeg) && tipAngleDeg > 0 && tipAngleDeg < MAX_TIP_ANGLE_DEG;
+  return {
+    id: tool['id'],
+    name: tool['name'],
+    kind: isCncToolKindValue(tool['kind']) ? tool['kind'] : 'end-mill',
+    diameterMm,
+    ...(tipAngleValid ? { tipAngleDeg } : {}),
+  };
+}
+
+function isCncToolKindValue(value: unknown): value is (typeof CNC_TOOL_KINDS)[number] {
+  return typeof value === 'string' && (CNC_TOOL_KINDS as ReadonlyArray<string>).includes(value);
 }
 
 function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> {
@@ -287,7 +315,10 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function numberOrDefault(value: unknown, fallback: number): number {
-  return typeof value === 'number' ? value : fallback;
+  // Same finiteness rule as every sibling helper: the shape validator covers
+  // today's two callers, but this helper's name invites use on fields it
+  // doesn't — an unguarded Infinity here would ride into emitted G-code.
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function normalizeFramingFeed(dev: Record<string, unknown>): number {

@@ -44,7 +44,18 @@ function addCurveGeometryToObject(value: unknown): unknown {
 function addCurveGeometryToColoredPath(value: unknown): unknown {
   const path = record(value);
   if (path === null || !Array.isArray(path['polylines'])) return value;
-  return { ...path, curves: path['polylines'].map(rawPolylineToCurve) };
+  // A zero-point legacy polyline would synthesize a phantom {0,0} curve start
+  // the source file never contained; drop it from BOTH channels so the
+  // polyline/curve arrays stay paired. Non-record junk rides through for the
+  // shape validator to reject with a real message.
+  const polylines = path['polylines'].filter(hasAnyPoint);
+  return { ...path, polylines, curves: polylines.map(rawPolylineToCurve) };
+}
+
+function hasAnyPoint(value: unknown): boolean {
+  const polyline = record(value);
+  if (polyline === null || !Array.isArray(polyline['points'])) return true;
+  return polyline['points'].length > 0;
 }
 
 function rawPolylineToCurve(value: unknown): unknown {
