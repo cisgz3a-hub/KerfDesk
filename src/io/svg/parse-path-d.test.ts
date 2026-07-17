@@ -49,6 +49,43 @@ describe('parsePathD — relative variants', () => {
       { x: 10, y: 5 },
     ]);
   });
+
+  it('keeps a relative moveto AFTER a closepath relative to the closed subpath start', () => {
+    // SVG 1.1 §8.3.2: only the path's FIRST moveto is treated as absolute.
+    // After Z the current point is the closed subpath's initial point, and a
+    // following `m dx dy` is relative to it. SVGO's optimized multi-contour
+    // output (`...z m...`) depends on this; treating it as absolute displaces
+    // every later contour (rolling audit 2026-07-17-0515 P1-1).
+    const subs = parsePathD('M 10 10 L 20 10 Z m 5 5 l 1 0');
+    expect(subs[1]?.points[0]).toEqual({ x: 15, y: 15 });
+    expect(subs[1]?.points).toEqual([
+      { x: 15, y: 15 },
+      { x: 16, y: 15 },
+    ]);
+  });
+
+  it('keeps a relative moveto after an UNCLOSED subpath relative to the cursor', () => {
+    // Between subpaths without Z the cursor is simply the last point.
+    const subs = parsePathD('M 10 10 L 20 10 m 5 5 l 1 0');
+    expect(subs[1]?.points[0]).toEqual({ x: 25, y: 15 });
+  });
+});
+
+describe('parsePathD — degenerate arcs', () => {
+  it('omits an arc whose endpoints coincide (spec: identical endpoints, omit the arc)', () => {
+    const subs = parsePathD('M 10 10 A 5 5 0 0 0 10 10 L 20 20');
+    const points = subs[0]?.points ?? [];
+    // No non-finite geometry and no spurious arc points — the path is just
+    // the moveto and the line.
+    expect(points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
+    expect(points).toEqual([
+      { x: 10, y: 10 },
+      { x: 20, y: 20 },
+    ]);
+    // The degenerate arc must not survive in the curve channel either.
+    const segments = subs[0]?.curve?.segments ?? [];
+    expect(segments.some((seg) => seg.kind === 'elliptical-arc')).toBe(false);
+  });
 });
 
 describe('parsePathD — implicit line-to after M', () => {

@@ -25,6 +25,11 @@ type MutableSubPath = {
 type State = {
   subpaths: MutableSubPath[];
   cur: MutableSubPath | null;
+  // SVG 1.1 §8.3.2: ONLY the path's first moveto treats relative coordinates
+  // as absolute. `cur === null` is the wrong proxy for "first" — closepath
+  // also nulls it, which turned every post-Z relative moveto absolute and
+  // displaced later contours (SVGO `z m` output).
+  sawCommand: boolean;
   cursor: Vec2;
   // Last cubic control point (for S/s reflection). Reset when the previous
   // command isn't C/c or S/s.
@@ -86,6 +91,7 @@ export function parsePathD(
   const state: State = {
     subpaths: [],
     cur: null,
+    sawCommand: false,
     cursor: { x: 0, y: 0 },
     lastCubicCtrl: null,
     lastQuadraticCtrl: null,
@@ -188,6 +194,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
 
 function dispatch(state: State, tok: Token): void {
   HANDLERS[tok.cmd]?.(state, tok.args, tok.cmd);
+  state.sawCommand = true;
 }
 
 function ensureSub(state: State): MutableSubPath {
@@ -239,7 +246,7 @@ function resetSmoothControls(state: State): void {
 
 function handleMove(state: State, args: ReadonlyArray<number>, rel: boolean): void {
   for (let k = 0; k + 1 < args.length; k += 2) {
-    const useRel = rel && (k > 0 || state.cur !== null);
+    const useRel = rel && (k > 0 || state.sawCommand);
     const x = (args[k] ?? 0) + (useRel ? state.cursor.x : 0);
     const y = (args[k + 1] ?? 0) + (useRel ? state.cursor.y : 0);
     state.cursor = { x, y };
@@ -355,6 +362,10 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
     const largeArc = (args[k + 3] ?? 0) !== 0;
     const sweep = (args[k + 4] ?? 0) !== 0;
     const end = offset(args[k + 5] ?? 0, args[k + 6] ?? 0, rel, state.cursor);
+    // SVG 1.1 §F.6.2: identical endpoints mean the arc is omitted entirely —
+    // no motion, no segment. Skipping here also keeps the degenerate tuple out
+    // of the curve channel (it previously survived only by NaN accident).
+    if (end.x === state.cursor.x && end.y === state.cursor.y) continue;
     const out: Vec2[] = [];
     flattenArc(
       state.cursor,

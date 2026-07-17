@@ -86,6 +86,10 @@ export function flattenArc(
     out.push(end);
     return;
   }
+  // Identical endpoints: the spec omits the arc (§F.6.2). Without this guard
+  // the center math divides 0/0 and only NaN propagation into segCount kept
+  // the output clean — an explicit return makes the omission deliberate.
+  if (start.x === end.x && start.y === end.y) return;
   // Convert to center parameterization then to a sequence of cubic Beziers
   // (≤ 4 per arc, one per quarter-turn).
   const cubics = arcToCubics(start, end, rx0, ry0, arc);
