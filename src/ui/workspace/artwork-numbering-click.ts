@@ -56,6 +56,7 @@ export function handleArtworkNumberingPointerDown(args: {
   readonly project: Project;
   readonly viewState: ViewState;
 }): boolean {
+  if (useStore.getState().previewMode) return false;
   const ui = useUiStore.getState();
   if (ui.artworkNumbering.kind !== 'active' || args.event.button !== 0) return false;
   const point = canvasMouseToScene(args.event, args.canvas, args.project, args.viewState);

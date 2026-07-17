@@ -8,8 +8,29 @@ import type { Project } from '../../core/scene';
 import type { DragState } from './drag-state';
 import { computeView } from './view-transform';
 
+const MIDDLE_BUTTON = 1;
 const RIGHT_BUTTON = 2;
 const CONTEXT_CLICK_TOLERANCE_PX = 4;
+
+export function panDragForPointerDown(
+  e: { readonly button: number; readonly clientX: number; readonly clientY: number },
+  state: {
+    readonly spaceDown: boolean;
+    readonly panX: number;
+    readonly panY: number;
+  },
+): Extract<DragState, { kind: 'pan' }> | null {
+  const trigger = panTriggerForPointerDown(e.button, state.spaceDown);
+  if (trigger === null) return null;
+  return {
+    kind: 'pan',
+    trigger,
+    startClientX: e.clientX,
+    startClientY: e.clientY,
+    startPanX: state.panX,
+    startPanY: state.panY,
+  };
+}
 
 export function isStationaryRightPanClick(
   drag: Extract<DragState, { kind: 'pan' }>,
@@ -54,4 +75,14 @@ export function panOffsetForDrag(args: {
   const dxMm = (args.e.clientX - args.drag.startClientX) / cssScale / view.scale;
   const dyMm = (args.e.clientY - args.drag.startClientY) / cssScale / view.scale;
   return { panX: args.drag.startPanX + dxMm, panY: args.drag.startPanY + dyMm };
+}
+
+function panTriggerForPointerDown(
+  button: number,
+  spaceDown: boolean,
+): Extract<DragState, { kind: 'pan' }>['trigger'] | null {
+  if (spaceDown && button === 0) return 'space-left-button';
+  if (button === MIDDLE_BUTTON) return 'middle-button';
+  if (button === RIGHT_BUTTON) return 'right-button';
+  return null;
 }
