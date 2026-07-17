@@ -13,6 +13,7 @@ import {
 } from './job-review-live-rows';
 import {
   detailsStyle,
+  detailsSummaryCountStyle,
   detailsSummaryStyle,
   factListStyle,
   mutedNoteStyle,
@@ -31,6 +32,11 @@ export function JobReviewControllerSection(props: {
         title="Expand to review the live controller facts: firmware, state, position, WCS, overrides, and the $$ settings read this session."
       >
         Controller — {controllerReviewSummary(args)}
+        {facts.length === 0 ? null : (
+          <span style={detailsSummaryCountStyle}>
+            · {facts.length} fact{facts.length === 1 ? '' : 's'}
+          </span>
+        )}
       </summary>
       {facts.length === 0 ? (
         <p style={mutedNoteStyle}>

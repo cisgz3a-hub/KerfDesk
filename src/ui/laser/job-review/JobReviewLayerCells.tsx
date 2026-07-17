@@ -1,10 +1,22 @@
-// The per-row editable cell sets for the Job Review layers table (ADR-224):
-// the core burn numbers for a laser operation, or the core cut numbers for a
-// CNC operation. Everything else stays read-only in the review — Cancel and
-// use the full layer editors for structural changes.
+// The per-row cell sets for the Job Review artwork-settings table: the
+// editable core numbers for a laser or CNC operation, plus the shared name /
+// mode-chip / detail-line cells (ADR-224 v2). Everything beyond the core
+// numbers stays read-only in the review — Cancel and use the full layer
+// editors for structural changes.
 
 import type { CncLayerSettings, LayerOperationSettings } from '../../../core/scene';
-import { airCellLabelStyle, tableCellStyle } from './job-review.styles';
+import {
+  airCellLabelStyle,
+  detailCellStyle,
+  materialChipDotStyle,
+  materialChipStyle,
+  modeChipStyle,
+  operationNameCellStyle,
+  operationNameInnerStyle,
+  operationNameTextStyle,
+  swatchStyle,
+  tableCellStyle,
+} from './job-review-table.styles';
 import { ReviewNumberCell } from './ReviewNumberCell';
 
 const PERCENT_MAX = 100;
@@ -12,6 +24,57 @@ const MIN_SPEED_MM_PER_MIN = 1;
 const MIN_PASSES = 1;
 const MIN_CNC_DEPTH_MM = 0.1;
 const MIN_FEED_MM_PER_MIN = 1;
+
+export function OperationNameCell(props: {
+  readonly color: string;
+  readonly name: string;
+}): JSX.Element {
+  return (
+    <td style={operationNameCellStyle}>
+      <span style={operationNameInnerStyle}>
+        <span
+          aria-hidden="true"
+          title={`Operation color ${props.color}`}
+          style={{ ...swatchStyle, background: props.color }}
+        />
+        <span style={operationNameTextStyle}>{props.name}</span>
+      </span>
+    </td>
+  );
+}
+
+export function ModeChipCell(props: { readonly label: string }): JSX.Element {
+  return (
+    <td style={tableCellStyle}>
+      <span style={modeChipStyle}>{props.label}</span>
+    </td>
+  );
+}
+
+/** The muted one-line "everything else" row under an operation, with an
+ * optional bound-material chip. */
+export function OperationDetailRow(props: {
+  readonly colSpan: number;
+  readonly chip: { readonly label: string; readonly color: string } | null;
+  readonly text: string;
+}): JSX.Element {
+  return (
+    <tr>
+      <td colSpan={props.colSpan} style={detailCellStyle}>
+        {props.chip === null ? null : (
+          <span style={materialChipStyle}>
+            <span
+              aria-hidden="true"
+              style={{ ...materialChipDotStyle, background: props.chip.color }}
+            />
+            {props.chip.label}
+          </span>
+        )}
+        {props.text}
+      </td>
+    </tr>
+  );
+}
 
 export function LaserRowCells(props: {
   readonly ariaContext: string;

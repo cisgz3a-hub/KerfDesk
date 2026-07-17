@@ -65,6 +65,21 @@ export function describeJobOrigin(origin: JobOriginPlacement | undefined): strin
   return base;
 }
 
+/** Short origin name for the stat tile ("Absolute", "User origin", …). */
+export function originTileValue(origin: JobOriginPlacement | undefined): string {
+  if (origin === undefined) return 'Absolute';
+  return origin.startFrom === 'absolute' ? 'Absolute' : START_FROM_REVIEW_LABELS[origin.startFrom];
+}
+
+/** One-line origin qualifier for the stat tile's detail row. */
+export function originTileDetail(origin: JobOriginPlacement | undefined): string {
+  if (origin === undefined) return 'Machine space';
+  if (origin.startFrom === 'current-position') {
+    return `Head at X ${formatMm(origin.currentPosition.x)} · Y ${formatMm(origin.currentPosition.y)}`;
+  }
+  return `Anchor ${humanizeToken(origin.anchor)}`;
+}
+
 export function describeOverrides(overrides: OverrideValues | null): string {
   if (overrides === null) return 'Not reported yet';
   return `Feed ${overrides.feed}% · Rapid ${overrides.rapid}% · Spindle ${overrides.spindle}%`;

@@ -18,7 +18,7 @@ import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
   const job = compileJob(project.scene, project.device);
-  const warnings = [...detectUncalibratedJobWarnings(job)];
+  const warnings = [...detectUncalibratedJobWarnings(job, project.scene.layers)];
   appendFillHeatWarnings(job, warnings);
 
   const outputLayers = project.scene.layers.filter((layer) => layer.output);

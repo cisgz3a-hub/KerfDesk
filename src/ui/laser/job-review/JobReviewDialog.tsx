@@ -1,22 +1,31 @@
 // JobReviewDialog — the pre-start Job Review window (ADR-224). Opens for
 // every Start that goes through the shared start flow, shows everything the
-// burn depends on (stats from the exact prepared G-code, editable operation
-// numbers and placement, live controller/machine facts, warnings, and the
-// absorbed safety acknowledgement), and hands the operator's Confirm/Cancel
-// back to the flow's review gate. Mounted once at the App level; renders
-// null until the gate opens a request.
+// burn depends on (stats from the exact prepared G-code, grouped warnings,
+// editable artwork settings with per-mode detail lines, CNC material &
+// stock, live controller/machine facts, and the absorbed safety
+// acknowledgement), and hands the operator's Confirm/Cancel back to the
+// flow's review gate. Placement is read-only here (v2): the origin tile and
+// the footer fact echo it, editing stays on the machine rail.
 
 import { useEffect, useRef, type RefObject } from 'react';
-import { Button, Dialog, DialogActions } from '../../kit';
+import { Button, Dialog, Icon } from '../../kit';
 import { useJobReviewStore, type JobReviewState } from './job-review-store';
-import { bannerListStyle, bannerStyle } from './job-review.styles';
+import {
+  bannerListStyle,
+  bannerStyle,
+  footerBarStyle,
+  footerOriginStyle,
+  sectionHeadingStyle,
+  sectionStyle,
+  startButtonContentStyle,
+} from './job-review.styles';
 import { JobReviewAcknowledgement } from './JobReviewAcknowledgement';
 import { JobReviewControllerSection } from './JobReviewControllerSection';
 import { JobReviewHeader } from './JobReviewHeader';
 import { JobReviewLayersTable } from './JobReviewLayersTable';
 import { JobReviewMachineSection } from './JobReviewMachineSection';
-import { JobReviewPlacement } from './JobReviewPlacement';
 import { JobReviewStats } from './JobReviewStats';
+import { JobReviewStockCard } from './JobReviewStockCard';
 import { JobReviewWarnings } from './JobReviewWarnings';
 import { useJobReviewRebuildTrigger } from './use-job-review-rebuild';
 
@@ -47,18 +56,24 @@ function OpenJobReview(props: {
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
       {blocker !== null ? <BlockerBanner blocker={blocker} /> : null}
       <JobReviewWarnings warnings={model.warnings} />
+      <JobReviewStockCard />
       <JobReviewLayersTable machineKind={model.machineKind} />
-      <JobReviewPlacement
-        resolvedOriginLabel={model.resolvedOriginLabel}
-        isPreparing={isPreparing}
-      />
-      <JobReviewControllerSection machineKind={model.machineKind} />
-      <JobReviewMachineSection
-        machineKind={model.machineKind}
-        toolPlanLabels={model.toolPlanLabels}
-      />
+      <section aria-label="Before you start" style={sectionStyle}>
+        <h3 style={sectionHeadingStyle}>Before you start</h3>
+        <JobReviewControllerSection machineKind={model.machineKind} />
+        <JobReviewMachineSection
+          machineKind={model.machineKind}
+          toolPlanLabels={model.toolPlanLabels}
+        />
+      </section>
       <JobReviewAcknowledgement acknowledgement={model.acknowledgement} />
-      <DialogActions>
+      <div style={footerBarStyle}>
+        <span
+          style={{ ...footerOriginStyle, opacity: isPreparing ? 0.55 : 1 }}
+          title="The origin the shown G-code runs from. To change placement, cancel and set it on the machine rail."
+        >
+          Runs from <strong>{model.resolvedOriginLabel}</strong>
+        </span>
         <Button
           onClick={handleCancel}
           title="Close this review without starting. Edits made here are kept."
@@ -71,9 +86,12 @@ function OpenJobReview(props: {
           title={startDisabledReason ?? 'Start this job now with the settings shown above.'}
           onClick={handleConfirm}
         >
-          Start job
+          <span style={startButtonContentStyle}>
+            <Icon name="play" size={11} />
+            Start job
+          </span>
         </Button>
-      </DialogActions>
+      </div>
     </Dialog>
   );
 }

@@ -120,4 +120,19 @@ describe('JobReviewLayersTable', () => {
 
     expect(host.textContent).toContain('No operations have Output enabled');
   });
+
+  it('shows the mode-specific detail line under a laser operation', async () => {
+    seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'laser');
+    await render('laser');
+
+    expect(host.textContent).toContain('Artwork settings');
+    expect(host.textContent).toContain('Kerf 0 mm · tabs off · min power 0%');
+  });
+
+  it('shows the strategy detail line under a CNC operation', async () => {
+    seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'cnc');
+    await render('cnc');
+
+    expect(host.textContent).toContain('1 pass · stepover 40% · tabs off');
+  });
 });

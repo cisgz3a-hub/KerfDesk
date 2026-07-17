@@ -9,7 +9,7 @@ import {
 import { detectJobIntentWarnings } from './job-intent-warnings';
 
 const DEFAULT_WARNING =
-  'Layer L1 is still using uncalibrated defaults: 30% power, 1500 mm/min, 1 pass. Run a material test on scrap before burning final material.';
+  'Operation "Operation" is still using the uncalibrated defaults (30% power, 1500 mm/min, 1 pass). Run a material test on scrap before burning final material.';
 
 function artwork(id: string, power?: number): SceneObject {
   return {

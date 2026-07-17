@@ -5,7 +5,7 @@
 
 import { NumberInput } from '../../kit';
 import { useDebouncedCommit } from '../../layers/use-debounced-commit';
-import { cellInputStyle, tableCellStyle } from './job-review.styles';
+import { cellInputStyle, tableCellStyle } from './job-review-table.styles';
 
 export function ReviewNumberCell(props: {
   readonly label: string;
