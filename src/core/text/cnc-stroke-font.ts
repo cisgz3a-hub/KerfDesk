@@ -1,3 +1,4 @@
+import { fairStrokeFont, isPolylineDigitizedFont } from './fair-stroke-font';
 import {
   renderStrokeFontText,
   type StrokeFont,
@@ -25,7 +26,10 @@ async function loadCncStrokeFont(fontKey: string): Promise<StrokeFont> {
   const { CNC_STROKE_FONT_DATA } = await import('./cnc-stroke-font-data');
   const source = CNC_STROKE_FONT_DATA.find((font) => font.key === fontKey);
   if (source === undefined) throw new Error(`Unsupported CNC single-line font "${fontKey}".`);
-  const compiled = svgStrokeFont(source);
+  const native = svgStrokeFont(source);
+  // EMS faces are line-chain digitized; fair them into smooth cubics so
+  // script letters render round instead of turning at every sample vertex.
+  const compiled = isPolylineDigitizedFont(fontKey) ? fairStrokeFont(native) : native;
   fontCache.set(fontKey, compiled);
   return compiled;
 }
