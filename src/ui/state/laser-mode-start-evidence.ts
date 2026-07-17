@@ -70,8 +70,9 @@ export function laserModeStartEvidenceIssue(
   // Every operator-reachable Start path supplies evidence and is checked here.
   if (evidence === undefined) return null;
 
+  // Frame-first (2026-07-17): a reported $32=0 no longer refuses the Start —
+  // the Job Review acknowledgement banner carries it as the warning instead.
   const snapshot = captureLaserModeStartSnapshot(current);
-  if (snapshot.laserModeEnabled === false) return LASER_MODE_DISABLED_AT_START_MESSAGE;
   if (!sameLaserModeStartSnapshot(snapshot, evidence)) {
     return LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE;
   }

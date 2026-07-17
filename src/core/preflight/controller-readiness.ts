@@ -100,6 +100,15 @@ export function runControllerReadiness(
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
 type ReadinessWarnings = Array<ControllerReadinessMessage<ControllerReadinessWarningCode>>;
 
+/** The laser `max-power-mismatch` message text (a Job Review warning under
+ * frame-first; the mismatch never blocks Start). */
+function laserMaxPowerMismatchMessage(
+  controllerMaxPowerS: number,
+  projectMaxPowerS: number,
+): string {
+  return `Controller $30 is ${controllerMaxPowerS} but this project is set to max S ${projectMaxPowerS}. Apply the detected setting before starting.`;
+}
+
 // What to do when the dump did not report a setting: 'error' blocks Start;
 // 'warn' states the gap and proceeds through Job Review. Laser uses the
 // warning path for missing evidence; CNC uses it only for partial read-only
@@ -179,7 +188,7 @@ function laserReadiness(
   } else if (controller.maxPowerS !== project.device.maxPowerS) {
     errors.push({
       code: 'max-power-mismatch',
-      message: `Controller $30 is ${controller.maxPowerS} but this project is set to max S ${project.device.maxPowerS}. Apply the detected setting before starting.`,
+      message: laserMaxPowerMismatchMessage(controller.maxPowerS, project.device.maxPowerS),
     });
   }
 

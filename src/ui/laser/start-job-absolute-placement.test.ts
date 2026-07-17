@@ -7,7 +7,8 @@ import {
   IDENTITY_TRANSFORM,
   type Project,
 } from '../../core/scene';
-import { ABSOLUTE_HOME_REQUIRED_MESSAGE } from './absolute-placement-safety';
+import { frameVerificationBlockedMessage } from './frame-verification-policy';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -58,23 +59,27 @@ function homingProject(): Project {
   };
 }
 
-describe('Start safety for Absolute Coordinates', () => {
-  it('blocks until the homing laser is homed in this connection', () => {
+// Frame-first (2026-07-17): homing state never gates Start. The one policy
+// gate is a completed Frame for the exact job; with it, an unhomed Absolute
+// start proceeds.
+describe('Start gating for Absolute Coordinates', () => {
+  it('requires only a completed Frame — not homing — on a homing-capable laser', () => {
     const project = homingProject();
     const blocked = prepareStartJob(project, controller, {
       ...readyMachine,
       homingState: 'unknown',
     });
-    expect(blocked).toEqual({ ok: false, messages: [ABSOLUTE_HOME_REQUIRED_MESSAGE] });
+    expect(blocked).toEqual({ ok: false, messages: [frameVerificationBlockedMessage()] });
 
-    const ready = prepareStartJob(project, controller, {
+    const framed = prepareStartJob(project, controller, {
       ...readyMachine,
-      homingState: 'confirmed',
+      homingState: 'unknown',
+      frameVerification: frameVerificationForProject(project),
     });
-    expect(ready.ok).toBe(true);
+    expect(framed.ok).toBe(true);
   });
 
-  it('keeps Current Position available without automatic homing', () => {
+  it('keeps Current Position available without homing — only the frame gate remains', () => {
     const result = prepareStartJob(
       homingProject(),
       controller,
@@ -82,6 +87,6 @@ describe('Start safety for Absolute Coordinates', () => {
       { startFrom: 'current-position', anchor: 'front-left' },
     );
 
-    expect(result.ok).toBe(true);
+    expect(result).toEqual({ ok: false, messages: [frameVerificationBlockedMessage()] });
   });
 });

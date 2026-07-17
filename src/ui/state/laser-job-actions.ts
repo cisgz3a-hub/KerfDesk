@@ -19,7 +19,6 @@ import {
   CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
   cncControllerEpochOf,
   cncSetupAttestationMatches,
-  cncSetupOverrideAcknowledgement,
   type CncControllerEpoch,
 } from './cnc-setup-attestation';
 import {
@@ -183,8 +182,7 @@ async function prepareStartBoundary(
   assertStartReservation(get, setupEpoch);
   await refreshCncLiveStartState(set, get, safeWrite, driver, machineKind);
   assertStartAllowed(set, get, true);
-  const acknowledgedOverrides = cncSetupOverrideAcknowledgement(options.cncSetupAttestation);
-  assertCncLiveStartReady(set, get, machineKind, acknowledgedOverrides);
+  assertCncLiveStartReady(set, get, machineKind);
   assertStartReservation(get, setupEpoch);
   const pendingState = get();
   if (hasPendingControllerWrite(pendingState)) {

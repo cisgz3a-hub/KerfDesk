@@ -443,9 +443,14 @@ Identical to F-A3 except:
 
 ### F-A10. Pre-flight check (before G-code save)
 
-Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. Any failing
-check surfaces the pre-flight modal listing every issue and cancels the
-save/start until they clear.
+Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
+G-code**, any failing check surfaces the pre-flight modal and cancels the save
+until it clears. For **Start**, frame-first applies (ADR-228): the only
+findings that still cancel the Start are unstreamable output (`non-finite-
+coordinate`, `empty-output`, `relief-needs-cnc`, `no-output-layer`) and compile
+failures — every other finding (bounds, no-go zones, travel heuristics, layer
+values, controller readiness) is carried into the Job Review dialog as a
+warning the operator confirms after the mandatory Frame trace.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -1137,15 +1142,13 @@ separate exact replay receipt.
    controller-setting writes start one epoch-bound qualification flow. GRBL-family
    controllers own one `$$` read after fresh Idle; unsupported dumps are
    `not-required`, and late prior-epoch replies are ignored.
-2. Ordinary **Laser Start stays available** when settings qualification is incomplete or
-   failed once no settings transaction owns the serial controller. Missing `$30`/`$32` evidence
-   is shown in Job Review and uses the existing unverified-laser-mode acknowledgement; a failed
-   settings read alone is not a dead-button gate. A known `$30` mismatch or known `$32=0` still
-   refuses Laser Start.
-3. **CNC Start and supervised recovery remain inline-disabled** with **Reading controller
-   settings…** until qualification is current. Failure shows **Retry reading controller
-   settings** and Reconnect. Alarm/non-Idle, current-tool, and Work-Z mismatches still refuse
-   Start.
+2. Frame-first (ADR-228): **ordinary Start on BOTH machine kinds never gates on
+   qualification.** All `$30`/`$32` findings — absent evidence, a known mismatch, and a known
+   `$32=0`/`$32=1` inversion — surface as Job Review warnings with the unverified-laser-mode
+   acknowledgement where applicable. Only supervised recovery still requires fresh
+   qualification before re-entry.
+3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
+   stream); the blocked-Start dialog offers Unlock/Home in place.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,

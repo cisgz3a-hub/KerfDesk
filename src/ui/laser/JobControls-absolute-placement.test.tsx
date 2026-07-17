@@ -1,12 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createLayer, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { ABSOLUTE_HOME_REQUIRED_MESSAGE } from './absolute-placement-safety';
 import { JobControls } from './JobControls';
 
 (
@@ -34,6 +34,35 @@ beforeEach(() => {
   useStore.setState((state) => ({
     project: {
       ...state.project,
+      scene: {
+        ...EMPTY_SCENE,
+        layers: [createLayer({ id: 'L1', color: '#ff0000' })],
+        objects: [
+          {
+            kind: 'imported-svg',
+            id: 'O1',
+            source: 'a.svg',
+            bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+            transform: IDENTITY_TRANSFORM,
+            paths: [
+              {
+                color: '#ff0000',
+                polylines: [
+                  {
+                    closed: true,
+                    points: [
+                      { x: 0, y: 0 },
+                      { x: 10, y: 0 },
+                      { x: 10, y: 10 },
+                      { x: 0, y: 10 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
       device: {
         ...state.project.device,
         homing: { ...state.project.device.homing, enabled: true },
@@ -50,8 +79,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('JobControls Absolute Coordinates safety', () => {
-  it('keeps Home explicit and blocks Frame motion/Start until homing is confirmed', async () => {
+// Frame-first (2026-07-17): no placement-policy gate pre-disables Start or
+// Frame. An unhomed Absolute machine frames freely — the watched trace IS the
+// placement proof — and Start's only policy gate is the completed Frame.
+describe('JobControls Absolute Coordinates frame-first', () => {
+  it('keeps Start and Frame clickable before homing and dispatches the frame trace', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -68,24 +100,15 @@ describe('JobControls Absolute Coordinates safety', () => {
 
       expect(buttonByText('Home').disabled).toBe(false);
       expect(buttonByText('Frame').disabled).toBe(false);
-      expect(buttonByText('Start job').disabled).toBe(true);
-      expect(buttonByText('Start job').title).toBe(ABSOLUTE_HOME_REQUIRED_MESSAGE);
+      expect(buttonByText('Start job').disabled).toBe(false);
 
       await act(async () => {
         buttonByText('Frame').dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(useLaserStore.getState().frame).not.toHaveBeenCalled();
-      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
-        message: ABSOLUTE_HOME_REQUIRED_MESSAGE,
-        variant: 'error',
-      });
-
-      await act(async () => {
-        useLaserStore.setState({ homingState: 'confirmed' });
-      });
-
-      expect(buttonByText('Start job').disabled).toBe(false);
+      expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1);
+      // The dispatched trace records the frame verification Start requires.
+      expect(useLaserStore.getState().frameVerification).not.toBeNull();
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

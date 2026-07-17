@@ -19,7 +19,6 @@ import { useToastStore } from '../state/toast-store';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
-import { frameVerificationRequirement } from './frame-verification-policy';
 
 export function useFrameAction(): () => void {
   const frame = useLaserStore((s) => s.frame);
@@ -170,7 +169,6 @@ async function dispatchFrameIfSafe(
     return false;
   }
   const feed = project.device.framingFeedMmPerMin;
-  const frameRequirement = frameVerificationRequirement(placement);
   try {
     // Resolves when the first frame line is dispatched; the remaining trace
     // streams via status observations. Failures already surface through the
@@ -179,14 +177,16 @@ async function dispatchFrameIfSafe(
   } catch {
     return false;
   }
-  if (frameRequirement !== 'none') {
-    const laser = useLaserStore.getState();
-    laser.markFrameVerified({
-      boundsSignature: frameBoundsSignature(bounds),
-      wco: laser.wcoCache,
-      workOriginActive: laser.workOriginActive,
-    });
-  }
+  // Frame-first: every dispatched trace records the proof Start requires
+  // (2026-07-17). The physical trace continues after dispatch; Start stays
+  // transport-blocked while the frame motion runs, so "frame completed" and
+  // "Start open" line up for the operator.
+  const laser = useLaserStore.getState();
+  laser.markFrameVerified({
+    boundsSignature: frameBoundsSignature(bounds),
+    wco: laser.wcoCache,
+    workOriginActive: laser.workOriginActive,
+  });
   return true;
 }
 

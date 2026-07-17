@@ -1,4 +1,4 @@
-import { machineKindOf, type Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
 import {
   resolveJobPlacement,
   type JobPlacementSettings,
@@ -9,7 +9,6 @@ import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import { useCameraStore } from '../state/camera-store';
 import type { HomingState } from '../state/laser-store';
-import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 
 type CameraFrameMachineSnapshot = MachinePlacementSnapshot & {
   readonly homingState: HomingState;
@@ -36,13 +35,9 @@ export function resolveCameraSafeFramePlacement(
     ),
   });
   if (issue !== null) return { ok: false, messages: [issue] };
-  const absoluteHomeIssue = absoluteCoordinatesHomeIssue({
-    machineKind: machineKindOf(project.machine),
-    startFrom: jobPlacement.startFrom,
-    homingEnabled: project.device.homing.enabled,
-    homingState: machine.homingState,
-  });
-  return absoluteHomeIssue === null
-    ? resolveJobPlacement(jobPlacement, machine)
-    : { ok: false, messages: [absoluteHomeIssue] };
+  // The absolute-home Start gate deliberately does NOT apply here: a beam-off
+  // Frame trace is how the operator checks placement on an unhomed machine,
+  // and the Start refusal offers Home in place (2026-07-17). Camera placement
+  // keeps its own position proof above.
+  return resolveJobPlacement(jobPlacement, machine);
 }

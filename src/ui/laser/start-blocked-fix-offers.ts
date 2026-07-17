@@ -1,41 +1,28 @@
-// Blocked-Start fix offers (maintainer, 2026-07-17: blocks must ask to fix in
-// place, not dead-end in an alert). Each offer fires only when its gate is the
-// SOLE refusal message — repairing one blocker cannot unblock a Start that
-// other gates would still refuse, so mixed refusals keep the plain report.
+// Blocked-Start fix offers (maintainer, 2026-07-17: frame-first — Frame is
+// the ONLY Start guard; blocks must ask to fix in place, not dead-end in an
+// alert). Under frame-first the refusals that remain are transport state
+// (alarm), compile inputs (origins — offered by the sibling setup module),
+// and the Frame gate itself, whose offer runs the trace right here. Each
+// offer fires only when its gate is the SOLE refusal message — repairing one
+// blocker cannot unblock a Start that other gates would still refuse.
 
-import {
-  RT_FEED_OV_RESET,
-  RT_RAPID_OV_FULL,
-  RT_SPINDLE_OV_RESET,
-} from '../../core/controllers/grbl';
 import { useStore } from '../state';
-import { CNC_OVERRIDE_BLOCK_PREFIX } from '../state/cnc-accessory-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useLaserStore, type LaserState } from '../state/laser-store';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE } from '../state/work-z-zero-evidence';
 import { frameVerificationBlockedMessage } from './frame-verification-policy';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
-import { offerZeroZForBlockedStart } from './start-blocked-zero-z-offer';
+import { repairFailed, settleThenRetry, type BlockedStartRepair } from './start-blocked-repair';
+import { offerSetupFixForBlockedStart } from './start-blocked-setup-offers';
 import { runFrameNow } from './use-frame-action';
 
-/** 'retry' — the blocking condition is repaired; rerun the Start flow once.
- * 'handled' — a physical operator step is underway (the frame trace); skip
- * the refusal report, the operator re-Starts when the step completes.
- * 'unrepaired' — nothing offered or the operator declined; report as before. */
-export type BlockedStartRepair = 'retry' | 'handled' | 'unrepaired';
-
-export const PROBE_PLATE_OFFER_PROMPT =
-  'The probed work zero is set, but the touch plate must be clear before the spindle starts.\n\n' +
-  'Are the touch plate and probe lead removed from the stock and cutter?\n\n' +
-  'OK: confirm removal and continue this Start.\n' +
-  'Cancel: leave the job blocked until the plate is off.';
+export type { BlockedStartRepair } from './start-blocked-repair';
 
 export const FRAME_OFFER_PROMPT =
-  'Verified Origin needs a Verified Frame before Start.\n\n' +
+  'Start needs a completed Frame for this exact job first.\n\n' +
   'OK: trace the job outline now (beam off; a CNC bit lifts to safe Z first). ' +
-  'Watch that the trace stays on the stock, then press Start again.\n' +
+  'Watch that the trace lands where you expect, then press Start again.\n' +
   'Cancel: leave the job blocked.';
 
 export const UNLOCK_OFFER_PROMPT =
@@ -52,26 +39,19 @@ export const HOME_OFFER_PROMPT =
   'OK: home now and continue this Start when the cycle finishes.\n' +
   'Cancel: leave the job blocked.';
 
-export const OVERRIDE_RESET_OFFER_PROMPT =
-  'Controller feed/rapid/spindle overrides are not at 100%, so the cut would not match the ' +
-  'compiled job.\n\n' +
-  'OK: reset all overrides to 100% and continue this Start.\n' +
-  'Cancel: leave the job blocked.';
-
 export async function offerFixForBlockedStart(
   messages: ReadonlyArray<string>,
 ): Promise<BlockedStartRepair> {
-  if (await offerZeroZForBlockedStart(messages)) return 'retry';
   // An active alarm is the one condition that legitimately refuses with two
   // messages at once (alarm state + not-Idle), so it gets an every-message
   // match instead of the sole-blocker rule.
   if (isAlarmOnlyRefusal(messages)) return offerAlarmRecovery();
   const sole = messages.length === 1 ? messages[0] : undefined;
   if (sole === undefined) return 'unrepaired';
-  if (sole === PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE) return offerProbePlateConfirm();
   if (sole === frameVerificationBlockedMessage()) return offerFrameRun();
-  if (sole.startsWith(CNC_OVERRIDE_BLOCK_PREFIX)) return offerOverrideReset();
-  return 'unrepaired';
+  // Compile-input gates (missing/misplaced origins) offer their own
+  // one-click remedies from the sibling module.
+  return offerSetupFixForBlockedStart(sole);
 }
 
 function isAlarmOnlyRefusal(messages: ReadonlyArray<string>): boolean {
@@ -82,13 +62,6 @@ function isAlarmOnlyRefusal(messages: ReadonlyArray<string>): boolean {
     machineNotIdleStartMessage('Alarm'),
   ];
   return messages.every((message) => alarmMessages.includes(message));
-}
-
-function offerProbePlateConfirm(): BlockedStartRepair {
-  if (!jobAwareConfirm(PROBE_PLATE_OFFER_PROMPT)) return 'unrepaired';
-  useLaserStore.getState().confirmProbePlateRemoved();
-  useToastStore.getState().pushToast('Touch-plate removal confirmed.', 'success');
-  return 'retry';
 }
 
 async function offerFrameRun(): Promise<BlockedStartRepair> {
@@ -140,69 +113,4 @@ async function offerHomeCycle(): Promise<BlockedStartRepair> {
     'Homing complete.',
     'Homed — press Start again once the controller reports Idle.',
   );
-}
-
-async function offerOverrideReset(): Promise<BlockedStartRepair> {
-  if (!useLaserStore.getState().capabilities.overrides) return 'unrepaired';
-  if (!jobAwareConfirm(OVERRIDE_RESET_OFFER_PROMPT)) return 'unrepaired';
-  try {
-    const send = useLaserStore.getState().sendRealtimeOverride;
-    await send(RT_FEED_OV_RESET);
-    await send(RT_RAPID_OV_FULL);
-    await send(RT_SPINDLE_OV_RESET);
-  } catch (cause) {
-    return repairFailed('Override reset failed', cause);
-  }
-  return settleThenRetry(
-    (state) => isBaselineOverride(state.ovCache),
-    'Controller overrides reset to 100%.',
-    'Override reset sent — press Start again once overrides report 100%.',
-  );
-}
-
-const OVERRIDE_BASELINE_PERCENT = 100;
-
-function isBaselineOverride(overrides: LaserState['ovCache']): boolean {
-  return (
-    overrides != null &&
-    overrides.feed === OVERRIDE_BASELINE_PERCENT &&
-    overrides.rapid === OVERRIDE_BASELINE_PERCENT &&
-    overrides.spindle === OVERRIDE_BASELINE_PERCENT
-  );
-}
-
-// GRBL reflects unlock/home/override effects through the next status report,
-// so a bounded settle-wait covers the poll latency. Timing out is not a
-// failure: the command was accepted, so hand back 'handled' with a
-// press-Start-again toast instead of the refusal alert.
-const REPAIR_SETTLE_TIMEOUT_MS = 4_000;
-const REPAIR_SETTLE_POLL_MS = 50;
-
-async function settleThenRetry(
-  ready: (state: LaserState) => boolean,
-  settledToast: string,
-  pendingToast: string,
-): Promise<BlockedStartRepair> {
-  const deadline = Date.now() + REPAIR_SETTLE_TIMEOUT_MS;
-  while (Date.now() <= deadline) {
-    if (ready(useLaserStore.getState())) {
-      useToastStore.getState().pushToast(settledToast, 'success');
-      return 'retry';
-    }
-    await sleep(REPAIR_SETTLE_POLL_MS);
-  }
-  useToastStore.getState().pushToast(pendingToast, 'success');
-  return 'handled';
-}
-
-function repairFailed(action: string, cause: unknown): BlockedStartRepair {
-  const reason = cause instanceof Error ? cause.message : String(cause);
-  useToastStore.getState().pushToast(`${action}: ${reason}`, 'warning');
-  return 'unrepaired';
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

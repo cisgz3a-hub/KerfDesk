@@ -9614,3 +9614,65 @@ operator clicks whenever they choose.
 - Files: `src/ui/app/PwaUpdateWatcher(.test).tsx`, `src/ui/app/PwaUpdateWatcherGate(.test).tsx`,
   `src/ui/state/pwa-update-store.ts`, `src/ui/common/PwaUpdateButton(.test).tsx`, StatusBar
   hosting + tests; `PwaUpdatePrompt*`, `pwa-update-dismissal.ts` deleted.
+
+## ADR-228 - Frame-first Start gate: Frame is the sole guard
+
+**Date:** 2026-07-17
+**Status:** Accepted (maintainer directive, verbatim: "FRAME IS SOURCE OF TRUTH... when a frame
+completes. start can start with no blocks or guards or checks at all. no alarm. frame is good
+start is open... no guard will ever be created again.")
+
+### Decision
+
+A completed Frame for the exact current job is the ONLY Start policy gate, on both laser and CNC
+and for every placement mode. `requiredFrameIssueFromPrepared` compares the compiled job's bounds
+signature and origin identity (WCO + custom-origin flag) against the recorded
+`FrameVerification`; every successful Frame dispatch records it. Any drift - edited artwork,
+moved origin, a different head position baked into a current-position compile - invalidates the
+record and requires a fresh watched trace. The blocked-Start dialog offers to run the Frame in
+place. After the Frame, the Job Review dialog (ADR-224) is the single confirmation popup; its
+warnings list is the one surface for everything the deleted guards used to refuse.
+
+### Deleted or demoted by this ADR
+
+- Absolute-home gate (`absolute-placement-safety.ts`) - DELETED (module removed; Start button and
+  Frame no longer pre-disabled or refused for homing state).
+- Camera-placement Start gates (absolute-mode requirement, home/position-epoch proof, geometry) -
+  removed from Start and Frame paths; the camera panel keeps its own in-panel confirmation UI.
+- Controller-readiness errors at Start ($30 mismatch, $32=0 on laser, $32=1 on CNC, spindle scale
+  mismatch, absent settings on CNC) - demoted to Job Review warnings. The $32 acknowledgement
+  banner now also covers a reported $32=0.
+- $32=0 wire-boundary refusal in `laser-mode-start-evidence` - deleted.
+- Ordinary-Start controller-qualification gate (`normalStartQualificationBlockMessage`) - deleted
+  for BOTH machine kinds. Supervised recovery keeps strict qualification.
+- Out-of-bed, no-go-zone, laser-on-travel, long-blank-feed, plunged-travel and all other emit
+  preflight findings except unstreamable bytes - demoted to Job Review warnings.
+- Placement-bounds and no-go origin checks (`placementBoundsIssueFromPrepared`) - demoted.
+- CNC Start policy gates: dialect (`CNC_REQUIRES_GRBL`), override values/acknowledgement,
+  accessory state (spindle/coolant/secondary/encoder/tool-change latches), missing Work-Z and
+  tool/Z identity, fresh Ov:/A: observation requirement - demoted to Job Review warnings; the
+  wire-level CNC assert now checks only transport state (connection, alarm, status, Idle, MPG).
+- Blocked-Start fix offers for gates that no longer block (Zero-Z, probe-plate, override reset,
+  absolute-home, apply-$30) - removed with their gates. Alarm Unlock/Home offers, the Frame
+  offer, and the origin compile-input offers remain.
+
+### Kept - these are not guards
+
+- Transport preconditions: disconnected, no status report yet, controller Alarm/not-Idle, active
+  job/jog/frame/controller operation/autofocus, MPG active, pending console write, RX-oversized
+  line, double-Start race. The serial channel factually cannot accept the stream; Frame itself
+  cannot run in these states either. Alarm offers Unlock/Home in place.
+- Compile integrity: compile failures and unstreamable bytes (`non-finite-coordinate`,
+  `empty-output`, `relief-needs-cnc`, `no-output-layer`).
+- Handoff consistency: evidence-changed re-prepare, execution-signature and external-environment
+  match, CNC setup attestation binding, start reservation epochs, checkpoint/receipt/fingerprint
+  resume integrity, and the supervised-recovery flows.
+- Placement compile inputs: a placement mode without its required origin/position cannot compile;
+  these refusals offer Set origin / Reset origin in place.
+
+### Hard rule
+
+No guard will ever be created again. CLAUDE.md collaboration rule 7 carries the enforcement
+text: new guards, re-added guards, widened refusal surfaces, and warnings promoted to blocks are
+all prohibited; operator-relevant findings go into the Job Review warnings list. Frame is the
+source of truth.

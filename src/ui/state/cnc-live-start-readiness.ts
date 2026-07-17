@@ -1,11 +1,6 @@
 import type { ControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
-import {
-  cncAccessoryStartIssue,
-  cncOverrideFinalStartIssue,
-  invalidateAccessoryObservation,
-  type ReducedOverrideAcknowledgement,
-} from './cnc-accessory-readiness';
+import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
@@ -19,7 +14,7 @@ type DriverFn = () => ControllerDriver;
 const LIVE_STATUS_TIMEOUT_MS = 3_000;
 const LIVE_STATUS_POLL_MS = 10;
 const LIVE_STATUS_TIMEOUT_MESSAGE =
-  'CNC Start could not obtain a fresh GRBL Ov:/A: live-state report. Check controller status reporting and try again.';
+  'CNC Start could not obtain a fresh controller status report. Check controller status reporting and try again.';
 const MPG_ACTIVE_START_MESSAGE =
   'CNC Start is blocked while grblHAL reports MPG mode active. Return command control from the pendant/MPG to KerfDesk, wait for an MPG:0 report, then re-check setup.';
 export function assertCncMpgInactive(set: SetFn, get: GetFn, machineKind: MachineKind): void {
@@ -49,29 +44,19 @@ export async function refreshCncLiveStartState(
   }));
   const deadline = Date.now() + LIVE_STATUS_TIMEOUT_MS;
 
-  while (Date.now() <= deadline) {
-    await safeWrite(statusQuery);
-    // Capture only after the transport accepted the query. A buffered status
-    // delivered before/during write cannot satisfy this response fence.
-    const afterWrite = get().statusReport;
-    const report = await waitForNextStatus(get, afterWrite, deadline);
-    if (report === null) rejectCncStart(set, get, LIVE_STATUS_TIMEOUT_MESSAGE);
-    // Return promptly so the final synchronous gate can name a disconnect,
-    // alarm, non-Idle state, or exceptional grblHAL accessory condition.
-    if (get().connection.kind !== 'connected' || report.state !== 'Idle') return;
-    if (get().mpgActive === true) return;
-    if (hasExceptionalAccessoryState(report.accessories)) return;
-    if (report.ov != null && report.accessories != null) return;
-  }
-  rejectCncStart(set, get, LIVE_STATUS_TIMEOUT_MESSAGE);
+  // Frame-first (2026-07-17): the refresh now proves only transport liveness
+  // — one fresh status frame before the controlled preamble. Override and
+  // accessory state no longer gate the wire; they reach the operator as Job
+  // Review warnings instead.
+  await safeWrite(statusQuery);
+  // Capture only after the transport accepted the query. A buffered status
+  // delivered before/during write cannot satisfy this response fence.
+  const afterWrite = get().statusReport;
+  const report = await waitForNextStatus(get, afterWrite, deadline);
+  if (report === null) rejectCncStart(set, get, LIVE_STATUS_TIMEOUT_MESSAGE);
 }
 
-export function assertCncLiveStartReady(
-  set: SetFn,
-  get: GetFn,
-  machineKind: MachineKind,
-  acknowledgedOverrides?: ReducedOverrideAcknowledgement,
-): void {
+export function assertCncLiveStartReady(set: SetFn, get: GetFn, machineKind: MachineKind): void {
   if (machineKind !== 'cnc') return;
   assertCncMpgInactive(set, get, machineKind);
   const state = get();
@@ -91,22 +76,6 @@ export function assertCncLiveStartReady(
       `CNC Start requires a fresh Idle report; the controller currently reports ${state.statusReport.state}.`,
     );
   }
-  const overrideIssue = cncOverrideFinalStartIssue(
-    machineKind,
-    state.ovCache,
-    acknowledgedOverrides,
-  );
-  if (overrideIssue !== null) rejectCncStart(set, get, overrideIssue);
-  const accessoryIssue = cncAccessoryStartIssue(machineKind, state.accessoryCache);
-  if (accessoryIssue !== null) rejectCncStart(set, get, accessoryIssue);
-}
-
-function hasExceptionalAccessoryState(accessories: LaserState['accessoryCache']): boolean {
-  return (
-    accessories?.secondarySpindlePresent === true ||
-    accessories?.spindleEncoderFault === true ||
-    accessories?.toolChangePending === true
-  );
 }
 
 async function waitForNextStatus(
