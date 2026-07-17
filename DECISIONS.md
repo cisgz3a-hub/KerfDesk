@@ -77,7 +77,7 @@
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
 | ADR-205 | 2026-07-15 | Accepted | Machine Setup is one controller-first atomic workflow |
 | ADR-206 | 2026-07-15 | Accepted | Require explicit maintainer permission for every new guard |
-| ADR-207 | 2026-07-15 | Accepted | One top live-motion bar owns run controls |
+| ADR-207 | 2026-07-15 | Amended | One layout-stable live-motion bar owns run controls |
 | ADR-208 | 2026-07-15 | Accepted | Remove obstructive 4040 and advisory machine policies |
 | ADR-209 | 2026-07-15 | Accepted | Remove universal CNC expiry, depth, override, and spin-up policies |
 | ADR-210 | 2026-07-15 | Accepted | Enforce explicit machine output capability at every project entry point |
@@ -8587,9 +8587,9 @@ remain unchanged; this decision removes only the four audited policies named her
 
 ---
 
-## ADR-207 - One top live-motion bar owns run controls
+## ADR-207 - One layout-stable live-motion bar owns run controls
 
-**Status:** Accepted | **Date:** 2026-07-15
+**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17
 
 ### Context
 
@@ -8600,9 +8600,11 @@ made the most important controls small, and produced overlapping buttons at narr
 
 ### Decision
 
-- A single full-width **Live Motion** bar, directly below the command shell and above the workspace,
+- A single full-width **Live Motion** bar, directly below the workspace and above the status bar,
   owns Pause, Resume, tool-change Continue, and software Abort while a job or machine operation is
-  active. Numeric Edits and the Machine rail do not render duplicate run actions.
+  active. Numeric Edits and the Machine rail do not render duplicate run actions. Anchoring it to the
+  workspace's lower edge keeps top-aligned machine controls stationary when a short jog starts and
+  settles.
 - The bar shows the active state and job progress beside its actions. Its controls use a minimum
   48 px target height; software Abort is at least 144 px wide and is labelled **ABORT JOB** or
   **ABORT MOTION** so its scope is explicit.
@@ -8618,10 +8620,11 @@ made the most important controls small, and produced overlapping buttons at narr
 
 ### Consequences
 
-There is one obvious action cluster to learn and test, with a stable position and larger targets.
-Responsive layouts no longer stack competing Abort buttons. Removing a panel or changing selection
-tools cannot remove the visible software Abort path, while the UI remains honest that only physical
-hardware can provide a safety-rated emergency stop.
+There is one obvious action cluster to learn and test, with larger targets. Responsive layouts no
+longer stack competing Abort buttons, and transient jog state no longer moves the jog controls under
+the operator's pointer. Removing a panel or changing selection tools cannot remove the visible
+software Abort path, while the UI remains honest that only physical hardware can provide a
+safety-rated emergency stop.
 
 ---
 

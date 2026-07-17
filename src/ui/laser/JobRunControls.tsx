@@ -81,7 +81,7 @@ export function MotionControls(props: { readonly operationKind: 'frame' | 'jog' 
   return (
     <div style={rowStyle}>
       <span style={runningSafetyStyle}>
-        {motionLabel} motion is active. Use ABORT MOTION in the top bar
+        {motionLabel} motion is active. Use ABORT MOTION in the Live Motion bar
         {hasJogCancel ? '.' : '; this firmware has no separate jog-cancel command.'} Use the
         physical E-stop if unsafe.
       </span>

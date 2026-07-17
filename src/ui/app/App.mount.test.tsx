@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { useStore } from '../state';
+import { startMotionOperation } from '../state/laser-motion-operation';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { App } from './App';
@@ -39,6 +41,12 @@ describe('App mount', () => {
       registrationPanelOpen: false,
       textDialog: null,
       workspaceContextBar: null,
+    });
+    useLaserStore.setState({
+      controllerOperation: null,
+      fireActive: false,
+      motionOperation: null,
+      streamer: null,
     });
     useToastStore.setState({ toasts: [] });
     host = document.createElement('div');
@@ -79,6 +87,25 @@ describe('App mount', () => {
     expect(host.textContent).not.toContain('Something broke');
     expect(alertText).not.toContain('Rendered more hooks');
     expect(consoleErrors.filter(isHookOrderOrBoundaryError)).toEqual([]);
+  });
+
+  it('anchors the live motion bar below the workspace so jog controls do not move', async () => {
+    useLaserStore.setState({ motionOperation: startMotionOperation('jog') });
+
+    await act(async () => {
+      root = createRoot(host);
+      root.render(
+        <PlatformProvider adapter={mockPlatform}>
+          <App />
+        </PlatformProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    const workspace = host.querySelector('main');
+    const liveMotionBar = host.querySelector('[aria-label="Live Motion"]');
+    expect(liveMotionBar).not.toBeNull();
+    expect(workspace?.nextElementSibling).toBe(liveMotionBar);
   });
 });
 

@@ -48,8 +48,8 @@
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order widens the same docked rail while the canvas remains on the left; it is not a modal or a third sidebar. Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
-- **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the top Live Motion bar.
-- **Live Motion bar**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears directly below the command shell and above the workspace. It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs without covering workspace content.
+- **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
+- **Live Motion bar**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears directly below the workspace and above the status bar, so its arrival shortens the workspace from the bottom without moving the top-aligned jog controls. It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs without covering workspace content.
 - **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
 - **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
 - **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
@@ -815,9 +815,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B7. Pause / resume
 
-Pause, Resume, and tool-change Continue appear only in the top Live Motion bar. The bar remains in a
-stable position above the workspace and wraps its status and action groups instead of shrinking the
-controls below their minimum target size.
+Pause, Resume, and tool-change Continue appear only in the Live Motion bar. The bar remains in normal
+layout below the workspace, keeping the top-aligned machine controls stationary, and wraps its status
+and action groups instead of shrinking the controls below their minimum target size.
 
 #### Success — pause (GRBL-family laser)
 1. User clicks **Pause**. The app freezes host refill before writing any controller byte.
