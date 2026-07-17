@@ -14,6 +14,7 @@ export function openContextBarForRightClick(args: {
   readonly viewState: ViewState;
   readonly selectObject: (id: string | null) => void;
 }): void {
+  if (useStore.getState().previewMode) return;
   if (args.e.type !== 'mouseup' || !isStationaryRightPanClick(args.drag, args.e)) return;
   const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
   const hitId = point === null ? null : hitTest(args.project.scene, point);

@@ -50,6 +50,40 @@ afterEach(async () => {
 });
 
 describe('useDragMove hook event pipeline', () => {
+  it.each([
+    ['Space + left drag', 0, true],
+    ['middle-button drag', 1, false],
+    ['right-button drag', 2, false],
+  ])('allows %s to pan the read-only preview', async (_label, button, spaceDown) => {
+    const project = projectWithRectangle();
+    useStore.getState().setProject(project);
+    useStore.getState().selectObject('rect');
+    useStore.setState({ previewMode: true });
+    useStore.getState().beginInteraction();
+    useUiStore.getState().startArtworkNumbering(['rect']);
+    useUiStore.setState({ spaceDown });
+    const { canvas } = await renderHarness({ previewMode: true });
+
+    await dispatchPointer(canvas, 'pointerdown', { clientX: 60, clientY: 60, button });
+    await dispatchPointer(canvas, 'pointermove', { clientX: 80, clientY: 90, button });
+
+    expect(useUiStore.getState().panX).toBeGreaterThan(0);
+    expect(useUiStore.getState().panY).toBeGreaterThan(0);
+    expect(canvas.setPointerCapture as Mock).toHaveBeenCalledWith(POINTER_ID);
+    expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(
+      project.scene.objects[0]?.transform,
+    );
+    expect(useUiStore.getState().artworkNumbering).toMatchObject({
+      kind: 'active',
+      assignedUnitKeys: [],
+    });
+
+    await dispatchPointer(canvas, 'pointerup', { clientX: 80, clientY: 90, button });
+    await dispatchPointer(canvas, 'pointerdown', { clientX: 90, clientY: 90, button: 2 });
+    await dispatchPointer(canvas, 'pointerup', { clientX: 90, clientY: 90, button: 2 });
+    expect(useUiStore.getState().workspaceContextBar).toBeNull();
+  });
+
   it('runs measure drag through pointer down, move, and up handlers', async () => {
     useUiStore.getState().setToolMode({ kind: 'measure' });
     const { canvas } = await renderHarness();
@@ -181,13 +215,15 @@ function DragHarness(props: { readonly previewMode?: boolean }): JSX.Element {
 
 const POINTER_ID = 7;
 
-async function renderHarness(): Promise<{ readonly canvas: HTMLCanvasElement }> {
+async function renderHarness(
+  props: { readonly previewMode?: boolean } = {},
+): Promise<{ readonly canvas: HTMLCanvasElement }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   mountedRoots.push(root);
   await act(async () => {
-    root.render(<DragHarness />);
+    root.render(<DragHarness {...props} />);
   });
   const canvas = host.querySelector('canvas');
   if (!(canvas instanceof HTMLCanvasElement)) throw new Error('drag harness canvas missing');
@@ -197,13 +233,13 @@ async function renderHarness(): Promise<{ readonly canvas: HTMLCanvasElement }> 
 async function dispatchPointer(
   target: HTMLCanvasElement,
   type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel' | 'pointerleave',
-  init: { readonly clientX: number; readonly clientY: number },
+  init: { readonly clientX: number; readonly clientY: number; readonly button?: number },
 ): Promise<void> {
   // jsdom has no PointerEvent constructor, so build a MouseEvent of the
   // pointer type (React maps it to onPointerX) and attach a pointerId.
   const event = new MouseEvent(type, {
     bubbles: true,
-    button: 0,
+    button: init.button ?? 0,
     clientX: init.clientX,
     clientY: init.clientY,
   });

@@ -31,6 +31,7 @@ import {
   selectionRotateAnchor,
 } from './rotate-handle';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
+import { panDragForPointerDown } from './pan-drag';
 
 export type MoveStartTransform = {
   readonly id: string;
@@ -124,12 +125,6 @@ export function pickHandleDrag(args: {
   return null;
 }
 
-// Mouse button codes per the DOM event spec / React's MouseEvent. We
-// trigger pan on middle OR right — CAD convention, so users don't have
-// to learn the Space modifier to pan with a regular mouse.
-const MIDDLE_BUTTON = 1;
-const RIGHT_BUTTON = 2;
-
 // Resolve a mouse-down event to the drag it should initiate. Pure of
 // React — takes side-effect callbacks (selection updates) so the hook in
 // Workspace stays under the function-line cap.
@@ -142,6 +137,7 @@ type MouseDownDragArgs = {
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   readonly onShiftClick: (id: string) => void;
   readonly onPlainClick: (id: string | null) => void;
+  readonly panOnly?: boolean;
   // 9-dot rotate/scale pivot from the numeric-edits bar; defaults to center.
   readonly selectionAnchor?: SelectionAnchor;
 };
@@ -161,17 +157,9 @@ export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null 
   // button (CAD convention), right button (alternative for users
   // without middle button). All three create the same pan DragState
   // and use the same downstream offset math.
-  const trigger = panTriggerForMouseDown(e.button, useUiStore.getState().spaceDown);
-  if (trigger !== null) {
-    return {
-      kind: 'pan',
-      trigger,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      startPanX: useUiStore.getState().panX,
-      startPanY: useUiStore.getState().panY,
-    };
-  }
+  const panDrag = panDragForPointerDown(e, useUiStore.getState());
+  if (panDrag !== null) return panDrag;
+  if (args.panOnly === true) return null;
   const point = canvasMouseToScene(e, ref.current, project, viewState);
   if (point === null) return null;
   if (handleAltSelectionCycle({ ...args, point })) return null;
@@ -369,16 +357,6 @@ function constrainMoveDelta(dx: number, dy: number): Vec2 {
   if (distance === 0) return { x: dx, y: dy };
   const snapped = Math.round(Math.atan2(dy, dx) / AXIS_SNAP_RADIANS) * AXIS_SNAP_RADIANS;
   return { x: Math.cos(snapped) * distance, y: Math.sin(snapped) * distance };
-}
-
-function panTriggerForMouseDown(
-  button: number,
-  spaceDown: boolean,
-): Extract<DragState, { kind: 'pan' }>['trigger'] | null {
-  if (spaceDown && button === 0) return 'space-left-button';
-  if (button === MIDDLE_BUTTON) return 'middle-button';
-  if (button === RIGHT_BUTTON) return 'right-button';
-  return null;
 }
 
 // Compute the next transform for a move/scale/rotate drag event. Pan

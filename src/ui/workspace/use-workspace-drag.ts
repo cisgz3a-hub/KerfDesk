@@ -74,7 +74,6 @@ export function useDragMove(
   const handlePointerDown = (e: CanvasPointerEvent): void => {
     useUiStore.getState().closeWorkspaceContextBar();
     deps.setSnapGuides([]);
-    if (previewMode) return;
     if (handleArtworkNumberingPointerDown({ event: e, canvas: ref.current, project, viewState }))
       return;
     const next = beginWorkspaceDrag({
@@ -82,6 +81,7 @@ export function useDragMove(
       ref,
       project,
       viewState,
+      previewMode,
       toolMode: deps.toolMode,
       selectedObjectId: deps.selectedObjectId,
       additionalSelectedIds: deps.additionalSelectedIds,
@@ -189,6 +189,7 @@ function beginWorkspaceDrag(args: {
   readonly ref: CanvasRef;
   readonly project: Project;
   readonly viewState: WorkspaceViewState;
+  readonly previewMode: boolean;
   readonly toolMode: ReturnType<typeof useUiStore.getState>['toolMode'];
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
@@ -198,7 +199,7 @@ function beginWorkspaceDrag(args: {
   readonly drawShape: (shape: ShapeObject) => void;
   readonly selectionAnchor: SelectionAnchor;
 }): DragState | null {
-  if (args.e.button === 0 && !useUiStore.getState().spaceDown) {
+  if (!args.previewMode && args.e.button === 0 && !useUiStore.getState().spaceDown) {
     const tool = beginToolDrag(args);
     if (tool.kind === 'handled') return tool.drag;
   }
@@ -212,6 +213,7 @@ function beginWorkspaceDrag(args: {
     onShiftClick: args.toggleSelectObject,
     onPlainClick: args.selectObject,
     selectionAnchor: args.selectionAnchor,
+    panOnly: args.previewMode,
   });
 }
 
