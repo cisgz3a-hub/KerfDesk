@@ -9593,7 +9593,11 @@ operator clicks whenever they choose.
 
 - Operators are never interrupted about updates. LightBurn (desktop) shows a startup update
   dialog; the maintainer explicitly chose no-popup here, so this is a deliberate, recorded
-  divergence from LightBurn behavior.
+  divergence from LightBurn behavior. (Amended 2026-07-17, rolling audit #22 P3-3,
+  maintainer-approved: `PwaUpdateButton` also mounts a visually-hidden `role="status"` live
+  region that politely announces readiness to screen-reader users — the deleted banner was
+  `role="alert"`, so the passive button was silent for them. Audio-only, no visual popup;
+  the suppression predicate is unchanged.)
 - On Electron nothing changes: the watcher never mounts, the store stays `none`, the status bar
   never shows the button, and desktop updates remain electron-updater's (ADR-024/ADR-135).
 - Files: `src/ui/app/PwaUpdateWatcher(.test).tsx`, `src/ui/app/PwaUpdateWatcherGate(.test).tsx`,

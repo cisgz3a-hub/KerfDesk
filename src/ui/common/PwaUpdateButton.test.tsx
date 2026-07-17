@@ -32,6 +32,7 @@ import { PwaUpdateButton } from './PwaUpdateButton';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const BUTTON = 'button[aria-label="Apply app update"]';
+const LIVE_REGION = '[role="status"]';
 
 async function render(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
@@ -111,5 +112,31 @@ describe('PwaUpdateButton', () => {
     h.machine[field] = {};
     const { host } = await render();
     expect(host.querySelector(BUTTON)).toBeNull();
+  });
+
+  // ADR-227 amendment (audit #22 P3-3): the old banner had role="alert", so
+  // screen-reader users were told when an update arrived; the passive button
+  // must announce through a polite live region instead — mounted persistently
+  // (an already-present region announces text changes; one inserted together
+  // with its text may be skipped) and audio-only, never a visual popup.
+  it('mounts an empty polite live region before any update is ready', async () => {
+    const { host } = await render();
+    const region = host.querySelector(LIVE_REGION);
+    expect(region).not.toBeNull();
+    expect(region?.textContent).toBe('');
+  });
+
+  it('announces readiness through the live region when the machine is idle', async () => {
+    markUpdateReady();
+    const { host } = await render();
+    expect(host.querySelector(LIVE_REGION)?.textContent).toContain('KerfDesk');
+    expect(host.querySelector(LIVE_REGION)?.textContent).toContain('Update');
+  });
+
+  it('keeps the live region silent while a job is active', async () => {
+    markUpdateReady();
+    h.streamer.status = 'streaming';
+    const { host } = await render();
+    expect(host.querySelector(LIVE_REGION)?.textContent).toBe('');
   });
 });
