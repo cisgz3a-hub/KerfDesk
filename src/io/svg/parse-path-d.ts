@@ -365,7 +365,7 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
     // SVG 1.1 §F.6.2: identical endpoints mean the arc is omitted entirely —
     // no motion, no segment. Skipping here also keeps the degenerate tuple out
     // of the curve channel (it previously survived only by NaN accident).
-    if (end.x === state.cursor.x && end.y === state.cursor.y) continue;
+    if (isSamePoint(end, state.cursor)) continue;
     const out: Vec2[] = [];
     flattenArc(
       state.cursor,
@@ -392,6 +392,10 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
     state.cursor = end;
   }
   resetSmoothControls(state);
+}
+
+function isSamePoint(a: Vec2, b: Vec2): boolean {
+  return a.x === b.x && a.y === b.y;
 }
 
 function quadraticAsCubic(from: Vec2, control: Vec2, to: Vec2): PathSegment {
