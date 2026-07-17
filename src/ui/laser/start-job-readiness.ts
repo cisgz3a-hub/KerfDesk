@@ -10,17 +10,11 @@ import {
 } from '../../core/job';
 import type {
   ControllerSettingsSnapshot,
-  PreflightIssue,
   PreflightOptions,
   ReadinessSettingsCapability,
 } from '../../core/preflight';
 import { runControllerReadiness } from '../../core/preflight';
-import {
-  DEFAULT_OUTPUT_SCOPE,
-  machineKindOf,
-  type OutputScope,
-  type Project,
-} from '../../core/scene';
+import { DEFAULT_OUTPUT_SCOPE, type OutputScope, type Project } from '../../core/scene';
 import {
   emitPreparedGcode,
   prepareOutput,
@@ -33,7 +27,6 @@ import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { FrameVerification } from '../state/frame-verification';
 import { cncToolPlan, type CncToolPlanEntry } from '../state/cnc-tool-plan';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
-import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import {
   DEFAULT_JOB_PLACEMENT,
   trustedMotionOffsetForPreflight,
@@ -41,7 +34,7 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import type { HomingState } from '../state/laser-store';
-import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
+import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
@@ -54,13 +47,14 @@ import {
   withControllerReportUnits,
 } from './start-job-preparation';
 import { collectStartWarnings } from './start-job-warnings';
+import { demotedPolicyWarnings, partitionEmitPreflight } from './start-job-readiness-policy';
+
+export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
 export const STATUS_ALARM_START_MESSAGE =
   'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
-export const CNC_REQUIRES_GRBL_MESSAGE =
-  'CNC jobs require a GRBL-family controller (GRBL, grblHAL, FluidNC). The connected firmware does not accept the GRBL CNC dialect — e.g. it reads the G4 spin-up dwell in milliseconds instead of seconds, so the bit would plunge before the spindle is at speed.';
 
 export type StartJobPreparation =
   | {
@@ -127,67 +121,6 @@ export type MachineStartSnapshot = {
   readonly statusQuery?: StatusQueryCapability;
   readonly reportInches?: boolean;
 };
-
-// Frame-first (maintainer, 2026-07-17): the old policy blockers — CNC dialect,
-// overrides, accessories, missing Work-Z — no longer refuse Start. They join
-// the Job Review warnings so the operator sees them on the one confirmation
-// popup after Frame has proven placement.
-function demotedPolicyWarnings(project: Project, machine: MachineStartSnapshot): string[] {
-  const warnings: string[] = [];
-  const machineKind = machineKindOf(project.machine);
-  if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
-    warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
-  }
-  warnings.push(...cncOverrideStartIssues(project, machine.ovCache));
-  warnings.push(...cncAccessoryStartIssues(project, machine.accessoryCache));
-  const workZeroIssue = cncWorkZeroStartIssue(
-    project,
-    machine.workZZeroEvidence,
-    machine.workZReferenceEpoch,
-    machine.controllerSessionEpoch,
-  );
-  if (workZeroIssue !== null) warnings.push(workZeroIssue);
-  return warnings;
-}
-
-// Emit-preflight findings that keep blocking even under frame-first: bytes the
-// controller cannot execute at all (NaN coordinates) or a program with no cut
-// motion. Everything else — bounds, no-go zones, travel heuristics — is a
-// reviewed warning; the watched Frame trace is the placement proof.
-const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = new Set([
-  'non-finite-coordinate',
-  'empty-output',
-  'relief-needs-cnc',
-  'no-output-layer',
-]);
-
-function partitionEmitPreflight(preflight: { readonly issues: ReadonlyArray<PreflightIssue> }): {
-  readonly blocking: string[];
-  readonly warnings: string[];
-} {
-  const blocking: string[] = [];
-  const warnings: string[] = [];
-  for (const issue of preflight.issues) {
-    (EMIT_BLOCKING_PREFLIGHT_CODES.has(issue.code) ? blocking : warnings).push(issue.message);
-  }
-  return { blocking, warnings };
-}
-
-function cncAccessoryStartIssues(
-  project: Project,
-  accessories: NonNullable<StatusReport['accessories']> | null | undefined,
-): ReadonlyArray<string> {
-  const issue = cncAccessoryStartIssue(machineKindOf(project.machine), accessories);
-  return issue === null ? [] : [issue];
-}
-
-function cncOverrideStartIssues(
-  project: Project,
-  overrides: OverrideValues | null | undefined,
-): ReadonlyArray<string> {
-  const issue = cncOverrideStartIssue(machineKindOf(project.machine), overrides);
-  return issue === null ? [] : [issue];
-}
 
 export function prepareStartJob(
   project: Project,

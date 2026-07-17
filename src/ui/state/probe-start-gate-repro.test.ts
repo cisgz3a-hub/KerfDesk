@@ -11,7 +11,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildZProbeLines } from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
-import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import {
   createLayer,
@@ -22,11 +21,11 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { prepareOutput } from '../../io/gcode';
 import {
   CNC_NO_WORK_ZERO_START_MESSAGE,
   cncWorkZeroStartIssue,
 } from '../laser/cnc-start-advisories';
+import { frameVerificationForProject } from '../laser/frame-verification-testing';
 import { prepareStartJob, type MachineStartSnapshot } from '../laser/start-job-readiness';
 import {
   DEFAULT_JOB_PLACEMENT,
@@ -192,18 +191,11 @@ function frameVerificationFromStore(
     wcoCache: state.wcoCache,
   });
   if (!resolved.ok) throw new Error(`fixture placement failed: ${resolved.messages.join('; ')}`);
-  const prepared = prepareOutput(
-    cncProject,
-    resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin },
-  );
-  if (!prepared.ok) throw new Error('fixture compile failed');
-  const bounds = computeJobBounds(prepared.job, prepared.project.device);
-  if (bounds === null) throw new Error('fixture job has no bounds');
-  return {
-    boundsSignature: frameBoundsSignature(bounds),
+  return frameVerificationForProject(cncProject, {
+    ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
     wco: state.wcoCache,
     workOriginActive: state.workOriginActive,
-  };
+  });
 }
 
 beforeEach(() => {
