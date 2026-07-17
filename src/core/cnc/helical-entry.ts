@@ -1,3 +1,4 @@
+import { pointInPolygon } from '../geometry';
 import type { CncHelicalContourPass, CncPass } from '../job';
 import type { CncHelixEntrySettings, Polyline, Vec2 } from '../scene';
 
@@ -256,18 +257,6 @@ function pointToSegmentDistance(point: Vec2, start: Vec2, end: Vec2): number {
     Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
   );
   return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  let inside = false;
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
-    const a = polygon[index];
-    const b = polygon[previous];
-    if (a === undefined || b === undefined || a.y > point.y === b.y > point.y) continue;
-    const crossingX = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-    if (point.x < crossingX) inside = !inside;
-  }
-  return inside;
 }
 
 function validSettings(settings: CncHelixEntrySettings): boolean {

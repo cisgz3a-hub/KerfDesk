@@ -1,7 +1,9 @@
-// Ray-cast point-in-polygon (even-odd rule). Extracted because this is the
-// third containment test in the tree — kerf-offset.ts and profile-ordering.ts
-// still carry older local copies; migrating them here is a separate tidy-first
-// refactor so feature diffs stay single-concern.
+// Ray-cast point-in-polygon (even-odd rule). The single containment test in
+// the tree: kerf-offset, profile-ordering, compile-cnc-helpers, helical-entry,
+// adaptive-pocket-verifier, and line-art-contours all import THIS — an
+// edge-semantics change here (on-boundary probes, epsilon) reaches every
+// caller at once, which is the point of the consolidation (tidy-first,
+// rolling audit 2026-07-17-0745 P3-1).
 
 import type { Vec2 } from '../scene';
 

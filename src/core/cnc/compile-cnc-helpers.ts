@@ -1,3 +1,4 @@
+import { pointInPolygon } from '../geometry';
 import type { CncPass } from '../job';
 import type { CncCutType, Polyline, Vec2 } from '../scene';
 
@@ -46,18 +47,6 @@ function containmentDepth(polyline: Polyline, closed: ReadonlyArray<Polyline>): 
     if (candidate !== polyline && pointInPolygon(probe, candidate.points)) depth += 1;
   }
   return depth;
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  let inside = false;
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
-    const a = polygon[index];
-    const b = polygon[previous];
-    if (a === undefined || b === undefined || a.y > point.y === b.y > point.y) continue;
-    const xAtY = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-    if (point.x < xAtY) inside = !inside;
-  }
-  return inside;
 }
 
 function ensureRingClosure(polyline: Polyline): ReadonlyArray<Vec2> {
