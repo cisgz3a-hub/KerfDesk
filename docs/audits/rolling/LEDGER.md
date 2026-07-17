@@ -23,6 +23,7 @@ One line per 30-minute audit iteration. Areas rotate; pick the least-recently co
 | 2026-07-17 12:00 | origin/main b8f773e5 | DXF importer (6-dim adversarial review, 28 raised, 0 refuted → 1 P2 + 6 P3) | [report](2026-07-17-1200-dxf-importer.md) | 0 | 1 | 6 |
 | 2026-07-17 12:31 | origin/main b8f773e5 | LightBurn importers .lbrn/.clb/.lbdev (6-dim review, 25 raised, 1 refuted → 2 P2 + 6 P3) | [report](2026-07-17-1231-lightburn-importers.md) | 0 | 2 | 6 |
 | 2026-07-17 12:46 | origin/main b8f773e5 | GRBL streamer state machine (6-dim review, 13 raised, 1 refuted → 4 P3; ZERO P1/P2) | [report](2026-07-17-1246-grbl-streamer.md) | 0 | 0 | 4 |
+| 2026-07-17 13:15 | origin/main b8f773e5 | Recovery core — checkpoint + CNC pass-resume (6-dim review, 13 raised → 5 P3; ZERO P1/P2; recut-never-skip holds) | [report](2026-07-17-1315-recovery-core.md) | 0 | 0 | 5 |
 
 **"Fix all" session (08:30–10:05):** every open P1/P2 and 13 of 16 P3s fixed via PRs #262 #263 #264 #265 #267 #268 #269 #271 #272 (plus #260 earlier). Deferred with reasons: audit-level policy (needs a level/override decision), Weld cross-color parity + curve-preserving booleans (need LightBurn reference verification / design), e2e-gates-deploy (new blocking gate — needs explicit ADR-206 approval).
 
