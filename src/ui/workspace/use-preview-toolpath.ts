@@ -4,7 +4,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
-import { resolveJobPlacement, type JobPlacementSettings } from '../job-placement';
+import {
+  resolveExportJobPlacement,
+  resolveJobPlacement,
+  type JobPlacementSettings,
+} from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-preview';
@@ -108,11 +112,19 @@ function usePreviewPlacement(jobPlacement: JobPlacementSettings) {
   const workOriginActive = useLaserStore((state) => state.workOriginActive);
   const wcoCache = useLaserStore((state) => state.wcoCache);
   const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  return useMemo(
-    () =>
-      resolveJobPlacement(jobPlacement, { statusReport, workOriginActive, wcoCache, reportInches }),
-    [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches],
-  );
+  return useMemo(() => {
+    // Preview does not move the machine. User Origin output is work-zero
+    // relative, so it can be inspected before the controller origin is set.
+    // Start still uses resolveJobPlacement and remains blocked.
+    const resolvePlacement =
+      jobPlacement.startFrom === 'user-origin' ? resolveExportJobPlacement : resolveJobPlacement;
+    return resolvePlacement(jobPlacement, {
+      statusReport,
+      workOriginActive,
+      wcoCache,
+      reportInches,
+    });
+  }, [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches]);
 }
 
 function hasVariableText(project: Project): boolean {
