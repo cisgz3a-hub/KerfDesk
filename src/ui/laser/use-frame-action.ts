@@ -44,6 +44,23 @@ export function useFrameAction(): () => void {
   };
 }
 
+/** Imperative Frame run for non-hook callers (the blocked-Start fix offer).
+ * True when the frame motion was dispatched — the physical trace continues
+ * asynchronously afterwards, so callers must not assume the head is idle. */
+export async function runFrameNow(): Promise<boolean> {
+  const laser = useLaserStore.getState();
+  return runFrameAction({
+    frame: laser.frame,
+    statusReport: laser.statusReport,
+    workOriginActive: laser.workOriginActive,
+    wcoCache: laser.wcoCache,
+    homingState: laser.homingState,
+    trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
+    reportInches: laser.controllerSettings?.reportInches === true,
+    pushToast: useToastStore.getState().pushToast,
+  });
+}
+
 async function runFrameAction({
   frame,
   statusReport,
@@ -64,7 +81,7 @@ async function runFrameAction({
 > & {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
   readonly reportInches: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   // Click-only consumer: read project/placement at call time instead of
   // subscribing; a render-per-mousemove for a button handler would be noisy.
   const app = useStore.getState();
@@ -80,7 +97,7 @@ async function runFrameAction({
   });
   if (!placement.ok) {
     pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
-    return;
+    return false;
   }
   const frameScene = filterSceneForOutputScope(project.scene, outputScope);
   const frameBounds = computeFrameBounds(
@@ -99,22 +116,28 @@ async function runFrameAction({
   if (!prepared.ok) {
     const fallbackBounds = rasterBudgetFallbackBounds(prepared.preflight, frameBounds);
     if (fallbackBounds !== null) {
-      dispatchFrameIfSafe(frame, pushToast, fallbackBounds, fallbackBounds, placement, project);
-      return;
+      return dispatchFrameIfSafe(
+        frame,
+        pushToast,
+        fallbackBounds,
+        fallbackBounds,
+        placement,
+        project,
+      );
     }
     pushToast(
       prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
       'error',
     );
-    return;
+    return false;
   }
   const bounds = computeJobBounds(prepared.job, project.device);
   if (bounds === null) {
     pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
-    return;
+    return false;
   }
   const motionBounds = computeJobMotionBounds(prepared.job, project.device) ?? bounds;
-  dispatchFrameIfSafe(frame, pushToast, bounds, motionBounds, placement, project);
+  return dispatchFrameIfSafe(frame, pushToast, bounds, motionBounds, placement, project);
 }
 
 function rasterBudgetFallbackBounds(
@@ -127,14 +150,14 @@ function rasterBudgetFallbackBounds(
   return rasterOnly ? frameBounds : null;
 }
 
-function dispatchFrameIfSafe(
+async function dispatchFrameIfSafe(
   frame: (bounds: JobBounds, feed: number) => Promise<void>,
   pushToast: (message: string, variant: 'error') => void,
   bounds: JobBounds,
   motionBounds: JobBounds,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
   project: ReturnType<typeof useStore.getState>['project'],
-): void {
+): Promise<boolean> {
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
   const motionIssue = describeFrameMotionPreflightIssue(
     motionBounds,
@@ -144,21 +167,27 @@ function dispatchFrameIfSafe(
   );
   if (motionIssue !== null) {
     pushToast(motionIssue, 'error');
-    return;
+    return false;
   }
   const feed = project.device.framingFeedMmPerMin;
   const frameRequirement = frameVerificationRequirement(placement);
-  void frame(bounds, feed)
-    .then(() => {
-      if (frameRequirement === 'none') return;
-      const laser = useLaserStore.getState();
-      laser.markFrameVerified({
-        boundsSignature: frameBoundsSignature(bounds),
-        wco: laser.wcoCache,
-        workOriginActive: laser.workOriginActive,
-      });
-    })
-    .catch(() => undefined);
+  try {
+    // Resolves when the first frame line is dispatched; the remaining trace
+    // streams via status observations. Failures already surface through the
+    // store's write-error log, matching the old silent .catch here.
+    await frame(bounds, feed);
+  } catch {
+    return false;
+  }
+  if (frameRequirement !== 'none') {
+    const laser = useLaserStore.getState();
+    laser.markFrameVerified({
+      boundsSignature: frameBoundsSignature(bounds),
+      wco: laser.wcoCache,
+      workOriginActive: laser.workOriginActive,
+    });
+  }
+  return true;
 }
 
 function describeFrameMotionPreflightIssue(
