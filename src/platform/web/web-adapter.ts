@@ -29,6 +29,9 @@ function acceptTypesFor(accept: ReadonlyArray<string>): FilePickerAcceptType[] {
 }
 
 async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<FileHandle>> {
+  if (typeof window.showOpenFilePicker !== 'function') {
+    throw new Error('File System Access API is required to open files in the web app.');
+  }
   let handles: FileSystemFileHandle[];
   try {
     handles = await window.showOpenFilePicker({
