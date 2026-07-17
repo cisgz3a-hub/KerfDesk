@@ -18,7 +18,7 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
     write: async (data) => {
       await write(data);
       // Real GRBL answers the connect-time $G modal query (C6) with its state
-      // then ok; model it so the ackless query settles during connect.
+      // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {
         emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
         emit('ok');

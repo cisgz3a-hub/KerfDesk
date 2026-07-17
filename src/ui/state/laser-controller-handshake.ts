@@ -25,7 +25,6 @@ type SafeWriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
-  options?: { readonly ackless?: boolean },
 ) => Promise<void>;
 
 const PASSIVE_STARTUP_WAIT_MS = 250;
@@ -215,10 +214,10 @@ async function qualifyConnectedController(
   // After qualification, ask the controller for its modal state ($G) so a
   // non-G54 frame left active by a $N startup block or an external session
   // becomes visible to the placement-mismatch advisory (C6) with no operator
-  // action. The query, its ackless semantics, and the quiescent-ledger
-  // precondition live in the shared active-wcs-readback helper (also used by
-  // the post-reset settings re-qualification); called inline — not through a
-  // wrapper — to keep the handshake's microtask depth unchanged.
+  // action. The query is a normal owed-ack read living in the shared
+  // active-wcs-readback helper (also used by the post-reset settings
+  // re-qualification); called inline — not through a wrapper — to keep the
+  // handshake's microtask depth unchanged.
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
   await requestActiveWcsReadback(get, refs.driver, safeWrite, guard.expectedSessionEpoch);
 }

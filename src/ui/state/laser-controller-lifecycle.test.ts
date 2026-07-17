@@ -172,7 +172,7 @@ describe('laser controller lifecycle operations', () => {
     expect(useLaserStore.getState().activeWcs).toBe('G54');
   });
 
-  it('reads the active WCS at connect via an ackless $G that never strands the fence (C6)', async () => {
+  it('reads the active WCS at connect via an owed-ack $G that never strands the fence (C6)', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -192,7 +192,7 @@ describe('laser controller lifecycle operations', () => {
     // The controller was left in G55 by a $N startup block / another sender.
     expect(writes).toContain('$G\n');
     connection.emitLine('[GC:G0 G55 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
-    connection.emitLine('ok'); // the $G ok — ackless, so it must NOT owe the fence
+    connection.emitLine('ok'); // the $G ok — owed and settled, so the fence ends at zero
     await flush();
     expect(useLaserStore.getState().activeWcs).toBe('G55');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);

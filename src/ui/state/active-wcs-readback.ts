@@ -1,9 +1,11 @@
-// Ackless $G modal read that seeds store.activeWcs for the placement-mismatch
+// $G modal read that seeds store.activeWcs for the placement-mismatch
 // advisory (C6). Shared by the connect handshake and the post-reset settings
 // re-qualification: both end with a freshly qualified controller whose modal
 // state the store has never (or, after a reset banner, no longer) observed.
-// Advisory-only and non-fatal — a missing capability, a stale epoch, or a
-// failed write just leaves activeWcs null (no warning).
+// A NORMAL owed-ack query — its [GC:...] reply is captured passively by the
+// line handler, its terminal ok settles the untracked-ack fence like any
+// other command's. Advisory-only and non-fatal — a missing capability, a
+// stale epoch, or a failed write just leaves activeWcs null (no warning).
 
 import type { ControllerDriver } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -15,7 +17,6 @@ type WriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
-  options?: { readonly ackless?: boolean },
 ) => Promise<void>;
 
 export async function requestActiveWcsReadback(
@@ -34,10 +35,9 @@ export async function requestActiveWcsReadback(
   ) {
     return;
   }
-  // The ackless $G leaves its ok unaccounted, so it must only settle against a
-  // quiescent ledger: if any other command's terminal ack were outstanding, the
-  // $G ok would settle THAT ack instead (F1). Post-qualification the ledger is
-  // empty; skip the read rather than risk a mis-settle if it is not.
+  // Conservative: stay out of any in-flight command exchange. The owed-ack
+  // accounting would be correct either way; skipping just keeps the advisory
+  // read from interleaving with an operator command's reply window.
   if (state.pendingUntrackedAcks > 0) return;
-  await safeWrite(`${modalQuery}\n`, undefined, 'system', { ackless: true }).catch(() => undefined);
+  await safeWrite(`${modalQuery}\n`, undefined, 'system').catch(() => undefined);
 }
