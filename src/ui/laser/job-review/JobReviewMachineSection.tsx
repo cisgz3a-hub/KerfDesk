@@ -8,6 +8,7 @@ import { useStore } from '../../state';
 import { buildMachineReviewFacts } from './job-review-live-rows';
 import {
   detailsStyle,
+  detailsSummaryCountStyle,
   detailsSummaryStyle,
   factListStyle,
   mutedNoteStyle,
@@ -28,6 +29,9 @@ export function JobReviewMachineSection(props: {
         title="Expand to review the machine profile facts: bed, origin, dialect, and the laser or CNC setup this job will run with."
       >
         Machine — {project.device.name}
+        <span style={detailsSummaryCountStyle}>
+          · {facts.length} fact{facts.length === 1 ? '' : 's'}
+        </span>
       </summary>
       <dl style={factListStyle}>
         {facts.map((entry) => (

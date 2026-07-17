@@ -29,6 +29,8 @@ import {
   formatBoundsSize,
   formatCount,
   formatGcodeSize,
+  originTileDetail,
+  originTileValue,
 } from './job-review-format';
 
 export type PreparedCurrentStart = Extract<
@@ -40,6 +42,8 @@ export type JobReviewStatTile = {
   readonly label: string;
   readonly value: string;
   readonly detail: string;
+  // 'text' renders the value at body size (origin names, not big numbers).
+  readonly emphasis?: 'text';
 };
 
 export type JobReviewAcknowledgement =
@@ -88,7 +92,20 @@ function buildStatTiles(
     sizeTile(job, device),
     operationsTile(job, machineKind, prepared.cncToolPlan),
     gcodeTile(prepared.gcode),
+    originTile(prepared.jobOrigin),
   ];
+}
+
+// Placement controls live on the machine rail (v2 dropped them from the
+// review); this read-only tile keeps the one safety-relevant placement fact
+// in front of the operator right up to Confirm.
+function originTile(origin: PreparedCurrentStart['jobOrigin']): JobReviewStatTile {
+  return {
+    label: 'Origin',
+    value: originTileValue(origin),
+    detail: originTileDetail(origin),
+    emphasis: 'text',
+  };
 }
 
 function timeTile(job: Job, device: DeviceProfile): JobReviewStatTile {

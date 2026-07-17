@@ -9402,6 +9402,28 @@ non-negotiable #21 approval for this confirmation gate.
 - The dialog reuses `JobPlacementControls` wholesale, so placement UX cannot drift between the job
   panel and the review.
 
+### Revision - v2 (2026-07-17, same day)
+
+Maintainer feedback after using the shipped dialog: make it more visually attractive, drop the
+placement section, show all artwork and material settings per profile, and collapse the warnings
+into a dropdown. Changes, none touching the gate contract:
+
+- **Job placement section removed.** Placement stays editable on the machine rail. The review
+  keeps two read-only echoes: an Origin stat tile and the `Runs from ...` fact in the footer.
+- **Operations became "Artwork settings".** Every row gains a muted detail line with the
+  mode-specific settings (laser: kerf/tabs/pass-through, hatch, dither; CNC: computed passes,
+  stepover, direction, tabs, entry strategy, finish allowance) and the bound material preset as
+  a chip resolved from the material library.
+- **New CNC "Material & stock" card** - project material (chipload key), stock footprint, stock
+  origin offset, safe Z.
+- **Warnings render as a collapsed amber dropdown** whose summary always shows the count.
+  Identical warnings are grouped at the source: `detectUncalibratedJobWarnings` now emits one
+  message naming the affected operations by *name* (it previously printed raw layer ids, one
+  line per layer - ten imports produced ten near-identical paragraphs).
+- **Visual pass:** accent-tinted hero estimated-time tile, uppercase micro-labels, mode chips,
+  chevroned fact sections with counts, sticky Cancel/Start footer with a play glyph.
+- **Guard surface unchanged:** still one affirmative click, warnings still never block, and
+  in-dialog blockers still only re-surface refusals the readiness pipeline already issues.
 > **Numbering note.** Drafted as ADR-221, but the fleet landed ADR-221 (elapsed-time badge),
 > ADR-222 (single-artwork selection), and ADR-223 (Canvas Focus layout) on main mid-flight - so
 > this entry is **ADR-224**. Re-verify the tail and open-PR claims before merge.

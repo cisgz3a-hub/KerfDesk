@@ -1,10 +1,30 @@
-// Shared inline-style constants for the Job Review dialog (ADR-224).
-// Chrome classes (.lf-banner, .lf-card, .lf-dialog…) come from tokens.css;
-// these constants only lay the sections out.
+// Shared inline-style constants for the Job Review dialog sections (ADR-224
+// v2 look). Chrome classes (.lf-banner, .lf-dialog…) come from tokens.css;
+// table and stock-card styles live in job-review-table.styles.ts.
 
 import type { CSSProperties } from 'react';
 
+// .lf-dialog padding (--lf-space-6); the sticky footer bleeds through it.
+const DIALOG_PADDING_PX = 16;
+
 export const sectionStyle: CSSProperties = { marginTop: 14 };
+
+// Uppercase micro-label heading a section (kept an h3 for the a11y outline).
+export const sectionHeadingStyle: CSSProperties = {
+  margin: '0 0 7px',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: 'var(--lf-text-faint)',
+};
+
+export const sectionHintStyle: CSSProperties = {
+  marginLeft: 8,
+  fontWeight: 400,
+  letterSpacing: 0,
+  textTransform: 'none',
+};
 
 export const headerRowStyle: CSSProperties = {
   display: 'flex',
@@ -41,16 +61,46 @@ export const statRowStyle: CSSProperties = {
   marginTop: 12,
 };
 
+export const statTileStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+  background: 'var(--lf-bg-0)',
+  border: '1px solid var(--lf-border)',
+  borderRadius: 'var(--lf-radius-lg)',
+  padding: '9px 11px 8px',
+};
+
+// The estimated-time tile is the one number every start decision weighs;
+// the accent tint makes it the band's anchor.
+export const heroTileStyle: CSSProperties = {
+  ...statTileStyle,
+  background: 'var(--lf-tint-info)',
+};
+
 export const statLabelStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
+  fontSize: 10,
+  fontWeight: 650,
+  letterSpacing: '0.07em',
+  textTransform: 'uppercase',
+  color: 'var(--lf-text-faint)',
 };
 
 export const statValueStyle: CSSProperties = {
-  fontSize: 16,
+  fontSize: 19,
   fontWeight: 700,
   fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1.2,
 };
+
+// Word-valued tiles (the Origin tile) read as labels, not measurements.
+export const statTextValueStyle: CSSProperties = {
+  ...statValueStyle,
+  fontSize: 14,
+  paddingTop: 3,
+};
+
+export const heroValueColor = 'var(--lf-accent-fg)';
 
 export const statDetailStyle: CSSProperties = {
   fontSize: 11,
@@ -64,6 +114,32 @@ export const recomputingStyle: CSSProperties = {
   color: 'var(--lf-text-muted)',
 };
 
+export const warnDetailsStyle: CSSProperties = {
+  marginTop: 12,
+  background: 'var(--lf-tint-warning)',
+  border: '1px solid var(--lf-border)',
+  borderLeft: '3px solid var(--lf-warning)',
+  borderRadius: 'var(--lf-radius-lg)',
+};
+
+export const warnSummaryStyle: CSSProperties = {
+  cursor: 'pointer',
+  padding: '8px 11px',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--lf-warning-fg)',
+};
+
+export const warnHintStyle: CSSProperties = { fontWeight: 400, opacity: 0.85 };
+
+export const warnListStyle: CSSProperties = {
+  margin: 0,
+  padding: '0 14px 9px 30px',
+  fontSize: 12,
+  lineHeight: 1.5,
+  color: 'var(--lf-text)',
+};
+
 export const bannerStyle: CSSProperties = { marginTop: 12 };
 
 export const bannerListStyle: CSSProperties = {
@@ -71,69 +147,6 @@ export const bannerListStyle: CSSProperties = {
   paddingLeft: 18,
   fontSize: 12,
   lineHeight: 1.5,
-};
-
-export const tableStyle: CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 12,
-};
-
-export const tableHeaderCellStyle: CSSProperties = {
-  textAlign: 'left',
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--lf-text-muted)',
-  padding: '4px 6px',
-  borderBottom: '1px solid var(--lf-border)',
-  whiteSpace: 'nowrap',
-};
-
-export const tableCellStyle: CSSProperties = {
-  padding: '3px 6px',
-  borderBottom: '1px solid var(--lf-border)',
-  verticalAlign: 'middle',
-};
-
-export const operationNameCellStyle: CSSProperties = {
-  ...tableCellStyle,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  minWidth: 120,
-};
-
-export const swatchStyle: CSSProperties = {
-  width: 12,
-  height: 12,
-  borderRadius: 3,
-  flex: '0 0 auto',
-  border: '1px solid var(--lf-border)',
-};
-
-export const operationNameTextStyle: CSSProperties = {
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  maxWidth: 180,
-};
-
-export const subOperationNameTextStyle: CSSProperties = {
-  ...operationNameTextStyle,
-  paddingLeft: 14,
-  color: 'var(--lf-text-muted)',
-};
-
-export const cellInputStyle: CSSProperties = {
-  width: 72,
-  fontVariantNumeric: 'tabular-nums',
-};
-
-export const airCellLabelStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 4,
-  fontSize: 11,
 };
 
 export const factListStyle: CSSProperties = { margin: '6px 0 0' };
@@ -152,9 +165,9 @@ export const factTermStyle: CSSProperties = {
 };
 
 export const detailsStyle: CSSProperties = {
-  marginTop: 14,
+  marginTop: 10,
   border: '1px solid var(--lf-border)',
-  borderRadius: 6,
+  borderRadius: 'var(--lf-radius-lg)',
   padding: '7px 10px',
 };
 
@@ -162,6 +175,13 @@ export const detailsSummaryStyle: CSSProperties = {
   cursor: 'pointer',
   fontSize: 13,
   fontWeight: 650,
+};
+
+export const detailsSummaryCountStyle: CSSProperties = {
+  marginLeft: 6,
+  fontWeight: 400,
+  fontSize: 11,
+  color: 'var(--lf-text-faint)',
 };
 
 export const mutedNoteStyle: CSSProperties = {
@@ -197,4 +217,33 @@ export const toolPlanListStyle: CSSProperties = {
   paddingLeft: 18,
   fontSize: 12,
   lineHeight: 1.5,
+};
+
+// Sticky inside the .lf-dialog scroll container: Cancel/Start stay visible
+// while the operator scrolls a long review. Negative margins bleed through
+// the panel padding so the bar spans edge to edge.
+export const footerBarStyle: CSSProperties = {
+  position: 'sticky',
+  bottom: -DIALOG_PADDING_PX,
+  margin: `14px -${DIALOG_PADDING_PX}px -${DIALOG_PADDING_PX}px`,
+  padding: `10px ${DIALOG_PADDING_PX}px`,
+  background: 'var(--lf-bg-1)',
+  borderTop: '1px solid var(--lf-border)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  zIndex: 1,
+};
+
+export const footerOriginStyle: CSSProperties = {
+  marginRight: 'auto',
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+  overflowWrap: 'anywhere',
+};
+
+export const startButtonContentStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
 };

@@ -24,6 +24,7 @@ const model: JobReviewModel = {
     { label: 'Job size', value: '8 × 8 mm', detail: 'X 1 to 9 · Y 1 to 9 mm' },
     { label: 'Operations', value: '1 operation', detail: '1 pass total' },
     { label: 'G-code', value: '12 lines', detail: '1.2 KB' },
+    { label: 'Origin', value: 'User origin', detail: 'Anchor front left', emphasis: 'text' },
   ],
   warnings: ['Island fill can overburn small details.'],
   resolvedOriginLabel: 'User origin — anchor front left',
@@ -87,10 +88,17 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('Review job before starting');
     expect(host.textContent).toContain('2m 5s');
     expect(host.textContent).toContain('8 × 8 mm');
+    expect(host.textContent).toContain('Warnings (1)');
     expect(host.textContent).toContain('Island fill can overburn small details.');
     expect(host.textContent).toContain('User origin — anchor front left');
     expect(host.textContent).toContain('Controller laser mode prompt body.');
-    expect(host.textContent).toContain('Operations');
+    expect(host.textContent).toContain('Artwork settings');
+    expect(host.textContent).toContain('Before you start');
+    // v2: placement is read-only — no placement controls inside the review.
+    expect(host.textContent).not.toContain('Job placement');
+    expect(host.querySelector('select')).toBeNull();
+    // Laser profiles have no stock; the CNC card must stay out of the way.
+    expect(host.textContent).not.toContain('Material & stock');
     expect(buttonByText('Start job').disabled).toBe(false);
     expect(host.querySelector('form')).toBeNull();
   });
@@ -155,6 +163,9 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('ROUTER');
     expect(host.textContent).toContain('CNC setup confirmation');
     expect(host.textContent).toContain('CNC attestation prompt body.');
+    expect(host.textContent).toContain('Material & stock');
+    expect(host.textContent).toContain('Custom (manual feeds)');
+    expect(host.textContent).toContain('400 × 400 × 6.4 mm');
     expect(host.textContent).toContain('Stock');
     expect(host.textContent).toContain('Safe Z');
     expect(host.textContent).toContain('1. 3.175 mm (1/8") end mill');

@@ -112,11 +112,15 @@ describe('buildJobReviewModel', () => {
       'Job size',
       'Operations',
       'G-code',
+      'Origin',
     ]);
     expect(model.stats[1]?.value).toBe('8 × 8 mm');
     expect(model.stats[2]?.value).toBe('1 operation');
     expect(model.stats[2]?.detail).toBe('1 pass total');
     expect(model.stats[3]?.value).toMatch(/^[\d,]+ lines$/);
+    // The origin tile is word-valued: it must ask for the text treatment.
+    expect(model.stats[4]?.emphasis).toBe('text');
+    expect(model.stats[4]?.value.length).toBeGreaterThan(0);
     expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
     expect(model.resolvedOriginLabel.length).toBeGreaterThan(0);
     expect(new Set(model.warnings).size).toBe(model.warnings.length);

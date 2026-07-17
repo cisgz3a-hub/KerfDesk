@@ -748,17 +748,23 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
 3. A laser controller that reports `$32=0` is refused before the review opens (unchanged).
 4. App compiles the project to G-code via `emitGcode`, then opens the **Job Review** dialog
-   (ADR-224) built from the exact prepared program: stat tiles (estimated time with cut/travel
-   split, job size and motion envelope, operations/cutters, G-code lines and bytes), an amber
-   strip holding every start warning (they no longer flash by as a toast), the output-operations
-   table with the core numbers editable in place (laser: power / speed / passes / air; CNC:
-   depth, depth-per-pass, feed, plunge, spindle RPM), the editable job-placement controls plus
-   resolved-origin and work-origin facts, collapsible read-only Controller ($32, $30 vs profile,
-   travel, homing, units, WCS, overrides, position) and Machine (bed, stock, bit, safe-Z,
-   spindle, coolant, park, rotary, tool plan) sections, and the safety acknowledgement — the
-   unverified-`$32` cable-loss/latched-output prompt or the CNC workholding/exclusive-access
-   attestation, verbatim. Pressing the review's **Start job** records the same evidence objects
-   the previous native confirms produced.
+   (ADR-224, v2 look) built from the exact prepared program: five stat tiles (estimated time as
+   the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
+   G-code lines and bytes, and a read-only Origin tile), a **collapsed amber "Warnings (N)"
+   dropdown** whose summary always shows the count (identical warnings arrive grouped — e.g. one
+   uncalibrated-defaults message naming the affected operations instead of one per layer), a CNC
+   **Material & stock** card (project material, stock footprint, stock origin, safe Z), the
+   **Artwork settings** table with the core numbers editable in place (laser: power / speed /
+   passes / air; CNC: depth, depth-per-pass, feed, plunge, spindle RPM) and a muted per-row
+   detail line carrying the mode-specific settings (kerf/tabs/hatch/dither; CNC passes,
+   stepover, direction, tabs, entry) plus the bound material chip, collapsible read-only
+   Controller ($32, $30 vs profile, travel, homing, units, WCS, overrides, position) and
+   Machine (bed, stock, bit, safe-Z, spindle, coolant, park, rotary, tool plan) fact sections
+   with counts, and the safety acknowledgement — the unverified-`$32` cable-loss/latched-output
+   prompt or the CNC workholding/exclusive-access attestation, verbatim. Placement is **not**
+   editable in the review (it stays on the machine rail); the sticky footer echoes the resolved
+   origin ("Runs from …") beside Cancel and **Start job**. Pressing the review's Start job
+   records the same evidence objects the previous native confirms produced.
 5. Editing a value inside the review commits through the normal layer/placement store actions and
    re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
    the fresh program replaces the shown one — the bytes streamed are always the bytes last shown.
@@ -801,8 +807,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    review's Start button. Fields stay editable — fixing the value recovers in place. No bytes sent.
 
 #### Empty — nothing to warn or acknowledge
-1. With no warnings the amber strip is absent; a laser whose `$32=1` is verified this session
-   shows a one-line verified note instead of an acknowledgement prompt.
+1. With no warnings the amber dropdown is absent entirely (no "Warnings (0)"); a laser whose
+   `$32=1` is verified this session shows a one-line verified note instead of an
+   acknowledgement prompt. An in-review edit that fixes the last warning removes the dropdown
+   on the next re-prepare; one that introduces a warning brings it back.
 
 #### Edge — cancel the review
 1. **Cancel** or Escape closes the dialog with zero side effects: nothing staged, nothing sent,

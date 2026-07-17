@@ -152,7 +152,7 @@ describe('detectJobIntentWarnings', () => {
 
   it('warns when output layers still use uncalibrated first-run power and speed defaults', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'line'))).toContain(
-      'Layer L1 is still using uncalibrated defaults: 30% power, 1500 mm/min, 1 pass. Run a material test on scrap before burning final material.',
+      'Operation "Operation" is still using the uncalibrated defaults (30% power, 1500 mm/min, 1 pass). Run a material test on scrap before burning final material.',
     );
   });
 
@@ -245,8 +245,6 @@ describe('detectJobIntentWarnings', () => {
       },
     };
 
-    expect(detectJobIntentWarnings(project)).not.toContain(
-      'Layer L1 is still using uncalibrated defaults: 30% power, 1500 mm/min, 1 pass. Run a material test on scrap before burning final material.',
-    );
+    expect(detectJobIntentWarnings(project).some((w) => w.includes('uncalibrated'))).toBe(false);
   });
 });
