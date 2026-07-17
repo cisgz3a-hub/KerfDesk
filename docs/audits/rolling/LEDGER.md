@@ -25,6 +25,7 @@ One line per 30-minute audit iteration. Areas rotate; pick the least-recently co
 | 2026-07-17 12:46 | origin/main b8f773e5 | GRBL streamer state machine (6-dim review, 13 raised, 1 refuted → 4 P3; ZERO P1/P2) | [report](2026-07-17-1246-grbl-streamer.md) | 0 | 0 | 4 |
 | 2026-07-17 13:15 | origin/main b8f773e5 | Recovery core — checkpoint + CNC pass-resume (6-dim review, 13 raised → 5 P3; ZERO P1/P2; recut-never-skip holds) | [report](2026-07-17-1315-recovery-core.md) | 0 | 0 | 5 |
 | 2026-07-17 13:45 | origin/main b8f773e5 | Zustand store slices (6-dim review, 14 raised → 6 P3; ZERO P1/P2; immutability holds) | [report](2026-07-17-1345-store-slices.md) | 0 | 0 | 6 |
+| 2026-07-17 14:37 | origin/main b8f773e5 | Live ack-attribution + command arbiter (6-dim review, 18 raised → **3 P2** + 5 P3; P2-1 demonstrated by unit probe; one root cause) | [report](2026-07-17-1437-ack-attribution.md) | 0 | 3 | 5 |
 
 **"Fix all" session (08:30–10:05):** every open P1/P2 and 13 of 16 P3s fixed via PRs #262 #263 #264 #265 #267 #268 #269 #271 #272 (plus #260 earlier). Deferred with reasons: audit-level policy (needs a level/override decision), Weld cross-color parity + curve-preserving booleans (need LightBurn reference verification / design), e2e-gates-deploy (new blocking gate — needs explicit ADR-206 approval).
 
