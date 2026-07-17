@@ -20,10 +20,10 @@ describe('CNC_MACHINE_CATALOG', () => {
   });
 
   // Regression: these two rows once shipped a different model tier's work
-  // area (435×435 / 840×435 — Machinist-class numbers). Onefinity publishes
-  // Woodworker as a 32″×32″ cut area (807×765 mm) and Journeyman as
-  // 48″×32″ (1214×765 mm).
-  it('ships the published Onefinity cut areas, not the smaller-tier values', () => {
+  // area (435×435 / 840×435 — Machinist-class numbers). These values are
+  // conservative, rounded-down Elite max-travel figures for the Woodworker
+  // 32″-class and Journeyman 48″×32″-class machines; exact travel varies.
+  it('ships conservative Onefinity class envelopes, not the smaller-tier values', () => {
     const woodworker = CNC_MACHINE_CATALOG.find((preset) => preset.id === 'onefinity-woodworker');
     const journeyman = CNC_MACHINE_CATALOG.find((preset) => preset.id === 'onefinity-journeyman');
     expect(woodworker?.bedWidthMm).toBe(807);

@@ -68,8 +68,9 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
   {
     id: 'onefinity-woodworker',
     name: 'Onefinity Woodworker',
-    // Onefinity publishes the Woodworker as a 32″×32″ cut area (807×765 mm);
-    // 16″-class numbers belong to the Machinist, which is not this preset.
+    // Conservative envelope for the 32″-class Woodworker. A current Elite
+    // listing gives 807.99×765.99 mm max travel; round down because usable
+    // travel varies by generation and setup.
     bedWidthMm: 807,
     bedHeightMm: 765,
     spindleMaxRpm: 24000,
@@ -78,7 +79,8 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
   {
     id: 'onefinity-journeyman',
     name: 'Onefinity Journeyman',
-    // Published Journeyman cut area is 48″×32″ (1214×765 mm).
+    // Conservative envelope for the 48″×32″-class Journeyman, using
+    // the rounded-down max travel from the corresponding Elite listing.
     bedWidthMm: 1214,
     bedHeightMm: 765,
     spindleMaxRpm: 24000,
