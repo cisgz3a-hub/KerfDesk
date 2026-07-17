@@ -21,6 +21,7 @@ import {
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { useStartBlockerStore } from './start-blocker-store';
 import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
@@ -126,8 +127,9 @@ async function makeInterruptedRun(repository: RecoveryRepository) {
 beforeEach(() => {
   localStorage.clear();
   resetStore();
+  const project = runnableProject();
   useStore.setState({
-    project: runnableProject(),
+    project,
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
@@ -147,6 +149,9 @@ beforeEach(() => {
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+    // Frame-first (ADR-228): a completed Frame for this exact job is THE
+    // Start gate, so every full-flow test records one up front.
+    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
   vi.mocked(jobAwareAlert).mockClear();
@@ -205,6 +210,13 @@ describe('runStartJobFlow', () => {
       workOriginActive: true,
       workOriginSource: 'g92',
       wcoCache: { x: 0, y: 0, z: 0 },
+      // The user-origin compile and origin identity differ from the default
+      // absolute one, so the recorded Frame must match this exact job.
+      frameVerification: frameVerificationForProject(runnableProject(), {
+        jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+        wco: { x: 0, y: 0, z: 0 },
+        workOriginActive: true,
+      }),
     });
 
     await runStartJobFlow(repository);

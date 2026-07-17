@@ -9,6 +9,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -35,12 +36,18 @@ const readyMachine = {
 
 describe('prepareStartJob output scope', () => {
   it('starts only selected artwork when Cut Selected Graphics is enabled', () => {
+    const project = twoLineProject();
+    const scope = selectedScope(['B']);
     const result = prepareStartJob(
-      twoLineProject(),
+      project,
       readyController,
-      readyMachine,
+      {
+        ...readyMachine,
+        // Frame-first (ADR-228): the Frame must cover the scoped compile.
+        frameVerification: frameVerificationForProject(project, { outputScope: scope }),
+      },
       undefined,
-      selectedScope(['B']),
+      scope,
     );
 
     expect(result.ok).toBe(true);

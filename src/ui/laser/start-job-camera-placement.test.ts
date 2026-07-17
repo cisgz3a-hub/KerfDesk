@@ -11,6 +11,7 @@ import {
   CAMERA_HOME_REQUIRED_MESSAGE,
   CAMERA_POSITION_CONFIRMATION_REQUIRED_MESSAGE,
 } from '../camera/camera-placement-safety';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const READY_CONTROLLER = { maxPowerS: 1000, minPowerS: 0, laserModeEnabled: true };
@@ -60,55 +61,67 @@ function cameraProject(homingEnabled: boolean): Project {
   };
 }
 
+// Frame-first (ADR-228): the camera Start gates (absolute-mode requirement,
+// home / position-epoch proof) are deleted entirely — not even demoted to
+// warnings. The watched Frame trace is the placement proof; the camera panel
+// keeps its own in-panel confirmation UI.
 describe('Start camera-placement integration', () => {
-  it('refuses a camera-placed job changed back to a relative origin', () => {
+  it('starts a camera-placed job on a relative origin once framed', () => {
+    const project = cameraProject(true);
+    const wco = { x: 15, y: 25, z: 0 };
     const result = prepareStartJob(
-      cameraProject(true),
+      project,
       READY_CONTROLLER,
-      { ...READY_MACHINE, cameraPlacementActive: true, homingState: 'confirmed' },
+      {
+        ...READY_MACHINE,
+        cameraPlacementActive: true,
+        homingState: 'confirmed',
+        workOriginActive: true,
+        wcoCache: wco,
+        frameVerification: frameVerificationForProject(project, {
+          jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+          wco,
+          workOriginActive: true,
+        }),
+      },
       { startFrom: 'user-origin', anchor: 'front-left' },
     );
-    expect(result).toEqual({ ok: false, messages: [CAMERA_ABSOLUTE_COORDINATES_MESSAGE] });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).not.toContain(CAMERA_ABSOLUTE_COORDINATES_MESSAGE);
+    }
   });
 
-  it('requires and accepts a completed Home on a homing-capable machine', () => {
+  it('starts without a completed Home on a homing-capable machine once framed', () => {
     const project = cameraProject(true);
-    const blocked = prepareStartJob(project, READY_CONTROLLER, {
+    const result = prepareStartJob(project, READY_CONTROLLER, {
       ...READY_MACHINE,
       cameraPlacementActive: true,
       homingState: 'unknown',
+      frameVerification: frameVerificationForProject(project),
     });
-    expect(blocked).toEqual({ ok: false, messages: [CAMERA_HOME_REQUIRED_MESSAGE] });
 
-    const ready = prepareStartJob(project, READY_CONTROLLER, {
-      ...READY_MACHINE,
-      cameraPlacementActive: true,
-      homingState: 'confirmed',
-    });
-    expect(ready.ok).toBe(true);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).not.toContain(CAMERA_HOME_REQUIRED_MESSAGE);
+    }
   });
 
-  it('requires a current epoch-bound confirmation on a no-homing machine', () => {
+  it('starts without an epoch-bound confirmation on a no-homing machine once framed', () => {
     const project = cameraProject(false);
-    const blocked = prepareStartJob(project, READY_CONTROLLER, {
+    const result = prepareStartJob(project, READY_CONTROLLER, {
       ...READY_MACHINE,
       cameraPlacementActive: true,
       homingState: 'unknown',
       trustedPositionEpoch: 9,
       cameraConfirmedPositionEpoch: 8,
-    });
-    expect(blocked).toEqual({
-      ok: false,
-      messages: [CAMERA_POSITION_CONFIRMATION_REQUIRED_MESSAGE],
+      frameVerification: frameVerificationForProject(project),
     });
 
-    const ready = prepareStartJob(project, READY_CONTROLLER, {
-      ...READY_MACHINE,
-      cameraPlacementActive: true,
-      homingState: 'unknown',
-      trustedPositionEpoch: 9,
-      cameraConfirmedPositionEpoch: 9,
-    });
-    expect(ready.ok).toBe(true);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).not.toContain(CAMERA_POSITION_CONFIRMATION_REQUIRED_MESSAGE);
+    }
   });
 });

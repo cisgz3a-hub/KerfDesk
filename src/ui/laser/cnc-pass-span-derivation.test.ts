@@ -17,6 +17,7 @@ import { createExecutionArtifact, type ExecutionArtifactV1 } from '../state/reco
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { deriveCncArtifactPassSpans } from './cnc-pass-span-derivation';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareCurrentStartJob } from './start-job-source';
 
 const idleStatus: StatusReport = {
@@ -53,16 +54,17 @@ const lineObject: SceneObject = {
 };
 
 async function archivedCncArtifact(): Promise<ExecutionArtifactV1> {
-  useStore.setState({
-    project: {
-      ...createProject(DEFAULT_DEVICE_PROFILE),
-      machine: DEFAULT_CNC_MACHINE_CONFIG,
-      scene: {
-        ...EMPTY_SCENE,
-        objects: [lineObject],
-        layers: [createLayer({ id: 'red', color: '#ff0000' })],
-      },
+  const project = {
+    ...createProject(DEFAULT_DEVICE_PROFILE),
+    machine: DEFAULT_CNC_MACHINE_CONFIG,
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [lineObject],
+      layers: [createLayer({ id: 'red', color: '#ff0000' })],
     },
+  };
+  useStore.setState({
+    project,
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
@@ -80,6 +82,8 @@ async function archivedCncArtifact(): Promise<ExecutionArtifactV1> {
       referenceEpoch: 7,
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
     },
+    // Frame-first (ADR-228): the completed Frame is the sole Start gate.
+    frameVerification: frameVerificationForProject(project),
   });
   const laser = useLaserStore.getState();
   const prepared = await prepareCurrentStartJob(

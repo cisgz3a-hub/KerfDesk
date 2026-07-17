@@ -3,11 +3,15 @@
 // Set origin -> Z probe with touch plate). Drives the REAL store probe
 // transaction against a fake serial connection (same harness as
 // laser-probe-lifecycle.test.ts), then interrogates the CNC Start work-zero
-// gate exactly as prepareStartJob does. Findings-only: no production code is
+// findings exactly as prepareStartJob does. Frame-first (ADR-228): the only
+// Start policy gate is a completed Frame for the exact job, so the harness
+// records a matching FrameVerification and the work-zero/tool findings are
+// observed as Job Review warnings. Findings-only: no production code is
 // modified by this file.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildZProbeLines } from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
+import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import {
   createLayer,
@@ -18,11 +22,18 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { prepareOutput } from '../../io/gcode';
 import {
   CNC_NO_WORK_ZERO_START_MESSAGE,
   cncWorkZeroStartIssue,
 } from '../laser/cnc-start-advisories';
 import { prepareStartJob, type MachineStartSnapshot } from '../laser/start-job-readiness';
+import {
+  DEFAULT_JOB_PLACEMENT,
+  resolveJobPlacement,
+  type JobPlacementSettings,
+} from '../job-placement';
+import type { FrameVerification } from './frame-verification';
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
 import {
@@ -149,7 +160,9 @@ async function runSuccessfulZProbe(connection: FakeConnection, writes: string[])
 // The live-machine snapshot prepareStartJob receives, with evidence + epoch
 // taken from the real laser store and the non-work-zero fields set to the
 // same known-good values the existing cnc-start-tool-evidence.test.ts uses.
-function machineSnapshotFromStore(): MachineStartSnapshot {
+function machineSnapshotFromStore(
+  frameVerification: FrameVerification | null = null,
+): MachineStartSnapshot {
   const state = useLaserStore.getState();
   return {
     statusReport: state.statusReport,
@@ -161,6 +174,35 @@ function machineSnapshotFromStore(): MachineStartSnapshot {
     wcoCache: state.wcoCache,
     workZZeroEvidence: state.workZZeroEvidence,
     workZReferenceEpoch: state.workZReferenceEpoch,
+    frameVerification,
+  };
+}
+
+// Frame-first (ADR-228): mirror dispatchFrameIfSafe's recording for this
+// project/placement so the one remaining Start gate — a completed Frame for
+// the exact compiled job — is satisfied and the work-zero findings under
+// test stay observable.
+function frameVerificationFromStore(
+  placement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
+): FrameVerification {
+  const state = useLaserStore.getState();
+  const resolved = resolveJobPlacement(placement, {
+    statusReport: state.statusReport,
+    workOriginActive: state.workOriginActive,
+    wcoCache: state.wcoCache,
+  });
+  if (!resolved.ok) throw new Error(`fixture placement failed: ${resolved.messages.join('; ')}`);
+  const prepared = prepareOutput(
+    cncProject,
+    resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin },
+  );
+  if (!prepared.ok) throw new Error('fixture compile failed');
+  const bounds = computeJobBounds(prepared.job, prepared.project.device);
+  if (bounds === null) throw new Error('fixture job has no bounds');
+  return {
+    boundsSignature: frameBoundsSignature(bounds),
+    wco: state.wcoCache,
+    workOriginActive: state.workOriginActive,
   };
 }
 
@@ -219,11 +261,12 @@ describe('probe -> CNC Start work-zero gate (field repro: "cannot start without 
       probePlateRemoved: false,
     });
 
-    // BEFORE the operator confirms plate removal, the gate must block — but
-    // with the plate-removal message, NOT "no work zero". If the UI never
-    // surfaces/executes confirmProbePlateRemoved, Start stays blocked here
-    // and pressing Zero Z (manual-zero evidence has no plate flag) is the
-    // only unblock — the exact operator behavior in the bug report.
+    // BEFORE the operator confirms plate removal, the work-zero finding must
+    // surface — with the plate-removal message, NOT "no work zero". Under
+    // frame-first (ADR-228) it reaches the operator as a Job Review warning
+    // rather than a Start block, but the wrong message would still coach a
+    // redundant Zero Z (manual-zero evidence has no plate flag) — the exact
+    // operator behavior in the bug report.
     expect(
       cncWorkZeroStartIssue(
         cncProject,
@@ -245,10 +288,16 @@ describe('probe -> CNC Start work-zero gate (field repro: "cannot start without 
       cncWorkZeroStartIssue(cncProject, confirmed.workZZeroEvidence, confirmed.workZReferenceEpoch),
     ).toBeNull();
 
-    const prepared = prepareStartJob(cncProject, controllerSettings, machineSnapshotFromStore());
+    const prepared = prepareStartJob(
+      cncProject,
+      controllerSettings,
+      machineSnapshotFromStore(frameVerificationFromStore()),
+    );
     expect(prepared).toMatchObject({ ok: true });
     if (prepared.ok) {
       expect(prepared.cncToolPlan).toEqual([{ id: 'em-3175', name: '3.175 mm (1/8") end mill' }]);
+      expect(prepared.warnings.join('\n')).not.toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
+      expect(prepared.warnings.join('\n')).not.toContain(PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE);
     }
   });
 
@@ -283,16 +332,22 @@ describe('probe -> CNC Start work-zero gate (field repro: "cannot start without 
       cncWorkZeroStartIssue(cncProject, after.workZZeroEvidence, after.workZReferenceEpoch),
     ).toBeNull();
 
-    const prepared = prepareStartJob(cncProject, controllerSettings, machineSnapshotFromStore(), {
+    const userOriginPlacement: JobPlacementSettings = {
       startFrom: 'user-origin',
       anchor: 'front-left',
-    });
+    };
+    const prepared = prepareStartJob(
+      cncProject,
+      controllerSettings,
+      machineSnapshotFromStore(frameVerificationFromStore(userOriginPlacement)),
+      userOriginPlacement,
+    );
     // Reveal the blocking messages verbatim on failure.
     expect(prepared.ok ? [] : prepared.messages).toEqual([]);
     expect(prepared.ok).toBe(true);
   });
 
-  it('case 3: probing with a different Active bit than the job starts with blocks Start with the tool message', async () => {
+  it('case 3: probing with a different Active bit than the job starts with surfaces the tool warning', async () => {
     // Operator probed while the 1/4" bit was selected as Active...
     useStore.setState({
       project: { ...cncProject, machine: { ...DEFAULT_CNC_MACHINE_CONFIG, toolId: 'em-6350' } },
@@ -310,20 +365,26 @@ describe('probe -> CNC Start work-zero gate (field repro: "cannot start without 
     expect(state.workZZeroEvidence).toMatchObject({ source: 'probe', toolId: 'em-6350' });
 
     // ...but the compiled job's first cutter section resolves to the default
-    // em-3175 bit. The work-zero gate itself passes; the TOOL gate blocks.
+    // em-3175 bit. The work-zero finding itself passes; the TOOL mismatch
+    // surfaces — under frame-first (ADR-228) as a Job Review warning, not a
+    // Start block — and with the tool message, never "no work zero".
     expect(
       cncWorkZeroStartIssue(cncProject, state.workZZeroEvidence, state.workZReferenceEpoch),
     ).toBeNull();
 
-    const prepared = prepareStartJob(cncProject, controllerSettings, machineSnapshotFromStore());
-    expect(prepared.ok).toBe(false);
-    if (!prepared.ok) {
-      expect(prepared.messages).toEqual([
+    const prepared = prepareStartJob(
+      cncProject,
+      controllerSettings,
+      machineSnapshotFromStore(frameVerificationFromStore()),
+    );
+    expect(prepared.ok).toBe(true);
+    if (prepared.ok) {
+      expect(prepared.warnings).toContain(
         'This job starts with 3.175 mm (1/8") end mill, but work Z was established for ' +
           '6.35 mm (1/4") end mill. Load 3.175 mm (1/8") end mill, select it as the Active bit, ' +
           'then touch it to the stock top and Zero Z — or probe again.',
-      ]);
-      expect(prepared.messages.join('\n')).not.toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
+      );
+      expect(prepared.warnings.join('\n')).not.toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
     }
   });
 });

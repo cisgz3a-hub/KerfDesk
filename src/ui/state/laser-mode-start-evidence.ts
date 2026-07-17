@@ -23,9 +23,6 @@ export type LaserModeStartEvidence = LaserModeStartSnapshot & {
 export const LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE =
   'Controller settings changed while Start was being prepared. Start again so KerfDesk can re-check $30 and $32 before sending job G-code.';
 
-export const LASER_MODE_DISABLED_AT_START_MESSAGE =
-  'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.';
-
 const LASER_MODE_UNVERIFIED_AT_START_MESSAGE =
   'Controller laser mode is not verified for this Start. Start again and review the $32 acknowledgement before sending job G-code.';
 

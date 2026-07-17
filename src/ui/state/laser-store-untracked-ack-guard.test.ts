@@ -166,7 +166,11 @@ describe('untracked-ack start guard', () => {
     expect(writesWhileFencing).toEqual([]);
   });
 
-  it('rechecks reported laser mode after the queue fence before writing job bytes', async () => {
+  // Frame-first (ADR-228): the $32=0-specific wire refusal was deleted — a
+  // reported $32=0 reaches the operator through the Job Review acknowledgement
+  // banner instead. A $32 flip DURING Start preparation is still caught at the
+  // wire, as changed settings evidence, before any job byte is written.
+  it('rechecks laser-mode evidence after the queue fence before writing job bytes', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -205,7 +209,7 @@ describe('untracked-ack start guard', () => {
     });
     connection.emitLine('ok');
 
-    await expect(started).rejects.toThrow(/reports \$32=0/i);
+    await expect(started).rejects.toThrow(/settings changed while Start was being prepared/i);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(writes.some((write) => write.includes(LONG_LINE))).toBe(false);
   });

@@ -31,6 +31,7 @@ import {
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareCurrentStartJob } from './start-job-source';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -111,8 +112,9 @@ function repository(): RecoveryRepository {
 }
 
 function configureReadyCncRecovery(): void {
+  const project = recoveryProject();
   useStore.setState({
-    project: recoveryProject(),
+    project,
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
@@ -130,6 +132,10 @@ function configureReadyCncRecovery(): void {
       referenceEpoch: 7,
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
     },
+    // Frame-first (ADR-228): a completed Frame for this exact job is the one
+    // Start policy gate; both the seeding Start and the recovery re-prepare
+    // check it against the live store (null WCO, work origin inactive here).
+    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
 }

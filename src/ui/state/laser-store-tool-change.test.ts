@@ -146,58 +146,60 @@ afterEach(async () => {
 });
 
 describe('CNC tool-change activation (CNC-01..03)', () => {
-  it('rechecks live accessory evidence at the store boundary before arming', async () => {
+  // Frame-first (ADR-228): live accessory state (A:S spindle on) no longer
+  // refuses at the wire — it reaches the operator as a Job Review warning at
+  // prepare time. The store boundary still runs the queue fence and demands
+  // one fresh status report before the program arms.
+  it('arms through a live spindle-on accessory report after the status fence (ADR-228)', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes, 'active'));
     writes.length = 0;
 
-    // The older snapshot says off, but the post-confirmation live reports say
-    // spindle on. No program byte may be armed from the stale snapshot.
-    await expect(
-      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
-        machineKind: 'cnc',
-        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
-      }),
-    ).rejects.toThrow(/clockwise spindle/i);
+    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
+    });
 
-    expect(writes).toContain('G4 P0.01\n');
-    expect(writes).toContain('?');
-    expect(writes.join('')).not.toContain('G1 X1 Y1');
-    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(writes[0]).toBe('G4 P0.01\n');
+    expect(writes[1]).toBe('?');
+    expect(writes.join('')).toContain('G1 X1 Y1');
+    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
   });
 
-  it('rechecks live overrides at the store boundary before arming', async () => {
+  // Frame-first (ADR-228): non-baseline override values (Ov:110,100,100) no
+  // longer refuse at the wire — demoted to a Job Review warning.
+  it('arms through non-baseline live overrides after the status fence (ADR-228)', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes, 'override'));
     writes.length = 0;
 
-    await expect(
-      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
-        machineKind: 'cnc',
-        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
-      }),
-    ).rejects.toThrow(/feed 110%/i);
+    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
+    });
 
-    expect(writes).toContain('G4 P0.01\n');
-    expect(writes).toContain('?');
-    expect(writes.join('')).not.toContain('G1 X1 Y1');
-    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(writes[0]).toBe('G4 P0.01\n');
+    expect(writes[1]).toBe('?');
+    expect(writes.join('')).toContain('G1 X1 Y1');
+    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
   });
 
-  it('blocks a fresh grblHAL spindle encoder fault before arming', async () => {
+  // Frame-first (ADR-228): a latched grblHAL spindle encoder fault (A:E) no
+  // longer refuses at the wire — demoted to a Job Review warning.
+  it('arms through a fresh grblHAL spindle encoder fault report (ADR-228)', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes, 'encoder-fault'));
     writes.length = 0;
 
-    await expect(
-      useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
-        machineKind: 'cnc',
-        cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
-      }),
-    ).rejects.toThrow(/spindle encoder fault/i);
+    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, {
+      machineKind: 'cnc',
+      cncSetupAttestation: currentCncSetupAttestation(CNC_MULTI_TOOL),
+    });
 
-    expect(writes).toEqual(['G4 P0.01\n', '?']);
-    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(writes[0]).toBe('G4 P0.01\n');
+    expect(writes[1]).toBe('?');
+    expect(writes.join('')).toContain('G1 X1 Y1');
+    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
   });
 
   it('reserves the arming window against concurrent console accessory commands', async () => {

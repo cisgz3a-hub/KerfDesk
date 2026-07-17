@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../../core/scene';
 import {
-  LASER_MODE_DISABLED_AT_START_MESSAGE,
   LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE,
   createLaserModeStartEvidence,
   laserModeStartEvidenceIssue,
@@ -63,6 +62,17 @@ describe('laser-mode Start acknowledgement', () => {
       }),
     ).toBe(true);
     expect(laserModeStartAcknowledgementRequired(project, knownSnapshot)).toBe(false);
+  });
+
+  it('covers a reported $32=0 with the acknowledgement instead of a block (frame-first)', () => {
+    // ADR-228: the $32=0 pre-block is deleted; the Job Review acknowledgement
+    // banner is exactly the surface that carries a reported-disabled $32.
+    expect(
+      laserModeStartAcknowledgementRequired(createProject(), {
+        ...knownSnapshot,
+        laserModeEnabled: false,
+      }),
+    ).toBe(true);
   });
 
   it('never adds the laser acknowledgement to a CNC/router Start', () => {
@@ -135,7 +145,10 @@ describe('laser-mode evidence at the first job-write boundary', () => {
     ).toMatch(/not verified/i);
   });
 
-  it('refuses a fresh $32=0 report even when earlier evidence proved $32=1', () => {
+  it('treats a fresh $32=0 report as evidence drift, not a dedicated block', () => {
+    // Frame-first (ADR-228): the $32=0 wire refusal is deleted. A flip to
+    // $32=0 after evidence was accepted still refuses — but as the generic
+    // evidence-drift consistency check, which asks for a re-prepared Start.
     expect(
       laserModeStartEvidenceIssue(
         source(false, {
@@ -143,7 +156,27 @@ describe('laser-mode evidence at the first job-write boundary', () => {
         }),
         createLaserModeStartEvidence(knownSnapshot, false),
       ),
-    ).toBe(LASER_MODE_DISABLED_AT_START_MESSAGE);
+    ).toBe(LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE);
+  });
+
+  it('streams a reported $32=0 only under the informed acknowledgement', () => {
+    const disabledSnapshot: LaserModeStartSnapshot = {
+      ...knownSnapshot,
+      laserModeEnabled: false,
+    };
+
+    expect(
+      laserModeStartEvidenceIssue(
+        source(false),
+        createLaserModeStartEvidence(disabledSnapshot, true),
+      ),
+    ).toBeNull();
+    expect(
+      laserModeStartEvidenceIssue(
+        source(false),
+        createLaserModeStartEvidence(disabledSnapshot, false),
+      ),
+    ).toMatch(/not verified/i);
   });
 
   it('refuses observation, setting, or controller-session drift before job bytes', () => {

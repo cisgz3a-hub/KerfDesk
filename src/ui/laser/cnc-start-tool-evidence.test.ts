@@ -11,6 +11,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { cncToolPlan } from '../state/cnc-tool-plan';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -66,6 +67,8 @@ const machine = {
     flood: false,
     mist: false,
   },
+  // Frame-first (ADR-228): the completed Frame is the sole Start gate.
+  frameVerification: frameVerificationForProject(project),
 };
 
 function prepareFor(toolId: string | undefined) {
@@ -117,16 +120,18 @@ describe('CNC Start tool-bound work-Z evidence', () => {
     }
   });
 
-  it('blocks current evidence for a different or unrecorded bit', () => {
+  it('warns on current evidence for a different or unrecorded bit', () => {
+    // Frame-first (ADR-228): tool/Work-Z identity findings inform the Job
+    // Review instead of refusing the Start the Frame already proved out.
     const wrong = prepareFor('em-6350');
-    expect(wrong.ok).toBe(false);
-    if (!wrong.ok) {
-      expect(wrong.messages.join('\n')).toContain('This job starts with 3.175 mm');
-      expect(wrong.messages.join('\n')).toContain('work Z was established for 6.35 mm');
+    expect(wrong.ok).toBe(true);
+    if (wrong.ok) {
+      expect(wrong.warnings.join('\n')).toContain('This job starts with 3.175 mm');
+      expect(wrong.warnings.join('\n')).toContain('work Z was established for 6.35 mm');
     }
 
     const unknown = prepareFor(undefined);
-    expect(unknown.ok).toBe(false);
-    if (!unknown.ok) expect(unknown.messages.join('\n')).toContain('an unrecorded bit');
+    expect(unknown.ok).toBe(true);
+    if (unknown.ok) expect(unknown.warnings.join('\n')).toContain('an unrecorded bit');
   });
 });

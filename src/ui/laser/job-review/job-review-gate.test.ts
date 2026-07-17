@@ -26,6 +26,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../../state/recovery/testing';
 import { resetStore } from '../../state/test-helpers';
+import { frameVerificationForProject } from '../frame-verification-testing';
 import { useStartBlockerStore } from '../start-blocker-store';
 import { runStartJobFlow } from '../start-job-flow';
 import { useJobReviewStore } from './job-review-store';
@@ -98,6 +99,8 @@ function configureReadyCncStart(): void {
       referenceEpoch: CONTROLLER_EPOCH,
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
     },
+    // The CNC machine compiles a different job, so re-record the Frame for it.
+    frameVerification: frameVerificationForProject(useStore.getState().project),
   });
 }
 
@@ -112,15 +115,16 @@ function reviewState() {
 beforeEach(() => {
   localStorage.clear();
   resetStore();
-  useStore.setState({
-    project: {
-      ...createProject(DEFAULT_DEVICE_PROFILE),
-      scene: {
-        ...EMPTY_SCENE,
-        objects: [lineObject],
-        layers: [createLayer({ id: 'red', color: '#ff0000' })],
-      },
+  const project = {
+    ...createProject(DEFAULT_DEVICE_PROFILE),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [lineObject],
+      layers: [createLayer({ id: 'red', color: '#ff0000' })],
     },
+  };
+  useStore.setState({
+    project,
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
@@ -136,6 +140,9 @@ beforeEach(() => {
       laserModeEnabled: true,
     },
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+    // Frame-first (ADR-228): record the Frame for this exact job so the
+    // review gate — not the frame gate — is what these tests exercise.
+    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
   useStartBlockerStore.getState().clear();

@@ -19,6 +19,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
@@ -68,15 +69,16 @@ const lineObject: SceneObject = {
 describe('exact laser recovery activation', () => {
   beforeEach(() => {
     resetStore();
-    useStore.setState({
-      project: {
-        ...createProject(DEFAULT_DEVICE_PROFILE),
-        scene: {
-          ...EMPTY_SCENE,
-          objects: [lineObject],
-          layers: [createLayer({ id: 'red', color: '#ff0000' })],
-        },
+    const project = {
+      ...createProject(DEFAULT_DEVICE_PROFILE),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [lineObject],
+        layers: [createLayer({ id: 'red', color: '#ff0000' })],
       },
+    };
+    useStore.setState({
+      project,
       selectedObjectId: null,
       additionalSelectedIds: new Set(),
     });
@@ -96,6 +98,10 @@ describe('exact laser recovery activation', () => {
         laserModeEnabled: true,
       },
       controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+      // Frame-first (ADR-228): the seeding Start and every recovery
+      // re-prepare require a Frame recorded for this exact compiled job and
+      // origin identity (null WCO, work origin inactive in this harness).
+      frameVerification: frameVerificationForProject(project),
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareAlert).mockClear();

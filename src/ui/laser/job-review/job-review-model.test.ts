@@ -16,6 +16,7 @@ import { captureLaserModeStartSnapshot } from '../../state/laser-mode-start-evid
 import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
 import { resetStore } from '../../state/test-helpers';
+import { frameVerificationForProject } from '../frame-verification-testing';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from '../laser-mode-start-acknowledgement';
 import { prepareCurrentStartJob } from '../start-job-source';
 import { buildJobReviewModel, type JobReviewModel } from './job-review-model';
@@ -89,6 +90,11 @@ afterEach(() => {
 });
 
 async function buildModelFromCurrentStores(): Promise<JobReviewModel> {
+  // Frame-first (ADR-228): a recorded Frame for the exact current job is the
+  // one Start gate; record it here so prepare succeeds for every arrangement.
+  useLaserStore.setState({
+    frameVerification: frameVerificationForProject(useStore.getState().project),
+  });
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
@@ -145,6 +151,27 @@ describe('buildJobReviewModel', () => {
       kind: 'laser-unverified',
       prompt: LASER_MODE_UNVERIFIED_START_PROMPT,
     });
+  });
+
+  it('carries the acknowledgement and a warning — not a block — for a reported $32=0', async () => {
+    // Frame-first (ADR-228): $32=0 no longer refuses the Start anywhere. The
+    // readiness error joins the review warnings and the $32 acknowledgement
+    // banner covers the reported-disabled case.
+    useLaserStore.setState({
+      controllerSettings: {
+        maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
+        minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
+        laserModeEnabled: false,
+      },
+    });
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.acknowledgement).toEqual({
+      kind: 'laser-unverified',
+      prompt: LASER_MODE_UNVERIFIED_START_PROMPT,
+    });
+    expect(model.warnings).toContainEqual(expect.stringContaining('$32=0'));
   });
 
   it('summarizes a CNC job with the tool plan and the exact attestation prompt', async () => {
