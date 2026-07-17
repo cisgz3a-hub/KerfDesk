@@ -135,11 +135,16 @@ describe('controller readiness without $-settings (Marlin)', () => {
     expect(result.warnings.map((w) => w.code)).toContain('power-scale-unverified');
   });
 
-  it('still enforces $30/$32 proof for grbl-dollar firmwares', () => {
+  it('warns when a grbl-dollar firmware has not reported $30/$32 yet', () => {
     const project = {
       device: DEFAULT_DEVICE_PROFILE,
     } as unknown as Parameters<typeof runControllerReadiness>[0];
     const result = runControllerReadiness(project, null, 'grbl-dollar');
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.map((warning) => warning.code)).toEqual([
+      'power-scale-unverified',
+      'laser-mode-unverified',
+    ]);
   });
 });
