@@ -9512,6 +9512,9 @@ from pinned hashes, OFL notices and attribution ship in web and desktop
 distributions, and tests prove all four outputs remain finite and open. The
 fonts are also usable for single-pass laser line engraving, but their product
 labeling and default machining policy remain CNC-oriented.
+
+---
+
 ## ADR-227 - Status-bar Update button replaces the PWA update popup
 
 **Date:** 2026-07-17
