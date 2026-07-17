@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.4 — named artwork operations (ADR-211); MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.5 — pre-start Job Review dialog (ADR-224), machine-rail control order and go-green coaching (ADR-225), CNC canvas readout family (ADR-216..221); ADR tail at 226. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 

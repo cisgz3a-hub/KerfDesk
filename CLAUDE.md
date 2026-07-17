@@ -106,7 +106,7 @@ platform/ ← imports from: core/, platform/types, nothing in ui/ or io/
 ui/    ← imports from: core/, io/, platform/types (never platform/web or platform/electron directly)
 ```
 
-Enforced by `eslint-plugin-boundaries`. Violation is a CI fail, not a warning.
+Enforced by `eslint-plugin-boundaries`. Violation is a CI fail, not a warning. Two scoped exceptions, both deliberate: `src/ui/app/main.tsx` is the composition root and may wire `platform/web` → `ui` (ADR-011), and **test files (`*.test.ts`, `*.test.tsx`) plus `src/__fixtures__/` are exempt from boundary enforcement** — a test may import across modules for scaffolding. Do not read the exemption as license to couple production code through a test.
 
 Cross-module imports must go through `index.ts`. Reaching into `../scene/internal/foo.ts` from outside `scene/` is forbidden.
 
