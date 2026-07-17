@@ -332,6 +332,18 @@ describe('handleLine streamer writes', () => {
   });
 });
 
+describe('handleLine controller reset boundary', () => {
+  it('clears the cached active WCS on a reset banner (C6)', () => {
+    const { refs, set, get } = makeHarness();
+    set({ activeWcs: 'G55' });
+    // A reset re-initializes the parser's modal state ($N runs fresh), so the
+    // pre-reset selection is stale the moment the banner lands.
+    handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
+    expect(get().detectedControllerKind).toBe('grbl-v1.1');
+    expect(get().activeWcs).toBeNull();
+  });
+});
+
 describe('handleLine alarm terminates paused streams', () => {
   // GRBL keeps acking held lines during a feed hold, so a paused stream
   // routinely has an empty in-flight tail. An alarm then must still cancel

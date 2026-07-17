@@ -130,6 +130,39 @@ describe('laser-store machine settings', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
+  it('re-reads the active WCS once a post-reset settings re-qualification completes (C6)', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+
+    // Mid-session the operator selects G55; the controller then reboots and
+    // reverts to its own startup modal state, so the cached selection is stale
+    // the moment the banner lands.
+    useLaserStore.setState({ activeWcs: 'G55' });
+    connection.emitLine('Grbl 1.1f');
+    await flush();
+    expect(useLaserStore.getState().activeWcs).toBeNull();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    writes.length = 0;
+
+    // The post-reset re-qualification action (refs.runControllerQualification).
+    const read = useLaserStore.getState().readMachineSettings();
+    await flush();
+    connection.emitLine('$30=900');
+    connection.emitLine('ok');
+    await read;
+    await flush();
+
+    // Re-qualification re-issues the modal query; the fake connection's
+    // [GC:...G54...] auto-reply re-seeds the advisory without stranding the fence.
+    expect(writes).toContain('$G\n');
+    expect(useLaserStore.getState().activeWcs).toBe('G54');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
   it('does not let an earlier console acknowledgement terminate a new settings read', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

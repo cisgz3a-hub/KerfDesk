@@ -224,6 +224,9 @@ function handleWelcomeLine(
     lastSettingsReadAt: null,
     alarmCode: null,
     wcoCache: null,
+    // A reset re-initializes the parser's modal state ($N runs fresh), so the
+    // cached WCS selection is stale until re-qualification re-reads $G (C6).
+    activeWcs: null,
     ovCache: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,

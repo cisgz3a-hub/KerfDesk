@@ -7,6 +7,7 @@ import { grblSettingMachineKindIssue } from '../../core/controllers/grbl/grbl-se
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from './store';
+import { requestActiveWcsReadback } from './active-wcs-readback';
 import { beginSettingsCollection } from './detected-settings-action';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import {
@@ -100,6 +101,10 @@ async function readMachineSettingsAction(
     });
     finishSettingsQualification(set, get, refs, qualificationEpoch);
     clearInteractiveOperation(set, qualificationEpoch);
+    // A reset banner nulls activeWcs and this action is the post-reset
+    // re-qualification (refs.runControllerQualification), so a completed read
+    // is the earliest safe point to re-seed the C6 advisory's modal state.
+    await requestActiveWcsReadback(get, refs.driver, write, qualificationEpoch);
   } catch (err) {
     failSettingsOperation(set, refs, qualificationEpoch, 'read', err);
   }
