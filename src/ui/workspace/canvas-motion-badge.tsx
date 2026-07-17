@@ -192,8 +192,13 @@ function badgeMessage(
       ? ` • Z ${run.reportedHead.z.toFixed(2)} mm`
       : '';
   const reason = run.accuracyReason === null ? '' : ` • ${run.accuracyReason}`;
-  const relativeLabel = relative ? ' • relative view — physical bed position unverified' : '';
-  return `${truth} • ${state}${elapsedBadgeText(run, nowMs)}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}${relativeLabel}`;
+  // A running origin-anchored job can intentionally use the artwork-relative
+  // frame when the machine has no trusted absolute bed coordinates. Its live
+  // beam/trail is still controller-reconciled in the job frame, so repeating
+  // the idle bed-position warning here incorrectly makes a valid run look
+  // unverified. Any real live-position limitation is already carried by the
+  // plan capability and accuracy reason.
+  return `${truth} • ${state}${elapsedBadgeText(run, nowMs)}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}`;
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

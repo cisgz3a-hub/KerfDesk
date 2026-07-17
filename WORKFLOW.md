@@ -1137,14 +1137,20 @@ separate exact replay receipt.
    controller-setting writes start one epoch-bound qualification flow. GRBL-family
    controllers own one `$$` read after fresh Idle; unsupported dumps are
    `not-required`, and late prior-epoch replies are ignored.
-2. Start is inline-disabled with **Reading controller settings…** while qualifying.
-   Failure shows **Retry reading controller settings** and Reconnect. Real `$30`,
-   `$32`, Alarm/non-Idle, current-tool, and Work-Z mismatches still refuse Start.
-3. **Forget Controller** safely stops active motion when possible, closes/revokes
+2. Ordinary **Laser Start stays available** when settings qualification is incomplete or
+   failed once no settings transaction owns the serial controller. Missing `$30`/`$32` evidence
+   is shown in Job Review and uses the existing unverified-laser-mode acknowledgement; a failed
+   settings read alone is not a dead-button gate. A known `$30` mismatch or known `$32=0` still
+   refuses Laser Start.
+3. **CNC Start and supervised recovery remain inline-disabled** with **Reading controller
+   settings…** until qualification is current. Failure shows **Retry reading controller
+   settings** and Reconnect. Alarm/non-Idle, current-tool, and Work-Z mismatches still refuse
+   Start.
+4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,
    libraries, and preferences. It does not send `$RST=*` or factory-reset EEPROM.
-4. An ordinary Idle Forget has no error dialog. If transport failure leaves motion
+5. An ordinary Idle Forget has no error dialog. If transport failure leaves motion
    uncertain, the physical-safety warning remains instead of claiming a clean stop.
 
 ---

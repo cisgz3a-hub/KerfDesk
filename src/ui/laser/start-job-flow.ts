@@ -21,7 +21,7 @@ import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
-import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
+import { normalStartQualificationBlockMessage } from '../state/laser-controller-qualification';
 import {
   createRunId,
   recoveryRepository,
@@ -89,13 +89,13 @@ async function runStartJobFlowWithCheckpoint(
 ): Promise<void> {
   useStartBlockerStore.getState().clear();
   const laser = useLaserStore.getState();
-  if (blockUnqualifiedStart(laser)) return;
+  const app = useStore.getState();
+  if (blockUnqualifiedStart(machineKindOf(app.project.machine), laser)) return;
   const initialCheckpointIssue = checkpointStartIssue(checkpointToReplace);
   if (initialCheckpointIssue !== null) {
     reportBlockedStart(initialCheckpointIssue);
     return;
   }
-  const app = useStore.getState();
   const { project } = app;
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
@@ -205,8 +205,12 @@ async function repairOrReportBlockedStart(
   return 'blocked';
 }
 
-function blockUnqualifiedStart(laser: ReturnType<typeof useLaserStore.getState>): boolean {
-  const message = controllerQualificationStartBlockMessage(
+function blockUnqualifiedStart(
+  machineKind: ReturnType<typeof machineKindOf>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+): boolean {
+  const message = normalStartQualificationBlockMessage(
+    machineKind,
     laser.controllerQualification,
     laser.controllerSessionEpoch,
   );

@@ -43,6 +43,8 @@ export function runControllerReadiness(
 ): ControllerReadinessResult {
   const errors: Array<ControllerReadinessMessage<ControllerReadinessErrorCode>> = [];
   const warnings: Array<ControllerReadinessMessage<ControllerReadinessWarningCode>> = [];
+  const cncMachine =
+    project.machine !== undefined && project.machine.kind === 'cnc' ? project.machine : null;
 
   // Firmwares with NO numeric $-settings dump at all (Marlin, Smoothie)
   // cannot prove $30/$32 agreement. The power scale then rests on the device
@@ -50,8 +52,6 @@ export function runControllerReadiness(
   // ADR-095). Firmwares with a READ-ONLY dump (FluidNC) fall through to the
   // verification below: what they report is checked (audit F6).
   if (settingsCapability === 'none') {
-    const cncMachine =
-      project.machine !== undefined && project.machine.kind === 'cnc' ? project.machine : null;
     warnings.push({
       code: 'power-scale-unverified',
       message:
@@ -63,10 +63,15 @@ export function runControllerReadiness(
   }
 
   if (controller === null) {
+    // An unavailable settings read is not proof that a laser is configured
+    // incorrectly. Let the profile assumptions reach Job Review as warnings,
+    // matching controllers that expose no settings dump at all. CNC remains
+    // strict because unknown $30/$32 changes spindle and plunge semantics.
+    if (cncMachine === null) return laserReadiness(project, {}, 'warn');
     errors.push({
       code: 'controller-settings-unknown',
       message:
-        'Controller settings are not confirmed yet. Connect to the laser and wait for $$ detection before starting.',
+        'Controller settings are not confirmed yet. Reconnect or retry reading settings before starting CNC output.',
     });
     return { ok: false, errors, warnings };
   }
@@ -83,19 +88,22 @@ export function runControllerReadiness(
   // Spindle/router machines invert the laser rules: $32 must be OFF and $30
   // is the spindle's max RPM, not the laser S scale (F-CNC provenance header:
   // "; assumes: ... $32=0 (router mode)").
-  const machine = project.machine;
-  if (machine !== undefined && machine.kind === 'cnc') {
-    return cncReadiness(machine.params.spindleMaxRpm, controller, absentPolicy);
+  if (cncMachine !== null) {
+    return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy);
   }
-  return laserReadiness(project, controller, absentPolicy);
+  // Missing laser settings are review warnings; known mismatches are still
+  // errors inside laserReadiness. This prevents a partial/failed $$ response
+  // from becoming a dead Start button while preserving proven hazard blocks.
+  return laserReadiness(project, controller, 'warn');
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
 type ReadinessWarnings = Array<ControllerReadinessMessage<ControllerReadinessWarningCode>>;
 
-// What to do when the dump did not report a setting: 'error' blocks Start
-// (grbl-dollar — a real $$ always reports these), 'warn' states the gap and
-// proceeds (readonly-dump — a compat dump may be incomplete; audit F6).
+// What to do when the dump did not report a setting: 'error' blocks Start;
+// 'warn' states the gap and proceeds through Job Review. Laser uses the
+// warning path for missing evidence; CNC uses it only for partial read-only
+// compatibility dumps.
 type AbsentSettingPolicy = 'error' | 'warn';
 
 function cncReadiness(
@@ -165,7 +173,7 @@ function laserReadiness(
     } else {
       warnings.push({
         code: 'power-scale-unverified',
-        message: `The controller's settings dump did not include $30, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`,
+        message: `Controller settings did not confirm $30, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`,
       });
     }
   } else if (controller.maxPowerS !== project.device.maxPowerS) {
@@ -186,7 +194,7 @@ function laserReadiness(
       warnings.push({
         code: 'laser-mode-unverified',
         message:
-          "The controller's settings dump did not include $32, so laser mode is NOT verified against the firmware. Confirm $32=1 in the controller's configuration before burning.",
+          'Controller settings did not confirm $32, so laser mode is NOT verified against the firmware. Confirm $32=1 in the controller configuration before burning.',
       });
     }
   } else if (!controller.laserModeEnabled) {

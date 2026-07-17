@@ -1,6 +1,7 @@
 import type { JobCheckpoint } from '../../core/recovery';
+import { machineKindOf } from '../../core/scene';
 import { useCameraStore } from '../state/camera-store';
-import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
+import { normalStartQualificationBlockMessage } from '../state/laser-controller-qualification';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import { useStore } from '../state/store';
@@ -56,7 +57,8 @@ export function currentLaserForAuthorizedStartNow(
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();
-  const qualificationIssue = controllerQualificationStartBlockMessage(
+  const qualificationIssue = normalStartQualificationBlockMessage(
+    machineKindOf(useStore.getState().project.machine),
     current.controllerQualification,
     current.controllerSessionEpoch,
   );

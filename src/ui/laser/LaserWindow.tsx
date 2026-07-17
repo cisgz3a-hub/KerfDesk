@@ -26,7 +26,7 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useStartBlockerStore } from './start-blocker-store';
-import { controllerQualificationStartBlockMessage } from '../state/laser-controller-qualification';
+import { normalStartQualificationBlockMessage } from '../state/laser-controller-qualification';
 import { useToastStore } from '../state/toast-store';
 
 export function LaserWindow(): JSX.Element {
@@ -93,7 +93,8 @@ export function LaserWindow(): JSX.Element {
       <ProbePanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
-        startDisabledReason={qualificationStartDisabledReason(
+        startDisabledReason={normalStartQualificationBlockMessage(
+          machineKind,
           controllerQualification,
           controllerSessionEpoch,
         )}
@@ -149,13 +150,6 @@ function useControllerActions(): {
     wakeController: useLaserStore((s) => s.wakeController),
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
   };
-}
-
-function qualificationStartDisabledReason(
-  qualification: ReturnType<typeof useLaserStore.getState>['controllerQualification'],
-  currentEpoch: number,
-): string | null {
-  return controllerQualificationStartBlockMessage(qualification, currentEpoch);
 }
 
 function CollapsedMachineRail(props: {
