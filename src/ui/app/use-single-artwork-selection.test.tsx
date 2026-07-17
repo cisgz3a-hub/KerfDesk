@@ -81,11 +81,47 @@ describe('useSingleArtworkSelection (ADR-222)', () => {
     expect(useStore.getState().selectedObjectId).toBe('A');
   });
 
-  it('re-marks the lone artwork after Escape / empty-canvas deselect', async () => {
+  it('allows the lone artwork to stay deselected after Escape / empty-canvas click', async () => {
     mountHarness();
     await settle(() => {
       useStore.getState().importSvgObject(svgObj('A', [RED]));
+    });
+    expect(useStore.getState().selectedObjectId).toBe('A');
+
+    await settle(() => {
       useStore.getState().selectObject(null);
+    });
+    expect(useStore.getState().selectedObjectId).toBeNull();
+  });
+
+  it('keeps manual deselection through unrelated project edits', async () => {
+    mountHarness();
+    await settle(() => {
+      useStore.getState().importSvgObject(svgObj('A', [RED]));
+    });
+    await settle(() => {
+      useStore.getState().selectObject(null);
+    });
+
+    await settle(() => {
+      useStore.setState((state) => ({ project: { ...state.project, notes: 'Operator note' } }));
+    });
+    expect(useStore.getState().selectedObjectId).toBeNull();
+  });
+
+  it('marks a newly opened project even when its lone artwork reuses the same id', async () => {
+    mountHarness();
+    const project = () => projectWith([svgObj('A', [RED])], [createLayer({ id: RED, color: RED })]);
+    await settle(() => {
+      useStore.getState().setProject(project());
+    });
+    await settle(() => {
+      useStore.getState().selectObject(null);
+    });
+    expect(useStore.getState().selectedObjectId).toBeNull();
+
+    await settle(() => {
+      useStore.getState().setProject(project());
     });
     expect(useStore.getState().selectedObjectId).toBe('A');
   });

@@ -92,7 +92,7 @@
 | ADR-219 | 2026-07-16 | Accepted | Centerline arc-length quadratic fairing (anti-wobble stage) |
 | ADR-220 | 2026-07-16 | Accepted | Show the live spindle RPM on the CNC canvas motion badge |
 | ADR-221 | 2026-07-17 | Accepted | Show wall-clock elapsed job time on the canvas motion badge |
-| ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes keep the artwork selected |
+| ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes select the artwork by default |
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
 | ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
 | ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
@@ -9260,7 +9260,7 @@ stamp simply omit it.
 
 ---
 
-## ADR-222 - Single-artwork scenes keep the artwork selected
+## ADR-222 - Single-artwork scenes select the artwork by default
 
 **Status:** Accepted | **Date:** 2026-07-17
 
@@ -9270,33 +9270,37 @@ stamp simply omit it.
 ### Context
 
 The dominant workflow is one design on the bed. A fresh import already selects its artwork
-(F-A3), but Open project, New, undo/redo, deleting down to the last object, and every deselect
-(Escape, empty-canvas click, marquee miss) landed on "Nothing selected". The Selected-artwork
-inspector and the per-operation settings hang off the selection, so the panel blanked out and
-the operator had to click the only object in the scene to get its settings back. Maintainer
-direction (2026-07-16): "artwork should always be marked; if there is only one artwork it
-should be selected by default."
+(F-A3), but Open project, undo/redo, and deleting down to the last object could land on
+"Nothing selected". The Selected-artwork inspector and per-operation settings hang off the
+selection, so the operator had to click the only object to get them back. The first ADR-222
+implementation interpreted "selected by default" as "always selected" and immediately
+re-marked the artwork after Escape, an empty-canvas click, or a marquee miss. Maintainer
+clarification (2026-07-17): mark it from the start, then let the operator unmark it.
 
 ### Decision
 
-An App-mounted store subscription (`useSingleArtworkSelection`, the same hook pattern as the
-ADR-214 fairing upgrade) re-selects the scene's only artwork whenever the selection is empty.
-`loneSelectableArtworkId` defines "only artwork": exactly one scene object that is not the
-registration jig / captured-board outline (ADR-057 / ADR-124 placement aids, never counted and
-never auto-selected). The lone artwork must also be selectable - locked artwork stays
-unselected (Lock Selection deliberately clears the selection), as does artwork on a hidden
-layer. Scenes with zero or two-plus artworks keep normal deselect semantics.
+An App-mounted subscription (`useSingleArtworkSelection`) applies the default at mount and when
+the scene enters a new one-selectable-artwork state. It compares the previous and next lone
+artwork ids and never reacts to selection-only changes, so an explicit deselect remains
+authoritative. Project Open applies the same default in `setProject`, including when two
+different projects reuse the same object id. `loneSelectableArtworkId` defines "only artwork":
+exactly one scene object that is not the registration jig / captured-board outline (ADR-057 /
+ADR-124 placement aids, never counted and never auto-selected). The lone artwork must also be
+selectable; locked artwork and artwork on a hidden layer stay unselected.
+
+A stationary right-button release on empty canvas clears selection before opening the empty
+workspace context bar. The pointer-event path accepts `pointerup` (as well as legacy `mouseup`),
+while a right-button drag beyond the context-click tolerance remains a pan and does not alter
+selection.
 
 ### Consequences
 
-- Deliberate divergence from LightBurn, which allows an empty selection with a single object;
-  maintainer-directed 2026-07-16.
-- While a scene's only artwork is selectable, an empty selection is unreachable: Escape and
-  empty-canvas clicks re-mark it, and the status bar does not show "Nothing selected". Arrow-key
-  nudges therefore always have a target in that state (already true immediately after import).
-- "Selected artwork only" output scope cannot be armed with an empty selection in a
-  single-artwork scene.
-- The re-mark changes selection state only - no undo entry, no dirty flag.
+- Import, Open, undo/redo into a lone-artwork scene, and deleting down to one selectable artwork
+  start with that artwork selected.
+- Escape, an empty-space left click or marquee miss, and a stationary empty-space right click
+  clear the selection and leave it clear until the operator selects artwork or the scene enters
+  a different lone-artwork state.
+- Default selection changes selection state only: it creates no undo entry and no dirty flag.
 ---
 
 ## ADR-223 - Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice

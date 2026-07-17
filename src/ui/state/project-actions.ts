@@ -1,4 +1,5 @@
 import { createProject, machineKindOf, type Project } from '../../core/scene';
+import { loneSelectableArtworkId } from './lone-selectable-artwork';
 import { currentMaterialLibraryState } from './material-library-actions';
 import { resolveProjectMachineCapability } from './project-machine-capability';
 import { currentSavedLibrariesState } from './saved-libraries-actions';
@@ -25,6 +26,8 @@ export function projectActions(
         cachedCncMachine: resolution.cachedCncMachine,
         dirty: resolution.loadResult.kind === 'capability-repaired',
       }));
+      const loneArtworkId = loneSelectableArtworkId(resolution.project.scene);
+      if (loneArtworkId !== null) get().selectObject(loneArtworkId);
       return resolution.loadResult;
     },
     newProject: () =>
