@@ -213,7 +213,11 @@ const MAX_TIP_ANGLE_DEG = 180;
 
 function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
-  const tools = raw.flatMap((tool) => normalizeCncTool(tool) ?? []);
+  const tools: Array<Record<string, unknown>> = [];
+  for (const tool of raw) {
+    const normalized = normalizeCncTool(tool);
+    if (normalized !== null) tools.push(normalized);
+  }
   return tools.length > 0 ? tools : DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
 }
 
