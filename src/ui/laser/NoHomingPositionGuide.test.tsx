@@ -53,6 +53,8 @@ afterEach(() => {
     statusReport: null,
     alarmCode: null,
     controllerOperation: null,
+    workOriginActive: false,
+    wcoCache: null,
   });
   vi.restoreAllMocks();
 });
@@ -146,6 +148,74 @@ describe('NoHomingPositionGuide', () => {
       expect(setOriginHere).toHaveBeenCalledTimes(1);
       expect(useStore.getState().jobPlacement.startFrom).toBe('verified-origin');
       expect(host.textContent).toContain('Hand position ready');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // A custom work origin means positioning is already settled — the card must
+  // leave the rail once the operator clicks Set origin here (maintainer,
+  // 2026-07-17). Reset origin brings it back.
+  it('hides once a custom work origin is active', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Idle'),
+      capabilities: { ...originalLaser.capabilities, sleep: true },
+      workOriginActive: true,
+    });
+    const host = document.createElement('div');
+    const root = await renderGuide(host);
+    try {
+      expect(host.textContent).toBe('');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('dismisses a stale released-motors step when origin is set outside the guide', async () => {
+    const releaseMotors = vi.fn(async () => undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Idle'),
+      capabilities: { ...originalLaser.capabilities, sleep: true },
+      releaseMotors,
+    });
+    const host = document.createElement('div');
+    const root = await renderGuide(host);
+    try {
+      await act(async () => {
+        button(host, 'Release motors to move by hand').click();
+        await Promise.resolve();
+      });
+      expect(host.textContent).toContain('Waiting for Sleep');
+      // Operator wakes the controller elsewhere, jogs, and clicks Set origin
+      // here — the guide's sticky step must not keep claiming motors are
+      // released.
+      await act(async () =>
+        useLaserStore.setState({ statusReport: status('Idle'), workOriginActive: true }),
+      );
+      expect(host.textContent).toBe('');
+      // Reset origin re-opens the guide at its entry step, not the stale one.
+      await act(async () => useLaserStore.setState({ workOriginActive: false }));
+      expect(host.textContent).toContain('release the motors');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('still guides hand positioning while the controller sleeps with no origin', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Sleep'),
+      capabilities: { ...originalLaser.capabilities, sleep: true },
+      workOriginActive: false,
+      wcoCache: null,
+    });
+    const host = document.createElement('div');
+    const root = await renderGuide(host);
+    try {
+      expect(button(host, 'Use this position')).toHaveProperty('disabled', false);
     } finally {
       await act(async () => root.unmount());
     }

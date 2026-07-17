@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useLaserStore } from '../state/laser-store';
+import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { sectionCaptionStyle } from './JobControls.styles';
@@ -26,6 +26,17 @@ type GuideActions = {
   readonly onUnlock: () => void;
 };
 
+// Phases whose feedback must survive an active origin: 'releasing' runs before
+// the $SLP ack clears the origin, and the wake/unlock chain must never strand
+// the operator mid-recovery.
+const ORIGIN_TRANSACTION_PHASES: ReadonlyArray<GuidePhase> = [
+  'releasing',
+  'waking',
+  'alarmed',
+  'waiting-idle',
+  'setting-origin',
+];
+
 export function NoHomingPositionGuide(props: {
   readonly disabled: boolean;
   readonly streaming: boolean;
@@ -35,9 +46,18 @@ export function NoHomingPositionGuide(props: {
   const status = useLaserStore((state) => state.statusReport?.state ?? null);
   const canSleep = useLaserStore((state) => state.capabilities.sleep);
   const canUnlock = useLaserStore((state) => state.capabilities.unlock);
-  const actions = useGuideActions(connection.kind === 'connected', status);
+  const workOriginActive = useLaserStore((state) => state.workOriginActive);
+  const wcoCache = useLaserStore((state) => state.wcoCache);
+  const originSettled = workOriginActive || hasCustomOrigin(wcoCache);
+  const actions = useGuideActions(connection.kind === 'connected', status, originSettled);
   if (homingEnabled) return null;
   const phase = status === 'Sleep' && actions.phase === 'idle' ? 'positioning' : actions.phase;
+  // A custom work origin means positioning is already settled — Set origin
+  // here is the flow's whole destination, so the card leaves the rail the
+  // moment one exists (however it was set) and returns when the origin is
+  // cleared. Releasing motors and Sleep both clear the origin in the store,
+  // so a genuine hand-position run is never hidden by this.
+  if (originSettled && !ORIGIN_TRANSACTION_PHASES.includes(phase)) return null;
   const normalBusy = props.disabled || props.streaming || status !== 'Idle';
   return (
     <section aria-label="Position job" style={guideStyle}>
@@ -54,7 +74,11 @@ export function NoHomingPositionGuide(props: {
   );
 }
 
-function useGuideActions(connected: boolean, status: string | null): GuideActions {
+function useGuideActions(
+  connected: boolean,
+  status: string | null,
+  originSettled: boolean,
+): GuideActions {
   const [phase, setPhase] = useState<GuidePhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const setJobPlacement = useStore((state) => state.setJobPlacement);
@@ -78,6 +102,17 @@ function useGuideActions(connected: boolean, status: string | null): GuideAction
       setError(null);
     }
   }, [connected]);
+  // An origin set outside a live transaction (Set origin here, or the flow's
+  // own completion) makes any parked step stale — 'positioning' would keep
+  // claiming released motors after the operator woke the controller
+  // elsewhere, and 'ready'/'failed' would resurface out of context after a
+  // later Reset origin. Park back at idle so the card re-opens fresh.
+  useEffect(() => {
+    if (!originSettled) return;
+    if (phase !== 'positioning' && phase !== 'ready' && phase !== 'failed') return;
+    setPhase('idle');
+    setError(null);
+  }, [originSettled, phase]);
   useEffect(() => {
     if (phase !== 'waiting-idle' || status !== 'Idle') return;
     setPhase('setting-origin');
