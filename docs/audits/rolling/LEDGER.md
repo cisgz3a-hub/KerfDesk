@@ -21,6 +21,7 @@ One line per 30-minute audit iteration. Areas rotate; pick the least-recently co
 | 2026-07-17 10:50* | origin/main 5ab41815 | PERCEPTUAL pass 3 — raster emitter fidelity (*cron fired early; passes are sequential) | [report](2026-07-17-1050-perceptual-raster-fidelity.md) | 0 | 0 | 0 |
 | 2026-07-17 11:24 | origin/main b8f773e5 | CNC GRBL G-code emitter (6-dim adversarial review, 21 raised → 6 distinct) | [report](2026-07-17-1124-cnc-gcode-emitter.md) | 0 | 0 | 6 |
 | 2026-07-17 12:00 | origin/main b8f773e5 | DXF importer (6-dim adversarial review, 28 raised, 0 refuted → 1 P2 + 6 P3) | [report](2026-07-17-1200-dxf-importer.md) | 0 | 1 | 6 |
+| 2026-07-17 12:31 | origin/main b8f773e5 | LightBurn importers .lbrn/.clb/.lbdev (6-dim review, 25 raised, 1 refuted → 2 P2 + 6 P3) | [report](2026-07-17-1231-lightburn-importers.md) | 0 | 2 | 6 |
 
 **"Fix all" session (08:30–10:05):** every open P1/P2 and 13 of 16 P3s fixed via PRs #262 #263 #264 #265 #267 #268 #269 #271 #272 (plus #260 earlier). Deferred with reasons: audit-level policy (needs a level/override decision), Weld cross-color parity + curve-preserving booleans (need LightBurn reference verification / design), e2e-gates-deploy (new blocking gate — needs explicit ADR-206 approval).
 
