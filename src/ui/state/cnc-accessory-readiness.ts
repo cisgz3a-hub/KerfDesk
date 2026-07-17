@@ -59,6 +59,11 @@ export function cncAccessoryStartIssue(
   );
 }
 
+/** Stable head of the override refusal (the tail embeds live percentages),
+ * exported so the blocked-Start fix offers can recognize it. */
+export const CNC_OVERRIDE_BLOCK_PREFIX =
+  'CNC Start blocks increased or invalid controller overrides.';
+
 export function cncOverrideStartIssue(
   machineKind: MachineKind,
   overrides: OverrideValues | null | undefined,
@@ -71,10 +76,7 @@ export function cncOverrideStartIssue(
     );
   }
   if (overrideIsBaseline(overrides) || overrideIsSafeReduction(overrides)) return null;
-  return (
-    'CNC Start blocks increased or invalid controller overrides. ' +
-    `${overrideValuesLabel(overrides)} Keep feed, rapid, and spindle within 1-100%.`
-  );
+  return `${CNC_OVERRIDE_BLOCK_PREFIX} ${overrideValuesLabel(overrides)} Keep feed, rapid, and spindle within 1-100%.`;
 }
 
 export function cncOverrideStartWarning(

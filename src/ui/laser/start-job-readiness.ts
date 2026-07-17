@@ -43,6 +43,7 @@ import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
 import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
+import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import {
@@ -403,7 +404,7 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
     issues.push('Auto-focus is running. Wait for it to finish before starting a job.');
   }
   if (machine.alarmCode !== null) {
-    issues.push('Controller is in alarm state. Clear the alarm before starting.');
+    issues.push(ALARM_ACTIVE_START_MESSAGE);
   }
   if (machine.statusReport === null) {
     issues.push(
@@ -412,7 +413,7 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
   } else if (machine.statusReport.state === 'Alarm' && machine.alarmCode === null) {
     issues.push(STATUS_ALARM_START_MESSAGE);
   } else if (machine.statusReport.state !== 'Idle') {
-    issues.push(`Machine must be Idle before starting (currently ${machine.statusReport.state}).`);
+    issues.push(machineNotIdleStartMessage(machine.statusReport.state));
   }
   return issues;
 }
