@@ -258,14 +258,27 @@ async function runReadLoop(
       if (done) break;
       const extracted = extractSerialLines(buffer, decoder.decode(value, { stream: true }));
       buffer = extracted.buffer;
-      for (const line of extracted.lines) {
-        for (const h of lineSubs) h(line);
-      }
+      for (const line of extracted.lines) dispatchLine(lineSubs, line);
     }
   } catch (err) {
     console.error('Serial read loop terminated:', err);
   } finally {
     onEnd();
+  }
+}
+
+// Subscriber exceptions must not masquerade as a dropped cable: before this
+// isolation, one throwing handler exited the read loop through catch/finally,
+// closed the streams, and fired onClose — a full mid-job "port closed" — and
+// silently dropped the rest of the chunk's lines. Loop-fatal behavior is
+// reserved for genuine stream errors from reader.read().
+function dispatchLine(lineSubs: Subscribers<string>, line: string): void {
+  for (const h of lineSubs) {
+    try {
+      h(line);
+    } catch (err) {
+      console.error('Serial line handler threw; continuing with remaining lines:', err);
+    }
   }
 }
 

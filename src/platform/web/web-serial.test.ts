@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { extractSerialLines, webSerial } from './web-serial';
 
 const originalSerialDescriptor = Object.getOwnPropertyDescriptor(navigator, 'serial');
@@ -166,6 +166,43 @@ describe('webSerial connection cleanup', () => {
 
     expect(port.close).toHaveBeenCalledTimes(1);
     expect(port.forget).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('webSerial line dispatch isolation', () => {
+  it('keeps the connection alive and delivers remaining lines when a subscriber throws', async () => {
+    // Rolling audit 2026-07-17-0715 P2-1: a throwing line handler exited the
+    // read loop through its catch/finally, closed the streams, and fired
+    // onClose — one subscriber bug became a full mid-job "port closed" that
+    // looked like a cable yank, dropping the rest of the chunk's lines too.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const port = installMockSerial(new MockPort());
+    // Hold the first chunk until subscribers are registered, then release it.
+    let releaseChunk: (result: ReadableStreamReadResult<Uint8Array>) => void = () => undefined;
+    (port.reader.read as Mock).mockImplementationOnce(
+      () =>
+        new Promise<ReadableStreamReadResult<Uint8Array>>((resolve) => {
+          releaseChunk = resolve;
+        }),
+    );
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    const conn = await ref.open({ baudRate: 115200 });
+    const seen: string[] = [];
+    const onClose = vi.fn();
+    conn.onClose(onClose);
+    conn.onLine(() => {
+      throw new Error('subscriber bug');
+    });
+    conn.onLine((line) => seen.push(line));
+    releaseChunk({ done: false, value: new TextEncoder().encode('first\nsecond\n') });
+    await flushMicrotasks();
+
+    // Both lines reach the healthy subscriber; the transport stays up.
+    expect(seen).toEqual(['first', 'second']);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(port.reader.cancel).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
   });
 });
 

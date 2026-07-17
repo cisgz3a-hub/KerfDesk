@@ -35,6 +35,31 @@ describe('webAdapter save target', () => {
   });
 });
 
+describe('webAdapter open picker', () => {
+  const originalOpenPickerDescriptor = Object.getOwnPropertyDescriptor(
+    window,
+    'showOpenFilePicker',
+  );
+
+  afterEach(() => {
+    if (originalOpenPickerDescriptor === undefined) {
+      Reflect.deleteProperty(window, 'showOpenFilePicker');
+    } else {
+      Object.defineProperty(window, 'showOpenFilePicker', originalOpenPickerDescriptor);
+    }
+  });
+
+  it('reports unsupported browsers with the same clear error as the save path', async () => {
+    // The module contract says unsupported browsers "fail clearly"; without a
+    // capability check this was a raw TypeError (audit 2026-07-17-0715 P3-2).
+    Object.defineProperty(window, 'showOpenFilePicker', { configurable: true, value: undefined });
+
+    await expect(
+      webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
+    ).rejects.toThrow(/File System Access API/);
+  });
+});
+
 function installSavePicker(writable: WritableMock): void {
   const handle = {
     kind: 'file',
