@@ -16,6 +16,7 @@ One line per 30-minute audit iteration. Areas rotate; pick the least-recently co
 | 2026-07-17 08:15 | ed40b6d5 | Layers panel + visibility/output parity baseline | [report](2026-07-17-0815-layers-panel-parity.md) | 0 | 0 | 1 |
 | 2026-07-17 10:10 | origin/main 58cb3ae2 | Job Review Start gate (ADR-224, #259) | [report](2026-07-17-1010-job-review-gate.md) | 0 | 0 | 0 |
 | 2026-07-17 10:30 | origin/main 58cb3ae2 | User-Origin preview/render family (#254, #258) | [report](2026-07-17-1030-user-origin-preview-family.md) | 0 | 0 | 0 |
+| 2026-07-17 10:45 | origin/main 58cb3ae2 | PERCEPTUAL pass 1 — SVG import fidelity (rendered) | [report](2026-07-17-1045-perceptual-import-fidelity.md) | 0 | 0 | 0 |
 
 **"Fix all" session (08:30–10:05):** every open P1/P2 and 13 of 16 P3s fixed via PRs #262 #263 #264 #265 #267 #268 #269 #271 #272 (plus #260 earlier). Deferred with reasons: audit-level policy (needs a level/override decision), Weld cross-color parity + curve-preserving booleans (need LightBurn reference verification / design), e2e-gates-deploy (new blocking gate — needs explicit ADR-206 approval).
 
