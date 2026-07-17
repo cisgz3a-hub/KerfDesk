@@ -1,6 +1,14 @@
 name: Browser smoke
 
+# Runs on main pushes as well as PRs so a direct-to-main commit (which
+# happens in this repo) still gets the only automated check that loads the
+# real app in a browser (rolling audit 2026-07-17-0450 P2-1). OBSERVABILITY
+# ONLY on main: deploy.yml gates on the CI workflow alone — making deploys
+# additionally require this workflow would be a new blocking gate and needs
+# explicit maintainer approval per ADR-206 first.
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
