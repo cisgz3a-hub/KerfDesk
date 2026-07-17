@@ -96,6 +96,7 @@
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
 | ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
 | ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
+| ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
 
 ---
 
@@ -9444,3 +9445,64 @@ re-landed after a merge race via #261).
    the Start from dropdown and read as a mystery step. The card reduces to
    plain-language hand-positioning copy plus "Release motors to move by hand";
    the release -> wake -> unlock -> set-origin wizard behind it is unchanged.
+
+---
+
+## ADR-226 - Add four reviewed OFL native-stroke fonts for CNC writing
+
+**Status:** Accepted | **Date:** 2026-07-17
+
+> **Numbering note.** ADR-222 through ADR-225 landed while this work was in
+> progress; **ADR-226** is the next free number.
+
+### Context
+
+ADR-213 removed an earlier Hershey/EMS/Forge/traced-script bundle because its
+writing quality did not meet the maintainer's request. CNC writing still needs
+native centerline letters: tracing an ordinary TTF outline produces edge
+contours rather than a path down the middle of each stroke. Four initial BGI
+candidates looked suitable, but an asset-level provenance audit found retained
+Borland copyright strings and no authoritative license grant for those binary
+font files. They must not ship as MIT.
+
+A second rendered review selected Relief SingleLine, EMS Nixish, EMS Decorous
+Script, and EMS Casual Hand. Their actual source files identify or accompany
+SIL Open Font License 1.1 terms, and the maintainer explicitly approved the
+four rendered styles.
+
+### Decision
+
+- Bundle Relief SingleLine from `isdat-type/Relief-SingleLine` commit
+  `01dfc5779ec1e9e4b288d96c6c96c23bfccbaf9d`, plus EMS Nixish, EMS Decorous
+  Script, and EMS Casual Hand from `oskay/svg-fonts` commit
+  `8c71f2d9e1a5292047bb88e5595a766241b82cc6`.
+- Pin the canonical remote-byte SHA-256 for every source SVG and both source
+  license files. The generator refuses a changed hash, a missing OFL marker,
+  changed font identity metadata, unsupported path commands, or missing space
+  and fallback glyphs.
+- Generate compact checked-in glyph data. A pure TypeScript parser supports the
+  absolute and relative line/cubic SVG commands used by the reviewed sources
+  and materializes only open geometry. Load the data lazily when a stroke font
+  is first previewed or rendered.
+- Reuse the existing text object's persisted string font key and materialized
+  path contract; no project migration or runtime package is added.
+- Draw each stroke face from its real machining paths in the font picker.
+  Label it single-line and show operation guidance beside the selected font.
+- Fresh CNC layers using a stroke font default to Engrave even with a V-bit.
+  Engrave and Profile on path are compatible; V-carve, Pocket, Fill, and
+  inside/outside profiles require closed outline text.
+- Preserve each source's Latin/extended character coverage. Unsupported
+  Unicode renders the visible `?` fallback instead of silently dropping
+  content.
+
+### Consequences
+
+KerfDesk gains four distinct CNC writing styles that generate one toolpath per
+authored stroke, while the rejected ADR-213 bundle and the unverified BGI
+candidates stay out of the product. Relief retains native Bézier curves; the
+EMS faces retain their authored centerline segments. Outline-font behavior and
+saved materialized geometry remain unchanged. The sources are reproducible
+from pinned hashes, OFL notices and attribution ship in web and desktop
+distributions, and tests prove all four outputs remain finite and open. The
+fonts are also usable for single-pass laser line engraving, but their product
+labeling and default machining policy remain CNC-oriented.

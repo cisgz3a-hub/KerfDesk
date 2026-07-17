@@ -1,7 +1,7 @@
 // generate-third-party-notices.mjs — builds public/third-party-notices.txt
 // from the real license sources: each production dependency's LICENSE file in
-// node_modules, plus the bundled fonts' name-table copyright records with the
-// canonical Apache-2.0 / OFL-1.1 texts (scripts/license-texts/). The output
+// node_modules, plus bundled font copyright records with the canonical
+// Apache-2.0 / OFL-1.1 texts (scripts/license-texts/). The output
 // ships inside dist/web (vite publicDir), which electron-builder also packs,
 // so both distributions carry the notices their licenses require.
 //
@@ -26,6 +26,58 @@ const FONTS = [
   { file: 'src/ui/text/fonts/Inconsolata-Regular.ttf', name: 'Inconsolata', spdx: 'OFL-1.1' },
   { file: 'src/ui/text/fonts/Pacifico-Regular.ttf', name: 'Pacifico', spdx: 'OFL-1.1' },
   { file: 'src/ui/text/fonts/DancingScript-Regular.ttf', name: 'Dancing Script', spdx: 'OFL-1.1' },
+];
+
+const CNC_STROKE_FONTS = [
+  {
+    name: 'Relief SingleLine',
+    file: 'ReliefSingleLineSVG-Regular.svg',
+    source:
+      'https://github.com/isdat-type/Relief-SingleLine/tree/' +
+      '01dfc5779ec1e9e4b288d96c6c96c23bfccbaf9d',
+    sha256: '75f05a5b64ed6039c9816628ee051d98e16c19148a8268c63f5eccf8382479e2',
+    attribution: [
+      'Source SVG notice: Copyright 2021 The Relief SingleLine Project Authors',
+      'OFL distribution notice: Copyright 2022 The Relief SingleLine Project Authors',
+      'Authors: François Chastanet, Noëlie Dayma, Élisa Garzelli',
+    ],
+  },
+  {
+    name: 'EMS Nixish',
+    file: 'EMSNixish.svg',
+    source:
+      'https://gitlab.com/oskay/svg-fonts/-/tree/' +
+      '8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS',
+    sha256: '418b9986220ebce947396af4f918d20266cd42d22d4d141fdd52c8ea20980ec6',
+    attribution: [
+      'Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay',
+      'Derivative of Nixie One; designer Jovanny Lemonad',
+    ],
+  },
+  {
+    name: 'EMS Decorous Script',
+    file: 'EMSDecorousScript.svg',
+    source:
+      'https://gitlab.com/oskay/svg-fonts/-/tree/' +
+      '8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS',
+    sha256: '131fc9b7cead71f7a907aa793b7a862be2acef041209e7a2dedc233a2d53ebfc',
+    attribution: [
+      'Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay',
+      'Derivative of Petit Formal Script; designer Impallari Type',
+    ],
+  },
+  {
+    name: 'EMS Casual Hand',
+    file: 'EMSCasualHand.svg',
+    source:
+      'https://gitlab.com/oskay/svg-fonts/-/tree/' +
+      '8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS',
+    sha256: 'e8c64afb9739ff78b3cd0ae1bfb95d21fb1077eda569e0eef5d262b64da38041',
+    attribution: [
+      'Created by Sheldon B. Michaels; SVG font conversion by Windell H. Oskay',
+      'Derivative of Covered By Your Grace; designer Kimberly Geswein',
+    ],
+  },
 ];
 
 const LICENSE_TEXTS = {
@@ -65,7 +117,17 @@ function fontSections() {
       `Full license text: see the ${spdx} section at the end of this file.`,
     ].join('\n');
   });
-  return outlineFonts;
+  const cncStrokeFonts = CNC_STROKE_FONTS.map((font) =>
+    [
+      `--- Font: ${font.name} (OFL-1.1) ---`,
+      `Source file: ${font.file}`,
+      ...font.attribution,
+      `Pinned source snapshot: ${font.source}`,
+      `Canonical source SHA-256: ${font.sha256}`,
+      'Full license text: see the OFL-1.1 section at the end of this file.',
+    ].join('\n'),
+  );
+  return [...outlineFonts, ...cncStrokeFonts];
 }
 
 function findLicenseFile(depDir) {

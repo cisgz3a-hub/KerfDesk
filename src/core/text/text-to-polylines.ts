@@ -1,6 +1,6 @@
 // textToPolylines — render a TextObject's content into ColoredPath
-// polylines via opentype.js. Pure once the font ArrayBuffer is in
-// hand (no I/O — the caller owns the fetch).
+// polylines. Outline fonts use opentype.js once their ArrayBuffer is in
+// hand; bundled CNC fonts route to their native open-stroke renderer.
 //
 // Algorithm:
 //   1. parse the font with opentype.js
@@ -46,6 +46,7 @@ import {
   translateTextOutline,
   type TextOutlineGeometry,
 } from './text-outline-path';
+import { cncStrokeTextToPolylines } from './cnc-stroke-font';
 
 // Module surface we actually use. Lets the loader narrow the dynamic-
 // import result to something callable without a sprawling cast.
@@ -85,9 +86,11 @@ type TextRenderSharedInput = {
   readonly color: string;
 };
 
-export type TextRenderInput = TextRenderSharedInput & {
-  readonly fontBuffer: ArrayBuffer;
-};
+export type TextRenderInput = TextRenderSharedInput &
+  (
+    | { readonly geometry?: 'outline'; readonly fontBuffer: ArrayBuffer }
+    | { readonly geometry: 'single-line'; readonly fontKey: string }
+  );
 
 export type TextRenderResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -95,6 +98,7 @@ export type TextRenderResult = {
 };
 
 export async function textToPolylines(input: TextRenderInput): Promise<TextRenderResult> {
+  if (input.geometry === 'single-line') return cncStrokeTextToPolylines(input);
   const ot = await loadOpentype();
   const font = ot.parse(input.fontBuffer);
   const lines = input.content.split('\n');
