@@ -19,6 +19,7 @@ One line per 30-minute audit iteration. Areas rotate; pick the least-recently co
 | 2026-07-17 10:45 | origin/main 58cb3ae2 | PERCEPTUAL pass 1 — SVG import fidelity (rendered) | [report](2026-07-17-1045-perceptual-import-fidelity.md) | 0 | 0 | 0 |
 | 2026-07-17 11:10 | origin/main 5ab41815 | PERCEPTUAL pass 2 — emitted fill burn coverage | [report](2026-07-17-1110-perceptual-burn-coverage.md) | 0 | 0 | 0 |
 | 2026-07-17 10:50* | origin/main 5ab41815 | PERCEPTUAL pass 3 — raster emitter fidelity (*cron fired early; passes are sequential) | [report](2026-07-17-1050-perceptual-raster-fidelity.md) | 0 | 0 | 0 |
+| 2026-07-17 11:24 | origin/main b8f773e5 | CNC GRBL G-code emitter (6-dim adversarial review, 21 raised → 6 distinct) | [report](2026-07-17-1124-cnc-gcode-emitter.md) | 0 | 0 | 6 |
 
 **"Fix all" session (08:30–10:05):** every open P1/P2 and 13 of 16 P3s fixed via PRs #262 #263 #264 #265 #267 #268 #269 #271 #272 (plus #260 earlier). Deferred with reasons: audit-level policy (needs a level/override decision), Weld cross-color parity + curve-preserving booleans (need LightBurn reference verification / design), e2e-gates-deploy (new blocking gate — needs explicit ADR-206 approval).
 
