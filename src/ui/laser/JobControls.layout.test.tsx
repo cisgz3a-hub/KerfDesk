@@ -20,20 +20,18 @@ afterEach(() => {
 });
 
 describe('JobControls action hierarchy', () => {
-  // Maintainer-directed order (ADR-225): placement above origin, origin above
-  // the job actions, and the hand-positioning guide last as a fallback.
-  it('orders the rail placement, then origin, then job actions, then the guide', async () => {
+  // Maintainer-directed order (ADR-225, amended 2026-07-17): origin first,
+  // job actions next so Start/Frame stay above the fold on short windows,
+  // placement below them, and the hand-positioning guide last as a fallback.
+  it('orders the rail origin, then job actions, then placement, then the guide', async () => {
     const view = await renderControls();
     try {
-      expect(precedes(startFrom(view.host), button(view.host, 'Set origin here'))).toBe(true);
       expect(precedes(button(view.host, 'Set origin here'), button(view.host, 'Start job'))).toBe(
         true,
       );
+      expect(precedes(button(view.host, 'Start job'), startFrom(view.host))).toBe(true);
       expect(
-        precedes(
-          button(view.host, 'Start job'),
-          button(view.host, 'Release motors to move by hand'),
-        ),
+        precedes(startFrom(view.host), button(view.host, 'Release motors to move by hand')),
       ).toBe(true);
     } finally {
       await view.unmount();

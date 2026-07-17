@@ -9474,6 +9474,8 @@ re-landed after a merge race via #261).
    plain-language hand-positioning copy plus "Release motors to move by hand";
    the release -> wake -> unlock -> set-origin wizard behind it is unchanged.
 
+**Amendment (2026-07-17, same day).** Placement moves below the job actions: the placement block above the cluster pushed Start/Frame under the 720p fold, and the maintainer requires the go-actions visible without scrolling. Final rail order: origin -> job actions -> placement -> hand-positioning guide. Placement stays a set-once compile setting and is re-presented in the pre-start Job Review dialog (ADR-224), so nothing is lost at Start time. The ux-shell e2e restores the hard above-the-fold assertion for Start job and Frame at laptop height.
+
 ---
 
 ## ADR-226 - Add four reviewed OFL native-stroke fonts for CNC writing
