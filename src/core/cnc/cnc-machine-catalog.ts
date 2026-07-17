@@ -68,16 +68,19 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
   {
     id: 'onefinity-woodworker',
     name: 'Onefinity Woodworker',
-    bedWidthMm: 435,
-    bedHeightMm: 435,
+    // Onefinity publishes the Woodworker as a 32″×32″ cut area (807×765 mm);
+    // 16″-class numbers belong to the Machinist, which is not this preset.
+    bedWidthMm: 807,
+    bedHeightMm: 765,
     spindleMaxRpm: 24000,
     note: CONFIRM,
   },
   {
     id: 'onefinity-journeyman',
     name: 'Onefinity Journeyman',
-    bedWidthMm: 840,
-    bedHeightMm: 435,
+    // Published Journeyman cut area is 48″×32″ (1214×765 mm).
+    bedWidthMm: 1214,
+    bedHeightMm: 765,
     spindleMaxRpm: 24000,
     note: CONFIRM,
   },
