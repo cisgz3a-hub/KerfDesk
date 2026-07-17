@@ -54,7 +54,8 @@ import {
   reportStartAuthorizationRefusal,
 } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
-import { offerZeroZForBlockedStart, type StartOfferPolicy } from './start-blocked-zero-z-offer';
+import { offerFixForBlockedStart } from './start-blocked-fix-offers';
+import { type StartOfferPolicy } from './start-blocked-zero-z-offer';
 import { runJobReviewGate } from './job-review';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 
@@ -186,13 +187,17 @@ async function currentLaserForAuthorizedStart(args: {
 
 // Blocks that have a one-click remedy offer it in place instead of
 // dead-ending in an alert. Retried at most once ('no-offers') so a gate that
-// still fails cannot loop the operator through the same dialog.
+// still fails cannot loop the operator through the same dialog. 'handled'
+// (frame trace underway) skips the refusal report entirely — its toast
+// already tells the operator to press Start again after the trace.
 async function repairOrReportBlockedStart(
   messages: ReadonlyArray<string>,
   offerPolicy: StartOfferPolicy,
 ): Promise<'retry' | 'blocked'> {
-  if (offerPolicy === 'offer-fixes' && (await offerZeroZForBlockedStart(messages))) {
-    return 'retry';
+  if (offerPolicy === 'offer-fixes') {
+    const repair = await offerFixForBlockedStart(messages);
+    if (repair === 'retry') return 'retry';
+    if (repair === 'handled') return 'blocked';
   }
   useStartBlockerStore.getState().report(messages);
   const lines = messages.map((message) => `• ${message}`).join('\n');
