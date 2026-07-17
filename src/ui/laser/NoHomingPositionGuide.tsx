@@ -21,7 +21,6 @@ type GuidePhase =
 type GuideActions = {
   readonly phase: GuidePhase;
   readonly error: string | null;
-  readonly onUseCurrent: () => void;
   readonly onRelease: () => void;
   readonly onUseHandPosition: () => void;
   readonly onUnlock: () => void;
@@ -36,7 +35,6 @@ export function NoHomingPositionGuide(props: {
   const status = useLaserStore((state) => state.statusReport?.state ?? null);
   const canSleep = useLaserStore((state) => state.capabilities.sleep);
   const canUnlock = useLaserStore((state) => state.capabilities.unlock);
-  const isJogPositioning = useStore((state) => state.jobPlacement.startFrom === 'current-position');
   const actions = useGuideActions(connection.kind === 'connected', status);
   if (homingEnabled) return null;
   const phase = status === 'Sleep' && actions.phase === 'idle' ? 'positioning' : actions.phase;
@@ -51,7 +49,6 @@ export function NoHomingPositionGuide(props: {
         normalBusy={normalBusy}
         canSleep={canSleep}
         canUnlock={canUnlock}
-        isJogPositioning={isJogPositioning}
       />
     </section>
   );
@@ -94,12 +91,6 @@ function useGuideActions(connected: boolean, status: string | null): GuideAction
   return {
     phase,
     error,
-    onUseCurrent: () => {
-      setJobPlacement({ startFrom: 'current-position' });
-      setPhase('idle');
-      setError(null);
-      pushToast('Current Position selected. Jog to place the job; Frame is optional.', 'success');
-    },
     onRelease: () => {
       if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;
       setPhase('releasing');
@@ -149,7 +140,6 @@ function GuideBody(props: {
   readonly normalBusy: boolean;
   readonly canSleep: boolean;
   readonly canUnlock: boolean;
-  readonly isJogPositioning: boolean;
 }): JSX.Element {
   if (props.phase === 'positioning') {
     return (
@@ -182,8 +172,6 @@ function GuideBody(props: {
       canSleep={props.canSleep}
       error={props.actions.error}
       releasing={props.phase === 'releasing'}
-      isJogPositioning={props.isJogPositioning}
-      onChooseJog={props.actions.onUseCurrent}
       onRelease={props.actions.onRelease}
     />
   );

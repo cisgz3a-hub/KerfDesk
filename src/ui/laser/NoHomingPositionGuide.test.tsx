@@ -58,7 +58,9 @@ afterEach(() => {
 });
 
 describe('NoHomingPositionGuide', () => {
-  it('offers jog positioning unselected under the User Origin default', async () => {
+  // ADR-225: the guide is a plain hand-positioning card. Jog placement lives
+  // in the placement block (Start from = Current Position), not here.
+  it('offers hand positioning in plain language with no jog-method card', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: status('Idle'),
@@ -68,16 +70,16 @@ describe('NoHomingPositionGuide', () => {
     const host = document.createElement('div');
     const root = await renderGuide(host);
     try {
-      expect(host.textContent).toContain('Jog with controls');
-      expect(host.textContent).not.toContain('Selected');
-      expect(button(host, 'Choose jog positioning')).toHaveProperty('disabled', false);
+      expect(host.textContent).toContain('release the motors');
+      expect(host.textContent).not.toContain('Choose jog positioning');
+      expect(host.textContent).not.toContain('Jog with controls');
       expect(button(host, 'Release motors to move by hand')).toHaveProperty('disabled', false);
     } finally {
       await act(async () => root.unmount());
     }
   });
 
-  it('shows jog positioning as selected without a capture-style action', async () => {
+  it('keeps hand positioning available while Current Position is selected', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: status('Idle'),
@@ -87,34 +89,7 @@ describe('NoHomingPositionGuide', () => {
     const host = document.createElement('div');
     const root = await renderGuide(host);
     try {
-      expect(host.textContent).toContain('Jog with controls');
-      expect(host.textContent).toContain('Selected');
-      expect(host.textContent).toContain('Jog to the job anchor');
-      expect(host.textContent).not.toContain('Use current head position');
       expect(button(host, 'Release motors to move by hand')).toHaveProperty('disabled', false);
-    } finally {
-      await act(async () => root.unmount());
-    }
-  });
-
-  it('selects jog positioning without setting an origin', async () => {
-    const setOriginHere = vi.fn(async () => undefined);
-    useLaserStore.setState({
-      connection: { kind: 'connected' },
-      statusReport: status('Idle'),
-      setOriginHere,
-      capabilities: { ...originalLaser.capabilities, sleep: true },
-    });
-    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } });
-    const host = document.createElement('div');
-    const root = await renderGuide(host);
-    try {
-      await act(async () => button(host, 'Choose jog positioning').click());
-      expect(useStore.getState().jobPlacement).toEqual({
-        startFrom: 'current-position',
-        anchor: 'center',
-      });
-      expect(setOriginHere).not.toHaveBeenCalled();
     } finally {
       await act(async () => root.unmount());
     }

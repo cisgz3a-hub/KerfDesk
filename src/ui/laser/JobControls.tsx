@@ -74,15 +74,13 @@ export function JobControls({
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
-  // Positioning first, job actions second — maintainer-directed order for the
-  // no-homing workflow: pick the job's anchor (placement), set the origin
-  // under it, alternate positioning entries below, then run. Deliberate
-  // divergence from LightBurn's Start-first Laser window.
+  // Maintainer-directed rail order (ADR-225): placement above origin, origin
+  // above the job actions, and the hand-positioning guide last as a fallback.
+  // Deliberate divergence from LightBurn's Start-first Laser window.
   return (
     <div style={containerStyle}>
       <JobPlacementControls streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
-      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       <span style={sectionCaptionStyle}>Job</span>
       <SetupRow
         disabled={disabled}
@@ -115,6 +113,7 @@ export function JobControls({
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
       <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
+      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
   );
