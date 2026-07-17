@@ -12,6 +12,7 @@ import {
 } from '../state/recovery/testing';
 import { RecoveryRepository } from '../state/recovery';
 import { resetStore } from '../state/test-helpers';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
 
@@ -82,14 +83,24 @@ function recoveryRepository(): RecoveryRepository {
 beforeEach(() => {
   localStorage.clear();
   resetStore();
+  const project = runnableProject();
   useStore.setState({
-    project: runnableProject(),
+    project,
     jobPlacement: { startFrom: 'current-position', anchor: 'front-left' },
   });
   useLaserStore.setState({
     ...initialLaserState(),
     connection: { kind: 'connected' },
     statusReport: { ...idleStatus, mPos: { x: 120, y: 80, z: 0 } },
+    // Frame-first (ADR-228): the recorded Frame must match the compile that
+    // bakes in the live head position the status report implies (120, 80).
+    frameVerification: frameVerificationForProject(project, {
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'front-left',
+        currentPosition: { x: 120, y: 80 },
+      },
+    }),
     controllerSessionEpoch: CONTROLLER_EPOCH,
     controllerQualification: {
       kind: 'qualified',

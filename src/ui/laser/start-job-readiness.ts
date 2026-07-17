@@ -10,6 +10,7 @@ import {
 } from '../../core/job';
 import type {
   ControllerSettingsSnapshot,
+  PreflightIssue,
   PreflightOptions,
   ReadinessSettingsCapability,
 } from '../../core/preflight';
@@ -39,8 +40,6 @@ import {
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
-import { cameraPlacementSafetyIssue } from '../camera/camera-placement-safety';
-import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 import type { HomingState } from '../state/laser-store';
 import { cncWorkZeroStartIssue, cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
@@ -129,25 +128,49 @@ export type MachineStartSnapshot = {
   readonly reportInches?: boolean;
 };
 
-// Machine-state blockers plus the ADR-098 dialect gate: CNC is GRBL-only —
-// the emitter's dialect (G4 dwell in seconds) is unsafe on firmwares that
-// parse it differently.
-function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): string[] {
-  const issues = [...findMachineStartIssues(machine)];
+// Frame-first (maintainer, 2026-07-17): the old policy blockers — CNC dialect,
+// overrides, accessories, missing Work-Z — no longer refuse Start. They join
+// the Job Review warnings so the operator sees them on the one confirmation
+// popup after Frame has proven placement.
+function demotedPolicyWarnings(project: Project, machine: MachineStartSnapshot): string[] {
+  const warnings: string[] = [];
   const machineKind = machineKindOf(project.machine);
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
-    issues.push(CNC_REQUIRES_GRBL_MESSAGE);
+    warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
   }
-  issues.push(...cncOverrideStartIssues(project, machine.ovCache));
-  issues.push(...cncAccessoryStartIssues(project, machine.accessoryCache));
+  warnings.push(...cncOverrideStartIssues(project, machine.ovCache));
+  warnings.push(...cncAccessoryStartIssues(project, machine.accessoryCache));
   const workZeroIssue = cncWorkZeroStartIssue(
     project,
     machine.workZZeroEvidence,
     machine.workZReferenceEpoch,
     machine.controllerSessionEpoch,
   );
-  if (workZeroIssue !== null) issues.push(workZeroIssue);
-  return issues;
+  if (workZeroIssue !== null) warnings.push(workZeroIssue);
+  return warnings;
+}
+
+// Emit-preflight findings that keep blocking even under frame-first: bytes the
+// controller cannot execute at all (NaN coordinates) or a program with no cut
+// motion. Everything else — bounds, no-go zones, travel heuristics — is a
+// reviewed warning; the watched Frame trace is the placement proof.
+const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = new Set([
+  'non-finite-coordinate',
+  'empty-output',
+  'relief-needs-cnc',
+  'no-output-layer',
+]);
+
+function partitionEmitPreflight(preflight: { readonly issues: ReadonlyArray<PreflightIssue> }): {
+  readonly blocking: string[];
+  readonly warnings: string[];
+} {
+  const blocking: string[] = [];
+  const warnings: string[] = [];
+  for (const issue of preflight.issues) {
+    (EMIT_BLOCKING_PREFLIGHT_CODES.has(issue.code) ? blocking : warnings).push(issue.message);
+  }
+  return { blocking, warnings };
 }
 
 function cncAccessoryStartIssues(
@@ -180,7 +203,7 @@ export function prepareStartJob(
   allowRotaryRaster?: boolean,
 ): StartJobPreparation {
   const effectivePlacement = placementForResolvedOrigin(jobPlacement, resolvedJobOrigin);
-  const gateIssues = findStartGateIssues(project, machine, effectivePlacement);
+  const gateIssues = findMachineStartIssues(machine);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
   const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
@@ -197,7 +220,7 @@ export function prepareStartJob(
     machine,
   );
   if (!inspected.ok) return inspected;
-  const { prepared, toolPlan } = inspected;
+  const { prepared, toolPlan, advisoryWarnings } = inspected;
 
   const { gcode, preflight } = emitPreparedGcode(prepared, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
@@ -206,27 +229,26 @@ export function prepareStartJob(
     ...initialMachinePositionOption(machineWithReportUnits),
     allowRotaryRaster: allowRotaryRaster === true,
   });
-  if (!preflight.ok) {
-    return { ok: false, messages: preflight.issues.map((i) => i.message) };
+  const emitSplit = partitionEmitPreflight(preflight);
+  if (emitSplit.blocking.length > 0) {
+    return { ok: false, messages: emitSplit.blocking };
   }
 
-  const verifiedFrameIssue = requiredFrameIssueFromPrepared({
-    device: project.device,
-    prepared,
-    placement,
-    machine,
-  });
+  const verifiedFrameIssue = requiredFrameIssueFromPrepared({ prepared, machine });
   if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
-  if (!controller.ok) {
-    return { ok: false, messages: controller.errors.map((i) => i.message) };
-  }
-
   const warnings = collectStartWarnings(
     project,
     controllerSettings,
-    controller.warnings.map((i) => i.message),
+    [
+      ...demotedPolicyWarnings(project, machine),
+      ...advisoryWarnings,
+      ...emitSplit.warnings,
+      // Frame-first: readiness errors ($30/$32 state) inform, never block.
+      ...controller.errors.map((i) => i.message),
+      ...controller.warnings.map((i) => i.message),
+    ],
     machine.ovCache,
     machine.activeWcs,
   );
@@ -258,7 +280,7 @@ export async function prepareStartJobSnapshot(
   },
 ): Promise<StartJobPreparation> {
   const effectivePlacement = placementForResolvedOrigin(jobPlacement, options.resolvedJobOrigin);
-  const gateIssues = findStartGateIssues(project, machine, effectivePlacement);
+  const gateIssues = findMachineStartIssues(machine);
   if (gateIssues.length > 0) return { ok: false, messages: gateIssues };
 
   const machineWithReportUnits = withControllerReportUnits(machine, controllerSettings);
@@ -283,7 +305,7 @@ export async function prepareStartJobSnapshot(
     machine,
   );
   if (!inspected.ok) return inspected;
-  const { prepared, toolPlan } = inspected;
+  const { prepared, toolPlan, advisoryWarnings } = inspected;
 
   const { gcode, preflight } = emitPreparedGcode(prepared, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
@@ -292,25 +314,25 @@ export async function prepareStartJobSnapshot(
     ...initialMachinePositionOption(machineWithReportUnits),
     allowRotaryRaster,
   });
-  if (!preflight.ok) {
-    return { ok: false, messages: preflight.issues.map((issue) => issue.message) };
+  const emitSplit = partitionEmitPreflight(preflight);
+  if (emitSplit.blocking.length > 0) {
+    return { ok: false, messages: emitSplit.blocking };
   }
-  const verifiedFrameIssue = requiredFrameIssueFromPrepared({
-    device: project.device,
-    prepared,
-    placement,
-    machine,
-  });
+  const verifiedFrameIssue = requiredFrameIssueFromPrepared({ prepared, machine });
   if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
-  if (!controller.ok) {
-    return { ok: false, messages: controller.errors.map((issue) => issue.message) };
-  }
   const warnings = collectStartWarnings(
     project,
     controllerSettings,
-    controller.warnings.map((issue) => issue.message),
+    [
+      ...demotedPolicyWarnings(project, machine),
+      ...advisoryWarnings,
+      ...emitSplit.warnings,
+      // Frame-first: readiness errors ($30/$32 state) inform, never block.
+      ...controller.errors.map((issue) => issue.message),
+      ...controller.warnings.map((issue) => issue.message),
+    ],
     machine.ovCache,
     machine.activeWcs,
   );
@@ -342,6 +364,9 @@ type PreparedStartInspection =
       readonly ok: true;
       readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
       readonly toolPlan: ReadonlyArray<CncToolPlanEntry>;
+      // Frame-first: placement-bounds and tool/Work-Z findings inform the Job
+      // Review instead of refusing the Start the Frame already proved out.
+      readonly advisoryWarnings: ReadonlyArray<string>;
     }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
@@ -354,17 +379,17 @@ function inspectPreparedStart(
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
+  const advisoryWarnings: string[] = [];
   const originIssue = placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
-  if (originIssue !== null) return { ok: false, messages: [originIssue] };
+  if (originIssue !== null) advisoryWarnings.push(originIssue);
   const toolPlan = cncToolPlan(prepared.job);
   const toolIssue = cncWorkZeroToolStartIssue(
     prepared.project,
     machine.workZZeroEvidence,
     toolPlan[0],
   );
-  return toolIssue === null
-    ? { ok: true, prepared, toolPlan }
-    : { ok: false, messages: [toolIssue] };
+  if (toolIssue !== null) advisoryWarnings.push(toolIssue);
+  return { ok: true, prepared, toolPlan, advisoryWarnings };
 }
 
 function placementBoundsIssueFromPrepared(
@@ -416,38 +441,4 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
     issues.push(machineNotIdleStartMessage(machine.statusReport.state));
   }
   return issues;
-}
-
-function findCameraPlacementIssue(
-  project: Project,
-  machine: MachineStartSnapshot,
-  jobPlacement: JobPlacementSettings,
-): string | null {
-  return cameraPlacementSafetyIssue({
-    active: machine.cameraPlacementActive === true,
-    startFrom: jobPlacement.startFrom,
-    homingEnabled: project.device.homing.enabled,
-    homingState: machine.homingState ?? 'unknown',
-    trustedPositionEpoch: machine.trustedPositionEpoch ?? 0,
-    confirmedPositionEpoch: machine.cameraConfirmedPositionEpoch ?? null,
-    geometryIssue: machine.cameraPlacementGeometryIssue ?? null,
-  });
-}
-
-function findStartGateIssues(
-  project: Project,
-  machine: MachineStartSnapshot,
-  jobPlacement: JobPlacementSettings,
-): ReadonlyArray<string> {
-  const machineIssues = findEarlyStartIssues(project, machine);
-  if (machineIssues.length > 0) return machineIssues;
-  const cameraIssue = findCameraPlacementIssue(project, machine, jobPlacement);
-  if (cameraIssue !== null) return [cameraIssue];
-  const absoluteHomeIssue = absoluteCoordinatesHomeIssue({
-    machineKind: machineKindOf(project.machine),
-    startFrom: jobPlacement.startFrom,
-    homingEnabled: project.device.homing.enabled,
-    homingState: machine.homingState ?? 'unknown',
-  });
-  return absoluteHomeIssue === null ? [] : [absoluteHomeIssue];
 }

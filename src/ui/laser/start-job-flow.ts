@@ -21,7 +21,6 @@ import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
-import { normalStartQualificationBlockMessage } from '../state/laser-controller-qualification';
 import {
   createRunId,
   recoveryRepository,
@@ -55,7 +54,7 @@ import {
 } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
 import { offerFixForBlockedStart } from './start-blocked-fix-offers';
-import { type StartOfferPolicy } from './start-blocked-zero-z-offer';
+import { type StartOfferPolicy } from './start-blocked-repair';
 import { runJobReviewGate } from './job-review';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 
@@ -90,7 +89,6 @@ async function runStartJobFlowWithCheckpoint(
   useStartBlockerStore.getState().clear();
   const laser = useLaserStore.getState();
   const app = useStore.getState();
-  if (blockUnqualifiedStart(machineKindOf(app.project.machine), laser)) return;
   const initialCheckpointIssue = checkpointStartIssue(checkpointToReplace);
   if (initialCheckpointIssue !== null) {
     reportBlockedStart(initialCheckpointIssue);
@@ -203,20 +201,6 @@ async function repairOrReportBlockedStart(
   const lines = messages.map((message) => `• ${message}`).join('\n');
   jobAwareAlert(`Cannot start job:\n\n${lines}`);
   return 'blocked';
-}
-
-function blockUnqualifiedStart(
-  machineKind: ReturnType<typeof machineKindOf>,
-  laser: ReturnType<typeof useLaserStore.getState>,
-): boolean {
-  const message = normalStartQualificationBlockMessage(
-    machineKind,
-    laser.controllerQualification,
-    laser.controllerSessionEpoch,
-  );
-  if (message === null) return false;
-  useStartBlockerStore.getState().report([message]);
-  return true;
 }
 
 async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {

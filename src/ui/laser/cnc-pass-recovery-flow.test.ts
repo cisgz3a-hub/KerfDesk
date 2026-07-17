@@ -35,6 +35,7 @@ import { resetStore } from '../state/test-helpers';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareCurrentStartJob } from './start-job-source';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -120,8 +121,9 @@ function repository(): RecoveryRepository {
 }
 
 function configureReadyCncRecovery(): void {
+  const project = recoveryProject();
   useStore.setState({
-    project: recoveryProject(),
+    project,
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
@@ -139,6 +141,10 @@ function configureReadyCncRecovery(): void {
       referenceEpoch: 7,
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
     },
+    // Frame-first (ADR-228): a completed Frame for this exact job is the one
+    // Start policy gate; both the seeding Start and the recovery re-prepare
+    // check it against the live store (null WCO, work origin inactive here).
+    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
 }
@@ -321,7 +327,16 @@ describe('runCncPassRecoveryFlow', () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
     const startJob = vi.fn(async () => undefined);
-    useLaserStore.setState({ startJob, wcoCache: { ...ARCHIVED_WCO } });
+    // The WCO became known after the seeding Frame ran with a null WCO; the
+    // operator re-frames at the live offset so the frame-first gate still
+    // matches when recovery re-prepares this exact job (ADR-228).
+    useLaserStore.setState({
+      startJob,
+      wcoCache: { ...ARCHIVED_WCO },
+      frameVerification: frameVerificationForProject(useStore.getState().project, {
+        wco: ARCHIVED_WCO,
+      }),
+    });
 
     const started = await runCncPassRecoveryFlow(
       capsule,
@@ -343,7 +358,16 @@ describe('runCncPassRecoveryFlow', () => {
         options?.assertFinalStartAuthorized?.();
       },
     );
-    useLaserStore.setState({ startJob, wcoCache: { ...ARCHIVED_WCO } });
+    // The WCO became known after the seeding Frame ran with a null WCO; the
+    // operator re-frames at the live offset so the frame-first gate still
+    // matches when recovery re-prepares this exact job (ADR-228).
+    useLaserStore.setState({
+      startJob,
+      wcoCache: { ...ARCHIVED_WCO },
+      frameVerification: frameVerificationForProject(useStore.getState().project, {
+        wco: ARCHIVED_WCO,
+      }),
+    });
     const claim = repo.claimRecovery.bind(repo);
     vi.spyOn(repo, 'claimRecovery').mockImplementation(async (args) => {
       // A status frame lands while the operator reads the confirmation

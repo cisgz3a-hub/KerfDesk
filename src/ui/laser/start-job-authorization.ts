@@ -1,7 +1,5 @@
 import type { JobCheckpoint } from '../../core/recovery';
-import { machineKindOf } from '../../core/scene';
 import { useCameraStore } from '../state/camera-store';
-import { normalStartQualificationBlockMessage } from '../state/laser-controller-qualification';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import { useStore } from '../state/store';
@@ -57,14 +55,6 @@ export function currentLaserForAuthorizedStartNow(
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();
-  const qualificationIssue = normalStartQualificationBlockMessage(
-    machineKindOf(useStore.getState().project.machine),
-    current.controllerQualification,
-    current.controllerSessionEpoch,
-  );
-  if (qualificationIssue !== null) {
-    return { ok: false, refusal: { kind: 'blocked', message: qualificationIssue } };
-  }
   if (controllerStartPreparationStillCurrent(args.preparedAgainst, current)) {
     return { ok: true, laser: current };
   }

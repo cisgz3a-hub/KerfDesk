@@ -14,6 +14,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { runStartJobFlow } from './start-job-flow';
 
@@ -88,6 +89,8 @@ describe('CNC reduced-override Start flow', () => {
         referenceEpoch: CONTROLLER_EPOCH,
         toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
       },
+      // Frame-first (ADR-228): the completed Frame is the sole Start gate.
+      frameVerification: frameVerificationForProject(project),
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);

@@ -16,6 +16,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 import { CNC_REQUIRES_GRBL_MESSAGE, prepareStartJob } from './start-job-readiness';
 import { CNC_NO_WORK_ZERO_START_MESSAGE } from './cnc-start-advisories';
+import { frameVerificationForProject } from './frame-verification-testing';
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -173,44 +174,50 @@ function neotronicsFineDetailFillProject(fillStyle: 'scanline' | 'island'): Proj
 }
 
 describe('prepareStartJob', () => {
-  it('blocks CNC Start on controllers without the GRBL CNC dialect', () => {
+  it('warns instead of blocking CNC Start on controllers without the GRBL CNC dialect', () => {
     // The CNC emitter speaks GRBL (G4 P in seconds); Marlin reads P as
-    // milliseconds, so the spin-up dwell would collapse to nothing and the
-    // bit plunges before the spindle is at speed. ADR-098: CNC is GRBL-only.
-    const project: Project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+    // milliseconds. Frame-first (ADR-228): the dialect mismatch informs the
+    // Job Review as a warning; the completed Frame is the only Start gate.
+    const project: Project = { ...runnableProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
     const result = prepareStartJob(
       project,
       { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
-      { ...readyMachine, cncJobsSupported: false },
+      {
+        ...readyMachine,
+        cncJobsSupported: false,
+        frameVerification: frameVerificationForProject(project),
+      },
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages).toContain(CNC_REQUIRES_GRBL_MESSAGE);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toContain(CNC_REQUIRES_GRBL_MESSAGE);
     }
   });
 
-  it('blocks Start when connected controller $30 differs from project max S', () => {
+  it('warns when connected controller $30 differs from project max S', () => {
+    // Frame-first (ADR-228): controller-readiness errors inform, never block.
+    const project = calibratedProject();
     const result = prepareStartJob(
-      calibratedProject(),
-      {
-        maxPowerS: 255,
-        minPowerS: 0,
-        laserModeEnabled: true,
-      },
-      readyMachine,
+      project,
+      { maxPowerS: 255, minPowerS: 0, laserModeEnabled: true },
+      { ...readyMachine, frameVerification: frameVerificationForProject(project) },
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages).toContain(
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toContain(
         'Controller $30 is 255 but this project is set to max S 1000. Apply the detected setting before starting.',
       );
     }
   });
 
   it('returns G-code when project preflight and controller readiness both pass', () => {
-    const result = prepareStartJob(calibratedProject(), readyController, readyMachine);
+    const project = calibratedProject();
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project),
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -233,14 +240,11 @@ describe('prepareStartJob', () => {
   });
 
   it('allows Start with a nonzero $31 warning after critical readiness passes', () => {
+    const project = runnableProject();
     const result = prepareStartJob(
-      runnableProject(),
-      {
-        maxPowerS: 1000,
-        minPowerS: 10,
-        laserModeEnabled: true,
-      },
-      readyMachine,
+      project,
+      { maxPowerS: 1000, minPowerS: 10, laserModeEnabled: true },
+      { ...readyMachine, frameVerification: frameVerificationForProject(project) },
     );
 
     expect(result.ok).toBe(true);
@@ -252,7 +256,11 @@ describe('prepareStartJob', () => {
   });
 
   it('includes trace/vector intent warnings in the Start warning list', () => {
-    const result = prepareStartJob(runnableProject(tracedObject), readyController, readyMachine);
+    const project = runnableProject(tracedObject);
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project),
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -263,11 +271,11 @@ describe('prepareStartJob', () => {
   });
 
   it('allows 4040-safe Island Fill short sweeps with a warning on the Neotronics 4040 profile', () => {
-    const result = prepareStartJob(
-      neotronicsFineDetailFillProject('island'),
-      readyController,
-      readyMachine,
-    );
+    const project = neotronicsFineDetailFillProject('island');
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project),
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -278,11 +286,11 @@ describe('prepareStartJob', () => {
   });
 
   it('allows the same Neotronics 4040 fine-detail job with Scanline Fill', () => {
-    const result = prepareStartJob(
-      neotronicsFineDetailFillProject('scanline'),
-      readyController,
-      readyMachine,
-    );
+    const project = neotronicsFineDetailFillProject('scanline');
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project),
+    });
 
     expect(result.ok).toBe(true);
   });
@@ -417,17 +425,22 @@ describe('prepareStartJob', () => {
     }
   });
 
-  // CNC-05: the stock-top contract is a Start blocker driven by qualified live
-  // machine evidence, so it is asserted through prepareStartJob.
+  // CNC-05, demoted by frame-first (ADR-228): the stock-top contract now
+  // informs the Job Review as a warning driven by qualified live machine
+  // evidence, so it is still asserted through prepareStartJob.
   const cncProject = (): Project => ({ ...runnableProject(), machine: DEFAULT_CNC_MACHINE_CONFIG });
   const cncReadyController = { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false };
 
-  it('blocks a CNC Start with no current work-Z evidence', () => {
-    const result = prepareStartJob(cncProject(), cncReadyController, readyMachine);
+  it('warns on a CNC Start with no current work-Z evidence', () => {
+    const project = cncProject();
+    const result = prepareStartJob(project, cncReadyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project),
+    });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages).toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toContain(CNC_NO_WORK_ZERO_START_MESSAGE);
     }
   });
 });

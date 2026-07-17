@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
-import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import {
   createLayer,
   createProject,
-  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { prepareOutput } from '../../io/gcode';
 import type { JobPlacementSettings } from '../job-placement';
 import type { FrameVerification } from '../state/frame-verification';
+import { frameVerificationBlockedMessage } from './frame-verification-policy';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -47,18 +46,17 @@ const userOriginFrontLeft: JobPlacementSettings = {
   anchor: 'front-left',
 };
 
+// Frame-first (ADR-228): every Start needs a Frame recorded for this exact
+// compiled job, so ok-path tests build one the same way the gate re-derives it.
 function userOriginVerification(
   project: Project,
   wco: { readonly x: number; readonly y: number; readonly z: number },
 ): FrameVerification {
-  const prepared = prepareOutput(project, {
+  return frameVerificationForProject(project, {
     jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
-    outputScope: DEFAULT_OUTPUT_SCOPE,
+    wco,
+    workOriginActive: true,
   });
-  if (!prepared.ok) throw new Error('test setup: prepareOutput failed');
-  const bounds = computeJobBounds(prepared.job);
-  if (bounds === null) throw new Error('test setup: no bounds');
-  return { boundsSignature: frameBoundsSignature(bounds), wco, workOriginActive: true };
 }
 
 const centeredTraceObject: SceneObject = {
@@ -130,8 +128,9 @@ function fillOverscanProject(): Project {
 
 describe('prepareStartJob job placement', () => {
   it('places the selected anchor at the current machine position for Current Position jobs', () => {
+    const project = homedProjectWith(centeredTraceObject);
     const result = prepareStartJob(
-      homedProjectWith(centeredTraceObject),
+      project,
       readyController,
       {
         ...readyMachine,
@@ -140,6 +139,14 @@ describe('prepareStartJob job placement', () => {
           mPos: { x: 120, y: 80, z: 0 },
           wPos: null,
         },
+        // The Frame must match the compile that bakes in the live head XY.
+        frameVerification: frameVerificationForProject(project, {
+          jobOrigin: {
+            startFrom: 'current-position',
+            anchor: 'center',
+            currentPosition: { x: 120, y: 80 },
+          },
+        }),
       },
       currentPositionCenter,
     );
@@ -168,13 +175,16 @@ describe('prepareStartJob job placement', () => {
   });
 
   it('anchors a centered traced image to the custom work origin before emitting G-code', () => {
+    const project = homedProjectWith(centeredTraceObject);
+    const wco = { x: 120, y: 80, z: 0 };
     const result = prepareStartJob(
-      homedProjectWith(centeredTraceObject),
+      project,
       readyController,
       {
         ...readyMachine,
         workOriginActive: true,
-        wcoCache: { x: 120, y: 80, z: 0 },
+        wcoCache: wco,
+        frameVerification: userOriginVerification(project, wco),
       },
       userOriginFrontLeft,
     );
@@ -231,33 +241,41 @@ describe('prepareStartJob job placement', () => {
     }
   });
 
-  it('blocks Start when a homed custom work origin would push the adjusted job off the physical bed', () => {
+  it('warns when a homed custom work origin would push the adjusted job off the physical bed', () => {
+    // Frame-first (ADR-228): placement-bounds findings inform the Job Review;
+    // the watched Frame trace is the placement proof.
+    const project = homedProjectWith(centeredTraceObject);
+    const wco = { x: 380, y: 390, z: 0 };
     const result = prepareStartJob(
-      homedProjectWith(centeredTraceObject),
+      project,
       readyController,
       {
         ...readyMachine,
         workOriginActive: true,
-        wcoCache: { x: 380, y: 390, z: 0 },
+        wcoCache: wco,
+        frameVerification: userOriginVerification(project, wco),
       },
       userOriginFrontLeft,
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/selected job origin/i);
-      expect(result.messages.join('\n')).toMatch(/machine bed/i);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings.join('\n')).toMatch(/selected job origin/i);
+      expect(result.warnings.join('\n')).toMatch(/machine bed/i);
     }
   });
 
   it('allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed', () => {
+    const project = withHoming(fillOverscanProject());
+    const wco = { x: 100, y: 100, z: 0 };
     const result = prepareStartJob(
-      withHoming(fillOverscanProject()),
+      project,
       readyController,
       {
         ...readyMachine,
         workOriginActive: true,
-        wcoCache: { x: 100, y: 100, z: 0 },
+        wcoCache: wco,
+        frameVerification: userOriginVerification(project, wco),
       },
       userOriginFrontLeft,
     );
@@ -268,21 +286,24 @@ describe('prepareStartJob job placement', () => {
     }
   });
 
-  it('blocks homed custom-origin fill overscan when WCO puts the runway physically off the bed', () => {
+  it('warns when homed custom-origin fill overscan WCO puts the runway physically off the bed', () => {
+    const project = withHoming(fillOverscanProject());
+    const wco = { x: 2, y: 100, z: 0 };
     const result = prepareStartJob(
-      withHoming(fillOverscanProject()),
+      project,
       readyController,
       {
         ...readyMachine,
         workOriginActive: true,
-        wcoCache: { x: 2, y: 100, z: 0 },
+        wcoCache: wco,
+        frameVerification: userOriginVerification(project, wco),
       },
       userOriginFrontLeft,
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/X out of bed: -3/);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings.join('\n')).toMatch(/X out of bed: -3/);
     }
   });
 
@@ -305,18 +326,22 @@ describe('prepareStartJob job placement', () => {
     }
   });
 
-  it('names fill overscan when an absolute fill job is too close to the bed edge', () => {
-    const result = prepareStartJob(fillOverscanProject(), readyController, readyMachine);
+  it('warns naming fill overscan when an absolute fill job is too close to the bed edge', () => {
+    const project = fillOverscanProject();
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project),
+    });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/overscan/i);
-      expect(result.messages.join('\n')).toMatch(/5 mm/);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings.join('\n')).toMatch(/overscan/i);
+      expect(result.warnings.join('\n')).toMatch(/5 mm/);
     }
   });
 });
 
-describe('prepareStartJob Verified Origin gate (ADR-053 P2)', () => {
+describe('prepareStartJob frame-first gate (ADR-228)', () => {
   const verifiedOriginFrontLeft: JobPlacementSettings = {
     startFrom: 'verified-origin',
     anchor: 'front-left',
@@ -324,17 +349,14 @@ describe('prepareStartJob Verified Origin gate (ADR-053 P2)', () => {
   const framedWco = { x: 0, y: -90, z: 0 };
 
   function matchingVerification(project: Project, wco: typeof framedWco): FrameVerification {
-    const prepared = prepareOutput(project, {
+    return frameVerificationForProject(project, {
       jobOrigin: { startFrom: 'verified-origin', anchor: 'front-left' },
-      outputScope: DEFAULT_OUTPUT_SCOPE,
+      wco,
+      workOriginActive: true,
     });
-    if (!prepared.ok) throw new Error('test setup: prepareOutput failed');
-    const bounds = computeJobBounds(prepared.job);
-    if (bounds === null) throw new Error('test setup: no bounds');
-    return { boundsSignature: frameBoundsSignature(bounds), wco, workOriginActive: true };
   }
 
-  it('blocks Start until a Verified Frame is recorded', () => {
+  it('blocks Start until a Frame is recorded, with the sole frame-first message', () => {
     const result = prepareStartJob(
       calibratedProjectWith(centeredTraceObject),
       readyController,
@@ -344,7 +366,7 @@ describe('prepareStartJob Verified Origin gate (ADR-053 P2)', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/verified frame/i);
+      expect(result.messages).toEqual([frameVerificationBlockedMessage()]);
     }
   });
 
@@ -381,7 +403,7 @@ describe('prepareStartJob Verified Origin gate (ADR-053 P2)', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/verified frame/i);
+      expect(result.messages).toEqual([frameVerificationBlockedMessage()]);
     }
   });
 });

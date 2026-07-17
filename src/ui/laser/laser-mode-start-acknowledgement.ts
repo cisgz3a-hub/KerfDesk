@@ -16,7 +16,8 @@ export function laserModeStartAcknowledgementRequired(
   snapshot: LaserModeStartSnapshot,
 ): boolean {
   if (machineKindOf(project.machine) !== 'laser') return false;
-  if (snapshot.laserModeEnabled === false) return false;
+  // A reported $32=0 used to be pre-blocked before this question was asked;
+  // under frame-first it is exactly the case the acknowledgement must cover.
   return !laserModeStartSnapshotIsVerified(snapshot);
 }
 

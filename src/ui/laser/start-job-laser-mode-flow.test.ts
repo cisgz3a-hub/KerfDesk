@@ -22,6 +22,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
@@ -115,8 +116,9 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
   beforeEach(() => {
     localStorage.clear();
     resetStore();
+    const project = runnableProject();
     useStore.setState({
-      project: runnableProject(),
+      project,
       selectedObjectId: null,
       additionalSelectedIds: new Set(),
     });
@@ -136,6 +138,9 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
         laserModeEnabled: true,
       },
       controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+      // Frame-first (ADR-228): the sole Start gate is a completed Frame for
+      // this exact job; record it so the $32 acknowledgement is what gates.
+      frameVerification: frameVerificationForProject(project),
       startJob: vi.fn(async () => undefined),
     });
     vi.mocked(jobAwareAlert).mockClear();

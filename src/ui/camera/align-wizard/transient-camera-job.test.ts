@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../../core/controllers/grbl';
 import { createProject } from '../../../core/scene';
 import {
-  LASER_MODE_DISABLED_AT_START_MESSAGE,
+  LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE,
   type LaserModeStartEvidence,
 } from '../../state/laser-mode-start-evidence';
 import { initialLaserState } from '../../state/laser-store-helpers';
@@ -33,6 +33,11 @@ const idleStatus: StatusReport = {
 };
 const LASER_MODE_GENERIC_WARNING =
   "The controller's settings dump did not include $32, so laser mode is NOT verified against the firmware. Confirm $32=1 in the controller's configuration before burning.";
+// Frame-first (ADR-228): a reported $32=0 is a controller-readiness WARNING
+// on the prepared result now, never a block. Same text as the demoted
+// readiness error the real prepare emits.
+const LASER_MODE_DISABLED_WARNING =
+  'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.';
 const UNRELATED_CAMERA_WARNING = 'Controller $31 minimum S is 5.';
 
 function preparedMarkerJob(warnings: ReadonlyArray<string> = []): StartJobPreparation {
@@ -148,6 +153,37 @@ describe('runTransientCameraJob laser-mode evidence', () => {
     expect(startJob).not.toHaveBeenCalled();
   });
 
+  it('routes a reported $32=0 through the informed acknowledgement, not a block', async () => {
+    // Frame-first (ADR-228): the $32=0 wire refusal is deleted. The readiness
+    // finding arrives as a prepared warning; because it names $32 it is
+    // covered by the acknowledgement prompt instead of the warnings confirm,
+    // while unrelated warnings still get their own confirm first.
+    const startJob = vi.fn<typeof originalStartJob>(async () => undefined);
+    setReadyLaser(startJob, false);
+    vi.mocked(prepareStartJobSnapshot).mockResolvedValue(
+      preparedMarkerJob([LASER_MODE_DISABLED_WARNING, UNRELATED_CAMERA_WARNING]),
+    );
+
+    await expect(runTransientCameraJob(createProject())).resolves.toBe(true);
+
+    expect(jobAwareConfirm).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0]).toContain(UNRELATED_CAMERA_WARNING);
+    expect(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0]).not.toContain(
+      LASER_MODE_DISABLED_WARNING,
+    );
+    expect(vi.mocked(jobAwareConfirm).mock.calls[1]?.[0]).toBe(LASER_MODE_UNVERIFIED_START_PROMPT);
+    expect(jobAwareAlert).not.toHaveBeenCalled();
+    expect(startJob).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        laserModeStartEvidence: expect.objectContaining({
+          laserModeEnabled: false,
+          unverifiedAcknowledged: true,
+        }),
+      }),
+    );
+  });
+
   it('lets the real wire boundary refuse settings drift after camera preparation', async () => {
     setReadyLaser(originalStartJob, true);
     vi.mocked(prepareStartJobSnapshot).mockImplementation(async () => {
@@ -160,8 +196,10 @@ describe('runTransientCameraJob laser-mode evidence', () => {
 
     await expect(runTransientCameraJob(createProject())).resolves.toBe(false);
 
+    // Frame-first: a $32 flip during preparation is caught as evidence drift
+    // (handoff consistency), no longer by a dedicated $32=0 block.
     expect(jobAwareAlert).toHaveBeenCalledWith(
-      expect.stringContaining(LASER_MODE_DISABLED_AT_START_MESSAGE),
+      expect.stringContaining(LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE),
     );
   });
 });

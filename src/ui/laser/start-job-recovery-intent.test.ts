@@ -24,6 +24,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
@@ -121,19 +122,20 @@ async function compileCurrentLaserJob(): Promise<string> {
 beforeEach(() => {
   localStorage.clear();
   resetStore();
-  useStore.setState({
-    project: {
-      ...createProject({
-        ...DEFAULT_DEVICE_PROFILE,
-        streamingMode: 'ping-pong',
-        rxBufferBytes: 96,
-      }),
-      scene: {
-        ...EMPTY_SCENE,
-        objects: [lineObject],
-        layers: [createLayer({ id: 'red', color: '#ff0000' })],
-      },
+  const project = {
+    ...createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      streamingMode: 'ping-pong' as const,
+      rxBufferBytes: 96,
+    }),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [lineObject],
+      layers: [createLayer({ id: 'red', color: '#ff0000' })],
     },
+  };
+  useStore.setState({
+    project,
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
@@ -153,6 +155,9 @@ beforeEach(() => {
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+    // Frame-first (ADR-228): the sole Start gate is a completed Frame for
+    // this exact job, so the flow tests record one up front.
+    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
   useCameraStore.setState({

@@ -12,6 +12,13 @@ export const DEFAULT_JOB_PLACEMENT: JobPlacementSettings = {
   anchor: 'front-left',
 };
 
+// Exported so the blocked-Start fix offers can recognize these refusals
+// exactly and offer the one-click remedy (Set origin here / Reset origin).
+export const USER_ORIGIN_REQUIRED_MESSAGE =
+  'User Origin needs a custom work origin. Click "Set origin here" first.';
+export const ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE =
+  'Absolute Coordinates requires the custom work origin to be cleared. Reset origin first, or choose User Origin.';
+
 export function defaultJobPlacementForDevice(
   device: Pick<DeviceProfile, 'homing'>,
 ): JobPlacementSettings {
@@ -143,9 +150,7 @@ function resolveAbsolute(machine: MachinePlacementSnapshot): ResolvedJobPlacemen
   if (!customOriginIsActive(machine)) return { ok: true };
   return {
     ok: false,
-    messages: [
-      'Absolute Coordinates requires the custom work origin to be cleared. Reset origin first, or choose User Origin.',
-    ],
+    messages: [ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE],
   };
 }
 
@@ -181,7 +186,7 @@ function resolveUserOrigin(
   if (!customOriginIsActive(machine)) {
     return {
       ok: false,
-      messages: ['User Origin needs a custom work origin. Click "Set origin here" first.'],
+      messages: [USER_ORIGIN_REQUIRED_MESSAGE],
     };
   }
   if (wco === null) {

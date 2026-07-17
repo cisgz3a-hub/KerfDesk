@@ -26,7 +26,6 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useStartBlockerStore } from './start-blocker-store';
-import { normalStartQualificationBlockMessage } from '../state/laser-controller-qualification';
 import { useToastStore } from '../state/toast-store';
 
 export function LaserWindow(): JSX.Element {
@@ -38,8 +37,6 @@ export function LaserWindow(): JSX.Element {
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const controllerQualification = useLaserStore((s) => s.controllerQualification);
-  const controllerSessionEpoch = useLaserStore((s) => s.controllerSessionEpoch);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   // ADR-101 §7: shared chrome re-labels machine-aware; behavior is identical.
@@ -93,11 +90,6 @@ export function LaserWindow(): JSX.Element {
       <ProbePanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
-        startDisabledReason={normalStartQualificationBlockMessage(
-          machineKind,
-          controllerQualification,
-          controllerSessionEpoch,
-        )}
         onConfigureAutofocus={() => setMachineSetupRequest({ initialStep: 'safety' })}
         onStartJob={() => void runStartJobFlow()}
       />

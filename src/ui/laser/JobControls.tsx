@@ -32,7 +32,6 @@ import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
 import { RunAgainControl } from './RunAgainControl';
-import { absoluteCoordinatesHomeIssue } from './absolute-placement-safety';
 
 type Props = {
   readonly disabled: boolean;
@@ -152,23 +151,17 @@ function SetupRow(props: {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const isCncMachine = machineKind === 'cnc';
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  const startFrom = useStore((s) => s.jobPlacement.startFrom);
   const statusReport = useLaserStore((s) => s.statusReport);
-  const homingState = useLaserStore((s) => s.homingState);
   const home = useLaserStore((s) => s.home);
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
-  const absoluteHomeIssue = absoluteCoordinatesHomeIssue({
-    machineKind,
-    startFrom,
-    homingEnabled,
-    homingState,
-  });
   const frameControl = frameControlProps(busy, statusReport?.state);
+  // An unhomed Absolute Coordinates Start is NOT pre-disabled here: the Start
+  // flow refuses it with an in-place Home offer (2026-07-17), which a dead
+  // button would make unreachable.
   const startControl = startControlProps(
     busy,
     props.startDisabledReason,
-    absoluteHomeIssue,
     startJobTitle(estimate, jobTimeNoun(machineKind)),
   );
   // No portable autofocus G-code exists, so an empty command becomes a direct
@@ -283,11 +276,12 @@ function frameControlProps(busy: boolean, state: string | undefined): ControlBut
 function startControlProps(
   busy: boolean,
   startDisabledReason: string | null | undefined,
-  absoluteHomeIssue: string | null,
   fallbackTitle: string,
 ): ControlButtonProps {
-  const blocker = startDisabledReason ?? absoluteHomeIssue;
-  return { disabled: busy || blocker != null, title: blocker ?? fallbackTitle };
+  return {
+    disabled: busy || startDisabledReason != null,
+    title: startDisabledReason ?? fallbackTitle,
+  };
 }
 
 function frameBlockedTitle(state: string | undefined): string {

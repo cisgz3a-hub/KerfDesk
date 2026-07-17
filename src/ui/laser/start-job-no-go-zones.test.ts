@@ -8,6 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const IDLE_AT_ENTRY: StatusReport = {
@@ -21,9 +22,12 @@ const IDLE_AT_ENTRY: StatusReport = {
 };
 
 describe('Start no-go entry path', () => {
-  it('blocks the entry move from the live head position through a no-go zone', () => {
+  it('warns when the entry move from the live head position crosses a no-go zone', () => {
+    // Frame-first (ADR-228): no-go findings inform the Job Review as
+    // warnings; the watched Frame trace is the placement proof.
+    const project = guardedProject();
     const result = prepareStartJob(
-      guardedProject(),
+      project,
       {
         maxPowerS: 1000,
         minPowerS: 0,
@@ -33,12 +37,13 @@ describe('Start no-go entry path', () => {
         statusReport: IDLE_AT_ENTRY,
         alarmCode: null,
         hasActiveStreamer: false,
+        frameVerification: frameVerificationForProject(project),
       },
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages).toContain('Line 8: motion crosses no-go zone "Clamp".');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toContain('Line 8: motion crosses no-go zone "Clamp".');
     }
   });
 });

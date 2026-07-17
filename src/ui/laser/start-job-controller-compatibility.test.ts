@@ -8,6 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -52,30 +53,36 @@ const sampleObject: SceneObject = {
 
 describe('Start controller selection policy', () => {
   it('allows the user-selected profile when detected firmware differs', () => {
-    const result = prepareStartJob(projectFor('grbl-v1.1'), readyController, {
+    const project = projectFor('grbl-v1.1');
+    const result = prepareStartJob(project, readyController, {
       ...readyMachine,
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'marlin',
+      frameVerification: frameVerificationForProject(project),
     });
 
     expect(result.ok).toBe(true);
   });
 
   it('does not require reconnecting after the user selects another profile', () => {
-    const result = prepareStartJob(projectFor('marlin'), readyController, {
+    const project = projectFor('marlin');
+    const result = prepareStartJob(project, readyController, {
       ...readyMachine,
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'grbl-v1.1',
+      frameVerification: frameVerificationForProject(project),
     });
 
     expect(result.ok).toBe(true);
   });
 
   it('also allows matching profile and controller identities', () => {
-    const result = prepareStartJob(projectFor('grblhal'), readyController, {
+    const project = projectFor('grblhal');
+    const result = prepareStartJob(project, readyController, {
       ...readyMachine,
       activeControllerKind: 'grblhal',
       detectedControllerKind: 'grblhal',
+      frameVerification: frameVerificationForProject(project),
     });
 
     expect(result.ok).toBe(true);
