@@ -13,5 +13,6 @@ One line per 30-minute audit iteration. Areas rotate; pick the least-recently co
 | 2026-07-17 06:45 | origin/main ed40b6d5 | Docs-vs-code drift (ADR integrity + enforcement claims) | [report](2026-07-17-0645-docs-vs-code-drift.md) | 0 | 0 | 2 |
 | 2026-07-17 07:15 | ed40b6d5 (rebased) | Platform adapters (Web Serial + file/camera) | [report](2026-07-17-0715-platform-adapters.md) | 0 | 1 | 1 |
 | 2026-07-17 07:45 | ed40b6d5 | Core geometry (clipper boolean/offset seam) | [report](2026-07-17-0745-core-geometry-booleans.md) | 0 | 0 | 3 |
+| 2026-07-17 08:15 | ed40b6d5 | Layers panel + visibility/output parity baseline | [report](2026-07-17-0815-layers-panel-parity.md) | 0 | 0 | 1 |
 
 P2-1 (iter 1) fixed via PR #260 (approved "fix", 2026-07-17 04:44). P3-4 addendum added to iter-1 report 04:45 (ackless option dropped by store wiring — found during the fix). Iterations 02:16–04:16 coalesced: the fix task occupied the session.
