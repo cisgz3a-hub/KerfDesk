@@ -55,6 +55,7 @@
   --lf-tint-danger: #fff1f1;
   --lf-tint-warning: #fff7e6;
   --lf-tint-info: #eef6ff;
+  --lf-tint-success: #e9f7ec;
   /* Faint accent wash (drag-import overlay fill) */
   --lf-accent-wash: rgba(25, 118, 210, 0.08);
 
@@ -168,6 +169,21 @@ body {
 }
 .lf-btn--ghost:hover:not(:disabled) {
   background: var(--lf-bg-2);
+}
+
+/* Light-green "go" actions (LightBurn's green-means-run): Frame and Start.
+   Success-tinted fill with dark success text keeps AA contrast on the rail. */
+.lf-btn--go {
+  background: var(--lf-tint-success);
+  border-color: var(--lf-success);
+  color: var(--lf-success-fg);
+}
+.lf-btn--go:hover:not(:disabled) {
+  background: #d9efe0;
+  border-color: var(--lf-success);
+}
+.lf-btn--go:active:not(:disabled) {
+  background: #c9e7d2;
 }
 
 .lf-btn--pressed,

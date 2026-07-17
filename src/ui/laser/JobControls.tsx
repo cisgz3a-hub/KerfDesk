@@ -75,12 +75,14 @@ export function JobControls({
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
   // Positioning first, job actions second — maintainer-directed order for the
-  // no-homing workflow (jog/hand-move the head, set the origin, then run).
-  // Deliberate divergence from LightBurn's Start-first Laser window.
+  // no-homing workflow: pick the job's anchor (placement), set the origin
+  // under it, alternate positioning entries below, then run. Deliberate
+  // divergence from LightBurn's Start-first Laser window.
   return (
     <div style={containerStyle}>
-      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
+      <JobPlacementControls streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
+      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       <span style={sectionCaptionStyle}>Job</span>
       <SetupRow
         disabled={disabled}
@@ -109,7 +111,6 @@ export function JobControls({
           isToolChange={isToolChange}
         />
       )}
-      <JobPlacementControls streaming={controlsBusy} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
@@ -173,14 +174,15 @@ function SetupRow(props: {
   // setup entry instead of a disabled control that leaves users hunting for
   // the vendor-specific command field.
   const noAutofocus = autofocusCommand.trim() === '';
-  // Start leads the grid full-width — it is the panel's primary action and the
-  // first control in LightBurn's Laser window; setup helpers rank below it.
+  // Start leads the grid full-width; Frame pairs beside Home under it. Both
+  // run-the-machine actions wear the light-green go look (maintainer request,
+  // matching LightBurn's green Start), so "moves the head" reads at a glance.
   return (
     <>
       <div style={actionGridStyle}>
         <button
           type="button"
-          className="lf-btn lf-btn--primary"
+          className="lf-btn lf-btn--go"
           style={primaryActionStyle}
           onClick={props.onStartJob}
           disabled={startControl.disabled}
@@ -190,7 +192,7 @@ function SetupRow(props: {
         </button>
         <button
           type="button"
-          className="lf-btn"
+          className="lf-btn lf-btn--go"
           onClick={onFrame}
           disabled={frameControl.disabled}
           title={frameControl.title}
