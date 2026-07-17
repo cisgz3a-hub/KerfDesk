@@ -1540,15 +1540,16 @@ Shipped" and update the hardware verification inventory.
 For a device profile with Homing disabled, a newly created or opened project
 starts in **User Origin** (2026-07-16 maintainer amendment; previously Current
 Position): Start refuses until an origin exists, so the default flow is
-position the head, **Set origin here**, then Start. The machine
-panel shows **Position job** with two paths:
+position the head, **Set origin here**, then Start. The machine panel offers
+two positioning paths (per ADR-225 the **Position job** card sits last on the
+rail, below the job actions, as the hand-placement fallback):
 
-1. **Jog with controls.** The operator clicks **Choose jog positioning** to
-   select Current Position; the guide then shows this mode as **Selected** and
-   does not present a capture-style action. The operator jogs to the chosen
-   9-dot job anchor, may click Frame to inspect the perimeter, then clicks
-   Start. Frame remains available but is not required. Set origin is not
-   required while Current Position is active.
+1. **Jog with controls.** The operator jogs to the workpiece zero and clicks
+   **Set origin here** (User Origin), or selects **Current Position** in the
+   Start from dropdown and jogs to the chosen 9-dot job anchor. Frame remains
+   available but is not required. Set origin is not required while Current
+   Position is active. (The former "Choose jog positioning" button was removed
+   as redundant with the Start from dropdown — ADR-225.)
 2. **Move head by hand.** The operator selects **Release motors to move by hand**,
    confirms Release motors, and physically moves the head. The guide then exposes
    **Use this position**, which sends Wake and waits for controller recovery.

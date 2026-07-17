@@ -55,6 +55,7 @@
   --lf-tint-danger: #fff1f1;
   --lf-tint-warning: #fff7e6;
   --lf-tint-info: #eef6ff;
+  --lf-tint-success: #e9f7ec;
   /* Faint accent wash (drag-import overlay fill) */
   --lf-accent-wash: rgba(25, 118, 210, 0.08);
 
@@ -170,11 +171,55 @@ body {
   background: var(--lf-bg-2);
 }
 
+/* Light-green "go" actions (LightBurn's green-means-run): Frame and Start.
+   Success-tinted fill with dark success text keeps AA contrast on the rail. */
+.lf-btn--go {
+  background: var(--lf-tint-success);
+  border-color: var(--lf-success);
+  color: var(--lf-success-fg);
+}
+.lf-btn--go:hover:not(:disabled) {
+  background: #d9efe0;
+  border-color: var(--lf-success);
+}
+.lf-btn--go:active:not(:disabled) {
+  background: #c9e7d2;
+}
+
 .lf-btn--pressed,
 .lf-btn[aria-pressed='true'] {
   background: var(--lf-accent);
   border-color: var(--lf-accent);
   color: #fff;
+}
+
+/* Attention pulse — coaches the one next required step (e.g. "Set origin
+   here" on a no-homing machine before a job can run). Flat colors only, per
+   the performance note above: the pulse animates background/border/color
+   between the neutral and primary looks, no shadows or blur. The CSS
+   animation runs on the compositor clock, independent of React re-renders. */
+@keyframes lf-attention-pulse {
+  0%,
+  100% {
+    background: var(--lf-bg-2);
+    border-color: var(--lf-accent);
+    color: var(--lf-text);
+  }
+  50% {
+    background: var(--lf-accent);
+    border-color: var(--lf-accent);
+    color: var(--lf-on-fill);
+  }
+}
+.lf-btn--attention:not(:disabled) {
+  animation: lf-attention-pulse 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lf-btn--attention:not(:disabled) {
+    animation: none;
+    background: var(--lf-tint-info);
+    border-color: var(--lf-accent);
+  }
 }
 
 .lf-iconbtn {

@@ -20,19 +20,27 @@ afterEach(() => {
 });
 
 describe('JobControls action hierarchy', () => {
-  it('places Frame and Start before placement and origin details', async () => {
+  // Maintainer-directed order (ADR-225): placement above origin, origin above
+  // the job actions, and the hand-positioning guide last as a fallback.
+  it('orders the rail placement, then origin, then job actions, then the guide', async () => {
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Frame'), startFrom(view.host))).toBe(true);
-      expect(precedes(button(view.host, 'Start job'), button(view.host, 'Set origin here'))).toBe(
+      expect(precedes(startFrom(view.host), button(view.host, 'Set origin here'))).toBe(true);
+      expect(precedes(button(view.host, 'Set origin here'), button(view.host, 'Start job'))).toBe(
         true,
       );
+      expect(
+        precedes(
+          button(view.host, 'Start job'),
+          button(view.host, 'Release motors to move by hand'),
+        ),
+      ).toBe(true);
     } finally {
       await view.unmount();
     }
   });
 
-  it('leads with Start job, then Frame, then Home — primary action first', async () => {
+  it('leads the job cluster with Start job, then Frame, then Home', async () => {
     const view = await renderControls();
     try {
       expect(precedes(button(view.host, 'Start job'), button(view.host, 'Frame'))).toBe(true);
@@ -42,7 +50,7 @@ describe('JobControls action hierarchy', () => {
     }
   });
 
-  it('places passive frame status before placement details while framing', async () => {
+  it('keeps passive frame status with the job cluster while framing', async () => {
     useLaserStore.setState({
       motionOperation: {
         kind: 'frame',
@@ -53,15 +61,20 @@ describe('JobControls action hierarchy', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderControls();
     try {
+      // Placement leads the rail, so run status renders below the actions
+      // that caused it — directly under Start/Frame, not above placement.
       expect(
-        precedes(elementContaining(view.host, 'Frame motion is active'), startFrom(view.host)),
+        precedes(
+          button(view.host, 'Start job'),
+          elementContaining(view.host, 'Frame motion is active'),
+        ),
       ).toBe(true);
     } finally {
       await view.unmount();
     }
   });
 
-  it('keeps run actions out of the rail while placing safety detail before placement', async () => {
+  it('keeps run actions out of the rail while placing safety detail with the job cluster', async () => {
     useLaserStore.setState({
       streamer: {
         status: 'streaming',
@@ -79,7 +92,10 @@ describe('JobControls action hierarchy', () => {
     const view = await renderControls();
     try {
       expect(
-        precedes(elementContaining(view.host, 'Pause is feed hold only'), startFrom(view.host)),
+        precedes(
+          button(view.host, 'Start job'),
+          elementContaining(view.host, 'Pause is feed hold only'),
+        ),
       ).toBe(true);
       const labels = [...view.host.querySelectorAll('button')].map(
         (candidate) => candidate.textContent,

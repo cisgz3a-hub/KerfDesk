@@ -95,6 +95,7 @@
 | ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes keep the artwork selected |
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
 | ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
+| ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
 
 ---
 
@@ -9404,3 +9405,42 @@ non-negotiable #21 approval for this confirmation gate.
 > ADR-222 (single-artwork selection), and ADR-223 (Canvas Focus layout) on main mid-flight - so
 > this entry is **ADR-224**. Re-verify the tail and open-PR claims before merge.
 
+
+
+## ADR-225 - Machine-rail control order, go-green actions, and origin coaching
+
+**Date:** 2026-07-17
+**Status:** Accepted
+
+**Context.** The machine-rail job cluster predated the ADR-047 design system: bare
+browser-default buttons in ragged wrapping rows, an unlabeled 3x3 anchor grid, a
+double-bordered "Position job" card with a redundant jog-method chooser, and no
+visual cue that a no-homing job needs an origin before Start. The maintainer
+directed a redesign in review (2026-07-17 session; originally PRs #248/#255,
+re-landed after a merge race via #261).
+
+**Decision.**
+
+1. Rail order is placement -> origin -> job actions -> hand-positioning guide.
+   The Start from dropdown and job-origin anchor grid sit directly above the
+   Origin buttons, Start/Frame/Home/auto-focus follow under a JOB caption, and
+   the no-homing "Position job" card renders last as the fallback path. This is
+   a deliberate, maintainer-directed divergence from LightBurn's Start-first
+   Laser window, matching the no-homing workflow (jog, set origin, then start).
+   Locked by JobControls.layout.test.tsx; the ux-shell e2e asserts Frame/Start
+   are scroll-reachable inside the rail rather than above the 720p fold.
+2. Machine-motion "go" actions (Start job, Frame) wear `.lf-btn--go`, a light
+   success-tinted fill (`--lf-tint-success`) with AA-contrast success text,
+   matching LightBurn's green-means-run convention. Every control in the
+   cluster rides the ADR-047 classes (`.lf-btn`/`.lf-select`/`.lf-checkbox`).
+3. `.lf-btn--attention` plus the `lf-attention-pulse` keyframes are the standard
+   coaching affordance for "the one next required step". First and currently
+   only use: "Set origin here" pulses when homing is disabled, the rail is
+   connected and idle, Start from = User Origin, and no work origin is active.
+   Flat colors only per the tokens.css performance note; prefers-reduced-motion
+   gets a static tint. It is a cue, not a guard - nothing is gated (ADR-206).
+4. The "Choose jog positioning" button and its "Jog with controls" method card
+   are removed from the guide: they duplicated selecting Current Position in
+   the Start from dropdown and read as a mystery step. The card reduces to
+   plain-language hand-positioning copy plus "Release motors to move by hand";
+   the release -> wake -> unlock -> set-origin wizard behind it is unchanged.

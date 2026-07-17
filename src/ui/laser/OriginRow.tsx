@@ -1,6 +1,7 @@
 // OriginRow — Set / Reset work origin (ADR-021) + Release motors (ADR-053 P4),
 // extracted from JobControls.tsx when it hit the ADR-015 size cap.
 
+import { type JobStartMode } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
@@ -22,6 +23,55 @@ const CLEAR_PERSISTENT_ORIGIN_CONFIRM =
   'Clear persistent G54 origin?\n\n' +
   'This sends G92.1, then G10 L2 P1 X0 Y0 to clear both transient and stored G54 origin offsets.';
 
+const SET_ORIGIN_ATTENTION_TITLE =
+  'No work origin is set. Move the head over the workpiece zero (jog or hand-place), ' +
+  'then click here — jobs starting from User Origin run relative to this point.';
+
+/** The pulse coaches exactly one situation: a no-homing machine, ready to
+ * move, whose User Origin start mode has no origin behind it yet. Any other
+ * start mode does not need an origin (Current Position reads the live head;
+ * Absolute ignores work offsets; the hand-position wizard sets its own), and
+ * a busy or disconnected rail should stay quiet. */
+function needsSetOriginAttention(state: {
+  readonly homingEnabled: boolean;
+  readonly hasCustom: boolean;
+  readonly busy: boolean;
+  readonly startFrom: JobStartMode;
+}): boolean {
+  return (
+    !state.homingEnabled && !state.busy && !state.hasCustom && state.startFrom === 'user-origin'
+  );
+}
+
+function SetOriginButton(props: {
+  readonly busy: boolean;
+  readonly needsAttention: boolean;
+  readonly onSet: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className={props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}
+      onClick={props.onSet}
+      disabled={props.busy}
+      title={
+        props.needsAttention
+          ? SET_ORIGIN_ATTENTION_TITLE
+          : 'Declare the current head position as the workpiece (0, 0). Cleared on alarm or stop.'
+      }
+    >
+      Set origin here
+    </button>
+  );
+}
+
+function resetOriginTitle(persistentOrUnknown: boolean, hasCustom: boolean): string {
+  if (persistentOrUnknown) return 'This origin may be stored in G54. Use Clear persistent origin.';
+  return hasCustom
+    ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
+    : 'No custom origin active. Set one with "Set origin here" first.';
+}
+
 // F.3 — Set / Reset the work-coordinate origin to the current head
 // position. See ADR-021. Buttons:
 //   - "Set origin here" sends G92 X0 Y0. Always enabled (subject to
@@ -37,6 +87,7 @@ export function OriginRow(props: {
   const wcs = useLaserStore((s) => s.capabilities.wcs);
   const canSleep = useLaserStore((s) => s.capabilities.sleep);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const startFrom = useStore((s) => s.jobPlacement.startFrom);
   const setOrigin = useLaserStore((s) => s.setOriginHere);
   const resetOrigin = useLaserStore((s) => s.resetOrigin);
   const releaseMotors = useLaserStore((s) => s.releaseMotors);
@@ -64,27 +115,17 @@ export function OriginRow(props: {
     <div style={originSectionStyle}>
       <span style={sectionCaptionStyle}>Origin</span>
       <div style={actionGridStyle}>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={onSet}
-          disabled={busy}
-          title="Declare the current head position as the workpiece (0, 0). Cleared on alarm or stop."
-        >
-          Set origin here
-        </button>
+        <SetOriginButton
+          busy={busy}
+          needsAttention={needsSetOriginAttention({ homingEnabled, hasCustom, busy, startFrom })}
+          onSet={onSet}
+        />
         <button
           type="button"
           className="lf-btn"
           onClick={onReset}
           disabled={busy || !hasCustom || persistentOrUnknown}
-          title={
-            persistentOrUnknown
-              ? 'This origin may be stored in G54. Use Clear persistent origin.'
-              : hasCustom
-                ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
-                : 'No custom origin active. Set one with "Set origin here" first.'
-          }
+          title={resetOriginTitle(persistentOrUnknown, hasCustom)}
         >
           Reset origin
         </button>
