@@ -91,6 +91,44 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut');
   });
 
+  it('re-arms between passes with the GROUP effective mode, not the dialect default', () => {
+    // Rolling audit 2026-07-17-0625 P2-1: the pass-2 re-arm hardcoded the
+    // dialect's cutPowerMode (always M3 S0), so a dynamic-override cut layer
+    // burned pass 1 under M4 and passes 2+ under M3 — and emitJob's modal
+    // tracker was never told, so a following fill group got no re-arm at all.
+    const dynamicCut: CutGroup = {
+      ...cut(),
+      layerId: 'dyn-multi',
+      powerMode: 'dynamic',
+      passes: 2,
+    };
+    const out = emit({ groups: [dynamicCut, fill(5)] });
+    // Pass 2 re-arms dynamic, never constant.
+    expect(out).toContain('; pass 2 of 2\nM4 S0');
+    // The ONLY M3 S0 in the file is the preamble arm — the controller is in
+    // M4 when the fill body runs, matching the tracker.
+    expect(out.match(/^M3 S0$/gm) ?? []).toHaveLength(1);
+    expect(findLaserOnTravelIssues(out)).toEqual([]);
+  });
+
+  it('re-arms between passes with constant power for a plain multi-pass cut (unchanged)', () => {
+    const multiCut: CutGroup = { ...cut(), layerId: 'plain-multi', passes: 2 };
+    const out = emit({ groups: [multiCut] });
+    expect(out).toContain('; pass 2 of 2\nM3 S0');
+    expect(out).not.toContain('M4');
+  });
+
+  it('emits no motion for a degenerate single-point segment', () => {
+    const degenerate: CutGroup = {
+      ...cut(),
+      layerId: 'degen',
+      segments: [{ polyline: [{ x: 5, y: 5 }], closed: false }],
+    };
+    const out = emit({ groups: [degenerate] });
+    // A one-point polyline has nothing to cut; it must not emit a bare rapid.
+    expect(out).not.toContain('X5.000 Y5.000');
+  });
+
   it('honors explicit vector overrides and switches before each affected group', () => {
     const dynamicCut: CutGroup = { ...cut(), layerId: 'dynamic-cut', powerMode: 'dynamic' };
     const constantFill: FillGroup = {

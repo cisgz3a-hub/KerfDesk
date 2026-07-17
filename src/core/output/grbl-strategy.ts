@@ -95,7 +95,9 @@ function postamble(
 function emitSegment(seg: CutSegment, s: number, feed: number, dialect: GrblGcodeDialect): string {
   const lines: string[] = [];
   const first = seg.polyline[0];
-  if (first === undefined) {
+  // A one-point polyline has nothing to cut — emitting its rapid alone would
+  // be a pointless stray G0 (defense in depth; producers filter these).
+  if (first === undefined || seg.polyline.length < 2) {
     return '';
   }
   // Rapid to start with laser off.
@@ -120,7 +122,11 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
   );
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
-    if (p > 0) chunks.push(`${laserModeWord(dialect.cutPowerMode)} S0`);
+    // Re-arm with the GROUP's effective mode: a dynamic-override layer must
+    // stay M4 on every pass, and the intra-group word must match what
+    // emitJob's modal tracker armed before the group — a dialect-default M3
+    // here silently flipped later groups to constant power (audit P2-1).
+    if (p > 0) chunks.push(`${vectorPowerWord(group, dialect)} S0`);
     for (const seg of group.segments) {
       const segText = emitSegment(seg, s, feed, dialect);
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
@@ -383,11 +389,16 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
 }
 
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
-  if ((group.kind === 'cut' || group.kind === 'fill') && group.powerMode !== undefined) {
-    return laserModeWord(group.powerMode);
-  }
-  if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
   if (group.kind === 'raster' || group.kind === 'cnc') return 'group-managed';
+  return vectorPowerWord(group, dialect);
+}
+
+// The effective M3/M4 word for a vector group: per-layer override first, then
+// the dialect's per-kind default. Used both to arm the group (emitJob) and to
+// re-arm between passes (emitGroup) so the two can never disagree.
+function vectorPowerWord(group: CutGroup | FillGroup, dialect: GrblGcodeDialect): 'M3' | 'M4' {
+  if (group.powerMode !== undefined) return laserModeWord(group.powerMode);
+  if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
   return laserModeWord(dialect.cutPowerMode);
 }
 
