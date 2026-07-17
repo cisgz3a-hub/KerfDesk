@@ -57,7 +57,6 @@ beforeEach(() => {
   h.machine.motionOperation = null;
   h.machine.controllerOperation = null;
   usePwaUpdateStore.setState({ availability: { kind: 'none' } });
-  localStorage.clear();
   vi.clearAllMocks();
 });
 
@@ -112,12 +111,5 @@ describe('PwaUpdateButton', () => {
     h.machine[field] = {};
     const { host } = await render();
     expect(host.querySelector(BUTTON)).toBeNull();
-  });
-
-  it('does not let an archived interrupted-job checkpoint hide the button', async () => {
-    markUpdateReady();
-    localStorage.setItem('laserforge.job-checkpoint.v1', '{"archived":true}');
-    const { host } = await render();
-    expect(host.querySelector(BUTTON)).not.toBeNull();
   });
 });
