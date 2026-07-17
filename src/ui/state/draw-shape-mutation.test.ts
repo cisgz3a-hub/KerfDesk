@@ -20,7 +20,7 @@ describe('applyDrawShape', () => {
     expect(result.additionalSelectedIds.size).toBe(0);
   });
 
-  it('auto-creates a line operation with an automatic presentation color', () => {
+  it('auto-creates the first line operation in black', () => {
     const shape = createRectangle({
       id: 'S2',
       color: '#123456',
@@ -31,7 +31,7 @@ describe('applyDrawShape', () => {
     const layer =
       stored === undefined ? null : primaryOperationForObject(stored, result.project.scene.layers);
     expect(layer).not.toBeNull();
-    expect(layer?.color).not.toBe(shape.color);
+    expect(layer?.color).toBe('#000000');
     // Drawn vectors default to a line/cut layer (LightBurn parity).
     expect(layer?.mode).toBe('line');
   });

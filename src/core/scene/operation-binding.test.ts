@@ -88,13 +88,14 @@ describe('explicit operation binding', () => {
 
 describe('automatic artwork operations', () => {
   it('uses deterministic distinct palette colors and an artwork name', () => {
-    expect(nextOperationColor([])).toBe('#2563eb');
-    expect(nextOperationColor([{ color: '#2563eb' }])).toBe('#dc2626');
+    expect(nextOperationColor([])).toBe('#000000');
+    expect(nextOperationColor([{ color: '#000000' }])).toBe('#2563eb');
+    expect(nextOperationColor([{ color: '#000000' }, { color: '#2563eb' }])).toBe('#dc2626');
     const result = createArtworkOperation(EMPTY_SCENE, artwork('Johann'));
     expect(result.operation).toMatchObject({
       id: 'operation-Johann',
       name: 'Johann',
-      color: '#2563eb',
+      color: '#000000',
     });
     expect(result.object.operationIds).toEqual(['operation-Johann']);
   });

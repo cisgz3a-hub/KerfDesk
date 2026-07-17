@@ -11,8 +11,8 @@ describe('artwork operation actions', () => {
     useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
     const { objects, layers } = useStore.getState().project.scene;
     expect(layers.map((layer) => [layer.name, layer.color])).toEqual([
-      ['Johann', '#2563eb'],
-      ['Box', '#dc2626'],
+      ['Johann', '#000000'],
+      ['Box', '#2563eb'],
     ]);
     expect(operationIdsForObject(objects[0]!, layers)).not.toEqual(
       operationIdsForObject(objects[1]!, layers),

@@ -39,7 +39,7 @@ describe('compact operation row and selected operation settings', () => {
       const row = operationRow(mounted.host);
       await click(row);
 
-      expect(useUiStore.getState().activeLayerColor).toBe('#2563eb');
+      expect(useUiStore.getState().activeLayerColor).toBe('#000000');
       expect(row.getAttribute('aria-current')).toBe('true');
       expect(row.querySelector('select')).toBeNull();
       expect(row.textContent).not.toContain('Advanced cut settings');
