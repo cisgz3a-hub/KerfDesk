@@ -3622,8 +3622,9 @@ working.
 safe update prompt, connection badge + Install button). Hardware verification
 (Web Serial driving the laser with the network down) is the standing gap.
 Service-worker registration is **web-only**: on the desktop shell (the `app://`
-scheme, where Chromium refuses SW) the update prompt is gated off at its mount
-(`PwaUpdatePromptGate`, ELE-06), so the desktop auto-update path (ADR-024) is the
+scheme, where Chromium refuses SW) the update watcher is gated off at its mount
+(`PwaUpdateWatcherGate` since ADR-227; formerly `PwaUpdatePromptGate`, ELE-06), so
+the desktop auto-update path (ADR-024) is the
 single updater and no cached precache can mask its on-disk swap.
 
 **Context.** PROJECT.md already mandates this — the web app is "PWA-installable"
@@ -9592,7 +9593,11 @@ operator clicks whenever they choose.
 
 - Operators are never interrupted about updates. LightBurn (desktop) shows a startup update
   dialog; the maintainer explicitly chose no-popup here, so this is a deliberate, recorded
-  divergence from LightBurn behavior.
+  divergence from LightBurn behavior. (Amended 2026-07-17, rolling audit #22 P3-3,
+  maintainer-approved: `PwaUpdateButton` also mounts a visually-hidden `role="status"` live
+  region that politely announces readiness to screen-reader users — the deleted banner was
+  `role="alert"`, so the passive button was silent for them. Audio-only, no visual popup;
+  the suppression predicate is unchanged.)
 - On Electron nothing changes: the watcher never mounts, the store stays `none`, the status bar
   never shows the button, and desktop updates remain electron-updater's (ADR-024/ADR-135).
 - Files: `src/ui/app/PwaUpdateWatcher(.test).tsx`, `src/ui/app/PwaUpdateWatcherGate(.test).tsx`,
