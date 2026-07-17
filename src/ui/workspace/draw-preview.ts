@@ -84,11 +84,18 @@ function drawObjectPolylinesFaint(
   if (!hasFaintVectorGeometry(obj)) return;
   for (const path of obj.paths) {
     const operationIds = path.operationIds ?? obj.operationIds;
-    const layer =
+    const colorLayer = layerByColor.get(path.color);
+    const bound =
       operationIds === undefined
-        ? layerByColor.get(path.color)
-        : operationIds.flatMap((id) => layerByColor.get(id) ?? [])[0];
-    if (layer === undefined || !layer.visible) continue;
+        ? colorLayer === undefined
+          ? []
+          : [colorLayer]
+        : operationIds.flatMap((id) => layerByColor.get(id) ?? []);
+    // Artwork stays on canvas while ANY bound operation is visible — the old
+    // first-binding pick hid the object when operation 1 was hidden even
+    // though a visible operation 2 still ran it (audit 2026-07-17-0815 P3-1).
+    const layer = bound.find((candidate) => candidate.visible);
+    if (layer === undefined) continue;
     ctx.strokeStyle = layer.color;
     ctx.lineWidth = layer.output ? 1.5 : 0.75;
     const display = buildDisplayPolylines(path.polylines);

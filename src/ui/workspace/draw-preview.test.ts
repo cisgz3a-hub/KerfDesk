@@ -275,7 +275,78 @@ describe('drawPreview', () => {
     expect(calls.moveTo).toBeGreaterThan(0);
     expect(calls.lineTo).toBeGreaterThan(0);
   });
+
+  // Audit 2026-07-17-0815 P3-1: the faint layer resolved multi-operation
+  // artwork through its FIRST bound operation only, so hiding operation 1
+  // removed the artwork from the canvas even while a visible operation 2
+  // still referenced (and would run) it.
+  it('keeps multi-operation artwork visible while ANY bound operation is visible', () => {
+    const project = multiOperationProject({ firstVisible: false, secondVisible: true });
+    const { ctx, calls } = countingContext();
+
+    drawObjectsFaint(ctx, project, view);
+
+    expect(calls.moveTo).toBeGreaterThan(0);
+    expect(calls.lineTo).toBeGreaterThan(0);
+  });
+
+  it('hides multi-operation artwork only when every bound operation is hidden', () => {
+    const project = multiOperationProject({ firstVisible: false, secondVisible: false });
+    const { ctx, calls } = countingContext();
+
+    drawObjectsFaint(ctx, project, view);
+
+    expect(calls.moveTo).toBe(0);
+    expect(calls.lineTo).toBe(0);
+  });
 });
+
+function multiOperationProject(options: {
+  readonly firstVisible: boolean;
+  readonly secondVisible: boolean;
+}): Project {
+  const project = createProject();
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      layers: [
+        {
+          ...createLayer({ id: 'op-1', color: '#111111', mode: 'line' }),
+          visible: options.firstVisible,
+        },
+        {
+          ...createLayer({ id: 'op-2', color: '#222222', mode: 'line' }),
+          visible: options.secondVisible,
+        },
+      ],
+      objects: [
+        {
+          kind: 'imported-svg',
+          id: 'multi-op',
+          source: 'multi.svg',
+          bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
+          transform: IDENTITY_TRANSFORM,
+          paths: [
+            {
+              color: '#111111',
+              operationIds: ['op-1', 'op-2'],
+              polylines: [
+                {
+                  closed: false,
+                  points: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
 
 function travelThenCutToolpath(): Toolpath {
   return {
