@@ -17,15 +17,15 @@ describe('runControllerReadiness', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('blocks live Start when controller settings have not been confirmed', () => {
+  it('warns without blocking laser Start when controller settings have not been confirmed', () => {
     const result = runControllerReadiness(createProject(), null);
 
-    expect(result.ok).toBe(false);
-    expect(result.errors).toContainEqual({
-      code: 'controller-settings-unknown',
-      message:
-        'Controller settings are not confirmed yet. Connect to the laser and wait for $$ detection before starting.',
-    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.map((warning) => warning.code)).toEqual([
+      'power-scale-unverified',
+      'laser-mode-unverified',
+    ]);
   });
 
   it('blocks live Start when GRBL $30 differs from the project max S profile', () => {
@@ -42,18 +42,15 @@ describe('runControllerReadiness', () => {
     });
   });
 
-  it('blocks live Start when the controller does not report GRBL $30', () => {
+  it('warns without blocking laser Start when the controller does not report GRBL $30', () => {
     const result = runControllerReadiness(createProject(), {
       minPowerS: 0,
       laserModeEnabled: true,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.errors).toContainEqual({
-      code: 'max-power-unknown',
-      message:
-        'Controller did not report GRBL $30 max S. KerfDesk cannot prove that power percentages map safely.',
-    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.map((warning) => warning.code)).toContain('power-scale-unverified');
   });
 
   it('blocks live Start when GRBL laser mode is disabled', () => {
@@ -154,6 +151,17 @@ describe('runControllerReadiness', () => {
 
       expect(result.ok).toBe(true);
       expect(result.errors).toEqual([]);
+    });
+
+    it('keeps Start blocked when CNC controller settings are not confirmed', () => {
+      const result = runControllerReadiness(cncProject, null);
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual({
+        code: 'controller-settings-unknown',
+        message:
+          'Controller settings are not confirmed yet. Reconnect or retry reading settings before starting CNC output.',
+      });
     });
 
     it('blocks CNC Start when laser mode is ENABLED, advising $32=0', () => {

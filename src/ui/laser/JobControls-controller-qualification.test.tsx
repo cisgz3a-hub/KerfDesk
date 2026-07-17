@@ -57,8 +57,8 @@ afterEach(() => {
   });
 });
 
-describe('JobControls controller qualification gate', () => {
-  it('disables only Start while controller qualification needs attention', async () => {
+describe('JobControls Start-only disabled reason', () => {
+  it('disables only Start when the parent supplies a qualification blocker', async () => {
     installRunnableProject();
     useLaserStore.setState({
       statusReport: {

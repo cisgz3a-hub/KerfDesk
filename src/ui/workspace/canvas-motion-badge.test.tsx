@@ -248,6 +248,37 @@ describe('CanvasMotionBadge spindle RPM (ADR-220)', () => {
   });
 });
 
+describe('CanvasMotionBadge artwork-relative laser status', () => {
+  it('does not label a valid running laser job as physically unverified', async () => {
+    const plan: CanvasMotionPlan = {
+      ...laserPlan(),
+      coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+    };
+    const { host, unmount } = await renderBadge(spindleOverlay({ spindle: 500, plan }));
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain('Controller-reported • Run');
+      expect(status?.textContent).not.toContain('physical bed position unverified');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('retains the bed-position explanation for an idle relative preview', async () => {
+    const plan: CanvasMotionPlan = {
+      ...laserPlan(),
+      coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+    };
+    const { host, unmount } = await renderBadge({ plan, run: null });
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toBe('Relative view — physical bed position unverified');
+    } finally {
+      await unmount();
+    }
+  });
+});
+
 function timedOverlay(opts: {
   readonly startedAtMs: number;
   readonly endedAtMs?: number | null;

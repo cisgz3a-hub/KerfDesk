@@ -1,3 +1,4 @@
+import type { MachineKind } from '../../core/scene';
 import type { LaserState } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 
@@ -67,6 +68,21 @@ export function controllerQualificationStartBlockMessage(
     return `Controller qualification failed: ${qualification.message}`;
   }
   return 'Controller qualification is not current. Reconnect or retry reading controller settings.';
+}
+
+// Ordinary laser output can already surface absent $30/$32 evidence in Job
+// Review and require the existing unverified-laser-mode acknowledgement. Do
+// not turn the background settings read into a duplicate dead-button gate.
+// CNC keeps the strict qualification contract because spindle mode/scale and
+// recovery setup are not safely inferred from the project profile.
+export function normalStartQualificationBlockMessage(
+  machineKind: MachineKind,
+  qualification: ControllerQualification,
+  currentEpoch: number,
+): string | null {
+  return machineKind === 'laser'
+    ? null
+    : controllerQualificationStartBlockMessage(qualification, currentEpoch);
 }
 
 export function failedControllerQualificationPatch(

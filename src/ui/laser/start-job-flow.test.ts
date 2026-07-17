@@ -191,20 +191,35 @@ describe('runStartJobFlow', () => {
     expect(jobAwareConfirm).not.toHaveBeenCalled();
   });
 
-  it('blocks inline while controller qualification is not current', async () => {
+  it('allows a no-homing User Origin laser Start after a settings-read failure', async () => {
     const { repository } = recoveryHarness();
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
     useLaserStore.setState({
       controllerQualification: {
-        kind: 'qualifying',
+        kind: 'failed',
         epoch: CONTROLLER_EPOCH,
-        phase: 'settings-read',
+        message: 'The controller settings response was empty.',
       },
+      controllerSettings: null,
+      controllerSettingsObservation: null,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 0, y: 0, z: 0 },
     });
 
     await runStartJobFlow(repository);
 
-    expect(startSpy()).not.toHaveBeenCalled();
-    expect(useStartBlockerStore.getState().messages).toEqual(['Reading controller settings…']);
+    expect(startSpy()).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        machineKind: 'laser',
+        laserModeStartEvidence: expect.objectContaining({
+          laserModeEnabled: undefined,
+          unverifiedAcknowledged: true,
+        }),
+      }),
+    );
+    expect(useStartBlockerStore.getState().messages).toEqual([]);
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });
 

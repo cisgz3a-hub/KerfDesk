@@ -5752,6 +5752,13 @@ controller reset look like job recovery even though the durable checkpoint is a 
   read) → qualified or failed. GRBL-family reset/reconnect/wake/probe/settings-write paths own one `$$`
   read after fresh Idle; late replies from prior epochs cannot qualify Start. Failure is shown inline
   with Retry/Reconnect instead of a generic settings-confirmation alert.
+- **Ordinary Laser Start amendment (2026-07-17):** qualification remains the source of fresh
+  controller evidence, but its incomplete/failed state is not itself a hard Laser Start gate.
+  Missing `$30`/`$32` evidence follows the already accepted warning-and-acknowledgement path in Job
+  Review, matching controllers that expose no numeric settings dump. A reported `$30` mismatch or
+  reported `$32=0` remains blocking. An in-flight settings transaction still owns the serial channel
+  until it settles. CNC Start and every supervised recovery keep the strict fresh-qualification
+  requirement because spindle/WCS re-entry semantics cannot be inferred safely.
 - **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
   clears controller evidence, live execution, recovery/replay data, notices, errors, transcript, and
   logs while preserving the project, selected profile, libraries, and preferences. It is a logical app
