@@ -86,6 +86,52 @@ describe('migrateToCurrent', () => {
     });
   });
 
+  it('drops an empty v1 polyline instead of inventing a {0,0} curve start', () => {
+    // Audit 2026-07-17-0550 P3-3: a zero-point legacy polyline used to become
+    // { start: {0,0}, segments: [] } — a phantom origin point the source file
+    // never contained. It must vanish from BOTH channels so they stay paired.
+    const result = migrateToCurrent(
+      {
+        schemaVersion: 1,
+        scene: {
+          objects: [
+            {
+              paths: [
+                {
+                  color: '#000000',
+                  polylines: [
+                    { closed: false, points: [] },
+                    {
+                      closed: false,
+                      points: [
+                        { x: 1, y: 2 },
+                        { x: 3, y: 4 },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      1,
+    );
+    if (result.kind !== 'ok') throw new Error('expected ok migration');
+    const scene = result.raw['scene'] as {
+      objects: Array<{ paths: Array<{ polylines: unknown[]; curves: unknown[] }> }>;
+    };
+    const path = scene.objects[0]?.paths[0];
+    expect(path?.polylines).toHaveLength(1);
+    expect(path?.curves).toEqual([
+      {
+        start: { x: 1, y: 2 },
+        segments: [{ kind: 'line', to: { x: 3, y: 4 } }],
+        closed: false,
+      },
+    ]);
+  });
+
   it('migrates v2 colors, object overrides, and sub-layers to explicit operations', () => {
     const result = migrateToCurrent(
       {

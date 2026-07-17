@@ -28,6 +28,70 @@ function deserializeOk(text: string): Project {
   return result.project;
 }
 
+describe('.lf2 machine tools validation (audit 2026-07-17-0550 P2-1)', () => {
+  function loadWithTools(tools: unknown): Project {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    (raw['machine'] as Record<string, unknown>)['tools'] = tools;
+    return deserializeOk(`${JSON.stringify(raw)}\n`);
+  }
+
+  function toolsOf(project: Project): ReadonlyArray<{ id: string; diameterMm: number }> {
+    return project.machine?.kind === 'cnc' ? project.machine.tools : [];
+  }
+
+  it('drops a tool whose diameter is non-finite (JSON 1e999 parses to Infinity)', () => {
+    const tools = toolsOf(
+      loadWithTools([{ id: 't-inf', name: 'Broken', kind: 'end-mill', diameterMm: 1e999 }]),
+    );
+    expect(tools.every((tool) => Number.isFinite(tool.diameterMm))).toBe(true);
+    expect(tools.some((tool) => tool.id === 't-inf')).toBe(false);
+  });
+
+  it('keeps a valid tool while dropping an invalid sibling', () => {
+    const tools = toolsOf(
+      loadWithTools([
+        { id: 'good', name: 'Good', kind: 'end-mill', diameterMm: 3.175 },
+        { id: 'bad', name: 'Bad', kind: 'end-mill', diameterMm: 1e999 },
+      ]),
+    );
+    expect(tools.map((tool) => tool.id)).toEqual(['good']);
+  });
+
+  it('drops a malformed tipAngleDeg but keeps the tool', () => {
+    const project = loadWithTools([
+      { id: 'vb', name: 'V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 1e999 },
+    ]);
+    const tool = project.machine?.kind === 'cnc' ? project.machine.tools[0] : undefined;
+    expect(tool?.id).toBe('vb');
+    expect(tool?.tipAngleDeg).toBeUndefined();
+  });
+
+  it('keeps a valid tipAngleDeg', () => {
+    const project = loadWithTools([
+      { id: 'vb45', name: '45 V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 45 },
+    ]);
+    const tool = project.machine?.kind === 'cnc' ? project.machine.tools[0] : undefined;
+    expect(tool?.tipAngleDeg).toBe(45);
+  });
+
+  it('defaults an unknown tool kind to end-mill instead of trusting junk', () => {
+    const project = loadWithTools([
+      { id: 'odd', name: 'Odd', kind: 'laser-beam', diameterMm: 3 },
+    ]);
+    const tool = project.machine?.kind === 'cnc' ? project.machine.tools[0] : undefined;
+    expect(tool?.id).toBe('odd');
+    expect(tool?.kind).toBe('end-mill');
+  });
+
+  it('strips unknown extra fields from a tool record', () => {
+    const project = loadWithTools([
+      { id: 'x', name: 'X', kind: 'end-mill', diameterMm: 3, rogueField: 'boo' },
+    ]);
+    const tool = project.machine?.kind === 'cnc' ? project.machine.tools[0] : undefined;
+    expect(tool).toEqual({ id: 'x', name: 'X', kind: 'end-mill', diameterMm: 3 });
+  });
+});
+
 describe('.lf2 machine / cnc round-trip', () => {
   it('round-trips inlay-pair settings and drops malformed values', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
