@@ -14,7 +14,7 @@ function makeConnection(writes: string[]): FakeConnection {
     write: async (data) => {
       writes.push(data);
       // Real GRBL answers the connect-time $G modal query (C6) with its state
-      // then ok; model it so the ackless query settles during connect. Answer
+      // then ok; model it so the modal query settles during connect. Answer
       // ONLY the handshake's $G (controllerOperation is still the connection
       // handshake): an operator console $G lands with no active operation and
       // drives its own reply, so it must not be auto-answered here.

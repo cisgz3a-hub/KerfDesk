@@ -18,11 +18,11 @@ function stateWith(overrides: Partial<LaserState>): () => LaserState {
 }
 
 describe('requestActiveWcsReadback', () => {
-  it('issues the ackless modal query against a qualified, quiescent session', async () => {
+  it('issues the modal query as a normal system write against a qualified, quiescent session', async () => {
     const write = vi.fn(async () => undefined);
     await requestActiveWcsReadback(stateWith({}), grblDriver, write, QUALIFIED_EPOCH);
     expect(write).toHaveBeenCalledTimes(1);
-    expect(write).toHaveBeenCalledWith('$G\n', undefined, 'system', { ackless: true });
+    expect(write).toHaveBeenCalledWith('$G\n', undefined, 'system');
   });
 
   it('skips controllers without a modal-state query', async () => {
