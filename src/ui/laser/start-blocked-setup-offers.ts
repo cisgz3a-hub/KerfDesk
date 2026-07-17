@@ -18,12 +18,12 @@ import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 export const SET_ORIGIN_OFFER_PROMPT =
   'User Origin needs a custom work origin.\n\n' +
   'OK: set the work origin at the current head position — the job runs from here — and ' +
-  'continue this Start.\n' +
+  'then Frame the updated placement before starting.\n' +
   'Cancel: leave the job blocked.';
 
 export const RESET_ORIGIN_OFFER_PROMPT =
   'Absolute Coordinates requires the custom work origin to be cleared.\n\n' +
-  'OK: reset the work origin to machine coordinates and continue this Start.\n' +
+  'OK: reset the work origin to machine coordinates, then Frame before starting.\n' +
   'Cancel: leave the job blocked.';
 
 export async function offerSetupFixForBlockedStart(message: string): Promise<BlockedStartRepair> {

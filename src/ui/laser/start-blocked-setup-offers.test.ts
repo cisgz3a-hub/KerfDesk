@@ -7,7 +7,11 @@ import {
   USER_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { offerFixForBlockedStart } from './start-blocked-fix-offers';
-import { offerSetupFixForBlockedStart } from './start-blocked-setup-offers';
+import {
+  offerSetupFixForBlockedStart,
+  RESET_ORIGIN_OFFER_PROMPT,
+  SET_ORIGIN_OFFER_PROMPT,
+} from './start-blocked-setup-offers';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareConfirm: vi.fn(() => true),
@@ -36,6 +40,8 @@ afterEach(() => {
 describe('set-origin offer', () => {
   it('sets the work origin at the current position and retries', async () => {
     await expect(offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe('retry');
+    expect(jobAwareConfirm).toHaveBeenCalledWith(SET_ORIGIN_OFFER_PROMPT);
+    expect(SET_ORIGIN_OFFER_PROMPT).toContain('Frame the updated placement before starting');
     expect(vi.mocked(useLaserStore.getState().setOriginHere)).toHaveBeenCalledTimes(1);
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'success' });
   });
@@ -71,6 +77,8 @@ describe('reset-origin offer', () => {
     await expect(offerSetupFixForBlockedStart(ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE)).resolves.toBe(
       'retry',
     );
+    expect(jobAwareConfirm).toHaveBeenCalledWith(RESET_ORIGIN_OFFER_PROMPT);
+    expect(RESET_ORIGIN_OFFER_PROMPT).toContain('then Frame before starting');
     expect(vi.mocked(useLaserStore.getState().resetOrigin)).toHaveBeenCalledTimes(1);
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'success' });
   });

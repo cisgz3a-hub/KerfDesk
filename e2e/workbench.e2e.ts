@@ -322,6 +322,16 @@ kerfDeskTest(
     const probe = page.getByTestId('canvas-motion-probe');
     await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
     await connectAndHome(page, kerfdesk);
+
+    // ADR-228: Start is available only after the exact compiled job has completed a Frame.
+    const frameButton = page.getByRole('button', { name: 'Frame', exact: true });
+    const writesBeforeFrame = serialWrites(await kerfdesk.events()).length;
+    await frameButton.click();
+    await expect
+      .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
+      .toContain('$J=G90 G21');
+    await expect(frameButton).toBeEnabled();
+
     await kerfdesk.setAutoAcknowledge(false);
     page.on('dialog', (dialog) => void dialog.accept());
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
