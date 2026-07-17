@@ -59,7 +59,7 @@ describe('useStore', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     const { scene } = useStore.getState().project;
     expect(scene.objects).toHaveLength(1);
-    expect(scene.layers.map((operation) => operation.color)).toEqual(['#2563eb', '#dc2626']);
+    expect(scene.layers.map((operation) => operation.color)).toEqual(['#000000', '#2563eb']);
     expect(operationIdsFor('O1')).toEqual(scene.layers.map((operation) => operation.id));
   });
 

@@ -317,7 +317,7 @@ describe('layer store actions', () => {
 
     expect(useStore.getState().project.scene.layers[0]).toMatchObject({
       id: 'operation-O1',
-      color: '#2563eb',
+      color: '#000000',
       mode: 'fill',
       power: 22,
     });

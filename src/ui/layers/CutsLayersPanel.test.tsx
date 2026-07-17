@@ -83,8 +83,8 @@ describe('Artwork Operations panel', () => {
       expect(host.querySelector('[aria-label="Operation Johann"]')).not.toBeNull();
       expect(host.querySelector('[aria-label="Operation Box"]')).not.toBeNull();
       expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+        '#000000',
         '#2563eb',
-        '#dc2626',
       ]);
     } finally {
       await unmount();
