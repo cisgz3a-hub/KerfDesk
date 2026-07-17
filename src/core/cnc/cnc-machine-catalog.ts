@@ -68,16 +68,21 @@ export const CNC_MACHINE_CATALOG: ReadonlyArray<CncMachinePreset> = [
   {
     id: 'onefinity-woodworker',
     name: 'Onefinity Woodworker',
-    bedWidthMm: 435,
-    bedHeightMm: 435,
+    // Conservative envelope for the 32″-class Woodworker. A current Elite
+    // listing gives 807.99×765.99 mm max travel; round down because usable
+    // travel varies by generation and setup.
+    bedWidthMm: 807,
+    bedHeightMm: 765,
     spindleMaxRpm: 24000,
     note: CONFIRM,
   },
   {
     id: 'onefinity-journeyman',
     name: 'Onefinity Journeyman',
-    bedWidthMm: 840,
-    bedHeightMm: 435,
+    // Conservative envelope for the 48″×32″-class Journeyman, using
+    // the rounded-down max travel from the corresponding Elite listing.
+    bedWidthMm: 1214,
+    bedHeightMm: 765,
     spindleMaxRpm: 24000,
     note: CONFIRM,
   },
