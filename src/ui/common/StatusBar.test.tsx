@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
+import { usePwaUpdateStore } from '../state/pwa-update-store';
 import { useUiStore } from '../state/ui-store';
 import { StatusBar } from './StatusBar';
 
@@ -19,6 +20,7 @@ afterEach(() => {
   document.body.innerHTML = '';
   useStore.getState().newProject();
   useUiStore.getState().resetView();
+  usePwaUpdateStore.setState({ availability: { kind: 'none' } });
 });
 
 describe('StatusBar', () => {
@@ -99,6 +101,29 @@ describe('StatusBar', () => {
     try {
       expect(host.textContent).toContain('Groups: 1');
       expect(host.textContent).toContain('Locked: 2');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('hosts the right-aligned Update button when an update is ready (ADR-227)', async () => {
+    usePwaUpdateStore.setState({
+      availability: { kind: 'ready', applyUpdate: () => Promise.resolve() },
+    });
+    const { host, root } = await renderStatusBar();
+    try {
+      const button = host.querySelector<HTMLButtonElement>('button[aria-label="Apply app update"]');
+      expect(button).not.toBeNull();
+      expect(button?.style.marginLeft).toBe('auto');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('shows no Update button when no update is ready', async () => {
+    const { host, root } = await renderStatusBar();
+    try {
+      expect(host.querySelector('button[aria-label="Apply app update"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
     }

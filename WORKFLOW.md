@@ -1081,7 +1081,7 @@ separate exact replay receipt.
 4. **Discard** deletes only the capsule. It does not stop, reset, reconnect, move,
    or modify the current job.
 5. Recovery storage/quota/schema failure shows a nonblocking warning. Current Start
-   and the PWA update/reload prompt remain available.
+   and the status-bar PWA Update button (ADR-227) remain available.
 
 #### Error — project changed since the run
 1. Exact capsules do not depend on the current project and therefore cannot fail

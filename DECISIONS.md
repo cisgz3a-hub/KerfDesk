@@ -97,6 +97,7 @@
 | ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
 | ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
 | ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
+| ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
 
 ---
 
@@ -3665,7 +3666,12 @@ direct Web Serial control is a genuine gap.
    waiting slot, no reload, banner left standing. `pwa-prompted-reload.ts`
    now guarantees the clicked Reload always reloads — via `statechange` once
    the skip-waited worker activates, or a plain reload when nothing is
-   actually waiting.)
+   actually waiting.) (Amended 2026-07-17 by ADR-227: the Reload/Later
+   banner is gone - update readiness now surfaces as a passive status-bar
+   Update button (`PwaUpdateWatcher` publishes to `pwa-update-store`,
+   `PwaUpdateButton` renders it), the "Later" dismissal persistence and its
+   `updatefound` re-arm are removed, and the click path through
+   `pwa-prompted-reload.ts` is unchanged.)
 3. **`injectRegister: false`; register via the `virtual:pwa-register/react`
    hook.** A bundled hook is same-origin, satisfying the strict CSP
    (`script-src 'self'`, `public/_headers`) where the inline registration form is
@@ -9506,3 +9512,65 @@ from pinned hashes, OFL notices and attribution ship in web and desktop
 distributions, and tests prove all four outputs remain finite and open. The
 fonts are also usable for single-pass laser line engraving, but their product
 labeling and default machining policy remain CNC-oriented.
+
+---
+
+## ADR-227 - Status-bar Update button replaces the PWA update popup
+
+**Date:** 2026-07-17
+**Status:** Accepted
+
+### Context
+
+ADR-060's update UX was a fixed bottom-center Reload/Later banner (`PwaUpdatePrompt`). With a
+deploy landing on nearly every merge and workbox-window re-firing `waiting` on every page load,
+the banner behaved as a permanent interruption: each new deploy legitimately re-armed it (a
+strictly-newer SW must not stay swallowed by a persisted "Later"), and before the 2026-07-17
+uncontrolled-page fix its Reload could also be a silent no-op, leaving the same "new version"
+message standing after the user acted — which reads as "there is no update, stop asking." The
+maintainer asked for the popup to be removed entirely in favor of a prominent control the
+operator clicks whenever they choose.
+
+### Decision
+
+1. **No popup, banner, or dialog for update availability - ever.** `PwaUpdateWatcher` (replacing
+   `PwaUpdatePrompt`) is headless: it registers the service worker exactly as before (ADR-060
+   items 1, 3, 4 unchanged, still web-only via `PwaUpdateWatcherGate`) and publishes readiness to
+   a dedicated Zustand slice, `pwa-update-store`
+   (`{ kind: 'none' } | { kind: 'ready'; applyUpdate }`).
+2. **The status bar hosts the update control.** `PwaUpdateButton` renders a right-aligned
+   primary **Update** button whenever availability is `ready`. Clicking it runs the staged
+   callback - the unchanged `applyPromptedReload` path (skip-wait, then a guaranteed reload in
+   every service-worker state). The update still applies only on a user click; ADR-060's
+   "never auto-reload" rule stands.
+3. **The old banner's machine suppression carries over verbatim as presentation.** The button is
+   hidden - not disabled - while a job is active or a safety notice / motion operation /
+   controller operation is pending; readiness persists in the store, so the button reappears
+   once the machine clears. This preserves ADR-060's "a reload can abort motion" intent with no
+   new guard surface (ADR-206: same predicate, same effect, nothing newly blocked).
+4. **The "Later" dismissal machinery is deleted** (`pwa-update-dismissal.ts` and the
+   `updatefound` re-arm). It existed only to stop the popup from re-nagging; a passive button
+   does not nag, so workbox re-firing `waiting` on every load is now harmless. The orphaned
+   `kerfdesk.pwa.dismissedUpdateVersion.v1` localStorage key is simply ignored.
+
+### Alternatives rejected
+
+- A popup with longer/persistent dismissal - any popup re-surfaces on the next deploy, and this
+  project deploys on nearly every merge; the nag was structural, not a timing bug.
+- An always-visible "Check for updates" control - permanent chrome for a state that is almost
+  always empty; update discovery still happens on page load exactly as before.
+- Disabling instead of hiding during jobs - a visible disabled control invites mid-burn clicks
+  and enlarges the existing suppression surface; hiding preserves it exactly.
+- A toolbar placement - the status bar is the app's persistent low-attention strip (VS
+  Code-style update affordance) and the maintainer asked for a "task bar" location.
+
+### Consequences
+
+- Operators are never interrupted about updates. LightBurn (desktop) shows a startup update
+  dialog; the maintainer explicitly chose no-popup here, so this is a deliberate, recorded
+  divergence from LightBurn behavior.
+- On Electron nothing changes: the watcher never mounts, the store stays `none`, the status bar
+  never shows the button, and desktop updates remain electron-updater's (ADR-024/ADR-135).
+- Files: `src/ui/app/PwaUpdateWatcher(.test).tsx`, `src/ui/app/PwaUpdateWatcherGate(.test).tsx`,
+  `src/ui/state/pwa-update-store.ts`, `src/ui/common/PwaUpdateButton(.test).tsx`, StatusBar
+  hosting + tests; `PwaUpdatePrompt*`, `pwa-update-dismissal.ts` deleted.
