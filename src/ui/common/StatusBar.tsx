@@ -1,11 +1,13 @@
 // StatusBar — WORKFLOW.md F-A16. Bottom bar with cursor position, selection
-// summary, object / layer counts, device name, bed dimensions. Job estimate
-// is Phase C.
+// summary, object / layer counts, device name, bed dimensions, and the
+// right-aligned Update button when a new version is ready (ADR-227). Job
+// estimate is Phase C.
 
 import { transformedBBox, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
+import { PwaUpdateButton } from './PwaUpdateButton';
 
 export function StatusBar(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -39,6 +41,7 @@ export function StatusBar(): JSX.Element {
         Bed: {project.device.bedWidth} × {project.device.bedHeight} mm
       </Segment>
       <Segment>Zoom: {Math.round(zoomFactor * 100)}%</Segment>
+      <PwaUpdateButton />
     </footer>
   );
 }

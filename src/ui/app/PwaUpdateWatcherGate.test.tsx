@@ -3,12 +3,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from './platform-context';
-import { PwaUpdatePromptGate } from './PwaUpdatePromptGate';
+import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 
 // Mock the gated child so the test verifies only the gate's mount decision, not
-// PwaUpdatePrompt's own service-worker/store wiring (covered by its own test).
-vi.mock('./PwaUpdatePrompt', () => ({
-  PwaUpdatePrompt: () => <div data-testid="pwa-update-prompt" />,
+// PwaUpdateWatcher's own service-worker/store wiring (covered by its own test).
+vi.mock('./PwaUpdateWatcher', () => ({
+  PwaUpdateWatcher: () => <div data-testid="pwa-update-watcher" />,
 }));
 
 // The gate reads only adapter.id; a partial cast keeps the test focused on the
@@ -35,31 +35,31 @@ function render(node: ReactNode): void {
   act(() => root.render(node));
 }
 
-function promptMounted(): boolean {
-  return container.querySelector('[data-testid="pwa-update-prompt"]') !== null;
+function watcherMounted(): boolean {
+  return container.querySelector('[data-testid="pwa-update-watcher"]') !== null;
 }
 
-describe('PwaUpdatePromptGate', () => {
-  it('does not mount the PWA update prompt on the desktop shell', () => {
+describe('PwaUpdateWatcherGate', () => {
+  it('does not mount the PWA update watcher on the desktop shell', () => {
     render(
       <PlatformProvider adapter={adapterWithId('electron')}>
-        <PwaUpdatePromptGate />
+        <PwaUpdateWatcherGate />
       </PlatformProvider>,
     );
-    expect(promptMounted()).toBe(false);
+    expect(watcherMounted()).toBe(false);
   });
 
-  it('mounts the PWA update prompt on the web target', () => {
+  it('mounts the PWA update watcher on the web target', () => {
     render(
       <PlatformProvider adapter={adapterWithId('web')}>
-        <PwaUpdatePromptGate />
+        <PwaUpdateWatcherGate />
       </PlatformProvider>,
     );
-    expect(promptMounted()).toBe(true);
+    expect(watcherMounted()).toBe(true);
   });
 
   it('mounts on the web target when no platform provider is present', () => {
-    render(<PwaUpdatePromptGate />);
-    expect(promptMounted()).toBe(true);
+    render(<PwaUpdateWatcherGate />);
+    expect(watcherMounted()).toBe(true);
   });
 });
