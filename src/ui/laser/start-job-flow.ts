@@ -54,6 +54,7 @@ import {
   reportStartAuthorizationRefusal,
 } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
+import { offerZeroZForBlockedStart, type StartOfferPolicy } from './start-blocked-zero-z-offer';
 import { runJobReviewGate } from './job-review';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 
@@ -83,6 +84,7 @@ async function runStartJobFlowWithCheckpoint(
   checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
   repository: RecoveryRepository,
+  offerPolicy: StartOfferPolicy = 'offer-fixes',
 ): Promise<void> {
   useStartBlockerStore.getState().clear();
   const laser = useLaserStore.getState();
@@ -105,9 +107,14 @@ async function runStartJobFlowWithCheckpoint(
     completedReceipt?.artifact.jobOrigin,
   );
   if (!prepared.ok) {
-    useStartBlockerStore.getState().report(prepared.messages);
-    const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(`Cannot start job:\n\n${lines}`);
+    if ((await repairOrReportBlockedStart(prepared.messages, offerPolicy)) === 'retry') {
+      return runStartJobFlowWithCheckpoint(
+        checkpointToReplace,
+        completedReceipt,
+        repository,
+        'no-offers',
+      );
+    }
     return;
   }
   if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
@@ -175,6 +182,22 @@ async function currentLaserForAuthorizedStart(args: {
     args.repository,
   );
   return null;
+}
+
+// Blocks that have a one-click remedy offer it in place instead of
+// dead-ending in an alert. Retried at most once ('no-offers') so a gate that
+// still fails cannot loop the operator through the same dialog.
+async function repairOrReportBlockedStart(
+  messages: ReadonlyArray<string>,
+  offerPolicy: StartOfferPolicy,
+): Promise<'retry' | 'blocked'> {
+  if (offerPolicy === 'offer-fixes' && (await offerZeroZForBlockedStart(messages))) {
+    return 'retry';
+  }
+  useStartBlockerStore.getState().report(messages);
+  const lines = messages.map((message) => `• ${message}`).join('\n');
+  jobAwareAlert(`Cannot start job:\n\n${lines}`);
+  return 'blocked';
 }
 
 function blockUnqualifiedStart(laser: ReturnType<typeof useLaserStore.getState>): boolean {
