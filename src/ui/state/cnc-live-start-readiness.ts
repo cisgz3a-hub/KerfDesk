@@ -40,7 +40,10 @@ export async function refreshCncLiveStartState(
   set((state) => ({
     ovCache: null,
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
-    controllerOperation: { kind: 'start-arming', phase: 'live-status' },
+    controllerOperation:
+      state.controllerOperation?.kind === 'start-arming'
+        ? { ...state.controllerOperation, phase: 'live-status' }
+        : { kind: 'start-arming', phase: 'live-status' },
   }));
   const deadline = Date.now() + LIVE_STATUS_TIMEOUT_MS;
 

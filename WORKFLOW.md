@@ -721,12 +721,21 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B4. Frame
 
 #### Success
-1. User clicks **Frame** while connected and the controller is Idle.
-2. App resolves the job placement (start-from mode, anchor, cached WCO), compiles through the shared `prepareOutput` pipeline, and computes the job's motion bounds (including overscan).
-3. Frame preflight checks the motion bounds against the bed (with any placement offset) and no-go zones. On failure an error toast explains the violation and no bytes are sent.
-4. App builds five absolute `$J=G90 G21 X<x> Y<y> F<feed>` jogs tracing the perimeter (start corner, four edges back to the start) at `min(framingFeedMmPerMin, maxFeed)`.
-5. The first jog is written immediately; each remaining line is dispatched as the previous jog completes. Status polling shows `Jog`, then `Idle` when the box closes.
-6. When framing from a verified origin, a successful pass records frame verification for the Start-job preflight.
+1. User clicks **Frame job** while connected and the controller is Idle.
+2. App resolves placement once, compiles one exact executable artifact through the shared
+   `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
+   Unstreamable/empty output refuses; bed, no-go, homing, camera, settings, accessory, override,
+   dialect, tool, and other policy findings remain warnings.
+3. **Job Review** shows those warnings and the exact artifact. The operator accepts with
+   **Accept & Frame**; an edit inside review re-prepares before acceptance.
+4. Frame establishes driver-produced tool-off state, then builds the watched absolute jog sequence
+   around the exact generated motion envelope. Every line is dispatched only after the prior line
+   completes and receives its terminal acknowledgement.
+5. After tracing the box, Frame returns to the normalized work position occupied when the artifact
+   was prepared. A final fresh clean `Idle`, all acknowledgements, and unchanged controller/origin/
+   settings evidence issue a one-run permit for that exact artifact.
+6. Cancel, error, Alarm, non-motion controller state, MPG takeover, disconnect, manual controller
+   mutation, or evidence drift drops the candidate and issues no permit.
 
 #### Canvas start markers
 1. The canvas shows `FRAME START` and `JOB START` markers by default. Label text renders at 50%
@@ -738,14 +747,23 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    status badge.
 
 #### CNC — safe-Z retract and restore
-1. For a CNC project with a current work-Z zero, the XY perimeter is wrapped with Z motion (ADR-192): a safe-Z retract (`$J=G90 G21 Z<safeZ>`) is written first so the bit clears the stock, and after the box closes a final jog restores the bit to its pre-frame work Z. The bit ends where it started — at Z0 when it was touching the stock — never parked at the clearance height.
-2. Without a current work-Z zero the work-frame retract would target an arbitrary physical height, so framing falls back to the XY-only perimeter (as in laser mode). The restore jog is also omitted when the pre-frame Z is unknown or already equals safe Z.
+1. CNC Frame requires current-session stock-top Work-Z and a fresh known work position because its
+   absolute work-frame safe-Z retract/restore program cannot otherwise be constructed safely
+   (ADR-192). If Work-Z is missing, the setup flow offers **Zero Z here and continue** only when the
+   operator confirms the bit is touching the stock top.
+2. Frame writes tool/spindle/coolant off, retracts to `<safeZ>`, traces and returns in XY while
+   retracted, then restores the exact pre-Frame work Z. Missing Work-Z, unknown return Z, or a driver
+   without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
+3. CNC dialect, tool identity, probe-plate state, controller settings, accessories, overrides,
+   bounds, and no-go findings remain Job Review warnings and never become Frame policy gates.
 
 #### Error — origin cannot be resolved
 1. Placement resolution fails (e.g. selection origin requested with nothing usable); error toast, no bytes sent.
 
 #### Edge — raster job exceeds the raster budget
-1. If preflight fails only with `raster-too-large`, the app still frames the outline using the frame bounds (framing must stay available for exactly these jobs).
+1. The exact artifact cannot be produced, so Frame refuses with the raster-budget compile message.
+   It never substitutes an approximate artwork rectangle, because that would authorize bytes that
+   were not the artifact physically framed.
 
 #### Edge — cancel mid-frame
 1. **Cancel** writes the real-time jog-cancel byte (`0x85`); pending frame lines are dropped and the motion operation clears.
@@ -763,13 +781,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B6. Start job
 
 #### Success
-1. User clicks **Start job** while connected and idle (toolbar button or Cmd/Ctrl+Return; Run
-   again and confirmed checkpoint replacement follow the same path).
-2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. A laser controller that reports `$32=0` no longer refuses Start — frame-first (ADR-228)
-   demoted it to the Job Review `$32` acknowledgement banner, which the operator must
-   acknowledge inside the dialog before confirming.
-4. App compiles the project to G-code via `emitGcode`, then opens the **Job Review** dialog
+1. With no current permit, the primary action reads **Set up & Frame** (the separate action reads
+   **Frame job**). User activates either while connected and Idle.
+2. App resolves placement once and compiles one exact executable artifact. Transport and compile
+   integrity failures stop here; policy findings such as `$30`/`$32`, bounds, homing, camera,
+   overrides, accessories, and CNC setup remain warnings.
+3. App opens the **Job Review** dialog
    (ADR-224, v2 look) built from the exact prepared program: five stat tiles (estimated time as
    the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
    G-code lines and bytes, and a read-only Origin tile), a **collapsed amber "Warnings (N)"
@@ -785,14 +802,26 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    with counts, and the safety acknowledgement — the unverified-`$32` cable-loss/latched-output
    prompt or the CNC workholding/exclusive-access attestation, verbatim. Placement is **not**
    editable in the review (it stays on the machine rail); the sticky footer echoes the resolved
-   origin ("Runs from …") beside Cancel and **Start job**. Pressing the review's Start job
+   origin ("Runs from …") beside Cancel and **Accept & Frame**. Pressing Accept & Frame
    records the same evidence objects the previous native confirms produced.
-5. Editing a value inside the review commits through the normal layer/placement store actions and
+4. Editing a value inside the review commits through the normal layer/placement store actions and
    re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
-   the fresh program replaces the shown one — the bytes streamed are always the bytes last shown.
-6. On the review's **Start job**, the app builds a streamer and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
-7. Every `ok` advances the streamer by one line and writes more.
-8. Progress bar reflects `completed / total` lines.
+   the fresh program replaces the shown one — the artifact framed and later streamed is always the
+   one last shown.
+5. Frame traces the exact generated motion envelope with the tool off, then returns to the same
+   normalized work position used during preparation. Dispatch alone authorizes nothing: every
+   Frame command must receive its terminal acknowledgement and the controller must reach final
+   clean Idle without interruption or reviewed controller/origin/settings drift.
+6. Clean completion issues a one-run exact `FramedRunPermit`. The controls read **Ready to start —
+   framed job unchanged**, **Start framed job**, and **Frame again**. Any relevant edit, camera or
+   rotary change, jog/origin/probe/reset/disconnect, or controller drift expires it.
+7. User clicks **Start framed job**. Start sends the permit's cached G-code without recompiling,
+   reopening Job Review, or rerunning policy gates. Only live transport and exact-handoff checks
+   remain; a deterministic empty/comment-only or RX-oversized program was already rejected before
+   Frame.
+8. App builds the streamer and writes the first batch (as much as the RX window allows — default
+   120 bytes, per-profile `rxBufferBytes`). Every `ok` advances one line and progress reflects
+   `completed / total`.
 9. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
@@ -819,12 +848,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
     stopped, errored, or disconnected — so the final duration stays
     readable (ADR-221). Runs without a recorded start show no timer.
 
-#### Error — preflight fails
-1. Modal lists the violations. No bytes sent. The review never opens.
+#### Error — exact artifact cannot be produced
+1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job
+   bytes are sent and Job Review does not open. Policy findings do not enter this path.
 
 #### Error — re-prepare refused inside the review
-1. An in-review edit that makes the job unpreparable (an alarm arrives, bounds are exceeded, the
-   output empties, or program identity is lost under Run again / checkpoint replacement) shows
+1. An in-review edit that makes the job unpreparable (an alarm arrives, the output empties, or
+   program identity is lost under Run again / checkpoint replacement) shows
    the exact refusal messages in a red banner, keeps the last good stats dimmed, and disables the
    review's Start button. Fields stay editable — fixing the value recovers in place. No bytes sent.
 
@@ -2421,19 +2451,16 @@ F-CNC19 tiling.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
-#### Work-Z evidence at Start *(demoted by frame-first — ADR-228; this section predates it)*
-1. Missing work-Z evidence for the current reference epoch no longer blocks CNC
-   Start — the Job Review dialog carries the warning instead, and Zero Z /
-   probing remain available in the panel. KerfDesk's CNC emitter still defines
-   Z0 as the stock top, so the warning is prominent.
-2. The evidence still records the Active bit selected when Zero Z/probing begins.
-   Start compares it with the first bit in the exact compiled tool-section plan;
-   missing or mismatched identity is a Job Review warning, not a block.
-3. Probe-derived evidence still starts with touch-plate removal unconfirmed.
-   Unconfirmed removal surfaces as a Job Review warning at ordinary Start (the
-   mid-job tool-change probe-plate check is unchanged — resume/recovery class).
-4. Set Origin establishes XY only and does not satisfy this gate. Laser Start
-   is unaffected.
+#### Initial Frame setup — establish stock-top Z0
+1. CNC Frame needs current-session Work-Z and a fresh work position to construct its absolute
+   safe-Z retract and exact restore. Manual Zero Z or a settled probe supplies that coordinate;
+   Set Origin establishes XY only. This is Frame-motion compile input, not an additional Start gate.
+2. If Work-Z is missing and the bit is touching stock top, **Zero Z here and continue** performs the
+   acknowledged setup in place and waits for a fresh position before preparing the artifact.
+3. Active-bit identity, probe-plate removal, controller settings, and accessory state are shown in
+   Job Review as warnings. They do not block ordinary Frame or Start.
+4. Once the exact CNC Frame completes, ordinary Start consumes its permit with no further Work-Z,
+   tool, plate, accessory, override, or dialect policy check.
 
 #### Success
 1. Every M0 change block carries "; re-zero Z on the stock top, then

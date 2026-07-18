@@ -40,3 +40,6 @@ export type SafeWriteFn = (
 // ack accounting; 'untracked' means a console/origin/handshake write sent
 // before the stream owns it (FIFO), so the streamer must not see it.
 export type AckOwner = 'stream' | 'untracked';
+export type AckSettlement =
+  | { readonly owner: 'stream' }
+  | { readonly owner: 'untracked'; readonly motionOperationId: number | null };

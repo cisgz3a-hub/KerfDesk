@@ -48,6 +48,7 @@ import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
+import type { FramedRunPermit } from './framed-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
 import type {
@@ -218,6 +219,9 @@ export type LaserState = LaserStoreActions & {
    * bounds signature stops matching). null = not verified.
    */
   readonly frameVerification: FrameVerification | null;
+  /** Exact reviewed program authorized only after its Frame physically
+   * completes. A pending Frame candidate lives on motionOperation instead. */
+  readonly framedRun: FramedRunPermit | null;
   /**
    * ADR-094 — capabilities snapshot of the active ControllerDriver. UI
    * components gate controls on these flags, never on the controller kind.
@@ -292,6 +296,7 @@ const refs: LiveRefs = {
   pauseResumeTransition: null,
   writeEpoch: 0,
   pendingResetCleanup: null,
+  untrackedAckReservations: [],
 };
 
 async function safeWrite(
@@ -338,7 +343,10 @@ function autofocusActions(
           reason: 'Wait for the previous controller command to finish before auto-focusing.',
         };
       }
-      set({ autofocusBusy: true });
+      // Auto-focus/probe is physical machine activity after Frame. Expire the
+      // one-run permit before the vendor command can move or refocus anything;
+      // returning to the same reported coordinates must not resurrect it.
+      set({ autofocusBusy: true, framedRun: null, frameVerification: null });
       try {
         return await runAutofocus({
           connected: refs.connection !== null,

@@ -3,6 +3,7 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
+import { createFramedRunPermit } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import {
@@ -12,7 +13,10 @@ import {
 } from '../state/recovery/testing';
 import { RecoveryRepository } from '../state/recovery';
 import { resetStore } from '../state/test-helpers';
-import { frameVerificationForProject } from './frame-verification-testing';
+import {
+  framedRunPermitForCurrentState,
+  installFramedRunPermitForCurrentState,
+} from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
 
@@ -80,7 +84,7 @@ function recoveryRepository(): RecoveryRepository {
   });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
   resetStore();
   const project = runnableProject();
@@ -92,15 +96,6 @@ beforeEach(() => {
     ...initialLaserState(),
     connection: { kind: 'connected' },
     statusReport: { ...idleStatus, mPos: { x: 120, y: 80, z: 0 } },
-    // Frame-first (ADR-228): the recorded Frame must match the compile that
-    // bakes in the live head position the status report implies (120, 80).
-    frameVerification: frameVerificationForProject(project, {
-      jobOrigin: {
-        startFrom: 'current-position',
-        anchor: 'front-left',
-        currentPosition: { x: 120, y: 80 },
-      },
-    }),
     controllerSessionEpoch: CONTROLLER_EPOCH,
     controllerQualification: {
       kind: 'qualified',
@@ -115,6 +110,7 @@ beforeEach(() => {
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
     startJob: vi.fn(async () => undefined),
   });
+  await installFramedRunPermitForCurrentState();
   useJobReviewStore.getState().close();
   uninstallAutoReview = installAutoJobReview('confirm');
 });
@@ -128,6 +124,36 @@ afterEach(() => {
 });
 
 describe('completed Current Position replay', () => {
+  it('streams the exact framed bytes after Frame motion changes the live head position', async () => {
+    const repository = recoveryRepository();
+    const preparedAtOriginalHead = await framedRunPermitForCurrentState();
+    const exactGcode = preparedAtOriginalHead.candidate.preparedStart.gcode;
+
+    // A real Frame ends with a final controller snapshot. Model a different
+    // final point and issue the permit from that state; Start must consume the
+    // cached candidate, not re-resolve Current Position from this new report.
+    useLaserStore.setState({
+      statusReport: { ...idleStatus, mPos: { x: 5, y: 6, z: 0 } },
+    });
+    const permit = createFramedRunPermit(
+      preparedAtOriginalHead.candidate,
+      useLaserStore.getState(),
+    );
+    useLaserStore.setState({
+      framedRun: permit,
+      frameVerification: permit.candidate.frameVerification,
+    });
+
+    await runStartJobFlow(repository);
+
+    expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(exactGcode, expect.any(Object));
+    expect(repository.getSnapshot().activeRun?.artifact.jobOrigin).toEqual({
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 120, y: 80 },
+    });
+  });
+
   it('reuses the frozen origin after the live head moves', async () => {
     const repository = recoveryRepository();
     await runStartJobFlow(repository);

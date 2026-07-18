@@ -30,6 +30,7 @@ beforeEach(() => {
   useLaserStore.setState({
     ...initialLaserState(),
     connection: { kind: 'connected' },
+    activeWcs: 'G54',
     controllerSessionEpoch: CONTROLLER_EPOCH,
     controllerQualification: {
       kind: 'qualified',

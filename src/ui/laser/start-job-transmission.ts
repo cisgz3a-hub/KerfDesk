@@ -1,7 +1,6 @@
 import { streamingModeForController } from '../../core/devices';
 import type { JobCheckpoint } from '../../core/recovery';
-import type { MachineKind } from '../../core/scene';
-import type { useStore } from '../state';
+import type { MachineKind, OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';
 import type { createRunId, LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
@@ -22,10 +21,11 @@ import {
   startAuthorizationRefusalMessage,
 } from './start-job-authorization-reporting';
 import { useStartBlockerStore } from './start-blocker-store';
+import type { FramedRunStartClaim } from './framed-run-start-claim';
 
 export type PreparedStartArgs = {
-  readonly app: ReturnType<typeof useStore.getState>;
-  readonly project: ReturnType<typeof useStore.getState>['project'];
+  readonly outputScope: OutputScope;
+  readonly project: Project;
   readonly laser: ReturnType<typeof useLaserStore.getState>;
   readonly prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>;
   readonly machineKind: MachineKind;
@@ -35,6 +35,7 @@ export type PreparedStartArgs = {
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly externalEnvironment: StartExternalEnvironment;
   readonly repository: RecoveryRepository;
+  readonly framedRunClaim?: FramedRunStartClaim;
 };
 
 export async function transmitPreparedStart(input: {
@@ -101,6 +102,7 @@ function preparedStartOptions(
       ? {}
       : { cncSetupAttestation: args.cncSetupAttestation }),
     canvasPlan: args.prepared.canvasPlan,
+    ...(args.framedRunClaim === undefined ? {} : { framedRunPermit: args.framedRunClaim.permit }),
   };
 }
 

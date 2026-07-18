@@ -105,6 +105,7 @@ describe('smoothiewareDriver', () => {
     expect(smoothiewareDriver.commands.unlock).toBe('M999');
     expect(smoothiewareDriver.commands.settingsQuery).toBeNull();
     expect(smoothiewareDriver.commands.stopLaserLines).toEqual(['M5', 'M9']);
+    expect(smoothiewareDriver.commands.frameToolOffLines).toEqual(['M5', 'M9']);
   });
 
   it('settles with M400, not G4 P0.01 — G4 P is milliseconds on Smoothieware', () => {

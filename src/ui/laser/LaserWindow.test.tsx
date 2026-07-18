@@ -75,9 +75,7 @@ describe('LaserWindow autofocus busy controls', () => {
       });
       expect(useToastStore.getState().toasts.at(-1)?.message).toContain('Machine Setup');
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
       useToastStore.setState({ toasts: [] });
       vi.clearAllTimers();
@@ -109,9 +107,7 @@ describe('LaserWindow autofocus busy controls', () => {
       expect(host.textContent).toContain('Step 1 of 7');
       expect(host.textContent).toContain('Import or export a machine profile');
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -145,17 +141,15 @@ describe('LaserWindow autofocus busy controls', () => {
       expect(button(host, 'Disconnect').disabled).toBe(true);
       expect(button(host, 'Home').disabled).toBe(true);
       expect(button(host, 'Auto-focus').disabled).toBe(true);
-      expect(button(host, 'Frame').disabled).toBe(true);
-      expect(button(host, 'Start job').disabled).toBe(true);
+      expect(button(host, 'Frame job').disabled).toBe(true);
+      expect(button(host, 'Set up & Frame').disabled).toBe(true);
       expect(button(host, 'Set origin here').disabled).toBe(true);
       const stepSelect = host.querySelector<HTMLSelectElement>(
         'select[aria-label="Jog step size"]',
       );
       expect(stepSelect?.disabled).toBe(true);
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -183,9 +177,7 @@ describe('LaserWindow autofocus busy controls', () => {
 
       expect(host.textContent).toContain('USB lost mid-job. Use physical E-stop.');
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -194,6 +186,7 @@ describe('LaserWindow autofocus busy controls', () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       motionOperation: {
+        operationId: 1,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,
@@ -219,9 +212,7 @@ describe('LaserWindow autofocus busy controls', () => {
       );
       expect(stepSelect?.disabled).toBe(true);
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -250,7 +241,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       const arrows = [...host.querySelectorAll<HTMLButtonElement>('button[aria-label^="Jog "]')];
       expect(arrows.length).toBeGreaterThan(0);
       for (const arrow of arrows) expect(arrow.disabled).toBe(true);
-      expect(button(host, 'Frame').disabled).toBe(true);
+      expect(button(host, 'Frame job').disabled).toBe(true);
 
       await act(async () => {
         useLaserStore.setState({
@@ -267,11 +258,9 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       });
 
       for (const arrow of arrows) expect(arrow.disabled).toBe(false);
-      expect(button(host, 'Frame').disabled).toBe(false);
+      expect(button(host, 'Frame job').disabled).toBe(false);
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -325,7 +314,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
         'select[aria-label="Jog step size"]',
       );
       expect(stepSelect?.disabled).toBe(true);
-      expect(button(host, 'Frame').disabled).toBe(true);
+      expect(button(host, 'Frame job').disabled).toBe(true);
 
       await act(async () => {
         button(host, '$X').click();
@@ -337,9 +326,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       await act(async () => {
         useLaserStore.setState({ home: originalHome, unlockAlarm: originalUnlock });
       });
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -374,9 +361,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       );
       expect(stepSelect?.disabled).toBe(true);
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -414,9 +399,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       expect(arrows.length).toBeGreaterThan(0);
       for (const arrow of arrows) expect(arrow.disabled).toBe(false);
     } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
+      await unmountRoot(root);
       host.remove();
     }
   });
@@ -428,4 +411,8 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
   return match;
+}
+
+async function unmountRoot(root: Root | null): Promise<void> {
+  if (root !== null) await act(async () => root.unmount());
 }

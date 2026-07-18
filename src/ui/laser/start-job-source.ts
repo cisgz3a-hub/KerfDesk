@@ -40,6 +40,7 @@ export async function prepareCurrentStartJob(
   camera: ReturnType<typeof useCameraStore.getState>,
   allowRotaryRaster = resolveRotaryRasterAllowed(app.project),
   resolvedJobOrigin?: JobOriginPlacement,
+  requireFrame = true,
 ) {
   const { project, jobPlacement } = app;
   const registration = currentPrintCutOutputRegistration(project);
@@ -55,6 +56,7 @@ export async function prepareCurrentStartJob(
       renderVariableText,
       ...(registration === undefined ? {} : { registration }),
       ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
+      requireFrame,
     },
   );
 }

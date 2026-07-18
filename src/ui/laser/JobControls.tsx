@@ -6,11 +6,14 @@ import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { useCameraStore } from '../state/camera-store';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { jobTimeNoun } from '../machine/machine-labels';
 import {
   actionGridStyle,
   containerStyle,
   estimateStyle,
+  framedRunStatusStyle,
   gridFullRowStyle,
   primaryActionStyle,
   progressContainerStyle,
@@ -32,6 +35,7 @@ import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
 import { RunAgainControl } from './RunAgainControl';
+import { framedRunReadinessIssue } from './framed-run-readiness';
 
 type Props = {
   readonly disabled: boolean;
@@ -145,24 +149,38 @@ function SetupRow(props: {
 }): JSX.Element {
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
+  // A permit can become stale from an artwork, scope, placement, controller,
+  // or camera change. Subscribe to all three owning stores so the status text
+  // changes immediately; Start repeats the same comparison at handoff.
+  const app = useStore();
+  const laser = useLaserStore();
+  const camera = useCameraStore();
+  // The resolved rotary-raster policy is part of the framed environment but
+  // lives outside the app store, so subscribe explicitly for immediate expiry.
+  useExperimentalLaserFeatures((s) => s.features.rotaryRaster);
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
   // ADR-101 §5 (provisional): auto-focus is a laser focus routine; it hides
   // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const isCncMachine = machineKind === 'cnc';
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  const statusReport = useLaserStore((s) => s.statusReport);
+  const statusReport = laser.statusReport;
+  const framedRun = laser.framedRun;
+  const frameOperationActive = laser.motionOperation?.kind === 'frame';
   const home = useLaserStore((s) => s.home);
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
   const frameControl = frameControlProps(busy, statusReport?.state);
-  // An unhomed Absolute Coordinates Start is NOT pre-disabled here: the Start
-  // flow refuses it with an in-place Home offer (2026-07-17), which a dead
-  // button would make unreachable.
+  const framedRunIssue = framedRunReadinessIssue(framedRun, app, laser, camera);
+  const framedReady = framedRunIssue === null;
+  const startLabel = framedReady ? 'Start framed job' : 'Set up & Frame';
+  const frameLabel = framedReady ? 'Frame again' : 'Frame job';
   const startControl = startControlProps(
     busy,
     props.startDisabledReason,
-    startJobTitle(estimate, jobTimeNoun(machineKind)),
+    framedReady
+      ? startJobTitle(estimate, jobTimeNoun(machineKind))
+      : 'Prepare and review the exact job, then trace its full motion envelope with the tool off.',
   );
   // No portable autofocus G-code exists, so an empty command becomes a direct
   // setup entry instead of a disabled control that leaves users hunting for
@@ -182,7 +200,7 @@ function SetupRow(props: {
           disabled={startControl.disabled}
           title={startControl.title}
         >
-          Start job
+          {startLabel}
         </button>
         <button
           type="button"
@@ -191,7 +209,7 @@ function SetupRow(props: {
           disabled={frameControl.disabled}
           title={frameControl.title}
         >
-          Frame
+          {frameLabel}
         </button>
         <HomeButton onHome={() => void home()} busy={busy} homingEnabled={homingEnabled} />
         {!isCncMachine && (
@@ -204,9 +222,24 @@ function SetupRow(props: {
           />
         )}
       </div>
+      <span role="status" style={framedRunStatusStyle} title={framedRunIssue ?? undefined}>
+        {framedRunStatusText(frameOperationActive, framedReady, framedRun !== null, framedRunIssue)}
+      </span>
       <EstimateBadge estimate={estimate} />
     </>
   );
+}
+
+function framedRunStatusText(
+  frameOperationActive: boolean,
+  framedReady: boolean,
+  hasFramedRun: boolean,
+  framedRunIssue: string | null,
+): string {
+  if (frameOperationActive) return 'Framing exact job…';
+  if (framedReady) return 'Ready to start — framed job unchanged';
+  if (!hasFramedRun) return 'Not framed — prepare and Frame this job first';
+  return `Frame expired — ${framedRunIssue}`;
 }
 
 function HomeButton(props: {
@@ -268,7 +301,7 @@ function frameControlProps(busy: boolean, state: string | undefined): ControlBut
   return {
     disabled: busy || !ready,
     title: ready
-      ? "Trace the job's bounding box with the laser off to check placement"
+      ? 'Review the exact job, then trace its full generated motion envelope with the tool off.'
       : frameBlockedTitle(state),
   };
 }

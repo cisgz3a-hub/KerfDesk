@@ -9496,6 +9496,13 @@ non-negotiable #21 approval for this confirmation gate.
   wire-boundary assertion) backstop any residual staleness between the last shown program and the
   streamed bytes.
 
+**Amendment (2026-07-18, ADR-228 exact-artifact completion).** For an ordinary fresh job, this is
+now the pre-Frame review rather than a post-Frame/pre-stream review. Confirm reads **Accept &
+Frame** and binds the acknowledgements to the exact candidate. A clean Frame completion issues the
+permit; the later **Start framed job** action streams that cached artifact without reopening this
+dialog. Replay, replacement, resume, and supervised-recovery review surfaces keep their existing
+specialized flows.
+
 ### Alternatives rejected
 
 - A read-only summary — the maintainer explicitly chose inline editing of the core numbers.
@@ -9720,14 +9727,20 @@ start is open... no guard will ever be created again.")
 
 ### Decision
 
-A completed Frame for the exact current job is the ONLY Start policy gate, on both laser and CNC
-and for every placement mode. `requiredFrameIssueFromPrepared` compares the compiled job's bounds
-signature and origin identity (WCO + custom-origin flag) against the recorded
-`FrameVerification`; every successful Frame dispatch records it. Any drift - edited artwork,
-moved origin, a different head position baked into a current-position compile - invalidates the
-record and requires a fresh watched trace. The blocked-Start dialog offers to run the Frame in
-place. After the Frame, the Job Review dialog (ADR-224) is the single confirmation popup; its
-warnings list is the one surface for everything the deleted guards used to refuse.
+A completed Frame for one exact reviewed job is the ONLY Start policy gate, on both laser and CNC
+and for every placement mode. Job Review (ADR-224) now runs before motion: it prepares the exact
+G-code, presents every demoted policy finding and acknowledgement once, and hands that immutable
+artifact to Frame. The candidate survives every Frame leg, returns to the preparation-time work
+position, and becomes a `FramedRunPermit` only after all terminal acknowledgements and the final
+clean Idle, with the reviewed controller/origin/settings invariants unchanged. Error, Alarm,
+Sleep, Hold/Door/Check/Home/Tool interruption, cancellation, reset, disconnect, MPG, jog, origin,
+probe, controller drift, or any project/environment edit prevents or expires authorization.
+
+Start consumes the permit's cached bytes. It does not recompile, reopen Job Review, or rerun policy
+checks; only live transport and exact-handoff consistency remain. Current Position is therefore
+frozen at preparation instead of silently resolving from the post-Frame head position. The older
+`FrameVerification` bounds/origin proof remains transitional for recovery and compatibility paths,
+but ordinary fresh Start is authorized only by the completion-issued exact permit.
 
 ### Deleted or demoted by this ADR
 
@@ -9745,9 +9758,13 @@ warnings list is the one surface for everything the deleted guards used to refus
   preflight findings except unstreamable bytes - demoted to Job Review warnings.
 - Placement-bounds and no-go origin checks (`placementBoundsIssueFromPrepared`) - demoted.
 - CNC Start policy gates: dialect (`CNC_REQUIRES_GRBL`), override values/acknowledgement,
-  accessory state (spindle/coolant/secondary/encoder/tool-change latches), missing Work-Z and
-  tool/Z identity, fresh Ov:/A: observation requirement - demoted to Job Review warnings; the
-  wire-level CNC assert now checks only transport state (connection, alarm, status, Idle, MPG).
+  accessory state (spindle/coolant/secondary/encoder/tool-change latches), tool/Z identity,
+  probe-plate state, and fresh Ov:/A: observation requirement - demoted to Job Review warnings;
+  the wire-level CNC assert now checks only transport state (connection, alarm, status, Idle, MPG).
+  Work-Z is likewise not checked by Start. It remains only as a coordinate input to compile CNC
+  Frame's absolute safe-Z retract/restore (ADR-192), with a guided Zero-Z setup before preparation;
+  unknown Work-Z/return position or no driver retract builder means that physical Frame program
+  cannot be produced and therefore cannot issue a permit.
 - Blocked-Start fix offers for gates that no longer block (Zero-Z, probe-plate, override reset,
   absolute-home, apply-$30) - removed with their gates. Alarm Unlock/Home offers, the Frame
   offer, and the origin compile-input offers remain.
@@ -9759,7 +9776,9 @@ warnings list is the one surface for everything the deleted guards used to refus
   line, double-Start race. The serial channel factually cannot accept the stream; Frame itself
   cannot run in these states either. Alarm offers Unlock/Home in place.
 - Compile integrity: compile failures and unstreamable bytes (`non-finite-coordinate`,
-  `empty-output`, `relief-needs-cnc`, `no-output-layer`).
+  `empty-output`, `relief-needs-cnc`, `no-output-layer`). CNC Frame motion also needs a current
+  stock-top Work-Z coordinate, a known return position, and a driver safe-Z builder; no XY-only or
+  guessed-Z substitute is physically equivalent to the Frame being authorized (ADR-192).
 - Handoff consistency: evidence-changed re-prepare, execution-signature and external-environment
   match, CNC setup attestation binding, start reservation epochs, checkpoint/receipt/fingerprint
   resume integrity, and the supervised-recovery flows.
@@ -9772,20 +9791,21 @@ No guard will ever be created again. CLAUDE.md collaboration rule 7 carries the 
 text: new guards, re-added guards, widened refusal surfaces, and warnings promoted to blocks are
 all prohibited; operator-relevant findings go into the Job Review warnings list. Frame is the
 source of truth.
-### Amendment (2026-07-18) — proof records at trace COMPLETION; Abort clears it directly
+
+### Amendment (2026-07-18) — authorization records at trace COMPLETION; Abort clears it directly
 
 Maintainer approval in chat: "fix both", accepting the post-merge soundness audit's two findings.
 
-1. The FrameVerification payload now rides the frame motion operation itself (armed at dispatch
-   by the store's frame action) and is promoted into `frameVerification` only when the trace
-   settles status-driven with an empty perimeter queue — matching the directive's wording
-   "when a frame completes". Every forced exit (cancel, alarm, error line, disconnect, MPG
-   takeover) clears the operation and discards the armed proof with it; a dispatched-then-
-   interrupted trace earns nothing.
-2. `runStopJob` (Abort) now sets `frameVerification: null` explicitly instead of relying on the
-   reset side effects.
+1. The reviewed exact-job candidate, including its compatibility `FrameVerification` payload,
+   rides the frame motion operation itself. It is armed at dispatch and promoted to a one-use
+   `FramedRunPermit` plus `frameVerification` only after the trace settles status-driven with an
+   empty perimeter queue — matching the directive's wording "when a frame completes". Every
+   forced exit (cancel, alarm, error line, disconnect, MPG takeover) discards the candidate; a
+   dispatched-then-interrupted trace earns nothing.
+2. `runStopJob` (Abort) clears both `framedRun` and `frameVerification` explicitly instead of
+   relying on reset side effects.
 
-Both changes narrow WHEN the one guard's proof exists; the guard surface itself is unchanged.
+Both changes narrow when authorization exists; the guard surface itself is unchanged.
 
 ## ADR-229 - Super console: read-only expanded console dialog
 

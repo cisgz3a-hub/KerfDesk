@@ -6,6 +6,7 @@ import type { CncSetupAttestation } from './cnc-setup-attestation';
 import type { CncToolPlanEntry } from './cnc-tool-plan';
 import type { RunId } from './recovery';
 import type { LaserModeStartEvidence } from './laser-mode-start-evidence';
+import type { FramedRunPermit } from './framed-run';
 
 export type StartJobOptions = CreateStreamerOptions & {
   /** Stable ownership for persistence; unrelated runs must never share progress. */
@@ -17,6 +18,9 @@ export type StartJobOptions = CreateStreamerOptions & {
    * current.
    */
   readonly assertFinalStartAuthorized?: () => void;
+  /** Ordinary fresh Start only: the exact permit consumed synchronously after
+   * the final authorization assertion and before streamer creation. */
+  readonly framedRunPermit?: FramedRunPermit;
   readonly machineKind?: MachineKind;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncSetupAttestation?: CncSetupAttestation;

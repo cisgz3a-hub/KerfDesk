@@ -37,17 +37,17 @@ import {
 } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
-import {
-  captureStartExternalEnvironment,
-  type StartExternalEnvironment,
-} from './start-job-external-environment';
+import { captureStartExternalEnvironment } from './start-job-external-environment';
 import {
   COMPLETED_REPLAY_CHANGED_MESSAGE,
   completedReceiptIsCurrent,
   replayCompilationMatches,
   stageFreshExecutionArtifact,
 } from './start-job-execution-tracking';
-import { currentLaserForAuthorizedStartNow } from './start-job-authorization';
+import {
+  currentLaserForAuthorizedStartNow,
+  type CurrentStartAuthorizationArgs,
+} from './start-job-authorization';
 import {
   reportBlockedStart,
   reportStartAuthorizationRefusal,
@@ -57,11 +57,81 @@ import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import { type StartOfferPolicy } from './start-blocked-repair';
 import { runJobReviewGate } from './job-review';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
+import type { FramedRunPermit } from '../state/framed-run';
+import { framedRunReadinessIssue } from './framed-run-readiness';
+import { runFrameNow } from './use-frame-action';
+import {
+  claimCurrentFramedRunStart,
+  releaseFramedRunStartClaim,
+  type FramedRunStartClaim,
+} from './framed-run-start-claim';
 
 export async function runStartJobFlow(
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
-  await runStartJobFlowWithCheckpoint(null, null, repository);
+  await runFreshFramedJobFlow(repository);
+}
+
+async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<void> {
+  useStartBlockerStore.getState().clear();
+  const permit = useLaserStore.getState().framedRun;
+  const issue = framedRunReadinessIssue(permit);
+  if (issue !== null) {
+    if (permit !== null) {
+      useLaserStore.setState({ framedRun: null, frameVerification: null });
+      useToastStore.getState().pushToast(issue, 'warning');
+    }
+    // Start is the primary action: with no current permit it launches the same
+    // prepare/review/Frame flow as the Frame button. A successful trace arms
+    // the exact job; the operator then deliberately presses Start to burn/cut.
+    await runFrameNow();
+    return;
+  }
+  if (permit === null) return;
+  const claim = claimCurrentFramedRunStart(permit);
+  if (claim === null) {
+    useToastStore
+      .getState()
+      .pushToast('This framed job is already being handed to the controller.', 'warning');
+    return;
+  }
+  try {
+    await streamFramedRun(permit, claim, repository);
+  } finally {
+    releaseFramedRunStartClaim(claim);
+  }
+}
+
+async function streamFramedRun(
+  permit: FramedRunPermit,
+  claim: FramedRunStartClaim,
+  repository: RecoveryRepository,
+): Promise<void> {
+  const authorizationArgs = {
+    preparedAgainst: permit.controller,
+    checkpointToReplace: null,
+    completedReceipt: null,
+    expectedExecutionSignature: permit.candidate.executionSignature,
+    externalEnvironment: permit.candidate.externalEnvironment,
+    repository,
+    framedRunClaim: claim,
+  } as const;
+  const currentLaser = await currentLaserForAuthorizedStart(authorizationArgs);
+  if (currentLaser === null) return;
+  await streamPreparedStart({
+    outputScope: permit.candidate.outputScope,
+    project: permit.candidate.project,
+    laser: currentLaser,
+    prepared: permit.candidate.preparedStart,
+    machineKind: machineKindOf(permit.candidate.project.machine),
+    laserModeStartEvidence: permit.candidate.laserModeStartEvidence,
+    cncSetupAttestation: permit.candidate.cncSetupAttestation,
+    checkpointToReplace: null,
+    completedReceipt: null,
+    externalEnvironment: permit.candidate.externalEnvironment,
+    repository,
+    framedRunClaim: claim,
+  });
 }
 
 export async function runConfirmedCheckpointReplacementStart(
@@ -148,7 +218,7 @@ async function runStartJobFlowWithCheckpoint(
   });
   if (currentLaser === null) return;
   await streamPreparedStart({
-    app: bundle.app,
+    outputScope: currentOutputScope(bundle.app),
     project: bundle.project,
     laser: currentLaser,
     prepared: bundle.prepared,
@@ -162,14 +232,9 @@ async function runStartJobFlowWithCheckpoint(
   });
 }
 
-async function currentLaserForAuthorizedStart(args: {
-  readonly preparedAgainst: ReturnType<typeof useLaserStore.getState>;
-  readonly checkpointToReplace: JobCheckpoint | null;
-  readonly completedReceipt: LastCompletedReceipt | null;
-  readonly expectedExecutionSignature: string;
-  readonly externalEnvironment: StartExternalEnvironment;
-  readonly repository: RecoveryRepository;
-}): Promise<ReturnType<typeof useLaserStore.getState> | null> {
+async function currentLaserForAuthorizedStart(
+  args: CurrentStartAuthorizationArgs,
+): Promise<ReturnType<typeof useLaserStore.getState> | null> {
   if (!(await completedReplayCanContinue(args.completedReceipt, args.repository))) {
     return null;
   }
@@ -208,7 +273,7 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
   let staged = await stageFreshExecutionArtifact({
     runId,
     prepared: args.prepared,
-    outputScope: currentOutputScope(args.app),
+    outputScope: args.outputScope,
     laser: args.laser,
     repository: args.repository,
   });
@@ -230,6 +295,7 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
     expectedExecutionSignature: args.prepared.canvasPlan.retentionKey,
     externalEnvironment: args.externalEnvironment,
     repository: args.repository,
+    ...(args.framedRunClaim === undefined ? {} : { framedRunClaim: args.framedRunClaim }),
   } as const;
   const authorization = currentLaserForAuthorizedStartNow(authorizationArgs);
   if (!authorization.ok) {

@@ -76,6 +76,8 @@ afterEach(async () => {
     streamer: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
+    framedRun: null,
+    frameVerification: null,
     log: [],
     transcript: [],
   });
@@ -83,6 +85,31 @@ afterEach(async () => {
 });
 
 describe('store autofocus shared response ownership', () => {
+  it('expires a completed Frame permit before autofocus can dispatch', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectWith(connection);
+    writes.length = 0;
+    useLaserStore.setState({
+      framedRun: { kind: 'ready' } as ReturnType<typeof useLaserStore.getState>['framedRun'],
+      frameVerification: {
+        boundsSignature: 'autofocus-expiry',
+        wco: null,
+        workOriginActive: false,
+      },
+    });
+
+    const pending = useLaserStore.getState().autofocus('$HZ1');
+    await flush();
+
+    expect(writes[0]).toBe('$HZ1\n');
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await pending;
+  });
+
   it('tracks the command in the shared ledger and keeps status on the main line pump', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
@@ -121,7 +148,11 @@ describe('store autofocus shared response ownership', () => {
     expect(await pending).toEqual({ kind: 'rejected', errorCode: 20, raw: 'error:20' });
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(useLaserStore.getState().streamer).toBeNull();
-    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({
+      kind: 'controller-error',
+      code: 20,
+      rejectedLine: '$HZ1',
+    });
     expect(useLaserStore.getState().autofocusBusy).toBe(false);
   });
 

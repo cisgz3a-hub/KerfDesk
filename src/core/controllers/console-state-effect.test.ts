@@ -18,8 +18,9 @@ describe('commonConsoleStateEffect', () => {
 
   it('separates motion from accessory-only and non-positional commands', () => {
     expect(commonConsoleStateEffect('G0 X10 Y10')).toBe('machine-state');
-    expect(commonConsoleStateEffect('M3 S12000')).toBe('accessories');
-    expect(commonConsoleStateEffect('M5 M9')).toBe('accessories');
+    for (const command of ['M3 S12000', 'M4 S500', 'M5', 'M7', 'M8', 'M9']) {
+      expect(commonConsoleStateEffect(command)).toBe('accessories');
+    }
     expect(commonConsoleStateEffect('G4 P1')).toBe('non-positional');
   });
 

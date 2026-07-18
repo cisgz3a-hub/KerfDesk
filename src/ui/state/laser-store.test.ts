@@ -373,7 +373,15 @@ describe('laser-store serial write failures', () => {
         action: expectedAction,
       });
       if (expectedAction === 'frame') {
-        expect(getMotionOperation()).toBeNull();
+        // A rejected queued write is ambiguous: retain the cancelled Frame
+        // generation and its terminal-ack reservation until a reply or
+        // reconnect can retire the quarantine safely.
+        expect(getMotionOperation()).toMatchObject({
+          kind: 'frame',
+          cancelRequested: true,
+          pendingMotionTransportWrites: 0,
+        });
+        expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
       }
     },
   );

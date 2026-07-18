@@ -86,8 +86,8 @@ describe('JobControls Start-only disabled reason', () => {
         );
       });
       const buttons = [...host.querySelectorAll('button')];
-      const start = buttons.find((button) => button.textContent === 'Start job');
-      const frame = buttons.find((button) => button.textContent === 'Frame');
+      const start = buttons.find((button) => button.textContent === 'Set up & Frame');
+      const frame = buttons.find((button) => button.textContent === 'Frame job');
       expect(start).toMatchObject({ disabled: true, title: 'Reading controller settings…' });
       expect(frame?.disabled).toBe(false);
     } finally {

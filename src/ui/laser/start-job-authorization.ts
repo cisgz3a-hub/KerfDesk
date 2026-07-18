@@ -1,5 +1,6 @@
 import type { JobCheckpoint } from '../../core/recovery';
 import { useCameraStore } from '../state/camera-store';
+import type { FramedRunControllerSnapshot } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import { useStore } from '../state/store';
@@ -9,6 +10,7 @@ import {
   startExternalEnvironmentMatches,
   type StartExternalEnvironment,
 } from './start-job-external-environment';
+import { framedRunStartClaimIsCurrent, type FramedRunStartClaim } from './framed-run-start-claim';
 
 export type StartAuthorizationRefusal =
   | { readonly kind: 'completed-receipt-changed' }
@@ -20,13 +22,19 @@ export type StartAuthorization =
   | { readonly ok: false; readonly refusal: StartAuthorizationRefusal };
 
 export type CurrentStartAuthorizationArgs = {
-  readonly preparedAgainst: ReturnType<typeof useLaserStore.getState>;
+  readonly preparedAgainst: ReturnType<typeof useLaserStore.getState> | FramedRunControllerSnapshot;
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly expectedExecutionSignature: string;
   readonly externalEnvironment: StartExternalEnvironment;
   readonly repository: RecoveryRepository;
+  /** Ordinary fresh Start only. Replay/recovery retain their existing
+   * authorization paths and therefore omit this exact-permit claim. */
+  readonly framedRunClaim?: FramedRunStartClaim;
 };
+
+export const FRAMED_RUN_START_CLAIM_CHANGED_MESSAGE =
+  'The completed Frame permit was consumed, replaced, or revoked while Start was being prepared. Frame the exact job again before starting.';
 
 /**
  * This gate must remain synchronous: startJob invokes it after its last
@@ -35,6 +43,12 @@ export type CurrentStartAuthorizationArgs = {
 export function currentLaserForAuthorizedStartNow(
   args: CurrentStartAuthorizationArgs,
 ): StartAuthorization {
+  if (args.framedRunClaim !== undefined && !framedRunStartClaimIsCurrent(args.framedRunClaim)) {
+    return {
+      ok: false,
+      refusal: { kind: 'blocked', message: FRAMED_RUN_START_CLAIM_CHANGED_MESSAGE },
+    };
+  }
   const checkpointIssue = checkpointStartIssue(args.checkpointToReplace);
   if (checkpointIssue !== null) {
     return { ok: false, refusal: { kind: 'blocked', message: checkpointIssue } };
@@ -69,14 +83,19 @@ export function currentLaserForAuthorizedStartNow(
 }
 
 export function controllerStartPreparationStillCurrent(
-  preparedAgainst: ReturnType<typeof useLaserStore.getState>,
+  preparedAgainst: ReturnType<typeof useLaserStore.getState> | FramedRunControllerSnapshot,
   current: ReturnType<typeof useLaserStore.getState>,
+  options: { readonly ignoreStatusState?: boolean } = {},
 ): boolean {
   return (
     current.controllerSessionEpoch === preparedAgainst.controllerSessionEpoch &&
     current.controllerSettings === preparedAgainst.controllerSettings &&
     current.controllerSettingsObservation === preparedAgainst.controllerSettingsObservation &&
-    sameStartStatus(current.statusReport, preparedAgainst.statusReport) &&
+    sameStartStatus(
+      current.statusReport,
+      preparedAgainst.statusReport,
+      options.ignoreStatusState === true,
+    ) &&
     sameAxes(current.wcoCache, preparedAgainst.wcoCache) &&
     current.workOriginActive === preparedAgainst.workOriginActive &&
     current.workOriginSource === preparedAgainst.workOriginSource &&
@@ -89,14 +108,17 @@ export function controllerStartPreparationStillCurrent(
 function sameStartStatus(
   current: ReturnType<typeof useLaserStore.getState>['statusReport'],
   preparedAgainst: ReturnType<typeof useLaserStore.getState>['statusReport'],
+  ignoreState: boolean,
 ): boolean {
   if (current === null || preparedAgainst === null) return current === preparedAgainst;
+  // WCO is an intermittent GRBL status field. The stable wcoCache is compared
+  // by controllerStartPreparationStillCurrent; comparing report.wco here would
+  // expire a valid Frame merely because the next unchanged report omitted it.
   return (
-    current.state === preparedAgainst.state &&
-    current.subState === preparedAgainst.subState &&
+    (ignoreState ||
+      (current.state === preparedAgainst.state && current.subState === preparedAgainst.subState)) &&
     sameAxes(current.mPos, preparedAgainst.mPos) &&
-    sameAxes(current.wPos, preparedAgainst.wPos) &&
-    sameAxes(current.wco, preparedAgainst.wco)
+    sameAxes(current.wPos, preparedAgainst.wPos)
   );
 }
 

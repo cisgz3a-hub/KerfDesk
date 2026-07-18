@@ -85,6 +85,24 @@ afterEach(async () => {
 });
 
 describe('home command timeout', () => {
+  it('writes no Home command while an older terminal acknowledgement is owed', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+    await useLaserStore.getState().sendConsoleCommand('G92 X0');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    await expect(useLaserStore.getState().home()).rejects.toThrow(
+      /previous controller write and terminal acknowledgement/i,
+    );
+
+    expect(writes).toEqual(['G92 X0\n']);
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
   // GRBL only acks $H after the homing cycle physically completes — commonly
   // 10-60 s on real beds. While the cycle runs the controller answers status
   // polls with <Home|...>, which must keep the command alive well past the

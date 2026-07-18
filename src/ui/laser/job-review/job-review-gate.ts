@@ -34,7 +34,7 @@ import {
 } from '../start-job-external-environment';
 import { prepareCurrentStartJob } from '../start-job-source';
 import { buildJobReviewModel, type PreparedCurrentStart } from './job-review-model';
-import { useJobReviewStore } from './job-review-store';
+import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -58,9 +58,11 @@ export async function runJobReviewGate(args: {
   readonly initial: ReviewedStartBundle;
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
+  readonly purpose?: JobReviewPurpose;
 }): Promise<ConfirmedJobReview | null> {
+  const purpose = args.purpose ?? 'start';
   let current = args.initial;
-  if (!useJobReviewStore.getState().open(modelFor(current))) return null;
+  if (!useJobReviewStore.getState().open(modelFor(current), purpose)) return null;
   for (;;) {
     const signal = await useJobReviewStore.getState().nextSignal();
     if (signal === 'cancel') {
@@ -73,7 +75,11 @@ export async function runJobReviewGate(args: {
       return confirmed;
     }
     useJobReviewStore.getState().beginPrepare();
-    const rebuilt = await rebuildCurrentStart(args.checkpointToReplace, args.completedReceipt);
+    const rebuilt = await rebuildCurrentStart(
+      args.checkpointToReplace,
+      args.completedReceipt,
+      purpose,
+    );
     if (!rebuilt.ok) {
       useJobReviewStore.getState().failPrepare(rebuilt.messages);
       continue;
@@ -127,6 +133,7 @@ type RebuiltStart =
 async function rebuildCurrentStart(
   checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
+  purpose: JobReviewPurpose,
 ): Promise<RebuiltStart> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
@@ -139,6 +146,7 @@ async function rebuildCurrentStart(
     camera,
     externalEnvironment.rotaryRasterAllowed,
     completedReceipt?.artifact.jobOrigin,
+    purpose === 'start',
   );
   if (!prepared.ok) return { ok: false, messages: prepared.messages };
   if (

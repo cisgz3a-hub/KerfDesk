@@ -5,6 +5,7 @@ import {
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
@@ -37,6 +38,12 @@ function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): stri
   assertAutofocusIdle(get());
   const homeCommand = driver.commands.home;
   if (homeCommand === null) throw new Error('This controller has no homing command.');
+  if (hasPendingControllerWrite(get())) {
+    const message =
+      'Home is blocked until the previous controller write and terminal acknowledgement settle.';
+    set({ lastWriteError: message, log: pushLog(get(), `[lf2] Home command blocked: ${message}`) });
+    throw new Error(message);
+  }
   const blockedMessage = setupCommandBlockMessage(get());
   if (blockedMessage === null) return homeCommand;
   set({
@@ -76,6 +83,7 @@ export async function runHomeAction(
     // different physical height — work Z0 must be re-set (Codex audit P1).
     workZZeroEvidence: null,
     frameVerification: null,
+    framedRun: null,
     log: pushLog(state, '[lf2] Homing started. Cleared origin and frame verification.'),
   }));
   const epochs = {

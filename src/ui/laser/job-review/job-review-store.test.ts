@@ -23,6 +23,21 @@ describe('useJobReviewStore', () => {
     const state = useJobReviewStore.getState().state;
     expect(state.kind).toBe('open');
     expect(state.kind === 'open' ? state.model : null).toBe(model);
+    expect(state.kind === 'open' ? state.purpose : null).toBe('start');
+  });
+
+  it('carries the frame purpose through successful and failed rebuilds', () => {
+    useJobReviewStore.getState().open(model, 'frame');
+    useJobReviewStore.getState().beginPrepare();
+    useJobReviewStore.getState().completePrepare(rebuiltModel);
+
+    let state = useJobReviewStore.getState().state;
+    expect(state.kind === 'open' ? state.purpose : null).toBe('frame');
+
+    useJobReviewStore.getState().beginPrepare();
+    useJobReviewStore.getState().failPrepare(['cannot frame']);
+    state = useJobReviewStore.getState().state;
+    expect(state.kind === 'open' ? state.purpose : null).toBe('frame');
   });
 
   it('resolves an armed waiter exactly once; a double-click cannot double-resolve', async () => {

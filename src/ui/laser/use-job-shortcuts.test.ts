@@ -3,6 +3,7 @@ import { createStreamer, step } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
+import { useStartBlockerStore } from './start-blocker-store';
 import { installJobShortcuts } from './use-job-shortcuts';
 
 function patchLaserStore(partial: Partial<LaserState>): void {
@@ -42,6 +43,7 @@ afterEach(() => {
   });
   useUiStore.setState({ textDialog: null });
   useUiStore.setState({ imageDialog: null, modalDepth: 0 });
+  useStartBlockerStore.getState().clear();
   vi.restoreAllMocks();
 });
 
@@ -90,6 +92,7 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
       stopJob,
       cancelJog,
       motionOperation: {
+        operationId: 1,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,
@@ -138,7 +141,6 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
   });
 
   it('Ctrl+Enter claims the event when connected and idle', async () => {
-    const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     patchLaserStore({
       streamer: null,
       connection: { kind: 'connected' },
@@ -155,10 +157,12 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     });
     window.dispatchEvent(event);
 
-    // The flow runs and (with an empty scene / unknown status) surfaces the
-    // readiness alert — proving the shortcut reached runStartJobFlow.
+    // The flow runs and (with an empty scene / unknown status) records the
+    // Frame-preparation refusal — proving the shortcut reached runStartJobFlow.
     expect(event.defaultPrevented).toBe(true);
-    await vi.waitFor(() => expect(alert).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(useStartBlockerStore.getState().messages.length).toBeGreaterThan(0),
+    );
     uninstall();
   });
 

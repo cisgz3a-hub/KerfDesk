@@ -59,6 +59,11 @@ export const estimateStyle: CSSProperties = {
   alignSelf: 'flex-end',
   fontVariantNumeric: 'tabular-nums',
 };
+export const framedRunStatusStyle: CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.3,
+  color: 'var(--lf-text-muted)',
+};
 export const runningSafetyStyle: CSSProperties = {
   color: 'var(--lf-warning-fg)',
   fontSize: 12,

@@ -19,7 +19,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
-import { frameVerificationForProject } from './frame-verification-testing';
+import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
@@ -67,7 +67,7 @@ const lineObject: SceneObject = {
 };
 
 describe('exact laser recovery activation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     resetStore();
     const project = {
       ...createProject(DEFAULT_DEVICE_PROFILE),
@@ -98,12 +98,9 @@ describe('exact laser recovery activation', () => {
         laserModeEnabled: true,
       },
       controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
-      // Frame-first (ADR-228): the seeding Start and every recovery
-      // re-prepare require a Frame recorded for this exact compiled job and
-      // origin identity (null WCO, work origin inactive in this harness).
-      frameVerification: frameVerificationForProject(project),
       startJob: vi.fn(async () => undefined),
     });
+    await installFramedRunPermitForCurrentState();
     vi.mocked(jobAwareAlert).mockClear();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
     useJobReviewStore.getState().close();

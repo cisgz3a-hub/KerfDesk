@@ -6,9 +6,10 @@ import { onAck, step, type StreamerState } from '../../core/controllers/grbl';
 import { beginPostJobSettle } from './laser-post-job-settle';
 import type { LaserState } from './laser-store';
 import { hasUnsettledStreamAcks, toolChangeHoldEntryPatch } from './laser-store-helpers';
-import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
+import { consumeUntrackedAck } from './laser-untracked-ack-ledger';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
 // receive order. While the streamer still has unsettled acks, the earliest
@@ -20,23 +21,31 @@ import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-contai
 // an ack the stream cannot own settles the counter; it must then not reach
 // advanceStream either — a stale ok fed to a fresh job stream frees RX
 // budget GRBL has not freed (phantom refill past the real buffer).
-export function settleUntrackedAck(set: SetFn, state: LaserState, clsKind: string): AckOwner {
+export function settleUntrackedAck(
+  set: SetFn,
+  state: LaserState,
+  clsKind: string,
+  refs: HandlerRefs,
+): AckSettlement {
   const isTerminalAck = clsKind === 'ok' || clsKind === 'error';
-  if (!isTerminalAck) return 'stream';
+  if (!isTerminalAck) return { owner: 'stream' };
   // The disconnected stream is retained only as recovery evidence. Replies on
   // a replacement serial session must never advance its unconfirmed lines.
   // When a reconnect command owns an ack, settle that ledger; otherwise treat
   // a late terminal response as non-stream traffic and drop it here.
   if (state.streamer?.status === 'disconnected') {
     if (state.pendingUntrackedAcks > 0) {
+      const motionOperationId = consumeUntrackedAck(refs);
       set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
+      return { owner: 'untracked', motionOperationId };
     }
-    return 'untracked';
+    return { owner: 'untracked', motionOperationId: null };
   }
-  if (state.pendingUntrackedAcks === 0) return 'stream';
-  if (hasUnsettledStreamAcks(state.streamer)) return 'stream';
+  if (state.pendingUntrackedAcks === 0) return { owner: 'stream' };
+  if (hasUnsettledStreamAcks(state.streamer)) return { owner: 'stream' };
+  const motionOperationId = consumeUntrackedAck(refs);
   set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
-  return 'untracked';
+  return { owner: 'untracked', motionOperationId };
 }
 
 export function advanceStream(

@@ -67,6 +67,7 @@ export const marlinDriver: ControllerDriver = {
     offsetsQuery: null,
     queuedStatusQuery: MARLIN_CMD_POSITION,
     stopLaserLines: MARLIN_STOP_LASER_LINES,
+    frameToolOffLines: MARLIN_STOP_LASER_LINES,
     settleDwell: MARLIN_CMD_SETTLE,
     setOriginHere: 'G92 X0 Y0',
     clearOrigin: 'G92.1',

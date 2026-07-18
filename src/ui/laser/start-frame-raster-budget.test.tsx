@@ -114,8 +114,10 @@ function imageLayer(color: string): ReturnType<typeof createLayer> {
 afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
+    connection: { kind: 'disconnected' },
     streamer: null,
     statusReport: null,
+    activeWcs: null,
     workOriginActive: false,
     wcoCache: null,
   });
@@ -138,7 +140,7 @@ describe('custom-origin raster budget guard', () => {
     }
   });
 
-  it('frames an over-budget raster by physical bounds before compileJob can touch it', async () => {
+  it('refuses Frame when the exact raster artifact cannot pass compile-integrity preparation', async () => {
     useStore.setState({
       project: overBudgetRasterProject(),
       jobPlacement: userOriginPlacement,
@@ -147,8 +149,10 @@ describe('custom-origin raster budget guard', () => {
     const frame = vi.fn(async () => undefined);
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       streamer: null,
       statusReport: idleStatus,
+      activeWcs: 'G54',
       workOriginActive: true,
       wcoCache: { x: 100, y: 100, z: 0 },
     });
@@ -161,23 +165,19 @@ describe('custom-origin raster budget guard', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 6000);
-      expect(
-        useToastStore
-          .getState()
-          .toasts.filter(
-            (toast) =>
-              !toast.message.startsWith('Job recovery storage is unavailable while trying to read'),
-          ),
-      ).toEqual([]);
+      expect(frame).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'error',
+        message: expect.stringContaining('image would engrave at 7500x7500 px'),
+      });
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -187,7 +187,7 @@ describe('custom-origin raster budget guard', () => {
     }
   });
 
-  it('frames selected over-budget raster bounds instead of unrelated selected-output artwork', async () => {
+  it('refuses the selected-output Frame when that exact selected raster is over budget', async () => {
     useStore.setState({
       project: selectedOverBudgetRasterProject(),
       jobPlacement: userOriginPlacement,
@@ -199,8 +199,10 @@ describe('custom-origin raster budget guard', () => {
     const frame = vi.fn(async () => undefined);
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       streamer: null,
       statusReport: idleStatus,
+      activeWcs: 'G54',
       workOriginActive: true,
       wcoCache: { x: 100, y: 100, z: 0 },
     });
@@ -213,16 +215,19 @@ describe('custom-origin raster budget guard', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 6000);
-      expect(useToastStore.getState().toasts).toEqual([]);
+      expect(frame).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'error',
+        message: expect.stringContaining('image would engrave at 7500x7500 px'),
+      });
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -232,7 +237,7 @@ describe('custom-origin raster budget guard', () => {
     }
   });
 
-  it('keeps Falcon framing feed independent from a low burn/feed ceiling', async () => {
+  it('does not use Falcon framing feed as an approximate fallback for an unbuildable raster', async () => {
     useStore.setState({
       project: {
         ...overBudgetRasterProject(),
@@ -250,8 +255,10 @@ describe('custom-origin raster budget guard', () => {
     const frame = vi.fn(async () => undefined);
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       streamer: null,
       statusReport: idleStatus,
+      activeWcs: 'G54',
       workOriginActive: true,
       wcoCache: { x: 100, y: 100, z: 0 },
     });
@@ -264,16 +271,19 @@ describe('custom-origin raster budget guard', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 10000);
-      expect(useToastStore.getState().toasts).toEqual([]);
+      expect(frame).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'error',
+        message: expect.stringContaining('image would engrave at 7500x7500 px'),
+      });
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
