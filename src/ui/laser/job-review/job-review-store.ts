@@ -10,12 +10,14 @@ import { create } from 'zustand';
 import type { JobReviewModel } from './job-review-model';
 
 export type JobReviewSignal = 'confirm' | 'cancel' | 'rebuild';
+export type JobReviewPurpose = 'start' | 'frame';
 
 export type JobReviewState =
   | { readonly kind: 'idle' }
   | {
       readonly kind: 'open';
       readonly model: JobReviewModel;
+      readonly purpose: JobReviewPurpose;
       readonly isPreparing: boolean;
       readonly blocker: ReadonlyArray<string> | null;
     };
@@ -27,7 +29,7 @@ type JobReviewStore = {
   /** Highest-priority signal raised while unarmed, consumed by `nextSignal`. */
   readonly pendingSignal: JobReviewSignal | null;
   // Gate-facing — the start flow drives these.
-  readonly open: (model: JobReviewModel) => boolean;
+  readonly open: (model: JobReviewModel, purpose?: JobReviewPurpose) => boolean;
   readonly nextSignal: () => Promise<JobReviewSignal>;
   readonly beginPrepare: () => void;
   readonly completePrepare: (model: JobReviewModel) => void;
@@ -64,14 +66,14 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
     state: { kind: 'idle' },
     waiter: null,
     pendingSignal: null,
-    open: (model) => {
+    open: (model, purpose = 'start') => {
       // A second Start while a review is showing means an upstream gate
       // failed (the modal backdrop and shortcut suppression cover the known
       // paths). Fail the newcomer closed instead of replacing the visible
       // review (ConfirmSave precedent).
       if (get().state.kind !== 'idle') return false;
       set({
-        state: { kind: 'open', model, isPreparing: false, blocker: null },
+        state: { kind: 'open', model, purpose, isPreparing: false, blocker: null },
         waiter: null,
         pendingSignal: null,
       });
@@ -93,7 +95,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
     completePrepare: (model) => {
       const { state } = get();
       if (state.kind !== 'open') return;
-      set({ state: { kind: 'open', model, isPreparing: false, blocker: null } });
+      set({ state: { ...state, model, isPreparing: false, blocker: null } });
     },
     failPrepare: (blocker) => {
       // Keep the last good model on screen; the blocker banner explains why

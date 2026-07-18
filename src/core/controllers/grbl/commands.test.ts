@@ -66,6 +66,9 @@ describe('buildJogCommand', () => {
     expect(buildJogCommand({ dx: 12, dy: 0, feed: 1500, relative: false })).toBe(
       '$J=G90 G21 X12.000 Y0.000 F1500',
     );
+    expect(buildJogCommand({ dx: 0, dy: 0, feed: 1500, relative: false })).toBe(
+      '$J=G90 G21 X0.000 Y0.000 F1500',
+    );
     // Relative jogs still drop zero deltas (a zero delta is "don't move").
     expect(buildJogCommand({ dx: 0, dy: 5, feed: 1500 })).toBe('$J=G91 G21 Y5.000 F1500');
   });

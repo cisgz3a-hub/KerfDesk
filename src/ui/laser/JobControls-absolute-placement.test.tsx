@@ -7,6 +7,8 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
+import { frameVerificationForProject } from './frame-verification-testing';
+import { installAutoJobReview } from './job-review';
 import { JobControls } from './JobControls';
 
 (
@@ -19,6 +21,7 @@ beforeEach(() => {
   resetStore();
   useLaserStore.setState({
     ...initialLaserState(),
+    connection: { kind: 'connected' },
     statusReport: {
       state: 'Idle',
       subState: null,
@@ -28,6 +31,7 @@ beforeEach(() => {
       feed: 0,
       spindle: 0,
     },
+    activeWcs: 'G54',
     frame: vi.fn(async () => undefined),
   });
   useToastStore.setState({ toasts: [] });
@@ -86,6 +90,7 @@ describe('JobControls Absolute Coordinates frame-first', () => {
   it('keeps Start and Frame clickable before homing and dispatches the frame trace', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
+    const uninstallAutoReview = installAutoJobReview('confirm');
     let root: Root | null = null;
     const buttonByText = (text: string): HTMLButtonElement => {
       const button = [...host.querySelectorAll('button')].find((item) => item.textContent === text);
@@ -99,19 +104,27 @@ describe('JobControls Absolute Coordinates frame-first', () => {
       });
 
       expect(buttonByText('Home').disabled).toBe(false);
-      expect(buttonByText('Frame').disabled).toBe(false);
-      expect(buttonByText('Start job').disabled).toBe(false);
+      expect(buttonByText('Frame job').disabled).toBe(false);
+      expect(buttonByText('Set up & Frame').disabled).toBe(false);
 
       await act(async () => {
-        buttonByText('Frame').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        buttonByText('Frame job').dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1);
-      // The proof itself records only when the real trace settles (ADR-228
-      // amendment) — covered at the store layer; the mocked frame here just
-      // proves the click dispatches without recording anything yet.
+      await vi.waitFor(() => expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1));
+      expect(useLaserStore.getState().frame).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Number),
+        expect.objectContaining({
+          frameVerification: frameVerificationForProject(useStore.getState().project),
+        }),
+      );
+      // The exact candidate is armed at dispatch, but a mocked trace that has
+      // not physically completed earns neither compatibility proof nor permit.
       expect(useLaserStore.getState().frameVerification).toBeNull();
+      expect(useLaserStore.getState().framedRun).toBeNull();
     } finally {
+      uninstallAutoReview();
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
     }

@@ -8,9 +8,11 @@ import {
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
-import { grblDriver } from '../../core/controllers';
+import { grblDriver, marlinDriver, type ControllerDriver } from '../../core/controllers';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
+import { framedRunCandidate } from './laser-store-motion-operation.test-support';
+import { reserveUntrackedAcks } from './laser-untracked-ack-ledger';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -63,6 +65,7 @@ function makeLaserState(): LaserState {
     pendingToolId: null,
     workOriginSource: 'none',
     frameVerification: null,
+    framedRun: null,
     connect: async () => undefined,
     disconnect: async () => undefined,
     home: async () => undefined,
@@ -98,12 +101,13 @@ function makeLaserState(): LaserState {
     retryControllerQualification: async () => undefined,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
+    selectPrimaryWcsForFrame: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
   };
 }
 
-function makeHarness(): {
+function makeHarness(driver: ControllerDriver = grblDriver): {
   readonly refs: HandlerRefs;
   readonly set: SetFn;
   readonly get: GetFn;
@@ -115,7 +119,7 @@ function makeHarness(): {
   };
   return {
     refs: {
-      driver: grblDriver,
+      driver,
       settingsCollector: startCollecting(),
       settingsCollectorSessionEpoch: 0,
       onLineArrived: null,
@@ -234,6 +238,7 @@ describe('handleLine controller error (P0-1)', () => {
     set({
       pendingUntrackedAcks: 1,
       motionOperation: {
+        operationId: 1,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,
@@ -241,6 +246,7 @@ describe('handleLine controller error (P0-1)', () => {
         pendingLines: [],
       },
     });
+    reserveUntrackedAcks(refs, 1, 1);
 
     handleLine(set, get, refs, async () => undefined, 'error:8');
 
@@ -251,6 +257,115 @@ describe('handleLine controller error (P0-1)', () => {
       message: expect.stringContaining('frame command'),
     });
     expect(get().safetyNotice?.message).not.toContain('during the job');
+    expect(get().motionOperation).toMatchObject({ cancelRequested: true });
+  });
+
+  it('retains a cancelled multi-line motion owner until every response drains', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      pendingUntrackedAcks: 4,
+      motionOperation: {
+        operationId: 7,
+        kind: 'jog',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+    reserveUntrackedAcks(refs, 4, 7);
+
+    handleLine(set, get, refs, async () => undefined, 'error:20');
+    expect(get().pendingUntrackedAcks).toBe(3);
+    expect(get().motionOperation).toMatchObject({ operationId: 7, cancelRequested: true });
+
+    handleLine(set, get, refs, async () => undefined, 'ok');
+    handleLine(set, get, refs, async () => undefined, 'ok');
+    handleLine(set, get, refs, async () => undefined, 'ok');
+    expect(get().pendingUntrackedAcks).toBe(0);
+    expect(get().motionOperation).toMatchObject({ operationId: 7, cancelRequested: true });
+  });
+
+  it('does not retire motion when an unrelated poll or system write errors', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      pendingUntrackedAcks: 1,
+      motionOperation: {
+        operationId: 8,
+        kind: 'jog',
+        sawControllerBusy: true,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+    reserveUntrackedAcks(refs, 1, null);
+
+    handleLine(set, get, refs, async () => undefined, 'error:20');
+
+    expect(get().motionOperation).toMatchObject({ operationId: 8, sawControllerBusy: true });
+    expect(get().motionOperation?.cancelRequested).not.toBe(true);
+  });
+
+  it.each([
+    { line: 'error:20', driver: grblDriver },
+    { line: 'Resend: 4', driver: marlinDriver },
+  ])('expires a completed permit on $line', ({ line, driver }) => {
+    const { refs, set, get } = makeHarness(driver);
+    const candidate = framedRunCandidate();
+    set({
+      framedRun: {
+        kind: 'ready',
+        candidate,
+        completedStatusSequence: 1,
+        controller: candidate.controllerBeforeFrame,
+      },
+      frameVerification: candidate.frameVerification,
+    });
+
+    handleLine(set, get, refs, async () => undefined, line);
+
+    expect(get().framedRun).toBeNull();
+    expect(get().frameVerification).toBeNull();
+  });
+
+  it('quarantines Resend and permanently prevents an active Frame candidate from minting', () => {
+    const { refs, set, get } = makeHarness(marlinDriver);
+    const candidate = framedRunCandidate();
+    set({
+      pendingUntrackedAcks: 1,
+      motionOperation: {
+        operationId: 42,
+        kind: 'frame',
+        candidate,
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+        settlementLine: 'M400\n',
+        awaitingSettlementAck: true,
+      },
+    });
+    reserveUntrackedAcks(refs, 1, 42);
+
+    handleLine(set, get, refs, async () => undefined, 'Resend: 4');
+
+    expect(get().pendingUntrackedAcks).toBe(1);
+    expect(get().motionOperation).toMatchObject({
+      operationId: 42,
+      candidate,
+      cancelRequested: true,
+    });
+
+    // Even a later terminal response and matching position report cannot
+    // rehabilitate the rejected Frame generation or issue its one-run permit.
+    handleLine(set, get, refs, async () => undefined, 'ok');
+    handleLine(set, get, refs, async () => undefined, 'X:0.00 Y:0.00 Z:0.00');
+
+    expect(get().pendingUntrackedAcks).toBe(0);
+    expect(get().motionOperation).toMatchObject({ operationId: 42, cancelRequested: true });
+    expect(get().framedRun).toBeNull();
+    expect(get().frameVerification).toBeNull();
   });
 
   it('stops the stream for unrecognized error responses without treating them as GRBL codes', () => {

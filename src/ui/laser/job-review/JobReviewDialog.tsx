@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, type RefObject } from 'react';
 import { Button, Dialog, Icon } from '../../kit';
-import { useJobReviewStore, type JobReviewState } from './job-review-store';
+import { useJobReviewStore, type JobReviewPurpose, type JobReviewState } from './job-review-store';
 import {
   bannerListStyle,
   bannerStyle,
@@ -38,23 +38,24 @@ export function JobReviewDialog(): JSX.Element | null {
 function OpenJobReview(props: {
   readonly state: Extract<JobReviewState, { readonly kind: 'open' }>;
 }): JSX.Element {
-  const { model, isPreparing, blocker } = props.state;
+  const { model, purpose, isPreparing, blocker } = props.state;
+  const copy = reviewCopy(purpose);
   const topAnchorRef = useRef<HTMLSpanElement>(null);
   useJobReviewRebuildTrigger();
   useReviewInitialFocus(topAnchorRef);
   const handleCancel = (): void => useJobReviewStore.getState().cancel();
   const handleConfirm = (): void => useJobReviewStore.getState().confirm();
   const startDisabledReason = isPreparing
-    ? 'Recomputing the job with your latest edits — one moment.'
+    ? copy.preparingTitle
     : blocker !== null
       ? blocker.join('\n')
       : null;
   return (
-    <Dialog title="Review job before starting" size="xl" onClose={handleCancel}>
+    <Dialog title={copy.dialogTitle} size="xl" onClose={handleCancel}>
       <span ref={topAnchorRef} aria-hidden="true" />
       <JobReviewHeader machineKind={model.machineKind} />
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
-      {blocker !== null ? <BlockerBanner blocker={blocker} /> : null}
+      {blocker !== null ? <BlockerBanner blocker={blocker} purpose={purpose} /> : null}
       <JobReviewWarnings warnings={model.warnings} />
       <JobReviewStockCard />
       <JobReviewLayersTable machineKind={model.machineKind} />
@@ -66,7 +67,7 @@ function OpenJobReview(props: {
           toolPlanLabels={model.toolPlanLabels}
         />
       </section>
-      <JobReviewAcknowledgement acknowledgement={model.acknowledgement} />
+      <JobReviewAcknowledgement acknowledgement={model.acknowledgement} purpose={purpose} />
       <div style={footerBarStyle}>
         <span
           style={{ ...footerOriginStyle, opacity: isPreparing ? 0.55 : 1 }}
@@ -74,21 +75,18 @@ function OpenJobReview(props: {
         >
           Runs from <strong>{model.resolvedOriginLabel}</strong>
         </span>
-        <Button
-          onClick={handleCancel}
-          title="Close this review without starting. Edits made here are kept."
-        >
+        <Button onClick={handleCancel} title={copy.cancelTitle}>
           Cancel
         </Button>
         <Button
           variant="primary"
           disabled={startDisabledReason !== null}
-          title={startDisabledReason ?? 'Start this job now with the settings shown above.'}
+          title={startDisabledReason ?? copy.confirmTitle}
           onClick={handleConfirm}
         >
           <span style={startButtonContentStyle}>
             <Icon name="play" size={11} />
-            Start job
+            {copy.confirmLabel}
           </span>
         </Button>
       </div>
@@ -116,10 +114,17 @@ function useReviewInitialFocus(anchor: RefObject<HTMLElement>): void {
   }, [anchor]);
 }
 
-function BlockerBanner(props: { readonly blocker: ReadonlyArray<string> }): JSX.Element {
+function BlockerBanner(props: {
+  readonly blocker: ReadonlyArray<string>;
+  readonly purpose: JobReviewPurpose;
+}): JSX.Element {
   return (
     <div role="alert" className="lf-banner lf-banner--danger" style={bannerStyle}>
-      <strong>Cannot start this job as edited</strong>
+      <strong>
+        {props.purpose === 'frame'
+          ? 'Cannot frame this job as edited'
+          : 'Cannot start this job as edited'}
+      </strong>
       <ul style={bannerListStyle}>
         {props.blocker.map((message) => (
           <li key={message}>{message}</li>
@@ -127,4 +132,31 @@ function BlockerBanner(props: { readonly blocker: ReadonlyArray<string> }): JSX.
       </ul>
     </div>
   );
+}
+
+type JobReviewCopy = {
+  readonly dialogTitle: string;
+  readonly preparingTitle: string;
+  readonly cancelTitle: string;
+  readonly confirmTitle: string;
+  readonly confirmLabel: string;
+};
+
+function reviewCopy(purpose: JobReviewPurpose): JobReviewCopy {
+  if (purpose === 'frame') {
+    return {
+      dialogTitle: 'Review job before framing',
+      preparingTitle: 'Recomputing the job with your latest edits before framing — one moment.',
+      cancelTitle: 'Close this review without framing. Edits made here are kept.',
+      confirmTitle: 'Accept this review and frame the exact job shown above.',
+      confirmLabel: 'Accept & Frame',
+    };
+  }
+  return {
+    dialogTitle: 'Review job before starting',
+    preparingTitle: 'Recomputing the job with your latest edits — one moment.',
+    cancelTitle: 'Close this review without starting. Edits made here are kept.',
+    confirmTitle: 'Start this job now with the settings shown above.',
+    confirmLabel: 'Start job',
+  };
 }

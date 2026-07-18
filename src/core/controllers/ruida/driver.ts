@@ -49,6 +49,7 @@ export const ruidaDriver: ControllerDriver = {
     offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: [],
+    frameToolOffLines: [],
     settleDwell: '',
     setOriginHere: null,
     clearOrigin: null,

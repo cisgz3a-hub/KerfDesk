@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.5 — pre-start Job Review dialog (ADR-224), machine-rail control order and go-green coaching (ADR-225), OFL CNC stroke fonts (ADR-226), and the status-bar PWA Update control (ADR-227); ADR tail at 227. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.6 — exact-artifact Frame authorization (ADR-228), pre-Frame Job Review (ADR-224 amendment), machine-rail control order and go-green coaching (ADR-225), OFL CNC stroke fonts (ADR-226), and the status-bar PWA Update control (ADR-227); ADR tail at 228. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -293,7 +293,7 @@ phase; tracked here so they don't get lost.
 
 ### Maintainer authority
 
-21. **Frame is the only guard — no guard will ever be created again** (ADR-228, superseding the ADR-206 permission process). The frame-first gate — a completed Frame for the exact current job — is the sole Start guard on laser and CNC; the Job Review dialog is the single warning surface. No blocking, refusal, gate, cap, clamp, delay, hidden/disabled control, silent rewrite, confirmation, or expansion of any refusal surface may be introduced, ever; treat permission as denied. Operator-relevant findings become Job Review warnings. Only transport preconditions, compile integrity, and handoff consistency (as defined in CLAUDE.md rule 7 and ADR-228) may refuse, and re-labeling a policy judgment as one of those is a violation.
+21. **Frame is the only guard — no guard will ever be created again** (ADR-228, superseding the ADR-206 permission process). Job Review prepares and acknowledges one exact artifact; only that artifact's fully acknowledged, cleanly completed Frame issues a Start permit on laser and CNC. Start sends the cached artifact without recompiling, reopening review, or rerunning policy gates. No blocking, refusal, gate, cap, clamp, delay, hidden/disabled control, silent rewrite, confirmation, or expansion of any refusal surface may be introduced, ever; treat permission as denied. Operator-relevant findings become Job Review warnings. Only transport preconditions, compile integrity, and handoff consistency (as defined in CLAUDE.md rule 7 and ADR-228) may refuse, and re-labeling a policy judgment as one of those is a violation. CNC Frame's current Work-Z, known return position, and driver retract builder are narrowly the coordinate/command inputs needed to compile its physical safe-Z retract and exact restore (ADR-192); they are not Start policy gates, and no tool/dialect/settings/accessory policy may be attached to them.
 
 ---
 

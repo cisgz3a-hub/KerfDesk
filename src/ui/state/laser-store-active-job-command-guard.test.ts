@@ -128,6 +128,7 @@ describe('laser-store active-job command guard', () => {
       connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
       useLaserStore.setState({
         motionOperation: {
+          operationId: 1,
           kind: 'jog',
           sawControllerBusy: false,
           idleStatusReports: 0,
@@ -164,6 +165,7 @@ describe('laser-store active-job command guard', () => {
       workOriginActive: true,
       wcoCache: { x: 1, y: 1, z: 0 },
       motionOperation: {
+        operationId: 2,
         kind: 'jog',
         sawControllerBusy: false,
         idleStatusReports: 0,
@@ -262,7 +264,9 @@ describe('laser-store active-job command guard', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('done');
     writes.length = 0;
 
-    await expect(useLaserStore.getState().home()).rejects.toThrow(/job is active/i);
+    await expect(useLaserStore.getState().home()).rejects.toThrow(
+      /previous controller write and terminal acknowledgement settle/i,
+    );
 
     expect(writes.some((line) => line.startsWith('$H'))).toBe(false);
     expect(useLaserStore.getState().streamer?.status).toBe('done');

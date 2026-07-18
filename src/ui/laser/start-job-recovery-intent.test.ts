@@ -24,7 +24,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
-import { frameVerificationForProject } from './frame-verification-testing';
+import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
@@ -119,7 +119,7 @@ async function compileCurrentLaserJob(): Promise<string> {
   return gcode;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
   resetStore();
   const project = {
@@ -155,9 +155,6 @@ beforeEach(() => {
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
-    // Frame-first (ADR-228): the sole Start gate is a completed Frame for
-    // this exact job, so the flow tests record one up front.
-    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
   useCameraStore.setState({
@@ -166,6 +163,7 @@ beforeEach(() => {
     surfaceHeightMm: 0,
   });
   useExperimentalLaserFeatures.getState().resetFeatures();
+  await installFramedRunPermitForCurrentState();
   vi.mocked(jobAwareAlert).mockClear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   useJobReviewStore.getState().close();

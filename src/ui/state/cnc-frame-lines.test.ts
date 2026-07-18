@@ -4,6 +4,7 @@ import {
   buildGrblFrameRetract,
 } from '../../core/controllers/grbl/frame-lines';
 import {
+  CNC_FRAME_POSITION_REQUIRED_MESSAGE,
   CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE,
   CNC_FRAME_WORK_Z_REQUIRED_MESSAGE,
   buildCncFrameMotion,
@@ -66,11 +67,11 @@ describe('buildCncFrameMotion', () => {
     });
   });
 
-  // Unknown pre-frame Z: retract but do not guess a restore target — leave the
-  // bit at safe Z rather than jog somewhere unverified.
-  it('retracts without a restore when the pre-frame Z is unknown', () => {
-    const lines = motion({ preFrameWorkZMm: null, hasCurrentWorkZEvidence: true });
-    expect(lines).toEqual(['$J=G90 G21 Z3.810 F1000\n', ...PERIMETER]);
+  it('blocks when the pre-frame work Z is unknown', () => {
+    expect(plan({ preFrameWorkZMm: null, hasCurrentWorkZEvidence: true })).toEqual({
+      kind: 'blocked',
+      message: CNC_FRAME_POSITION_REQUIRED_MESSAGE,
+    });
   });
 
   it('omits a redundant restore when the bit is already at safe Z', () => {

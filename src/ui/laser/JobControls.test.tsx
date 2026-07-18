@@ -3,8 +3,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
+import type { FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { installAutoJobReview } from './job-review';
+import { completeFramedRunCandidateForTest } from './framed-run-testing';
 import { JobControls } from './JobControls';
 import { CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE } from './start-job-readiness';
 
@@ -108,11 +111,19 @@ function setMotionOperation(operation: MotionOperationSnapshot | null): void {
   >);
 }
 
+function buttonByText(host: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent === text);
+  if (button === undefined) throw new Error(`${text} button not rendered`);
+  return button;
+}
+
 afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
+    connection: { kind: 'disconnected' },
     streamer: null,
     statusReport: null,
+    activeWcs: null,
     homingState: 'unknown',
     workOriginActive: false,
     wcoCache: null,
@@ -123,14 +134,19 @@ afterEach(() => {
 });
 
 describe('JobControls Frame action', () => {
-  it('blocks Frame when fill overscan would make Start fail out of bounds', async () => {
+  it('treats out-of-bounds fill overscan as a review warning and lets the physical Frame decide', async () => {
     installFillProjectAtLeftEdge();
     useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const originalFrame = useLaserStore.getState().frame;
-    const frame = vi.fn(async () => undefined);
+    const frame = vi.fn(async (_bounds, _feed, candidate?: FramedRunCandidate) => {
+      if (candidate === undefined) throw new Error('Frame candidate was not supplied.');
+      completeFramedRunCandidateForTest(candidate);
+    });
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       streamer: null,
+      activeWcs: 'G54',
       statusReport: {
         state: 'Idle',
         subState: null,
@@ -143,6 +159,7 @@ describe('JobControls Frame action', () => {
     });
     const host = document.createElement('div');
     document.body.appendChild(host);
+    const uninstallAutoReview = installAutoJobReview('confirm');
     let root: Root | null = null;
     try {
       await act(async () => {
@@ -150,17 +167,18 @@ describe('JobControls Frame action', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).not.toHaveBeenCalled();
-      expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/overscan/i);
+      expect(frame).toHaveBeenCalledTimes(1);
+      expect(frame.mock.calls[0]?.[0]).toMatchObject({ minX: -5, maxX: 15 });
     } finally {
+      uninstallAutoReview();
       if (root !== null) {
         await act(async () => root?.unmount());
       }
@@ -175,9 +193,11 @@ describe('JobControls Frame action', () => {
     const frame = vi.fn(async () => undefined);
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       workOriginActive: true,
       wcoCache: null,
       streamer: null,
+      activeWcs: 'G54',
       statusReport: {
         state: 'Idle',
         subState: null,
@@ -198,9 +218,9 @@ describe('JobControls Frame action', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -313,15 +333,10 @@ describe('JobControls running safety copy', () => {
       expect(buttons).not.toContain('ABORT');
       expect(buttons).not.toContain('Pause');
       expect(buttons).not.toContain('Resume');
-      const buttonByText = (text: string): HTMLButtonElement => {
-        const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
-        if (button === undefined) throw new Error(`${text} button not rendered`);
-        return button;
-      };
-      expect(buttonByText('Home').disabled).toBe(true);
-      expect(buttonByText('Set origin here').disabled).toBe(true);
-      expect(buttonByText('Frame').disabled).toBe(true);
-      expect(buttonByText('Start job').disabled).toBe(true);
+      expect(buttonByText(host, 'Home').disabled).toBe(true);
+      expect(buttonByText(host, 'Set origin here').disabled).toBe(true);
+      expect(buttonByText(host, 'Frame job').disabled).toBe(true);
+      expect(buttonByText(host, 'Set up & Frame').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -360,15 +375,10 @@ describe('JobControls running safety copy', () => {
       expect(buttons).not.toContain('ABORT');
       expect(buttons).not.toContain('Pause');
       expect(buttons).not.toContain('Resume');
-      const buttonByText = (text: string): HTMLButtonElement => {
-        const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
-        if (button === undefined) throw new Error(`${text} button not rendered`);
-        return button;
-      };
-      expect(buttonByText('Home').disabled).toBe(true);
-      expect(buttonByText('Set origin here').disabled).toBe(true);
-      expect(buttonByText('Frame').disabled).toBe(true);
-      expect(buttonByText('Start job').disabled).toBe(true);
+      expect(buttonByText(host, 'Home').disabled).toBe(true);
+      expect(buttonByText(host, 'Set origin here').disabled).toBe(true);
+      expect(buttonByText(host, 'Frame job').disabled).toBe(true);
+      expect(buttonByText(host, 'Set up & Frame').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -389,21 +399,16 @@ describe('JobControls running safety copy', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
 
-      const buttonByText = (text: string): HTMLButtonElement => {
-        const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
-        if (button === undefined) throw new Error(`${text} button not rendered`);
-        return button;
-      };
       expect(host.textContent).toContain(
         'Frame motion is active. Use ABORT MOTION in the Live Motion bar',
       );
       expect(
         [...host.querySelectorAll('button')].map((button) => button.textContent),
       ).not.toContain('Cancel frame');
-      expect(buttonByText('Home').disabled).toBe(true);
-      expect(buttonByText('Set origin here').disabled).toBe(true);
-      expect(buttonByText('Frame').disabled).toBe(true);
-      expect(buttonByText('Start job').disabled).toBe(true);
+      expect(buttonByText(host, 'Home').disabled).toBe(true);
+      expect(buttonByText(host, 'Set origin here').disabled).toBe(true);
+      expect(buttonByText(host, 'Frame job').disabled).toBe(true);
+      expect(buttonByText(host, 'Set up & Frame').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());

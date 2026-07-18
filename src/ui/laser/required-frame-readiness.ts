@@ -1,4 +1,4 @@
-import { computeJobBounds, frameBoundsSignature } from '../../core/job';
+import { computeJobBounds, frameBoundsSignature, machineSpaceJob } from '../../core/job';
 import type { PreparedOutput } from '../../io/gcode';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
@@ -20,7 +20,13 @@ export function requiredFrameIssueFromPrepared(args: {
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly machine: RequiredFrameSnapshot;
 }): string | null {
-  const bounds = computeJobBounds(args.prepared.job, args.prepared.project.device);
+  const prepared = args.prepared;
+  const framedJob = machineSpaceJob(
+    prepared.job,
+    prepared.project.device,
+    prepared.project.machine,
+  );
+  const bounds = computeJobBounds(framedJob, prepared.project.device);
   if (bounds === null) return null;
   const valid = isVerifiedFrameValid(args.machine.frameVerification ?? null, {
     boundsSignature: frameBoundsSignature(bounds),

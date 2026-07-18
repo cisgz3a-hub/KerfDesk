@@ -57,6 +57,7 @@ function makeLaserState(): LaserState {
     pendingToolId: null,
     workOriginSource: 'none',
     frameVerification: null,
+    framedRun: null,
     connect: async () => undefined,
     disconnect: async () => undefined,
     home: async () => undefined,
@@ -92,6 +93,7 @@ function makeLaserState(): LaserState {
     retryControllerQualification: async () => undefined,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
+    selectPrimaryWcsForFrame: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
   };

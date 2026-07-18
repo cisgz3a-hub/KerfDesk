@@ -48,7 +48,7 @@ describe('LaserWindow Console disclosure', () => {
       expect(disclosure?.querySelector('input[aria-label="Console command"]')).toBeInstanceOf(
         HTMLInputElement,
       );
-      expect(disclosure?.contains(button(host, 'Start job'))).toBe(false);
+      expect(disclosure?.contains(button(host, 'Set up & Frame'))).toBe(false);
 
       await act(async () => summary?.click());
       expect((disclosure as HTMLDetailsElement).open).toBe(true);

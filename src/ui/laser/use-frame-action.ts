@@ -1,217 +1,347 @@
-import type { DeviceProfile } from '../../core/devices';
-import type { MotionBoundsOffset } from '../../core/invariants';
-import { filterSceneForOutputScope } from '../../core/scene';
 import {
-  computeFrameBounds,
   computeJobBounds,
   computeJobMotionBounds,
-  describeFramePreflightFailure,
-  framePreflight,
-  offsetJobBounds,
-  type JobBounds,
+  frameBoundsSignature,
+  machineSpaceJob,
 } from '../../core/job';
-import { prepareOutputSnapshot, type PreparedOutput } from '../../io/gcode';
-import { trustedMotionOffsetForPreflight, type ResolvedJobPlacement } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
+import { framedRunControllerSnapshot, type FramedRunCandidate } from '../state/framed-run';
+import { useCameraStore } from '../state/camera-store';
+import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
+import type { LaserMotionOperation } from '../state/laser-motion-operation';
+import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useToastStore } from '../state/toast-store';
-import { renderVariableText } from '../text/render-variable-text';
-import { currentPrintCutOutputRegistration } from './print-cut-output';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
+import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
+import { waitForFreshIdleFramePosition } from './frame-position-readiness';
+import { useStartBlockerStore } from './start-blocker-store';
+import { controllerStartPreparationStillCurrent } from './start-job-authorization';
+import { currentReplayExecutionSignature } from './start-job-execution-tracking';
+import {
+  captureStartExternalEnvironment,
+  startExternalEnvironmentMatches,
+} from './start-job-external-environment';
+import { prepareCurrentStartJob } from './start-job-source';
+import { runJobReviewGate, type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
+import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 
 export function useFrameAction(): () => void {
-  const frame = useLaserStore((s) => s.frame);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const workOriginActive = useLaserStore((s) => s.workOriginActive);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
-  const homingState = useLaserStore((s) => s.homingState);
-  const trustedPositionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
-  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
-  const pushToast = useToastStore((s) => s.pushToast);
   return () => {
-    void runFrameAction({
-      frame,
-      statusReport,
-      workOriginActive,
-      wcoCache,
-      homingState,
-      trustedPositionEpoch,
-      reportInches,
-      pushToast,
-    });
+    void runFrameNow();
   };
 }
 
-/** Imperative Frame run for non-hook callers (the blocked-Start fix offer).
- * True when the frame motion was dispatched — the physical trace continues
- * asynchronously afterwards, so callers must not assume the head is idle. */
+/**
+ * Prepare, review, and physically Frame one exact executable artifact. The
+ * controller store promotes the candidate to `framedRun` only after the final
+ * clean Idle; dispatch, cancel, Alarm, reset, or write failure earns no permit.
+ */
 export async function runFrameNow(): Promise<boolean> {
-  const laser = useLaserStore.getState();
-  return runFrameAction({
-    frame: laser.frame,
+  ensureFramedRunInvalidationSubscriptions();
+  useStartBlockerStore.getState().clear();
+  const initial = await prepareFrameReviewBundle();
+  if (initial === null) return false;
+  const review = await runJobReviewGate({
+    initial,
+    checkpointToReplace: null,
+    completedReceipt: null,
+    purpose: 'frame',
+  });
+  if (review === null) return false;
+  return dispatchReviewedFrame(review);
+}
+
+async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
+  if (!(await waitForFrameControllerQueue())) return null;
+  if (!(await normalizeFrameWorkCoordinateSystem())) return null;
+  const app = useStore.getState();
+  const laser = await prepareFrameLaser(
+    app.project.machine?.kind === 'cnc',
+    useLaserStore.getState(),
+  );
+  if (laser === null) return null;
+  const camera = useCameraStore.getState();
+  const placement = resolveCameraSafeFramePlacement(app.project, app.jobPlacement, {
     statusReport: laser.statusReport,
     workOriginActive: laser.workOriginActive,
     wcoCache: laser.wcoCache,
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
     reportInches: laser.controllerSettings?.reportInches === true,
-    pushToast: useToastStore.getState().pushToast,
-  });
-}
-
-async function runFrameAction({
-  frame,
-  statusReport,
-  workOriginActive,
-  wcoCache,
-  homingState,
-  trustedPositionEpoch,
-  reportInches,
-  pushToast,
-}: Pick<
-  ReturnType<typeof useLaserStore.getState>,
-  | 'frame'
-  | 'statusReport'
-  | 'workOriginActive'
-  | 'wcoCache'
-  | 'homingState'
-  | 'trustedPositionEpoch'
-> & {
-  readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
-  readonly reportInches: boolean;
-}): Promise<boolean> {
-  // Click-only consumer: read project/placement at call time instead of
-  // subscribing; a render-per-mousemove for a button handler would be noisy.
-  const app = useStore.getState();
-  const { project, jobPlacement } = app;
-  const outputScope = currentOutputScope(app);
-  const placement = resolveCameraSafeFramePlacement(project, jobPlacement, {
-    statusReport,
-    workOriginActive,
-    wcoCache,
-    homingState,
-    trustedPositionEpoch,
-    reportInches,
   });
   if (!placement.ok) {
-    pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
-    return false;
+    reportFrameRefusal(placement.messages);
+    return null;
   }
-  const frameScene = filterSceneForOutputScope(project.scene, outputScope);
-  const frameBounds = computeFrameBounds(
-    frameScene,
-    project.device,
-    placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
+  const externalEnvironment = captureStartExternalEnvironment(app.project, camera);
+  const prepared = await prepareCurrentStartJob(
+    app,
+    laser,
+    camera,
+    externalEnvironment.rotaryRasterAllowed,
+    placement.jobOrigin,
+    false,
   );
-  const registration = currentPrintCutOutputRegistration(project);
-  const prepared = await prepareOutputSnapshot(project, {
-    clock: () => new Date(),
-    renderVariableText,
-    ...(registration === undefined ? {} : { registration }),
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    outputScope,
-  });
   if (!prepared.ok) {
-    const fallbackBounds = rasterBudgetFallbackBounds(prepared.preflight, frameBounds);
-    if (fallbackBounds !== null) {
-      return dispatchFrameIfSafe(
-        frame,
-        pushToast,
-        fallbackBounds,
-        fallbackBounds,
-        placement,
-        project,
-      );
-    }
-    pushToast(
-      prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
-      'error',
-    );
-    return false;
+    reportFrameRefusal(prepared.messages);
+    return null;
   }
-  const bounds = computeJobBounds(prepared.job, project.device);
-  if (bounds === null) {
-    pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
-    return false;
-  }
-  const motionBounds = computeJobMotionBounds(prepared.job, project.device) ?? bounds;
-  return dispatchFrameIfSafe(frame, pushToast, bounds, motionBounds, placement, project);
+  return {
+    app,
+    project: app.project,
+    laser,
+    prepared,
+    laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+    externalEnvironment,
+  };
 }
 
-function rasterBudgetFallbackBounds(
-  preflight: Extract<PreparedOutput, { readonly ok: false }>['preflight'],
-  frameBounds: JobBounds | null,
-): JobBounds | null {
-  const rasterOnly =
-    preflight.issues.length > 0 &&
-    preflight.issues.every((issue) => issue.code === 'raster-too-large');
-  return rasterOnly ? frameBounds : null;
-}
-
-async function dispatchFrameIfSafe(
-  frame: (bounds: JobBounds, feed: number) => Promise<void>,
-  pushToast: (message: string, variant: 'error') => void,
-  bounds: JobBounds,
-  motionBounds: JobBounds,
-  placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
-  project: ReturnType<typeof useStore.getState>['project'],
-): Promise<boolean> {
-  const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
-  const motionIssue = describeFrameMotionPreflightIssue(
-    motionBounds,
-    motionOffset,
-    placement.jobOrigin !== undefined,
-    project.device,
-  );
-  if (motionIssue !== null) {
-    pushToast(motionIssue, 'error');
-    return false;
-  }
-  const feed = project.device.framingFeedMmPerMin;
+async function normalizeFrameWorkCoordinateSystem(): Promise<boolean> {
+  const before = useLaserStore.getState();
+  if (before.capabilities.transport !== 'serial' || before.activeWcs === 'G54') return true;
   try {
-    // Resolves when the first frame line is dispatched; the remaining trace
-    // streams via status observations. Failures already surface through the
-    // store's write-error log, matching the old silent .catch here.
-    await frame(bounds, feed);
-  } catch {
+    await before.selectPrimaryWcsForFrame();
+  } catch (error) {
+    reportFrameRefusal([
+      `Frame could not select the program's G54 coordinate system: ${error instanceof Error ? error.message : String(error)}`,
+    ]);
     return false;
   }
-  // Frame-first (ADR-228 amendment): the store arms the proof on the frame
-  // operation itself and records frameVerification only when the trace
-  // settles cleanly — a cancelled, alarmed, or dropped trace earns nothing.
+  if (!(await waitForFrameControllerQueue())) return false;
+  const afterSelectionSequence = useLaserStore.getState().statusSequence;
+  if (!(await waitForFreshIdleFramePosition(afterSelectionSequence))) {
+    reportFrameRefusal([
+      'G54 was selected, but the controller did not report a fresh Idle position in that coordinate system. Wait for a complete status report, then Frame again.',
+    ]);
+    return false;
+  }
+  if (useLaserStore.getState().activeWcs !== 'G54') {
+    reportFrameRefusal([
+      'The controller did not confirm the G54 coordinate system required by the prepared program.',
+    ]);
+    return false;
+  }
   return true;
 }
 
-function describeFrameMotionPreflightIssue(
-  motionBounds: JobBounds,
-  motionOffset: MotionBoundsOffset | undefined,
-  hasRelativeOrigin: boolean,
-  device: DeviceProfile,
-): string | null {
-  if (motionOffset === undefined && hasRelativeOrigin) {
-    return describeRelativeMotionTooLarge(motionBounds, device);
+async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolean> {
+  const { bundle } = review;
+  if (!(await waitForFrameControllerQueue())) return false;
+  const currentLaser = useLaserStore.getState();
+  if (!reviewedFrameIsCurrent(bundle, currentLaser)) {
+    reportFrameRefusal([
+      'The job or machine setup changed during review. Review the current job and Frame again.',
+    ]);
+    return false;
   }
-  const preflightBounds =
-    motionOffset === undefined ? motionBounds : offsetJobBounds(motionBounds, motionOffset);
-  const pre = framePreflight(preflightBounds, device);
-  if (pre.kind === 'out-of-bounds') {
-    return `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`;
+
+  const prepared = bundle.prepared.prepared;
+  const framedJob = machineSpaceJob(
+    prepared.job,
+    prepared.project.device,
+    prepared.project.machine,
+  );
+  const jobBounds = computeJobBounds(framedJob, prepared.project.device);
+  if (jobBounds === null) {
+    reportFrameRefusal(['Nothing to frame — enable Output on at least one layer.']);
+    return false;
   }
-  if (pre.kind === 'no-go-zone') {
-    return `Cannot frame: generated motion crosses no-go zone "${pre.zoneName}".`;
+  // Frame the actual generated motion envelope, including raster/vector
+  // overscan, rather than only the artwork/burn rectangle.
+  const motionBounds = computeJobMotionBounds(framedJob, prepared.project.device) ?? jobBounds;
+  const returnToWorkPosition = currentWorkXy(currentLaser);
+  if (returnToWorkPosition === undefined) {
+    reportFrameRefusal([
+      'The controller did not report a usable work position. Wait for a complete status report, then Frame again.',
+    ]);
+    return false;
   }
-  return null;
+  const candidate: FramedRunCandidate = {
+    preparedStart: bundle.prepared,
+    project: bundle.project,
+    outputScope: currentOutputScope(bundle.app),
+    executionSignature: bundle.prepared.canvasPlan.retentionKey,
+    controllerBeforeFrame: framedRunControllerSnapshot(currentLaser),
+    externalEnvironment: bundle.externalEnvironment,
+    frameVerification: {
+      boundsSignature: frameBoundsSignature(jobBounds),
+      wco: currentLaser.wcoCache,
+      workOriginActive: currentLaser.workOriginActive,
+    },
+    returnToWorkPosition,
+    ...(review.laserModeStartEvidence === undefined
+      ? {}
+      : { laserModeStartEvidence: review.laserModeStartEvidence }),
+    ...(review.cncSetupAttestation === undefined
+      ? {}
+      : { cncSetupAttestation: review.cncSetupAttestation }),
+  };
+
+  const completion = waitForFrameOutcome(candidate);
+  try {
+    await currentLaser.frame(motionBounds, bundle.project.device.framingFeedMmPerMin, candidate);
+  } catch (error) {
+    completion.cancel();
+    reportFrameRefusal([error instanceof Error ? error.message : String(error)]);
+    return false;
+  }
+  if (!completion.observeAfterDispatch()) {
+    reportFrameRefusal([
+      'The controller did not dispatch framing motion. No job was authorized to start.',
+    ]);
+    return false;
+  }
+  const accepted = await completion.result;
+  if (accepted) {
+    useToastStore
+      .getState()
+      .pushToast('Frame complete — this exact job is ready to start.', 'success');
+  }
+  return accepted;
 }
 
-function describeRelativeMotionTooLarge(
-  bounds: JobBounds,
-  device: { readonly bedWidth: number; readonly bedHeight: number },
-): string | null {
-  const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
-  if (width <= device.bedWidth && height <= device.bedHeight) return null;
-  const parts: string[] = [];
-  if (width > device.bedWidth) parts.push(`X span ${width.toFixed(1)} mm`);
-  if (height > device.bedHeight) parts.push(`Y span ${height.toFixed(1)} mm`);
-  return `Cannot frame: generated motion (${parts.join(', ')}) is larger than the ${device.bedWidth}×${device.bedHeight} mm bed. Scale the artwork down or reduce overscan.`;
+async function prepareFrameLaser(
+  isCnc: boolean,
+  laser: ReturnType<typeof useLaserStore.getState>,
+): Promise<ReturnType<typeof useLaserStore.getState> | null> {
+  if (!isCnc) return laser;
+  if (
+    isWorkZEvidenceCurrentForStart(
+      laser.workZZeroEvidence,
+      laser.workZReferenceEpoch,
+      laser.controllerSessionEpoch,
+    )
+  ) {
+    return laser;
+  }
+  const zeroHere = jobAwareConfirm(
+    `${CNC_FRAME_WORK_Z_REQUIRED_MESSAGE}\n\n` +
+      'If the bit is touching the stock-top Z reference now, choose OK to set Work Z zero and continue preparing Frame. Choose Cancel to jog or probe first.',
+  );
+  if (!zeroHere) {
+    reportFrameRefusal([CNC_FRAME_WORK_Z_REQUIRED_MESSAGE]);
+    return null;
+  }
+  try {
+    const positionSequenceBeforeZero = laser.statusSequence;
+    await laser.zeroZHere();
+    if (!(await waitForFreshIdleFramePosition(positionSequenceBeforeZero))) {
+      reportFrameRefusal([
+        'Work Z was set, but the controller did not report the fresh Idle position needed to build an exact Frame. Wait for a complete status report, then Frame again.',
+      ]);
+      return null;
+    }
+    return useLaserStore.getState();
+  } catch (error) {
+    reportFrameRefusal([error instanceof Error ? error.message : String(error)]);
+    return null;
+  }
+}
+
+function reviewedFrameIsCurrent(
+  bundle: ReviewedStartBundle,
+  currentLaser: ReturnType<typeof useLaserStore.getState>,
+): boolean {
+  return (
+    currentReplayExecutionSignature() === bundle.prepared.canvasPlan.retentionKey &&
+    startExternalEnvironmentMatches(
+      bundle.externalEnvironment,
+      useStore.getState().project,
+      useCameraStore.getState(),
+    ) &&
+    controllerStartPreparationStillCurrent(bundle.laser, currentLaser)
+  );
+}
+
+function currentWorkXy(
+  laser: ReturnType<typeof useLaserStore.getState>,
+): { readonly x: number; readonly y: number } | undefined {
+  const position = reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true);
+  return position === null ? undefined : { x: position.x, y: position.y };
+}
+
+function waitForFrameOutcome(candidate: FramedRunCandidate): {
+  readonly result: Promise<boolean>;
+  readonly cancel: () => void;
+  readonly observeAfterDispatch: () => boolean;
+} {
+  let settled = false;
+  let sawOwnedFrame = false;
+  let finish: (value: boolean) => void = () => undefined;
+  const result = new Promise<boolean>((resolve) => {
+    finish = resolve;
+  });
+  const complete = (value: boolean): void => {
+    if (settled) return;
+    settled = true;
+    unsubscribe();
+    finish(value);
+  };
+  const unsubscribe = useLaserStore.subscribe((state, previous) => {
+    const ownedOperation = candidateFrameOperation(state.motionOperation, candidate);
+    if (ownedOperation !== null) {
+      sawOwnedFrame = true;
+      if (ownedOperation.cancelRequested === true) {
+        complete(false);
+        return;
+      }
+    }
+    if (state.framedRun?.candidate === candidate) {
+      complete(true);
+      return;
+    }
+    if (
+      sawOwnedFrame &&
+      candidateFrameOperation(previous.motionOperation, candidate) !== null &&
+      state.motionOperation === null
+    ) {
+      complete(false);
+    }
+  });
+  const observeAfterDispatch = (): boolean => {
+    const state = useLaserStore.getState();
+    if (state.framedRun?.candidate === candidate) {
+      complete(true);
+      return true;
+    }
+    const operation = candidateFrameOperation(state.motionOperation, candidate);
+    const dispatched = operation !== null && operation.cancelRequested !== true;
+    if (!dispatched) complete(false);
+    return dispatched;
+  };
+  return { result, cancel: () => complete(false), observeAfterDispatch };
+}
+
+function candidateFrameOperation(
+  operation: LaserMotionOperation | null,
+  candidate: FramedRunCandidate,
+): (LaserMotionOperation & { readonly kind: 'frame' }) | null {
+  return operation?.kind === 'frame' && operation.candidate === candidate ? operation : null;
+}
+
+function reportFrameRefusal(messages: ReadonlyArray<string>): void {
+  useStartBlockerStore.getState().report(messages);
+  useToastStore.getState().pushToast(messages[0] ?? 'The job cannot be framed.', 'error');
+}
+
+const FRAME_QUEUE_SETTLE_TIMEOUT_MS = 1_500;
+
+async function waitForFrameControllerQueue(): Promise<boolean> {
+  const deadline = Date.now() + FRAME_QUEUE_SETTLE_TIMEOUT_MS;
+  while (hasPendingControllerWrite(useLaserStore.getState())) {
+    if (Date.now() > deadline) {
+      reportFrameRefusal([
+        'The controller is still finishing a previous command. Wait for its acknowledgement, then Frame again.',
+      ]);
+      return false;
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 25);
+    });
+  }
+  return true;
 }

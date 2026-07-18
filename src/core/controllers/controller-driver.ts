@@ -48,6 +48,10 @@ export type ControllerCommands = {
   /** Best-effort de-energize lines written after a job Abort
    *  (GRBL: ['M9']; Marlin: ['M5', 'M107']). No trailing newlines. */
   readonly stopLaserLines: ReadonlyArray<string>;
+  /** Queued tool-off lines dispatched and acknowledged before any Frame motion.
+   *  These must explicitly de-energize every driver-owned cutting accessory;
+   *  unlike stopLaserLines, callers cannot rely on a preceding soft reset. */
+  readonly frameToolOffLines: ReadonlyArray<string>;
   /** Ack-fenced no-op used as a settle marker after motion (GRBL 'G4 P0.01';
    *  Marlin 'M400' which acks only when buffered motion has drained). */
   readonly settleDwell: string;

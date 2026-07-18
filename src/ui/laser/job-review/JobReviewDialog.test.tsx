@@ -125,6 +125,26 @@ describe('JobReviewDialog', () => {
     expect(useJobReviewStore.getState().pendingSignal).toBe('cancel');
   });
 
+  it('uses framing-specific review, acknowledgement, action, and blocker copy', async () => {
+    useJobReviewStore.getState().open(model, 'frame');
+    await render();
+
+    expect(host.textContent).toContain('Review job before framing');
+    expect(host.textContent).toContain('Pressing Accept & Frame records this confirmation');
+    const frame = buttonByText('Accept & Frame');
+    expect(frame.disabled).toBe(false);
+    expect(frame.title).toBe('Accept this review and frame the exact job shown above.');
+    expect(buttonByText('Cancel').title).toMatch(/without framing/i);
+
+    await act(async () => {
+      useJobReviewStore.getState().failPrepare(['Controller reports Alarm.']);
+    });
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'Cannot frame this job as edited',
+    );
+    expect(buttonByText('Accept & Frame').disabled).toBe(true);
+  });
+
   it('disables Start while a re-prepare is in flight', async () => {
     useJobReviewStore.getState().open(model);
     useJobReviewStore.getState().beginPrepare();

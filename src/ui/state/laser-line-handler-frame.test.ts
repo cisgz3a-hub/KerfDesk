@@ -52,6 +52,7 @@ function makeLaserState(): LaserState {
     pendingToolId: null,
     workOriginSource: 'none',
     frameVerification: null,
+    framedRun: null,
     connect: async () => undefined,
     disconnect: async () => undefined,
     home: async () => undefined,
@@ -87,6 +88,7 @@ function makeLaserState(): LaserState {
     retryControllerQualification: async () => undefined,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
+    selectPrimaryWcsForFrame: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
   };
@@ -126,6 +128,7 @@ describe('frame proof records at trace completion (ADR-228 amendment)', () => {
 
   function armedFrameOp(pendingLines: ReadonlyArray<string>): LaserState['motionOperation'] {
     return {
+      operationId: 1,
       kind: 'frame',
       sawControllerBusy: false,
       idleStatusReports: 0,
@@ -183,6 +186,7 @@ describe('handleLine queued Frame writes', () => {
     set({
       frameVerification: verification,
       motionOperation: {
+        operationId: 1,
         kind: 'frame',
         sawControllerBusy: true,
         idleStatusReports: 0,
@@ -199,7 +203,10 @@ describe('handleLine queued Frame writes', () => {
     await Promise.resolve();
 
     expect(safeWrite).toHaveBeenCalledWith('$J=G90 G21 X10.000 Y0.000 F1000\n', 'frame');
-    expect(get().motionOperation).toBeNull();
+    expect(get().motionOperation).toMatchObject({
+      kind: 'frame',
+      cancelRequested: true,
+    });
     expect(get().frameVerification).toBeNull();
   });
 });
@@ -227,6 +234,7 @@ describe('handleLine hard-limit during Verified Frame (ADR-053 P3)', () => {
         pins: { limitX: true, limitY: false, limitZ: false, probe: false, door: false },
       },
       motionOperation: {
+        operationId: 2,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,

@@ -3,6 +3,7 @@ import type { ControllerKind } from '../../core/devices';
 import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
+import type { FramedRunCandidate } from './framed-run';
 import type { StartJobOptions } from './laser-job-options';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { ProbeResult } from './probe-actions';
@@ -29,6 +30,9 @@ export type LaserStoreActions = {
   readonly retryControllerQualification: () => Promise<void>;
   readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
+  /** Owned G54 selection used before preparing Frame so Frame and emitted
+   * program resolve coordinates in the same canonical WCS. */
+  readonly selectPrimaryWcsForFrame: () => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
@@ -43,6 +47,7 @@ export type LaserStoreActions = {
       readonly maxY: number;
     },
     feed: number,
+    candidate?: FramedRunCandidate,
   ) => Promise<void>;
   readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;

@@ -1,4 +1,9 @@
-import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
+import {
+  findOversizedLine,
+  isSendableGcodeLine,
+  type OverrideValues,
+  type StatusReport,
+} from '../../core/controllers/grbl';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { SimilarityTransform } from '../../core/registration';
@@ -94,25 +99,25 @@ export type MachineStartSnapshot = {
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   // Last live GRBL Ov: field, cached across intermittent status frames.
   // A known non-default value changes physical feed/RPM independently of the
-  // prepared G-code, so CNC Start requires the compiled 100/100/100 baseline.
+  // prepared G-code, so Job Review surfaces it as an operator warning.
   readonly ovCache?: OverrideValues | null;
   // Last live GRBL A: observation. This is controller-commanded state, not
-  // physical spindle/coolant sensor proof. Known active accessories block CNC
-  // Start; null/undefined remains unknown rather than being invented as off.
+  // physical spindle/coolant sensor proof. Known active accessories warn in
+  // Job Review; null/undefined remains unknown rather than invented as off.
   readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
-  // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
+  // Transitional verified-bounds proof retained for recovery/compatibility;
+  // ordinary fresh Start uses the exact completion-issued FramedRunPermit.
   readonly frameVerification?: FrameVerification | null;
   // ADR-094 — how the connected firmware exposes settings. Non-GRBL values
   // relax the $30/$32 readiness proof into an explicit unverified warning.
   readonly settingsCapability?: ReadinessSettingsCapability;
-  // ADR-098 — CNC is GRBL-only. False blocks CNC Start outright (the CNC
-  // emitter's dialect is unsafe on other firmwares); absent = allowed.
+  // Connected-driver CNC dialect support. False produces a Job Review warning;
+  // it does not refuse Frame or Start (ADR-228).
   readonly cncJobsSupported?: boolean;
   readonly activeControllerKind?: ControllerKind;
   readonly detectedControllerKind?: ControllerKind | null;
-  // Camera placement is a physical bed-coordinate contract. These optional
-  // fields keep non-camera callers backward-compatible while Start and Resume
-  // can enforce the same position proof as Frame.
+  // Camera placement observations used for warning/canvas context. These
+  // optional fields keep non-camera callers backward-compatible.
   readonly cameraPlacementActive?: boolean;
   readonly cameraConfirmedPositionEpoch?: number | null;
   readonly cameraPlacementGeometryIssue?: string | null;
@@ -134,6 +139,7 @@ export function prepareStartJob(
   // re-validated through the origin's mode (R1).
   resolvedJobOrigin?: JobOriginPlacement,
   allowRotaryRaster?: boolean,
+  requireFrame = true,
 ): StartJobPreparation {
   const effectivePlacement = placementForResolvedOrigin(jobPlacement, resolvedJobOrigin);
   const gateIssues = findMachineStartIssues(machine);
@@ -153,49 +159,19 @@ export function prepareStartJob(
     machine,
   );
   if (!inspected.ok) return inspected;
-  const { prepared, toolPlan, advisoryWarnings } = inspected;
-
-  const { gcode, preflight } = emitPreparedGcode(prepared, {
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    outputScope,
-    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
-    ...initialMachinePositionOption(machineWithReportUnits),
-    allowRotaryRaster: allowRotaryRaster === true,
-  });
-  const emitSplit = partitionEmitPreflight(preflight);
-  if (emitSplit.blocking.length > 0) {
-    return { ok: false, messages: emitSplit.blocking };
-  }
-
-  const verifiedFrameIssue = requiredFrameIssueFromPrepared({ prepared, machine });
-  if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
-
-  const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
-  const warnings = collectStartWarnings(
+  return finalizeStartPreparation({
     project,
     controllerSettings,
-    [
-      ...demotedPolicyWarnings(project, machine),
-      ...advisoryWarnings,
-      ...emitSplit.warnings,
-      // Frame-first: readiness errors ($30/$32 state) inform, never block.
-      ...controller.errors.map((i) => i.message),
-      ...controller.warnings.map((i) => i.message),
-    ],
-    machine.ovCache,
-    machine.activeWcs,
-  );
-  return okPreparation(
-    gcode,
-    warnings,
-    placement.jobOrigin,
-    toolPlan,
-    prepared,
     machine,
+    machineWithReportUnits,
+    outputScope,
+    allowRotaryRaster: allowRotaryRaster === true,
+    requireFrame,
+    placement,
     motionOffset,
-    controllerReportsInches(controllerSettings),
-    canvasPlanRetentionKey(project, outputScope, effectivePlacement),
-  );
+    inspected,
+    canvasPlanKey: canvasPlanRetentionKey(project, outputScope, effectivePlacement),
+  });
 }
 
 export async function prepareStartJobSnapshot(
@@ -210,6 +186,8 @@ export async function prepareStartJobSnapshot(
     readonly renderVariableText: VariableTextRenderer;
     readonly registration?: SimilarityTransform | null;
     readonly resolvedJobOrigin?: JobOriginPlacement;
+    /** Frame preparation compiles the exact candidate before a permit exists. */
+    readonly requireFrame?: boolean;
   },
 ): Promise<StartJobPreparation> {
   const effectivePlacement = placementForResolvedOrigin(jobPlacement, options.resolvedJobOrigin);
@@ -238,8 +216,56 @@ export async function prepareStartJobSnapshot(
     machine,
   );
   if (!inspected.ok) return inspected;
-  const { prepared, toolPlan, advisoryWarnings } = inspected;
+  return finalizeStartPreparation({
+    project,
+    controllerSettings,
+    machine,
+    machineWithReportUnits,
+    outputScope,
+    allowRotaryRaster,
+    requireFrame: options.requireFrame !== false,
+    placement,
+    motionOffset,
+    inspected,
+    canvasPlanKey: canvasPlanRetentionKey(
+      project,
+      outputScope,
+      effectivePlacement,
+      options.registration,
+    ),
+  });
+}
 
+type SuccessfulPreparedStartInspection = Extract<PreparedStartInspection, { readonly ok: true }>;
+
+type FinalizeStartPreparationOptions = {
+  readonly project: Project;
+  readonly controllerSettings: ControllerSettingsSnapshot | null;
+  readonly machine: MachineStartSnapshot;
+  readonly machineWithReportUnits: MachineStartSnapshot;
+  readonly outputScope: OutputScope;
+  readonly allowRotaryRaster: boolean;
+  readonly requireFrame: boolean;
+  readonly placement: Extract<ResolvedJobPlacement, { readonly ok: true }>;
+  readonly motionOffset: PreflightOptions['motionOffset'];
+  readonly inspected: SuccessfulPreparedStartInspection;
+  readonly canvasPlanKey: string;
+};
+
+function finalizeStartPreparation({
+  project,
+  controllerSettings,
+  machine,
+  machineWithReportUnits,
+  outputScope,
+  allowRotaryRaster,
+  requireFrame,
+  placement,
+  motionOffset,
+  inspected,
+  canvasPlanKey,
+}: FinalizeStartPreparationOptions): StartJobPreparation {
+  const { prepared, toolPlan, advisoryWarnings } = inspected;
   const { gcode, preflight } = emitPreparedGcode(prepared, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
@@ -251,8 +277,16 @@ export async function prepareStartJobSnapshot(
   if (emitSplit.blocking.length > 0) {
     return { ok: false, messages: emitSplit.blocking };
   }
-  const verifiedFrameIssue = requiredFrameIssueFromPrepared({ prepared, machine });
-  if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
+  const programIssue = preparedProgramIntegrityIssue(
+    gcode,
+    project.device.rxBufferBytes,
+    preflight,
+  );
+  if (programIssue !== null) return { ok: false, messages: programIssue };
+  if (requireFrame) {
+    const verifiedFrameIssue = requiredFrameIssueFromPrepared({ prepared, machine });
+    if (verifiedFrameIssue !== null) return { ok: false, messages: [verifiedFrameIssue] };
+  }
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
   const warnings = collectStartWarnings(
@@ -278,8 +312,33 @@ export async function prepareStartJobSnapshot(
     machine,
     motionOffset,
     controllerReportsInches(controllerSettings),
-    canvasPlanRetentionKey(project, outputScope, effectivePlacement, options.registration),
+    canvasPlanKey,
   );
+}
+
+function nonExecutableProgramMessages(preflight: {
+  readonly issues: ReadonlyArray<{ readonly message: string }>;
+}): ReadonlyArray<string> {
+  const messages = preflight.issues.map((issue) => issue.message);
+  return messages.length > 0
+    ? messages
+    : ['The prepared job contains no executable controller commands. Nothing was framed or sent.'];
+}
+
+function preparedProgramIntegrityIssue(
+  gcode: string,
+  rxBufferBytes: number,
+  preflight: { readonly issues: ReadonlyArray<{ readonly message: string }> },
+): ReadonlyArray<string> | null {
+  if (!gcode.split('\n').some(isSendableGcodeLine)) {
+    return nonExecutableProgramMessages(preflight);
+  }
+  const oversized = findOversizedLine(gcode, rxBufferBytes);
+  if (oversized === null) return null;
+  return [
+    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
+      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not framed or started.`,
+  ];
 }
 
 function registrationOption(registration: SimilarityTransform | null | undefined): {

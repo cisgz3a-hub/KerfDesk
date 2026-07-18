@@ -33,8 +33,9 @@ export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | 
 }
 
 // Full physical motion envelope, including laser-off acceleration runways.
-// Frame still traces computeJobBounds(), but safety gates use this helper so a
-// burn-area frame cannot approve a Start job whose overscan would leave the bed.
+// Physical Frame traces this envelope so the operator sees the same extents
+// the cached executable artifact will travel; computeJobBounds remains the
+// artwork/burn-area measurement shown separately in review.
 export function computeJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
   return computeBounds(job, true, device);
 }

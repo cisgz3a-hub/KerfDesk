@@ -10,11 +10,11 @@ import {
 } from '../../core/scene';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
-import { frameVerificationForProject } from './frame-verification-testing';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { runStartJobFlow } from './start-job-flow';
 
@@ -73,6 +73,7 @@ describe('CNC reduced-override Start flow', () => {
     useLaserStore.setState({
       ...initialLaserState(),
       connection: { kind: 'connected' },
+      activeWcs: 'G54',
       controllerSessionEpoch: CONTROLLER_EPOCH,
       controllerQualification: {
         kind: 'qualified',
@@ -89,9 +90,15 @@ describe('CNC reduced-override Start flow', () => {
         referenceEpoch: CONTROLLER_EPOCH,
         toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
       },
-      // Frame-first (ADR-228): the completed Frame is the sole Start gate.
-      frameVerification: frameVerificationForProject(project),
       startJob: vi.fn(async () => undefined),
+      frame: vi.fn(async (_bounds, _feed, candidate?: FramedRunCandidate) => {
+        if (candidate === undefined) throw new Error('Expected exact Frame candidate.');
+        const permit = createFramedRunPermit(candidate, useLaserStore.getState());
+        useLaserStore.setState({
+          framedRun: permit,
+          frameVerification: candidate.frameVerification,
+        });
+      }),
     });
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
     useJobReviewStore.getState().close();
@@ -108,6 +115,7 @@ describe('CNC reduced-override Start flow', () => {
   it('binds the acknowledged feed/rapid reduction to setup attestation', async () => {
     const review = captureJobReviewModels();
 
+    await runStartJobFlow();
     await runStartJobFlow();
 
     review.stop();

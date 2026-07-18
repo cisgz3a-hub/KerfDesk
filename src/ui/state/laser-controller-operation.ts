@@ -1,3 +1,5 @@
+import type { FramedRunPermit } from './framed-run';
+
 export type LaserControllerOperation =
   | {
       readonly kind: 'connection-handshake';
@@ -33,6 +35,11 @@ export type LaserControllerOperation =
   | {
       readonly kind: 'start-arming';
       readonly phase: 'queue-fence' | 'live-status';
+      /** One exact Run report accepted while the tagged CNC queue-fence dwell
+       * owned the controller. The stamp survives ordinary state updates only
+       * for this status sequence and this permit object. */
+      readonly ownedRunStatusSequence?: number;
+      readonly ownedRunPermit?: FramedRunPermit;
     }
   | {
       readonly kind: 'work-z-recovery';

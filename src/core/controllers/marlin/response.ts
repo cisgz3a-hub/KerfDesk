@@ -34,9 +34,11 @@ export function classifyMarlinResponse(line: string): ControllerEvent {
   return { kind: 'unknown', raw: trimmed };
 }
 
-/** M114 reply → StatusReport. Marlin has no machine-state reporting; a queued
- *  M114 only answers after the motion queued before it has finished, so the
- *  synthesized state is Idle. Feed/spindle/WCO are unknown on this firmware. */
+/** M114 reply -> StatusReport. Marlin has no machine-state reporting, and its
+ * default M114 reports the projected destination rather than proving physical
+ * motion has drained. The Idle-shaped report is status evidence only; motion
+ * authorization first crosses an owned M400 marker. Feed/spindle/WCO remain
+ * unknown on this firmware. */
 export function parseMarlinPositionReport(line: string): StatusReport | null {
   const match = POSITION_RE.exec(line);
   if (match === null) return null;

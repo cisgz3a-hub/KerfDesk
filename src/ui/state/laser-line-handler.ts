@@ -18,7 +18,7 @@ import {
   type GrblPins,
   type StreamerState,
 } from '../../core/controllers/grbl';
-import { detectControllerFromBanner } from '../../core/controllers';
+import { detectControllerFromBanner, type ControllerEvent } from '../../core/controllers';
 import { parseActiveWcsFromModalResponses } from '../../core/controllers/grbl/work-offset-readback';
 import { flushResetCleanup } from './laser-reset-cleanup';
 import {
@@ -29,13 +29,19 @@ import {
 import { controllerRebootNotice } from './laser-safety-notice';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
+  activeControllerCommandLine,
   cancelControllerLifecycleRefs,
   consumeControllerCommandResponse,
   consumeOwnedControllerIdentityResponse,
   observeControllerResetBoundary,
 } from './laser-interactive-command';
 import { handleErrorLine, handleResendLine } from './laser-error-line';
-import type { GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
+import {
+  acknowledgeMotionSettlementMarker,
+  takeNextAcknowledgedFramePrefixLine,
+} from './laser-motion-operation';
+import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { frameHitLimitNotice } from './laser-safety-notice';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
@@ -68,12 +74,25 @@ export function handleLine(
     handleWelcomeLine(set, get, refs, safeWrite, bannerRaw);
     return;
   }
-  const ackOwner = settleUntrackedAck(set, state, cls.kind);
+  handleNonBannerLine(set, get, refs, safeWrite, cls, line, state);
+}
+
+function handleNonBannerLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  cls: ControllerEvent,
+  line: string,
+  state: LaserState,
+): void {
+  const ackSettlement = settleUntrackedAck(set, state, cls.kind, refs);
+  const ownedCommandLine = activeControllerCommandLine(refs);
   const commandConsumed = consumeControllerCommandResponse(refs, cls, line);
   // An arbiter-owned ALARM still has global machine meaning: invalidate
   // origins, cancel a held stream, and surface the lock. The command promise
   // already rejected above; continue into the shared alarm handler as well.
-  if (commandConsumed && cls.kind !== 'alarm') return;
+  if (commandConsumed && !['alarm', 'error', 'resend'].includes(cls.kind)) return;
   if (cls.kind === 'status') {
     handleStatusLine(set, get, refs, safeWrite, cls.report);
     return;
@@ -83,7 +102,16 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'error') {
-    handleErrorLine(set, get, refs, safeWrite, cls.code, cls.raw, ackOwner);
+    handleErrorLine(
+      set,
+      get,
+      refs,
+      safeWrite,
+      cls.code,
+      cls.raw,
+      ackSettlement,
+      commandConsumed ? ownedCommandLine : undefined,
+    );
     return;
   }
   // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
@@ -93,7 +121,49 @@ export function handleLine(
     handleResendLine(set, get, refs, safeWrite, cls.line);
     return;
   }
-  if (cls.kind === 'ok' && ackOwner === 'stream') {
+  routeAcknowledgement(set, get, refs, safeWrite, cls.kind, ackSettlement, state.motionOperation);
+}
+
+function routeAcknowledgement(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  kind: ControllerEvent['kind'],
+  ackSettlement: AckSettlement,
+  motionOperationAtIngress: LaserState['motionOperation'],
+): void {
+  if (kind !== 'ok') return;
+  if (ackSettlement.owner === 'untracked') {
+    const currentOperation = get().motionOperation;
+    const queuedFramePrefix = takeNextAcknowledgedFramePrefixLine(
+      motionOperationAtIngress !== null &&
+        ackSettlement.motionOperationId === motionOperationAtIngress.operationId &&
+        currentOperation?.operationId === motionOperationAtIngress.operationId
+        ? currentOperation
+        : null,
+    );
+    if (queuedFramePrefix !== null) {
+      set({ motionOperation: queuedFramePrefix.operation });
+      dispatchQueuedMotionLine(
+        set,
+        get,
+        safeWrite,
+        queuedFramePrefix.line,
+        queuedFramePrefix.operation.operationId,
+      );
+    } else if (ackSettlement.motionOperationId !== null) {
+      const motionOperationId = ackSettlement.motionOperationId;
+      set((current) => ({
+        motionOperation: acknowledgeMotionSettlementMarker(
+          current.motionOperation,
+          motionOperationId,
+          current.statusSequence,
+        ),
+      }));
+    }
+  }
+  if (ackSettlement.owner === 'stream') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
 }
@@ -237,6 +307,7 @@ function handleWelcomeLine(
     ...(resetPolicy.preserveOperation ? {} : { controllerOperation: null, probeBusy: false }),
     fireActive: false,
     frameVerification: null,
+    framedRun: null,
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
@@ -330,6 +401,7 @@ function handleAlarmLine(
     controllerOperation: null,
     fireActive: false,
     frameVerification: null,
+    framedRun: null,
     statusObservation: null,
     homingState: 'unknown',
     homingProof: null,

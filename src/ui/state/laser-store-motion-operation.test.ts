@@ -1,84 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RT_JOG_CANCEL, RT_SOFT_RESET } from '../../core/controllers/grbl';
-import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { RT_JOG_CANCEL } from '../../core/controllers/grbl';
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
-
-type FakeConnection = SerialConnection & {
-  readonly emitLine: (line: string) => void;
-};
-
-type MotionOperationSnapshot = {
-  readonly kind: 'frame' | 'jog';
-  readonly sawControllerBusy: boolean;
-  readonly idleStatusReports?: number;
-  readonly dispatchComplete?: boolean;
-} | null;
-
-function getMotionOperation(): MotionOperationSnapshot {
-  return (
-    (useLaserStore.getState() as { readonly motionOperation?: MotionOperationSnapshot })
-      .motionOperation ?? null
-  );
-}
-
-function setMotionOperation(operation: MotionOperationSnapshot): void {
-  const normalized =
-    operation === null ? null : { dispatchComplete: false, idleStatusReports: 0, ...operation };
-  useLaserStore.setState({ motionOperation: normalized } as Partial<
-    ReturnType<typeof useLaserStore.getState>
-  >);
-}
-
-function makeConnection(
-  write: (data: string) => Promise<void>,
-  close: () => Promise<void> = async () => undefined,
-): FakeConnection {
-  const lineHandlers = new Set<(line: string) => void>();
-  const closeHandlers = new Set<() => void>();
-  return {
-    write,
-    onLine: (handler) => {
-      lineHandlers.add(handler);
-      return () => lineHandlers.delete(handler);
-    },
-    onClose: (handler) => {
-      closeHandlers.add(handler);
-      return () => closeHandlers.delete(handler);
-    },
-    close,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
-  };
-}
-
-function makeAdapter(connection: SerialConnection): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: async () => [],
-    pickFileForSave: async () => null,
-    serial: {
-      isSupported: () => true,
-      requestPort: async () => ({
-        open: async () => connection,
-      }),
-    },
-  };
-}
-
-async function connectWith(connection: FakeConnection): Promise<void> {
-  await useLaserStore.getState().connect(makeAdapter(connection));
-  connection.emitLine('Grbl 1.1f');
-  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  await flush();
-  connection.emitLine('ok');
-  await flush();
-}
-
-async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
-}
+import {
+  acknowledgeAndSettleFrameLeg,
+  acknowledgeFrameToolOffPrelude,
+  acknowledgeMotionSettlement,
+  acknowledgeToolOffLine,
+  connectWith,
+  flush,
+  framedRunCandidate,
+  getMotionOperation,
+  makeConnection,
+  setMotionOperation,
+} from './laser-store-motion-operation.test-support';
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -95,53 +30,10 @@ afterEach(async () => {
     safetyNotice: null,
     streamer: null,
     motionOperation: null,
+    frameVerification: null,
+    framedRun: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
   vi.restoreAllMocks();
-});
-
-describe('laser-store motion operation disconnect safety', () => {
-  it('resets and de-energizes before disconnecting an active Frame operation', async () => {
-    const close = vi.fn(async () => undefined);
-    const write = vi.fn(async () => undefined);
-    const connection = makeConnection(write, close);
-    await connectWith(connection);
-    setMotionOperation({ kind: 'frame', sawControllerBusy: true, dispatchComplete: true });
-
-    write.mockClear();
-    const disconnect = useLaserStore.getState().disconnect();
-    await flush();
-
-    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
-    expect(write).not.toHaveBeenCalledWith('M5\n');
-    expect(close).not.toHaveBeenCalled();
-
-    connection.emitLine('Grbl 1.1f');
-    await disconnect;
-
-    expect(write).toHaveBeenCalledWith('M5\n');
-    expect(write).toHaveBeenCalledWith('M9\n');
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(getMotionOperation()).toBeNull();
-  });
-
-  it('raises a disconnect safety notice if Frame jog-cancel fails before disconnect', async () => {
-    let shouldFail = false;
-    const write = vi.fn(async () => {
-      if (shouldFail) throw new Error('cancel rejected');
-    });
-    const connection = makeConnection(write);
-    await connectWith(connection);
-    setMotionOperation({ kind: 'frame', sawControllerBusy: true, dispatchComplete: true });
-
-    shouldFail = true;
-    await useLaserStore.getState().disconnect();
-
-    expect(useLaserStore.getState().safetyNotice).toMatchObject({
-      kind: 'write-failed',
-      action: 'disconnect',
-    });
-    expect(getMotionOperation()).toBeNull();
-  });
 });
 
 describe('laser-store motion operation lifecycle', () => {
@@ -158,10 +50,14 @@ describe('laser-store motion operation lifecycle', () => {
   });
 
   it('keeps Jog busy until GRBL reports motion and returns to Idle', async () => {
-    const write = vi.fn(async () => undefined);
+    const writes: string[] = [];
+    const write = vi.fn(async (data: string) => {
+      writes.push(data);
+    });
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    writes.length = 0;
 
     await useLaserStore.getState().jog({ dx: 10, feed: 1000 });
 
@@ -172,7 +68,23 @@ describe('laser-store motion operation lifecycle', () => {
     expect(getMotionOperation()).toMatchObject({ kind: 'jog', sawControllerBusy: true });
 
     connection.emitLine('<Idle|MPos:10.000,10.000,0.000|FS:0,0>');
+    await flush();
 
+    expect(writes).toEqual(['$J=G91 G21 X10.000 F1000\n']);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    expect(getMotionOperation()).toMatchObject({ kind: 'jog', sawControllerBusy: true });
+
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:10.000,10.000,0.000|FS:0,0>');
+    await flush();
+    expect(writes.at(-1)).toBe('G4 P0.01\n');
+    expect(getMotionOperation()).toMatchObject({
+      kind: 'jog',
+      awaitingSettlementAck: true,
+    });
+    connection.emitLine('<Idle|MPos:10.000,10.000,0.000|FS:0,0>');
+    expect(getMotionOperation()).not.toBeNull();
+    await acknowledgeMotionSettlement(connection);
     expect(getMotionOperation()).toBeNull();
   });
 
@@ -187,12 +99,23 @@ describe('laser-store motion operation lifecycle', () => {
 
     await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
 
+    expect(writes).toEqual(['M5\n']);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(writes).toEqual(['M5\n']);
+
+    await acknowledgeToolOffLine(connection);
+    expect(writes).toEqual(['M5\n', 'M9\n']);
+    await acknowledgeToolOffLine(connection);
+
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
       '$J=G90 G21 X0.000 Y0.000 F1000\n',
     ]);
     expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
 
     connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await Promise.resolve();
 
@@ -201,6 +124,156 @@ describe('laser-store motion operation lifecycle', () => {
       '$J=G90 G21 X10.000 Y0.000 F1000\n',
     ]);
     expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
+  });
+
+  it('does not begin Frame motion when the controller rejects a tool-off command', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await useLaserStore
+      .getState()
+      .frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, framedRunCandidate());
+    expect(writes).toEqual(['M5\n']);
+
+    connection.emitLine('error:20');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+
+    expect(writes.some((line) => line.startsWith('$J='))).toBe(false);
+    expect(useLaserStore.getState().motionOperation).toMatchObject({
+      kind: 'frame',
+      cancelRequested: true,
+    });
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+  });
+
+  it('issues the exact framed-run permit only after the final Frame leg reaches Idle', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    const candidate = framedRunCandidate();
+    const completionSnapshots: ReadonlyArray<unknown>[] = [];
+    const unsubscribe = useLaserStore.subscribe((state, previous) => {
+      if (
+        previous.motionOperation?.kind === 'frame' &&
+        previous.motionOperation.candidate === candidate &&
+        state.motionOperation === null
+      ) {
+        completionSnapshots.push([state.framedRun, state.frameVerification]);
+      }
+    });
+
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, candidate);
+
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+    await acknowledgeFrameToolOffPrelude(connection);
+    for (let leg = 0; leg < 4; leg += 1) await acknowledgeAndSettleFrameLeg(connection);
+    connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    expect(useLaserStore.getState().motionOperation).not.toBeNull();
+    expect(useLaserStore.getState().framedRun).toBeNull();
+
+    connection.emitLine('ok');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().motionOperation).not.toBeNull();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    await flush();
+    expect(writes.at(-1)).toBe('G4 P0.01\n');
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    await acknowledgeMotionSettlement(connection);
+
+    const state = useLaserStore.getState();
+    expect(state.motionOperation).toBeNull();
+    expect(state.framedRun?.candidate).toBe(candidate);
+    expect(state.framedRun?.completedStatusSequence).toBe(state.statusSequence);
+    expect(state.framedRun?.controller.statusReport?.state).toBe('Idle');
+    expect(state.frameVerification).toBe(candidate.frameVerification);
+    expect(completionSnapshots).toEqual([[state.framedRun, candidate.frameVerification]]);
+    unsubscribe();
+  });
+
+  it('does not issue a permit when the settlement marker errors after physical Frame', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    const candidate = framedRunCandidate();
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, candidate);
+
+    await acknowledgeFrameToolOffPrelude(connection);
+    for (let leg = 0; leg < 4; leg += 1) await acknowledgeAndSettleFrameLeg(connection);
+    connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().motionOperation).not.toBeNull();
+    expect(useLaserStore.getState().framedRun).toBeNull();
+
+    connection.emitLine('error:33');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().motionOperation).toMatchObject({
+      kind: 'frame',
+      cancelRequested: true,
+    });
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+  });
+
+  it.each(['Hold', 'Door', 'Check', 'Home', 'Tool'] as const)(
+    'invalidates the Frame candidate when the controller reports %s',
+    async (controllerState) => {
+      const connection = makeConnection(async () => undefined);
+      await connectWith(connection);
+      await useLaserStore
+        .getState()
+        .frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, framedRunCandidate());
+
+      connection.emitLine(`<${controllerState}|MPos:0.000,0.000,0.000|FS:0,0>`);
+      expect(useLaserStore.getState().motionOperation).toBeNull();
+      expect(useLaserStore.getState().framedRun).toBeNull();
+      expect(useLaserStore.getState().frameVerification).toBeNull();
+      expect(useLaserStore.getState().lastWriteError).toContain(controllerState);
+
+      connection.emitLine('ok');
+      connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+      expect(useLaserStore.getState().framedRun).toBeNull();
+    },
+  );
+
+  it('does not issue a permit when origin evidence changes during Frame', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    const candidate = framedRunCandidate();
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, candidate);
+
+    await acknowledgeFrameToolOffPrelude(connection);
+    for (let leg = 0; leg < 4; leg += 1) await acknowledgeAndSettleFrameLeg(connection);
+    connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|WCO:1.000,0.000,0.000|FS:0,0>');
+    await acknowledgeMotionSettlement(
+      connection,
+      '<Idle|MPos:0.000,0.000,0.000|WCO:1.000,0.000,0.000|FS:0,0>',
+    );
+
+    expect(useLaserStore.getState().motionOperation).toBeNull();
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+    expect(useLaserStore.getState().lastWriteError).toMatch(/changed during Frame/i);
   });
 
   it('retracts to safe Z, then queues a restore to the pre-frame Z, when work Z is set (CNC)', async () => {
@@ -220,6 +293,9 @@ describe('laser-store motion operation lifecycle', () => {
 
     await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
 
+    expect(writes).toEqual(['M5\n']);
+    await acknowledgeFrameToolOffPrelude(connection);
+
     // Default CNC safe Z is 3.81 mm above stock top; the retract must complete
     // before any XY leg so the bit is clear of the material.
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual(['$J=G90 G21 Z3.810 F1000\n']);
@@ -230,7 +306,8 @@ describe('laser-store motion operation lifecycle', () => {
         readonly motionOperation: { readonly pendingLines: ReadonlyArray<string> } | null;
       }
     ).motionOperation?.pendingLines;
-    expect(pending?.[pending.length - 1]).toBe('$J=G90 G21 Z0.000 F1000\n');
+    expect(pending?.[pending.length - 2]).toBe('$J=G90 G21 Z0.000 F1000\n');
+    expect(pending?.[pending.length - 1]).toBe('G4 P0.01\n');
   });
 
   it('blocks CNC Frame before writing when no work-Z zero is set', async () => {
@@ -262,7 +339,10 @@ describe('laser-store motion operation lifecycle', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     writes.length = 0;
 
-    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
+    await useLaserStore
+      .getState()
+      .frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, framedRunCandidate());
+    await acknowledgeFrameToolOffPrelude(connection);
     connection.emitLine('error:7002009');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
@@ -270,7 +350,12 @@ describe('laser-store motion operation lifecycle', () => {
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
       '$J=G90 G21 X0.000 Y0.000 F1000\n',
     ]);
-    expect(getMotionOperation()).toBeNull();
+    expect(getMotionOperation()).toMatchObject({
+      kind: 'frame',
+      cancelRequested: true,
+    });
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'controller-error',
       raw: 'error:7002009',
@@ -290,6 +375,8 @@ describe('laser-store motion operation lifecycle', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
 
     expect(getMotionOperation()).toBeNull();
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
   });
 
   it('does not clear Frame on stable Idle before frame writes finish dispatching', async () => {
@@ -303,20 +390,26 @@ describe('laser-store motion operation lifecycle', () => {
     expect(getMotionOperation()).toMatchObject({ kind: 'frame', dispatchComplete: false });
   });
 
-  it('sends jog-cancel and clears the active operation when cancelling Frame', async () => {
+  it('sends jog-cancel and clears the active operation on a fresh post-cancel Idle', async () => {
     const write = vi.fn(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     setMotionOperation({ kind: 'frame', sawControllerBusy: false });
 
     write.mockClear();
-    await useLaserStore.getState().cancelJog();
+    const cancel = useLaserStore.getState().cancelJog();
 
     expect(write).toHaveBeenCalledWith(RT_JOG_CANCEL);
+    expect(getMotionOperation()).toMatchObject({ cancelRequested: true });
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('G4 P0.01\n'));
+    connection.emitLine('ok');
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('?'));
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await cancel;
     expect(getMotionOperation()).toBeNull();
   });
 
-  it('clears the active operation even when jog-cancel write fails', async () => {
+  it('retains a cancelled owner when jog-cancel write fails', async () => {
     const write = vi.fn(async () => {
       throw new Error('cancel rejected');
     });
@@ -326,6 +419,16 @@ describe('laser-store motion operation lifecycle', () => {
 
     await expect(useLaserStore.getState().cancelJog()).rejects.toThrow('cancel rejected');
 
-    expect(getMotionOperation()).toBeNull();
+    expect(getMotionOperation()).toMatchObject({
+      kind: 'frame',
+      cancelRequested: true,
+    });
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(getMotionOperation()).toMatchObject({
+      kind: 'frame',
+      cancelRequested: true,
+    });
   });
 });
