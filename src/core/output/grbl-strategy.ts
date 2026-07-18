@@ -19,7 +19,11 @@ import {
   type GrblGcodeDialect,
   type GrblPowerMode,
 } from '../devices';
-import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
+import {
+  effectiveFillOverscanMm,
+  expandFillHatchWithOverscan,
+  fillOverscanCommentText,
+} from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
@@ -141,8 +145,14 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   const s = scaleS(group.power, device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
+  const overscanText = fillOverscanCommentText(
+    group.overscanMm,
+    group.fillStyle,
+    group.islandMotionPolicy,
+    fmt,
+  );
   chunks.push(
-    `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} overscan ${fmt(group.overscanMm)} mm`,
+    `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} ${overscanText}`,
   );
   // Each scanline's runs become ONE continuous laser-on sweep: a single G1
   // pass across the row that blanks the interior gaps (holes) with S0 instead
