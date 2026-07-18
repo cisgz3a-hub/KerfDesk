@@ -9676,3 +9676,17 @@ No guard will ever be created again. CLAUDE.md collaboration rule 7 carries the 
 text: new guards, re-added guards, widened refusal surfaces, and warnings promoted to blocks are
 all prohibited; operator-relevant findings go into the Job Review warnings list. Frame is the
 source of truth.
+### Amendment (2026-07-18) — proof records at trace COMPLETION; Abort clears it directly
+
+Maintainer approval in chat: "fix both", accepting the post-merge soundness audit's two findings.
+
+1. The FrameVerification payload now rides the frame motion operation itself (armed at dispatch
+   by the store's frame action) and is promoted into `frameVerification` only when the trace
+   settles status-driven with an empty perimeter queue — matching the directive's wording
+   "when a frame completes". Every forced exit (cancel, alarm, error line, disconnect, MPG
+   takeover) clears the operation and discards the armed proof with it; a dispatched-then-
+   interrupted trace earns nothing.
+2. `runStopJob` (Abort) now sets `frameVerification: null` explicitly instead of relying on the
+   reset side effects.
+
+Both changes narrow WHEN the one guard's proof exists; the guard surface itself is unchanged.

@@ -6,7 +6,6 @@ import {
   computeJobBounds,
   computeJobMotionBounds,
   describeFramePreflightFailure,
-  frameBoundsSignature,
   framePreflight,
   offsetJobBounds,
   type JobBounds,
@@ -177,16 +176,9 @@ async function dispatchFrameIfSafe(
   } catch {
     return false;
   }
-  // Frame-first: every dispatched trace records the proof Start requires
-  // (2026-07-17). The physical trace continues after dispatch; Start stays
-  // transport-blocked while the frame motion runs, so "frame completed" and
-  // "Start open" line up for the operator.
-  const laser = useLaserStore.getState();
-  laser.markFrameVerified({
-    boundsSignature: frameBoundsSignature(bounds),
-    wco: laser.wcoCache,
-    workOriginActive: laser.workOriginActive,
-  });
+  // Frame-first (ADR-228 amendment): the store arms the proof on the frame
+  // operation itself and records frameVerification only when the trace
+  // settles cleanly — a cancelled, alarmed, or dropped trace earns nothing.
   return true;
 }
 
