@@ -9,7 +9,11 @@ import {
   RT_SPINDLE_OV_RESET,
 } from '../../core/controllers/grbl';
 import { useStore } from '../state';
-import { CNC_OVERRIDE_BLOCK_PREFIX } from '../state/cnc-accessory-readiness';
+import { USER_ORIGIN_MISSING_MESSAGE, VERIFIED_ORIGIN_MISSING_MESSAGE } from '../job-placement';
+import {
+  CNC_ACCESSORY_ACTIVE_BLOCK_PREFIX,
+  CNC_OVERRIDE_BLOCK_PREFIX,
+} from '../state/cnc-accessory-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -58,6 +62,18 @@ export const OVERRIDE_RESET_OFFER_PROMPT =
   'OK: reset all overrides to 100% and continue this Start.\n' +
   'Cancel: leave the job blocked.';
 
+export const SET_ORIGIN_OFFER_PROMPT =
+  'No work origin is set — the job runs relative to a point you declare.\n\n' +
+  'Is the head parked over the workpiece zero right now?\n\n' +
+  'OK: set the origin at the current head position and continue this Start.\n' +
+  'Cancel: leave the job blocked; jog the head to the workpiece zero first.';
+
+export const ACCESSORY_STOP_OFFER_PROMPT =
+  'GRBL reports the spindle or coolant still active, so the job preamble cannot own their ' +
+  'state.\n\n' +
+  'OK: send M5 (spindle stop) and M9 (coolant off) and continue this Start.\n' +
+  'Cancel: leave the job blocked.';
+
 export async function offerFixForBlockedStart(
   messages: ReadonlyArray<string>,
 ): Promise<BlockedStartRepair> {
@@ -71,6 +87,10 @@ export async function offerFixForBlockedStart(
   if (sole === PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE) return offerProbePlateConfirm();
   if (sole === frameVerificationBlockedMessage()) return offerFrameRun();
   if (sole.startsWith(CNC_OVERRIDE_BLOCK_PREFIX)) return offerOverrideReset();
+  if (sole === USER_ORIGIN_MISSING_MESSAGE || sole === VERIFIED_ORIGIN_MISSING_MESSAGE) {
+    return offerSetOrigin();
+  }
+  if (sole.startsWith(CNC_ACCESSORY_ACTIVE_BLOCK_PREFIX)) return offerAccessoryStop();
   return 'unrepaired';
 }
 
@@ -157,6 +177,48 @@ async function offerOverrideReset(): Promise<BlockedStartRepair> {
     (state) => isBaselineOverride(state.ovCache),
     'Controller overrides reset to 100%.',
     'Override reset sent — press Start again once overrides report 100%.',
+  );
+}
+
+async function offerSetOrigin(): Promise<BlockedStartRepair> {
+  if (!jobAwareConfirm(SET_ORIGIN_OFFER_PROMPT)) return 'unrepaired';
+  try {
+    // Waits internally (up to 3 s) for the post-G92 WCO frame, so the
+    // location-unknown gate normally cannot trip on the retry.
+    await useLaserStore.getState().setOriginHere();
+  } catch (cause) {
+    return repairFailed('Set origin failed', cause);
+  }
+  return settleThenRetry(
+    (state) => state.workOriginActive && state.wcoCache !== null,
+    'Origin set to the current head position.',
+    'Origin set — press Start again once the controller reports its work offset.',
+  );
+}
+
+async function offerAccessoryStop(): Promise<BlockedStartRepair> {
+  if (!jobAwareConfirm(ACCESSORY_STOP_OFFER_PROMPT)) return 'unrepaired';
+  try {
+    const sendConsoleCommand = useLaserStore.getState().sendConsoleCommand;
+    await sendConsoleCommand('M5');
+    await sendConsoleCommand('M9');
+  } catch (cause) {
+    return repairFailed('Spindle/coolant stop failed', cause);
+  }
+  return settleThenRetry(
+    (state) => accessoriesReportedOff(state.accessoryCache),
+    'Spindle and coolant stopped.',
+    'M5/M9 sent — press Start again once the status report shows them off.',
+  );
+}
+
+function accessoriesReportedOff(accessories: LaserState['accessoryCache']): boolean {
+  return (
+    accessories != null &&
+    !accessories.spindleCw &&
+    !accessories.spindleCcw &&
+    !accessories.flood &&
+    !accessories.mist
   );
 }
 

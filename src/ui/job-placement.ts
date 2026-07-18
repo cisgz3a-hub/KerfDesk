@@ -12,6 +12,13 @@ export const DEFAULT_JOB_PLACEMENT: JobPlacementSettings = {
   anchor: 'front-left',
 };
 
+// Exported so the blocked-Start fix offers can recognize these refusals
+// exactly and offer Set origin here in place.
+export const USER_ORIGIN_MISSING_MESSAGE =
+  'User Origin needs a custom work origin. Click "Set origin here" first.';
+export const VERIFIED_ORIGIN_MISSING_MESSAGE =
+  'Verified Origin needs a custom work origin. Click "Set origin here" first.';
+
 export function defaultJobPlacementForDevice(
   device: Pick<DeviceProfile, 'homing'>,
 ): JobPlacementSettings {
@@ -181,7 +188,7 @@ function resolveUserOrigin(
   if (!customOriginIsActive(machine)) {
     return {
       ok: false,
-      messages: ['User Origin needs a custom work origin. Click "Set origin here" first.'],
+      messages: [USER_ORIGIN_MISSING_MESSAGE],
     };
   }
   if (wco === null) {
@@ -211,7 +218,7 @@ function resolveVerifiedOrigin(
   if (!customOriginIsActive(machine)) {
     return {
       ok: false,
-      messages: ['Verified Origin needs a custom work origin. Click "Set origin here" first.'],
+      messages: [VERIFIED_ORIGIN_MISSING_MESSAGE],
     };
   }
   return {

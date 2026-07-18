@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
+import { USER_ORIGIN_MISSING_MESSAGE, VERIFIED_ORIGIN_MISSING_MESSAGE } from '../job-placement';
+import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -27,6 +28,8 @@ const original = {
   unlockAlarm: useLaserStore.getState().unlockAlarm,
   home: useLaserStore.getState().home,
   sendRealtimeOverride: useLaserStore.getState().sendRealtimeOverride,
+  setOriginHere: useLaserStore.getState().setOriginHere,
+  sendConsoleCommand: useLaserStore.getState().sendConsoleCommand,
   capabilities: useLaserStore.getState().capabilities,
 };
 
@@ -44,16 +47,29 @@ beforeEach(() => {
     unlockAlarm: vi.fn(async () => undefined),
     home: vi.fn(async () => undefined),
     sendRealtimeOverride: vi.fn(async () => undefined),
+    setOriginHere: vi.fn(async () => undefined),
+    sendConsoleCommand: vi.fn(async () => undefined),
     statusReport: idleStatus(),
     alarmCode: null,
     ovCache: null,
+    workOriginActive: false,
+    wcoCache: null,
+    accessoryCache: null,
   });
   useToastStore.setState({ toasts: [] });
 });
 
 afterEach(() => {
   vi.useRealTimers();
-  useLaserStore.setState({ ...original, statusReport: null, alarmCode: null, ovCache: null });
+  useLaserStore.setState({
+    ...original,
+    statusReport: null,
+    alarmCode: null,
+    ovCache: null,
+    workOriginActive: false,
+    wcoCache: null,
+    accessoryCache: null,
+  });
   useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
@@ -202,5 +218,57 @@ describe('override reset offer', () => {
     useLaserStore.setState({ capabilities: { ...original.capabilities, overrides: false } });
     await expect(offerFixForBlockedStart([overrideMessage()])).resolves.toBe('unrepaired');
     expect(jobAwareConfirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('set-origin offer', () => {
+  it('sets the origin here and retries a User Origin refusal', async () => {
+    useLaserStore.setState({ workOriginActive: true, wcoCache: { x: 0, y: 0, z: 0 } });
+    await expect(offerFixForBlockedStart([USER_ORIGIN_MISSING_MESSAGE])).resolves.toBe('retry');
+    expect(vi.mocked(useLaserStore.getState().setOriginHere)).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers the same fix for the Verified Origin variant', async () => {
+    useLaserStore.setState({ workOriginActive: true, wcoCache: { x: 0, y: 0, z: 0 } });
+    await expect(offerFixForBlockedStart([VERIFIED_ORIGIN_MISSING_MESSAGE])).resolves.toBe('retry');
+    expect(vi.mocked(useLaserStore.getState().setOriginHere)).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the block when the operator is not over the workpiece zero', async () => {
+    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    await expect(offerFixForBlockedStart([USER_ORIGIN_MISSING_MESSAGE])).resolves.toBe(
+      'unrepaired',
+    );
+    expect(vi.mocked(useLaserStore.getState().setOriginHere)).not.toHaveBeenCalled();
+  });
+});
+
+describe('accessory stop offer', () => {
+  function accessoryMessage(): string {
+    const message = cncAccessoryStartIssue('cnc', {
+      spindleCw: true,
+      spindleCcw: false,
+      flood: true,
+      mist: false,
+    });
+    if (message === null) throw new Error('Expected an active-accessory refusal message.');
+    return message;
+  }
+
+  it('sends M5 and M9 and retries once the status reports all off', async () => {
+    useLaserStore.setState({
+      accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
+    });
+    await expect(offerFixForBlockedStart([accessoryMessage()])).resolves.toBe('retry');
+    const send = vi.mocked(useLaserStore.getState().sendConsoleCommand);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenNthCalledWith(1, 'M5');
+    expect(send).toHaveBeenNthCalledWith(2, 'M9');
+  });
+
+  it('keeps the block when the operator declines the stop', async () => {
+    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    await expect(offerFixForBlockedStart([accessoryMessage()])).resolves.toBe('unrepaired');
+    expect(vi.mocked(useLaserStore.getState().sendConsoleCommand)).not.toHaveBeenCalled();
   });
 });

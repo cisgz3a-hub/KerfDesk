@@ -22,6 +22,11 @@ export function invalidateAccessoryObservation(
   };
 }
 
+/** Stable head of the active-accessory refusal (the tail lists live
+ * accessories), exported so the blocked-Start fix offers can recognize it. */
+export const CNC_ACCESSORY_ACTIVE_BLOCK_PREFIX =
+  'CNC Start requires spindle and coolant off before the controlled preamble.';
+
 export function cncAccessoryStartIssue(
   machineKind: MachineKind,
   accessories: Accessories | null | undefined,
@@ -54,7 +59,7 @@ export function cncAccessoryStartIssue(
   const active = activeAccessoryLabels(accessories);
   if (active.length === 0) return null;
   return (
-    `CNC Start requires spindle and coolant off before the controlled preamble. GRBL currently reports active: ${active.join(', ')}. ` +
+    `${CNC_ACCESSORY_ACTIVE_BLOCK_PREFIX} GRBL currently reports active: ${active.join(', ')}. ` +
     'Stop them with M5 and M9, then wait for a fresh all-off status report before starting.'
   );
 }
