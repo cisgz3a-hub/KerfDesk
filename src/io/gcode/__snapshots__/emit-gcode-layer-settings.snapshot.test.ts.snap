@@ -16,7 +16,7 @@ G0 X10.000 Y390.000 S0
 G1 X30.000 Y390.000 F1200 S600
 M5
 M4 S0
-; fill layer fill-blue color #0000ff power 35% speed 3000 mm/min passes 1 overscan 5.000 mm
+; fill layer fill-blue color #0000ff power 35% speed 3000 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
 G0 X45.000 Y330.000 S0
 G0 X50.000 Y330.000 S0

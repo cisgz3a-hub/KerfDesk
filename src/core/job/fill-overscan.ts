@@ -55,6 +55,30 @@ export function effectiveOverscanMm(polyline: ReadonlyArray<Vec2>, overscanMm: n
   return length < OVERSCAN_MIN_BURN_RATIO * overscanMm ? 0 : overscanMm;
 }
 
+/**
+ * The `overscan … mm` phrase for the fill-group G-code header comment. Printing
+ * the configured setting verbatim misled a hardware debugging session into
+ * assuming every run got the runway, when ADR-033 zeroes it (scanline) or caps
+ * it (Island Fill) on runs shorter than OVERSCAN_MIN_BURN_RATIO × the setting —
+ * in a real traced-lettering job most runs got none. The suffix states that
+ * per-run threshold so the header is honest; sensitive Island Fill always
+ * applies the full setting, so it keeps the plain phrase.
+ */
+export function fillOverscanCommentText(
+  overscanMm: number,
+  fillStyle: LayerFillStyle | undefined,
+  islandMotionPolicy: IslandFillMotionPolicy | undefined,
+  formatMm: (n: number) => string,
+): string {
+  const setting = `overscan ${formatMm(overscanMm)} mm`;
+  if (overscanMm <= 0) return setting;
+  if (fillStyle === 'island') {
+    if (isSensitiveIslandFillPolicy(islandMotionPolicy)) return setting;
+    return `${setting} (capped on runs shorter than ${formatMm(OVERSCAN_MIN_BURN_RATIO * overscanMm)} mm; ADR-033)`;
+  }
+  return `${setting} (skipped on runs shorter than ${formatMm(OVERSCAN_MIN_BURN_RATIO * overscanMm)} mm; ADR-033)`;
+}
+
 export function effectiveFillOverscanMm(
   polyline: ReadonlyArray<Vec2>,
   overscanMm: number,

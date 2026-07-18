@@ -3,6 +3,7 @@ import {
   effectiveFillOverscanMm,
   effectiveOverscanMm,
   expandFillHatchWithOverscan,
+  fillOverscanCommentText,
 } from './fill-overscan';
 
 describe('expandFillHatchWithOverscan', () => {
@@ -117,5 +118,33 @@ describe('effectiveFillOverscanMm', () => {
   it('keeps the full configured runway for sensitive Island Fill sweeps', () => {
     expect(effectiveFillOverscanMm(hatch(3), 5, 'island', 'sensitive')).toBe(5);
     expect(effectiveFillOverscanMm(hatch(9.5), 5, 'island', 'sensitive')).toBe(5);
+  });
+});
+
+describe('fillOverscanCommentText', () => {
+  const fmt = (n: number) => n.toFixed(3);
+
+  it('states the ADR-033 short-run skip threshold for scanline fill', () => {
+    expect(fillOverscanCommentText(5, 'scanline', undefined, fmt)).toBe(
+      'overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)',
+    );
+    expect(fillOverscanCommentText(5, undefined, undefined, fmt)).toBe(
+      'overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)',
+    );
+  });
+
+  it('states the ADR-033 short-run cap for Island Fill', () => {
+    expect(fillOverscanCommentText(5, 'island', undefined, fmt)).toBe(
+      'overscan 5.000 mm (capped on runs shorter than 10.000 mm; ADR-033)',
+    );
+    expect(fillOverscanCommentText(5, 'island', 'adaptive', fmt)).toBe(
+      'overscan 5.000 mm (capped on runs shorter than 10.000 mm; ADR-033)',
+    );
+  });
+
+  it('keeps the plain setting when it is applied to every run', () => {
+    expect(fillOverscanCommentText(0, 'scanline', undefined, fmt)).toBe('overscan 0.000 mm');
+    expect(fillOverscanCommentText(0, 'island', undefined, fmt)).toBe('overscan 0.000 mm');
+    expect(fillOverscanCommentText(5, 'island', 'sensitive', fmt)).toBe('overscan 5.000 mm');
   });
 });

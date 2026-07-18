@@ -514,6 +514,40 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
     expect(emit(job)).toContain('M5\nM4 S0\n; fill layer fill color #ff0000');
   });
 
+  it('annotates the fill header overscan with the ADR-033 short-run skip threshold', () => {
+    // The header used to print the configured setting verbatim, which read as
+    // "every run gets this runway" — ADR-033 zeroes it on short runs, and in a
+    // real traced-lettering job most runs got none (audit 2026-07-18).
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#ff0000',
+          power: 50,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          overscanMm: 5,
+          segments: [
+            {
+              polyline: [
+                { x: 1, y: 1 },
+                { x: 2, y: 1 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    };
+    expect(emit(job)).toContain(
+      '; fill layer fill color #ff0000 power 50% speed 1500 mm/min passes 1 ' +
+        'overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)',
+    );
+  });
+
   it('repeats raster row data for each raster pass', () => {
     const job: Job = {
       groups: [
