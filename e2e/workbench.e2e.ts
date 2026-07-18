@@ -324,20 +324,20 @@ kerfDeskTest(
     await connectAndHome(page, kerfdesk);
 
     // ADR-228: Start is available only after the exact compiled job has completed a Frame.
-    const frameButton = page.getByRole('button', { name: 'Frame', exact: true });
+    const frameButton = page.getByRole('button', { name: 'Frame job', exact: true });
     const writesBeforeFrame = serialWrites(await kerfdesk.events()).length;
     await frameButton.click();
+    await confirmFrameReview(page);
     await expect
       .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
       .toContain('$J=G90 G21');
-    await expect(frameButton).toBeEnabled();
+    const startButton = page.getByRole('button', { name: 'Start framed job', exact: true });
+    await expect(startButton).toBeEnabled();
 
     await kerfdesk.setAutoAcknowledge(false);
-    page.on('dialog', (dialog) => void dialog.accept());
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
     const writesBefore = serialWrites(await kerfdesk.events()).length;
-    await page.getByRole('button', { name: 'Start job' }).click();
-    await confirmJobReview(page);
+    await startButton.click();
     await expect(probe).toHaveAttribute('data-lifecycle', 'running');
     const pixelsBeforeStatus = await canvasPixels(page);
     const initial = Number(await probe.getAttribute('data-confirmed-route-mm'));
@@ -450,12 +450,12 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
 
-// ADR-224: every Start now opens the Job Review dialog; its single Start
-// button is the acknowledgement that absorbed the old native confirms.
-async function confirmJobReview(page: Page): Promise<void> {
+// ADR-228: Frame review owns the policy acknowledgement. A completed physical
+// trace mints the one-use permit; the later Start streams that exact artifact.
+async function confirmFrameReview(page: Page): Promise<void> {
   await page
-    .getByRole('dialog', { name: 'Review job before starting' })
-    .getByRole('button', { name: 'Start job' })
+    .getByRole('dialog', { name: 'Review job before framing' })
+    .getByRole('button', { name: 'Accept & Frame' })
     .click();
 }
 
