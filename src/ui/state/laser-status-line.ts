@@ -43,6 +43,7 @@ export function handleStatusLine(
     operation !== null && observedOperation === null ? takeNextFrameJogLine(operation) : null;
   const nextOperation = queuedFrameDispatch?.operation ?? observedOperation;
   const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
+  const frameCompletionPatch = completedFramePatch(operation, nextOperation);
   // Release the job lock once GRBL settles to Idle for BOTH a clean finish
   // ('done') and a rejected line ('errored'). Idle means physical motion has
   // stopped, so it is as safe to clear here as the 'done' case. Without the
@@ -69,6 +70,9 @@ export function handleStatusLine(
           sequence: nextSequence,
           observedAt: Date.now(),
         },
+    // Promotion first: a same-report MPG takeover (below) must still win and
+    // invalidate the freshly promoted proof.
+    ...frameCompletionPatch,
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...completedStreamerPatch,
@@ -293,6 +297,21 @@ function knownOrUnknownOriginSource(
   source: LaserState['workOriginSource'],
 ): LaserState['workOriginSource'] {
   return source === 'none' ? 'unknown' : source;
+}
+
+// A frame op ending status-driven with an empty queue is the one clean
+// completion: every other exit (cancel, alarm, error, disconnect) clears the
+// op elsewhere and discards the armed proof with it (ADR-228 amendment: the
+// proof records when the frame COMPLETES, not when it dispatches).
+function completedFramePatch(
+  operation: LaserState['motionOperation'],
+  nextOperation: LaserState['motionOperation'],
+): Partial<LaserState> {
+  return operation?.kind === 'frame' &&
+    nextOperation === null &&
+    operation.verification !== undefined
+    ? { frameVerification: operation.verification }
+    : {};
 }
 
 function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: string): void {

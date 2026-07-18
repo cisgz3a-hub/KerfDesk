@@ -508,6 +508,5 @@ export const useLaserStore = create<LaserState>((set, get) => {
     ...detectedSettingsActions(set, get),
     clearSafetyNotice: () => set({ safetyNotice: null }),
     pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
-    markFrameVerified: (verification) => set({ frameVerification: verification }),
   };
 });

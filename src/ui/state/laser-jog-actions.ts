@@ -5,6 +5,7 @@
 // active driver), and the connection-bound safe write. Type-only LaserState /
 // LiveRefs import — no runtime cycle.
 
+import { frameBoundsSignature } from '../../core/job';
 import { firstZoneCrossedBySegment } from '../../core/preflight';
 import { buildCncFrameMotion, type CncFrameMotionPlan } from './cnc-frame-lines';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
@@ -14,6 +15,7 @@ import { type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
+import type { FrameVerification } from './frame-verification';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -98,7 +100,9 @@ export function jogActions(
       }
       const [firstLine, ...pendingLines] = plan.lines;
       if (firstLine === undefined) return;
-      set({ motionOperation: startMotionOperation('frame', pendingLines) });
+      set({
+        motionOperation: startMotionOperation('frame', pendingLines, armedFrameProof(get, bounds)),
+      });
       try {
         await safeWrite(firstLine, 'frame');
         set((s) => ({
@@ -109,6 +113,21 @@ export function jogActions(
         throw err;
       }
     },
+  };
+}
+
+// Arm the proof on the frame operation itself: it is promoted into
+// frameVerification only when the trace settles with an empty queue, and dies
+// with the op on cancel/alarm/error (ADR-228 amendment).
+function armedFrameProof(
+  get: GetFn,
+  bounds: Parameters<LaserState['frame']>[0],
+): FrameVerification {
+  const state = get();
+  return {
+    boundsSignature: frameBoundsSignature(bounds),
+    wco: state.wcoCache,
+    workOriginActive: state.workOriginActive,
   };
 }
 

@@ -7,7 +7,6 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { frameVerificationForProject } from './frame-verification-testing';
 import { JobControls } from './JobControls';
 
 (
@@ -108,10 +107,10 @@ describe('JobControls Absolute Coordinates frame-first', () => {
       });
 
       expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1);
-      // The dispatched trace records the frame verification Start requires.
-      expect(useLaserStore.getState().frameVerification).toEqual(
-        frameVerificationForProject(useStore.getState().project),
-      );
+      // The proof itself records only when the real trace settles (ADR-228
+      // amendment) — covered at the store layer; the mocked frame here just
+      // proves the click dispatches without recording anything yet.
+      expect(useLaserStore.getState().frameVerification).toBeNull();
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

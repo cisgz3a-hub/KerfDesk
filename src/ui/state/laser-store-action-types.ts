@@ -3,7 +3,6 @@ import type { ControllerKind } from '../../core/devices';
 import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
-import type { FrameVerification } from './frame-verification';
 import type { StartJobOptions } from './laser-job-options';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { ProbeResult } from './probe-actions';
@@ -61,5 +60,4 @@ export type LaserStoreActions = {
   readonly setPersistentOriginHere: () => Promise<void>;
   readonly clearPersistentOrigin: () => Promise<void>;
   readonly releaseMotors: () => Promise<void>;
-  readonly markFrameVerified: (verification: FrameVerification) => void;
 };

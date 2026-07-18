@@ -327,6 +327,20 @@ describe('laser-store serial write failures', () => {
     expect(writes).toContain('M9\n');
   });
 
+  it('clears the frame proof directly on Abort (ADR-228 amendment)', async () => {
+    // No reboot banner is emitted after the reset, so a surviving proof could
+    // only be cleared by runStopJob's own patch — which is what this pins.
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({
+      frameVerification: { boundsSignature: '0,0,10,10', wco: null, workOriginActive: false },
+    });
+
+    await expect(useLaserStore.getState().stopJob()).resolves.toBeUndefined();
+
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+  });
+
   it.each([
     ['Home', 'home', () => useLaserStore.getState().home()],
     ['Unlock', 'unlock', () => useLaserStore.getState().unlockAlarm()],

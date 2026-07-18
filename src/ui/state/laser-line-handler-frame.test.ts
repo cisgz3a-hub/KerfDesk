@@ -82,7 +82,6 @@ function makeLaserState(): LaserState {
     setPersistentOriginHere: async () => undefined,
     clearPersistentOrigin: async () => undefined,
     releaseMotors: async () => undefined,
-    markFrameVerified: () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
     retryControllerQualification: async () => undefined,
@@ -117,6 +116,61 @@ function makeHarness(): {
     get: () => state,
   };
 }
+
+describe('frame proof records at trace completion (ADR-228 amendment)', () => {
+  const armed: FrameVerification = {
+    boundsSignature: '0,0,25,25',
+    wco: null,
+    workOriginActive: false,
+  };
+
+  function armedFrameOp(pendingLines: ReadonlyArray<string>): LaserState['motionOperation'] {
+    return {
+      kind: 'frame',
+      sawControllerBusy: false,
+      idleStatusReports: 0,
+      dispatchComplete: true,
+      pendingLines,
+      verification: armed,
+    };
+  }
+
+  it('promotes the armed verification only when the trace settles with an empty queue', () => {
+    const { refs, set, get } = makeHarness();
+    set({ motionOperation: armedFrameOp([]) });
+
+    handleLine(set, get, refs, async () => undefined, '<Run|MPos:5.000,5.000,0.000|FS:1000,0>');
+    expect(get().frameVerification).toBeNull();
+
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(get().motionOperation).toBeNull();
+    expect(get().frameVerification).toEqual(armed);
+  });
+
+  it('keeps the proof unrecorded while queued perimeter legs remain', async () => {
+    const { refs, set, get } = makeHarness();
+    set({ motionOperation: armedFrameOp(['$J=G90 G21 X10.000 Y0.000 F1000\n']) });
+    const safeWrite = vi.fn(async () => undefined);
+
+    handleLine(set, get, refs, safeWrite, '<Run|MPos:5.000,5.000,0.000|FS:1000,0>');
+    handleLine(set, get, refs, safeWrite, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
+
+    expect(get().frameVerification).toBeNull();
+    // The re-armed operation for the next leg still carries the payload.
+    expect(get().motionOperation).toMatchObject({ kind: 'frame', verification: armed });
+  });
+
+  it('never promotes an armed verification after a mid-trace alarm', () => {
+    const { refs, set, get } = makeHarness();
+    set({ motionOperation: armedFrameOp([]) });
+
+    handleLine(set, get, refs, async () => undefined, 'ALARM:1');
+
+    expect(get().motionOperation).toBeNull();
+    expect(get().frameVerification).toBeNull();
+  });
+});
 
 describe('handleLine queued Frame writes', () => {
   it('clears frame verification when a queued frame leg fails to write', async () => {

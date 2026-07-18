@@ -238,6 +238,9 @@ async function runStopJob(context: JobActionContext): Promise<void> {
     wcoCache: null,
     accessoryCache: null,
     airAssistOn: false,
+    // ADR-228 amendment: Abort during a frame must kill the proof directly —
+    // an aborted trace was not completed, whatever the side effects imply.
+    frameVerification: null,
     ...originPatchAfterSoftReset(state),
     streamer:
       state.streamer === null

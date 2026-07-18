@@ -1,4 +1,5 @@
 import type { GrblState } from '../../core/controllers/grbl';
+import type { FrameVerification } from './frame-verification';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
 
@@ -8,11 +9,17 @@ export type LaserMotionOperation = {
   readonly idleStatusReports: number;
   readonly dispatchComplete: boolean;
   readonly pendingLines: ReadonlyArray<string>;
+  // Frame ops carry the proof they will earn. It rides the operation — any
+  // path that force-clears the op (cancel, alarm, error, disconnect) discards
+  // it — and only the clean empty-queue Idle settle promotes it into
+  // frameVerification ("when a frame COMPLETES", ADR-228 amendment).
+  readonly verification?: FrameVerification;
 };
 
 export function startMotionOperation(
   kind: LaserMotionOperationKind,
   pendingLines: ReadonlyArray<string> = [],
+  verification?: FrameVerification,
 ): LaserMotionOperation {
   return {
     kind,
@@ -20,6 +27,7 @@ export function startMotionOperation(
     idleStatusReports: 0,
     dispatchComplete: false,
     pendingLines,
+    ...(verification === undefined ? {} : { verification }),
   };
 }
 
@@ -54,7 +62,7 @@ export function takeNextFrameJogLine(
   if (operation === null || operation.kind !== 'frame') return null;
   const [line, ...pendingLines] = operation.pendingLines ?? [];
   if (line === undefined) return null;
-  return { operation: startMotionOperation('frame', pendingLines), line };
+  return { operation: startMotionOperation('frame', pendingLines, operation.verification), line };
 }
 
 // Frame move construction moved to the ControllerDriver (ADR-094):
