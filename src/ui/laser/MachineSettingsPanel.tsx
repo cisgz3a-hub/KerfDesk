@@ -3,12 +3,8 @@ import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { helpProps } from '../help/help-topics';
 import { useStore } from '../state';
-import {
-  controllerOperationCommandBlockMessage,
-  type LaserControllerOperation,
-} from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { machineSettingsReadBlockReason } from '../state/machine-settings-read-readiness';
 import { useToastStore } from '../state/toast-store';
 import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
 import {
@@ -32,24 +28,13 @@ type PresentedSettingRow = {
 export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX.Element {
   const platform = usePlatform();
   const project = useStore((s) => s.project);
-  const connection = useLaserStore((s) => s.connection);
-  const streamer = useLaserStore((s) => s.streamer);
-  const motionOperation = useLaserStore((s) => s.motionOperation);
-  const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const rows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
+  const readDisabledReason = useLaserStore(machineSettingsReadBlockReason);
   const pushToast = useToastStore((s) => s.pushToast);
   const context =
     props.context ?? machineSettingsContextForProfile(project.device, project.machine);
-  const readDisabledReason = machineSettingsReadDisabledReason({
-    connected: connection.kind === 'connected',
-    activeJob: isActiveJob(streamer),
-    motionOperationActive: motionOperation !== null,
-    controllerOperation,
-    autofocusBusy,
-  });
   const exportDisabledReason =
     rows.length === 0 ? 'Read machine settings before exporting a backup.' : null;
   const panelHelp = helpProps('control:laser.machine-settings');
@@ -272,28 +257,6 @@ function riskLabel(risk: GrblSettingRow['writeRisk']): string {
     case 'unknown':
       return 'Unknown';
   }
-}
-
-function machineSettingsReadDisabledReason(state: {
-  readonly connected: boolean;
-  readonly activeJob: boolean;
-  readonly motionOperationActive: boolean;
-  readonly controllerOperation: LaserControllerOperation | null;
-  readonly autofocusBusy: boolean;
-}): string | null {
-  if (!state.connected) return 'Connect to the controller before reading machine settings.';
-  if (state.activeJob) return 'A job is active. Request ABORT before reading machine settings.';
-  if (state.motionOperationActive) {
-    return 'A jog or frame operation is active. Wait for it to finish before reading settings.';
-  }
-  const controllerOperationMessage = controllerOperationCommandBlockMessage(
-    state.controllerOperation,
-  );
-  if (controllerOperationMessage !== null) return controllerOperationMessage;
-  if (state.autofocusBusy) {
-    return 'Auto-focus is active. Wait for it to finish before reading settings.';
-  }
-  return null;
 }
 
 function errMsg(err: unknown): string {

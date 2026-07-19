@@ -3,6 +3,7 @@ import type { SerialTranscriptEntry } from '../../state/laser-transcript';
 import {
   filterSuperConsoleEntries,
   formatSuperConsoleLine,
+  formatSuperConsoleTsv,
   groupForEntry,
   SUPER_CONSOLE_GROUPS,
   type SuperConsoleGroup,
@@ -77,13 +78,21 @@ describe('filterSuperConsoleEntries', () => {
     expect(visible.map((e) => e.id)).toEqual([1, 3]);
   });
 
-  it('matches search text case-insensitively against raw and decoded text', () => {
+  it('matches search text case-insensitively across every displayed column', () => {
     expect(
       filterSuperConsoleEntries(entries, { groups: allGroups, search: '$32' }).map((e) => e.id),
     ).toEqual([3]);
     expect(
       filterSuperConsoleEntries(entries, { groups: allGroups, search: 'MIST' }).map((e) => e.id),
     ).toEqual([1]);
+    expect(
+      filterSuperConsoleEntries(entries, { groups: allGroups, search: 'console' }).map((e) => e.id),
+    ).toEqual([2]);
+    expect(
+      filterSuperConsoleEntries(entries, { groups: allGroups, search: 'settings-query' }).map(
+        (e) => e.id,
+      ),
+    ).toEqual([2]);
   });
 
   it('returns everything when all groups are on and search is blank', () => {
@@ -91,13 +100,26 @@ describe('filterSuperConsoleEntries', () => {
   });
 });
 
-describe('formatSuperConsoleLine', () => {
-  it('includes direction, source, kind, raw, and decoded text when present', () => {
+describe('Super console TSV formatting', () => {
+  it('includes an ISO timestamp and every detail column', () => {
     expect(
       formatSuperConsoleLine(
         entry({ id: 1, kind: 'error', raw: 'error:9', decoded: 'Homing fail' }),
       ),
-    ).toBe('in controller error error:9 Homing fail');
-    expect(formatSuperConsoleLine(entry({ id: 2, raw: 'ok' }))).toBe('in controller ok ok');
+    ).toBe('1970-01-01T00:00:00.001Z\tin\tcontroller\terror\terror:9\tHoming fail');
+    expect(formatSuperConsoleLine(entry({ id: 2, raw: 'ok' }))).toBe(
+      '1970-01-01T00:00:00.002Z\tin\tcontroller\tok\tok\t',
+    );
+  });
+
+  it('pins the header and escapes control characters so one entry stays one row', () => {
+    expect(
+      formatSuperConsoleTsv([
+        entry({ id: 3, raw: '$I\tvalue', decoded: 'line one\r\nline two\\tail' }),
+      ]),
+    ).toBe(
+      'Timestamp\tDirection\tSource\tKind\tRaw\tDecoded\n' +
+        '1970-01-01T00:00:00.003Z\tin\tcontroller\tok\t$I\\tvalue\tline one\\r\\nline two\\\\tail',
+    );
   });
 });

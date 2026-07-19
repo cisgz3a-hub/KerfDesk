@@ -8,8 +8,7 @@ import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from './store';
 import { requestActiveWcsReadback } from './active-wcs-readback';
-import { beginSettingsCollection } from './detected-settings-action';
-import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { beginSettingsCollection, SETTINGS_READ_OPERATION_LABEL } from './detected-settings-action';
 import {
   failedControllerQualificationPatch,
   qualifiedController,
@@ -17,16 +16,10 @@ import {
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
-import { hasPendingControllerWrite } from './laser-start-queue-fence';
-import {
-  ACTIVE_JOB_COMMAND_MESSAGE,
-  FIRE_ACTIVE_COMMAND_MESSAGE,
-  MOTION_OPERATION_ACTIVE_MESSAGE,
-  isActiveJob,
-  pushLog,
-} from './laser-store-helpers';
+import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
+import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -63,7 +56,9 @@ async function readMachineSettingsAction(
   write: SettingsWriteFn,
 ): Promise<void> {
   const settingsQuery = refs.driver.commands.settingsQuery;
-  const blocked = machineSettingsReadBlockReason(get(), refs);
+  const blocked = machineSettingsReadBlockReason(get(), {
+    settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
+  });
   if (blocked !== null) return blockRead(set, get, blocked);
   const qualificationEpoch = get().controllerSessionEpoch;
   if (settingsQuery === null) {
@@ -82,7 +77,7 @@ async function readMachineSettingsAction(
     controllerOperation: {
       kind: 'interactive-command',
       phase: 'command',
-      label: 'Reading controller settings',
+      label: SETTINGS_READ_OPERATION_LABEL,
     },
     detectedSettings: null,
     controllerSettings: null,
@@ -259,33 +254,6 @@ function finishSettingsQualification(
   );
 }
 
-function machineSettingsReadBlockReason(
-  state: LaserState,
-  refs: GrblSettingsActionRefs,
-): string | null {
-  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
-  if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
-  if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
-  if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
-  if (hasPendingControllerWrite(state)) {
-    return 'Wait for the previous controller write and acknowledgement before reading machine settings.';
-  }
-  if (state.statusReport?.state !== 'Idle') {
-    return 'Controller must report Idle before reading machine settings.';
-  }
-  const controllerOperationMessage = controllerOperationCommandBlockMessage(
-    state.controllerOperation,
-  );
-  if (controllerOperationMessage !== null) return controllerOperationMessage;
-  if (state.autofocusBusy) {
-    return 'Auto-focus is running. Wait for it to finish before reading machine settings.';
-  }
-  if (refs.settingsCollector.kind === 'collecting') {
-    return 'Machine settings are already being read. Wait for the current $$ response to finish.';
-  }
-  return null;
-}
-
 function machineSettingsWriteBlockReason(
   state: LaserState,
   refs: GrblSettingsActionRefs,
@@ -293,7 +261,9 @@ function machineSettingsWriteBlockReason(
   id: number,
   value: string,
 ): string | null {
-  const readBlocked = machineSettingsReadBlockReason(state, refs);
+  const readBlocked = machineSettingsReadBlockReason(state, {
+    settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
+  });
   if (readBlocked !== null) return readBlocked;
   if (state.statusReport?.state !== 'Idle') {
     return 'Machine must report Idle before writing firmware settings.';

@@ -42,9 +42,13 @@ const POSITION_AFFECTING_SETTING_IDS: ReadonlyArray<number> = [
 ];
 
 export function prepareConsoleCommand(input: string): ConsoleCommandResult {
-  const normalized = input.trim();
-  if (normalized === '') return { ok: false, reason: EMPTY_REASON };
-  if (/[\r\n]/.test(normalized)) return { ok: false, reason: MULTILINE_REASON };
+  const trimmed = input.trim();
+  if (trimmed === '') return { ok: false, reason: EMPTY_REASON };
+  if (/[\r\n]/.test(trimmed)) return { ok: false, reason: MULTILINE_REASON };
+  // GRBL discards horizontal whitespace while parsing `$` system commands.
+  // Classify and emit that same compact form so spaces cannot disguise a
+  // persistent write/reset as ordinary G-code and bypass its safety policy.
+  const normalized = normalizeConsoleInput(trimmed);
   const upper = normalized.toUpperCase();
   if (isBlockedPersistentCommand(upper)) {
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };
@@ -78,6 +82,10 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
     ? 'reference'
     : commonConsoleStateEffect(normalized);
   return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
+}
+
+function normalizeConsoleInput(trimmed: string): string {
+  return trimmed.startsWith('$') ? trimmed.replaceAll(/[ \t]/g, '') : trimmed;
 }
 
 function settingWriteStateEffect(normalized: string): ConsoleStateEffect {

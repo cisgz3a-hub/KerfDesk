@@ -410,6 +410,57 @@ body {
   max-width: none;
 }
 
+/* Super console owns a dense transcript + diagnostics workspace. Keep this
+   feature-specific so other xl dialogs retain their established footprint. */
+.lf-dialog--super-console {
+  width: min(1200px, calc(100vw - 20px));
+  height: min(760px, calc(100vh - 20px));
+  max-width: none;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.lf-dialog--super-console > .lf-super-console-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lf-super-console-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.lf-super-console-transcript,
+.lf-super-console-settings {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 840px), (max-height: 560px) {
+  .lf-dialog--super-console {
+    height: calc(100vh - 12px);
+    width: calc(100vw - 12px);
+    padding: var(--lf-space-4);
+    overflow-y: auto;
+  }
+
+  .lf-dialog--super-console > .lf-super-console-body {
+    flex: 0 0 auto;
+  }
+
+  .lf-super-console-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lf-super-console-transcript,
+  .lf-super-console-settings {
+    min-height: 300px;
+  }
+}
+
 .lf-dialog-title {
   margin: 0;
   font-size: var(--lf-text-xl);

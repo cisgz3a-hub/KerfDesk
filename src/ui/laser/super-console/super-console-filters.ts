@@ -45,12 +45,40 @@ export function filterSuperConsoleEntries(
   return entries.filter((entry) => {
     if (!filter.groups.has(groupForEntry(entry))) return false;
     if (needle === '') return true;
-    if (entry.raw.toLowerCase().includes(needle)) return true;
-    return entry.decoded !== undefined && entry.decoded.toLowerCase().includes(needle);
+    return [
+      new Date(entry.at).toISOString(),
+      entry.direction,
+      entry.source,
+      entry.kind,
+      entry.raw,
+      entry.decoded ?? '',
+    ].some((value) => value.toLowerCase().includes(needle));
   });
 }
 
+export const SUPER_CONSOLE_TSV_HEADER = 'Timestamp\tDirection\tSource\tKind\tRaw\tDecoded';
+
 export function formatSuperConsoleLine(entry: SerialTranscriptEntry): string {
-  const decoded = entry.decoded === undefined ? '' : ` ${entry.decoded}`;
-  return `${entry.direction} ${entry.source} ${entry.kind} ${entry.raw}${decoded}`;
+  return [
+    new Date(entry.at).toISOString(),
+    entry.direction,
+    entry.source,
+    entry.kind,
+    entry.raw,
+    entry.decoded ?? '',
+  ]
+    .map(escapeTsvCell)
+    .join('\t');
+}
+
+export function formatSuperConsoleTsv(entries: ReadonlyArray<SerialTranscriptEntry>): string {
+  return [SUPER_CONSOLE_TSV_HEADER, ...entries.map(formatSuperConsoleLine)].join('\n');
+}
+
+function escapeTsvCell(value: string): string {
+  return value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\r', '\\r')
+    .replaceAll('\n', '\\n')
+    .replaceAll('\t', '\\t');
 }

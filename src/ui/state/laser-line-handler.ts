@@ -27,7 +27,11 @@ import {
   scheduleControllerQualification,
 } from './laser-controller-qualification';
 import { controllerRebootNotice } from './laser-safety-notice';
-import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
+import {
+  consumeSettingsResponse,
+  SETTINGS_READ_OPERATION_LABEL,
+  type DetectedSettingsResult,
+} from './detected-settings-action';
 import {
   activeControllerCommandLine,
   cancelControllerLifecycleRefs,
@@ -209,9 +213,18 @@ function publishDetectedSettings(
   cls: ReturnType<HandlerRefs['driver']['classifyLine']>,
 ): void {
   const state = get();
+  const collectionWasActive = refs.settingsCollector.kind === 'collecting';
   const detected = consumeSettingsResponse(refs, cls, state.controllerSessionEpoch);
-  if (detected === null) return;
-  set({
+  const collectionFinished = collectionWasActive && refs.settingsCollector.kind !== 'collecting';
+  if (detected === null) {
+    if (collectionFinished) {
+      set((current) =>
+        isSettingsReadOperation(current.controllerOperation) ? { controllerOperation: null } : {},
+      );
+    }
+    return;
+  }
+  set((current) => ({
     detectedSettings: shouldShowDetectedSettingsReview(detected) ? detected.patch : null,
     controllerSettings: detected.controllerSettings,
     controllerSettingsObservation: {
@@ -221,7 +234,14 @@ function publishDetectedSettings(
     controllerQualification: qualifiedController(state.controllerSessionEpoch, 'verified'),
     grblSettingsRows: detected.settingsRows,
     lastSettingsReadAt: Date.now(),
-  });
+    ...(isSettingsReadOperation(current.controllerOperation) ? { controllerOperation: null } : {}),
+  }));
+}
+
+function isSettingsReadOperation(operation: LaserState['controllerOperation']): boolean {
+  return (
+    operation?.kind === 'interactive-command' && operation.label === SETTINGS_READ_OPERATION_LABEL
+  );
 }
 
 function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
