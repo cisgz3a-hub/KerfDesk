@@ -11,8 +11,9 @@
 
 ## Decision index
 
-> This index is partial: ADR-019–134 are mostly unlisted here (a known gap — locate any ADR by
-> searching `## ADR-NNN` in the body, which is in insertion order, not numeric order).
+> The index is numerically complete; gaps in the numbering are reserved blocks with no ADR body
+> (e.g. most of 054–091, reserved by the build plan). The body itself is in insertion order, not
+> numeric order — locate any ADR by searching `## ADR-NNN`.
 
 | ID | Date | Status | Title |
 |---|---|---|---|
@@ -34,7 +35,86 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-019 | — | Accepted | Phase F kickoff: Fill is a geometry decision in `compileJob` |
+| ADR-020 | — | Accepted | Phase F.2 raster image engrave (kickoff) |
+| ADR-021 | 2026-05-28 | Accepted, code shipped, hardware verification pending | Phase F.3 set-work-origin via G92 (kickoff) |
+| ADR-022 | 2026-06-01 | Accepted, code shipped, hardware verification pending | Origin-aware job placement and physical Frame/Start preflight |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
+| ADR-025 | 2026-05-29 | Accepted, harness shipped, scope limits documented below | Perceptual fidelity harness for the trace pipeline |
+| ADR-026 | — | Accepted | Trace keeps its source image (LightBurn-style overlay) |
+| ADR-027 | 2026-05-29 | Accepted | LightBurn is the source of truth; divergences are defects to redesign |
+| ADR-028 | 2026-05-29 | Accepted | Raster engrave preview renders in scene space via the compile path's dither |
+| ADR-029 | 2026-05-29 | Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage... | Convert to Bitmap (vector → raster engrave source) |
+| ADR-030 | 2026-05-29 | Proposed (documentation gate | Trace control model realigned to LightBurn (Cutoff/Threshold band) |
+| ADR-031 | 2026-06-01 | Accepted | Fill hatch overscan lead-in/out |
+| ADR-032 | 2026-06-01 | Accepted | Bidirectional raster rows after overscan runtime regression |
+| ADR-033 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Skip fill overscan on short hatch runs; emit runway as rapid |
+| ADR-034 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Continuous-sweep fill: one G1 per scanline, S0-blanked gaps |
+| ADR-035 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Split a fill scanline at large gaps so the emitter rapids across them |
+| ADR-036 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Fill engraving emits M4 dynamic power (was M3 constant); supersedes ADR-020 #4 |
+| ADR-037 | 2026-06-03 | Accepted, code shipped, visual verification pending | Raise the image-trace decode cap 1024 -> 2048 px for small-feature fidelity |
+| ADR-038 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Per-layer unidirectional fill option (was: snake hardcoded) |
+| ADR-039 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Split a raster row at wide white gaps so the emitter rapids across them |
+| ADR-040 | 2026-06-03 | Accepted, code shipped | Shared prepared-output pipeline (preview = save = start = estimate) |
+| ADR-041 | 2026-06-04 | Accepted, code shipped | A GRBL error:N ack is terminal for the stream (stop sending + safety notice) |
+| ADR-042 | 2026-06-04 | Accepted, code shipped | Ack-driven follow-up write failure raises the disconnect safety notice (P0-3) |
+| ADR-043 | 2026-06-05 | Accepted, code shipped | Trace is vector-only; remove the Photo and Detailed trace presets |
+| ADR-044 | 2026-06-09 | Accepted | Minimal Material/Interval Test calibration workflow |
+| ADR-045 | 2026-06-09 | Accepted | Native Material Library IO foundation |
+| ADR-046 | 2026-06-10 | Accepted | SVG import unit resolution (viewBox scaling + 96 DPI px) |
+| ADR-047 | 2026-06-10 | Superseded by ADR-049 (chrome is now light | Design tokens + shared chrome classes (dark chrome, light bed) |
+| ADR-048 | 2026-06-11 | Accepted | Metadata-less bitmap imports default to 254 DPI (LightBurn parity) |
+| ADR-049 | 2026-06-13 | Accepted | Unified light chrome (supersedes ADR-047's dark-chrome decision) |
+| ADR-050 | 2026-06-13 | Accepted | Module-level memoization caches in core/job (narrow exception to "no module-level mutable") |
+| ADR-051 | 2026-06-14 | Accepted | Phase G: on-canvas drawing tools (shape SceneObject variant + tool-mode) |
+| ADR-052 | 2026-06-17 | Accepted | Scanning offset compensation: a per-speed table cancels the bidirectional zipper |
+| ADR-053 | 2026-06-17 | Accepted | Verified Origin: hand-set origin + mandatory verified frame for no-homing / hand-positioned machines |
+| ADR-057 | 2026-06-24 | Accepted | Registration Box: camera-free placement jig |
+| ADR-058 | 2026-06-25 | Accepted | Centerline trace rework: a measured pixel-centering bar + junction chaining |
+| ADR-059 | 2026-06-25 | Accepted | Edge Detection trace mode: clean-room Canny → single-stroke vectors |
+| ADR-060 | 2026-06-26 | Accepted | Offline-first PWA: installable service worker + safe update model |
+| ADR-092 | 2026-06-24 | Accepted | Connect-time Device Setup wizard (manual, draft-commit, guarded firmware sync) |
+| ADR-093 | 2026-06-26 | Accepted | In-app multi-library Material Library UI: create/edit wizard, Saved Libraries browser, auto-save |
+| ADR-094 | 2026-07-02 | Accepted | Phase H multi-controller architecture: ControllerDriver seam + capability-gated UI |
+| ADR-095 | 2026-07-02 | Accepted | Marlin controller support (queued status, stream-side pause, inline/fan dialects) |
+| ADR-096 | 2026-07-02 | Accepted | Smoothieware controller support (fractional S power scale) |
+| ADR-097 | 2026-07-02 | Accepted | Ruida: experimental .rd export, file-only transport |
+| ADR-098 | 2026-07-02 | Amended by ADR-209 | CNC router mode becomes a first-class product track (Phase H "Router") |
+| ADR-100 | — | Accepted | Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params |
+| ADR-101 | 2026-07-02 | Accepted | CNC/laser UI separation policy: gate-and-hide |
+| ADR-102 | 2026-07-03 | Accepted | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
+| ADR-103 | — | accepted (maintainer session directive) | Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03) |
+| ADR-104 | — | accepted (recorded at the merge of `claude/determined-dew... | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
+| ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
+| ADR-106 | — | accepted (maintainer-approved build plan, 2026-07-03) | Parametric finger-joint box generator: claim-model joinery (2026-07-03) |
+| ADR-107 | 2026-06-27 | Accepted | Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4) |
+| ADR-108 | 2026-06-28 | Accepted | Camera Mode v2: fisheye lens calibration + de-fisheye render |
+| ADR-109 | 2026-07-03 | Accepted | Camera Mode v3: automatic marker alignment (no-click homography) |
+| ADR-110 | 2026-07-03 | Accepted | Camera Mode v4: capture-to-trace at true bed coordinates |
+| ADR-111 | — | accepted (maintainer directive after a real 4040 cut wand... | CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04) |
+| ADR-112 | — | accepted (maintainer follow-up to ADR-111: on the live ap... | Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04) |
+| ADR-113 | — | accepted (maintainer-directed follow-up to the trace-fide... | Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05) |
+| ADR-114 | — | Accepted | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
+| ADR-115 | — | accepted (maintainer-directed after rejecting ADR-059's l... | Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05) |
+| ADR-116 | — | accepted (maintainer directive: "I need my box designer t... | Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07) |
+| ADR-117 | — | accepted | Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07) |
+| ADR-118 | — | amended (isolated IndexedDB execution artifacts, 2026-07-15) | Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07) |
+| ADR-119 | — | accepted | Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07) |
+| ADR-120 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
+| ADR-121 | — | accepted | Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07) |
+| ADR-122 | — | accepted | Camera-driven positioning and burn-target alignment wizard (Camera, 2026-07-07) |
+| ADR-123 | 2026-07-08 | Accepted | Own-engine trace: remove the potrace-derived backend (closes the ADR-120 blocker) |
+| ADR-124 | — | accepted (maintainer directive: "jog the head to each cor... | Capture Board Corners: build the registration box from jogged machine coordinates (2026-07-08) |
+| ADR-125 | — | accepted (maintainer directive: expand Place Board — chos... | Fill the board: auto-fit + array artwork onto the placed board (2026-07-08) |
+| ADR-126 | — | accepted (maintainer directive: capture round boards - "o... | Generalize Place Board to a board-shape union; circle boards (2026-07-08) |
+| ADR-127 | — | Accepted | Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09) |
+| ADR-128 | — | Accepted | Measured-boundary trace pipeline: sub-pixel extraction, supersampling, and fair-then-fit finishing |
+| ADR-129 | — | accepted (audit DEV-04: no-go zones gated Start/Frame/exp... | Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10) |
+| ADR-130 | — | accepted (audit CAM-04: the Registration Jig panel could... | Registration-box provenance: protect a captured board from the jig panel (2026-07-10) |
+| ADR-131 | — | accepted (audit ARC-01/ARC-02: core geometry ops throw us... | Canonical Result<T, E> for core control-flow errors (2026-07-11) |
+| ADR-132 | — | accepted (audit ARC-03: the 250 soft tier promised by ADR... | The 250-line soft tier is a report-only script, not an ESLint warning (2026-07-11) |
+| ADR-133 | — | accepted (audit ELE-02: residual-risk hardening of ADR-12... | Camera bridge trusts only the exact production origins and refuses all loopback frame-proxy targets (2026-07-11) |
+| ADR-134 | — | accepted (Codex re-audit R2: the overlay applied a rectif... | The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11) |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Superseded | CNC interruption recovery rewinds to a retract-first safe boundary (see ADR-143) |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
