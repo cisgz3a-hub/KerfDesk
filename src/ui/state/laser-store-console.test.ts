@@ -1,54 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { createFramedRunPermit, type FramedRunCandidate } from './framed-run';
+import { connectWith, flushConnect, makeConnection } from './laser-store-console-harness';
 import { useLaserStore } from './laser-store';
-
-type FakeConnection = SerialConnection & {
-  readonly emitLine: (line: string) => void;
-};
-
-function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
-  const lineHandlers = new Set<(line: string) => void>();
-  return {
-    write,
-    onLine: (handler) => {
-      lineHandlers.add(handler);
-      return () => lineHandlers.delete(handler);
-    },
-    onClose: () => () => undefined,
-    close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
-  };
-}
-
-function makeAdapter(connection: SerialConnection): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: async () => [],
-    pickFileForSave: async () => null,
-    serial: {
-      isSupported: () => true,
-      requestPort: async () => ({ open: async () => connection }),
-    },
-  };
-}
-
-async function connectWith(connection: FakeConnection): Promise<void> {
-  await useLaserStore.getState().connect(makeAdapter(connection));
-  connection.emitLine('Grbl 1.1f');
-  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  // Let the handshake's $$ write land, then ack it like real GRBL does —
-  // startJob waits for owed untracked acks to drain.
-  await flushConnect();
-  connection.emitLine('ok');
-  await flushConnect();
-}
-
-async function flushConnect(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
-}
 
 function currentWorkZEvidence() {
   return {
@@ -172,7 +125,11 @@ describe('laser-store console commands', () => {
     await connectWith(connection);
     useLaserStore.setState({ detectedSettings: null, controllerSettings: null });
 
-    await useLaserStore.getState().sendConsoleCommand('$$');
+    // A console $$ now owns the timeout-armed command arbiter, so it resolves
+    // on the terminal ok rather than on byte-queue: emit the dump while the
+    // read is still pending, then await it.
+    const read = useLaserStore.getState().sendConsoleCommand('$$');
+    await flushConnect();
     expect(useLaserStore.getState().controllerOperation).toMatchObject({
       kind: 'interactive-command',
       label: 'Reading controller settings',
@@ -180,6 +137,7 @@ describe('laser-store console commands', () => {
     for (const line of ['$30=1000', '$31=0', '$32=1', '$130=400', '$131=400', 'ok']) {
       connection.emitLine(line);
     }
+    await read;
 
     expect(writes.at(-1)).toBe('$$\n');
     expect(useLaserStore.getState().controllerOperation).toBeNull();
