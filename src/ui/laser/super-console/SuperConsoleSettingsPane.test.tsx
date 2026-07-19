@@ -1,8 +1,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../../core/devices';
+import { FALCON_COMPATIBLE_PROFILE } from '../../../core/devices/falcon-profiles';
 import type { PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
+import { useStore } from '../../state';
 import { useLaserStore, type LaserState } from '../../state/laser-store';
 import { SuperConsoleSettingsPane } from './SuperConsoleSettingsPane';
 
@@ -49,6 +52,7 @@ async function renderPane(): Promise<{
 }
 
 afterEach(() => {
+  useStore.getState().newProject();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,
@@ -69,6 +73,23 @@ afterEach(() => {
 });
 
 describe('SuperConsoleSettingsPane', () => {
+  it('reports whether the selected profile activates the 4040 fill-quality policy', async () => {
+    const generic = await renderPane();
+    expect(generic.host.textContent).toContain('4040 fill-quality policy inactive');
+    await generic.unmount();
+
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    const neotronics = await renderPane();
+    expect(neotronics.host.textContent).toContain('4040 fill-quality policy active');
+    expect(neotronics.host.textContent).not.toContain('4040 fill-quality policy inactive');
+    await neotronics.unmount();
+
+    useStore.getState().replaceDeviceProfile(FALCON_COMPATIBLE_PROFILE);
+    const falcon = await renderPane();
+    expect(falcon.host.textContent).not.toContain('4040 fill-quality policy');
+    await falcon.unmount();
+  });
+
   it('auto-reads settings exactly once when connected', async () => {
     const readMachineSettings = vi.fn(async () => undefined);
     useLaserStore.setState({

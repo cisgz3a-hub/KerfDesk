@@ -31,7 +31,7 @@ export function sliceToolpath(toolpath: Toolpath, cut: number): SlicedToolpath {
 function truncateStep(step: ToolpathStep, length: number): ToolpathStep {
   if (step.kind === 'travel') {
     const to = lerp(step.from, step.to, length / step.length);
-    return { kind: 'travel', from: step.from, to, length };
+    return { ...step, to, length };
   }
   if (step.kind === 'plunge') {
     const t = length / step.length;

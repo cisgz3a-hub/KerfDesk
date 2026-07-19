@@ -213,7 +213,7 @@ function drawStep(
   showTravel: boolean,
 ): void {
   if (step.kind === 'travel') {
-    if (showTravel) drawTravel(ctx, step.from, step.to, view);
+    if (showTravel) drawTravel(ctx, step.from, step.to, view, step.motion);
   } else if (step.kind === 'plunge') {
     // Vertical-only move — no XY extent to draw in the 2D route. The
     // depth-shaded CNC preview (H.2 removal grid) is where plunges show.
@@ -299,10 +299,12 @@ function drawTravel(
   from: Vec2,
   to: Vec2,
   view: ViewTransform,
+  motion: Extract<ToolpathStep, { kind: 'travel' }>['motion'],
 ): void {
-  ctx.strokeStyle = canvasTheme.previewTravel;
-  ctx.lineWidth = 0.5;
-  ctx.setLineDash([2, 3]);
+  const feed = motion === 'feed';
+  ctx.strokeStyle = feed ? canvasTheme.previewFeedTravel : canvasTheme.previewTravel;
+  ctx.lineWidth = feed ? 0.75 : 0.5;
+  ctx.setLineDash(feed ? [5, 2] : [2, 3]);
   ctx.beginPath();
   ctx.moveTo(view.offsetX + from.x * view.scale, view.offsetY + from.y * view.scale);
   ctx.lineTo(view.offsetX + to.x * view.scale, view.offsetY + to.y * view.scale);

@@ -66,7 +66,7 @@ function appendGroupSteps(
     case 'fill':
       return appendFillGroupSteps(steps, prevEnd, group, options);
     case 'cut':
-      return appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
+      return appendContourGroupSteps(steps, prevEnd, group.segments, group.color, group.passes);
     case 'cnc':
       // Z-aware CNC steps (H.2): retract/travel/plunge/cut mirroring the
       // emitter's motion contract, with per-step Z spans for depth shading.
@@ -81,13 +81,22 @@ function appendFillGroupSteps(
   options: BuildToolpathOptions,
 ): Vec2 | null {
   if ((group.fillStyle ?? 'scanline') === 'offset') {
-    return appendContourGroupSteps(steps, initialPrevEnd, group.segments, group.color);
+    return appendContourGroupSteps(
+      steps,
+      initialPrevEnd,
+      group.segments,
+      group.color,
+      group.passes,
+    );
   }
   const scanOffsetMm = offsetForSpeed(options.scanningOffsets ?? [], group.speed);
   let prevEnd = initialPrevEnd;
-  for (const plan of planFillSweeps(group)) {
-    const end = appendFillSweepSteps(steps, prevEnd, plan, group.color, scanOffsetMm);
-    if (end !== null) prevEnd = end;
+  const plans = planFillSweeps(group);
+  for (let pass = 0; pass < group.passes; pass += 1) {
+    for (const plan of plans) {
+      const end = appendFillSweepSteps(steps, prevEnd, plan, group.color, scanOffsetMm);
+      if (end !== null) prevEnd = end;
+    }
   }
   return prevEnd;
 }
@@ -97,20 +106,23 @@ function appendContourGroupSteps(
   initialPrevEnd: Vec2 | null,
   segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2> }>,
   color: string,
+  passes: number,
 ): Vec2 | null {
   let prevEnd = initialPrevEnd;
-  for (const seg of segments) {
-    const first = seg.polyline[0];
-    if (first === undefined) continue;
-    appendTravelStep(steps, prevEnd, first);
-    steps.push({
-      kind: 'cut',
-      color,
-      polyline: seg.polyline,
-      length: polylineLength(seg.polyline),
-    });
-    const last = seg.polyline[seg.polyline.length - 1];
-    if (last !== undefined) prevEnd = last;
+  for (let pass = 0; pass < passes; pass += 1) {
+    for (const seg of segments) {
+      const first = seg.polyline[0];
+      if (first === undefined) continue;
+      appendTravelStep(steps, prevEnd, first);
+      steps.push({
+        kind: 'cut',
+        color,
+        polyline: seg.polyline,
+        length: polylineLength(seg.polyline),
+      });
+      const last = seg.polyline[seg.polyline.length - 1];
+      if (last !== undefined) prevEnd = last;
+    }
   }
   return prevEnd;
 }
@@ -144,8 +156,13 @@ function appendFillSweepSteps(
   if (first === undefined || last === undefined) return null;
   const run = expandFillHatchWithRunways([first.start, last.end], plan);
   if (run === null) return null;
-  appendTravelStep(steps, prevEnd, run.leadStart);
-  appendTravelStep(steps, run.leadStart, run.burnStart);
+  appendTravelStep(steps, prevEnd, run.leadStart, 'rapid');
+  appendTravelStep(
+    steps,
+    run.leadStart,
+    run.burnStart,
+    plan.runwayMotion === 'feed-matched' ? 'feed' : 'rapid',
+  );
   for (let i = 0; i < spans.length; i += 1) {
     const span = spans[i];
     if (span === undefined) continue;
@@ -156,9 +173,14 @@ function appendFillSweepSteps(
       length: dist(span.start, span.end),
     });
     const next = spans[i + 1];
-    if (next !== undefined) appendTravelStep(steps, span.end, next.start);
+    if (next !== undefined) appendTravelStep(steps, span.end, next.start, 'feed');
   }
-  appendTravelStep(steps, run.burnEnd, run.leadEnd);
+  appendTravelStep(
+    steps,
+    run.burnEnd,
+    run.leadEnd,
+    plan.runwayMotion === 'feed-matched' ? 'feed' : 'rapid',
+  );
   return run.leadEnd;
 }
 

@@ -1,4 +1,5 @@
 import type { Toolpath, ToolpathStep } from '../../core/job';
+import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 
 export type PreviewTimeline = {
   readonly totalDistanceMm: number;
@@ -15,12 +16,11 @@ type PreviewTimelineSegment = {
 
 export function buildPreviewTimeline(
   toolpath: Toolpath,
-  breakdown: { readonly cutSeconds: number; readonly travelSeconds: number },
+  breakdown: JobDurationBreakdown,
 ): PreviewTimeline {
-  const cutDistanceMm = sumStepLengths(toolpath.steps, (step) => step.kind !== 'travel');
-  const travelDistanceMm = sumStepLengths(toolpath.steps, (step) => step.kind === 'travel');
   const cutSeconds = finiteNonNegative(breakdown.cutSeconds);
   const travelSeconds = finiteNonNegative(breakdown.travelSeconds);
+  const timing = previewCategoryTiming(toolpath, breakdown, cutSeconds, travelSeconds);
   const segments: PreviewTimelineSegment[] = [];
   let distanceMm = 0;
   let seconds = 0;
@@ -28,9 +28,12 @@ export function buildPreviewTimeline(
   for (const step of toolpath.steps) {
     const length = finiteNonNegative(step.length);
     if (length === 0) continue;
-    const categoryDistance = step.kind === 'travel' ? travelDistanceMm : cutDistanceMm;
-    const categorySeconds = step.kind === 'travel' ? travelSeconds : cutSeconds;
-    const duration = categoryDistance > 0 ? (categorySeconds * length) / categoryDistance : 0;
+    const category = timelineCategory(step, timing.detailedTravel);
+    const categoryTiming = timing[category];
+    const duration =
+      categoryTiming.distanceMm > 0
+        ? (categoryTiming.seconds * length) / categoryTiming.distanceMm
+        : 0;
     segments.push({
       startDistanceMm: distanceMm,
       endDistanceMm: distanceMm + length,
@@ -46,6 +49,76 @@ export function buildPreviewTimeline(
     totalSeconds: cutSeconds + travelSeconds,
     segments,
   };
+}
+
+type TimelineCategory = 'cut' | 'travel' | 'rapid-travel' | 'feed-travel';
+
+type CategoryTiming = { readonly distanceMm: number; readonly seconds: number };
+
+type PreviewCategoryTiming = Readonly<Record<TimelineCategory, CategoryTiming>> & {
+  readonly detailedTravel: boolean;
+};
+
+function previewCategoryTiming(
+  toolpath: Toolpath,
+  breakdown: JobDurationBreakdown,
+  cutSeconds: number,
+  travelSeconds: number,
+): PreviewCategoryTiming {
+  const cutDistanceMm = sumStepLengths(toolpath.steps, (step) => step.kind !== 'travel');
+  const travelDistanceMm = sumStepLengths(toolpath.steps, (step) => step.kind === 'travel');
+  const rapidTravelDistanceMm = sumStepLengths(
+    toolpath.steps,
+    (step) => step.kind === 'travel' && step.motion !== 'feed',
+  );
+  const feedTravelDistanceMm = sumStepLengths(
+    toolpath.steps,
+    (step) => step.kind === 'travel' && step.motion === 'feed',
+  );
+  const detailed = detailedTravelTiming(
+    breakdown,
+    travelSeconds,
+    rapidTravelDistanceMm,
+    feedTravelDistanceMm,
+  );
+  return {
+    cut: { distanceMm: cutDistanceMm, seconds: cutSeconds },
+    travel: { distanceMm: travelDistanceMm, seconds: travelSeconds },
+    'rapid-travel': {
+      distanceMm: rapidTravelDistanceMm,
+      seconds: detailed?.rapidTravelSeconds ?? 0,
+    },
+    'feed-travel': {
+      distanceMm: feedTravelDistanceMm,
+      seconds: detailed?.feedTravelSeconds ?? 0,
+    },
+    detailedTravel: detailed !== null,
+  };
+}
+
+function timelineCategory(step: ToolpathStep, detailed: boolean): TimelineCategory {
+  if (step.kind !== 'travel') return 'cut';
+  if (!detailed) return 'travel';
+  return step.motion === 'feed' ? 'feed-travel' : 'rapid-travel';
+}
+
+function detailedTravelTiming(
+  breakdown: JobDurationBreakdown,
+  travelSeconds: number,
+  rapidTravelDistanceMm: number,
+  feedTravelDistanceMm: number,
+): { readonly rapidTravelSeconds: number; readonly feedTravelSeconds: number } | null {
+  const rawRapid = breakdown.rapidTravelSeconds;
+  const rawFeed = breakdown.feedTravelSeconds;
+  if (!isFiniteNonNegative(rawRapid) || !isFiniteNonNegative(rawFeed)) return null;
+  const detailTotal = rawRapid + rawFeed;
+  const tolerance = 1e-6 * Math.max(1, travelSeconds);
+  if (Math.abs(detailTotal - travelSeconds) > tolerance) return null;
+  // Some legacy/raster toolpaths do not yet tag every feed leg. Fall back to
+  // the original aggregate travel pacing instead of dropping category time.
+  if (rawRapid > 0 && rapidTravelDistanceMm <= 0) return null;
+  if (rawFeed > 0 && feedTravelDistanceMm <= 0) return null;
+  return { rapidTravelSeconds: rawRapid, feedTravelSeconds: rawFeed };
 }
 
 export function elapsedSecondsAtScrubber(timeline: PreviewTimeline, scrubberT: number): number {
@@ -111,6 +184,10 @@ function interpolate(
 
 function finiteNonNegative(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function isFiniteNonNegative(value: number | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function clamp01(value: number): number {

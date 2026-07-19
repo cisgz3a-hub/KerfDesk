@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FALCON_COMPATIBLE_PROFILE } from '../../core/devices/falcon-profiles';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { DeviceSettings } from './DeviceSettings';
@@ -41,6 +42,17 @@ describe('DeviceSettings disclosure', () => {
       const details = host.querySelector('details');
       if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
       expect(details.open).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps the profile status neutral for Falcon instead of calling 4040 policy inactive', async () => {
+    useStore.getState().replaceDeviceProfile(FALCON_COMPATIBLE_PROFILE);
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      expect(host.textContent).toContain('Current profile fill behavior unchanged');
+      expect(host.textContent).not.toContain('4040 fill-quality policy inactive');
     } finally {
       await unmount();
     }

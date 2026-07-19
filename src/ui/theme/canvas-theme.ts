@@ -47,6 +47,7 @@ export const canvasTheme = {
   rulerMinorTick: '#aaa',
   // Preview toolpath (draw-preview)
   previewTravel: '#bbbbbb',
+  previewFeedTravel: '#7c5ce7',
   previewCut: '#2563eb',
   previewHeadFill: '#ff3b30',
   previewHeadStroke: '#fff',

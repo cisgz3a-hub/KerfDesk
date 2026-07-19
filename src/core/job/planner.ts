@@ -36,16 +36,21 @@
 import type { DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
-import { planFillSweeps } from './fill-sweep-plan';
+import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Job } from './job';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 
 type BlockKind = 'cut' | 'travel';
+type BlockMotion = 'rapid' | 'feed';
 
 type Block = {
   readonly kind: BlockKind;
+  // Timing/accounting and kinematic continuity are independent. A G1/S0
+  // runway is travel for the operator-facing breakdown but feed motion for
+  // junction planning, so it must blend into the following powered G1.
+  readonly motion?: BlockMotion;
   readonly distance: number; // mm
   readonly targetVelocity: number; // mm/sec
   // Unit direction vector. Travels with zero length are filtered out
@@ -55,7 +60,12 @@ type Block = {
 
 export type PlannedDuration = {
   readonly totalSeconds: number;
-  readonly breakdown: { readonly cutSeconds: number; readonly travelSeconds: number };
+  readonly breakdown: {
+    readonly cutSeconds: number;
+    readonly travelSeconds: number;
+    readonly rapidTravelSeconds: number;
+    readonly feedTravelSeconds: number;
+  };
 };
 
 export function estimateWithPlanner(job: Job, device: DeviceProfile): PlannedDuration {
@@ -63,20 +73,35 @@ export function estimateWithPlanner(job: Job, device: DeviceProfile): PlannedDur
   const jd = Math.max(0, device.junctionDeviationMm);
   const travelV = Math.max(1, device.maxFeed) / SECONDS_PER_MINUTE;
   const blocks = buildBlocks(job, device, travelV);
-  if (blocks.length === 0)
-    return { totalSeconds: 0, breakdown: { cutSeconds: 0, travelSeconds: 0 } };
+  if (blocks.length === 0) {
+    return {
+      totalSeconds: 0,
+      breakdown: {
+        cutSeconds: 0,
+        travelSeconds: 0,
+        rapidTravelSeconds: 0,
+        feedTravelSeconds: 0,
+      },
+    };
+  }
   const plan = planVelocities(blocks, accel, jd);
   let cutSeconds = 0;
-  let travelSeconds = 0;
+  let rapidTravelSeconds = 0;
+  let feedTravelSeconds = 0;
   for (let i = 0; i < blocks.length; i += 1) {
     const block = blocks[i];
     const p = plan[i];
     if (block === undefined || p === undefined) continue;
     const t = blockTime(block, p.entryV, p.exitV, accel);
     if (block.kind === 'cut') cutSeconds += t;
-    else travelSeconds += t;
+    else if (blockMotion(block) === 'feed') feedTravelSeconds += t;
+    else rapidTravelSeconds += t;
   }
-  return { totalSeconds: cutSeconds + travelSeconds, breakdown: { cutSeconds, travelSeconds } };
+  const travelSeconds = rapidTravelSeconds + feedTravelSeconds;
+  return {
+    totalSeconds: cutSeconds + travelSeconds,
+    breakdown: { cutSeconds, travelSeconds, rapidTravelSeconds, feedTravelSeconds },
+  };
 }
 
 // Block decomposition. Walks every cut segment and produces one block
@@ -118,30 +143,55 @@ function appendFillGroupBlocks(
   const plans = planFillSweeps(group);
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const plan of plans) {
-      const sweep = plan.sweep;
-      const first = sweep.spans[0];
-      const last = sweep.spans[sweep.spans.length - 1];
-      if (first === undefined || last === undefined) continue;
-      // A scanline is one continuous G1 sweep at feed (ink + S0-blanked gaps),
-      // so the burn is a SINGLE cut block from the first span's start to the
-      // last span's end — no per-run full stop (ADR-034). The gaps move at feed
-      // too, so pricing the whole span as one cut block is accurate for total
-      // time. The 4040 policy's S0 runways use the same feed and stay in that
-      // continuous block; legacy runways remain rapid travel.
-      const run = expandFillHatchWithRunways([first.start, last.end], plan);
-      if (run === null) continue;
-      appendTravel(out, cursor, run.leadStart, travelV);
-      if (plan.runwayMotion === 'feed-matched') {
-        appendCut(out, run.leadStart, run.leadEnd, cutV);
-      } else {
-        appendTravel(out, run.leadStart, run.burnStart, travelV);
-        appendCut(out, run.burnStart, run.burnEnd, cutV);
-        appendTravel(out, run.burnEnd, run.leadEnd, travelV);
-      }
-      cursor = run.leadEnd;
+      cursor = appendFillSweepBlocks(out, cursor, plan, cutV, travelV);
     }
   }
   return cursor;
+}
+
+function appendFillSweepBlocks(
+  out: Block[],
+  cursor: Vec2,
+  plan: FillSweepPlan,
+  cutV: number,
+  travelV: number,
+): Vec2 {
+  const sweep = plan.sweep;
+  const first = sweep.spans[0];
+  const last = sweep.spans[sweep.spans.length - 1];
+  if (first === undefined || last === undefined) return cursor;
+  // The emitted scanline is one continuous G1 chain across powered spans
+  // and S0-blanked gaps (ADR-034). Separate the timing buckets while every
+  // G1 leg stays in feed motion, so changing S never invents a planner stop.
+  const run = expandFillHatchWithRunways([first.start, last.end], plan);
+  if (run === null) return cursor;
+  appendTravel(out, cursor, run.leadStart, travelV);
+  if (plan.leadInMm > 0) {
+    appendRunwayBlock(out, run.leadStart, run.burnStart, plan, cutV, travelV);
+  }
+  for (let spanIndex = 0; spanIndex < sweep.spans.length; spanIndex += 1) {
+    const span = sweep.spans[spanIndex];
+    if (span === undefined) continue;
+    appendCut(out, span.start, span.end, cutV);
+    const next = sweep.spans[spanIndex + 1];
+    if (next !== undefined) appendFeedTravel(out, span.end, next.start, cutV);
+  }
+  if (plan.leadOutMm > 0) {
+    appendRunwayBlock(out, run.burnEnd, run.leadEnd, plan, cutV, travelV);
+  }
+  return run.leadEnd;
+}
+
+function appendRunwayBlock(
+  out: Block[],
+  from: Vec2,
+  to: Vec2,
+  plan: FillSweepPlan,
+  cutV: number,
+  travelV: number,
+): void {
+  if (plan.runwayMotion === 'feed-matched') appendFeedTravel(out, from, to, cutV);
+  else appendTravel(out, from, to, travelV);
 }
 
 function appendCutGroupBlocks(
@@ -176,13 +226,37 @@ function appendCutPolylineBlocks(out: Block[], polyline: ReadonlyArray<Vec2>, cu
 function appendTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {
   const d = distance(from, to);
   if (d <= 0) return;
-  out.push({ kind: 'travel', distance: d, targetVelocity: v, direction: unitVector(from, to, d) });
+  out.push({
+    kind: 'travel',
+    motion: 'rapid',
+    distance: d,
+    targetVelocity: v,
+    direction: unitVector(from, to, d),
+  });
+}
+
+function appendFeedTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {
+  const d = distance(from, to);
+  if (d <= 0) return;
+  out.push({
+    kind: 'travel',
+    motion: 'feed',
+    distance: d,
+    targetVelocity: v,
+    direction: unitVector(from, to, d),
+  });
 }
 
 function appendCut(out: Block[], from: Vec2, to: Vec2, v: number): void {
   const d = distance(from, to);
   if (d <= 0) return;
-  out.push({ kind: 'cut', distance: d, targetVelocity: v, direction: unitVector(from, to, d) });
+  out.push({
+    kind: 'cut',
+    motion: 'feed',
+    distance: d,
+    targetVelocity: v,
+    direction: unitVector(from, to, d),
+  });
 }
 
 type PlanEntry = { entryV: number; exitV: number };
@@ -259,12 +333,10 @@ function forwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: num
 // previous block's direction and the next block's direction.
 // sin(θ/2) is computed from the dot product without an explicit acos.
 export function junctionVelocity(prev: Block, next: Block, accel: number, jd: number): number {
-  // Travels run with laser off so the start of a cut following a
-  // travel is effectively a fresh path — junction analysis with a
-  // travel doesn't help (we won't smoothly transition between them).
-  // Same for travel after cut. Treat all transitions crossing the
-  // cut/travel boundary as full stops.
-  if (prev.kind !== next.kind) return 0;
+  // Rapid and feed motion retain the estimator's conservative stop boundary.
+  // Laser state is not a motion boundary: G1/S0 feed travel blends through a
+  // powered G1 span exactly as the emitted continuous sweep does.
+  if (blockMotion(prev) !== blockMotion(next)) return 0;
   const cosTheta = prev.direction.x * next.direction.x + prev.direction.y * next.direction.y;
   // Clamp to handle float noise just outside [-1, 1].
   const clamped = Math.min(1, Math.max(-1, cosTheta));
@@ -327,6 +399,10 @@ function distance(a: Vec2, b: Vec2): number {
 
 function unitVector(from: Vec2, to: Vec2, length: number): Vec2 {
   return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
+}
+
+function blockMotion(block: Block): BlockMotion {
+  return block.motion ?? (block.kind === 'cut' ? 'feed' : 'rapid');
 }
 
 // Compatibility note: a future per-group export could expose Block[]

@@ -186,12 +186,14 @@ describe('buildToolpath', () => {
     expect(tp.steps.map((s) => s.kind)).toEqual(['cut', 'travel', 'cut', 'travel', 'cut']);
     expect(tp.steps[1]).toMatchObject({
       kind: 'travel',
+      motion: 'feed',
       from: { x: 5, y: 0 },
       to: { x: 8, y: 0 },
       length: 3,
     });
     expect(tp.steps[3]).toMatchObject({
       kind: 'travel',
+      motion: 'feed',
       from: { x: 12, y: 0 },
       to: { x: 15, y: 0 },
       length: 3,
@@ -245,6 +247,7 @@ describe('buildToolpath', () => {
     const rapidRemainder = tp.steps[2];
     expect(rapidRemainder).toMatchObject({
       kind: 'travel',
+      motion: 'rapid',
       from: { x: 7.015, y: 43 },
     });
     if (rapidRemainder?.kind !== 'travel') throw new Error('Expected rapid remainder');
@@ -253,6 +256,7 @@ describe('buildToolpath', () => {
     const feedEntry = tp.steps[3];
     expect(feedEntry).toMatchObject({
       kind: 'travel',
+      motion: 'feed',
       to: { x: 16.62, y: 43 },
       length: 5,
     });
@@ -387,5 +391,27 @@ describe('sliceToolpath', () => {
     if (sliced.partial?.kind === 'travel') {
       expect(sliced.partial.to).toEqual({ x: 15, y: 0 });
     }
+  });
+
+  it('preserves feed-travel motion metadata when slicing a runway', () => {
+    const toolpath = {
+      totalLength: 10,
+      steps: [
+        {
+          kind: 'travel' as const,
+          motion: 'feed' as const,
+          from: { x: 0, y: 0 },
+          to: { x: 10, y: 0 },
+          length: 10,
+        },
+      ],
+    };
+
+    expect(sliceToolpath(toolpath, 5).partial).toMatchObject({
+      kind: 'travel',
+      motion: 'feed',
+      to: { x: 5, y: 0 },
+      length: 5,
+    });
   });
 });

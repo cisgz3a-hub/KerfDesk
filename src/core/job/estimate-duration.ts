@@ -36,12 +36,19 @@ import {
 import { estimateWithPlanner } from './planner';
 import { rasterRow } from './raster-rows';
 
+export type JobDurationBreakdown = {
+  readonly cutSeconds: number;
+  readonly travelSeconds: number;
+  // Optional keeps older callers/fixtures source-compatible. KerfDesk's live
+  // estimator always provides both details so Preview can distinguish G0 from
+  // laser-off G1 motion while Job Review retains the aggregate travel total.
+  readonly rapidTravelSeconds?: number;
+  readonly feedTravelSeconds?: number;
+};
+
 export type JobDurationEstimate = {
   readonly totalSeconds: number;
-  readonly breakdown: {
-    readonly cutSeconds: number;
-    readonly travelSeconds: number;
-  };
+  readonly breakdown: JobDurationBreakdown;
 };
 
 const PIXEL_CENTER_OFFSET = 0.5;
@@ -54,13 +61,17 @@ export function estimateJobDuration(job: Job, device: DeviceProfile): JobDuratio
   const plungeSeconds = cncPlungeSeconds(job, device);
   const cutSeconds =
     (estimate.breakdown.cutSeconds + plungeSeconds) * timingScale(device.estimateCutTimeScale);
-  const travelSeconds =
-    estimate.breakdown.travelSeconds * timingScale(device.estimateTravelTimeScale);
+  const travelScale = timingScale(device.estimateTravelTimeScale);
+  const rapidTravelSeconds = estimate.breakdown.rapidTravelSeconds * travelScale;
+  const feedTravelSeconds = estimate.breakdown.feedTravelSeconds * travelScale;
+  const travelSeconds = rapidTravelSeconds + feedTravelSeconds;
   return {
     totalSeconds: cutSeconds + travelSeconds,
     breakdown: {
       cutSeconds,
       travelSeconds,
+      rapidTravelSeconds,
+      feedTravelSeconds,
     },
   };
 }

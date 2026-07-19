@@ -23,6 +23,40 @@ const mixed: Toolpath = {
 };
 
 describe('preview timeline', () => {
+  it('paces rapid and laser-off feed travel from separate timing buckets', () => {
+    const detailed: Toolpath = {
+      totalLength: 300,
+      steps: [
+        mixed.steps[0]!,
+        {
+          kind: 'travel',
+          motion: 'rapid',
+          from: { x: 100, y: 0 },
+          to: { x: 200, y: 0 },
+          length: 100,
+        },
+        {
+          kind: 'travel',
+          motion: 'feed',
+          from: { x: 200, y: 0 },
+          to: { x: 300, y: 0 },
+          length: 100,
+        },
+      ],
+    };
+    const timeline = buildPreviewTimeline(detailed, {
+      cutSeconds: 60,
+      travelSeconds: 30,
+      rapidTravelSeconds: 20,
+      feedTravelSeconds: 10,
+    });
+
+    expect(elapsedSecondsAtScrubber(timeline, 1 / 3)).toBeCloseTo(60, 8);
+    expect(elapsedSecondsAtScrubber(timeline, 2 / 3)).toBeCloseTo(80, 8);
+    expect(scrubberAtElapsedSeconds(timeline, 70)).toBeCloseTo(0.5, 8);
+    expect(scrubberAtElapsedSeconds(timeline, 85)).toBeCloseTo(5 / 6, 8);
+  });
+
   it('allocates equal distances according to estimated cut and travel time', () => {
     const timeline = buildPreviewTimeline(mixed, { cutSeconds: 90, travelSeconds: 10 });
 
