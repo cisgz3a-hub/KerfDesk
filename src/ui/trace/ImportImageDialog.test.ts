@@ -15,10 +15,19 @@ vi.mock('./use-trace-worker-client', () => ({
   traceImageWithFallback: vi.fn(async () => ({
     paths: [{ color: '#000000', polylines: [] }],
     bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    width: 2,
+    height: 2,
   })),
 }));
-
-import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../../core/scene';
+import {
+  IDENTITY_TRANSFORM,
+  createLayer,
+  createProject,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+} from '../../core/scene';
 import { DEFAULT_TRACE_OPTIONS, type TraceBoundary } from '../../core/trace';
 import { commit, sameTraceSource } from './ImportImageDialog';
 import { loadImageAsRawData } from './image-loader';
@@ -49,10 +58,30 @@ function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
 function ctxWith(getCurrentObject: (id: string) => SceneObject | undefined) {
   return {
     traceExistingImage: vi.fn(),
+    commitRasterizedTrace: vi.fn(),
     pushToast: vi.fn(),
     close: vi.fn(),
     setBusy: vi.fn(),
-    getCurrentObject,
+    getCurrentProject: () => projectWith(getCurrentObject('src-1')),
+  };
+}
+
+function imageOperation(over: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: 'image-op', color: '#808080', mode: 'image' }), ...over };
+}
+
+function projectWith(
+  object: SceneObject | undefined,
+  operation: Layer = imageOperation(),
+): Project {
+  const project = createProject();
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      objects: object === undefined ? [] : [object],
+      layers: [operation],
+    },
   };
 }
 
@@ -66,6 +95,7 @@ const args = (
   file: new File([''], 'logo.png'),
   options: DEFAULT_TRACE_OPTIONS,
   seed,
+  traceOutput: 'vector' as const,
   traceFillStyle: 'scanline' as const,
   ...overrides,
 });
@@ -105,6 +135,8 @@ describe('commit source revalidation (P2-A)', () => {
     const result = {
       paths: [{ color: '#000000', polylines: [] }],
       bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      width: 2,
+      height: 2,
     };
 
     await commit(
@@ -146,6 +178,8 @@ describe('commit source revalidation (P2-A)', () => {
           result: {
             paths: [{ color: '#ff0000', polylines: [] }],
             bounds: { minX: 9, minY: 9, maxX: 9, maxY: 9 },
+            width: 2,
+            height: 2,
           },
         },
       },
@@ -246,9 +280,11 @@ describe('commit source revalidation (P2-A)', () => {
         },
       ],
       bounds: { minX: 0, minY: 0, maxX: 1, maxY: 2 },
+      width: 1,
+      height: 2,
     });
-    const seed = seedRaster();
-    const ctx = ctxWith(() => seedRaster());
+    const seed = seedRaster({ pixelWidth: 2, pixelHeight: 2 });
+    const ctx = ctxWith(() => seed);
     await commit(args(seed, { boundary: { x: 1, y: 0, width: 1, height: 2 } }), ctx);
 
     expect(traceImageWithFallback).toHaveBeenCalledWith(
@@ -273,6 +309,51 @@ describe('commit source revalidation (P2-A)', () => {
             ],
           },
         ],
+      }),
+      { deleteSourceAfterTrace: false },
+    );
+  });
+
+  it('scales a 6000px source boundary before a fresh 2048px commit trace', async () => {
+    vi.mocked(loadImageAsRawData).mockResolvedValueOnce({
+      width: 2048,
+      height: 1024,
+      data: new Uint8ClampedArray(2048 * 1024 * 4),
+    });
+    vi.mocked(traceImageWithFallback).mockResolvedValueOnce({
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 1, y: 1 },
+              ],
+            },
+          ],
+        },
+      ],
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      width: 410,
+      height: 1024,
+    });
+    const seed = seedRaster({ pixelWidth: 6000, pixelHeight: 3000 });
+    const ctx = ctxWith(() => seed);
+
+    await commit(args(seed, { boundary: { x: 4500, y: 0, width: 1200, height: 3000 } }), ctx);
+
+    expect(traceImageWithFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 410, height: 1024 }),
+      DEFAULT_TRACE_OPTIONS,
+    );
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({
+        tracePixelWidth: 2048,
+        tracePixelHeight: 1024,
+        bounds: { minX: 1536, minY: 0, maxX: 1537, maxY: 1 },
       }),
       { deleteSourceAfterTrace: false },
     );

@@ -48,6 +48,8 @@ describe('traceImage single-flight worker lifecycle', () => {
           kind: 'ok',
           paths: [],
           bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+          width: request.image.width,
+          height: request.image.height,
         };
         queueMicrotask(() => {
           this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
@@ -72,6 +74,8 @@ describe('traceImage single-flight worker lifecycle', () => {
       await expect(second).resolves.toEqual({
         paths: [],
         bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+        width: 401,
+        height: 400,
       });
       expect(workers[0]?.terminated).toBe(true);
       expect(workers[1]?.terminated).toBe(false);
@@ -103,6 +107,8 @@ describe('traceImage single-flight worker lifecycle', () => {
           kind: 'ok',
           paths: [],
           bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+          width: request.image.width,
+          height: request.image.height,
         };
         queueMicrotask(() => {
           this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
@@ -123,6 +129,8 @@ describe('traceImage single-flight worker lifecycle', () => {
     await expect(second).resolves.toEqual({
       paths: [],
       bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      width: 2,
+      height: 2,
     });
   });
 });

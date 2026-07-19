@@ -20,6 +20,63 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
 ] as const;
 
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
+export type TraceOutput = 'raster' | 'vector';
+
+export function TraceOutputFields(props: {
+  readonly machineKind: 'laser' | 'cnc';
+  readonly traceOutput: TraceOutput;
+  readonly onTraceOutputChange: (output: TraceOutput) => void;
+  readonly supportsFillStyle: boolean;
+  readonly traceFillStyle: TraceFillStyle;
+  readonly onTraceFillStyleChange: (style: TraceFillStyle) => void;
+}): JSX.Element {
+  const vectorOutput = props.machineKind === 'cnc' || props.traceOutput === 'vector';
+  return (
+    <>
+      {props.machineKind === 'cnc' ? (
+        <CncTraceHint />
+      ) : (
+        <TraceOutputPicker value={props.traceOutput} onChange={props.onTraceOutputChange} />
+      )}
+      {vectorOutput && props.supportsFillStyle ? (
+        <TraceFillStylePicker
+          value={props.traceFillStyle}
+          onChange={props.onTraceFillStyleChange}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function TraceOutputPicker(props: {
+  readonly value: TraceOutput;
+  readonly onChange: (next: TraceOutput) => void;
+}): JSX.Element {
+  return (
+    <Field label="Output">
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(parseTraceOutput(e.target.value))}
+        className="lf-select"
+        style={selectStyle}
+        aria-label="Trace output"
+        title="Choose whether the traced result engraves as a raster scan or stays as editable vectors."
+      >
+        <option value="raster">Raster scan (recommended)</option>
+        <option value="vector">Editable vectors</option>
+      </select>
+      <span style={fillStyleHintStyle}>
+        Raster scan uses the same Raster/Image scan motion as a photo. The trace is binary artwork,
+        not a grayscale photo; traced ink burns at one image tone. Editable vectors use line or fill
+        motion instead.
+      </span>
+    </Field>
+  );
+}
+
+function parseTraceOutput(value: string): TraceOutput {
+  return value === 'vector' ? 'vector' : 'raster';
+}
 
 export function PresetPicker(props: {
   readonly value: string;
@@ -100,7 +157,7 @@ export function DeleteImageAfterTraceToggle(props: {
         type="checkbox"
         className="lf-checkbox"
         checked={props.checked}
-        title="Remove the source bitmap from the workspace after creating traced vectors."
+        title="Remove the source bitmap from the workspace after creating the traced output."
         onChange={(e) => props.onChange(e.target.checked)}
       />
       <span>Delete Image After trace</span>
@@ -135,9 +192,9 @@ export function PresetHint(): JSX.Element {
       pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
       <strong>Centerline</strong> — one vector path down black strokes. <strong>Sharp</strong> —
       pixel-perfect detail, no blur. <strong>Edge Detection</strong> — single lines along the
-      brightness edges of full-colour art. For photos and shaded/continuous-tone images, do not
-      trace — engrave them directly as a raster image (Image layer), which is how LightBurn handles
-      photographs.
+      brightness edges of full-colour art. Raster scan burns any preset through the Image pipeline;
+      a direct raster image still preserves grayscale shading that a binary trace intentionally
+      removes.
     </p>
   );
 }

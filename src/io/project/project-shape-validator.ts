@@ -13,6 +13,7 @@ import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import { validateCncTabAnchors } from './project-cnc-tab-validator';
 import { validateOptionalArtworkOrder } from './project-artwork-order-validator';
+import { validateTracedImageMetadata } from './project-trace-shape-validator';
 import {
   firstError,
   isObject,
@@ -163,7 +164,9 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   const kind = obj['kind'];
   if (kind === 'imported-svg') return validateVectorObject(obj, path);
   if (kind === 'text') return validateTextObject(obj, path);
-  if (kind === 'traced-image') return validateTracedImageObject(obj, path);
+  if (kind === 'traced-image') {
+    return firstError([validateVectorObject(obj, path), validateTracedImageMetadata(obj, path)]);
+  }
   if (kind === 'raster-image') return validateRasterObject(obj, path);
   if (kind === 'shape') return validateShapeObject(obj, path);
   if (kind === 'relief') return validateReliefObject(obj, path);
@@ -220,13 +223,6 @@ function validateVectorObject(obj: Record<string, unknown>, path: string): strin
   ]);
 }
 
-function validateTracedImageObject(obj: Record<string, unknown>, path: string): string | null {
-  return firstError([
-    validateVectorObject(obj, path),
-    optionalLiteral(obj, `${path}.traceMode`, ['filled-contours', 'centerline', 'edge']),
-  ]);
-}
-
 function validateTextObject(obj: Record<string, unknown>, path: string): string | null {
   return firstError([
     requireString(obj, `${path}.id`),
@@ -253,6 +249,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
   const fieldError = firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
+    optionalString(obj, `${path}.traceSourceId`),
     requireString(obj, `${path}.dataUrl`),
     requirePositiveInteger(obj, `${path}.pixelWidth`),
     requirePositiveInteger(obj, `${path}.pixelHeight`),

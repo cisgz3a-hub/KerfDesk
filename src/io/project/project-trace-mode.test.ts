@@ -30,7 +30,27 @@ function edgeTraceObject(): SceneObject {
         ],
       },
     ],
+    traceSourceId: 'source-photo',
+    tracePixelWidth: 2048,
+    tracePixelHeight: 1365,
     traceMode: 'edge',
+  };
+}
+
+function rasterTraceObject(): SceneObject {
+  return {
+    kind: 'raster-image',
+    id: 'TR-raster',
+    source: 'edge trace (bitmap)',
+    traceSourceId: 'source-photo',
+    dataUrl: 'data:image/png;base64,AAAA',
+    pixelWidth: 1,
+    pixelHeight: 1,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'threshold',
+    linesPerMm: 10,
   };
 }
 
@@ -48,6 +68,9 @@ describe('project traced-image traceMode serialization', () => {
       expect(result.project.scene.objects[0]?.kind).toBe('traced-image');
       if (result.project.scene.objects[0]?.kind === 'traced-image') {
         expect(result.project.scene.objects[0].traceMode).toBe('edge');
+        expect(result.project.scene.objects[0].traceSourceId).toBe('source-photo');
+        expect(result.project.scene.objects[0].tracePixelWidth).toBe(2048);
+        expect(result.project.scene.objects[0].tracePixelHeight).toBe(1365);
       }
     }
   });
@@ -66,5 +89,51 @@ describe('project traced-image traceMode serialization', () => {
     if (result.kind === 'invalid') {
       expect(result.reason).toMatch(/scene\.objects\[0\]\.traceMode/);
     }
+  });
+
+  it.each([
+    ['tracePixelWidth', 0],
+    ['tracePixelWidth', 1.5],
+    ['tracePixelWidth', '2048'],
+    ['tracePixelHeight', 0],
+    ['tracePixelHeight', 1.5],
+    ['tracePixelHeight', '1365'],
+  ])('rejects invalid traced-image %s metadata', (field, value) => {
+    const trace = { ...edgeTraceObject(), [field]: value } as unknown as SceneObject;
+    const base = createProject();
+    const result = deserializeProject(
+      serializeProject({ ...base, scene: { ...base.scene, objects: [trace] } }),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') expect(result.reason).toContain(field);
+  });
+
+  it('roundtrips source provenance on a rasterized trace', () => {
+    const raster = rasterTraceObject();
+    const base = createProject();
+    const original: Project = { ...base, scene: addObject(base.scene, raster) };
+    const result = deserializeProject(serializeProject(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
+      const restored = result.project.scene.objects[0];
+      expect(restored?.kind).toBe('raster-image');
+      if (restored?.kind === 'raster-image') {
+        expect(restored.traceSourceId).toBe('source-photo');
+      }
+    }
+  });
+
+  it('rejects a non-string raster traceSourceId', () => {
+    const raster = { ...rasterTraceObject(), traceSourceId: 42 } as unknown as SceneObject;
+    const base = createProject();
+    const result = deserializeProject(
+      serializeProject({ ...base, scene: { ...base.scene, objects: [raster] } }),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') expect(result.reason).toContain('traceSourceId');
   });
 });

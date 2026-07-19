@@ -23,5 +23,9 @@ export async function traceImageRegion(
   return {
     paths: offsetColoredPaths(traced.paths, normalized.x, normalized.y),
     bounds: offsetBounds(traced.bounds, normalized.x, normalized.y),
+    // The offset paths are back in the full working image's coordinates, not
+    // the cropped trace request's local grid.
+    width: image.width,
+    height: image.height,
   };
 }

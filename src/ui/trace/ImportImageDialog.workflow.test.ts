@@ -17,10 +17,13 @@ vi.mock('./use-trace-worker-client', () => ({
   traceImageWithFallback: vi.fn(async () => ({
     paths: [{ color: '#000000', polylines: [] }],
     bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    width: 2,
+    height: 2,
   })),
 }));
 
-import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { loadImageAsRawData } from './image-loader';
 import { ImportImageDialog } from './ImportImageDialog';
@@ -46,6 +49,23 @@ function seedRaster(): RasterImage {
 }
 
 describe('Trace Image workflow controls', () => {
+  it('defaults laser traces to the Raster/Image scan pipeline with explicit binary copy', async () => {
+    await withTraceDialog(async (host) => {
+      const output = outputSelect(host);
+      expect(output?.value).toBe('raster');
+      expect(Array.from(output?.options ?? []).map((option) => option.textContent)).toEqual([
+        'Raster scan (recommended)',
+        'Editable vectors',
+      ]);
+      expect(host.textContent ?? '').toContain(
+        'Raster scan uses the same Raster/Image scan motion as a photo.',
+      );
+      expect(host.textContent ?? '').toContain(
+        'The trace is binary artwork, not a grayscale photo',
+      );
+    });
+  });
+
   it('offers all five trace presets including the rebuilt Edge Detection', async () => {
     await withTraceDialog(async (host) => {
       const select = presetSelect(host);
@@ -62,6 +82,8 @@ describe('Trace Image workflow controls', () => {
 
   it('shows Fill Style only for filled-contour presets', async () => {
     await withTraceDialog(async (host) => {
+      expect(fillStyleSelect(host)).toBeNull();
+      await changeSelect(outputSelect(host), 'vector');
       const select = presetSelect(host);
       expect(fillStyleSelect(host)?.value).toBe('scanline');
       expect(
@@ -83,6 +105,21 @@ describe('Trace Image workflow controls', () => {
         expect(fillStyleSelect(host)).toBeNull();
       }
     });
+  });
+
+  it('keeps CNC tracing vector-only', async () => {
+    const prior = useStore.getState().project;
+    useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    try {
+      await withTraceDialog(async (host) => {
+        expect(outputSelect(host)).toBeNull();
+        expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
+        expect(host.textContent ?? '').toContain('Cutting on CNC');
+        expect(host.textContent ?? '').not.toContain('Raster scan (recommended)');
+      });
+    } finally {
+      useStore.setState({ project: prior });
+    }
   });
 
   it('shows vector trace settings without image-adjustment controls', async () => {
@@ -271,8 +308,18 @@ function fillStyleSelect(host: HTMLElement): HTMLSelectElement | null {
   return host.querySelector('select[aria-label="Trace fill style"]');
 }
 
+function outputSelect(host: HTMLElement): HTMLSelectElement | null {
+  return host.querySelector('select[aria-label="Trace output"]');
+}
+
 async function changePreset(select: HTMLSelectElement, value: string): Promise<void> {
+  await changeSelect(select, value);
+}
+
+async function changeSelect(select: HTMLSelectElement | null, value: string): Promise<void> {
+  expect(select).toBeInstanceOf(HTMLSelectElement);
   await act(async () => {
+    if (select === null) return;
     select.value = value;
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });

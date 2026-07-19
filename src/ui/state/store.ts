@@ -248,6 +248,13 @@ export type AppState = ObjectPropertiesActions &
       traced: TracedImage,
       options?: TraceExistingImageOptions,
     ) => void;
+    // Commit traced geometry as a Raster/Image scan while retaining the
+    // original raster's operation settings and re-trace provenance.
+    readonly commitRasterizedTrace: (
+      sourceId: string,
+      raster: RasterImage,
+      options?: TraceExistingImageOptions,
+    ) => void;
     // ADR-029 Convert to Bitmap: replace the selected vector(s) with the one
     // raster engrave-source rasterized from them (LightBurn discards the
     // originals; a multi-selection merges into a single bitmap).

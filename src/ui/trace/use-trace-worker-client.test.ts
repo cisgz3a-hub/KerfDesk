@@ -84,6 +84,7 @@ describe('traceImage (worker client with inline fallback)', () => {
     const result = await traceImage(tinyImage(), traceOptions);
     expect(result).toHaveProperty('paths');
     expect(result).toHaveProperty('bounds');
+    expect(result).toMatchObject({ width: 4, height: 4 });
     expect(Array.isArray(result.paths)).toBe(true);
     // Bounds must be finite numbers — no NaN / Infinity leaking
     // out from a no-result trace.
@@ -107,6 +108,8 @@ describe('traceImage (worker client with inline fallback)', () => {
           kind: 'ok',
           paths: [],
           bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+          width: request.image.width,
+          height: request.image.height,
         };
         queueMicrotask(() => {
           this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
@@ -154,6 +157,8 @@ describe('traceImage (worker client with inline fallback)', () => {
                 kind: 'ok',
                 paths: [],
                 bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+                width: request.image.width,
+                height: request.image.height,
               };
         queueMicrotask(() => {
           this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
@@ -172,6 +177,8 @@ describe('traceImage (worker client with inline fallback)', () => {
     await expect(client.traceImage(largeImage(), traceOptions)).resolves.toEqual({
       paths: [],
       bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      width: 401,
+      height: 400,
     });
     expect(workers).toHaveLength(1);
     expect(workers[0]?.postCount).toBe(2);
@@ -196,6 +203,8 @@ describe('traceImage (worker client with inline fallback)', () => {
           kind: 'ok',
           paths: [],
           bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+          width: request.image.width,
+          height: request.image.height,
         };
         queueMicrotask(() => {
           if (workers[0] === this) {
@@ -220,6 +229,8 @@ describe('traceImage (worker client with inline fallback)', () => {
     await expect(client.traceImage(largeImage(), traceOptions)).resolves.toEqual({
       paths: [],
       bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      width: 401,
+      height: 400,
     });
     expect(workers).toHaveLength(2);
     expect(workers[0]?.terminated).toBe(true);

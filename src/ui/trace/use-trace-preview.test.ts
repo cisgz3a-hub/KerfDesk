@@ -35,7 +35,12 @@ const tracedPaths: ColoredPath[] = [
     ],
   },
 ];
-const traceResult = { paths: tracedPaths, bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 } };
+const traceResult = {
+  paths: tracedPaths,
+  bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+  width: 2,
+  height: 2,
+};
 
 afterEach(() => {
   vi.mocked(traceImageWithFallback).mockReset();
@@ -56,6 +61,22 @@ describe('runTrace stale-result guard (P2-A)', () => {
     expect(setState).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'ready', paths: tracedPaths }),
     );
+  });
+
+  it('uses the trace result grid when it differs from the input image metadata', async () => {
+    vi.mocked(traceImageWithFallback).mockResolvedValue({
+      ...traceResult,
+      width: 8,
+      height: 6,
+    });
+    const setState = vi.fn();
+
+    await runTrace({ img, options, isCurrent: () => true, setState });
+
+    expect(setState).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'ready', width: 8, height: 6 }),
+    );
+    expect(setState.mock.calls[0]?.[0].svg).toContain('viewBox="0 0 8 6"');
   });
 
   it('retains the matching request and trace result for commit reuse', async () => {
@@ -92,6 +113,8 @@ describe('runTrace stale-result guard (P2-A)', () => {
         },
       ],
       bounds: { minX: 0, minY: 0, maxX: 1, maxY: 2 },
+      width: 1,
+      height: 2,
     });
 
     const setState = vi.fn();
@@ -123,6 +146,132 @@ describe('runTrace stale-result guard (P2-A)', () => {
       }),
     );
     expect(setState.mock.calls[0]?.[0].svg).toContain('viewBox="0 0 2 2"');
+  });
+
+  it('scales a right-side 6000px source crop into the 2048px working grid', async () => {
+    const workingImage: RawImageData = {
+      width: 2048,
+      height: 1024,
+      data: new Uint8ClampedArray(2048 * 1024 * 4),
+    };
+    vi.mocked(traceImageWithFallback).mockResolvedValue({
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 1, y: 1 },
+              ],
+            },
+          ],
+        },
+      ],
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      width: 410,
+      height: 1024,
+    });
+    const setState = vi.fn();
+
+    await runTrace({
+      img: workingImage,
+      options,
+      boundary: { x: 4500, y: 0, width: 1200, height: 3000 },
+      sourceGrid: { width: 6000, height: 3000 },
+      isCurrent: () => true,
+      setState,
+    });
+
+    expect(traceImageWithFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 410, height: 1024 }),
+      options,
+    );
+    expect(setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'ready',
+        width: 2048,
+        height: 1024,
+        paths: [
+          {
+            color: '#000000',
+            polylines: [
+              {
+                closed: false,
+                points: [
+                  { x: 1536, y: 0 },
+                  { x: 1537, y: 1 },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+
+  it('scales a right-side 6000px enhance box before the 2x region re-trace', async () => {
+    const workingImage: RawImageData = {
+      width: 2048,
+      height: 1024,
+      data: new Uint8ClampedArray(2048 * 1024 * 4),
+    };
+    const polyline = (points: ReadonlyArray<readonly [number, number]>) => ({
+      closed: false,
+      points: points.map(([x, y]) => ({ x, y })),
+    });
+    vi.mocked(traceImageWithFallback)
+      .mockResolvedValueOnce({
+        paths: [
+          {
+            color: '#000000',
+            polylines: [
+              polyline([
+                [0, 0],
+                [2, 2],
+              ]),
+            ],
+          },
+        ],
+        bounds: { minX: 0, minY: 0, maxX: 2047, maxY: 1023 },
+        width: 2048,
+        height: 1024,
+      })
+      .mockResolvedValueOnce({
+        paths: [
+          {
+            color: '#000000',
+            polylines: [
+              polyline([
+                [20, 20],
+                [40, 40],
+              ]),
+            ],
+          },
+        ],
+        bounds: { minX: 20, minY: 20, maxX: 40, maxY: 40 },
+        width: 820,
+        height: 820,
+      });
+    const setState = vi.fn();
+
+    await runTrace({
+      img: workingImage,
+      options,
+      boundary: { x: 4500, y: 750, width: 1200, height: 1200 },
+      boundaryMode: 'enhance',
+      sourceGrid: { width: 6000, height: 3000 },
+      isCurrent: () => true,
+      setState,
+    });
+
+    expect(traceImageWithFallback).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ width: 820, height: 820 }),
+      expect.objectContaining({ pixelScale: 2 }),
+    );
+    expect(setState).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ready' }));
   });
 
   it('does not set error when a failing trace is no longer current', async () => {
@@ -174,6 +323,8 @@ describe('runTrace stale-result guard (P2-A)', () => {
           },
         ],
         bounds: { minX: 0, minY: 0, maxX: 19, maxY: 19 },
+        width: 20,
+        height: 20,
       })
       // Region re-trace on the 20x20 supersample; downscaled /2 + offset (5,5).
       .mockResolvedValueOnce({
@@ -189,6 +340,8 @@ describe('runTrace stale-result guard (P2-A)', () => {
           },
         ],
         bounds: { minX: 6, minY: 6, maxX: 10, maxY: 10 },
+        width: 20,
+        height: 20,
       });
 
     const setState = vi.fn();
