@@ -49,7 +49,7 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
           title={
             cameraPlacementActive
               ? 'Camera placement is aligned to the physical bed, so Absolute Coordinates is required. Exit camera placement in the Camera panel to use another origin mode.'
-              : 'Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin (ordinary no-homing placement is size-checked; Frame remains optional).'
+              : 'Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin. Every ordinary Start requires the exact completed Frame.'
           }
           onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
         >

@@ -235,10 +235,9 @@ describe('runPreEmitPreflight', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('blocks a registration jig with the box and artwork both set to output', () => {
+  it('leaves a registration jig with the box and artwork both set to output for Frame review', () => {
     const result = runPreEmitPreflight(projectWithJig({ regOutput: true, artOutput: true }));
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.code === 'registration-both-output')).toBe(true);
+    expect(result.ok).toBe(true);
   });
 
   it('allows a registration jig burning only one run', () => {

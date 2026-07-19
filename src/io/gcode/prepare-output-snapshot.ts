@@ -69,12 +69,6 @@ function validateRegistrationOptions(
       'Print-and-Cut registration is not valid. Capture both machine points again.',
     );
   }
-  if (options.registration !== undefined && options.jobOrigin !== undefined) {
-    return snapshotFailure(
-      'print-and-cut-job-origin-disabled',
-      'Job-origin placement is disabled while Print-and-Cut registration is active.',
-    );
-  }
   return null;
 }
 
@@ -217,7 +211,7 @@ function variableFailure(message: string): Extract<MaterializedProject, { readon
 }
 
 function snapshotFailure(
-  code: 'print-and-cut-registration-invalid' | 'print-and-cut-job-origin-disabled',
+  code: 'print-and-cut-registration-invalid',
   message: string,
 ): Extract<PreparedOutput, { readonly ok: false }> {
   return { ok: false, preflight: { ok: false, issues: [{ code, message }] } };
