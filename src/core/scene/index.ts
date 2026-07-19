@@ -127,9 +127,7 @@ export {
 } from './selection-transform';
 export type {
   SelectionAlignEdit,
-  SelectionAlignError,
   SelectionAlignKind,
-  SelectionAlignResult,
 } from './selection-align';
 export { buildSelectionAlignEdit } from './selection-align';
 export type { BestFitRectangle, BoardAnchor, BoardShape, BoardShapeKind } from './board-capture';
