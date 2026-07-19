@@ -458,14 +458,14 @@ Identical to F-A3 except:
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
 G-code**, any failing check surfaces the pre-flight modal and cancels the save
-until it clears. For **Start**, frame-first applies (ADR-228, ADR-230, ADR-231): the only
+until it clears. For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the only
 findings that still cancel the Start are unstreamable output (`non-finite-
 coordinate`, `empty-output`, `relief-needs-cnc`, `no-output-layer`) and compile
-failures. The mandatory Frame has a separate physical-validity contract: it sends no motion and
-earns no permit when the exact commanded envelope is outside known travel, its perimeter or known
-full path crosses a no-go zone, CNC Z motion cannot be constructed safely, or the live output
-contract is known wrong (or unproved for CNC GRBL). All remaining policy findings are carried into
-Job Review as warnings before the Frame trace; Start itself adds no policy gate.
+failures. Calculated bed bounds, configured no-go zones, and live output-setting findings are
+carried into Job Review as warnings before the Frame trace; they do not refuse Frame. The actual
+controller outcome is authoritative: only a cleanly completed trace and return earns the exact-job
+permit. A Frame still cannot dispatch when transport cannot accept it or when the executable motion
+cannot be constructed. Start itself adds no policy gate.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -507,9 +507,9 @@ grouped by what each validates:
 21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
 
 For **Save G-code**, all applicable blocking checks must pass. For the ordinary
-job flow, factual placement/compile-integrity failures stop preparation and the
-physical-validity checks above can refuse Frame; all other policy findings are
-confirmed in Job Review.
+job flow, factual placement/compile-integrity failures stop preparation. Calculated
+bed/no-go/settings findings are confirmed in Job Review and never refuse Frame;
+the completed physical Frame is the spatial source of truth.
 
 ---
 

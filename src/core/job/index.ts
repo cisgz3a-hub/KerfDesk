@@ -30,8 +30,6 @@ export {
   PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
   scenePreparationTooComplex,
 } from './preparation-complexity';
-export type { FramePreflight } from './frame-preflight';
-export { describeFramePreflightFailure, framePreflight } from './frame-preflight';
 export type {
   JobOriginAnchor,
   JobOriginPlacement,

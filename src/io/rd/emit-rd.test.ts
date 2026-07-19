@@ -9,7 +9,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import { emitRdFile } from './emit-rd';
 
-function ruidaLineProject(): Project {
+function ruidaLineProject(offsetX = 0): Project {
   return {
     ...createProject(),
     device: { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'ruida' },
@@ -21,7 +21,7 @@ function ruidaLineProject(): Project {
           id: 'line-1',
           source: 'line.svg',
           bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
-          transform: IDENTITY_TRANSFORM,
+          transform: { ...IDENTITY_TRANSFORM, x: offsetX },
           paths: [
             {
               color: '#000000',
@@ -61,5 +61,10 @@ describe('emitRdFile', () => {
     const b = emitRdFile(project);
     if (!a.ok || !b.ok) throw new Error('fixture should emit ok');
     expect([...a.bytes]).toEqual([...b.bytes]);
+  });
+
+  it('does not make configured bed bounds an export refusal', () => {
+    const result = emitRdFile(ruidaLineProject(405));
+    expect(result.ok).toBe(true);
   });
 });

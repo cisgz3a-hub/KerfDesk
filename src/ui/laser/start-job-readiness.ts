@@ -7,12 +7,7 @@ import {
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { SimilarityTransform } from '../../core/registration';
-import {
-  computeJobBounds,
-  describeFramePreflightFailure,
-  framePreflight,
-  type JobOriginPlacement,
-} from '../../core/job';
+import type { JobOriginPlacement } from '../../core/job';
 import type {
   ControllerSettingsSnapshot,
   PreflightOptions,
@@ -155,8 +150,6 @@ export function prepareStartJob(
       ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
       outputScope,
     }),
-    placement,
-    motionOffset,
     machine,
   );
   if (!inspected.ok) return inspected;
@@ -212,8 +205,6 @@ export async function prepareStartJobSnapshot(
       ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
       outputScope,
     }),
-    placement,
-    motionOffset,
     machine,
   );
   if (!inspected.ok) return inspected;
@@ -365,16 +356,12 @@ type PreparedStartInspection =
 
 function inspectPreparedStart(
   prepared: PreparedOutput,
-  placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
-  motionOffset: { readonly x: number; readonly y: number } | undefined,
   machine: MachineStartSnapshot,
 ): PreparedStartInspection {
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
   const advisoryWarnings: string[] = [];
-  const originIssue = placementBoundsIssueFromPrepared(prepared, placement, motionOffset);
-  if (originIssue !== null) advisoryWarnings.push(originIssue);
   const toolPlan = cncToolPlan(prepared.job);
   const toolIssue = cncWorkZeroToolStartIssue(
     prepared.project,
@@ -383,28 +370,6 @@ function inspectPreparedStart(
   );
   if (toolIssue !== null) advisoryWarnings.push(toolIssue);
   return { ok: true, prepared, toolPlan, advisoryWarnings };
-}
-
-function placementBoundsIssueFromPrepared(
-  prepared: Extract<PreparedOutput, { readonly ok: true }>,
-  placement: Extract<ResolvedJobPlacement, { ok: true }>,
-  motionOffset: { readonly x: number; readonly y: number } | undefined,
-): string | null {
-  if (placement.jobOrigin === undefined || motionOffset === undefined) return null;
-  const bounds = computeJobBounds(prepared.job, prepared.project.device);
-  if (bounds === null) return null;
-  const physicalBounds = {
-    minX: bounds.minX + motionOffset.x,
-    minY: bounds.minY + motionOffset.y,
-    maxX: bounds.maxX + motionOffset.x,
-    maxY: bounds.maxY + motionOffset.y,
-  };
-  const preflight = framePreflight(physicalBounds, prepared.project.device);
-  if (preflight.kind === 'ok') return null;
-  if (preflight.kind === 'no-go-zone') {
-    return `Selected job origin would place this job through no-go zone "${preflight.zoneName}".`;
-  }
-  return `Selected job origin would place this job outside the machine bed. ${describeFramePreflightFailure(preflight)}`;
 }
 
 function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {

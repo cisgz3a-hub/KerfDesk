@@ -134,7 +134,7 @@ afterEach(() => {
 });
 
 describe('JobControls Frame action', () => {
-  it('refuses an exact Frame whose fill overscan would leave the physical bed', async () => {
+  it('lets the physical Frame decide when calculated fill overscan extends past the bed', async () => {
     installFillProjectAtLeftEdge();
     useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const originalFrame = useLaserStore.getState().frame;
@@ -175,11 +175,8 @@ describe('JobControls Frame action', () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      await vi.waitFor(() => expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('error'));
-      expect(frame).not.toHaveBeenCalled();
-      expect(useToastStore.getState().toasts.at(-1)?.message ?? '').toContain(
-        'overhangs the bed (400×400 mm) on left by 5.0 mm',
-      );
+      await vi.waitFor(() => expect(frame).toHaveBeenCalledOnce());
+      expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('success');
     } finally {
       uninstallAutoReview();
       if (root !== null) {
