@@ -48,6 +48,7 @@ import {
 } from './start-job-preparation';
 import { collectStartWarnings } from './start-job-warnings';
 import { demotedPolicyWarnings, partitionEmitPreflight } from './start-job-readiness-policy';
+import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
@@ -165,6 +166,7 @@ export function prepareStartJob(
     motionOffset,
     inspected,
     canvasPlanKey: canvasPlanRetentionKey(project, outputScope, effectivePlacement),
+    printCutRegistrationActive: false,
   });
 }
 
@@ -225,6 +227,7 @@ export async function prepareStartJobSnapshot(
       effectivePlacement,
       options.registration,
     ),
+    printCutRegistrationActive: options.registration !== undefined,
   });
 }
 
@@ -242,6 +245,7 @@ type FinalizeStartPreparationOptions = {
   readonly motionOffset: PreflightOptions['motionOffset'];
   readonly inspected: SuccessfulPreparedStartInspection;
   readonly canvasPlanKey: string;
+  readonly printCutRegistrationActive: boolean;
 };
 
 function finalizeStartPreparation({
@@ -256,6 +260,7 @@ function finalizeStartPreparation({
   motionOffset,
   inspected,
   canvasPlanKey,
+  printCutRegistrationActive,
 }: FinalizeStartPreparationOptions): StartJobPreparation {
   const { prepared, toolPlan, advisoryWarnings } = inspected;
   const { gcode, preflight } = emitPreparedGcode(prepared, {
@@ -288,6 +293,7 @@ function finalizeStartPreparation({
       ...demotedPolicyWarnings(project, machine),
       ...advisoryWarnings,
       ...emitSplit.warnings,
+      ...collectPrintCutFrameWarnings(project, printCutRegistrationActive, placement.jobOrigin),
       // Frame-first: readiness errors ($30/$32 state) inform, never block.
       ...controller.errors.map((issue) => issue.message),
       ...controller.warnings.map((issue) => issue.message),

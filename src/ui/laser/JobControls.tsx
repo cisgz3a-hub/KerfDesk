@@ -39,16 +39,12 @@ import { framedRunReadinessIssue } from './framed-run-readiness';
 
 type Props = {
   readonly disabled: boolean;
-  /** Disables only Start while controller qualification is incomplete. Other
-   * safe setup controls remain available so the operator can recover. */
-  readonly startDisabledReason?: string | null;
   readonly onConfigureAutofocus?: () => void;
   readonly onStartJob: () => void;
 };
 
 export function JobControls({
   disabled,
-  startDisabledReason,
   onConfigureAutofocus = doNothing,
   onStartJob,
 }: Props): JSX.Element {
@@ -89,7 +85,6 @@ export function JobControls({
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}
-        startDisabledReason={startDisabledReason}
         onConfigureAutofocus={onConfigureAutofocus}
         onStartJob={onStartJob}
       />
@@ -143,7 +138,6 @@ function shouldShowIdleOverrideReset(
 function SetupRow(props: {
   readonly disabled: boolean;
   readonly streaming: boolean;
-  readonly startDisabledReason: string | null | undefined;
   readonly onConfigureAutofocus: () => void;
   readonly onStartJob: () => void;
 }): JSX.Element {
@@ -177,7 +171,6 @@ function SetupRow(props: {
   const frameLabel = framedReady ? 'Frame again' : 'Frame job';
   const startControl = startControlProps(
     busy,
-    props.startDisabledReason,
     framedReady
       ? startJobTitle(estimate, jobTimeNoun(machineKind))
       : 'Prepare and review the exact job, then trace its full motion envelope with the tool off.',
@@ -306,14 +299,10 @@ function frameControlProps(busy: boolean, state: string | undefined): ControlBut
   };
 }
 
-function startControlProps(
-  busy: boolean,
-  startDisabledReason: string | null | undefined,
-  fallbackTitle: string,
-): ControlButtonProps {
+function startControlProps(busy: boolean, fallbackTitle: string): ControlButtonProps {
   return {
-    disabled: busy || startDisabledReason != null,
-    title: startDisabledReason ?? fallbackTitle,
+    disabled: busy,
+    title: fallbackTitle,
   };
 }
 

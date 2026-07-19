@@ -132,7 +132,7 @@ describe('prepareOutputSnapshot', () => {
     expect(text?.transform.rotationDeg).toBeCloseTo(90);
   });
 
-  it('fails closed for stale registration and job-origin composition', async () => {
+  it('fails closed for stale registration but lets Frame decide job-origin composition', async () => {
     const stale = await prepareOutputSnapshot(createProject(), {
       clock: () => NOW,
       renderVariableText: renderer,
@@ -143,15 +143,12 @@ describe('prepareOutputSnapshot', () => {
       preflight: { issues: [{ code: 'print-and-cut-registration-invalid' }] },
     });
 
-    const doublePlaced = await prepareOutputSnapshot(createProject(), {
+    const doublePlaced = await prepareOutputSnapshot(variableProject(), {
       clock: () => NOW,
       renderVariableText: renderer,
       registration: { scale: 1, rotationRad: 0, translation: { x: 1, y: 2 } },
       jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
     });
-    expect(doublePlaced).toMatchObject({
-      ok: false,
-      preflight: { issues: [{ code: 'print-and-cut-job-origin-disabled' }] },
-    });
+    expect(doublePlaced.ok).toBe(true);
   });
 });

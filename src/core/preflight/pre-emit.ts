@@ -19,11 +19,7 @@ import {
 import { scenePreparationTooComplex } from '../job/preparation-complexity';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
-import {
-  outputOperationLayers,
-  registrationOutputConflict,
-  sceneObjectUsesOperation,
-} from '../scene';
+import { outputOperationLayers, sceneObjectUsesOperation } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
@@ -33,13 +29,6 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
       code: 'vector-segment-budget-exceeded',
       message:
         'This design exceeds the safe curve or fill segment budget. Simplify the artwork or split it into smaller jobs.',
-    });
-  }
-  if (registrationOutputConflict(project.scene)) {
-    issues.push({
-      code: 'registration-both-output',
-      message:
-        'Registration jig: the box and your artwork are both set to burn. In the Registration Jig panel pick "Burn Box Only" or "Burn Artwork Only" so they do not burn in the same pass.',
     });
   }
   issues.push(...rasterBudgetIssues(project));

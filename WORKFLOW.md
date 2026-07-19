@@ -1282,11 +1282,10 @@ separate exact replay receipt.
    controller-setting writes start one epoch-bound qualification flow. GRBL-family
    controllers own one `$$` read after fresh Idle; unsupported dumps are
    `not-required`, and late prior-epoch replies are ignored.
-2. Frame-first: **ordinary Start on BOTH machine kinds never gates on qualification.** Before a
-   Frame may earn that permit, known `$30`/`$32` mismatches refuse because tool-off motion cannot
-   prove power/spindle semantics; GRBL CNC also fails closed when those values were not read.
-   Unknown laser values surface as Job Review warnings with the unverified-laser-mode
-   acknowledgement. Supervised recovery retains its separate fresh-qualification contract.
+2. Frame-first: **ordinary Start on BOTH machine kinds never gates on qualification.** Known or
+   unknown `$30`/`$32` state appears in Job Review as an advisory; it cannot refuse the physical
+   Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
+   its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
    stream); the blocked-Start dialog offers Unlock/Home in place.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
@@ -3097,8 +3096,9 @@ F-CNC19 tiling.
    controller would clamp it). Advisory only — the export/stream proceeds.
 
 #### Error — none (advisory, not a gate)
-1. Feed/stock advisories never block Save/Start. A known out-of-bed physical Frame envelope does
-   refuse Frame motion and cannot authorize Start; Save G-code retains its separate export preflight.
+1. Feed/stock advisories never block Frame/Start. An out-of-bed finding is shown in Job Review, and
+   the physical Frame decides whether the exact motion fits. Save G-code retains its separate export
+   preflight.
 
 #### Empty
 1. No connection (no reported limits) means no limit advisories — only the
@@ -3508,9 +3508,9 @@ F-CNC19 tiling.
 #### Edge — box larger than the bed
 1. Panels insert normally even when the sheet exceeds the workspace
    (LightBurn parity: generation is not bounds-gated); the existing
-   bounds finding appears in Job Review, and the physical Frame then refuses before motion instead
-   of authorizing an off-bed job. Save G-code may still require the user to re-nest
-   panels across exports.
+   bounds finding appears in Job Review, and the physical Frame decides whether the exact motion
+   fits before Start can be authorized. Save G-code may still require the user to re-nest panels
+   across exports.
 
 ### F-K2. Validation rejects an impossible spec
 

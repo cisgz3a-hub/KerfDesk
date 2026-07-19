@@ -32,9 +32,10 @@ export function SafetyZonesPanel(
       </div>
       {zones.length === 0 ? <p style={mutedStyle}>No safety zones configured.</p> : null}
       <p style={mutedStyle}>
-        Enabled zones block a job, frame, export, and any jog whose path would cross them. A
-        continuous or keyboard jog with no known machine position, and homing, are not checked —
-        keep the head clear of these areas by hand.
+        Enabled zones appear on the canvas, warn in Job Review for Frame and Start, and block G-code
+        export or a direct jog whose known path would cross them. A continuous or keyboard jog with
+        no known machine position, and homing, are not checked — keep the head clear of these areas
+        by hand.
       </p>
       {zones.map((zone, index) => (
         <ZoneEditor

@@ -119,8 +119,8 @@ export function registrationRunState(scene: Scene): RegistrationRunState {
 // True when a jig is present AND the registration box plus some other layer are
 // both set to output — i.e. the next Start would burn the box and the artwork in
 // the SAME pass, which defeats the two-run jig (the box re-burns over the placed
-// object, or the art burns before the object is placed). Preflight blocks this so
-// the operator picks one run (ADR-057).
+// object, or the art burns before the object is placed). Job Review warns while
+// the required physical Frame remains the final placement authority.
 export function registrationOutputConflict(scene: Scene): boolean {
   const layer = findRegistrationLayer(scene);
   if (layer === null || !layer.output || findRegistrationBoxes(scene).length === 0) return false;
