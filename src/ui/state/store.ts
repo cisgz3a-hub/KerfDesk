@@ -272,6 +272,10 @@ export type AppState = ObjectPropertiesActions &
     // real board. addCapturedBoardBox is the rectangle back-compat wrapper.
     readonly addCapturedBoard: (shape: BoardShape) => void;
     readonly addCapturedBoardBox: (widthMm: number, heightMm: number) => void;
+    // Resize a captured board after a physical anchor check while preserving the
+    // canvas anchor that corresponds to its work origin (rect bottom-left or
+    // circle center).
+    readonly updateCapturedBoard: (shape: BoardShape) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.
     readonly removeRegistrationBox: () => void;

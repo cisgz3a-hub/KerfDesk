@@ -1,19 +1,11 @@
-// BoardPlacementControls — post-capture controls for a RECTANGLE board
-// (ADR-124): move the selected artwork onto a corner/centre, fill the board
-// (fit/array), and jog the head to a board point. The circle equivalent is
-// CircleBoardPlacementControls; both share the placement gating
-// (useBoardPlacement) and the FillBoardControls / AnchorRow parts exported here.
-
-import {
-  bestFitRectangleFromCorners,
-  boardMachinePoints,
-  type BoardAnchor,
-  type TileLayout,
-  type Vec2,
-} from '../../../core/scene';
+import type { BoardAnchor, TileLayout } from '../../../core/scene';
+import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { Button } from '../../kit';
+import { useLaserStore } from '../../state/laser-store';
 import { BoardArrayForm } from './BoardArrayForm';
+import { BoardVerificationControls } from './BoardVerificationControls';
 import { useBoardPlacement } from './use-board-placement';
+import type { BoardVerificationController } from './use-board-verification';
 
 const ANCHORS: ReadonlyArray<{ readonly anchor: BoardAnchor; readonly label: string }> = [
   { anchor: 'center', label: 'Center' },
@@ -24,24 +16,19 @@ const ANCHORS: ReadonlyArray<{ readonly anchor: BoardAnchor; readonly label: str
 ];
 
 export function BoardPlacementControls(props: {
-  readonly corners: ReadonlyArray<Vec2>;
-  readonly feed: number;
+  readonly geometry: Extract<CapturedBoardGeometry, { readonly kind: 'rect' }>;
   readonly disabled: boolean;
+  readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard, jogToPoint } =
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
     useBoardPlacement();
-  const points = boardMachinePoints(props.corners);
-  const measured = bestFitRectangleFromCorners(props.corners);
-
   return (
     <div style={columnStyle}>
-      {measured !== null && (
-        <p style={measuredStyle}>
-          Measured: {measured.widthMm.toFixed(1)} × {measured.heightMm.toFixed(1)} mm — check
-          against the physical board.
-        </p>
-      )}
+      <p style={measuredStyle}>
+        Measured: {props.geometry.widthMm.toFixed(1)} × {props.geometry.heightMm.toFixed(1)} mm —
+        check against the physical board.
+      </p>
       <p style={hintStyle}>Add your artwork, select it, then place it:</p>
       <AnchorRow label="Place artwork">
         {ANCHORS.map(({ anchor, label }) => (
@@ -58,32 +45,25 @@ export function BoardPlacementControls(props: {
         ))}
       </AnchorRow>
       <FillBoardControls canFit={canFit} onFit={fitToBoard} onArray={arrayToBoard} />
-      <AnchorRow label="Jog head to">
-        {ANCHORS.map(({ anchor, label }) => {
-          const point = points?.[anchor];
-          return (
-            <Button
-              key={anchor}
-              disabled={props.disabled || point === undefined}
-              title={`Move the head to the ${label} of the board`}
-              onClick={() =>
-                point !== undefined &&
-                void jogToPoint(point.x, point.y, props.feed).catch(() => undefined)
-              }
-            >
-              {label}
-            </Button>
-          );
-        })}
-      </AnchorRow>
+      <BoardVerificationControls
+        geometry={props.geometry}
+        disabled={props.disabled}
+        controller={props.verification}
+      />
       <div style={rowStyle}>
-        <Button variant="ghost" onClick={props.onReset}>
+        <Button
+          variant="ghost"
+          disabled={props.disabled || props.verification.activeTarget !== null}
+          onClick={props.onReset}
+        >
           Capture a new board
         </Button>
         <Button
           variant="danger"
+          disabled={props.disabled || props.verification.activeTarget !== null}
           title="Delete this board outline"
           onClick={() => {
+            if (boardSessionIsLocked(props.verification)) return;
             removeBoard();
             props.onReset();
           }}
@@ -95,9 +75,10 @@ export function BoardPlacementControls(props: {
   );
 }
 
-// The "fill the board" operations — scale one design to fill it (A1) or tile
-// copies across it (A2). Both need exactly one selected design, so they share
-// the `canFit` gate. Exported for the circle placement controls too.
+function boardSessionIsLocked(verification: BoardVerificationController): boolean {
+  return verification.activeTarget !== null || useLaserStore.getState().motionOperation !== null;
+}
+
 export function FillBoardControls(props: {
   readonly canFit: boolean;
   readonly onFit: () => void;

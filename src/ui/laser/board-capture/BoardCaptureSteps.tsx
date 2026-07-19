@@ -28,6 +28,7 @@ export function BoardCaptureSteps(props: {
   readonly livePosition: Vec2 | null;
   readonly rect: BestFitRectangle | null;
   readonly disabled: boolean;
+  readonly sessionDisabled: boolean;
   readonly onCapture: () => void;
   readonly onUndo: () => void;
   readonly onFinish: () => void;
@@ -53,19 +54,30 @@ export function BoardCaptureSteps(props: {
         >
           Capture corner
         </Button>
-        <Button variant="ghost" disabled={count === 0} onClick={props.onUndo}>
+        <Button
+          variant="ghost"
+          disabled={props.sessionDisabled || count === 0}
+          onClick={props.onUndo}
+        >
           Undo last
         </Button>
         {count > 0 && (
-          <Button variant="ghost" onClick={props.onReset}>
+          <Button variant="ghost" disabled={props.sessionDisabled} onClick={props.onReset}>
             Start over
           </Button>
         )}
       </div>
       {allCaptured && props.rect !== null && (
-        <MeasuredBoard rect={props.rect} corners={props.corners} onFinish={props.onFinish} />
+        <MeasuredBoard
+          rect={props.rect}
+          corners={props.corners}
+          disabled={props.disabled}
+          onFinish={props.onFinish}
+        />
       )}
-      {count >= 1 && !allCaptured && <ManualSizeForm onDraw={props.onManualSize} />}
+      {count >= 1 && !allCaptured && (
+        <ManualSizeForm disabled={props.disabled} onDraw={props.onManualSize} />
+      )}
     </div>
   );
 }
@@ -84,6 +96,7 @@ function LivePositionRow({ position }: { readonly position: Vec2 | null }): JSX.
 function MeasuredBoard(props: {
   readonly rect: BestFitRectangle;
   readonly corners: ReadonlyArray<Vec2>;
+  readonly disabled: boolean;
   readonly onFinish: () => void;
 }): JSX.Element {
   const { widthMm, heightMm, offSquareMm } = props.rect;
@@ -117,7 +130,7 @@ function MeasuredBoard(props: {
           burn — is set at the wrong corner. Start over and capture the bottom-left corner first.
         </p>
       )}
-      <Button variant="primary" disabled={tooSmall} onClick={props.onFinish}>
+      <Button variant="primary" disabled={tooSmall || props.disabled} onClick={props.onFinish}>
         Create board outline
       </Button>
     </div>

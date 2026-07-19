@@ -24,6 +24,7 @@ export async function runOriginTransaction(
   label: string,
   writeCommands: OriginCommandWriter,
   successPatch: () => Partial<LaserState> | Promise<Partial<LaserState>>,
+  options: { readonly changesXyOrigin?: boolean } = {},
 ): Promise<void> {
   const operation: LaserControllerOperation = {
     kind: 'interactive-command',
@@ -48,6 +49,9 @@ export async function runOriginTransaction(
     const patch = await successPatch();
     set((state) => ({
       ...patch,
+      ...(options.changesXyOrigin === true
+        ? { workOriginVersion: (state.workOriginVersion ?? 0) + 1 }
+        : {}),
       controllerOperation:
         state.controllerOperation === operation ? null : state.controllerOperation,
       lastWriteError: null,
@@ -57,6 +61,9 @@ export async function runOriginTransaction(
     const message = error instanceof Error ? error.message : String(error);
     set((state) => ({
       ...unknownOriginPatch(),
+      ...(options.changesXyOrigin === true
+        ? { workOriginVersion: (state.workOriginVersion ?? 0) + 1 }
+        : {}),
       ...originControllerFailurePatch(state, message, pendingLine),
       controllerOperation:
         state.controllerOperation === operation ? null : state.controllerOperation,

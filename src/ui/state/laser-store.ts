@@ -186,6 +186,9 @@ export type LaserState = LaserStoreActions & {
   readonly mpgActive?: boolean | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
+  // Monotonic identity for XY work-origin mutations. Place Board registration
+  // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
+  readonly workOriginVersion?: number;
   // Qualified evidence for the CNC stock-top contract. Separate from
   // workOriginActive (XY origin): Set Origin (G92 X0 Y0) does not establish Z.
   // The record is bound to workZReferenceEpoch so reconnect/reset/home and

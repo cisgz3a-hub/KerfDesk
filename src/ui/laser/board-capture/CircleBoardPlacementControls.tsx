@@ -1,60 +1,60 @@
-// CircleBoardPlacementControls — post-capture controls for a CIRCLE board
-// (ADR-126). A circle's origin is its centre, so it offers a single Centre anchor
-// (align + jog) rather than the rectangle's four corners, plus the shared fill
-// controls. corners[0] is the captured centre machine coordinate.
-
-import type { Vec2 } from '../../../core/scene';
+import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { Button } from '../../kit';
+import { useLaserStore } from '../../state/laser-store';
 import { AnchorRow, FillBoardControls } from './BoardPlacementControls';
+import { BoardVerificationControls } from './BoardVerificationControls';
 import { useBoardPlacement } from './use-board-placement';
+import type { BoardVerificationController } from './use-board-verification';
 
 export function CircleBoardPlacementControls(props: {
-  readonly corners: ReadonlyArray<Vec2>;
-  readonly diameterMm: number;
-  readonly feed: number;
+  readonly geometry: Extract<CapturedBoardGeometry, { readonly kind: 'circle' }>;
   readonly disabled: boolean;
+  readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard, jogToPoint } =
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
     useBoardPlacement();
-  const centre = props.corners[0];
-
   return (
     <div style={columnStyle}>
       <p style={measuredStyle}>
-        Measured: ⌀ {props.diameterMm.toFixed(1)} mm — check against the physical board.
+        Measured: ⌀ {(props.geometry.radiusMm * 2).toFixed(1)} mm — check against the physical
+        board.
       </p>
       <p style={hintStyle}>Add your artwork, select it, then place it:</p>
       <AnchorRow label="Place artwork">
         <Button
           disabled={!canAlign}
-          title={canAlign ? 'Move artwork to the centre of the board' : 'Select your artwork first'}
+          title={canAlign ? 'Move artwork to the center of the board' : 'Select your artwork first'}
           onClick={() => alignToBox('center')}
         >
           Center
         </Button>
       </AnchorRow>
       <FillBoardControls canFit={canFit} onFit={fitToBoard} onArray={arrayToBoard} />
-      <AnchorRow label="Jog head to">
-        <Button
-          disabled={props.disabled || centre === undefined}
-          title="Move the head to the centre of the board"
-          onClick={() =>
-            centre !== undefined &&
-            void jogToPoint(centre.x, centre.y, props.feed).catch(() => undefined)
-          }
-        >
-          Center
-        </Button>
-      </AnchorRow>
+      <BoardVerificationControls
+        geometry={props.geometry}
+        disabled={props.disabled}
+        controller={props.verification}
+      />
       <div style={footerStyle}>
-        <Button variant="ghost" onClick={props.onReset}>
+        <Button
+          variant="ghost"
+          disabled={props.disabled || props.verification.activeTarget !== null}
+          onClick={props.onReset}
+        >
           Capture a new board
         </Button>
         <Button
           variant="danger"
+          disabled={props.disabled || props.verification.activeTarget !== null}
           title="Delete this board outline"
           onClick={() => {
+            if (
+              props.verification.activeTarget !== null ||
+              useLaserStore.getState().motionOperation !== null
+            ) {
+              return;
+            }
             removeBoard();
             props.onReset();
           }}

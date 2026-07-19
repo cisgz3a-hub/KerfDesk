@@ -6415,6 +6415,26 @@ Round boards work end-to-end (verified by panel integration tests: toggle -> cap
 
 Supersedes the "bounding square" note above. Fit/Array now fill a circle board's centered INSCRIBED SQUARE (side = diameter / sqrt(2)) instead of its bounding square, so a design stays inside the arc rather than overhanging the corners. A new pure helper `boardFitRegion(box)` (core/scene) returns the inscribed square for an ellipse box and the full bounds for a rectangle; `fitSelectionToBoard` and `tileSelectionIntoBoard` feed it to `fitObjectToRegion` / `tileIntoRegion`. Rectangle behavior is unchanged.
 
+### Amendment (2026-07-19) - rim-derived centre and physical-point verification
+
+Circle capture now defaults to four well-spaced rim captures. A best-fit circle
+derives the centre and diameter, then the head moves to the calculated centre
+with the beam off; after motion settles, the operator confirms the current head
+position as the centre and the app sets the work origin. The original
+marked-centre plus typed/measured-diameter flow remains available as a fallback.
+
+After either a rectangle/square or circle outline is created, its physical
+geometry can be checked point by point. Rectangle targets are its four corners;
+circle targets are its centre and four cardinal rim points. Selecting a target
+moves there with the beam off. The operator can accept it, or fine-jog to the
+physical point and confirm. Confirmation updates the existing locked outline:
+rectangle corners adjust the applicable extents, circle rim points adjust the
+diameter, and rectangle bottom-left or circle-centre corrections also update the
+work origin. Confirmation is gated on settled motion and a live machine
+position; machine-session, trusted-position, work-origin, or outline/Undo
+changes invalidate stale capture geometry rather than applying it to a new
+coordinate frame or a mismatched visible outline.
+
 
 ## ADR-127 - Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09)
 
