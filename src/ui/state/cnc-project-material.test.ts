@@ -38,7 +38,12 @@ function cncProject(layers: ReadonlyArray<Layer>): Project {
 
 describe('layerWithCncMaterial (ADR-112)', () => {
   it('fills feeds from the material + bit and tags the layer, preserving the rest', () => {
-    const filled = layerWithCncMaterial(cncLayer('#ff0000'), MACHINE, PROFILE, 'plywood-mdf');
+    const filled = layerWithCncMaterial({
+      layer: cncLayer('#ff0000'),
+      machine: MACHINE,
+      profile: PROFILE,
+      materialKey: 'plywood-mdf',
+    });
     const feeds = expectedFeeds('plywood-mdf');
     expect(filled.cnc?.materialKey).toBe('plywood-mdf');
     expect(filled.cnc?.feedMmPerMin).toBe(feeds.feedMmPerMin);
@@ -54,7 +59,14 @@ describe('layerWithCncMaterial (ADR-112)', () => {
 
   it('is a no-op for an unknown material key', () => {
     const layer = cncLayer('#ff0000');
-    expect(layerWithCncMaterial(layer, MACHINE, PROFILE, 'kryptonite')).toBe(layer);
+    expect(
+      layerWithCncMaterial({
+        layer,
+        machine: MACHINE,
+        profile: PROFILE,
+        materialKey: 'kryptonite',
+      }),
+    ).toBe(layer);
   });
 
   it('repairs a non-finite layer spindle from the valid machine ceiling', () => {
@@ -63,7 +75,14 @@ describe('layerWithCncMaterial (ADR-112)', () => {
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: Number.NaN },
     };
 
-    expect(layerWithCncMaterial(layer, MACHINE, PROFILE, 'hardwood').cnc).toMatchObject({
+    expect(
+      layerWithCncMaterial({
+        layer,
+        machine: MACHINE,
+        profile: PROFILE,
+        materialKey: 'hardwood',
+      }).cnc,
+    ).toMatchObject({
       materialKey: 'hardwood',
       spindleRpm: MACHINE.params.spindleMaxRpm,
       feedSource: { kind: 'material-recipe', materialKey: 'hardwood', fluteCount: 2 },

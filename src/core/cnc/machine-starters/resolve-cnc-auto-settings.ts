@@ -12,6 +12,9 @@ import {
   type CncMachineStarterLiveCaps,
 } from '../resolve-cnc-machine-starter';
 
+/** Shared engineering assumption for automatic material-feed calculations. */
+export const DEFAULT_ASSUMED_FLUTE_COUNT = 2;
+
 export type CncAutoSettingsInput = {
   readonly profile: DeviceProfile;
   readonly machine: CncMachineConfig;
@@ -47,7 +50,7 @@ export function resolveCncAutoLayerSettings(input: CncAutoSettingsInput): CncLay
       materialKey,
       spindleRpm: base.spindleRpm,
       machineSpindleMaxRpm: input.machine.params.spindleMaxRpm,
-      fluteCount: 2,
+      fluteCount: DEFAULT_ASSUMED_FLUTE_COUNT,
       ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
     });
     return materialPatch === null ? null : { ...base, ...materialPatch };

@@ -6,11 +6,10 @@
 
 import { useState } from 'react';
 import { CHIPLOAD_MATERIALS, chiploadFor, type ChiploadMaterial } from '../../core/cnc';
+import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
-
-const DEFAULT_FLUTES = 2;
 
 export function FeedsCalculatorRow(props: {
   readonly layer: Layer;
@@ -21,21 +20,21 @@ export function FeedsCalculatorRow(props: {
   const profile = useStore((s) => s.project.device);
   const liveCaps = useStore((s) => s.cncLiveCaps);
   const [material, setMaterial] = useState<ChiploadMaterial>('plywood-mdf');
-  const [flutes, setFlutes] = useState(DEFAULT_FLUTES);
+  const [flutes, setFlutes] = useState(DEFAULT_ASSUMED_FLUTE_COUNT);
   if (machine?.kind !== 'cnc') return null;
 
   const tool = layerCncTool(machine, props.settings);
   const rpm = props.settings.spindleRpm;
   const result = materialFeedResult(
-    materialFeedsPatch(
-      material,
+    materialFeedsPatch({
+      materialKey: material,
       tool,
-      rpm,
+      spindleRpm: rpm,
       profile,
-      machine.params.spindleMaxRpm,
+      machineSpindleMaxRpm: machine.params.spindleMaxRpm,
       liveCaps,
-      flutes,
-    ),
+      fluteCount: flutes,
+    }),
   );
   const canApply = result !== null;
   return (
@@ -54,7 +53,9 @@ export function FeedsCalculatorRow(props: {
             aria-label="Bit flute count"
             title="Number of cutting edges on the bit."
             value={flutes}
-            onChange={(e) => setFlutes(Math.max(1, Number(e.target.value) || DEFAULT_FLUTES))}
+            onChange={(e) =>
+              setFlutes(Math.max(1, Number(e.target.value) || DEFAULT_ASSUMED_FLUTE_COUNT))
+            }
           >
             <option value={1}>1</option>
             <option value={2}>2</option>

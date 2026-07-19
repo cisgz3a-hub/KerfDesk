@@ -5,6 +5,7 @@
 
 import { isChiploadMaterialKey } from '../../core/cnc';
 import {
+  DEFAULT_ASSUMED_FLUTE_COUNT,
   resolveCncMaterialFeedPatch,
   type CncMachineStarterLiveCaps,
 } from '../../core/cnc/machine-starters';
@@ -20,56 +21,53 @@ import {
   type Project,
 } from '../../core/scene';
 
-// One-click project/seed fill assumes a 2-flute bit, matching the per-layer
-// Material picker (ADR-111 #1). Precise flute/RPM control stays in the Feeds
-// calculator.
-const ASSUMED_FLUTES = 2;
-
 // `layer` with its feeds auto-filled from `materialKey`, using the layer's own
 // bit and spindle. Everything else on the layer is preserved; an unknown key is
 // a no-op (returns the same layer).
-export function layerWithCncMaterial(
-  layer: Layer,
-  machine: CncMachineConfig,
-  profile: DeviceProfile,
-  materialKey: string,
-  liveCaps?: CncMachineStarterLiveCaps | null,
-  fluteCount = ASSUMED_FLUTES,
-): Layer {
-  const cnc = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-  const patch = materialFeedsPatch(
-    materialKey,
-    layerCncTool(machine, cnc),
-    cnc.spindleRpm,
-    profile,
-    machine.params.spindleMaxRpm,
-    liveCaps,
-    fluteCount,
-  );
-  if (patch === null) return layer;
-  return { ...layer, cnc: { ...cnc, ...patch } };
+export function layerWithCncMaterial(input: {
+  readonly layer: Layer;
+  readonly machine: CncMachineConfig;
+  readonly profile: DeviceProfile;
+  readonly materialKey: string;
+  readonly liveCaps?: CncMachineStarterLiveCaps | null;
+  readonly fluteCount?: number;
+}): Layer {
+  const cnc = input.layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const patch = materialFeedsPatch({
+    materialKey: input.materialKey,
+    tool: layerCncTool(input.machine, cnc),
+    spindleRpm: cnc.spindleRpm,
+    profile: input.profile,
+    machineSpindleMaxRpm: input.machine.params.spindleMaxRpm,
+    ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
+    ...(input.fluteCount === undefined ? {} : { fluteCount: input.fluteCount }),
+  });
+  if (patch === null) return input.layer;
+  return { ...input.layer, cnc: { ...cnc, ...patch } };
 }
 
 // Material-derived feeds for a specific bit — the single source the material
 // pickers AND bit changes use, so swapping bits can never leave stale
 // material feeds behind. Null for unknown material keys.
-export function materialFeedsPatch(
-  materialKey: string,
-  tool: CncTool,
-  spindleRpm: number,
-  profile: DeviceProfile,
-  machineSpindleMaxRpm: number,
-  liveCaps?: CncMachineStarterLiveCaps | null,
-  fluteCount = ASSUMED_FLUTES,
-): Partial<CncLayerSettings> | null {
+export function materialFeedsPatch(input: {
+  readonly materialKey: string;
+  readonly tool: CncTool;
+  readonly spindleRpm: number;
+  readonly profile: DeviceProfile;
+  readonly machineSpindleMaxRpm: number;
+  readonly liveCaps?: CncMachineStarterLiveCaps | null;
+  readonly fluteCount?: number;
+}): Partial<CncLayerSettings> | null {
   return resolveCncMaterialFeedPatch({
-    profile,
-    tool,
-    materialKey,
-    spindleRpm,
-    machineSpindleMaxRpm,
-    fluteCount,
-    ...(liveCaps === null || liveCaps === undefined ? {} : { liveCaps }),
+    profile: input.profile,
+    tool: input.tool,
+    materialKey: input.materialKey,
+    spindleRpm: input.spindleRpm,
+    machineSpindleMaxRpm: input.machineSpindleMaxRpm,
+    fluteCount: input.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
+    ...(input.liveCaps === null || input.liveCaps === undefined
+      ? {}
+      : { liveCaps: input.liveCaps }),
   });
 }
 
@@ -91,7 +89,13 @@ export function projectWithStockMaterial(
     materialKey === null
       ? project.scene.layers
       : project.scene.layers.map((layer) =>
-          layerWithCncMaterial(layer, machine, project.device, materialKey, liveCaps),
+          layerWithCncMaterial({
+            layer,
+            machine,
+            profile: project.device,
+            materialKey,
+            ...(liveCaps === undefined ? {} : { liveCaps }),
+          }),
         );
   return {
     ...project,
@@ -111,7 +115,13 @@ export function seedLayerFromStockMaterial(
   const materialKey = machine.stock.materialKey;
   return materialKey === undefined
     ? layer
-    : layerWithCncMaterial(layer, machine, profile, materialKey, liveCaps);
+    : layerWithCncMaterial({
+        layer,
+        machine,
+        profile,
+        materialKey,
+        ...(liveCaps === undefined ? {} : { liveCaps }),
+      });
 }
 
 function stockWithoutMaterial(stock: CncStock): CncStock {

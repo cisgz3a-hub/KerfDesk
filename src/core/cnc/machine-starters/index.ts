@@ -10,6 +10,7 @@ export {
   type ResolvedCncMachineStarter,
 } from '../resolve-cnc-machine-starter';
 export {
+  DEFAULT_ASSUMED_FLUTE_COUNT,
   resolveCncAutoLayerSettings,
   resolveCncMaterialFeedPatch,
   resolveCncStarterFeedPatch,

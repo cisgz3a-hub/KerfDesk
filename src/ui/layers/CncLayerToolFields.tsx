@@ -51,15 +51,15 @@ export function LayerBitSelect(props: {
     if (machine?.kind !== 'cnc' || source?.kind !== 'material-recipe') return null;
     const tool = toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
     if (tool === undefined) return null;
-    return materialFeedsPatch(
-      source.materialKey,
+    return materialFeedsPatch({
+      materialKey: source.materialKey,
       tool,
-      props.settings.spindleRpm,
+      spindleRpm: props.settings.spindleRpm,
       profile,
-      machine.params.spindleMaxRpm,
+      machineSpindleMaxRpm: machine.params.spindleMaxRpm,
       liveCaps,
-      source.fluteCount,
-    );
+      fluteCount: source.fluteCount,
+    });
   };
   return (
     <Row label="Bit">

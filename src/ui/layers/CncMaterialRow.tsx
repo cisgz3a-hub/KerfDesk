@@ -6,16 +6,17 @@
 // calculator. CNC-only.
 
 import { CHIPLOAD_MATERIALS, type ChiploadMaterial } from '../../core/cnc';
-import { findCncMachineStarter, findCncMachineStarterById } from '../../core/cnc/machine-starters';
+import {
+  DEFAULT_ASSUMED_FLUTE_COUNT,
+  findCncMachineStarter,
+  findCncMachineStarterById,
+} from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 import { Row, selectStyle } from './CncLayerPrimitives';
 
-// One-click fill assumes a 2-flute bit (the common hobby default); the Feeds
-// calculator lets the user pick any flute count for a precise result.
-const ASSUMED_FLUTES = 2;
 const CUSTOM = '';
 const SAVED_MACHINE_STARTER = '__saved-machine-starter__';
 
@@ -48,15 +49,15 @@ export function CncMaterialRow(props: {
       return;
     }
     const material = value as ChiploadMaterial;
-    const patch = materialFeedsPatch(
-      material,
+    const patch = materialFeedsPatch({
+      materialKey: material,
       tool,
-      settings.spindleRpm,
+      spindleRpm: settings.spindleRpm,
       profile,
-      machine.params.spindleMaxRpm,
+      machineSpindleMaxRpm: machine.params.spindleMaxRpm,
       liveCaps,
-      ASSUMED_FLUTES,
-    );
+      fluteCount: DEFAULT_ASSUMED_FLUTE_COUNT,
+    });
     if (patch !== null) onCommitSettings({ ...settings, ...patch });
   };
 
