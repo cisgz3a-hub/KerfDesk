@@ -1,6 +1,11 @@
 import type { JobInterruption } from '../../../core/recovery';
-import type { ExecutionArtifactV1, RunId } from './execution-artifact';
+import {
+  estimateExecutionArtifactBytes,
+  type ExecutionArtifactV1,
+  type RunId,
+} from './execution-artifact';
 import { recoveryClaimIsExpired, type PersistedRecoverySlots } from './recovery-model';
+import { appendBoundedExecutionHistory } from './execution-history';
 
 export type SlotMutation<T> = {
   readonly slots: PersistedRecoverySlots;
@@ -38,6 +43,7 @@ export function activateFreshRunMutation(
         sendableLines: artifact.sendableLines,
         startedAtIso: acceptedAtIso,
         updatedAtIso: acceptedAtIso,
+        estimatedArtifactBytes: artifactEstimatedBytes(artifact),
       },
       recoveryCapsule: null,
       lastCompletedReceipt: null,
@@ -78,6 +84,17 @@ export function interruptRunMutation(
   if (slots.recoveryCapsule?.runId === runId) return unchanged(slots, true);
   if (active?.runId !== runId) return unchanged(slots, false);
   const revision = slots.revision + 1;
+  const finalAcked = Math.max(active.ackedLines, clampProgress(ackedLines, active.sendableLines));
+  const historyRecord = {
+    runId,
+    terminalKind: 'interrupted' as const,
+    startedAtIso: active.startedAtIso,
+    terminalAtIso: updatedAtIso,
+    ackedLines: finalAcked,
+    sendableLines: active.sendableLines,
+    estimatedArtifactBytes: active.estimatedArtifactBytes ?? 0,
+    interruption,
+  };
   return {
     slots: {
       ...slots,
@@ -87,12 +104,13 @@ export function interruptRunMutation(
         runId,
         artifactKind: 'exact-execution',
         revision,
-        ackedLines: Math.max(active.ackedLines, clampProgress(ackedLines, active.sendableLines)),
+        ackedLines: finalAcked,
         sendableLines: active.sendableLines,
         interruption,
         updatedAtIso,
       },
       lastCompletedReceipt: null,
+      executionHistory: appendBoundedExecutionHistory(slots, historyRecord),
     },
     value: true,
   };
@@ -105,12 +123,23 @@ export function completeRunMutation(
 ): SlotMutation<boolean> {
   if (slots.lastCompletedReceipt?.runId === runId) return unchanged(slots, true);
   if (slots.activeRun?.runId !== runId) return unchanged(slots, false);
+  const active = slots.activeRun;
+  const historyRecord = {
+    runId,
+    terminalKind: 'completed' as const,
+    startedAtIso: active.startedAtIso,
+    terminalAtIso: completedAtIso,
+    ackedLines: active.sendableLines,
+    sendableLines: active.sendableLines,
+    estimatedArtifactBytes: active.estimatedArtifactBytes ?? 0,
+  };
   return {
     slots: {
       ...slots,
       revision: slots.revision + 1,
       activeRun: null,
       lastCompletedReceipt: { runId, completedAtIso },
+      executionHistory: appendBoundedExecutionHistory(slots, historyRecord),
     },
     value: true,
   };
@@ -270,6 +299,7 @@ export function activateClaimedRecoveryMutation(
         sendableLines: args.artifact.sendableLines,
         startedAtIso: args.acceptedAtIso,
         updatedAtIso: args.acceptedAtIso,
+        estimatedArtifactBytes: artifactEstimatedBytes(args.artifact),
       },
       recoveryCapsule: null,
       lastCompletedReceipt: null,
@@ -286,6 +316,20 @@ export function promoteStaleActiveRunMutation(
   const active = slots.activeRun;
   if (active === null) return unchanged(slots, false);
   const revision = slots.revision + 1;
+  const interruption = {
+    kind: 'unknown' as const,
+    message: 'The application restarted while this job was active.',
+  };
+  const historyRecord = {
+    runId: active.runId,
+    terminalKind: 'interrupted' as const,
+    startedAtIso: active.startedAtIso,
+    terminalAtIso: updatedAtIso,
+    ackedLines: active.ackedLines,
+    sendableLines: active.sendableLines,
+    estimatedArtifactBytes: active.estimatedArtifactBytes ?? 0,
+    interruption,
+  };
   return {
     slots: {
       ...slots,
@@ -297,13 +341,11 @@ export function promoteStaleActiveRunMutation(
         revision,
         ackedLines: active.ackedLines,
         sendableLines: active.sendableLines,
-        interruption: {
-          kind: 'unknown',
-          message: 'The application restarted while this job was active.',
-        },
+        interruption,
         updatedAtIso,
       },
       lastCompletedReceipt: null,
+      executionHistory: appendBoundedExecutionHistory(slots, historyRecord),
     },
     value: true,
   };
@@ -324,4 +366,12 @@ function slotsReferenceRun(slots: PersistedRecoverySlots, runId: RunId): boolean
 function clampProgress(value: number, maximum: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(Math.floor(value), 0), maximum);
+}
+
+function artifactEstimatedBytes(artifact: ExecutionArtifactV1): number {
+  if (artifact.estimatedArtifactBytes !== undefined) return artifact.estimatedArtifactBytes;
+  // Artifacts created before the estimate field landed still contain the full
+  // prepared project, including raster buffers. Recompute from the complete
+  // payload so legacy records consume the same retention budget as new ones.
+  return estimateExecutionArtifactBytes(artifact);
 }

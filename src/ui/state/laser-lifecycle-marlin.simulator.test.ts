@@ -10,6 +10,7 @@ import {
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -157,7 +158,7 @@ describe('Marlin lifecycle against the simulator', () => {
   it('streams ping-pong: one line per ok, completes, and settles', async () => {
     const sim = await connectMarlinIdle();
     const gcode = 'G21\nG90\nM3 S0\nG1 X10 Y0 F600 S100\nG1 X10 Y5 F600 S100\nM5\n';
-    await useLaserStore.getState().startJob(gcode, { streamingMode: 'ping-pong' });
+    await startTestLaserJob(gcode, { streamingMode: 'ping-pong' });
     expect(useLaserStore.getState().streamer?.streamingMode).toBe('ping-pong');
     await pump(4000);
     expect(useLaserStore.getState().streamer).toBeNull();
@@ -171,7 +172,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('post-job settle uses the Marlin M400 marker, never the GRBL dwell (CTL-02)', async () => {
     const sim = await connectMarlinIdle();
-    await useLaserStore.getState().startJob('G1 X10 Y0 F600 S100\nM5\n', {
+    await startTestLaserJob('G1 X10 Y0 F600 S100\nM5\n', {
       streamingMode: 'ping-pong',
     });
     await pump(4000);
@@ -185,7 +186,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('pauses stream-side (no ! byte) and resumes to completion', async () => {
     const sim = await connectMarlinIdle();
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(30);
     await useLaserStore.getState().pauseJob();
     expect(sim.outbound()).not.toContain('!');
@@ -203,7 +204,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('stops with beam-off lines instead of a soft-reset byte', async () => {
     const sim = await connectMarlinIdle();
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(20);
     await useLaserStore.getState().stopJob();
     await pump(50);
@@ -215,7 +216,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('retains a physical-safety warning when Forget cannot confirm an active stop', async () => {
     const sim = await connectMarlinIdle({ responseDelayMs: 100 });
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
 
     await useLaserStore.getState().forgetDevice?.();
 
@@ -232,7 +233,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('prioritizes the unconfirmed physical stop over an older notice on Disconnect', async () => {
     const sim = await connectMarlinIdle({ responseDelayMs: 100, motionMs: 500 });
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     useLaserStore.setState({
       safetyNotice: {
         kind: 'controller-reboot',
@@ -273,7 +274,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('does not lose the unconfirmed physical stop across Abort then immediate Forget', async () => {
     const sim = await connectMarlinIdle({ responseDelayMs: 100, motionMs: 500 });
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
 
     await useLaserStore.getState().stopJob();
     expect(useLaserStore.getState()).toMatchObject({
@@ -308,7 +309,7 @@ describe('Marlin lifecycle against the simulator', () => {
     const sim = await connectMarlinIdle({
       rejectLines: [{ pattern: /X13\b/, error: 'Unknown command' }],
     });
-    await useLaserStore.getState().startJob(jobLines(30), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(30), { streamingMode: 'ping-pong' });
     await pump(50);
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
     expect(sim.outbound()).toContain('M107\n');

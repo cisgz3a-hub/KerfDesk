@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFramedRunPermit, type FramedRunCandidate } from './framed-run';
-import { connectWith, flushConnect, makeConnection } from './laser-store-console-harness';
 import { useLaserStore } from './laser-store';
+import { connectWith, flushConnect, makeConnection } from './laser-store-console.test-support';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 function currentWorkZEvidence() {
   return {
@@ -313,7 +314,7 @@ describe('laser-store console commands', () => {
       writes.push(data);
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     writes.length = 0;
 
     await expect(useLaserStore.getState().sendConsoleCommand('$I')).rejects.toThrow(
@@ -402,7 +403,7 @@ describe('job stream transcript source', () => {
     // Eight 29-byte lines: the 120-byte first window holds four; each ok
     // triggers a refill write for the next queued line.
     const longLine = 'G1 X99.000 Y99.000 F600 S255';
-    await useLaserStore.getState().startJob(Array.from({ length: 8 }, () => longLine).join('\n'));
+    await startTestLaserJob(Array.from({ length: 8 }, () => longLine).join('\n'));
     connection.emitLine('ok');
     connection.emitLine('ok');
     for (let i = 0; i < 5; i += 1) await Promise.resolve();

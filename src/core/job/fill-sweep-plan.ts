@@ -1,3 +1,4 @@
+import { boundedSplitRunwayLengths } from '../raster/raster-sweep-plan';
 import { effectiveFillOverscanMm } from './fill-overscan';
 import { FILL_GAP_RAPID_THRESHOLD_MM, groupFillScanlines, type FillSweep } from './fill-sweeps';
 import type { FillGroup } from './job';
@@ -17,6 +18,21 @@ export function feedMatchedFillRunwayMm(configuredMm: number): number {
 
 export function planFillSweeps(group: FillGroup): FillSweepPlan[] {
   const scanlines = groupFillScanlines(group.segments);
+  if (group.fillRunwayPolicy === 'raster-full') {
+    const runwayMm = Math.max(0, group.overscanMm);
+    return scanlines.flatMap((scanline) =>
+      scanline.map((sweep) => ({
+        sweep,
+        leadInMm: runwayMm,
+        leadOutMm: runwayMm,
+        runwayMotion: 'feed-matched' as const,
+      })),
+    );
+  }
+  if (group.fillRunwayPolicy === 'full' || group.fillRunwayPolicy === 'raster-bounded') {
+    const runwayMm = Math.max(0, group.overscanMm);
+    return scanlines.flatMap((scanline) => feedMatchedPlans(scanline, runwayMm));
+  }
   if (!usesFeedMatchedFillEntry(group)) {
     return scanlines.flatMap((scanline) => scanline.map((sweep) => legacyPlan(sweep, group)));
   }
@@ -25,10 +41,7 @@ export function planFillSweeps(group: FillGroup): FillSweepPlan[] {
 }
 
 export function usesFeedMatchedFillEntry(group: FillGroup): boolean {
-  return (
-    (group.fillStyle ?? 'scanline') === 'scanline' &&
-    group.fillRunwayPolicy === 'feed-matched-entry'
-  );
+  return group.fillRunwayPolicy === 'feed-matched-entry';
 }
 
 function legacyPlan(sweep: FillSweep, group: FillGroup): FillSweepPlan {
@@ -42,17 +55,30 @@ function legacyPlan(sweep: FillSweep, group: FillGroup): FillSweepPlan {
           group.overscanMm,
           group.fillStyle,
           group.islandMotionPolicy,
+          group.fillRunwayPolicy,
         );
   return { sweep, leadInMm: runwayMm, leadOutMm: runwayMm, runwayMotion: 'rapid' };
 }
 
 function feedMatchedPlans(scanline: ReadonlyArray<FillSweep>, runwayMm: number): FillSweepPlan[] {
-  return scanline.map((sweep, index) => ({
-    sweep,
-    leadInMm: runwayMm,
-    // Internal split boundaries own one entry runway only. This leaves a
-    // monotonic G0 remainder before the next G1/S0 lead-in and cannot overlap.
-    leadOutMm: index === scanline.length - 1 ? runwayMm : 0,
-    runwayMotion: 'feed-matched',
-  }));
+  return scanline.map((sweep, index) => {
+    const previous = scanline[index - 1];
+    const previousEnd = previous?.spans[previous.spans.length - 1]?.end;
+    const currentStart = sweep.spans[0]?.start;
+    const gapBeforeMm =
+      previousEnd === undefined || currentStart === undefined
+        ? runwayMm
+        : Math.hypot(currentStart.x - previousEnd.x, currentStart.y - previousEnd.y);
+    const runwayLengths = boundedSplitRunwayLengths({
+      index,
+      count: scanline.length,
+      requestedMm: runwayMm,
+      gapBeforeMm,
+    });
+    return {
+      sweep,
+      ...runwayLengths,
+      runwayMotion: 'feed-matched' as const,
+    };
+  });
 }

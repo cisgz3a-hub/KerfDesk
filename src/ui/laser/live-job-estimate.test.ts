@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { estimateJobDuration } from '../../core/job';
+import { prepareOutput } from '../../io/gcode';
 
 import {
   createLayer,
   createProject,
+  DEFAULT_OUTPUT_SCOPE,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type OutputScope,
@@ -128,6 +131,26 @@ function hugeRasterProject(): Project {
 describe('live job estimate', () => {
   it('estimates small vector jobs', () => {
     expect(estimateLiveJob(tracedLineProject(2)).kind).toBe('estimated');
+  });
+
+  it('prices Current Position from and back to the resolved live head position', () => {
+    const project = tracedLineProject(2);
+    const jobOrigin = {
+      startFrom: 'current-position',
+      anchor: 'front-left' as const,
+      currentPosition: { x: 120, y: 80 },
+    } as const;
+    const currentPosition = estimateLiveJob(project, DEFAULT_OUTPUT_SCOPE, jobOrigin);
+    const prepared = prepareOutput(project, { outputScope: DEFAULT_OUTPUT_SCOPE, jobOrigin });
+
+    expect(currentPosition.kind).toBe('estimated');
+    expect(prepared.ok).toBe(true);
+    if (currentPosition.kind !== 'estimated' || !prepared.ok) return;
+    const originBiased = estimateJobDuration(prepared.job, prepared.project.device);
+    expect(currentPosition.totalSeconds).toBeLessThan(originBiased.totalSeconds);
+    expect(currentPosition.breakdown.travelSeconds).toBeLessThan(
+      originBiased.breakdown.travelSeconds,
+    );
   });
 
   it('skips huge traces before compiling or optimizing them in React render', () => {

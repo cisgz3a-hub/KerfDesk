@@ -29,14 +29,12 @@ export function readCutSettingsPatch(
   const linesPerMm = mode === 'image' ? readImageLinesPerMm(data, layer) : layer.linesPerMm;
   const lineSettings = readLineSettingsPatch(data, layer, mode);
   const fillSettings = readFillSettingsPatch(data, layer, mode);
+  const imageSettings = readImageSettingsPatch(data, layer, mode, linesPerMm, power);
   return {
     mode,
     ...readPowerModePatch(data, layer, mode),
     power,
-    minPower:
-      mode === 'image'
-        ? numberField(data, 'minPower', layer.minPower, 0, power)
-        : Math.min(layer.minPower, power),
+    ...imageSettings,
     speed: numberField(data, 'speed', layer.speed, 1, maxFeed),
     passes: Math.max(
       1,
@@ -49,21 +47,49 @@ export function readCutSettingsPatch(
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
-    dotWidthCorrectionMm:
-      mode === 'image'
-        ? numberField(
-            data,
-            'dotWidthCorrectionMm',
-            layer.dotWidthCorrectionMm,
-            0,
-            dotWidthCorrectionMax(linesPerMm),
-          )
-        : layer.dotWidthCorrectionMm,
-    negativeImage: mode === 'image' ? data.has('negativeImage') : layer.negativeImage,
-    imageBidirectional:
-      mode === 'image' ? data.has('imageBidirectional') : layer.imageBidirectional,
-    passThrough: mode === 'image' ? data.has('passThrough') : layer.passThrough,
+    ...readScanOverridePatch(data, layer, mode),
   };
+}
+
+function readImageSettingsPatch(
+  data: FormData,
+  layer: Layer,
+  mode: LayerMode,
+  linesPerMm: number,
+  power: number,
+): LayerPatch {
+  if (mode !== 'image') {
+    return {
+      minPower: Math.min(layer.minPower, power),
+      dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+      negativeImage: layer.negativeImage,
+      imageBidirectional: layer.imageBidirectional,
+      passThrough: layer.passThrough,
+    };
+  }
+  return {
+    minPower: numberField(data, 'minPower', layer.minPower, 0, power),
+    dotWidthCorrectionMm: numberField(
+      data,
+      'dotWidthCorrectionMm',
+      layer.dotWidthCorrectionMm,
+      0,
+      dotWidthCorrectionMax(linesPerMm),
+    ),
+    negativeImage: data.has('negativeImage'),
+    imageBidirectional: data.has('imageBidirectional'),
+    passThrough: data.has('passThrough'),
+  };
+}
+
+function readScanOverridePatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  if (mode === 'fill' || mode === 'image') {
+    return {
+      allowUncalibratedBidirectionalScan: data.has('allowUncalibratedBidirectionalScan'),
+    };
+  }
+  if (layer.allowUncalibratedBidirectionalScan === undefined) return {};
+  return { allowUncalibratedBidirectionalScan: layer.allowUncalibratedBidirectionalScan };
 }
 
 function readFillSettingsPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {

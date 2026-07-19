@@ -93,6 +93,7 @@ async function archivedCncArtifact(): Promise<ExecutionArtifactV1> {
   );
   if (!prepared.ok) throw new Error(`Expected ready CNC job: ${prepared.messages.join('; ')}`);
   return createExecutionArtifact({
+    artifactSchemaVersion: 1,
     runId: 'run-derivation',
     gcode: prepared.gcode,
     prepared: prepared.prepared,
@@ -137,6 +138,7 @@ describe('deriveCncArtifactPassSpans', () => {
   it('returns null when the sealed bytes are not reproduced', async () => {
     const artifact = await archivedCncArtifact();
     const tampered = createExecutionArtifact({
+      artifactSchemaVersion: 1,
       runId: 'run-tampered',
       gcode: `${artifact.gcode}G0 X0.000 Y0.000\n`,
       prepared: artifact.prepared,

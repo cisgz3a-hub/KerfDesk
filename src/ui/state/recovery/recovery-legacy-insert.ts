@@ -2,7 +2,7 @@ import type { JobCheckpoint } from '../../../core/recovery';
 import type { LegacyFingerprintOnlyArtifactV1 } from './execution-artifact';
 import { matchesStoredArtifact } from './recovery-artifact-identity';
 import type { RecoveryStorageBackend } from './recovery-backend';
-import { validRecoverySlots } from './recovery-model';
+import { LEGACY_CHECKPOINT_ARTIFACT_ORIGIN, validRecoverySlots } from './recovery-model';
 
 export async function insertLegacyRecoveryCapsule(args: {
   readonly backend: RecoveryStorageBackend;
@@ -13,6 +13,7 @@ export async function insertLegacyRecoveryCapsule(args: {
   const inserted = await args.backend.putArtifact({
     runId: args.artifact.runId,
     generation: args.generation,
+    origin: LEGACY_CHECKPOINT_ARTIFACT_ORIGIN,
     artifact: args.artifact,
   });
   if (!inserted && !(await matchesStoredArtifact(args.backend, args.generation, args.artifact))) {

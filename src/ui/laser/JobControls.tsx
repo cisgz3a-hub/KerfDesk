@@ -36,6 +36,7 @@ import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
 import { RunAgainControl } from './RunAgainControl';
 import { framedRunReadinessIssue } from './framed-run-readiness';
+import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 
 type Props = {
   readonly disabled: boolean;
@@ -112,6 +113,7 @@ export function JobControls({
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
+      <ExecutionArchivePanel />
       <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}

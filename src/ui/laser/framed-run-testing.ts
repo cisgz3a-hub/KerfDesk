@@ -10,15 +10,13 @@ import {
   type FramedRunCandidate,
   type FramedRunPermit,
 } from '../state/framed-run';
-import {
-  captureLaserModeStartSnapshot,
-  createLaserModeStartEvidence,
-  laserModeStartSnapshotIsVerified,
-} from '../state/laser-mode-start-evidence';
+import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { captureStartExternalEnvironment } from './start-job-external-environment';
 import { prepareCurrentStartJob } from './start-job-source';
+import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
+import { buildJobReviewModel } from './job-review';
 
 export function idleControllerStatusForFrameTest(): StatusReport {
   return {
@@ -58,6 +56,12 @@ export async function framedRunPermitForCurrentState(): Promise<FramedRunPermit>
 
   const machineKind = machineKindOf(app.project.machine);
   const laserSnapshot = captureLaserModeStartSnapshot(laser);
+  const reviewModel = buildJobReviewModel({
+    project: app.project,
+    prepared,
+    laserModeStartSnapshot: laserSnapshot,
+    overrides: laser.ovCache,
+  });
   const position = reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true);
   if (position === null) {
     throw new Error('Cannot build a framed-run fixture without a reported work position.');
@@ -69,6 +73,8 @@ export async function framedRunPermitForCurrentState(): Promise<FramedRunPermit>
     executionSignature: prepared.canvasPlan.retentionKey,
     controllerBeforeFrame: framedRunControllerSnapshot(laser),
     returnToWorkPosition: { x: position.x, y: position.y },
+    reviewedAtIso: new Date().toISOString(),
+    reviewModel,
     frameVerification: {
       boundsSignature: frameBoundsSignature(bounds),
       wco: laser.wcoCache,
@@ -77,9 +83,10 @@ export async function framedRunPermitForCurrentState(): Promise<FramedRunPermit>
     externalEnvironment,
     ...(machineKind === 'laser'
       ? {
-          laserModeStartEvidence: createLaserModeStartEvidence(
+          laserModeStartEvidence: requiredLaserModeEvidence(
+            app.project,
             laserSnapshot,
-            !laserModeStartSnapshotIsVerified(laserSnapshot),
+            prepared.gcode,
           ),
         }
       : {
@@ -90,6 +97,18 @@ export async function framedRunPermitForCurrentState(): Promise<FramedRunPermit>
         }),
   };
   return createFramedRunPermit(candidate, laser);
+}
+
+function requiredLaserModeEvidence(
+  project: ReturnType<typeof useStore.getState>['project'],
+  snapshot: ReturnType<typeof captureLaserModeStartSnapshot>,
+  gcode: string,
+) {
+  const evidence = confirmLaserModeStartEvidence(project, snapshot, () => true, gcode);
+  if (evidence === null || evidence === undefined) {
+    throw new Error('Cannot build a framed-run fixture without laser-mode Start evidence.');
+  }
+  return evidence;
 }
 
 export async function installFramedRunPermitForCurrentState(): Promise<FramedRunPermit> {

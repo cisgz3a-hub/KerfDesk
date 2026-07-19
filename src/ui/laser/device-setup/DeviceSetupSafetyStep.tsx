@@ -8,12 +8,14 @@ import {
   type RotarySetup,
   type RotaryType,
 } from '../../../core/devices';
+import { scanOffsetMagnitudeLimitMm } from '../../../core/devices/scan-offset-profile';
 import { NumberField } from '../../common/NumberField';
 import { AutofocusEditor } from '../AutofocusEditor';
 import { ZRows } from '../DeviceProfileRows';
 import { SafetyZonesPanel } from '../MachineSetupSafetyZones';
 import { PlannerAdvanced } from '../PlannerAdvanced';
 import { ScanOffsetEditor } from '../ScanOffsetEditor';
+import { ControlledLaserOffTravelRow } from '../ControlledLaserOffTravelRow';
 import { Row, numInputStyle, unitStyle } from '../device-settings-shared';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
@@ -90,8 +92,25 @@ function LaserCalibrationSections(props: {
         <div style={bodyStyle}>
           <ScanOffsetEditor
             value={draft.scanningOffsets}
-            onChange={(scanningOffsets) => update({ scanningOffsets })}
+            maxOffsetMagnitudeMm={scanOffsetMagnitudeLimitMm(draft)}
+            onChange={(scanningOffsets) =>
+              update({
+                scanningOffsets,
+                scanOffsetCalibrationStatus: scanningOffsets.length > 0 ? 'pending' : undefined,
+              })
+            }
           />
+          <ControlledLaserOffTravelRow
+            value={draft.controlledLaserOffTravelFeedMmPerMin}
+            maxFeed={draft.maxFeed}
+            onChange={(controlledLaserOffTravelFeedMmPerMin) =>
+              update({ controlledLaserOffTravelFeedMmPerMin })
+            }
+          />
+          <p style={mutedStyle}>
+            Controlled seek travel is an expert motion policy. It keeps the laser off but can add
+            substantial return time, especially for one-way engraving.
+          </p>
         </div>
       </details>
       <details open style={detailsStyle}>

@@ -73,7 +73,7 @@ describe('planFillSweeps', () => {
     ['C 6.683 mm gap', 6.683],
     ['C 7.048 mm gap', 7.048],
     ['J 9.605 mm gap', 9.605],
-  ])('keeps a rapid remainder before the %s lead-in', (_name, gapMm) => {
+  ])('keeps a controlled-travel remainder before the %s lead-in', (_name, gapMm) => {
     const plans = planFillSweeps(group([seg(0, 0, 2, 0), seg(2 + gapMm, 0, 4 + gapMm, 0)]));
     const next = plans[1];
 
@@ -117,6 +117,22 @@ describe('planFillSweeps', () => {
       [5, 5],
     ]);
     expect(expandedEndpoints(safe[1] as (typeof safe)[number])?.leadStart.x).toBe(11);
+  });
+
+  it('keeps a full Island runway monotonic when configured overscan exceeds the split gap', () => {
+    const plans = planFillSweeps({
+      ...group([seg(0, 0, 10, 0), seg(16, 0, 26, 0)]),
+      fillStyle: 'island',
+      fillRunwayPolicy: 'full',
+      overscanMm: 10,
+    });
+    const second = plans[1];
+
+    expect(plans.map(({ leadInMm, leadOutMm }) => [leadInMm, leadOutMm])).toEqual([
+      [10, 0],
+      [6, 10],
+    ]);
+    expect(expandedEndpoints(second as (typeof plans)[number])?.leadStart.x).toBe(10);
   });
 
   it('keeps legacy short-fragment behavior byte-compatible outside the 4040 policy', () => {

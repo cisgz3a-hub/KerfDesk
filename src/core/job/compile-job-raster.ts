@@ -16,9 +16,12 @@ import {
 import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
 import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
+import { layerWithObjectOverride } from './compile-job-object-policy';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
+import { resolveImageScanDirection } from './scan-direction-policy';
+import { validatedScanOffsetMm } from './scan-offset';
 
 const WHITE_LUMA_BYTE = 255;
 
@@ -45,6 +48,8 @@ function compileRasterGroup(
   device: DeviceProfile,
   objects: ReadonlyArray<SceneObject>,
 ): RasterGroup {
+  const bidirectionalScanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
+  const scanDirection = resolveImageScanDirection(device, layer);
   const sourceLuma = decodeRasterLuma(obj);
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
@@ -110,7 +115,9 @@ function compileRasterGroup(
     bounds,
     overscanMm: DEFAULT_OVERSCAN_MM,
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
-    bidirectional: layer.imageBidirectional,
+    bidirectional: scanDirection.bidirectional,
+    scanDirection,
+    ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
   };
 }
 
@@ -209,11 +216,6 @@ function nearestSourceCoordinate(
   targetExtent: number,
 ): number {
   return Math.min(sourceExtent - 1, Math.floor(((target + 0.5) * sourceExtent) / targetExtent));
-}
-
-function layerWithObjectOverride(layer: Layer, obj: SceneObject): Layer {
-  if (obj.operationOverride === undefined) return layer;
-  return { ...layer, ...obj.operationOverride };
 }
 
 function imageMaskObjectFor(

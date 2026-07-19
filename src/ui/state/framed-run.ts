@@ -1,4 +1,5 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { ControllerSettingsSnapshot, PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
@@ -11,6 +12,7 @@ import type { WorkCoordinateOffset } from './origin-actions';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { JobOriginPlacement } from '../../core/job';
 import type { FrameVerification } from './frame-verification';
+import type { JobReviewModel } from '../laser/job-review/job-review-model';
 
 /** The exact executable bundle prepared and reviewed before a physical Frame. */
 export type PreparedStartProgram = {
@@ -46,14 +48,23 @@ export type FramedRunCandidate = {
   /** Work-coordinate point occupied while this exact program was prepared.
    * Frame appends a tool-off return leg so Start begins from that same point. */
   readonly returnToWorkPosition: { readonly x: number; readonly y: number };
+  /** Immutable Job Review evidence that authorized the exact candidate before Frame. */
+  readonly reviewedAtIso: string;
+  readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
+  /** Transient calibration jobs own immutable prepared bytes outside the open
+   * canvas. Their permit must follow that project rather than the unrelated
+   * live-project execution signature. */
+  readonly authorizationContext?: 'transient-camera';
 };
 
 export type FramedRunControllerSnapshot = {
   readonly controllerSessionEpoch: number;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly controllerSettingsObservation: SessionObservationStamp | null;
+  readonly controllerBuildInfo: GrblBuildInfo | null;
+  readonly controllerBuildInfoObservation: SessionObservationStamp | null;
   readonly statusReport: StatusReport | null;
   readonly wcoCache: WorkCoordinateOffset | null;
   readonly workOriginActive: boolean;
@@ -96,6 +107,8 @@ export function framedRunControllerSnapshot(
     controllerSessionEpoch: source.controllerSessionEpoch,
     controllerSettings: source.controllerSettings,
     controllerSettingsObservation: source.controllerSettingsObservation,
+    controllerBuildInfo: source.controllerBuildInfo,
+    controllerBuildInfoObservation: source.controllerBuildInfoObservation,
     statusReport: source.statusReport,
     wcoCache: source.wcoCache,
     workOriginActive: source.workOriginActive,
@@ -140,6 +153,8 @@ function sameControllerSetup(
     before.controllerSessionEpoch === completed.controllerSessionEpoch &&
     before.controllerSettings === completed.controllerSettings &&
     before.controllerSettingsObservation === completed.controllerSettingsObservation &&
+    before.controllerBuildInfo === completed.controllerBuildInfo &&
+    before.controllerBuildInfoObservation === completed.controllerBuildInfoObservation &&
     sameAxes(before.wcoCache, completed.wcoCache) &&
     before.workOriginActive === completed.workOriginActive &&
     before.workOriginSource === completed.workOriginSource &&

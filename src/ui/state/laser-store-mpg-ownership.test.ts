@@ -6,6 +6,7 @@ import {
   framedRunControllerSnapshot,
   type FramedRunCandidate,
 } from './framed-run';
+import { respondToStockGrblHandshakeQuery } from './laser-controller-handshake.test-support';
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
 
@@ -25,6 +26,7 @@ function makeConnection(
   const connection: FakeConnection = {
     write: async (data) => {
       writes.push(data);
+      if (respondToStockGrblHandshakeQuery(data, connection.emitLine)) return;
       if (!autoRespondToQueries) return;
       if (data === 'G4 P0.01\n') {
         setTimeout(() => {
@@ -93,7 +95,7 @@ function framedRunCandidate(): FramedRunCandidate {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 afterEach(async () => {

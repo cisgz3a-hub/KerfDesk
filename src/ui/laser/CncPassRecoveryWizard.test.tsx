@@ -100,6 +100,7 @@ function exactCapsule(options?: {
   if (!emitted.preflight.ok) throw new Error('Expected valid CNC preflight.');
   const runId = 'run-archived-cnc';
   const artifact = createExecutionArtifact({
+    artifactSchemaVersion: 1,
     runId,
     gcode: emitted.gcode,
     prepared,

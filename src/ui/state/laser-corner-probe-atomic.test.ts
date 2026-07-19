@@ -10,6 +10,7 @@ import {
 } from '../../core/controllers/grbl/probe';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -31,17 +32,21 @@ const CORNER_REQUEST = {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      respondToTestGrblHandshake(data, emitLine);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine,
   };
 }
 

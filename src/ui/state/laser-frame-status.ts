@@ -74,6 +74,8 @@ export function frameCompletionPatch(args: {
     controllerSessionEpoch: args.state.controllerSessionEpoch,
     controllerSettings: args.state.controllerSettings,
     controllerSettingsObservation: args.state.controllerSettingsObservation,
+    controllerBuildInfo: args.state.controllerBuildInfo,
+    controllerBuildInfoObservation: args.state.controllerBuildInfoObservation,
     statusReport: args.report,
     statusSequence: args.nextSequence,
     wcoCache: args.positionPatch.wcoCache ?? args.state.wcoCache,

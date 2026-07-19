@@ -14,6 +14,7 @@ import {
 import { grblDriver } from '../../core/controllers';
 import type { ConnectControllerOptions } from './laser-store';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -150,7 +151,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
   it('streams a job to completion and releases the streamer after settle', async () => {
     const sim = await connectIdle();
     const gcode = 'G21\nG90\nM3 S0\nG1 X10 Y0 F600 S100\nG1 X10 Y5 F600 S100\nM5\n';
-    await useLaserStore.getState().startJob(gcode);
+    await startTestLaserJob(gcode);
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
     await pump(3000);
     expect(useLaserStore.getState().streamer).toBeNull();
@@ -161,7 +162,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
 
   it('pauses mid-stream with Safety Door and resumes with ~ to completion', async () => {
     const sim = await connectIdle();
-    await useLaserStore.getState().startJob(jobLines(40, 1));
+    await startTestLaserJob(jobLines(40, 1));
     const pausing = useLaserStore.getState().pauseJob();
     await pump(5);
     await pausing;
@@ -182,7 +183,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
 
   it('stops mid-job with soft reset; alarm surfaces and $X recovers', async () => {
     const sim = await connectIdle();
-    await useLaserStore.getState().startJob(jobLines(40, 2));
+    await startTestLaserJob(jobLines(40, 2));
     await pump(5);
     await useLaserStore.getState().stopJob();
     expect(sim.outbound()).toContain('\x18');
@@ -200,7 +201,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
 
   it('treats a mid-stream error:N as terminal; recovery is Stop, then unlock', async () => {
     const sim = await connectIdle({ rejectLines: [{ pattern: /X13\b/, errorCode: 20 }] });
-    await useLaserStore.getState().startJob(jobLines(30, 3));
+    await startTestLaserJob(jobLines(30, 3));
     await pump(100);
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
@@ -222,7 +223,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
       rejectLines: [{ pattern: /X13\b/, errorCode: 20 }],
       alarmOnResetDuringMotion: false,
     });
-    await useLaserStore.getState().startJob(jobLines(30, 3));
+    await startTestLaserJob(jobLines(30, 3));
     await pump(100);
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
     expect(sim.outbound()).toContain('\x18');
@@ -232,7 +233,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
 
   it('cable yank mid-job: disconnected state, streamer marked, notice raised', async () => {
     const sim = await connectIdle();
-    await useLaserStore.getState().startJob(jobLines(30, 4));
+    await startTestLaserJob(jobLines(30, 4));
     sim.yankCable();
     await pump(10);
     const s = useLaserStore.getState();
@@ -299,7 +300,7 @@ describe('GRBL-family variants against the simulator', () => {
     expect(useLaserStore.getState().detectedControllerKind).toBe('fluidnc');
     expect(useLaserStore.getState().capabilities.settings).toBe('readonly-dump');
     await pump(1100);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X5 Y0 F600 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X5 Y0 F600 S100\nM5\n');
     await pump(3000);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state().mpos.x).toBe(5);

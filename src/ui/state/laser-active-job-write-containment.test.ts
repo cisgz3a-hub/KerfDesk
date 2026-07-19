@@ -5,6 +5,7 @@ import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
+import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type ConnectionBehavior = {
@@ -84,12 +85,7 @@ function handleProtocolWrite(
   }
   if (data === 'G4 P0.01\n') setTimeout(() => connection.emitLine('ok'), 0);
   if (data === '?') setTimeout(() => connection.emitLine(IDLE), 0);
-  // Real GRBL answers the connect-time $G modal query (C6) with its state then
-  // ok; model it so the modal query settles during connect.
-  if (data === '$G\n') {
-    connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
-    connection.emitLine('ok');
-  }
+  respondToTestGrblHandshake(data, connection.emitLine);
 }
 
 function adapterFor(connection: SerialConnection): PlatformAdapter {
@@ -152,9 +148,9 @@ describe('active-job transport write containment', () => {
     rejectInitial = true;
 
     await expect(
-      useLaserStore
-        .getState()
-        .startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n', { runId: 'run-first-write-reject' }),
+      startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n', {
+        runId: 'run-first-write-reject',
+      }),
     ).rejects.toThrow('job transport rejected');
     await flush();
 
@@ -182,11 +178,9 @@ describe('active-job transport write containment', () => {
     const connection = makeConnection(writes, behavior);
     liveBehavior = behavior;
     await connectReady(connection);
-    await useLaserStore
-      .getState()
-      .startJob('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\nG1 X1234567893\n', {
-        rxBufferBytes: 30,
-      });
+    await startTestLaserJob('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\nG1 X1234567893\n', {
+      rxBufferBytes: 30,
+    });
     writes.length = 0;
     rejectRefill = true;
 
@@ -230,11 +224,9 @@ describe('active-job transport write containment', () => {
     const connection = makeConnection(writes, behavior);
     liveBehavior = behavior;
     await connectReady(connection);
-    await useLaserStore
-      .getState()
-      .startJob('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\nG1 X1234567893\n', {
-        rxBufferBytes: 30,
-      });
+    await startTestLaserJob('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\nG1 X1234567893\n', {
+      rxBufferBytes: 30,
+    });
     writes.length = 0;
     holdRefill = true;
 

@@ -4,5 +4,5 @@ import { compileJob } from './compile-job';
 import { computeJobBounds, type JobBounds } from './job-bounds';
 
 export function computeSceneOutputBounds(scene: Scene, device: DeviceProfile): JobBounds | null {
-  return computeJobBounds(compileJob(scene, device));
+  return computeJobBounds(compileJob(scene, device), device);
 }

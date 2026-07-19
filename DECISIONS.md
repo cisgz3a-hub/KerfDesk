@@ -98,7 +98,7 @@
 | ADR-115 | — | accepted (maintainer-directed after rejecting ADR-059's l... | Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05) |
 | ADR-116 | — | accepted (maintainer directive: "I need my box designer t... | Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07) |
 | ADR-117 | — | accepted | Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07) |
-| ADR-118 | — | amended (isolated IndexedDB execution artifacts, 2026-07-15) | Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07) |
+| ADR-118 | — | amended (repository schema v3, exact-artifact provenance, execution archive, 2026-07-19) | Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07) |
 | ADR-119 | — | accepted | Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07) |
 | ADR-120 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
 | ADR-121 | — | accepted | Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07) |
@@ -199,6 +199,7 @@
 | ADR-232 | 2026-07-19 | Accepted (governing) | Physical Frame completion is the spatial source of truth |
 | ADR-233 | 2026-07-19 | Accepted | Revisioned machine-aware CNC starters initialize new operations without rewriting jobs |
 | ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
+| ADR-235 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
 
 ---
 
@@ -5725,7 +5726,8 @@ runs one.
 
 ## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
 
-**Status:** amended (isolated IndexedDB execution artifacts, 2026-07-15).
+**Status:** amended (repository schema v3, versioned exact-artifact provenance, and execution
+archive, 2026-07-19).
 
 ### Context
 
@@ -5745,20 +5747,44 @@ from the live editor/controller state.
 
 ### Decision
 
-- Store recovery in a versioned IndexedDB repository. It owns three newest-only
-  slots: the exact `activeRun`, zero or one interrupted `recoveryCapsule`, and
-  zero or one clean `lastCompletedReceipt`. Immutable artifacts are keyed by a
+- Store recovery in a versioned IndexedDB repository. Its operational owners are
+  the exact `activeRun`, zero or one interrupted `recoveryCapsule`, zero or one
+  clean `lastCompletedReceipt`, and one short-lived `pendingStart` write-ahead
+  slot introduced in repository schema v2. Immutable artifacts are keyed by a
   unique `runId`; progress and terminal writes must own that identity, so jobs
   with equal line counts cannot update one another.
-- Repository schema v2 also owns one short-lived `pendingStart` write-ahead slot.
-  It names the exact staged candidate before any controller Start can reach the
-  wire, while retaining the older capsule until transport acceptance commits the
-  candidate as `activeRun`.
+- Repository schema v3 also owns a bounded, oldest-pruned `executionHistory` of
+  completed and interrupted runs. It normally retains at most 20 runs and 100 MiB
+  of estimated full artifact payload. The newest run and any active, recovery,
+  replay, or pending-Start owner remain protected even when one protected record
+  temporarily exceeds those ordinary limits.
 - An exact artifact contains emitted G-code and fingerprint, materialized output,
   output scope, resolved origin, streaming/device configuration, canvas/tool
   plans, and (for CNC) the prepared semantic job and recovery manifest. Archived
   controller observations are diagnostics only: they are never written to
   firmware or copied into the open profile/session.
+- Current exact-artifact schema v2 requires provenance schema v2. It binds the
+  exact G-code, canonical machine profile, build/transport/controller evidence,
+  workflow/review evidence, and archived controller observation with SHA-256.
+  Stage, hydration, archived reads, and export decoding all validate those
+  bindings. The IndexedDB v1→v2 upgrade adds an outer
+  `pre-provenance-db-v1` origin only to exact schema-v1 records already present
+  in the old database. New writes carry `current-v2`; stage, archive/export, and
+  external decode accept only that origin with schema-v2/V2 provenance. Exact
+  schema-v1 artifacts always fail closed at runtime, including records tagged by
+  the upgrade: the outer IndexedDB origin remains mutable and cannot prove that
+  a payload genuinely predates provenance. Fingerprint-only legacy capsules stay
+  non-executable and may use only the separately gated current-project fallback.
+- Raster row providers are materialized into typed arrays before persistence so
+  recovery storage is structured-clone safe. Artifact capture caps the combined
+  raster payload at 32 MiB before calling any row provider and bounds the complete
+  artifact (G-code, embedded project images/fonts, plans, and binary data) at a
+  conservative 64 MiB allocation-free estimate. A larger executable job continues
+  without recovery/archive capture and shows the existing forensic-record warning
+  instead of allocating an unbounded archive copy before Start.
+  The read-only Execution archive can export a retained exact artifact as `.lfexecution.json`; its versioned
+  tagged-binary envelope preserves typed arrays, hashes every encoded field, and
+  never recompiles or overlays live editor/controller state.
 - Fresh Start stages the artifact before the first write, but does not replace an
   older capsule. Only transport acceptance activates the new run and supersedes
   the older capsule. A refused preflight, operator cancellation, settings error,
@@ -5770,15 +5796,26 @@ from the live editor/controller state.
   from classifying an in-progress handoff as a crash. Schema-v1 slots migrate
   without dropping their active, recovery, or replay ownership.
 - The App-mounted tracker advances only the live `activeRunId`, throttles ordinary
-  progress writes, and moves terminal streams to the capsule. Clean completion
+  progress writes, and moves terminal streams to the capsule. A progress commit
+  patches the already-verified in-memory active record only when its generation,
+  slot revision, and run identity match the transaction base; cross-window drift
+  falls back to an authoritative slot refresh, hydrating only new or unverified
+  artifacts. This avoids re-reading and hashing a large immutable artifact every
+  25 acknowledgements without weakening cross-tab ownership. Clean completion
   requires all acknowledgements, controller-specific settlement, and fresh stable
   Idle; only then is a replay receipt created. A terminal event that races ahead
   of activation is deferred and retried after acceptance, without delaying or
   refusing the machine stream.
-- Recovery storage failures are nonblocking warnings. Superseded referenced
-  artifacts are garbage-collected after an atomic slot transition. A deletion
-  generation marker prevents an incomplete Forget purge from resurrecting old
-  slots after reload.
+- Recovery storage failures are nonblocking warnings. Artifacts displaced from
+  every operational owner and the bounded execution history are garbage-collected
+  after an atomic slot transition. A deletion generation marker prevents an
+  incomplete Forget purge from resurrecting old slots after reload.
+- A staged artifact is integrity-checked before transmission and retained as verified
+  in-memory evidence through durable activation. After the first controller write,
+  activation updates slots without cloning or hashing the artifact again; immutable
+  artifacts already verified in the current generation are reused for local mutation
+  hydration. Public refresh/startup still rereads storage, and corrupt slots authorize
+  an explicit fail-closed empty reset rather than being hidden by revision monotonicity.
 - The former `laserforge.job-checkpoint.v1` localStorage value is migrated once as
   a nonblocking `legacy-fingerprint-only` capsule. It may use the old current-
   project fingerprint fallback only inside explicit recovery; ordinary Start,
@@ -5805,16 +5842,25 @@ from the live editor/controller state.
   Cleanly completed, still-exact work separately offers **Run same job again from
   start**, which recompiles, rechecks the signature/fingerprint, and creates a new
   run identity with zero progress and no recovery state.
+- Completed and interrupted terminal runs appear newest-first in a read-only
+  **Execution archive**. Export is forensic output only: it reads the retained
+  immutable artifact, preserves raster binary payloads and recorded provenance,
+  and sends no controller command.
 
 ### Verification
 
-Repository tests cover multi-megabyte round trips, immutable run ownership,
-newest-only replacement, claim conflicts, legacy/corrupt/quota handling, deletion
-generation, schema-v1 migration, pending-Start crash reconciliation, garbage
-collection, and completion/interruption before activation.
-Flow/UI tests cover nonblocking ordinary Start, read-only Review/Cancel, retryable
-failed recovery, exact replay invalidation, and PWA independence. Hardware crash,
-air-cut recovery, and physical CNC qualification remain release acceptance work.
+Repository tests cover multi-megabyte and bounded materialized-raster round trips,
+immutable run ownership, bounded/protected execution history, claim conflicts,
+legacy/corrupt/quota handling, deletion generation, repository schema migration,
+real IndexedDB origin migration, coherent progress fast-path/cross-tab fallback,
+pending-Start crash reconciliation, garbage collection, and completion/interruption
+before activation. Integrity tests cover current provenance creation, legacy
+compatibility, downgrade refusal, hash/profile/workflow/controller/buffer-observation tampering, and removal
+of current provenance at stage, hydration, archive-read, and export-decode
+boundaries. Flow/UI tests cover nonblocking ordinary Start, read-only
+Review/Cancel, retryable failed recovery, exact replay invalidation, archive
+display/export, and PWA independence. Hardware crash, air-cut recovery, and
+physical CNC qualification remain release acceptance work.
 
 ### Amendment â€” schema v2: also store the output scope + job placement (2026-07-11, PST-02)
 
@@ -8722,6 +8768,15 @@ overscan. Informational warnings stay visible without becoming permission prompt
 Console maintenance no longer forces setup repetition. The explicitly retained safety checks above
 remain unchanged; this decision removes only the four audited policies named here.
 
+### Amendment (2026-07-19) - targeted output-quality controls restored by ADR-235
+
+ADR-235 deliberately reverses only ADR-208's first decision bullet for profiles that explicitly
+configure controlled laser-off travel. The built-in Neotronics 4040 profile once again emits bounded
+laser-off `G1` seeks, while profiles without that capability retain the `G0` byte stream established
+here. ADR-234 remains the governing bounded-entry geometry for ordinary Fill; ADR-235 adds the
+one-way fallback and a full-where-safe Island policy without restoring a zero-overscan refusal or any
+ordinary Start guard.
+
 ---
 
 ## ADR-207 - One layout-stable live-motion bar owns run controls
@@ -10169,3 +10224,99 @@ transitions untouched, especially on alternating reverse rows.
 - A property test covers arbitrary split gaps and proves monotonic non-overlapping entry geometry.
 - Generic/Falcon emitter tests remain byte-identical, while planner, preview, and motion-bounds
   tests assert parity with the emitted 4040 runway geometry.
+
+---
+
+## ADR-235 - Profile-scoped 4040 scan quality hardening
+
+**Date:** 2026-07-19
+**Status:** Accepted, hardware verification pending (controller-setting policy remains governed by
+ADR-232)
+
+### Context
+
+Falcon output remained clean while physical Neotronics 4040 burns regressed, but source inspection
+cannot prove which electrical, optical, mechanical, material, firmware, or motion interaction caused
+the observed marks. The code did expose avoidable output-quality risks for the built-in 4040 profile:
+requested bidirectional scanning could run without a measured reverse-line offset, and laser-off
+repositioning used unbounded `G0` after ADR-208 removed the earlier profile-specific feed move.
+ADR-234 separately established the bounded, non-overlapping entry-runway geometry for ordinary
+4040 scanline Fill; this ADR retains that geometry. A final artifact audit also found that
+vector points distinct in memory could collapse to one coordinate at three-decimal GRBL precision,
+leaving stationary positive-power `G1` commands. The maintainer explicitly directed a profile-scoped
+quality policy while preserving generic/Falcon output.
+
+### Decision
+
+- Resolve the effective scan direction during compilation. Scanline Fill and Image operations
+  requested as bidirectional compile one-way on the built-in `neotronics-4040-safe` profile when its
+  scanning-offset table is empty. A populated calibration table enables bidirectional output, and a
+  persisted per-operation expert override may knowingly bypass that fallback. Sensitive 4040 Island
+  Fill remains one-way regardless of calibration or expert override; its existing motion invariant is
+  stronger than the new normal-scan allowance. Calibration coupons may set the override and an
+  explicit test offset so the reverse direction can be measured outside sensitive Island Fill.
+- Record the effective direction and its reason on compiled Fill/Raster groups. Job Review exposes
+  that fact so an operator can distinguish a requested one-way operation, calibrated
+  bidirectional output, expert override, and an uncalibrated 4040 fallback.
+- Keep ADR-234's `feed-matched-entry` policy and shared sweep planner as the sole authority for
+  ordinary 4040 scanline Fill. Sensitive Island Fill uses a distinct full-feed policy: exterior
+  runways receive the configured length, internal split sweeps omit the preceding exit and clamp the
+  next entry to the available gap so motion cannot reverse over the previous sweep. Raster duration
+  modeling retains its distinct two-sided full-runway mode because it mirrors executable raster
+  bytes. Bounds, path optimization, toolpath preview, duration planning, emission, and heat/runway
+  analysis all consume the same planned geometry.
+- Emit feed-matched 4040 Fill/Island runways as laser-off `G1 S0` motion at the burn feed. Report
+  exact pass-weighted full, partial, skipped, and explicitly-disabled entry-runway coverage plus
+  requested values in Job Review.
+- Add an optional profile capability, `controlledLaserOffTravelFeedMmPerMin`. The built-in 4040 sets
+  it to 800 mm/min, so vector and raster laser-off seeks emit explicit `G1 ... F800 S0`; profiles
+  that omit it continue to emit their existing `G0` seeks. Raster restores the burn feed after each
+  controlled seek, and duration planning prices these moves at the configured feed. Any positive
+  sub-1 programmatic value serializes as the controller's minimum integral `F1` instead of rounding
+  to invalid `F0`; the original value remains visible as a Job Review policy warning.
+- For the 4040 only, the controlled seek supersedes ADR-208's global `G0` transport and ADR-234's
+  historical `G0` wording without changing ADR-234's split geometry: the blank-gap remainder runs at
+  F800/S0 and the bounded entry runs at the fill feed/S0. Other profiles retain `G0` behavior.
+- At the shared GRBL vector-emitter boundary, compare formatted three-decimal coordinates and omit
+  any target that does not move the machine. If an entire segment collapses, omit its laser-off seek
+  too; if only a prefix collapses, attach feed and power to the first real move. This matches the
+  existing Fill/CNC guards and prevents stationary positive-power vector commands on every profile.
+- Mark generated controlled seeks/runways for diagnostics, but do not trust the comment alone.
+  Preflight recognizes a marked laser-off `G1` only when its explicit feed matches the active
+  profile's controlled-seek feed or its distance fits the job's configured overscan envelope. A
+  forged marker on arbitrary blank-feed motion remains reportable. Under ADR-228 this is review
+  evidence, not a new Start refusal.
+- Treat finite per-operation scan offsets beyond the profile's conservative magnitude cap, and
+  finite controlled-seek feeds outside the profile range, as post-emit Job Review warnings. They
+  remain loadable and compilable so the exact physical Frame stays authoritative. Non-finite scan
+  offsets and non-finite or non-positive controlled feeds remain pre-emit failures because no valid
+  controller program can be constructed. Device calibration tables keep their stricter input-time
+  validation; this warning policy applies to job operation overrides, not claimed calibration data.
+- Keep current `$30` and `$32` findings as Job Review advisories under governing ADR-232; known,
+  unknown, stale, or unavailable values never refuse Frame or Start. When the exact executable
+  program contains `M7` and a current stock-GRBL `$I` response proves option `M` is absent, refuse
+  laser or CNC preparation as factual command incompatibility: that controller cannot execute the
+  reviewed program. Re-evaluate that exact command against current build evidence after queue
+  fencing; observation or session drift alone is not incompatibility. Missing, stale, unavailable,
+  or non-stock `$I` evidence remains a Job Review acknowledgement, and no unrelated ADR-228 warning
+  becomes a refusal.
+- Compute Print-and-Cut/registration warnings from the prepared output-scoped project, not the
+  unscoped source scene. Selecting only artwork or only the registration box therefore cannot inherit
+  a false warning that both will burn in the same pass.
+- Export provenance advances to `adr-235-4040-quality-controlled-v2` because the combined controller
+  program differs from ADR-234 even though its non-overlapping split geometry remains governing.
+
+### Consequences
+
+The 4040 now favors repeatable motion and aligned scan direction over minimum runtime. Bounded
+scanline entries and full-where-safe Island runways increase travel for fragmented art, and one-way
+scanning can approach twice the scan time; those costs are intentional and visible in the same
+planner used for ETA. Generic and Falcon profiles retain legacy direction, runway, and `G0` behavior
+unless explicitly configured otherwise.
+Their ordinary vector bytes also remain unchanged; only paths with points equal at controller
+precision lose non-moving commands.
+
+This change establishes code-level output semantics and regression coverage only. It does not prove
+the cause of an existing bad burn, certify 4040 hardware, or establish that the resulting physical
+mark is acceptable. Material coupons and controlled A/B burns are still required to distinguish
+software improvement from focus, optics, mechanics, power delivery, firmware, and material effects.

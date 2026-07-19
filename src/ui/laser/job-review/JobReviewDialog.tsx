@@ -65,6 +65,7 @@ function OpenJobReview(props: {
         <JobReviewMachineSection
           machineKind={model.machineKind}
           toolPlanLabels={model.toolPlanLabels}
+          outputQualityFacts={model.outputQualityFacts}
         />
       </section>
       <JobReviewAcknowledgement acknowledgement={model.acknowledgement} purpose={purpose} />

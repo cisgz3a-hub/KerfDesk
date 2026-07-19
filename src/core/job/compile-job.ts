@@ -13,7 +13,6 @@ import { type DeviceProfile, toMachineCoords } from '../devices';
 import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
-import { objectPowerScalePercent } from './object-power-scale';
 import {
   applyTransform,
   assertNever,
@@ -32,6 +31,10 @@ import {
   withClosingPoint,
 } from '../scene';
 import { compileRasterGroupsForLayer } from './compile-job-raster';
+import {
+  layerWithObjectOverride,
+  sharedObjectPowerScalePercent,
+} from './compile-job-object-policy';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
@@ -40,6 +43,8 @@ import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import { offsetFillContours } from './offset-fill';
 import type { CutSegment, FillSegment, Group, Job } from './job';
 import { commonVectorGroupFields } from './vector-group-fields';
+import { resolveFillScanDirection, resolveIslandFillScanDirection } from './scan-direction-policy';
+import { validatedScanOffsetMm } from './scan-offset';
 
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
 
@@ -144,11 +149,6 @@ function vectorObjectBucketsForLayer(
   return buckets;
 }
 
-function layerWithObjectOverride(layer: Layer, obj: SceneObject): Layer {
-  if (obj.operationOverride === undefined) return layer;
-  return { ...layer, ...obj.operationOverride };
-}
-
 function vectorGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
@@ -160,8 +160,14 @@ function vectorGroupsForLayer(
     if (layer.fillStyle === 'island') {
       return islandFillGroupsForLayer(objects, layer, device, powerSource, sourceObjectId);
     }
-    const segments = collectFillSegmentsForLayer(objects, layer, device);
+    const scanDirection = resolveFillScanDirection(device, layer);
+    const hatchingLayer =
+      layer.fillStyle === 'offset'
+        ? layer
+        : { ...layer, fillBidirectional: scanDirection.bidirectional };
+    const segments = collectFillSegmentsForLayer(objects, hatchingLayer, device);
     if (segments.length === 0) return [];
+    const scanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
     const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
     const fillRunwayPolicy =
       layer.fillStyle === 'offset' ? undefined : fillRunwayPolicyForDevice(device);
@@ -171,6 +177,10 @@ function vectorGroupsForLayer(
         kind: 'fill' as const,
         fillStyle: layer.fillStyle,
         ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
+        ...(layer.fillStyle === 'offset' ? {} : { scanDirection }),
+        ...(layer.fillStyle === 'offset' || scanOffsetMm === undefined
+          ? {}
+          : { bidirectionalScanOffsetMm: scanOffsetMm }),
         overscanMm: Math.max(0, layer.fillOverscanMm),
         segments,
       },
@@ -194,7 +204,10 @@ function islandFillGroupsForLayer(
   const contours = collectFillContoursForLayer(objects, layer, device);
   const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
   const sensitiveIslandFill = islandMotionPolicy === 'sensitive';
-  const hatchingLayer = sensitiveIslandFill ? { ...layer, fillBidirectional: false } : layer;
+  const scanDirection = resolveIslandFillScanDirection(device, layer, sensitiveIslandFill);
+  const hatchingLayer = { ...layer, fillBidirectional: scanDirection.bidirectional };
+  const bidirectionalScanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
+  const fillRunwayPolicy = fillRunwayPolicyForDevice(device, 'island');
   return groupFillContoursIntoIslands(contours, {
     clusterMicroIslands: sensitiveIslandFill,
   }).flatMap((island): Group[] => {
@@ -212,24 +225,14 @@ function islandFillGroupsForLayer(
         kind: 'fill',
         fillStyle: 'island',
         ...(sensitiveIslandFill ? { islandMotionPolicy } : {}),
+        ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
+        scanDirection,
+        ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
         overscanMm: Math.max(0, layer.fillOverscanMm),
         segments,
       },
     ];
   });
-}
-
-function sharedObjectPowerScalePercent(objects: ReadonlyArray<SceneObject>): number | undefined {
-  let sharedScale: number | undefined;
-  for (const obj of objects) {
-    const scale = objectPowerScalePercent(obj);
-    if (sharedScale === undefined) {
-      sharedScale = scale;
-    } else if (sharedScale !== scale) {
-      return undefined;
-    }
-  }
-  return sharedScale;
 }
 
 function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {

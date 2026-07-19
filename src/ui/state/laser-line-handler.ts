@@ -52,6 +52,7 @@ import { frameHitLimitNotice } from './laser-safety-notice';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
 import type { LaserState } from './laser-store';
+import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { pushLog } from './laser-store-helpers';
 import { appendSystemNotice } from './laser-system-notice';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
@@ -312,6 +313,7 @@ function handleWelcomeLine(
     statusObservation: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(nextSessionEpoch, 'reset-cleanup'),
     detectedSettings: null,
     grblSettingsRows: [],

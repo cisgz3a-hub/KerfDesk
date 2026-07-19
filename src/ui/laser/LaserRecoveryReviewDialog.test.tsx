@@ -173,6 +173,7 @@ function exactCapsule(): RecoveryCapsule {
     retentionKey: 'exact-laser-signature',
   });
   const artifact = createExecutionArtifact({
+    artifactSchemaVersion: 1,
     runId: 'run-exact-laser',
     createdAtIso: '2026-07-15T09:00:00.000Z',
     gcode: emitted.gcode,

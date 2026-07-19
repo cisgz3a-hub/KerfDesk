@@ -100,8 +100,8 @@ export function runControllerReadiness(
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
 type ReadinessWarnings = Array<ControllerReadinessMessage<ControllerReadinessWarningCode>>;
 
-/** The laser `max-power-mismatch` message text (a Job Review warning under
- * frame-first; the mismatch never blocks Start). */
+/** The laser `max-power-mismatch` message text. Operator Start treats this
+ * reported contradiction as a refusal; missing evidence remains review-grade. */
 function laserMaxPowerMismatchMessage(
   controllerMaxPowerS: number,
   projectMaxPowerS: number,

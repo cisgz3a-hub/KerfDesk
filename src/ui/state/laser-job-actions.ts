@@ -32,6 +32,7 @@ import { invalidateControllerSessionEvidence } from './laser-controller-evidence
 import { clearCncLiveCaps } from './detected-settings-action';
 import {
   laserModeStartEvidenceIssue,
+  m7StartEvidenceIssue,
   type LaserModeStartSnapshotSource,
 } from './laser-mode-start-evidence';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
@@ -204,7 +205,7 @@ async function prepareStartBoundary(
   if (hasPendingControllerWrite(pendingState)) {
     throw new Error(startPendingControllerMessage(pendingState));
   }
-  assertLaserModeStartEvidence(get(), driver(), machineKind, options);
+  assertStartControllerEvidence(get(), driver(), machineKind, options, gcode);
   assertGcodeFitsController(gcode, options);
 }
 
@@ -275,20 +276,25 @@ function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
   return lines.some((line) => line.trim().toUpperCase() === 'M5') ? lines : ['M5', ...lines];
 }
 
-function assertLaserModeStartEvidence(
+function assertStartControllerEvidence(
   state: LaserState,
   activeDriver: ControllerDriver,
   machineKind: 'laser' | 'cnc',
   options: StartJobOptions,
+  gcode: string,
 ): void {
-  if (machineKind !== 'laser') return;
   const source: LaserModeStartSnapshotSource = {
     controllerSessionEpoch: state.controllerSessionEpoch,
     capabilities: activeDriver.capabilities,
     controllerSettings: state.controllerSettings,
     controllerSettingsObservation: state.controllerSettingsObservation,
+    controllerBuildInfo: state.controllerBuildInfo,
+    controllerBuildInfoObservation: state.controllerBuildInfoObservation,
   };
-  const issue = laserModeStartEvidenceIssue(source, options.laserModeStartEvidence);
+  const m7Issue = m7StartEvidenceIssue(source, gcode);
+  if (m7Issue !== null) throw new Error(m7Issue);
+  if (machineKind !== 'laser') return;
+  const issue = laserModeStartEvidenceIssue(source, options.laserModeStartEvidence, gcode);
   if (issue !== null) throw new Error(issue);
 }
 

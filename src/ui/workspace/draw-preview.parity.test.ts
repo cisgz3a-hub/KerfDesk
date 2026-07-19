@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { buildToolpath } from '../../core/job';
 import {
   addLayer,
@@ -78,16 +79,29 @@ describe('preview / output parity (P1-C)', () => {
       );
     }
   });
+
+  it('omits the phantom origin return when the active dialect does not park', () => {
+    const base = twoCutProject();
+    const project = { ...base, device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE };
+    const prepared = prepareOutput(project);
+    expect(prepared.ok).toBe(true);
+    if (prepared.ok) {
+      expect(buildPreviewToolpath(project)).toEqual(
+        expectedPreviewToolpath(project, prepared, false),
+      );
+    }
+  });
 });
 
 function expectedPreviewToolpath(
   project: Project,
   prepared: Extract<ReturnType<typeof prepareOutput>, { readonly ok: true }>,
+  parkAtOrigin = true,
 ) {
   return mapToolpathToScene(
     buildToolpath(prepared.job, {
       startPoint: { x: 0, y: 0 },
-      parkPoint: { x: 0, y: 0 },
+      ...(parkAtOrigin ? { parkPoint: { x: 0, y: 0 } } : {}),
       scanningOffsets: project.device.scanningOffsets,
     }),
     prepared.jobOriginOffset,

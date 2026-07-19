@@ -1,13 +1,12 @@
 import type { JobInterruption } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RunId } from './execution-artifact';
+import { RecoveryActivationCoordinator } from './recovery-activation-coordinator';
 import { legacyArtifact, readLegacyCheckpoint } from './legacy-checkpoint-migration';
-import { cleanupDisplacedRecoveryArtifacts } from './recovery-artifact-cleanup';
+import { RecoveryArtifactCleanupCoordinator } from './recovery-artifact-cleanup-coordinator';
 import { RecoveryArtifactStore } from './recovery-artifact-store';
 import { insertLegacyRecoveryCapsule } from './recovery-legacy-insert';
 import { compensateFailedRecoveryClaim } from './recovery-claim-compensation';
 import {
-  UNLOADED_RECOVERY_SNAPSHOT,
-  validRecoverySlots,
   type PersistedRecoverySlots,
   type RecoveryCapsule,
   type RecoveryRepositoryResult,
@@ -15,19 +14,13 @@ import {
   type StoredRecoveryArtifact,
 } from './recovery-model';
 import {
-  activateFreshRunMutation,
-  activateClaimedRecoveryMutation,
   claimRecoveryMutation,
-  completeRunMutation,
   discardCompletedReceiptMutation,
   discardRecoveryMutation,
-  interruptRunMutation,
   noteUntrackedRunAcceptedMutation,
   promoteStaleActiveRunMutation,
   releaseRecoveryClaimMutation,
-  updateProgressMutation,
 } from './recovery-slot-mutations';
-import { hydrateRecoverySnapshot } from './recovery-snapshot';
 import {
   recoveryErrorMessage as errorMessage,
   recoveryFailure as failure,
@@ -37,25 +30,33 @@ import {
   RecoveryTerminalCoordinator,
   type PendingRecoveryTerminal,
 } from './recovery-terminal-coordinator';
+import { recoveryTerminalPersistencePlan } from './recovery-terminal-persistence';
 import type { RecoveryRepositoryOptions } from './recovery-repository-options';
 import { RecoveryStartHandoff } from './recovery-start-handoff';
+import { RecoveryProgressCoordinator } from './recovery-progress-update';
+import { commitRecoverySlotMutation } from './recovery-mutation-commit';
+import { sanitizeUnhydratedRecoveryReferences } from './recovery-owner-sanitizer';
+import { RecoveryRepositoryState } from './recovery-repository-state';
+import type { RecoveryAuthoritativeResetBase } from './recovery-repository-state';
+import { RecoverySnapshotCoordinator } from './recovery-snapshot-coordinator';
 
 export type {
   RecoveryRepositoryOptions,
   RecoveryRepositoryWarning,
 } from './recovery-repository-options';
 
-type SnapshotListener = () => void;
-
 export class RecoveryRepository {
-  private snapshot: RecoveryRepositorySnapshot = UNLOADED_RECOVERY_SNAPSHOT;
-  private readonly listeners = new Set<SnapshotListener>();
+  private readonly state = new RecoveryRepositoryState(() => this.startHandoff.clearTimer());
   private readonly terminalCoordinator = new RecoveryTerminalCoordinator();
   private readonly nowIso: () => string;
   private initialization: Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> | null =
     null;
   private readonly artifactStore: RecoveryArtifactStore;
   private readonly startHandoff: RecoveryStartHandoff;
+  private readonly artifactCleanup: RecoveryArtifactCleanupCoordinator;
+  private readonly progressCoordinator: RecoveryProgressCoordinator;
+  private readonly snapshotCoordinator: RecoverySnapshotCoordinator;
+  private readonly activationCoordinator: RecoveryActivationCoordinator;
 
   constructor(private readonly options: RecoveryRepositoryOptions) {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString());
@@ -71,40 +72,60 @@ export class RecoveryRepository {
     this.startHandoff = new RecoveryStartHandoff({
       nowIso: this.nowIso,
       getSnapshot: this.getSnapshot,
-      exactArtifactRecord: (runId) => this.exactArtifactRecord(runId),
-      mutate: (operation, mutate) => this.mutateAndRefresh(operation, mutate),
+      exactArtifactRecord: (runId) => this.artifactStore.exact(runId),
+      mutate: (operation, mutate, requiredArtifactRunId) =>
+        this.mutateAndRefresh(operation, mutate, [], requiredArtifactRunId),
       refresh: this.refresh.bind(this),
+    });
+    this.artifactCleanup = new RecoveryArtifactCleanupCoordinator({
+      backend: options.backend,
+      isStaged: (runId) => this.terminalCoordinator.isStaged(runId),
+      stagedRuns: () => this.terminalCoordinator.stagedRuns(),
+      currentGeneration: () => this.currentGeneration(),
+      onFailure: (operation, error) => this.warn(operation, errorMessage(error)),
+    });
+    this.snapshotCoordinator = new RecoverySnapshotCoordinator({
+      backend: options.backend,
+      generationStore: options.generationStore,
+      state: this.state,
+      storageFailure: (operation, error) => this.storageFailure(operation, error),
+    });
+    this.activationCoordinator = new RecoveryActivationCoordinator({
+      artifactStore: this.artifactStore,
+      terminalCoordinator: this.terminalCoordinator,
+      persistTerminal: this.persistTerminal,
+      mutate: (operation, mutate, additionalArtifacts, requiredArtifactRunId) =>
+        this.mutateAndRefresh(operation, mutate, additionalArtifacts, requiredArtifactRunId),
+    });
+    this.progressCoordinator = new RecoveryProgressCoordinator({
+      backend: options.backend,
+      state: this.state,
+      minimumGeneration: () => this.currentGeneration(),
+      ensureLoaded: () => this.ensureLoaded(),
+      refreshAfterMutation: (authoritativeResetBase) =>
+        this.refreshAfterMutation([], authoritativeResetBase),
+      afterFallback: (before, after) => this.artifactCleanup.afterMutation(before, after),
+      storageFailure: (error) => this.storageFailure('update job recovery progress', error),
     });
   }
 
-  getSnapshot = (): RecoveryRepositorySnapshot => this.snapshot;
-
-  subscribe = (listener: SnapshotListener): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  getSnapshot = this.state.getSnapshot;
+  subscribe = this.state.subscribe;
 
   initialize(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
     this.initialization ??= this.initializeOnce();
     return this.initialization;
   }
 
-  async refresh(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
-    try {
-      const marker = this.options.generationStore.read();
-      const rawSlots = await this.options.backend.readSlots();
-      const slots = validRecoverySlots(rawSlots, marker);
-      if (slots.generation > marker) this.options.generationStore.write(slots.generation);
-      this.publish(await hydrateRecoverySnapshot(this.options.backend, slots));
-      return ok(this.snapshot);
-    } catch (error) {
-      return this.storageFailure('read recovery data', error);
-    }
+  refresh(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
+    return this.snapshotCoordinator.refresh();
   }
 
-  async stageArtifact(artifact: ExecutionArtifactV1): Promise<RecoveryRepositoryResult<RunId>> {
-    return this.artifactStore.stage(artifact);
-  }
+  stageArtifact = (artifact: ExecutionArtifactV1): Promise<RecoveryRepositoryResult<RunId>> =>
+    this.artifactStore.stage(artifact);
+
+  getArchivedExecution = (runId: RunId): Promise<RecoveryRepositoryResult<ExecutionArtifactV1>> =>
+    this.artifactStore.archived(runId);
 
   async discardStagedRun(runId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
     return this.artifactStore.discard(runId);
@@ -135,17 +156,7 @@ export class RecoveryRepository {
     runId: RunId,
     acceptedAtIso = this.nowIso(),
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    const record = await this.exactArtifactRecord(runId);
-    if (!record.ok) return record;
-    const activated = await this.mutateAndRefresh('activate job recovery tracking', (slots) =>
-      activateFreshRunMutation(
-        slots,
-        record.value.artifact as ExecutionArtifactV1,
-        record.value.generation,
-        acceptedAtIso,
-      ),
-    );
-    return this.terminalCoordinator.finishActivation(runId, activated, this.persistTerminal);
+    return this.activationCoordinator.fresh(runId, acceptedAtIso);
   }
 
   async updateProgress(
@@ -153,9 +164,7 @@ export class RecoveryRepository {
     ackedLines: number,
     updatedAtIso = this.nowIso(),
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.mutateAndRefresh('update job recovery progress', (slots) =>
-      updateProgressMutation(slots, runId, ackedLines, updatedAtIso),
-    );
+    return this.progressCoordinator.update(runId, ackedLines, updatedAtIso);
   }
 
   async interruptRun(
@@ -168,7 +177,7 @@ export class RecoveryRepository {
       runId,
       { kind: 'interrupted', ackedLines, interruption, updatedAtIso },
       this.persistTerminal,
-      () => this.snapshot.activeRun === null || this.snapshot.activeRun.runId === runId,
+      () => this.state.snapshot.activeRun === null || this.state.snapshot.activeRun.runId === runId,
     );
   }
 
@@ -180,15 +189,16 @@ export class RecoveryRepository {
       runId,
       { kind: 'completed', completedAtIso },
       this.persistTerminal,
-      () => this.snapshot.activeRun === null || this.snapshot.activeRun.runId === runId,
+      () => this.state.snapshot.activeRun === null || this.state.snapshot.activeRun.runId === runId,
     );
   }
 
-  async noteUntrackedRunAccepted(): Promise<RecoveryRepositoryResult<boolean>> {
+  async noteUntrackedRunAccepted(runId?: RunId): Promise<RecoveryRepositoryResult<boolean>> {
     const result = await this.mutateAndRefresh(
       'supersede recovery after untracked Start',
       noteUntrackedRunAcceptedMutation,
     );
+    if (result.ok && runId !== undefined) await this.artifactStore.discard(runId);
     if (result.ok) return result;
     const purged = await this.purgeControllerData();
     return purged.ok ? ok(true) : result;
@@ -240,7 +250,7 @@ export class RecoveryRepository {
       }
       return result;
     }
-    const capsule = this.snapshot.recoveryCapsule;
+    const capsule = this.state.snapshot.recoveryCapsule;
     return result.value && capsule?.claim?.attemptId === args.attemptId
       ? ok(capsule)
       : failure('conflict');
@@ -263,23 +273,10 @@ export class RecoveryRepository {
     readonly recoveryRunId: RunId;
     readonly acceptedAtIso?: string;
   }): Promise<RecoveryRepositoryResult<boolean>> {
-    const record = await this.exactArtifactRecord(args.recoveryRunId);
-    if (!record.ok) return record;
-    const activated = await this.mutateAndRefresh('activate supervised recovery run', (slots) =>
-      activateClaimedRecoveryMutation(slots, {
-        sourceRunId: args.sourceRunId,
-        sourceRevision: args.sourceRevision,
-        attemptId: args.attemptId,
-        artifact: record.value.artifact as ExecutionArtifactV1,
-        artifactGeneration: record.value.generation,
-        acceptedAtIso: args.acceptedAtIso ?? this.nowIso(),
-      }),
-    );
-    return this.terminalCoordinator.finishActivation(
-      args.recoveryRunId,
-      activated,
-      this.persistTerminal,
-    );
+    return this.activationCoordinator.claimed({
+      ...args,
+      acceptedAtIso: args.acceptedAtIso ?? this.nowIso(),
+    });
   }
 
   async migrateLegacyCheckpoint(): Promise<RecoveryRepositoryResult<boolean>> {
@@ -307,18 +304,26 @@ export class RecoveryRepository {
 
   async purgeControllerData(): Promise<RecoveryRepositoryResult<number>> {
     this.terminalCoordinator.clear();
+    this.artifactCleanup.clear();
+    this.artifactStore.clear();
+    this.snapshotCoordinator.clear();
     this.startHandoff.clearTimer();
-    const generation = Math.max(this.snapshot.generation, this.options.generationStore.read()) + 1;
+    const generation =
+      Math.max(this.state.snapshot.generation, this.options.generationStore.read()) + 1;
     const markerWritten = this.options.generationStore.write(generation);
     this.options.legacyStorage.clear();
-    this.publish({
-      loaded: true,
-      generation,
-      activeRun: null,
-      recoveryCapsule: null,
-      lastCompletedReceipt: null,
-      pendingStart: null,
-    });
+    this.state.publish(
+      {
+        loaded: true,
+        generation,
+        activeRun: null,
+        recoveryCapsule: null,
+        lastCompletedReceipt: null,
+        pendingStart: null,
+        executionHistory: [],
+      },
+      0,
+    );
     try {
       await this.options.backend.purge(generation);
       if (!markerWritten) {
@@ -333,34 +338,34 @@ export class RecoveryRepository {
   private async initializeOnce(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
     const loaded = await this.refresh();
     if (!loaded.ok) return loaded;
+    const sanitized = await this.mutateAndRefresh(
+      'drop invalid persisted recovery references',
+      sanitizeUnhydratedRecoveryReferences(this.state.snapshot, this.state.slotRevision),
+    );
+    if (!sanitized.ok) return sanitized;
     const reconciled = await this.startHandoff.reconcile();
     if (!reconciled.ok) return reconciled;
     const promoted = await this.promoteStaleActiveRun();
     if (!promoted.ok) return promoted;
     const migrated = await this.migrateLegacyCheckpoint();
-    return migrated.ok ? ok(this.snapshot) : migrated;
+    if (!migrated.ok) return migrated;
+    await this.artifactCleanup.afterInitialization();
+    return ok(this.state.snapshot);
   }
 
   private async promoteStaleActiveRun(): Promise<RecoveryRepositoryResult<boolean>> {
-    if (this.snapshot.activeRun === null) return ok(false);
+    if (this.state.snapshot.activeRun === null) return ok(false);
     return this.mutateAndRefresh('promote stale active run to recovery', (slots) =>
       promoteStaleActiveRunMutation(slots, this.nowIso()),
     );
   }
 
   private async ensureLoaded(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
-    return this.snapshot.loaded ? ok(this.snapshot) : this.refresh();
+    return this.state.snapshot.loaded ? ok(this.state.snapshot) : this.refresh();
   }
 
-  private currentGeneration(): number {
-    return Math.max(this.snapshot.generation, this.options.generationStore.read());
-  }
-
-  private async exactArtifactRecord(
-    runId: RunId,
-  ): Promise<RecoveryRepositoryResult<StoredRecoveryArtifact>> {
-    return this.artifactStore.exact(runId);
-  }
+  private currentGeneration = (): number =>
+    Math.max(this.state.snapshot.generation, this.options.generationStore.read());
 
   private async mutateAndRefresh<T>(
     operation: string,
@@ -368,32 +373,42 @@ export class RecoveryRepository {
       readonly slots: PersistedRecoverySlots;
       readonly value: T;
     },
+    additionalArtifacts: ReadonlyArray<StoredRecoveryArtifact> = [],
+    requiredArtifactRunId?: RunId,
   ): Promise<RecoveryRepositoryResult<T>> {
     const ready = await this.ensureLoaded();
     if (!ready.ok) return ready;
     try {
-      const before = this.snapshot;
+      const before = this.state.snapshot;
+      const beforeRevision = this.state.slotRevision;
       const generation = this.currentGeneration();
-      const value = await this.options.backend.mutateSlots((raw) =>
-        mutate(validRecoverySlots(raw, generation)),
-      );
-      await this.refreshAfterMutation();
-      await cleanupDisplacedRecoveryArtifacts({
+      const committed = await commitRecoverySlotMutation({
         backend: this.options.backend,
-        before,
-        after: this.snapshot,
-        isStaged: (runId) => this.terminalCoordinator.isStaged(runId),
-        onFailure: (error) =>
-          this.warn('clean up superseded recovery artifact', errorMessage(error)),
+        minimumGeneration: generation,
+        ...(requiredArtifactRunId === undefined ? {} : { requiredArtifactRunId }),
+        mutate,
       });
-      return ok(value);
+      if (!committed.artifactExists) return failure('not-found');
+      await this.refreshAfterMutation(
+        additionalArtifacts,
+        committed.baseAccepted ? undefined : { snapshot: before, slotRevision: beforeRevision },
+      );
+      await this.artifactCleanup.afterMutation(before, this.state.snapshot);
+      return ok(committed.value);
     } catch (error) {
       return this.storageFailure(operation, error);
     }
   }
 
-  private async refreshAfterMutation(): Promise<void> {
-    const refreshed = await this.refresh();
+  private async refreshAfterMutation(
+    additionalArtifacts: ReadonlyArray<StoredRecoveryArtifact> = [],
+    authoritativeResetBase?: RecoveryAuthoritativeResetBase,
+  ): Promise<void> {
+    const refreshed = await this.snapshotCoordinator.refresh({
+      reuseVerifiedArtifacts: true,
+      additionalArtifacts,
+      ...(authoritativeResetBase === undefined ? {} : { authoritativeResetBase }),
+    });
     if (!refreshed.ok) throw new Error('Recovery data was written but could not be reloaded.');
   }
 
@@ -401,33 +416,15 @@ export class RecoveryRepository {
     runId: RunId,
     terminal: PendingRecoveryTerminal,
   ): Promise<RecoveryRepositoryResult<boolean>> => {
-    return terminal.kind === 'completed'
-      ? this.mutateAndRefresh('complete job recovery tracking', (slots) =>
-          completeRunMutation(slots, runId, terminal.completedAtIso),
-        )
-      : this.mutateAndRefresh('save interrupted job recovery', (slots) =>
-          interruptRunMutation(
-            slots,
-            runId,
-            terminal.ackedLines,
-            terminal.interruption,
-            terminal.updatedAtIso,
-          ),
-        );
+    const plan = recoveryTerminalPersistencePlan(runId, terminal);
+    return this.mutateAndRefresh(plan.operation, plan.mutate);
   };
-
-  private publish(snapshot: RecoveryRepositorySnapshot): void {
-    if (snapshot.pendingStart === null) this.startHandoff.clearTimer();
-    this.snapshot = snapshot;
-    for (const listener of this.listeners) listener();
-  }
 
   private storageFailure<T>(operation: string, error: unknown): RecoveryRepositoryResult<T> {
     this.warn(operation, errorMessage(error));
     return failure('storage-unavailable');
   }
 
-  private warn(operation: string, message: string): void {
+  private warn = (operation: string, message: string): void =>
     this.options.onWarning?.({ operation, message });
-  }
 }

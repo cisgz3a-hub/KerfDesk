@@ -13,4 +13,9 @@ export const grblHalDriver: ControllerDriver = {
   ...grblDriver,
   kind: 'grblhal',
   label: 'grblHAL',
+  commands: {
+    ...grblDriver.commands,
+    // grblHAL extends `$I`; do not treat a variant response as stock proof.
+    buildInfoQuery: null,
+  },
 };

@@ -5,7 +5,7 @@
 import type { CameraAlignment, CameraCalibration } from '../camera';
 import type { RotarySetup } from './rotary';
 import type { LaserFireControl } from './fire-control';
-import type { ScanOffsetPoint } from './scan-offset-profile';
+import type { ScanOffsetCalibrationStatus, ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
 import type { CameraProfile } from '../camera';
@@ -184,6 +184,13 @@ export type DeviceProfile = {
   // Bidirectional fill/raster compensation. Empty keeps emitted output
   // unchanged until the operator calibrates a machine-specific table.
   readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
+  // Newly measured tables remain one-way on the 4040 until the operator burns
+  // and explicitly accepts a corrected verification coupon. Absent on a
+  // nonempty legacy table preserves the historical calibrated behavior.
+  readonly scanOffsetCalibrationStatus?: ScanOffsetCalibrationStatus | undefined;
+  // Optional controlled laser-off seek feed. Absent keeps normal G0 rapid
+  // positioning; a positive value emits explicit G1 F... S0 seeks.
+  readonly controlledLaserOffTravelFeedMmPerMin?: number | undefined;
   // Overhead-camera de-fisheye calibration (ADR-107/108). Absent until the operator
   // runs the calibration wizard; persisted so the rectified overlay survives reload.
   readonly cameraCalibration?: CameraCalibration;
@@ -338,6 +345,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   laserModeEnabled: true,
   airAssistCommand: 'none',
   gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+  controlledLaserOffTravelFeedMmPerMin: 800,
   framingFeedMmPerMin: 2000,
   noGoZones: [],
   capabilities: [

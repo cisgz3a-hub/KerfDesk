@@ -38,6 +38,11 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.scanningOffsets).toEqual([]);
   });
 
+  it('keeps generic seeks rapid and configures the 4040 controlled seek at F800', () => {
+    expect(DEFAULT_DEVICE_PROFILE.controlledLaserOffTravelFeedMmPerMin).toBeUndefined();
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.controlledLaserOffTravelFeedMmPerMin).toBe(800);
+  });
+
   it('defaults machine profile metadata and no-go zones to safe built-in values', () => {
     expect(DEFAULT_DEVICE_PROFILE.profileId).toBe('generic-grbl-400x400');
     expect(DEFAULT_DEVICE_PROFILE.profileSource).toBe('built-in');

@@ -27,6 +27,12 @@ function makeConnection(
     write: async (data) => {
       writes.push(data);
       await onWrite?.(data);
+      // Stock GRBL owns the connect-time $I exchange until its terminal ok.
+      if (data === '$I\n') {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
       // Real GRBL answers the connect-time $G modal query (C6) with its state
       // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {

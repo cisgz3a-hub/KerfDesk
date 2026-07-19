@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../../core/devices';
+import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import {
   moveLayer as moveSceneLayer,
@@ -68,7 +69,7 @@ export function sceneActions(
       }),
     updateDeviceProfile: (patch) =>
       set((s) => {
-        const nextDevice: DeviceProfile = { ...s.project.device, ...patch };
+        const nextDevice = deviceProfileWithInteractivePatch(s.project.device, patch);
         return {
           project: projectAfterDeviceProfileChange(s.project, nextDevice, s.cncLiveCaps),
           jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, nextDevice),

@@ -79,13 +79,14 @@ export function prepareOutput(
     ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
     : ZERO_OFFSET;
   const placed = applyJobOriginOffset(compiled, offset);
-  // optimize is pure path-order reduction (nearest-neighbor) — same cuts, same
-  // speeds, same passes, just shorter travel. Doing it HERE means the preview
-  // shows the exact order the machine will run.
+  // Optimization preserves cut geometry/settings while reordering and possibly
+  // reversing paths. Joining formerly separated paths can also change planner
+  // junction timing, not only travel distance. Doing it HERE means the preview
+  // and duration estimate use the exact order the machine will run.
   return {
     ok: true,
     project: outputProject,
-    job: optimizePaths(placed, project.optimization),
+    job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
     jobOriginOffset: offset,
   };
 }
@@ -116,5 +117,5 @@ function resolveJobOriginOffset(
     const fullBounds = computeSceneOutputBounds(project.scene, project.device);
     return fullBounds === null ? ZERO_OFFSET : jobOriginOffsetFromBounds(fullBounds, jobOrigin);
   }
-  return jobOriginOffset(compiled, jobOrigin);
+  return jobOriginOffset(compiled, jobOrigin, project.device);
 }

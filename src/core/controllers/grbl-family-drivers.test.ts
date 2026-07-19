@@ -12,19 +12,27 @@ import { selectControllerDriver } from './select-controller-driver';
 import { smoothiewareDriver } from './smoothieware/driver';
 
 describe('GRBL-family variant drivers', () => {
-  it('grblHAL shares the exact GRBL wire vocabulary and capabilities', () => {
+  const nonStockGrblCommands = { ...grblDriver.commands, buildInfoQuery: null };
+
+  it('exposes strict build-info proof only on the stock GRBL driver', () => {
+    expect(grblDriver.commands.buildInfoQuery).toBe('$I');
+    expect(grblHalDriver.commands.buildInfoQuery).toBeNull();
+    expect(fluidncDriver.commands.buildInfoQuery).toBeNull();
+  });
+
+  it('grblHAL shares GRBL operations except the stock-only build-info proof', () => {
     expect(grblHalDriver.kind).toBe('grblhal');
     expect(grblHalDriver.label).toBe('grblHAL');
     expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
-    expect(grblHalDriver.commands).toEqual(grblDriver.commands);
+    expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
     expect(grblHalDriver.capabilities).toEqual(grblDriver.capabilities);
     expect(grblHalDriver.defaultBaudRate).toBe(115200);
   });
 
-  it('FluidNC shares the wire vocabulary but downgrades settings writes', () => {
+  it('FluidNC omits stock-only build proof and downgrades settings writes', () => {
     expect(fluidncDriver.kind).toBe('fluidnc');
     expect(fluidncDriver.realtime).toEqual(grblDriver.realtime);
-    expect(fluidncDriver.commands).toEqual(grblDriver.commands);
+    expect(fluidncDriver.commands).toEqual(nonStockGrblCommands);
     expect(fluidncDriver.capabilities.settings).toBe('readonly-dump');
     expect(fluidncDriver.capabilities.firmwareSetupPanel).toBe('none');
     expect(fluidncDriver.capabilities.jog).toBe('native-jog');

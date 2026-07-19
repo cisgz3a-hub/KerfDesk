@@ -1,6 +1,11 @@
 import { frameBoundsSignature } from '../../core/job';
+import type { OutputScope, Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
-import { framedRunControllerSnapshot, type FramedRunCandidate } from '../state/framed-run';
+import {
+  framedRunControllerSnapshot,
+  type FramedRunCandidate,
+  type FramedRunPermit,
+} from '../state/framed-run';
 import { useCameraStore } from '../state/camera-store';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
@@ -52,6 +57,57 @@ export async function runFrameNow(): Promise<boolean> {
   });
   if (review === null) return false;
   return dispatchReviewedFrame(review);
+}
+
+export type TransientFrameControllerPreparation = {
+  readonly laser: ReturnType<typeof useLaserStore.getState>;
+  readonly wcsNormalizationWarning?: string;
+};
+
+/** Own the same queue/WCS/setup boundary as an ordinary exact Frame without
+ * replacing the open project. The caller can then compile its immutable
+ * transient project against this returned controller snapshot. */
+export async function prepareTransientFrameController(
+  project: Project,
+): Promise<TransientFrameControllerPreparation | null> {
+  ensureFramedRunInvalidationSubscriptions();
+  useStartBlockerStore.getState().clear();
+  if (!(await requireFrameControllerQueue())) return null;
+  const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
+  if (!wcsNormalization.ok) {
+    reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
+    return null;
+  }
+  const laser = await prepareFrameLaser(
+    project.machine?.kind === 'cnc',
+    useLaserStore.getState(),
+    wcsNormalization.warning,
+  );
+  if (laser === null) return null;
+  return {
+    laser,
+    ...(wcsNormalization.warning === undefined
+      ? {}
+      : { wcsNormalizationWarning: wcsNormalization.warning }),
+  };
+}
+
+/** Physically Frame an already-reviewed transient camera project. Success
+ * returns the exact completion-issued permit; dispatch alone returns null. */
+export async function dispatchTransientReviewedFrame(
+  review: ConfirmedJobReview,
+  outputScope: OutputScope,
+): Promise<FramedRunPermit | null> {
+  const accepted = await dispatchReviewedFrame(review, {
+    authorizationContext: 'transient-camera',
+    outputScope,
+  });
+  if (!accepted) return null;
+  const permit = useLaserStore.getState().framedRun;
+  return permit?.candidate.authorizationContext === 'transient-camera' &&
+    permit.candidate.project === review.bundle.project
+    ? permit
+    : null;
 }
 
 async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
@@ -107,23 +163,35 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
   };
 }
 
-async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolean> {
+type ReviewedFrameDispatchOptions = {
+  readonly authorizationContext?: 'transient-camera';
+  readonly outputScope?: OutputScope;
+};
+
+async function dispatchReviewedFrame(
+  review: ConfirmedJobReview,
+  options: ReviewedFrameDispatchOptions = {},
+): Promise<boolean> {
   const { bundle } = review;
   if (!(await requireFrameControllerQueue())) return false;
   const currentLaser = useLaserStore.getState();
-  if (!reviewedFrameIsCurrent(bundle, currentLaser)) {
+  if (!reviewedFrameIsCurrent(bundle, currentLaser, options.authorizationContext)) {
     reportFrameRefusal([
       'The job or machine setup changed during review. Review the current job and Frame again.',
     ]);
     return false;
   }
-
   const frameCandidate = resolveFrameCandidate(bundle.prepared);
   if (!frameCandidate.ok) {
     reportFrameRefusal(frameCandidate.messages);
     return false;
   }
   const { jobBounds, motionBounds } = frameCandidate;
+  const verificationBounds = frameVerificationBounds(
+    bundle.project.machine?.kind,
+    jobBounds,
+    motionBounds,
+  );
   const returnToWorkPosition = currentWorkXy(currentLaser);
   if (returnToWorkPosition === undefined) {
     reportFrameRefusal([
@@ -131,19 +199,22 @@ async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolea
     ]);
     return false;
   }
+  const candidateOptions = reviewedFrameCandidateOptions(bundle, options);
   const candidate: FramedRunCandidate = {
     preparedStart: bundle.prepared,
     project: bundle.project,
-    outputScope: currentOutputScope(bundle.app),
+    ...candidateOptions,
     executionSignature: bundle.prepared.canvasPlan.retentionKey,
     controllerBeforeFrame: framedRunControllerSnapshot(currentLaser),
     externalEnvironment: bundle.externalEnvironment,
     frameVerification: {
-      boundsSignature: frameBoundsSignature(jobBounds),
+      boundsSignature: frameBoundsSignature(verificationBounds),
       wco: currentLaser.wcoCache,
       workOriginActive: currentLaser.workOriginActive,
     },
     returnToWorkPosition,
+    reviewedAtIso: review.reviewedAtIso,
+    reviewModel: review.reviewModel,
     ...(review.laserModeStartEvidence === undefined
       ? {}
       : { laserModeStartEvidence: review.laserModeStartEvidence }),
@@ -167,6 +238,25 @@ async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolea
     return false;
   }
   return reportFrameCompletion(candidate, await completion.result);
+}
+
+function reviewedFrameCandidateOptions(
+  bundle: ReviewedStartBundle,
+  options: ReviewedFrameDispatchOptions,
+): Pick<FramedRunCandidate, 'outputScope' | 'authorizationContext'> {
+  const outputScope =
+    options.outputScope === undefined ? currentOutputScope(bundle.app) : options.outputScope;
+  return options.authorizationContext === undefined
+    ? { outputScope }
+    : { outputScope, authorizationContext: options.authorizationContext };
+}
+
+function frameVerificationBounds(
+  machineKind: 'laser' | 'cnc' | undefined,
+  jobBounds: Parameters<typeof frameBoundsSignature>[0],
+  motionBounds: Parameters<typeof frameBoundsSignature>[0],
+): Parameters<typeof frameBoundsSignature>[0] {
+  return machineKind === 'cnc' ? jobBounds : motionBounds;
 }
 
 function reportFrameCompletion(candidate: FramedRunCandidate, accepted: boolean): boolean {
@@ -234,12 +324,15 @@ async function prepareFrameLaser(
 function reviewedFrameIsCurrent(
   bundle: ReviewedStartBundle,
   currentLaser: ReturnType<typeof useLaserStore.getState>,
+  authorizationContext: 'transient-camera' | undefined,
 ): boolean {
+  const transientProject = authorizationContext === 'transient-camera';
   return (
-    currentReplayExecutionSignature() === bundle.prepared.canvasPlan.retentionKey &&
+    (transientProject ||
+      currentReplayExecutionSignature() === bundle.prepared.canvasPlan.retentionKey) &&
     startExternalEnvironmentMatches(
       bundle.externalEnvironment,
-      useStore.getState().project,
+      transientProject ? bundle.project : useStore.getState().project,
       useCameraStore.getState(),
     ) &&
     controllerStartPreparationStillCurrent(bundle.laser, currentLaser)

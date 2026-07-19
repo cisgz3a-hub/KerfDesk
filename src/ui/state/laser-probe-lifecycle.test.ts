@@ -9,6 +9,7 @@ import {
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -44,8 +45,21 @@ const CORNER_REQUEST = {
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
@@ -55,9 +69,7 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
       return () => closeHandlers.delete(handler);
     },
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
     emitClose: () => {
       for (const handler of closeHandlers) handler();
     },
@@ -143,9 +155,7 @@ describe('probe controller transaction lifecycle', () => {
     await expect(useLaserStore.getState().sendConsoleCommand('$I')).rejects.toThrow(
       /controller operation/i,
     );
-    await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
-      /controller operation/i,
-    );
+    await expect(startTestLaserJob('G21\nG90\nM5\n')).rejects.toThrow(/controller operation/i);
     await expect(useLaserStore.getState().sendRealtimeOverride('\x90')).rejects.toThrow(
       /locked during a probe/i,
     );
@@ -334,9 +344,7 @@ describe('probe controller transaction lifecycle', () => {
       phase: 'recovering',
     });
     expect(useLaserStore.getState().probeBusy).toBe(true);
-    await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
-      /controller operation/i,
-    );
+    await expect(startTestLaserJob('G21\nG90\nM5\n')).rejects.toThrow(/controller operation/i);
 
     // Idle reports received before reset transport acceptance are stale and
     // cannot satisfy the recovery proof.

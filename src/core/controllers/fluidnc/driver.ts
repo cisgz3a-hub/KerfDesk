@@ -11,6 +11,11 @@ export const fluidncDriver: ControllerDriver = {
   ...grblDriver,
   kind: 'fluidnc',
   label: 'FluidNC',
+  commands: {
+    ...grblDriver.commands,
+    // FluidNC identity/build output is not the strict stock-GRBL `$I` shape.
+    buildInfoQuery: null,
+  },
   capabilities: {
     ...grblDriver.capabilities,
     settings: 'readonly-dump',

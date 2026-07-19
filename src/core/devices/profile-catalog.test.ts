@@ -167,4 +167,17 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       }),
     ).toEqual([]);
   });
+
+  it('rejects a controlled laser-off seek feed above the machine feed ceiling', () => {
+    const source = GRBL_MACHINE_PROFILE_CATALOG[0]?.profile;
+    if (source === undefined) throw new Error('catalog profile missing');
+
+    expect(
+      validateMachineProfile({
+        ...source,
+        maxFeed: 1000,
+        controlledLaserOffTravelFeedMmPerMin: 1001,
+      }),
+    ).toContain('controlledLaserOffTravelFeedMmPerMin must not exceed maxFeed');
+  });
 });

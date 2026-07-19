@@ -1,4 +1,5 @@
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { respondToStockGrblHandshakeQuery } from './laser-controller-handshake.test-support';
 import { useLaserStore } from './laser-store';
 
 // Shared serial-connection fake and connect/flush helpers for the console
@@ -11,17 +12,24 @@ export type FakeConnection = SerialConnection & {
 
 export function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      // Complete only queries still owned by the connection handshake. The
+      // later console $$ under test is an interactive command, so it remains
+      // unanswered and can exercise rejection/timeout cleanup.
+      respondToStockGrblHandshakeQuery(data, emit);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -49,5 +57,5 @@ export async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 export async function flushConnect(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }

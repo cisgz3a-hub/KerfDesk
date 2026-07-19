@@ -82,6 +82,19 @@ export function optionalGrblRxBufferBytes(
     : `missing or invalid \`${path}\``;
 }
 
+export function optionalControlledLaserOffTravelFeed(
+  obj: Record<string, unknown>,
+  path: string,
+): string | null {
+  const shapeIssue = optionalPositiveNumber(obj, path);
+  if (shapeIssue !== null) return shapeIssue;
+  const feed = valueAtPath(obj, path);
+  const maxFeed = obj['maxFeed'];
+  return typeof feed === 'number' && typeof maxFeed === 'number' && feed > maxFeed
+    ? `${path} must not exceed device.maxFeed`
+    : null;
+}
+
 export function optionalCameraProfile(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined ? null : validateCameraProfileShape(value, path);

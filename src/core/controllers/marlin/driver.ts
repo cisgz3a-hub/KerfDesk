@@ -63,6 +63,7 @@ export const marlinDriver: ControllerDriver = {
     unlock: null,
     sleep: null,
     settingsQuery: null,
+    buildInfoQuery: null,
     modalStateQuery: null,
     offsetsQuery: null,
     queuedStatusQuery: MARLIN_CMD_POSITION,

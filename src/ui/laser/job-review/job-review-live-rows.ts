@@ -7,7 +7,15 @@ import type { OverrideValues, StatusReport } from '../../../core/controllers/grb
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
-import { activeCncTool, machineKindOf, type MachineKind, type Project } from '../../../core/scene';
+import { analyzeFillHeatRisk, type Job } from '../../../core/job';
+import type { ScanDirectionReason } from '../../../core/job/scan-direction-policy';
+import {
+  activeCncTool,
+  machineKindOf,
+  type Layer,
+  type MachineKind,
+  type Project,
+} from '../../../core/scene';
 import {
   describeOverrides,
   formatMm,
@@ -113,6 +121,113 @@ export function buildMachineReviewFacts(project: Project): ReadonlyArray<JobRevi
           ),
         ]),
   ];
+}
+
+export function buildOutputQualityReviewFacts(
+  job: Job,
+  layers: ReadonlyArray<Layer>,
+): ReadonlyArray<JobReviewFact> {
+  return [...buildFillRunwayFacts(job), ...buildScanDirectionFacts(job, layers)];
+}
+
+function buildFillRunwayFacts(job: Job): ReadonlyArray<JobReviewFact> {
+  const facts: JobReviewFact[] = [];
+  const coverage = analyzeFillHeatRisk(job);
+  if (coverage.fillSweepCount > 0) {
+    facts.push(
+      fact(
+        'Fill runway coverage',
+        `requested ${coverage.fillRequestedRunwayValuesMm.join(' / ')} mm · ${coverage.fillFullRunwaySweepCount} full · ${coverage.fillPartialRunwaySweepCount} partial · ${coverage.fillNoRunwaySweepCount} skipped · ${coverage.fillDisabledRunwaySweepCount} disabled (${coverage.fillSweepCount} emitted sweeps)`,
+        coverage.fillPartialRunwaySweepCount > 0 || coverage.fillNoRunwaySweepCount > 0
+          ? 'warning'
+          : 'default',
+      ),
+    );
+  }
+  return facts;
+}
+
+function buildScanDirectionFacts(
+  job: Job,
+  layers: ReadonlyArray<Layer>,
+): ReadonlyArray<JobReviewFact> {
+  const facts: JobReviewFact[] = [];
+  const seen = new Set<string>();
+  for (const group of job.groups) {
+    const entry = scanDirectionReviewEntry(group, layers);
+    if (entry === null || seen.has(entry.key)) continue;
+    seen.add(entry.key);
+    facts.push(entry.reviewFact);
+  }
+  return facts;
+}
+
+function scanDirectionReviewEntry(
+  group: Job['groups'][number],
+  layers: ReadonlyArray<Layer>,
+): { readonly key: string; readonly reviewFact: JobReviewFact } | null {
+  if (
+    group.kind === 'cnc' ||
+    group.kind === 'cut' ||
+    (group.kind === 'fill' && (group.fillStyle ?? 'scanline') === 'offset') ||
+    group.scanDirection === undefined
+  ) {
+    return null;
+  }
+  const direction = group.scanDirection;
+  const name = operationName(group.layerId, layers);
+  return {
+    key: `${group.layerId}:${group.kind}:${direction.reason}`,
+    reviewFact: fact(
+      `${group.kind === 'raster' ? 'Image' : 'Fill'} direction — ${name}`,
+      `${direction.bidirectional ? 'Bidirectional' : 'One-way'} — ${scanDirectionReasonLabel(direction.reason)}`,
+      scanDirectionFactTone(direction.reason),
+    ),
+  };
+}
+
+function scanDirectionFactTone(reason: ScanDirectionReason): JobReviewFact['tone'] {
+  const warningReasons: ReadonlyArray<ScanDirectionReason> = [
+    'expert-override',
+    'calibration-baseline',
+    'pending-calibration-4040-fallback',
+    'uncalibrated-4040-fallback',
+    'sensitive-island-one-way',
+  ];
+  return warningReasons.includes(reason) ? 'warning' : 'default';
+}
+
+function operationName(layerId: string, layers: ReadonlyArray<Layer>): string {
+  const direct = layers.find((layer) => layer.id === layerId);
+  if (direct !== undefined) return direct.name;
+  for (const layer of layers) {
+    const subLayer = layer.subLayers.find((candidate) => `${layer.id}:${candidate.id}` === layerId);
+    if (subLayer !== undefined) return `${layer.name} / ${subLayer.label}`;
+  }
+  return layerId;
+}
+
+function scanDirectionReasonLabel(reason: ScanDirectionReason): string {
+  switch (reason) {
+    case 'requested-one-way':
+      return 'selected by operator';
+    case 'requested-bidirectional':
+      return 'requested; profile does not require fallback';
+    case 'calibrated-bidirectional':
+      return 'scan-offset calibration present';
+    case 'calibration-baseline':
+      return 'uncorrected calibration baseline (explicit 0 mm)';
+    case 'calibration-verification':
+      return 'verification coupon using saved calibration table';
+    case 'expert-override':
+      return 'expert override without calibration';
+    case 'sensitive-island-one-way':
+      return 'sensitive Island Fill policy';
+    case 'pending-calibration-4040-fallback':
+      return '4040 fallback; saved calibration is awaiting verification';
+    case 'uncalibrated-4040-fallback':
+      return '4040 fallback; no scan-offset calibration';
+  }
 }
 
 function fact(

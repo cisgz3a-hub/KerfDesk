@@ -5,15 +5,12 @@
 // toolpath-raster.test.ts name for the behavior it covers.
 
 import type { Vec2 } from '../scene';
+import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
 import type { RasterGroup } from './job';
 import { rasterRow } from './raster-rows';
 import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
 import { appendTravelStep, dist } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
-
-const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
-
-type RasterSpan = { readonly firstX: number; readonly lastX: number };
 
 export function appendRasterGroupSteps(
   steps: ToolpathStep[],
@@ -31,19 +28,23 @@ export function appendRasterGroupSteps(
   for (let pass = 0; pass < passes; pass += 1) {
     let emittedRowCount = 0;
     for (let y = 0; y < group.pixelHeight; y += 1) {
-      const spans = rasterActiveSpans(group, y, pixelWidthMm);
-      if (spans.length === 0) continue;
-      const worldY = group.bounds.minY + (y + 0.5) * pixelHeightMm;
       const reverse = (group.bidirectional ?? true) && emittedRowCount % 2 === 1;
-      const ordered = reverse ? [...spans].reverse() : spans;
-      for (let spanIndex = 0; spanIndex < ordered.length; spanIndex += 1) {
-        const span = ordered[spanIndex];
-        if (span === undefined) continue;
+      const sweepPlans = planRasterRowSweeps({
+        row: rasterRow(group, y),
+        pixelWidthMm,
+        overscanMm: group.overscanMm,
+        reverse,
+      });
+      if (sweepPlans.length === 0) continue;
+      const worldY = group.bounds.minY + (y + 0.5) * pixelHeightMm;
+      for (let spanIndex = 0; spanIndex < sweepPlans.length; spanIndex += 1) {
+        const sweepPlan = sweepPlans[spanIndex];
+        if (sweepPlan === undefined) continue;
         prevEnd = appendRasterSpanSweepSteps(
           steps,
           prevEnd,
           group,
-          span,
+          sweepPlan,
           worldY,
           reverse,
           scanOffsetMm,
@@ -71,38 +72,11 @@ function hasUsableRasterGeometry(group: RasterGroup): boolean {
   );
 }
 
-function rasterActiveSpans(
-  group: RasterGroup,
-  y: number,
-  pixelWidthMm: number,
-): ReadonlyArray<RasterSpan> {
-  const row = rasterRow(group, y);
-  const spans: RasterSpan[] = [];
-  let firstX = -1;
-  let lastInk = -1;
-  for (let x = 0; x < group.pixelWidth; x += 1) {
-    if ((row[x] ?? 0) <= 0) continue;
-    if (firstX === -1) {
-      firstX = x;
-      lastInk = x;
-      continue;
-    }
-    const gapMm = (x - lastInk - 1) * pixelWidthMm;
-    if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
-      spans.push({ firstX, lastX: lastInk });
-      firstX = x;
-    }
-    lastInk = x;
-  }
-  if (firstX !== -1) spans.push({ firstX, lastX: lastInk });
-  return spans;
-}
-
 function appendRasterSpanSweepSteps(
   steps: ToolpathStep[],
   prevEnd: Vec2 | null,
   group: RasterGroup,
-  span: RasterSpan,
+  sweepPlan: RasterRowSweepPlan,
   worldY: number,
   reverse: boolean,
   scanOffsetMm: number,
@@ -112,13 +86,13 @@ function appendRasterSpanSweepSteps(
     readonly spanIndex: number;
   },
 ): Vec2 {
+  const span = sweepPlan.span;
   const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
   const activeStartX = group.bounds.minX + span.firstX * pixelWidthMm;
   const activeEndX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
-  const overscanMm = Math.max(0, group.overscanMm);
   const rowShiftX = reverse ? -scanOffsetMm : 0;
   const leadStart = {
-    x: (reverse ? activeEndX + overscanMm : activeStartX - overscanMm) + rowShiftX,
+    x: (reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm) + rowShiftX,
     y: worldY,
   };
   const burnStart = {
@@ -130,7 +104,8 @@ function appendRasterSpanSweepSteps(
     y: worldY,
   };
   const leadEnd = {
-    x: (reverse ? activeStartX - overscanMm : activeEndX + overscanMm) + rowShiftX,
+    x:
+      (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm) + rowShiftX,
     y: worldY,
   };
   appendTravelStep(steps, prevEnd, leadStart);

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -36,8 +37,21 @@ function makeConnection(
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
@@ -47,9 +61,7 @@ function makeConnection(
       return () => closeHandlers.delete(handler);
     },
     close,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
     emitClose: () => {
       for (const handler of closeHandlers) handler();
     },
@@ -83,7 +95,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 30; i += 1) {
     await Promise.resolve();
   }
 }
@@ -117,7 +129,7 @@ describe('laser-store safety notices (P0-B)', () => {
   it('raises a disconnect-during-job notice when the USB drops mid-job', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
 
     connection.emitClose();
@@ -145,7 +157,7 @@ describe('laser-store safety notices (P0-B)', () => {
   it('clearSafetyNotice acknowledges and removes the notice', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     connection.emitClose();
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
 
@@ -168,7 +180,7 @@ describe('laser-store safety notices (P0-B)', () => {
   it('raises a disconnect-during-job notice when USB drops after a controller error', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     connection.emitLine('error:7');
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
 
@@ -225,9 +237,7 @@ describe('laser-store serial write failures', () => {
       },
     });
 
-    await expect(useLaserStore.getState().startJob('G21\nG90\nM3 S0\nM5\n')).rejects.toThrow(
-      'port lost',
-    );
+    await expect(startTestLaserJob('G21\nG90\nM3 S0\nM5\n')).rejects.toThrow('port lost');
 
     expect(useLaserStore.getState().streamer).toMatchObject({
       status: 'cancelled',
@@ -251,7 +261,7 @@ describe('laser-store serial write failures', () => {
     live.connection = connection;
     await connectWith(connection);
 
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
 
     expect(useLaserStore.getState().streamer?.completed).toBe(1);
     expect(useLaserStore.getState().streamer?.inFlight.map((item) => item.line)).not.toContain(
@@ -267,7 +277,7 @@ describe('laser-store serial write failures', () => {
     const connection = makeConnection(write);
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
 
     shouldFail = true;
@@ -292,7 +302,7 @@ describe('laser-store serial write failures', () => {
     });
     const connection = makeConnection(write);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
 
     shouldFail = true;
@@ -317,7 +327,7 @@ describe('laser-store serial write failures', () => {
       if (data === '\x18') connection.emitLine('Grbl 1.1f');
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n');
 
     await expect(useLaserStore.getState().stopJob()).resolves.toBeUndefined();
 
@@ -429,9 +439,7 @@ describe('laser-store autofocus lifecycle', () => {
     await expect(
       useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000),
     ).rejects.toThrow(/auto-focus is running/i);
-    await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
-      /auto-focus is running/i,
-    );
+    await expect(startTestLaserJob('G21\nG90\nM5\n')).rejects.toThrow(/auto-focus is running/i);
     await expect(useLaserStore.getState().setOriginHere()).rejects.toThrow(
       /auto-focus is running/i,
     );
@@ -459,9 +467,7 @@ describe('startJob oversized-line guard (M13)', () => {
     writes.length = 0;
 
     const oversized = `G1 X${'9'.repeat(130)}`;
-    await expect(useLaserStore.getState().startJob(`G21\n${oversized}\n`)).rejects.toThrow(
-      /RX buffer/i,
-    );
+    await expect(startTestLaserJob(`G21\n${oversized}\n`)).rejects.toThrow(/RX buffer/i);
 
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(writes).toEqual([]);

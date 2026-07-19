@@ -9,15 +9,12 @@ import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
-import {
-  createExecutionArtifact,
-  RECOVERY_CLAIM_LEASE_MS,
-  RecoveryRepository,
-} from '../state/recovery';
+import { RECOVERY_CLAIM_LEASE_MS, RecoveryRepository } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
+import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -162,7 +159,7 @@ describe('CheckpointResumeBanner', () => {
   it('does not offer the older capsule while a newer Start handoff is pending', async () => {
     const repository = await interruptedRepository();
     const project = useStore.getState().project;
-    const candidate = createExecutionArtifact({
+    const candidate = await createCurrentTestExecutionArtifact({
       runId: 'run-pending-start',
       gcode: GCODE,
       prepared: preparedProject(project),
@@ -213,7 +210,7 @@ async function interruptedRepository(): Promise<RecoveryRepository> {
   const repository = createRepository();
   await repository.initialize();
   const project = useStore.getState().project;
-  const artifact = createExecutionArtifact({
+  const artifact = await createCurrentTestExecutionArtifact({
     runId: 'run-interrupted-laser',
     gcode: GCODE,
     prepared: preparedProject(project),

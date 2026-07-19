@@ -27,6 +27,9 @@ const DEFAULT_GAP_MM = 4;
 const DEFAULT_ORIGIN = { x: 0, y: 0 } as const;
 
 export type ScanOffsetCalibrationPatternOptions = {
+  /** Baseline deliberately bypasses the 4040 one-way fallback and forces zero
+   * correction. Verification uses the active profile table normally. */
+  readonly mode?: 'baseline' | 'verification';
   readonly steps: number;
   readonly speedMin: number;
   readonly speedMax: number;
@@ -83,6 +86,7 @@ export function generateScanOffsetCalibrationPattern(
   );
   const gapMm = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
+  const mode = options.mode ?? 'baseline';
   const speeds = linspace(speedHigh, speedLow, steps);
   const labelSize = labelSizeForSwatch(Math.min(swatchWidth, swatchHeight));
   const labelGap = Math.max(0.5, Math.min(gapMm / 2, 2));
@@ -92,7 +96,7 @@ export function generateScanOffsetCalibrationPattern(
 
   for (let step = 0; step < steps; step += 1) {
     const speed = speeds[step] ?? speedHigh;
-    const layer = scanOffsetLayer({ step, speed, power, hatchSpacingMm, overscanMm });
+    const layer = scanOffsetLayer({ step, speed, power, hatchSpacingMm, overscanMm, mode });
     const x = origin.x + step * (swatchWidth + gapMm);
     const y = origin.y;
     const objectId = `scan-offset-calibration-cell-${step}`;
@@ -106,6 +110,7 @@ export function generateScanOffsetCalibrationPattern(
         height: swatchHeight,
         x,
         y,
+        mode,
       }),
     );
     cells.push({
@@ -146,6 +151,7 @@ function scanOffsetLayer(args: {
   readonly power: number;
   readonly hatchSpacingMm: number;
   readonly overscanMm: number;
+  readonly mode: 'baseline' | 'verification';
 }): Layer {
   const color = scanOffsetLayerColor(args.step);
   return {
@@ -161,6 +167,10 @@ function scanOffsetLayer(args: {
     hatchSpacingMm: args.hatchSpacingMm,
     fillStyle: 'scanline',
     fillBidirectional: true,
+    scanOffsetCalibrationMode: args.mode,
+    ...(args.mode === 'baseline'
+      ? { allowUncalibratedBidirectionalScan: true, bidirectionalScanOffsetMm: 0 }
+      : {}),
     fillCrossHatch: false,
     fillOverscanMm: args.overscanMm,
   };
@@ -174,12 +184,13 @@ function swatchObject(args: {
   readonly height: number;
   readonly x: number;
   readonly y: number;
+  readonly mode: 'baseline' | 'verification';
 }): ImportedSvg {
   const bounds = { minX: 0, minY: 0, maxX: args.width, maxY: args.height };
   return {
     kind: 'imported-svg',
     id: args.id,
-    source: 'scan-offset-calibration-pattern',
+    source: `scan-offset-calibration-pattern:${args.mode}`,
     operationIds: [args.operationId],
     bounds,
     transform: { ...IDENTITY_TRANSFORM, x: args.x, y: args.y },

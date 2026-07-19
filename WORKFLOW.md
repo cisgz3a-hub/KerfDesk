@@ -728,9 +728,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Success
 1. User clicks **Frame job** while connected and the controller is Idle.
 2. Frame preparation compares the live controller output contract with the selected process.
-   Known `$30`/`$32` conflicts refuse before review because a tool-off trace cannot prove power or
-   spindle semantics. A GRBL CNC Frame also requires those settings to be read; unknown laser
-   values remain explicit Job Review warnings.
+   Known, unknown, stale, or unavailable `$30`/`$32` values remain explicit Job Review advisories;
+   they do not refuse Frame. If the exact program contains `M7` and current stock-GRBL build info
+   proves option `M` absent, preparation refuses as a factual command incompatibility. Missing,
+   stale, or non-stock build evidence remains an acknowledged warning.
 3. App resolves placement once. For any serial Frame, if G55-G59 is active, preparation selects G54
    through an owned controller operation and waits for its terminal acknowledgement plus fresh
    position evidence. This changes only the active WCS selection; it does not erase the stored
@@ -743,15 +744,16 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    G54, a durable warning names the original WCS and states that the active selection changed, the
    stored offsets were not erased, and cancelling leaves G54 selected. The operator accepts with
    **Accept & Frame**; an edit inside review re-prepares before acceptance.
-6. Immediately before dispatch, Frame checks the exact generated motion envelope against known
-   travel and no-go zones and rescans the exact prepared path for interior no-go collisions. A
-   failure sends no Frame motion and issues no permit. Otherwise Frame establishes driver-produced
-   tool-off state and runs the watched absolute jog sequence. Every line is dispatched only after
-   the prior line completes and receives its terminal acknowledgement.
+6. Calculated motion-envelope, travel, and no-go findings remain visible in Job Review but do not
+   pre-empt the governing physical test. Frame establishes driver-produced tool-off state and runs
+   the watched exact envelope; controller rejection, cancel, or interrupted motion issues no permit.
+   Every line is dispatched only after the prior line completes and receives its terminal
+   acknowledgement.
 7. After tracing the box, Frame returns to the exact work position occupied when the artifact was
    prepared — the acknowledged G54 work position when serial preparation began under G55-G59. A
-   final fresh clean `Idle`, all acknowledgements, and unchanged controller/origin/settings
-   evidence issue a one-run permit for that exact artifact.
+   final fresh clean `Idle`, all acknowledgements, and unchanged spatial session/origin evidence
+   issue a one-run permit for that exact artifact. Advisory settings/build-info observations may
+   refresh without invalidating the completed physical Frame.
 8. Cancel, error, Alarm, non-motion controller state, MPG takeover, disconnect, manual controller
    mutation, or evidence drift drops the candidate and issues no permit.
 
@@ -836,7 +838,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is **not**
    editable in the review (it stays on the machine rail); the sticky footer echoes the resolved
    origin ("Runs from …") beside Cancel and **Accept & Frame**. Pressing Accept & Frame records the
-   same evidence objects the previous native confirms produced.
+   same evidence objects the previous native confirms produced. For scan output, the review also
+   names each operation's effective direction/reason, exact pass-weighted runway coverage, requested
+   runway values, and any controlled laser-off seek policy warning.
 4. Editing a value inside the review commits through the normal layer/placement store actions and
    re-runs the full prepare pipeline (debounced). The stat tiles dim behind "Recomputing…" until
    the fresh program replaces the shown one — the artifact framed and later streamed is always the
@@ -845,7 +849,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    preparation-time work position — the acknowledged G54 position when serial preparation began
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
    acknowledgement and the controller must reach final clean Idle without interruption or reviewed
-   controller/origin/settings drift.
+   spatial session/origin drift. Advisory settings and build-info observations may refresh.
 6. Clean completion issues a one-run exact `FramedRunPermit`. The controls read **Ready to start —
    framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
    one-use. Any relevant edit, camera or rotary change, Jog, Home, origin/probe/reset/disconnect, or
@@ -853,7 +857,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 7. User clicks **Start framed job**. Start atomically claims the permit and sends its cached G-code
    without recompiling, reopening Job Review, or rerunning policy gates. Only live transport and
    exact-handoff checks remain; a deterministic empty/comment-only or RX-oversized program was
-   already rejected before Frame.
+   already rejected before Frame. After queue fencing, an exact program containing `M7` is checked
+   once more against current stock-GRBL build evidence; a proven missing option `M` refuses before
+   permit consumption or streamer creation, while observation drift alone is not incompatibility.
 8. App builds the streamer and writes the first batch (as much as the RX window allows — default
    120 bytes, per-profile `rxBufferBytes`). Every `ok` advances one line and progress reflects
    `completed / total`.
@@ -1147,6 +1153,8 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
 3. Preview, live estimate, Frame, Start job, and Save G-code all compile the same selected-only output scope.
 4. Source scene geometry is not moved or deleted.
 5. If selected-only output is enabled with no current selection, output generation returns a clear blocker instead of silently burning the full design.
+6. Registration/Print-and-Cut warnings use that same prepared output scope, so selecting only artwork
+   or only the registration box cannot inherit a warning that both will burn together.
 
 #### Success - Anchor from selected artwork
 1. **Anchor from selected artwork** is shown only when **Selected artwork only** is on and Start From is not Absolute Coordinates.
@@ -1169,6 +1177,20 @@ IndexedDB plus a small `activeRun` slot keyed by a unique run ID. Progress is
 updated every 25 acknowledgements and at state transitions. Interruption moves
 that run into the single newest recovery capsule; clean settled Idle creates a
 separate exact replay receipt.
+
+The **Execution Archive** lists the bounded exact-artifact history (up to 20 runs and 100 MiB),
+separate from the active interruption capsule. Each entry exposes verified provenance and export.
+New schema-2 artifacts require V2 provenance and archived-observation integrity; staging, hydration,
+archive reads, and export decoding fail closed on tampering. Explicit schema-1 handling is
+migration-only and never authorizes a downgraded current artifact.
+Progress checkpoints update the verified in-memory record only when the IndexedDB transaction began
+from the same generation/revision/run; a cross-window change forces an authoritative slot refresh
+and hydrates only new or unverified artifacts. Combined raster archive data is capped at 32 MiB
+before a streamed row provider is called, and the complete artifact is bounded by a conservative
+64 MiB allocation-free estimate including G-code and embedded project data. A larger job may still
+Start, but it runs without recovery/archive capture and the operator receives the forensic-record
+warning. Durable activation reuses the artifact verified before transmission, so no full artifact
+clone/hash runs after the first controller bytes are accepted.
 
 #### Success — resume after a crash
 1. App/tab/PC died mid-job. Operator relaunches. Recovery loads independently
@@ -1340,8 +1362,8 @@ The seven steps are always visible and always ordered:
 3. **Work area & coordinates** — name, usable bed, max/frame feed, origin, and homing policy.
 4. **Machine output** — laser S range/air/Fire or CNC safe Z/spindle/dwell/coolant/park. Stock,
    material, and bit remain job-specific and stay in Material & Bit.
-5. **Safety & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, and the
-   relevant laser-only scan/autofocus/rotary/camera status.
+5. **Safety & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, optional
+   controlled laser-off seek feed, and the relevant laser-only scan/autofocus/rotary/camera status.
 6. **Firmware review** — controller-specific configuration location and write policy. GRBL/grblHAL
    can queue common per-setting writes only after read + backup acknowledgement; FluidNC, Marlin,
    Smoothieware, and Ruida never receive numeric GRBL setup writes. Queuing is draft-only: Cancel
@@ -1487,9 +1509,10 @@ or traced image) with at least one closed polyline.
   lines, which engraves as a near-line. Acceptable; no minimum-size
   guard. The user can lower `hatchSpacingMm` or switch to Line mode.
 - *4040-safe scaled lettering*: ordinary scanline fragments separated by more than 5 mm retain a
-  G0/S0 gap remainder, then receive up to 5 mm of feed-matched G1/S0 entry before each burn. This
-  prevents short split letters from burning from rest without changing Default/Falcon, Island Fill,
-  or Offset Fill behavior (ADR-234).
+  controlled F800/S0 gap remainder, then receive up to 5 mm of feed-matched G1/S0 entry before each
+  burn. This preserves ADR-234's non-overlapping split geometry while ADR-235 replaces only the 4040
+  transport; Default/Falcon and Offset Fill behavior remain unchanged. Sensitive 4040 Island Fill
+  remains one-way and uses full-where-safe feed-matched runway.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before
@@ -1530,9 +1553,10 @@ correct M4-mode raster G-code from Compile.
    the dither" overlay in v1 — the image itself is the preview.
 7. **Compile** → emit-gcode walks the scene. The Image layer's group
    dispatches to `emitRaster` (M4 mode, per-pixel X sweep with S
-   modulating per dither output). Active rows alternate
-   left-to-right / right-to-left, and overscan extends the entry and
-   exit side of each row by ~5 mm with S0.
+   modulating per dither output). Active rows alternate left-to-right / right-to-left when effective
+   bidirectional output is enabled. An uncalibrated built-in 4040 request falls back to one-way rows
+   until a verified scan-offset table or explicit expert override permits bidirectional output.
+   Overscan extends each emitted row by ~5 mm with S0.
 8. G-code file lands in the chosen output target (download, Save As,
    or the connected serial).
 
@@ -1587,11 +1611,11 @@ Hardware burn on the Falcon (must be confirmed by user):
 5. **No "burn-line on travel" artefacts**: between rows, the head
    moves at S=0 — verify by looking at the row-end overscan zone
    for any unintended burn marks.
-6. **Bidirectional row speed**: on a two-row black/white test patch,
-   the second active row should return right-to-left instead of
-   rapiding back to the left edge first. If the burn shows ghosted or
-   staggered vertical edges, lower speed for the job and treat scanning
-   offset calibration as the next hardware task.
+6. **Effective row direction**: Job Review must name the compiled direction and reason. On a
+   calibrated or expert-enabled bidirectional two-row patch, the second active row returns
+   right-to-left. On an uncalibrated built-in 4040, both rows run one-way by design. If a
+   bidirectional burn shows ghosted or staggered vertical edges, lower speed and repeat scan-offset
+   calibration before trusting that mode.
 
 When this checklist passes, mark F.2.f complete in the hardware
 verification inventory and tag the build as the first Phase F.2 release.

@@ -3,6 +3,7 @@ import { nextQueuedLine, queuedLineCount } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PAUSE_RESUME_TRANSITION_TIMEOUT_MS } from './laser-pause-resume-transition';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
 
 const GRBL_SAFETY_DOOR = '\x84';
 const GRBL_RESUME = '~';
@@ -21,12 +22,7 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   return {
     write: async (data) => {
       await write(data);
-      // Real GRBL answers the connect-time $G modal query (C6) with its state
-      // then ok; model it so the modal query settles during connect.
-      if (data === '$G\n') {
-        emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
-        emit('ok');
-      }
+      respondToTestGrblHandshake(data, emit);
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -65,7 +61,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
@@ -134,7 +130,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await useLaserStore.getState().startJob(longLaserJob());
+    await startTestLaserJob(longLaserJob());
     connection.emitLine(stoppedDoor(0));
     await flushPromises();
     writes.length = 0;
@@ -170,7 +166,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await useLaserStore.getState().startJob(longLaserJob());
+    await startTestLaserJob(longLaserJob());
 
     const pause = useLaserStore.getState().pauseJob();
     await flushPromises();
@@ -212,7 +208,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await useLaserStore.getState().startJob(longLaserJob());
+    await startTestLaserJob(longLaserJob());
     failPause = true;
 
     await expect(useLaserStore.getState().pauseJob()).rejects.toThrow('pause write failed');
@@ -237,7 +233,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: null });
-    await useLaserStore.getState().startJob(longLaserJob());
+    await startTestLaserJob(longLaserJob());
 
     await expect(useLaserStore.getState().pauseJob()).resolves.toBeUndefined();
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
@@ -260,7 +256,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
       if (failRefill && data.includes('G1 X')) throw new Error('resume refill rejected');
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob(longLaserJob());
+    await startTestLaserJob(longLaserJob());
     await useLaserStore.getState().pauseJob();
     for (let index = 0; index < 10; index += 1) connection.emitLine('ok');
 
@@ -292,7 +288,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     try {
       await connectWith(connection);
-      await useLaserStore.getState().startJob(longLaserJob());
+      await startTestLaserJob(longLaserJob());
       writes.length = 0;
 
       const pause = useLaserStore.getState().pauseJob();
@@ -334,7 +330,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     try {
       await connectWith(connection);
-      await useLaserStore.getState().startJob(longLaserJob());
+      await startTestLaserJob(longLaserJob());
       await useLaserStore.getState().pauseJob();
       writes.length = 0;
 
@@ -378,7 +374,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     try {
       await connectWith(connection);
-      await useLaserStore.getState().startJob(longLaserJob());
+      await startTestLaserJob(longLaserJob());
       writes.length = 0;
 
       const pause = useLaserStore.getState().pauseJob();
@@ -421,7 +417,7 @@ describe('controller-confirmed laser Pause and Resume', () => {
     });
     try {
       await connectWith(connection);
-      await useLaserStore.getState().startJob(longLaserJob());
+      await startTestLaserJob(longLaserJob());
       await useLaserStore.getState().pauseJob();
       writes.length = 0;
 

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  effectiveScanOffsetCalibrationStatus,
   isScanOffsetTable,
+  isScanOffsetTableForProfile,
   mergeScanOffsetTableBySpeed,
   normalizeScanOffsetTable,
+  scanOffsetMagnitudeLimitMm,
 } from './scan-offset-profile';
 
 describe('scan offset table helpers', () => {
@@ -36,5 +39,27 @@ describe('scan offset table helpers', () => {
       { speedMmPerMin: 2000, offsetMm: 0.2 },
       { speedMmPerMin: 4000, offsetMm: 0.4 },
     ]);
+  });
+
+  it('uses a conservative profile-relative offset magnitude bound', () => {
+    expect(scanOffsetMagnitudeLimitMm({ bedWidth: 400, bedHeight: 400 })).toBe(4);
+    expect(scanOffsetMagnitudeLimitMm({ bedWidth: 1200, bedHeight: 800 })).toBe(5);
+    expect(
+      isScanOffsetTableForProfile([{ speedMmPerMin: 3000, offsetMm: 1e308 }], {
+        bedWidth: 400,
+        bedHeight: 400,
+      }),
+    ).toBe(false);
+  });
+
+  it('treats nonempty legacy tables as verified without masking explicit pending state', () => {
+    const scanningOffsets = [{ speedMmPerMin: 3000, offsetMm: 0.1 }];
+    expect(effectiveScanOffsetCalibrationStatus({ scanningOffsets })).toBe('legacy-verified');
+    expect(
+      effectiveScanOffsetCalibrationStatus({
+        scanningOffsets,
+        scanOffsetCalibrationStatus: 'pending',
+      }),
+    ).toBe('pending');
   });
 });

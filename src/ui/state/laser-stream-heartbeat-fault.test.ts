@@ -5,6 +5,7 @@ import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -26,6 +27,14 @@ function makeConnection(
       writes.push(data);
       if (data === '\x18' && options.autoResetBanner !== false) {
         setTimeout(() => connection.emitLine('Grbl 1.1f'), 0);
+      }
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        connection.emitLine('[VER:1.1h.20190830:test]');
+        connection.emitLine('[OPT:VM,15,128]');
+        connection.emitLine('ok');
       }
       // Real GRBL answers the connect-time $G modal query (C6) with its state
       // then ok; model it so the modal query settles during connect.
@@ -83,7 +92,7 @@ async function connectReady(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+  for (let index = 0; index < 30; index += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -107,17 +116,11 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes);
     liveConnection = connection;
     await connectReady(connection);
-    await useLaserStore
-      .getState()
-      .startJob(
-        [
-          'G21',
-          'G90',
-          'M4 S0',
-          ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`),
-          'M5',
-        ].join('\n'),
-      );
+    await startTestLaserJob(
+      ['G21', 'G90', 'M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join(
+        '\n',
+      ),
+    );
     writes.length = 0;
 
     await vi.advanceTimersByTimeAsync(ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS + 500);
@@ -154,11 +157,9 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes, { autoResetBanner: false });
     liveConnection = connection;
     await connectReady(connection);
-    await useLaserStore
-      .getState()
-      .startJob(
-        ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
-      );
+    await startTestLaserJob(
+      ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
+    );
     writes.length = 0;
 
     await vi.advanceTimersByTimeAsync(ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS + 250);
@@ -184,11 +185,9 @@ describe('active stream transport heartbeat', () => {
     const oldConnection = makeConnection(oldWrites, { autoResetBanner: false });
     liveConnection = oldConnection;
     await connectReady(oldConnection);
-    await useLaserStore
-      .getState()
-      .startJob(
-        ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
-      );
+    await startTestLaserJob(
+      ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
+    );
     oldWrites.length = 0;
 
     await vi.advanceTimersByTimeAsync(ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS + 250);
@@ -212,11 +211,9 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes, { autoResetBanner: false });
     liveConnection = connection;
     await connectReady(connection);
-    await useLaserStore
-      .getState()
-      .startJob(
-        ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
-      );
+    await startTestLaserJob(
+      ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
+    );
     writes.length = 0;
 
     await vi.advanceTimersByTimeAsync(ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS + 250);

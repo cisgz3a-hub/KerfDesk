@@ -4,6 +4,7 @@ import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../core/sce
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -21,6 +22,15 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
       // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {
         emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        emit('ok');
+      }
+      if (
+        data === '$I\n' &&
+        (useLaserStore.getState().controllerOperation?.kind === 'connection-handshake' ||
+          useLaserStore.getState().controllerOperation?.kind === 'interactive-command')
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
         emit('ok');
       }
     },
@@ -63,7 +73,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 30; i += 1) {
     await Promise.resolve();
   }
 }
@@ -211,7 +221,7 @@ describe('laser-store machine settings', () => {
   it('blocks read while a job is active', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
 
     await expect(useLaserStore.getState().readMachineSettings()).rejects.toThrow(/job is active/i);
   });

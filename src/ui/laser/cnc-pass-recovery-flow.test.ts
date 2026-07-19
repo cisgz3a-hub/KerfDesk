@@ -7,7 +7,6 @@ import {
   createProject,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
-  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type SceneObject,
@@ -21,19 +20,17 @@ import {
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import {
-  createExecutionArtifact,
-  RecoveryRepository,
-  type RecoveryCapsule,
-} from '../state/recovery';
+import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
+import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
+import { expectCncPassRecoveryProvenance } from './cnc-pass-recovery-provenance-testing';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareCurrentStartJob } from './start-job-source';
@@ -165,11 +162,10 @@ async function saveInterruptedRun(
   if (!prepared.ok) {
     throw new Error(`Expected ready CNC job: ${prepared.messages.join('; ')}`);
   }
-  const artifact = createExecutionArtifact({
+  const artifact = await createCurrentTestExecutionArtifact({
     runId: 'run-archived-cnc',
     gcode: prepared.gcode,
     prepared: prepared.prepared,
-    outputScope: DEFAULT_OUTPUT_SCOPE,
     ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
     canvasPlan: prepared.canvasPlan,
     ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
@@ -263,6 +259,7 @@ describe('runCncPassRecoveryFlow', () => {
       | undefined;
     expect(options?.machineKind).toBe('cnc');
     expect(options?.runId).toBe(repo.getSnapshot().activeRun?.runId);
+    expectCncPassRecoveryProvenance(repo, capsule, baseReview);
     expect(
       cncSetupAttestationMatches(
         options?.cncSetupAttestation,

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { cncControllerEpochOf } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblBuildInfo, settleTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
@@ -13,6 +14,7 @@ function makeConnection(writes: string[]): FakeConnection {
   return {
     write: async (data) => {
       writes.push(data);
+      respondToTestGrblBuildInfo(data, emit);
       // Real GRBL answers the connect-time $G modal query (C6) with its state
       // then ok; model it so the modal query settles during connect. Answer
       // ONLY the handshake's $G (controllerOperation is still the connection
@@ -59,7 +61,7 @@ async function connectReady(connection: FakeConnection): Promise<void> {
   await flush();
   connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
-  await flush();
+  await settleTestGrblHandshake();
 }
 
 afterEach(async () => {
@@ -84,7 +86,7 @@ describe('ordinary controller terminal responses', () => {
 
     connection.emitLine('$30=1000');
     connection.emitLine('ok');
-    await flush();
+    await settleTestGrblHandshake();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 

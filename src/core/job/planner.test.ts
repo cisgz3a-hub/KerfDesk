@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import type { CutGroup, CutSegment, Job } from './job';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
+import type { CutGroup, CutSegment, FillGroup, Job } from './job';
 import { estimateWithPlanner, junctionVelocity, blockTime, planVelocities } from './planner';
 
 const device = {
@@ -42,6 +42,50 @@ describe('estimateWithPlanner — basics', () => {
     const r = estimateWithPlanner(j, device);
     expect(r.breakdown.cutSeconds).toBeCloseTo(6.017, 2);
     expect(r.breakdown.travelSeconds).toBeCloseTo(1.1, 2);
+  });
+
+  it('mirrors dialect parking while preserving an explicit current-position finish', () => {
+    const job: Job = { groups: [group({ segments: [seg([0, 0], [100, 0])] })] };
+    const noParkDevice = {
+      ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      accelMmPerSec2: device.accelMmPerSec2,
+      junctionDeviationMm: device.junctionDeviationMm,
+    };
+
+    const noPark = estimateWithPlanner(job, noParkDevice);
+    const explicitFinish = estimateWithPlanner(job, noParkDevice, {
+      finishPosition: { x: 0, y: 0 },
+    });
+
+    expect(noPark.breakdown.travelSeconds).toBe(0);
+    expect(explicitFinish.breakdown.travelSeconds).toBeGreaterThan(0);
+  });
+
+  it('uses a trusted current position as both the initial cursor and finish', () => {
+    const currentPosition = { x: 120, y: 80 };
+    const job: Job = {
+      groups: [group({ segments: [seg([120, 80], [130, 80])] })],
+    };
+    const noParkDevice = {
+      ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      accelMmPerSec2: device.accelMmPerSec2,
+      junctionDeviationMm: device.junctionDeviationMm,
+    };
+
+    const trustedStartAndFinish = estimateWithPlanner(job, noParkDevice, {
+      initialPosition: currentPosition,
+      finishPosition: currentPosition,
+    });
+    const phantomOriginStart = estimateWithPlanner(job, noParkDevice, {
+      finishPosition: currentPosition,
+    });
+
+    // The trusted case contains only the real 10 mm return. Starting the
+    // estimate at work zero invents an additional long seek to the artwork.
+    expect(trustedStartAndFinish.breakdown.travelSeconds).toBeGreaterThan(0);
+    expect(trustedStartAndFinish.breakdown.travelSeconds).toBeLessThan(
+      phantomOriginStart.breakdown.travelSeconds,
+    );
   });
 
   it('a 101-vertex straight line is the same as a 2-vertex one (junctions are all 0°)', () => {
@@ -133,6 +177,40 @@ describe('estimateWithPlanner — basics', () => {
     );
     expect(three.breakdown.cutSeconds).toBeCloseTo(one.breakdown.cutSeconds * 3, 2);
   });
+
+  it('prices profile or explicit reverse-sweep scan offsets at the emitted Fill endpoints', () => {
+    const fill: FillGroup = {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#000',
+      power: 50,
+      speed: 1000,
+      passes: 1,
+      airAssist: false,
+      fillStyle: 'island',
+      overscanMm: 0,
+      segments: [
+        { ...seg([0, 0], [10, 0]), reverse: false },
+        { ...seg([10, 1], [0, 1]), reverse: true },
+      ],
+    };
+    const job: Job = { groups: [fill] };
+    const calibratedDevice = {
+      ...device,
+      scanningOffsets: [{ speedMmPerMin: fill.speed, offsetMm: 2 }],
+    };
+    const unshifted = estimateWithPlanner(job, device);
+    const profileShifted = estimateWithPlanner(job, calibratedDevice);
+    const explicitlyUnshifted = estimateWithPlanner(
+      { groups: [{ ...fill, bidirectionalScanOffsetMm: 0 }] },
+      calibratedDevice,
+    );
+
+    expect(profileShifted.breakdown.travelSeconds).toBeGreaterThan(
+      unshifted.breakdown.travelSeconds,
+    );
+    expect(explicitlyUnshifted.totalSeconds).toBeCloseTo(unshifted.totalSeconds, 8);
+  });
 });
 
 describe('junctionVelocity', () => {
@@ -173,6 +251,31 @@ describe('junctionVelocity', () => {
 
     expect(junctionVelocity(cutBlock(1, 0), rapid, accel, jd)).toBe(0);
     expect(junctionVelocity(cutBlock(1, 0), blankFeed, accel, jd)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('carries feed only through tagged, feed-matched full-runway laser transitions', () => {
+    const taggedCut = { ...cutBlock(1, 0), feedMatchedLaserMotion: true as const };
+    const taggedTravel = {
+      ...cutBlock(1, 0),
+      kind: 'travel' as const,
+      feedMatchedLaserMotion: true as const,
+    };
+
+    expect(junctionVelocity(taggedTravel, taggedCut, accel, jd)).toBe(Number.POSITIVE_INFINITY);
+    expect(junctionVelocity(taggedCut, taggedTravel, accel, jd)).toBe(Number.POSITIVE_INFINITY);
+    expect(junctionVelocity(taggedTravel, { ...taggedCut, targetVelocity: 50 }, accel, jd)).toBe(0);
+    expect(
+      junctionVelocity(taggedTravel, { ...taggedCut, direction: { x: -1, y: 0 } }, accel, jd),
+    ).toBe(0);
+
+    const corner = junctionVelocity(
+      taggedTravel,
+      { ...taggedCut, direction: { x: 0, y: 1 } },
+      accel,
+      jd,
+    );
+    expect(corner).toBeGreaterThan(0);
+    expect(Number.isFinite(corner)).toBe(true);
   });
 
   it('rises monotonically as the turn opens from a reversal toward straight', () => {

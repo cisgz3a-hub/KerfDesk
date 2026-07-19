@@ -20,9 +20,20 @@
 // invariant #5). The GRBL fill/raster emitters import this, but an empty device
 // table still returns 0 so uncalibrated machines keep byte-identical output.
 
-import type { ScanOffsetPoint } from '../devices';
+import type { DeviceProfile, ScanOffsetPoint } from '../devices';
 import type { Vec2 } from '../scene';
 export type { ScanOffsetPoint } from '../devices';
+
+export function validatedScanOffsetMm(
+  _device: DeviceProfile,
+  offsetMm: number | undefined,
+): number | undefined {
+  if (offsetMm === undefined) return undefined;
+  if (!Number.isFinite(offsetMm)) {
+    throw new RangeError(`Bidirectional scan offset ${String(offsetMm)} mm must be finite.`);
+  }
+  return offsetMm;
+}
 
 /**
  * One calibration sample: the measured forward-vs-reverse row separation
@@ -87,5 +98,20 @@ export function shiftAlongTravel(
   return {
     from: { x: from.x + shiftX, y: from.y + shiftY },
     to: { x: to.x + shiftX, y: to.y + shiftY },
+  };
+}
+
+type SweepSpan = { readonly start: Vec2; readonly end: Vec2 };
+
+export function shiftedScanSweepEndpoints(
+  first: SweepSpan,
+  last: SweepSpan,
+  reverse: boolean,
+  offsetMm: number,
+): { readonly start: Vec2; readonly end: Vec2 } {
+  if (!reverse || offsetMm === 0) return { start: first.start, end: last.end };
+  return {
+    start: shiftAlongTravel(first.start, first.end, offsetMm).from,
+    end: shiftAlongTravel(last.start, last.end, offsetMm).to,
   };
 }

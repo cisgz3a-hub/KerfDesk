@@ -1,10 +1,12 @@
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import type { LaserState } from './laser-store';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 
 export function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
   return {
     connection: { kind: 'disconnected' },
+    serialPortInfo: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
@@ -12,6 +14,7 @@ export function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
     detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
     grblSettingsRows: [],
     lastSettingsReadAt: null,

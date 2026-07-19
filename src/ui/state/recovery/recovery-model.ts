@@ -3,11 +3,27 @@ import type {
   ExecutionArtifactV1,
   LegacyFingerprintOnlyArtifactV1,
   RecoveryArtifactV1,
-  RunId,
 } from './execution-artifact';
+import { isRunId, type RunId } from './execution-artifact';
+import {
+  artifactOriginMatchesPayload,
+  type StoredRecoveryArtifactOrigin,
+} from './recovery-artifact-origin';
 
-export const RECOVERY_REPOSITORY_SCHEMA_VERSION = 2;
+export {
+  CURRENT_EXECUTION_ARTIFACT_ORIGIN,
+  LEGACY_CHECKPOINT_ARTIFACT_ORIGIN,
+  MIGRATED_LEGACY_EXACT_ARTIFACT_ORIGIN,
+  type StoredRecoveryArtifactOrigin,
+} from './recovery-artifact-origin';
+
+export const RECOVERY_REPOSITORY_SCHEMA_VERSION = 3;
+/** Hard parser-work cap for an untrusted persisted history envelope. Runtime
+ * retention is lower; the extra headroom permits protected records to coexist
+ * with the normal history window. */
+export const MAX_PERSISTED_EXECUTION_HISTORY_INPUT_RUNS = 64;
 const LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION = 1;
+const PREVIOUS_RECOVERY_REPOSITORY_SCHEMA_VERSION = 2;
 
 export type ActiveRunRecord = {
   readonly runId: RunId;
@@ -15,6 +31,7 @@ export type ActiveRunRecord = {
   readonly sendableLines: number;
   readonly startedAtIso: string;
   readonly updatedAtIso: string;
+  readonly estimatedArtifactBytes?: number;
 };
 
 export type RecoveryClaim = {
@@ -69,6 +86,18 @@ export type PendingStartRecord = {
   };
 };
 
+export type ExecutionHistoryRecord = {
+  readonly runId: RunId;
+  readonly terminalKind: 'completed' | 'interrupted';
+  readonly startedAtIso: string;
+  readonly terminalAtIso: string;
+  readonly ackedLines: number;
+  readonly sendableLines: number;
+  /** Deterministic approximation of the full retained structured-clone payload. */
+  readonly estimatedArtifactBytes: number;
+  readonly interruption?: JobInterruption;
+};
+
 export type PersistedRecoverySlots = {
   readonly schemaVersion: typeof RECOVERY_REPOSITORY_SCHEMA_VERSION;
   readonly generation: number;
@@ -77,11 +106,14 @@ export type PersistedRecoverySlots = {
   readonly recoveryCapsule: RecoveryCapsuleRecord | null;
   readonly lastCompletedReceipt: LastCompletedReceiptRecord | null;
   readonly pendingStart: PendingStartRecord | null;
+  readonly executionHistory: ReadonlyArray<ExecutionHistoryRecord>;
 };
 
 export type StoredRecoveryArtifact = {
   readonly runId: RunId;
   readonly generation: number;
+  readonly origin: StoredRecoveryArtifactOrigin;
+  readonly stagingLeaseExpiresAtEpochMs?: number;
   readonly artifact: RecoveryArtifactV1;
 };
 
@@ -98,6 +130,7 @@ export type RecoveryRepositorySnapshot = {
   readonly recoveryCapsule: RecoveryCapsule | null;
   readonly lastCompletedReceipt: LastCompletedReceipt | null;
   readonly pendingStart: PendingStartRecord | null;
+  readonly executionHistory: ReadonlyArray<ExecutionHistoryRecord>;
 };
 
 export type RecoveryRepositoryError = 'storage-unavailable' | 'not-found' | 'conflict';
@@ -112,6 +145,7 @@ export const UNLOADED_RECOVERY_SNAPSHOT: RecoveryRepositorySnapshot = {
   recoveryCapsule: null,
   lastCompletedReceipt: null,
   pendingStart: null,
+  executionHistory: [],
 };
 
 export function emptyRecoverySlots(generation: number): PersistedRecoverySlots {
@@ -123,6 +157,7 @@ export function emptyRecoverySlots(generation: number): PersistedRecoverySlots {
     recoveryCapsule: null,
     lastCompletedReceipt: null,
     pendingStart: null,
+    executionHistory: [],
   };
 }
 
@@ -130,53 +165,112 @@ export function validRecoverySlots(
   value: unknown,
   minimumGeneration: number,
 ): PersistedRecoverySlots {
-  if (!isRecord(value)) return emptyRecoverySlots(minimumGeneration);
+  return parseRecoverySlots(value, minimumGeneration).slots;
+}
+
+export type ParsedRecoverySlots = {
+  readonly slots: PersistedRecoverySlots;
+  readonly accepted: boolean;
+};
+
+export function parseRecoverySlots(value: unknown, minimumGeneration: number): ParsedRecoverySlots {
+  if (!isRecord(value)) return rejectedSlots(minimumGeneration);
   const schemaVersion = value['schemaVersion'];
-  if (
-    schemaVersion !== RECOVERY_REPOSITORY_SCHEMA_VERSION &&
-    schemaVersion !== LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION
-  ) {
-    return emptyRecoverySlots(minimumGeneration);
+  if (!isSupportedSchemaVersion(schemaVersion)) {
+    return rejectedSlots(minimumGeneration);
   }
   const generation = value['generation'];
   const revision = value['revision'];
   if (!isNonNegativeInteger(generation) || generation < minimumGeneration) {
-    return emptyRecoverySlots(minimumGeneration);
+    return rejectedSlots(minimumGeneration);
   }
-  if (!isNonNegativeInteger(revision)) return emptyRecoverySlots(generation);
+  if (!isNonNegativeInteger(revision)) return rejectedSlots(generation);
   const activeRun = parseActiveRun(value['activeRun']);
   const recoveryCapsule = parseRecoveryCapsule(value['recoveryCapsule']);
   const lastCompletedReceipt = parseCompletedReceipt(value['lastCompletedReceipt']);
-  const pendingStart =
-    schemaVersion === LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION
-      ? null
-      : parsePendingStart(value['pendingStart']);
-  if (
-    activeRun === undefined ||
-    recoveryCapsule === undefined ||
-    lastCompletedReceipt === undefined ||
-    pendingStart === undefined
-  ) {
-    return emptyRecoverySlots(generation);
-  }
-  return {
-    schemaVersion: RECOVERY_REPOSITORY_SCHEMA_VERSION,
-    generation,
-    revision,
+  const pendingStart = parsePendingStartForSchema(value['pendingStart'], schemaVersion);
+  const executionHistory = parseHistoryForSchema(value['executionHistory'], schemaVersion);
+  const parsedSlots = {
     activeRun,
     recoveryCapsule,
     lastCompletedReceipt,
     pendingStart,
+    executionHistory,
   };
+  if (!parsedSlotsAreValid(parsedSlots)) {
+    return rejectedSlots(generation);
+  }
+  return {
+    accepted: true,
+    slots: {
+      schemaVersion: RECOVERY_REPOSITORY_SCHEMA_VERSION,
+      generation,
+      revision,
+      ...parsedSlots,
+    },
+  };
+}
+
+function rejectedSlots(generation: number): ParsedRecoverySlots {
+  return { slots: emptyRecoverySlots(generation), accepted: false };
+}
+
+function isSupportedSchemaVersion(value: unknown): value is 1 | 2 | 3 {
+  return (
+    value === RECOVERY_REPOSITORY_SCHEMA_VERSION ||
+    value === PREVIOUS_RECOVERY_REPOSITORY_SCHEMA_VERSION ||
+    value === LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION
+  );
+}
+
+function parsePendingStartForSchema(
+  value: unknown,
+  schemaVersion: 1 | 2 | 3,
+): PendingStartRecord | null | undefined {
+  return schemaVersion === LEGACY_RECOVERY_REPOSITORY_SCHEMA_VERSION
+    ? null
+    : parsePendingStart(value);
+}
+
+function parseHistoryForSchema(
+  value: unknown,
+  schemaVersion: 1 | 2 | 3,
+): ReadonlyArray<ExecutionHistoryRecord> {
+  return schemaVersion === RECOVERY_REPOSITORY_SCHEMA_VERSION ? parseExecutionHistory(value) : [];
+}
+
+function parsedSlotsAreValid(value: {
+  readonly activeRun: ActiveRunRecord | null | undefined;
+  readonly recoveryCapsule: RecoveryCapsuleRecord | null | undefined;
+  readonly lastCompletedReceipt: LastCompletedReceiptRecord | null | undefined;
+  readonly pendingStart: PendingStartRecord | null | undefined;
+  readonly executionHistory: ReadonlyArray<ExecutionHistoryRecord>;
+}): value is {
+  readonly activeRun: ActiveRunRecord | null;
+  readonly recoveryCapsule: RecoveryCapsuleRecord | null;
+  readonly lastCompletedReceipt: LastCompletedReceiptRecord | null;
+  readonly pendingStart: PendingStartRecord | null;
+  readonly executionHistory: ReadonlyArray<ExecutionHistoryRecord>;
+} {
+  return Object.values(value).every((entry) => entry !== undefined);
 }
 
 export function validStoredArtifact(value: unknown): StoredRecoveryArtifact | null {
   if (!isRecord(value)) return null;
   const runId = value['runId'];
   const generation = value['generation'];
+  const origin = value['origin'];
+  const stagingLeaseExpiresAtEpochMs = value['stagingLeaseExpiresAtEpochMs'];
   const artifact = value['artifact'];
   if (typeof runId !== 'string' || !isNonNegativeInteger(generation)) return null;
+  if (
+    stagingLeaseExpiresAtEpochMs !== undefined &&
+    !isNonNegativeInteger(stagingLeaseExpiresAtEpochMs)
+  ) {
+    return null;
+  }
   if (!isRecord(artifact) || artifact['runId'] !== runId) return null;
+  if (!artifactOriginMatchesPayload(origin, artifact)) return null;
   return value as StoredRecoveryArtifact;
 }
 
@@ -185,7 +279,64 @@ function parseActiveRun(value: unknown): ActiveRunRecord | null | undefined {
   if (!isRecord(value)) return undefined;
   if (!isProgressRecord(value)) return undefined;
   if (typeof value['startedAtIso'] !== 'string') return undefined;
+  if (
+    value['estimatedArtifactBytes'] !== undefined &&
+    !isNonNegativeInteger(value['estimatedArtifactBytes'])
+  ) {
+    return undefined;
+  }
   return value as ActiveRunRecord;
+}
+
+function parseExecutionHistory(value: unknown): ReadonlyArray<ExecutionHistoryRecord> {
+  // Execution history is additive forensic data. A corrupt history envelope or
+  // entry must never erase otherwise valid active/recovery/start state.
+  if (!Array.isArray(value)) return [];
+  const records: ExecutionHistoryRecord[] = [];
+  const newestCandidates = value.slice(-MAX_PERSISTED_EXECUTION_HISTORY_INPUT_RUNS);
+  for (const candidate of newestCandidates) {
+    const record = parseExecutionHistoryRecord(candidate);
+    if (record !== undefined) records.push(record);
+  }
+  return records;
+}
+
+function parseExecutionHistoryRecord(value: unknown): ExecutionHistoryRecord | undefined {
+  if (!isRecord(value) || !hasValidHistoryProgress(value)) return undefined;
+  const terminalKind = value['terminalKind'];
+  if (terminalKind !== 'completed' && terminalKind !== 'interrupted') return undefined;
+  if (terminalKind === 'interrupted' && !isBoundedHistoryInterruption(value['interruption'])) {
+    return undefined;
+  }
+  if (terminalKind === 'completed' && value['interruption'] !== undefined) return undefined;
+  return value as ExecutionHistoryRecord;
+}
+
+function hasValidHistoryProgress(value: Record<string, unknown>): boolean {
+  if (!isRunId(value['runId'])) return false;
+  if (!isBoundedHistoryString(value['startedAtIso'], 128)) return false;
+  if (!isBoundedHistoryString(value['terminalAtIso'], 128)) return false;
+  if (!isNonNegativeInteger(value['ackedLines'])) return false;
+  if (!isNonNegativeInteger(value['sendableLines'])) return false;
+  if (value['ackedLines'] > value['sendableLines']) return false;
+  return isNonNegativeInteger(value['estimatedArtifactBytes']);
+}
+
+function isBoundedHistoryInterruption(value: unknown): value is JobInterruption {
+  if (!isInterruption(value) || !isRecord(value)) return false;
+  if (!isBoundedHistoryString(value['message'], 16_384, true)) return false;
+  return (
+    value['rejectedLine'] === undefined ||
+    isBoundedHistoryString(value['rejectedLine'], 16_384, true)
+  );
+}
+
+function isBoundedHistoryString(
+  value: unknown,
+  maxLength: number,
+  allowEmpty = false,
+): value is string {
+  return typeof value === 'string' && (allowEmpty || value.length > 0) && value.length <= maxLength;
 }
 
 function parseRecoveryCapsule(value: unknown): RecoveryCapsuleRecord | null | undefined {

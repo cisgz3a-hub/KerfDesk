@@ -4,6 +4,7 @@ import {
   type OverrideValues,
   type StatusReport,
 } from '../../core/controllers/grbl';
+import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { SimilarityTransform } from '../../core/registration';
@@ -34,6 +35,7 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import type { HomingState } from '../state/laser-store';
+import type { SessionObservationStamp } from '../state/laser-controller-observation';
 import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
@@ -49,6 +51,7 @@ import {
 import { collectStartWarnings } from './start-job-warnings';
 import { demotedPolicyWarnings, partitionEmitPreflight } from './start-job-readiness-policy';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
+import { startControllerPolicy } from './start-job-controller-policy';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
@@ -122,6 +125,8 @@ export type MachineStartSnapshot = {
   readonly trustedPositionEpoch?: number;
   readonly statusQuery?: StatusQueryCapability;
   readonly reportInches?: boolean;
+  readonly controllerBuildInfo?: GrblBuildInfo | null;
+  readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
 };
 
 export function prepareStartJob(
@@ -286,6 +291,10 @@ function finalizeStartPreparation({
   }
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
+  const controllerPolicy = startControllerPolicy(controller, gcode, machine);
+  if (controllerPolicy.blocking.length > 0) {
+    return { ok: false, messages: controllerPolicy.blocking };
+  }
   const warnings = collectStartWarnings(
     project,
     controllerSettings,
@@ -293,9 +302,12 @@ function finalizeStartPreparation({
       ...demotedPolicyWarnings(project, machine),
       ...advisoryWarnings,
       ...emitSplit.warnings,
-      ...collectPrintCutFrameWarnings(project, printCutRegistrationActive, placement.jobOrigin),
-      // Frame-first: readiness errors ($30/$32 state) inform, never block.
-      ...controller.errors.map((issue) => issue.message),
+      ...collectPrintCutFrameWarnings(
+        prepared.project,
+        printCutRegistrationActive,
+        placement.jobOrigin,
+      ),
+      ...controllerPolicy.advisories,
       ...controller.warnings.map((issue) => issue.message),
     ],
     machine.ovCache,

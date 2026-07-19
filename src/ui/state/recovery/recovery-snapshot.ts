@@ -1,11 +1,16 @@
 import {
+  estimateExecutionArtifactBytes,
+  isCurrentExecutionArtifact,
   isExecutionArtifact,
   isRecoveryArtifact,
   type RecoveryArtifactV1,
 } from './execution-artifact';
+import { storedExecutionArtifactIntegrityIsValid } from './execution-artifact-integrity';
+import { boundExecutionHistory } from './execution-history';
 import type { RecoveryStorageBackend } from './recovery-backend';
 import {
   validStoredArtifact,
+  type ExecutionHistoryRecord,
   type PersistedRecoverySlots,
   type RecoveryRepositorySnapshot,
 } from './recovery-model';
@@ -14,31 +19,50 @@ export async function hydrateRecoverySnapshot(
   backend: RecoveryStorageBackend,
   slots: PersistedRecoverySlots,
 ): Promise<RecoveryRepositorySnapshot> {
-  const records = await artifactMap(backend, slots);
+  return (await hydrateRecoveryState(backend, slots)).snapshot;
+}
+
+export type HydratedRecoveryState = {
+  readonly snapshot: RecoveryRepositorySnapshot;
+  readonly artifacts: ReadonlyMap<string, RecoveryArtifactV1>;
+};
+
+export async function hydrateRecoveryState(
+  backend: RecoveryStorageBackend,
+  slots: PersistedRecoverySlots,
+  knownArtifacts: ReadonlyMap<string, RecoveryArtifactV1> = new Map(),
+): Promise<HydratedRecoveryState> {
+  const records = await artifactMap(backend, slots, knownArtifacts);
   const activeArtifact = artifactFor(records, slots.activeRun?.runId);
   const recoveryArtifact = artifactFor(records, slots.recoveryCapsule?.runId);
   const completedArtifact = artifactFor(records, slots.lastCompletedReceipt?.runId);
+  const executionHistory = hydratedExecutionHistory(slots, records);
   return {
-    loaded: true,
-    generation: slots.generation,
-    activeRun:
-      slots.activeRun !== null &&
-      isExecutionArtifact(activeArtifact) &&
-      progressMatchesArtifact(slots.activeRun, activeArtifact)
-        ? { ...slots.activeRun, artifact: activeArtifact }
-        : null,
-    recoveryCapsule: hydratedRecoveryCapsule(slots, recoveryArtifact),
-    lastCompletedReceipt:
-      slots.lastCompletedReceipt !== null && isExecutionArtifact(completedArtifact)
-        ? { ...slots.lastCompletedReceipt, artifact: completedArtifact }
-        : null,
-    pendingStart: slots.pendingStart,
+    artifacts: records,
+    snapshot: {
+      loaded: true,
+      generation: slots.generation,
+      activeRun:
+        slots.activeRun !== null &&
+        isExecutionArtifact(activeArtifact) &&
+        progressMatchesArtifact(slots.activeRun, activeArtifact)
+          ? { ...slots.activeRun, artifact: activeArtifact }
+          : null,
+      recoveryCapsule: hydratedRecoveryCapsule(slots, recoveryArtifact),
+      lastCompletedReceipt:
+        slots.lastCompletedReceipt !== null && isExecutionArtifact(completedArtifact)
+          ? { ...slots.lastCompletedReceipt, artifact: completedArtifact }
+          : null,
+      pendingStart: slots.pendingStart,
+      executionHistory,
+    },
   };
 }
 
 async function artifactMap(
   backend: RecoveryStorageBackend,
   slots: PersistedRecoverySlots,
+  knownArtifacts: ReadonlyMap<string, RecoveryArtifactV1>,
 ): Promise<ReadonlyMap<string, RecoveryArtifactV1>> {
   const records = new Map<string, RecoveryArtifactV1>();
   const runIds = new Set(
@@ -47,21 +71,75 @@ async function artifactMap(
       slots.recoveryCapsule?.runId,
       slots.lastCompletedReceipt?.runId,
       slots.pendingStart?.runId,
+      slots.pendingStart?.sourceRecovery?.runId,
+      ...slots.executionHistory.map((record) => record.runId),
     ].filter((value): value is string => value !== undefined),
   );
+  for (const runId of runIds) {
+    const known = knownArtifacts.get(runId);
+    if (knownArtifactCanHydrate(known, runId)) records.set(runId, known);
+  }
   await Promise.all(
-    [...runIds].map(async (runId) => {
-      const stored = validStoredArtifact(await backend.getArtifact(runId));
-      if (
-        stored !== null &&
-        stored.generation === slots.generation &&
-        isRecoveryArtifact(stored.artifact)
-      ) {
-        records.set(runId, stored.artifact);
-      }
-    }),
+    [...runIds]
+      .filter((runId) => !records.has(runId))
+      .map(async (runId) => {
+        const stored = validStoredArtifact(await backend.getArtifact(runId));
+        if (
+          stored !== null &&
+          stored.generation === slots.generation &&
+          isRecoveryArtifact(stored.artifact) &&
+          (stored.artifact.kind === 'legacy-fingerprint-only' ||
+            (await storedExecutionArtifactIntegrityIsValid(stored)))
+        ) {
+          records.set(runId, stored.artifact);
+        }
+      }),
   );
   return records;
+}
+
+function knownArtifactCanHydrate(
+  artifact: RecoveryArtifactV1 | undefined,
+  runId: string,
+): artifact is RecoveryArtifactV1 {
+  return (
+    artifact?.runId === runId &&
+    isRecoveryArtifact(artifact) &&
+    (artifact.kind === 'legacy-fingerprint-only' || isCurrentExecutionArtifact(artifact))
+  );
+}
+
+function hydratedExecutionHistory(
+  slots: PersistedRecoverySlots,
+  records: ReadonlyMap<string, RecoveryArtifactV1>,
+): ReadonlyArray<ExecutionHistoryRecord> {
+  const seen = new Set<string>();
+  const newestUnique: ExecutionHistoryRecord[] = [];
+  for (let index = slots.executionHistory.length - 1; index >= 0; index -= 1) {
+    const record = slots.executionHistory[index];
+    if (record === undefined || seen.has(record.runId)) continue;
+    seen.add(record.runId);
+    const artifact = artifactFor(records, record.runId);
+    if (!isExecutionArtifact(artifact) || !progressMatchesArtifact(record, artifact)) continue;
+    newestUnique.push({
+      ...record,
+      estimatedArtifactBytes: estimateExecutionArtifactBytes(artifact),
+    });
+  }
+  newestUnique.reverse();
+  return boundExecutionHistory(newestUnique, protectedHistoryRunIds(slots));
+}
+
+function protectedHistoryRunIds(slots: PersistedRecoverySlots): ReadonlySet<string> {
+  const runIds = new Set<string>();
+  if (slots.activeRun !== null) runIds.add(slots.activeRun.runId);
+  if (slots.recoveryCapsule !== null) runIds.add(slots.recoveryCapsule.runId);
+  if (slots.lastCompletedReceipt !== null) runIds.add(slots.lastCompletedReceipt.runId);
+  if (slots.pendingStart !== null) runIds.add(slots.pendingStart.runId);
+  if (slots.pendingStart?.sourceRecovery !== undefined) {
+    runIds.add(slots.pendingStart.sourceRecovery.runId);
+  }
+  return runIds;
 }
 
 function hydratedRecoveryCapsule(

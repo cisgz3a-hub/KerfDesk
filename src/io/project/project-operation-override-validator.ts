@@ -31,6 +31,8 @@ export function validateObjectOperationOverride(value: unknown, path: string): s
     optionalNonNegativeNumber(value, `${path}.fillOverscanMm`),
     optionalLiteral(value, `${path}.fillStyle`, ['scanline', 'offset', 'island']),
     optionalBoolean(value, `${path}.fillBidirectional`),
+    optionalBoolean(value, `${path}.allowUncalibratedBidirectionalScan`),
+    optionalNumber(value, `${path}.bidirectionalScanOffsetMm`),
     optionalBoolean(value, `${path}.fillCrossHatch`),
     optionalLiteral(value, `${path}.ditherAlgorithm`, DITHER_ALGORITHMS),
     optionalPositiveNumber(value, `${path}.linesPerMm`),

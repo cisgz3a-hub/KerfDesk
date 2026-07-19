@@ -18,11 +18,12 @@ import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/wor
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { MachineKind } from '../../core/scene';
-import type { SerialConnection } from '../../platform/types';
+import type { SerialConnection, SerialPortIdentity } from '../../platform/types';
 import { runAutofocus } from './autofocus-action';
 import { consoleActions } from './laser-console-actions';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
+import type { ControllerBuildInfoState } from './laser-controller-build-info';
 import type {
   ControllerQualification,
   ControllerQualificationScheduleRefs,
@@ -89,158 +90,160 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 
 export type { ConnectControllerOptions } from './laser-store-action-types';
 
-export type LaserState = LaserStoreActions & {
-  readonly connection: ConnectionState;
-  readonly statusReport: StatusReport | null;
-  readonly controllerSessionEpoch: number;
-  readonly statusSequence: number;
-  readonly statusObservation: ControllerObservationStamp | null;
-  readonly alarmCode: number | null;
-  readonly lastError: number | null;
-  readonly lastWriteError: string | null;
-  // Operator-requested coolant/air state for the manual jog-panel control.
-  // Jobs may still emit their own M7/M8/M9 sequence; Stop/Disconnect force this
-  // false after sending the driver's coolant-off cleanup.
-  readonly airAssistOn: boolean;
-  // True while a guarded momentary Fire request is active, including its
-  // in-flight serial write. Every exit path clears this before the final M5.
-  readonly fireActive: boolean;
-  // P0-B: operator-facing safety alert raised when the store cannot guarantee
-  // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
-  // drop mid-job. null = nothing to warn about. Reconnect preserves the notice;
-  // only explicit operator acknowledgment via clearSafetyNotice clears it.
-  readonly safetyNotice: LaserSafetyNotice | null;
-  readonly autofocusBusy: boolean;
-  // ADR-103 G2 - a touch-plate probe cycle is mid-flight.
-  readonly probeBusy: boolean;
-  readonly motionOperation: LaserMotionOperation | null;
-  readonly controllerOperation: LaserControllerOperation | null;
-  readonly streamer: StreamerState | null;
-  /** Immutable recovery/replay ownership for the current streamer. */
-  readonly activeRunId: RunId | null;
-  /** Controller-reported canvas truth for the active or most recently
-   * completed run. The started plan is immutable for the life of the run. */
-  readonly liveCanvasRun?: LiveCanvasRun | null;
-  // Which machine kind the running job was compiled for. Pause safety
-  // differs by kind: lasers need the $32=1 proof before feed hold (the beam
-  // can stay on through a hold at $32=0); routers require $32=0 and hold is
-  // safe with the spindle spinning. null = no job started yet.
-  readonly activeJobMachineKind: MachineKind | null;
-  // Queued writes outside the job stream (console, origin, unlock, the
-  // handshake $$ …) that still owe a terminal ok/error. GRBL acks in strict
-  // receive order, so Start must wait for 0: a stale ok mis-attributed to a
-  // fresh job stream frees RX budget GRBL has not freed, and the phantom
-  // refill can overflow the real 128-byte buffer mid-burn.
-  readonly pendingUntrackedAcks: number;
-  // Writes whose transport promise has not resolved yet. Reserved before
-  // awaiting conn.write so Start cannot install an ack-correlated fence while
-  // an earlier command is accepted by the controller but absent from the ack ledger.
-  readonly pendingTransportWrites?: number;
-  readonly homingState: HomingState;
-  readonly homingProof: HomingProof | null;
-  readonly trustedPositionEpoch?: number;
-  readonly workZReferenceEpoch: number;
-  readonly log: ReadonlyArray<string>;
-  readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
-  // F-7: settings auto-detected from the `$$` dump on connect. Non-null
-  // means "the user hasn't responded to the detection banner yet" —
-  // null after either Apply (which dispatched updateDeviceProfile) or
-  // Dismiss (which left the profile alone).
-  readonly detectedSettings: Partial<DeviceProfile> | null;
-  readonly controllerSettings: ControllerSettingsSnapshot | null;
-  readonly controllerSettingsObservation: SessionObservationStamp | null;
-  /** Qualification of the live controller session. Every record is bound to
-   * controllerSessionEpoch so late replies from a reset or forgotten port can
-   * never make a newer session look ready. */
-  readonly controllerQualification: ControllerQualification;
-  readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
-  readonly lastSettingsReadAt: number | null;
-  /**
-   * F.3 — last-seen Work Coordinate Offset from the GRBL controller.
-   * GRBL only reports WCO on a cadence (~every Nth status frame), so
-   * the UI needs the *last non-null* value cached here, not the raw
-   * StatusReport.wco which is null on most frames. Updated by the
-   * line-handler when a WCO-bearing status arrives; cleared on
-   * disconnect, alarm, and soft reset (all of which clear G92 in
-   * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
-   */
-  readonly wcoCache: WorkCoordinateOffset | null;
-  // The work coordinate system the operator has selected via the console
-  // (G54-G59). Null = never selected one this session (KerfDesk's own flows
-  // always run in G54). GRBL status frames never report which WCS is active,
-  // only the active WCS's offset, so this is tracked from console commands;
-  // job/save advisories warn when it is non-G54 because emission pins G54 while
-  // placement is computed from the active offset (audit C6). Not populated for
-  // $N startup blocks or external-session selections — those need a $G readback.
-  readonly activeWcs: ActiveWorkCoordinateSystem | null;
-  // ADR-103 G3 - last-seen Ov: feed/rapid/spindle override percentages,
-  // cached across frames exactly like wcoCache.
-  readonly ovCache: OverrideValues | null;
-  // ADR-179 - last controller-commanded spindle/coolant state observed via
-  // GRBL A:. Optional only so older hand-built test states remain valid.
-  // null/undefined means unknown, not known off.
-  readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
-  // Explicit grblHAL MPG:1/0 ownership evidence. Latches across status frames
-  // that omit the intermittent field; null/undefined means never observed in
-  // this controller/transport session.
-  readonly mpgActive?: boolean | null;
-  readonly workOriginActive: boolean;
-  readonly workOriginSource: WorkOriginSource;
-  // Monotonic identity for XY work-origin mutations. Place Board registration
-  // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
-  readonly workOriginVersion?: number;
-  // Qualified evidence for the CNC stock-top contract. Separate from
-  // workOriginActive (XY origin): Set Origin (G92 X0 Y0) does not establish Z.
-  // The record is bound to workZReferenceEpoch so reconnect/reset/home and
-  // other reference-loss events make stale evidence fail closed at Start.
-  readonly workZZeroEvidence: WorkZZeroEvidence | null;
-  // Tool-change readiness: true only once a FRESH Idle status report has been
-  // observed since the streamer entered the tool-change hold (cleared on entry,
-  // set when Idle arrives with the pre-M0 tail drained). Guards the setup gate
-  // and Continue against a STALE Idle from before Start, so jog/probe/Continue
-  // cannot unlock while the pre-change retract/park is still moving (Codex audit
-  // P1).
-  readonly toolChangeIdleSeen: boolean;
-  // The next-bit labels remaining in the current CNC job, in stream order (R5).
-  // Set at Start from the compiled program's tool-change comments; the head is
-  // consumed into pendingToolLabel each time a tool-change hold is entered.
-  readonly toolChangeLabels: ReadonlyArray<string>;
-  // Stable IDs parallel to toolChangeLabels. null preserves the legacy/imported
-  // fallback where only a comment label is available.
-  readonly toolChangeToolIds: ReadonlyArray<string | null>;
-  // The bit to load at the CURRENT tool-change hold, or null when it is unknown
-  // (single-tool job, imported .nc, resume tail) — the UI names the bit when set
-  // and falls back to a generic prompt when null (R5).
-  readonly pendingToolLabel: string | null;
-  readonly pendingToolId: string | null;
-  /**
-   * Compatibility proof issued only after a clean Frame completion. Ordinary
-   * Start uses the exact `framedRun` permit below; this bounds/origin proof is
-   * retained for recovery and completed-job replay compatibility. Physical or
-   * setup mutations clear it, while project changes invalidate it structurally
-   * when the bounds signature no longer matches. null = not verified.
-   */
-  readonly frameVerification: FrameVerification | null;
-  /** Exact reviewed program authorized only after its Frame physically
-   * completes. A pending Frame candidate lives on motionOperation instead. */
-  readonly framedRun: FramedRunPermit | null;
-  /** Atomic owner while ordinary Start hands one exact permit to the store. */
-  readonly framedRunStartClaim: FramedRunStartClaim | null;
-  /**
-   * ADR-094 — capabilities snapshot of the active ControllerDriver. UI
-   * components gate controls on these flags, never on the controller kind.
-   * Defaults to GRBL's (all-enabled) capabilities while disconnected so the
-   * panel renders identically to the pre-driver app.
-   */
-  readonly capabilities: ControllerCapabilities;
-  /** Kind of the ACTIVE driver (selected at connect). Components use this for
-   *  pure driver-data lookups (console quick commands); guards still gate on
-   *  `capabilities`, never on the kind. */
-  readonly activeControllerKind: ControllerKind;
-  /** Firmware family detected from the welcome banner, null until seen. May
-   *  disagree with the profile-selected driver (advisory — see line handler). */
-  readonly detectedControllerKind: ControllerKind | null;
-};
+export type LaserState = LaserStoreActions &
+  ControllerBuildInfoState & {
+    readonly connection: ConnectionState;
+    readonly serialPortInfo?: SerialPortIdentity | null;
+    readonly statusReport: StatusReport | null;
+    readonly controllerSessionEpoch: number;
+    readonly statusSequence: number;
+    readonly statusObservation: ControllerObservationStamp | null;
+    readonly alarmCode: number | null;
+    readonly lastError: number | null;
+    readonly lastWriteError: string | null;
+    // Operator-requested coolant/air state for the manual jog-panel control.
+    // Jobs may still emit their own M7/M8/M9 sequence; Stop/Disconnect force this
+    // false after sending the driver's coolant-off cleanup.
+    readonly airAssistOn: boolean;
+    // True while a guarded momentary Fire request is active, including its
+    // in-flight serial write. Every exit path clears this before the final M5.
+    readonly fireActive: boolean;
+    // P0-B: operator-facing safety alert raised when the store cannot guarantee
+    // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
+    // drop mid-job. null = nothing to warn about. Reconnect preserves the notice;
+    // only explicit operator acknowledgment via clearSafetyNotice clears it.
+    readonly safetyNotice: LaserSafetyNotice | null;
+    readonly autofocusBusy: boolean;
+    // ADR-103 G2 - a touch-plate probe cycle is mid-flight.
+    readonly probeBusy: boolean;
+    readonly motionOperation: LaserMotionOperation | null;
+    readonly controllerOperation: LaserControllerOperation | null;
+    readonly streamer: StreamerState | null;
+    /** Immutable recovery/replay ownership for the current streamer. */
+    readonly activeRunId: RunId | null;
+    /** Controller-reported canvas truth for the active or most recently
+     * completed run. The started plan is immutable for the life of the run. */
+    readonly liveCanvasRun?: LiveCanvasRun | null;
+    // Which machine kind the running job was compiled for. Pause safety
+    // differs by kind: lasers need the $32=1 proof before feed hold (the beam
+    // can stay on through a hold at $32=0); routers require $32=0 and hold is
+    // safe with the spindle spinning. null = no job started yet.
+    readonly activeJobMachineKind: MachineKind | null;
+    // Queued writes outside the job stream (console, origin, unlock, the
+    // handshake $$ …) that still owe a terminal ok/error. GRBL acks in strict
+    // receive order, so Start must wait for 0: a stale ok mis-attributed to a
+    // fresh job stream frees RX budget GRBL has not freed, and the phantom
+    // refill can overflow the real 128-byte buffer mid-burn.
+    readonly pendingUntrackedAcks: number;
+    // Writes whose transport promise has not resolved yet. Reserved before
+    // awaiting conn.write so Start cannot install an ack-correlated fence while
+    // an earlier command is accepted by the controller but absent from the ack ledger.
+    readonly pendingTransportWrites?: number;
+    readonly homingState: HomingState;
+    readonly homingProof: HomingProof | null;
+    readonly trustedPositionEpoch?: number;
+    readonly workZReferenceEpoch: number;
+    readonly log: ReadonlyArray<string>;
+    readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
+    // F-7: settings auto-detected from the `$$` dump on connect. Non-null
+    // means "the user hasn't responded to the detection banner yet" —
+    // null after either Apply (which dispatched updateDeviceProfile) or
+    // Dismiss (which left the profile alone).
+    readonly detectedSettings: Partial<DeviceProfile> | null;
+    readonly controllerSettings: ControllerSettingsSnapshot | null;
+    readonly controllerSettingsObservation: SessionObservationStamp | null;
+    /** Qualification of the live controller session. Every record is bound to
+     * controllerSessionEpoch so late replies from a reset or forgotten port can
+     * never make a newer session look ready. */
+    readonly controllerQualification: ControllerQualification;
+    readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
+    readonly lastSettingsReadAt: number | null;
+    /**
+     * F.3 — last-seen Work Coordinate Offset from the GRBL controller.
+     * GRBL only reports WCO on a cadence (~every Nth status frame), so
+     * the UI needs the *last non-null* value cached here, not the raw
+     * StatusReport.wco which is null on most frames. Updated by the
+     * line-handler when a WCO-bearing status arrives; cleared on
+     * disconnect, alarm, and soft reset (all of which clear G92 in
+     * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
+     */
+    readonly wcoCache: WorkCoordinateOffset | null;
+    // The work coordinate system the operator has selected via the console
+    // (G54-G59). Null = never selected one this session (KerfDesk's own flows
+    // always run in G54). GRBL status frames never report which WCS is active,
+    // only the active WCS's offset, so this is tracked from console commands;
+    // job/save advisories warn when it is non-G54 because emission pins G54 while
+    // placement is computed from the active offset (audit C6). Not populated for
+    // $N startup blocks or external-session selections — those need a $G readback.
+    readonly activeWcs: ActiveWorkCoordinateSystem | null;
+    // ADR-103 G3 - last-seen Ov: feed/rapid/spindle override percentages,
+    // cached across frames exactly like wcoCache.
+    readonly ovCache: OverrideValues | null;
+    // ADR-179 - last controller-commanded spindle/coolant state observed via
+    // GRBL A:. Optional only so older hand-built test states remain valid.
+    // null/undefined means unknown, not known off.
+    readonly accessoryCache?: NonNullable<StatusReport['accessories']> | null;
+    // Explicit grblHAL MPG:1/0 ownership evidence. Latches across status frames
+    // that omit the intermittent field; null/undefined means never observed in
+    // this controller/transport session.
+    readonly mpgActive?: boolean | null;
+    readonly workOriginActive: boolean;
+    readonly workOriginSource: WorkOriginSource;
+    // Monotonic identity for XY work-origin mutations. Place Board registration
+    // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
+    readonly workOriginVersion?: number;
+    // Qualified evidence for the CNC stock-top contract. Separate from
+    // workOriginActive (XY origin): Set Origin (G92 X0 Y0) does not establish Z.
+    // The record is bound to workZReferenceEpoch so reconnect/reset/home and
+    // other reference-loss events make stale evidence fail closed at Start.
+    readonly workZZeroEvidence: WorkZZeroEvidence | null;
+    // Tool-change readiness: true only once a FRESH Idle status report has been
+    // observed since the streamer entered the tool-change hold (cleared on entry,
+    // set when Idle arrives with the pre-M0 tail drained). Guards the setup gate
+    // and Continue against a STALE Idle from before Start, so jog/probe/Continue
+    // cannot unlock while the pre-change retract/park is still moving (Codex audit
+    // P1).
+    readonly toolChangeIdleSeen: boolean;
+    // The next-bit labels remaining in the current CNC job, in stream order (R5).
+    // Set at Start from the compiled program's tool-change comments; the head is
+    // consumed into pendingToolLabel each time a tool-change hold is entered.
+    readonly toolChangeLabels: ReadonlyArray<string>;
+    // Stable IDs parallel to toolChangeLabels. null preserves the legacy/imported
+    // fallback where only a comment label is available.
+    readonly toolChangeToolIds: ReadonlyArray<string | null>;
+    // The bit to load at the CURRENT tool-change hold, or null when it is unknown
+    // (single-tool job, imported .nc, resume tail) — the UI names the bit when set
+    // and falls back to a generic prompt when null (R5).
+    readonly pendingToolLabel: string | null;
+    readonly pendingToolId: string | null;
+    /**
+     * Compatibility proof issued only after a clean Frame completion. Ordinary
+     * Start uses the exact `framedRun` permit below; this bounds/origin proof is
+     * retained for recovery and completed-job replay compatibility. Physical or
+     * setup mutations clear it, while project changes invalidate it structurally
+     * when the bounds signature no longer matches. null = not verified.
+     */
+    readonly frameVerification: FrameVerification | null;
+    /** Exact reviewed program authorized only after its Frame physically
+     * completes. A pending Frame candidate lives on motionOperation instead. */
+    readonly framedRun: FramedRunPermit | null;
+    /** Atomic owner while ordinary Start hands one exact permit to the store. */
+    readonly framedRunStartClaim: FramedRunStartClaim | null;
+    /**
+     * ADR-094 — capabilities snapshot of the active ControllerDriver. UI
+     * components gate controls on these flags, never on the controller kind.
+     * Defaults to GRBL's (all-enabled) capabilities while disconnected so the
+     * panel renders identically to the pre-driver app.
+     */
+    readonly capabilities: ControllerCapabilities;
+    /** Kind of the ACTIVE driver (selected at connect). Components use this for
+     *  pure driver-data lookups (console quick commands); guards still gate on
+     *  `capabilities`, never on the kind. */
+    readonly activeControllerKind: ControllerKind;
+    /** Firmware family detected from the welcome banner, null until seen. May
+     *  disagree with the profile-selected driver (advisory — see line handler). */
+    readonly detectedControllerKind: ControllerKind | null;
+  };
 
 export type LiveRefs = ControllerLifecycleRefs & {
   connection: SerialConnection | null;

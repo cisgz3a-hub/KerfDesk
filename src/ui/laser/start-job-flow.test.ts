@@ -13,12 +13,14 @@ import { useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { RecoveryRepository } from '../state/recovery';
+import { sha256Utf8 } from '../state/recovery/execution-provenance';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
+import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
@@ -108,6 +110,23 @@ function recoveryHarness(): RepositoryHarness {
 
 function startSpy() {
   return vi.mocked(useLaserStore.getState().startJob);
+}
+
+async function expectExactProvenance(
+  active: ReturnType<RecoveryRepository['getSnapshot']>['activeRun'],
+): Promise<void> {
+  const streamedGcode = startSpy().mock.calls[0]?.[0] ?? '';
+  expect(active?.artifact.gcode).toBe(streamedGcode);
+  expect(active?.artifact.fingerprint).toEqual(fingerprintGcode(streamedGcode));
+  expect(active?.artifact.provenance).toMatchObject({
+    schemaVersion: 2,
+    workflow: { kind: 'ordinary-start' },
+  });
+  expect(active?.artifact.provenance?.content.gcodeSha256).toBe(await sha256Utf8(streamedGcode));
+  expect(active?.artifact.provenance?.review).toMatchObject({
+    warningsShown: expect.any(Array),
+    acknowledgement: expect.objectContaining({ kind: expect.any(String) }),
+  });
 }
 
 async function makeInterruptedRun(repository: RecoveryRepository) {
@@ -266,10 +285,7 @@ describe('isolated execution recovery ownership', () => {
     const active = repository.getSnapshot().activeRun;
     expect(active).not.toBeNull();
     expect(active?.ackedLines).toBe(0);
-    expect(active?.artifact.gcode).toBe(startSpy().mock.calls[0]?.[0]);
-    expect(active?.artifact.fingerprint).toEqual(
-      fingerprintGcode(startSpy().mock.calls[0]?.[0] ?? ''),
-    );
+    await expectExactProvenance(active);
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
   });
 
@@ -279,7 +295,7 @@ describe('isolated execution recovery ownership', () => {
     const template = repository.getSnapshot().activeRun?.artifact;
     if (template === undefined) throw new Error('Expected a template artifact.');
     const interruptedGcode = 'G1 X1\n'.repeat(118_035);
-    const archived = createExecutionArtifact({
+    const archived = await createCurrentTestExecutionArtifact({
       runId: 'run-118035-lines',
       gcode: interruptedGcode,
       prepared: template.prepared,
@@ -386,6 +402,10 @@ describe('completed-job replay', () => {
     expect(replay?.runId).not.toBe(first.runId);
     expect(replay?.ackedLines).toBe(0);
     expect(replay?.artifact.gcode).toBe(first.artifact.gcode);
+    expect(replay?.artifact.provenance).toMatchObject({
+      schemaVersion: 2,
+      workflow: { kind: 'ordinary-start', completedReplaySourceRunId: first.runId },
+    });
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
     expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
   });

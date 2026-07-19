@@ -27,6 +27,7 @@ type HandoffHost = {
       readonly slots: PersistedRecoverySlots;
       readonly value: T;
     },
+    requiredArtifactRunId?: RunId,
   ) => Promise<RecoveryRepositoryResult<T>>;
   readonly refresh: () => Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>>;
 };
@@ -42,13 +43,16 @@ export class RecoveryStartHandoff {
   ): Promise<RecoveryRepositoryResult<boolean>> {
     const record = await this.host.exactArtifactRecord(runId);
     if (!record.ok) return record;
-    return this.host.mutate('arm durable job Start handoff', (slots) =>
-      armFreshStartMutation(
-        slots,
-        record.value.artifact as ExecutionArtifactV1,
-        record.value.generation,
-        armedAtIso,
-      ),
+    return this.host.mutate(
+      'arm durable job Start handoff',
+      (slots) =>
+        armFreshStartMutation(
+          slots,
+          record.value.artifact as ExecutionArtifactV1,
+          record.value.generation,
+          armedAtIso,
+        ),
+      runId,
     );
   }
 
@@ -61,15 +65,18 @@ export class RecoveryStartHandoff {
   }): Promise<RecoveryRepositoryResult<boolean>> {
     const record = await this.host.exactArtifactRecord(args.recoveryRunId);
     if (!record.ok) return record;
-    return this.host.mutate('arm durable supervised recovery handoff', (slots) =>
-      armClaimedRecoveryStartMutation(slots, {
-        sourceRunId: args.sourceRunId,
-        sourceRevision: args.sourceRevision,
-        attemptId: args.attemptId,
-        artifact: record.value.artifact as ExecutionArtifactV1,
-        artifactGeneration: record.value.generation,
-        armedAtIso: args.armedAtIso ?? this.host.nowIso(),
-      }),
+    return this.host.mutate(
+      'arm durable supervised recovery handoff',
+      (slots) =>
+        armClaimedRecoveryStartMutation(slots, {
+          sourceRunId: args.sourceRunId,
+          sourceRevision: args.sourceRevision,
+          attemptId: args.attemptId,
+          artifact: record.value.artifact as ExecutionArtifactV1,
+          artifactGeneration: record.value.generation,
+          armedAtIso: args.armedAtIso ?? this.host.nowIso(),
+        }),
+      args.recoveryRunId,
     );
   }
 

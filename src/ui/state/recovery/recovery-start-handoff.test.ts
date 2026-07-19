@@ -1,35 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../../core/scene';
-import type { PreparedOutput } from '../../../io/gcode';
-import type { CanvasMotionPlan } from '../canvas-motion-plan';
-import { createExecutionArtifact, type RunId } from './execution-artifact';
+import type { RunId } from './execution-artifact';
 import { MemoryRecoveryStorageBackend } from './recovery-backend';
 import { MemoryRecoveryGenerationStore } from './recovery-generation';
 import { RecoveryRepository } from './recovery-repository';
+import { createCurrentTestExecutionArtifact } from './testing/execution-artifact-test-fixture';
 
 const NOW = '2026-07-15T10:00:00.000Z';
 const LATER = '2026-07-15T10:01:00.000Z';
 
 function artifact(runId: RunId) {
-  const project = {
-    device: {
-      controllerKind: 'grbl-v1.1',
-      streamingMode: 'char-counted',
-      rxBufferBytes: 120,
-    },
-  } as unknown as Project;
-  return createExecutionArtifact({
+  return createCurrentTestExecutionArtifact({
     runId,
-    gcode: 'G21\nG90\nG1 X1\nM5\n',
-    prepared: {
-      ok: true,
-      project,
-      job: { groups: [] },
-      jobOriginOffset: { x: 0, y: 0 },
-    } as Extract<PreparedOutput, { readonly ok: true }>,
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    canvasPlan: { retentionKey: `signature-${runId}` } as CanvasMotionPlan,
-    controllerSettings: { maxPowerS: 1_000, laserModeEnabled: true },
     createdAtIso: NOW,
   });
 }
@@ -53,7 +34,7 @@ function harness(options?: {
 }
 
 async function interrupt(repository: RecoveryRepository, runId: RunId): Promise<void> {
-  expect((await repository.stageArtifact(artifact(runId))).ok).toBe(true);
+  expect((await repository.stageArtifact(await artifact(runId))).ok).toBe(true);
   expect((await repository.activateFreshRun(runId, NOW)).ok).toBe(true);
   expect(
     (
@@ -79,7 +60,7 @@ describe('durable Start handoff', () => {
   it('reconciles a crashed fresh Start as the newest uncertain capsule', async () => {
     const first = harness();
     await interrupt(first.repository, 'run-old');
-    await first.repository.stageArtifact(artifact('run-new'));
+    await first.repository.stageArtifact(await artifact('run-new'));
 
     expect(success(await first.repository.armFreshStart('run-new', NOW))).toBe(true);
     expect(first.repository.getSnapshot().recoveryCapsule?.runId).toBe('run-old');
@@ -96,7 +77,7 @@ describe('durable Start handoff', () => {
 
   it('does not let a second live window reconcile an active owner lease', async () => {
     const first = harness();
-    await first.repository.stageArtifact(artifact('run-live-owner'));
+    await first.repository.stageArtifact(await artifact('run-live-owner'));
     await first.repository.armFreshStart('run-live-owner', LATER);
 
     const second = harness({ backend: first.backend, generation: first.generation });
@@ -111,7 +92,7 @@ describe('durable Start handoff', () => {
   it('bounds a future clock-skewed owner timestamp to one local lease', async () => {
     vi.useFakeTimers();
     const first = harness();
-    await first.repository.stageArtifact(artifact('run-clock-skew'));
+    await first.repository.stageArtifact(await artifact('run-clock-skew'));
     await first.repository.armFreshStart('run-clock-skew', '2099-01-01T00:00:00.000Z');
 
     const reopened = harness({ backend: first.backend, generation: first.generation });
@@ -119,14 +100,14 @@ describe('durable Start handoff', () => {
     expect(reopened.repository.getSnapshot().pendingStart?.runId).toBe('run-clock-skew');
 
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(reopened.repository.getSnapshot().pendingStart).toBeNull();
+    await vi.waitFor(() => expect(reopened.repository.getSnapshot().pendingStart).toBeNull());
     expect(reopened.repository.getSnapshot().recoveryCapsule?.runId).toBe('run-clock-skew');
   });
 
   it('cancels a refused Start without disturbing the older capsule', async () => {
     const { repository, backend } = harness();
     await interrupt(repository, 'run-old');
-    await repository.stageArtifact(artifact('run-refused'));
+    await repository.stageArtifact(await artifact('run-refused'));
     await repository.armFreshStart('run-refused', NOW);
 
     expect(success(await repository.cancelPendingStart('run-refused'))).toBe(true);
@@ -135,7 +116,7 @@ describe('durable Start handoff', () => {
     expect(await backend.getArtifact('run-refused')).toBeNull();
   });
 
-  it('reconciles a crashed supervised recovery without reviving its source', async () => {
+  it('reconciles a crashed supervised recovery without reviving or deleting its archived source', async () => {
     const first = harness();
     await interrupt(first.repository, 'run-source');
     const offered = first.repository.getSnapshot().recoveryCapsule;
@@ -145,7 +126,7 @@ describe('durable Start handoff', () => {
       attemptId: 'attempt-crash',
     });
     if (!claimed.ok) throw new Error('Expected recovery claim to succeed.');
-    await first.repository.stageArtifact(artifact('run-recovery-attempt'));
+    await first.repository.stageArtifact(await artifact('run-recovery-attempt'));
     expect(
       success(
         await first.repository.armClaimedRecoveryStart({
@@ -161,7 +142,10 @@ describe('durable Start handoff', () => {
     const reopened = harness({ backend: first.backend, generation: first.generation });
     await reopened.repository.initialize();
     expect(reopened.repository.getSnapshot().recoveryCapsule?.runId).toBe('run-recovery-attempt');
-    expect(await first.backend.getArtifact('run-source')).toBeNull();
+    expect(await first.backend.getArtifact('run-source')).not.toBeNull();
+    expect(await reopened.repository.getArchivedExecution('run-source')).toMatchObject({
+      ok: true,
+    });
   });
 
   it('migrates schema-v1 slots without dropping the recovery capsule', async () => {
@@ -181,7 +165,7 @@ describe('durable Start handoff', () => {
 
   it('purges pending Start state so Forget Controller cannot resurrect it', async () => {
     const first = harness();
-    await first.repository.stageArtifact(artifact('run-pending-forget'));
+    await first.repository.stageArtifact(await artifact('run-pending-forget'));
     await first.repository.armFreshStart('run-pending-forget', NOW);
 
     expect((await first.repository.purgeControllerData()).ok).toBe(true);

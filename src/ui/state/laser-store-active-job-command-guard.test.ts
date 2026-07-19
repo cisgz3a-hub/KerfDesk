@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -22,17 +23,28 @@ function getMotionOperation(): MotionOperationSnapshot {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -62,7 +74,7 @@ async function connectWith(connection: FakeConnection, freshIdle = true): Promis
 }
 
 async function flushConnect(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -153,7 +165,7 @@ describe('laser-store active-job command guard', () => {
     ['Reset Origin', () => useLaserStore.getState().resetOrigin()],
     ['Set Persistent Origin', () => useLaserStore.getState().setPersistentOriginHere()],
     ['Clear Persistent Origin', () => useLaserStore.getState().clearPersistentOrigin()],
-    ['Start job', () => useLaserStore.getState().startJob('G21\nG90\nG1 X1 F1000\nM5\n')],
+    ['Start job', () => startTestLaserJob('G21\nG90\nG1 X1 F1000\nM5\n')],
   ] as const)('blocks %s while a jog/frame operation is active', async (_label, runCommand) => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
@@ -199,7 +211,7 @@ describe('laser-store active-job command guard', () => {
         writes.push(data);
       });
       await connectWith(connection);
-      await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+      await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
       writes.length = 0;
 
       await expect(runCommand()).rejects.toThrow(/job is active/i);
@@ -219,7 +231,7 @@ describe('laser-store active-job command guard', () => {
       writes.push(data);
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     writes.length = 0;
 
     await expect(useLaserStore.getState().autofocus('$HZ1')).resolves.toMatchObject({
@@ -237,7 +249,7 @@ describe('laser-store active-job command guard', () => {
       writes.push(data);
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     writes.length = 0;
 
     await expect(useLaserStore.getState().setOriginHere()).rejects.toThrow(/job is active/i);
@@ -259,7 +271,7 @@ describe('laser-store active-job command guard', () => {
       writes.push(data);
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
     for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
     expect(useLaserStore.getState().streamer?.status).toBe('done');
     writes.length = 0;

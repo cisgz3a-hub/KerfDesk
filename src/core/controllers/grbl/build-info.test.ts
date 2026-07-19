@@ -21,6 +21,11 @@ describe('parseBuildInfoResponses', () => {
     });
   });
 
+  it('retains the stock M option used as compiled mist-coolant proof', () => {
+    const result = parseBuildInfoResponses(['[VER:1.1h.20190830:]', '[OPT:VM,15,128]']);
+    expect(result).toMatchObject({ ok: true, value: { optionCodes: ['V', 'M'] } });
+  });
+
   it.each([
     ['missing VER', ['[OPT:V,15,128]']],
     ['missing OPT', ['[VER:1.1h.20190830:]']],

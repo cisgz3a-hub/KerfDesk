@@ -9,11 +9,12 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { RecoveryRepository } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
+import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { currentReplayExecutionSignature, RunAgainControl } from './RunAgainControl';
 
 (
@@ -159,7 +160,7 @@ async function completedRepository(): Promise<RecoveryRepository> {
   await repository.initialize();
   const app = useStore.getState();
   const executionSignature = currentReplayExecutionSignature(app);
-  const artifact = createExecutionArtifact({
+  const artifact = await createCurrentTestExecutionArtifact({
     runId: 'run-completed-laser',
     gcode: ['G21', 'G90', 'G1 X10 S100', 'M5'].join('\n'),
     prepared: preparedProject(app.project),

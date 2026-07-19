@@ -5,6 +5,7 @@ import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-disconnect-transaction';
 import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
+import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
 import { recoveryRepository } from './recovery';
 import { useToastStore } from './toast-store';
 
@@ -28,11 +29,7 @@ function makeConnection(
     write: async (data) => {
       events.push(`${label}:write:${JSON.stringify(data)}`);
       await onWrite?.(data, emitLine);
-      // Model GRBL's reply to the connect-time $G modal query (C6).
-      if (data === '$G\n') {
-        emitLine('[GC:G0 G54]');
-        emitLine('ok');
-      }
+      respondToTestGrblHandshake(data, emitLine, 'G0 G54');
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -241,9 +238,7 @@ describe('intentional GRBL connection teardown', () => {
     const connection = makeConnection('old', events);
     await connectReady(connection);
     const burnLines = Array.from({ length: 40 }, (_, index) => `G1 X${index + 1} S100`);
-    await useLaserStore
-      .getState()
-      .startJob(['G21', 'G90', 'M3 S0', ...burnLines, 'M5', ''].join('\n'));
+    await startTestLaserJob(['G21', 'G90', 'M3 S0', ...burnLines, 'M5', ''].join('\n'));
     events.length = 0;
 
     const disconnect = useLaserStore.getState().disconnect();

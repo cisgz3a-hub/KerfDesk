@@ -18,6 +18,7 @@ import {
   MemoryRecoveryStorageBackend,
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
+import * as executionProvenance from '../state/recovery/execution-provenance';
 import { resetStore } from '../state/test-helpers';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
@@ -173,6 +174,16 @@ describe('exact laser recovery activation', () => {
     const firstRecovery = repository.getSnapshot().activeRun;
     if (firstRecovery === null) throw new Error('Expected the first recovery run.');
     expect(firstRecovery.artifact.laserResumeChain).toHaveLength(1);
+    expect(firstRecovery.artifact.provenance).toMatchObject({
+      schemaVersion: 2,
+      controller: { sessionEpoch: CONTROLLER_EPOCH },
+      workflow: {
+        kind: 'laser-recovery',
+        sourceRunId: originalCapsule.runId,
+        sourceAckedLines: originalCapsule.ackedLines,
+      },
+      review: { acknowledgement: { kind: 'laser-recovery', resumeConfirmed: true } },
+    });
     await repository.interruptRun(firstRecovery.runId, 0, {
       kind: 'disconnect',
       message: 'Recovery connection lost.',
@@ -183,7 +194,16 @@ describe('exact laser recovery activation', () => {
     expect(await runLaserRecoveryCapsuleFlow(recoveredAgain, repository)).toBe(true);
 
     expect(recoveryStart).toHaveBeenCalledTimes(2);
-    expect(repository.getSnapshot().activeRun?.artifact.laserResumeChain).toHaveLength(2);
+    const secondRecovery = repository.getSnapshot().activeRun;
+    expect(secondRecovery?.artifact.laserResumeChain).toHaveLength(2);
+    expect(secondRecovery?.artifact.provenance).toMatchObject({
+      schemaVersion: 2,
+      workflow: {
+        kind: 'laser-recovery',
+        sourceRunId: firstRecovery.runId,
+        sourceAckedLines: recoveredAgain.ackedLines,
+      },
+    });
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
   });
 
@@ -243,6 +263,23 @@ describe('exact laser recovery activation', () => {
     expect(await runLaserRecoveryCapsuleFlow(capsule, repository)).toBe(false);
 
     expect(recoveryStart).not.toHaveBeenCalled();
+    expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
+  });
+
+  it('releases the claim when provenance hashing fails before staging', async () => {
+    const repository = recoveryHarness();
+    const capsule = await interruptedCapsule(repository);
+    const recoveryStart = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob: recoveryStart });
+    vi.spyOn(executionProvenance, 'createExecutionProvenance').mockRejectedValueOnce(
+      new Error('injected SHA-256 failure'),
+    );
+
+    expect(await runLaserRecoveryCapsuleFlow(capsule, repository)).toBe(false);
+
+    expect(recoveryStart).not.toHaveBeenCalled();
+    expect(repository.getSnapshot().activeRun).toBeNull();
+    expect(repository.getSnapshot().recoveryCapsule).toMatchObject({ runId: capsule.runId });
     expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
   });
 });

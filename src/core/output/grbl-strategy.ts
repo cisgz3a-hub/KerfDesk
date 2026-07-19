@@ -28,6 +28,7 @@ import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { fillRunwayCommentText } from './fill-runway-comment';
+import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -45,17 +46,32 @@ function laserModeWord(mode: GrblPowerMode): 'M3' | 'M4' {
   return mode === 'dynamic' ? 'M4' : 'M3';
 }
 
-function travelLine(x: number, y: number, dialect: GrblGcodeDialect): string {
+function laserOffSeekLine(
+  x: number,
+  y: number,
+  device: DeviceProfile,
+  dialect: GrblGcodeDialect,
+): string {
+  if (device.controlledLaserOffTravelFeedMmPerMin !== undefined) {
+    const feed = roundedPositiveFeed(
+      device.controlledLaserOffTravelFeedMmPerMin,
+      'Controlled laser-off travel',
+    );
+    return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+  }
   const base = `G0 X${fmt(x)} Y${fmt(y)}`;
   return dialect.requiresS0OnRapid ? `${base} S0` : base;
 }
 
+function laserOffRunwayLine(x: number, y: number, feed: number): string {
+  return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+}
+
 function roundedPositiveFeed(speed: number, context: string): number {
-  const feed = Math.round(speed);
-  if (!Number.isFinite(feed) || feed <= 0) {
+  if (!Number.isFinite(speed) || speed <= 0) {
     throw new Error(`${context}: speed must be finite and > 0`);
   }
-  return feed;
+  return Math.max(1, Math.round(speed));
 }
 
 function preamble(dialect: GrblGcodeDialect): string {
@@ -81,6 +97,7 @@ function preamble(dialect: GrblGcodeDialect): string {
 
 function postamble(
   laserAlreadyOff: boolean,
+  device: DeviceProfile,
   dialect: GrblGcodeDialect,
   finishPosition: OutputEmitOptions['finishPosition'],
 ): string {
@@ -90,28 +107,47 @@ function postamble(
   // holds either way.
   const lines = laserAlreadyOff ? [] : ['M5'];
   const park = finishPosition ?? (dialect.parkAtOriginAfterJob ? { x: 0, y: 0 } : null);
-  if (park !== null) lines.push(travelLine(park.x, park.y, dialect));
+  if (park !== null) lines.push(laserOffSeekLine(park.x, park.y, device, dialect));
   return lines.join(LINE_END) + LINE_END;
 }
 
-function emitSegment(seg: CutSegment, s: number, feed: number, dialect: GrblGcodeDialect): string {
-  const lines: string[] = [];
+function emitSegment(
+  seg: CutSegment,
+  s: number,
+  feed: number,
+  device: DeviceProfile,
+  dialect: GrblGcodeDialect,
+): string {
   const first = seg.polyline[0];
   // A one-point polyline has nothing to cut — emitting its rapid alone would
   // be a pointless stray G0 (defense in depth; producers filter these).
   if (first === undefined || seg.polyline.length < 2) {
     return '';
   }
-  // Rapid to start with laser off.
-  lines.push(travelLine(first.x, first.y, dialect));
-  // First G1 carries F and S; subsequent G1s inherit.
+  const burnLines: string[] = [];
+  let headX = fmt(first.x);
+  let headY = fmt(first.y);
+  let burnEmitted = false;
   for (let i = 1; i < seg.polyline.length; i += 1) {
     const pt = seg.polyline[i];
     if (pt === undefined) continue;
-    const feedWord = i === 1 || !dialect.modalFeedrate ? ` F${feed}` : '';
-    const sWord = i === 1 || dialect.emitSOnEveryBurnMove ? ` S${s}` : '';
-    lines.push(`G1 X${fmt(pt.x)} Y${fmt(pt.y)}${feedWord}${sWord}`);
+    const targetX = fmt(pt.x);
+    const targetY = fmt(pt.y);
+    // Formatting is part of the executable artifact: points that differ in
+    // memory can collapse to one machine coordinate at 3 dp. Never emit a
+    // stationary positive-power G1, and keep F/S for the first real move.
+    if (targetX === headX && targetY === headY) continue;
+    const feedWord = !burnEmitted || !dialect.modalFeedrate ? ` F${feed}` : '';
+    const sWord = !burnEmitted || dialect.emitSOnEveryBurnMove ? ` S${s}` : '';
+    burnLines.push(`G1 X${targetX} Y${targetY}${feedWord}${sWord}`);
+    burnEmitted = true;
+    headX = targetX;
+    headY = targetY;
   }
+  // If the entire segment collapses at emit precision, omit its laser-off seek
+  // as well; it has no executable burn motion to position for.
+  if (!burnEmitted) return '';
+  const lines = [laserOffSeekLine(first.x, first.y, device, dialect), ...burnLines];
   return lines.join(LINE_END) + LINE_END;
 }
 
@@ -130,7 +166,7 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
     // here silently flipped later groups to constant power (audit P2-1).
     if (p > 0) chunks.push(`${vectorPowerWord(group, dialect)} S0`);
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, s, feed, dialect);
+      const segText = emitSegment(seg, s, feed, device, dialect);
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }
@@ -148,12 +184,13 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} ${overscanText}`,
   );
   // Each scanline's nearby runs become continuous G1 sweeps with S0 gaps
-  // (ADR-034); wide gaps still split for G0 hard-off travel (ADR-035). Legacy
-  // profiles preserve the short-run runway skip. The 4040 plan instead gives
-  // every sweep a bounded feed-matched entry without overlapping its neighbor.
+  // (ADR-034); wide gaps split into independently planned sweeps (ADR-035).
+  // Legacy profiles preserve short-run runway behavior. The 4040 plan gives
+  // every sweep a bounded feed-matched entry without crossing its neighbor.
   const sweepPlans = planFillSweeps(group);
-  const scanOffsetMm = offsetForSpeed(device.scanningOffsets, group.speed);
-  const context = { s, feed, scanOffsetMm, dialect };
+  const scanOffsetMm =
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, group.speed);
+  const context = { s, feed, scanOffsetMm, device, dialect };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const plan of sweepPlans) {
@@ -178,20 +215,22 @@ function emitOffsetFillGroup(
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, s, feed, dialect);
+      const segText = emitSegment(seg, s, feed, device, dialect);
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }
   return chunks.join(LINE_END) + LINE_END;
 }
 
-// One planned sweep. Seek to its entry runway with G0/S0, traverse the runway
-// using the plan's rapid or feed-matched mode, then keep one G1 chain across
-// ink and S0 holes. G-code S is modal, so every span re-asserts its value.
+// One planned sweep. Seek to its entry runway with the device's laser-off
+// travel policy, traverse the runway in rapid/controlled or feed-matched mode,
+// then keep one G1 chain across ink and S0 holes. G-code S is modal, so every
+// span re-asserts its value.
 type FillSweepEmissionContext = {
   readonly s: number;
   readonly feed: number;
   readonly scanOffsetMm: number;
+  readonly device: DeviceProfile;
   readonly dialect: GrblGcodeDialect;
 };
 
@@ -202,7 +241,9 @@ function emitFillSweep(plan: FillSweepPlan, context: FillSweepEmissionContext): 
   if (first === undefined || last === undefined) return '';
   const run = expandFillHatchWithRunways([first.start, last.end], plan);
   if (run === null) return '';
-  const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, context.dialect)];
+  const lines: string[] = [
+    laserOffSeekLine(run.leadStart.x, run.leadStart.y, context.device, context.dialect),
+  ];
   if (plan.leadInMm > 0) {
     lines.push(runwayLine(run.burnStart, plan, context));
   }
@@ -221,9 +262,9 @@ function runwayLine(
   context: FillSweepEmissionContext,
 ): string {
   if (plan.runwayMotion === 'rapid') {
-    return travelLine(target.x, target.y, context.dialect);
+    return laserOffSeekLine(target.x, target.y, context.device, context.dialect);
   }
-  return `G1 X${fmt(target.x)} Y${fmt(target.y)} F${context.feed} S0`;
+  return laserOffRunwayLine(target.x, target.y, context.feed);
 }
 
 function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<FillSpan> {
@@ -295,7 +336,12 @@ function emitRasterGroupHere(
     passes: group.passes,
     overscanMm: group.overscanMm,
     dotWidthCorrectionMm: group.dotWidthCorrectionMm,
-    scanOffsetMm: offsetForSpeed(device.scanningOffsets, feed),
+    scanOffsetMm: group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, feed),
+    ...(device.controlledLaserOffTravelFeedMmPerMin === undefined
+      ? {}
+      : {
+          controlledLaserOffTravelFeedMmPerMin: device.controlledLaserOffTravelFeedMmPerMin,
+        }),
     ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
     laserModeCommand: laserModeWord(dialect.rasterPowerMode),
     modalFeedrate: dialect.modalFeedrate,
@@ -376,7 +422,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   parts.push(coolantTransition(coolant, 'off'));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
-  parts.push(postamble(mode === 'off', dialect, options.finishPosition));
+  parts.push(postamble(mode === 'off', device, dialect, options.finishPosition));
   return parts.join('');
 }
 

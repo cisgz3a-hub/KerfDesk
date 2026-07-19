@@ -9,6 +9,7 @@ import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence'
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
 import type { prepareCurrentStartJob } from './start-job-source';
 import type { StartExternalEnvironment } from './start-job-external-environment';
+import type { JobReviewModel } from './job-review';
 import { activateAcceptedFreshRun } from './start-job-execution-tracking';
 import {
   currentLaserForAuthorizedStartNow,
@@ -29,6 +30,8 @@ export type PreparedStartArgs = {
   readonly laser: ReturnType<typeof useLaserStore.getState>;
   readonly prepared: Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { ok: true }>;
   readonly machineKind: MachineKind;
+  readonly reviewedAtIso: string;
+  readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
   readonly checkpointToReplace: JobCheckpoint | null;

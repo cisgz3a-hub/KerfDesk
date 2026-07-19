@@ -170,6 +170,27 @@ describe('buildPreviewToolpath frame registration (H3)', () => {
     expect(cutPolylines(userOrigin)).toEqual(cutPolylines(absolute));
   });
 
+  it('starts and returns a current-position preview at the trusted head position', () => {
+    const project = offCenterProject();
+    const currentPosition = buildPreviewToolpath(project, {
+      jobOrigin: {
+        startFrom: 'current-position',
+        anchor: 'front-left',
+        currentPosition: { x: 120, y: 80 },
+      },
+    });
+
+    // The front-left artwork anchor is placed exactly under the head, so there
+    // is no phantom travel from work zero before the first cut.
+    expect(currentPosition.steps[0]?.kind).toBe('cut');
+    expect(currentPosition.steps.at(-1)).toEqual({
+      kind: 'travel',
+      from: { x: 50, y: 10 },
+      to: { x: 10, y: 10 },
+      length: 40,
+    });
+  });
+
   it('still mirrors the prepared (optimized) job content exactly', () => {
     const project = offCenterProject();
     const prepared = prepareOutput(project);

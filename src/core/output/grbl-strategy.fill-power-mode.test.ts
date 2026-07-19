@@ -129,6 +129,46 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     expect(out).not.toContain('X5.000 Y5.000');
   });
 
+  it('drops a vector segment that collapses at emit precision', () => {
+    const degenerate: CutGroup = {
+      ...cut(),
+      layerId: 'rounded-degen',
+      segments: [
+        {
+          polyline: [
+            { x: 1, y: 1.0000000000000002 },
+            { x: 1, y: 1 },
+            { x: 1.0000000000000002, y: 1 },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const out = emit({ groups: [degenerate] });
+    expect(out).not.toContain('X1.000 Y1.000');
+    expect(out).not.toMatch(/^G1 .* S[1-9]/m);
+  });
+
+  it('puts feed and power on the first real move after a collapsed prefix', () => {
+    const collapsedPrefix: CutGroup = {
+      ...cut(),
+      layerId: 'collapsed-prefix',
+      segments: [
+        {
+          polyline: [
+            { x: 1, y: 1 },
+            { x: 1.0004, y: 1.0004 },
+            { x: 2, y: 2 },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const out = emit({ groups: [collapsedPrefix] });
+    expect(out).not.toContain('G1 X1.000 Y1.000');
+    expect(out).toContain('G1 X2.000 Y2.000 F1500 S500');
+  });
+
   it('honors explicit vector overrides and switches before each affected group', () => {
     const dynamicCut: CutGroup = { ...cut(), layerId: 'dynamic-cut', powerMode: 'dynamic' };
     const constantFill: FillGroup = {

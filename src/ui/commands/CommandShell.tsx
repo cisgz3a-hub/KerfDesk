@@ -2,10 +2,8 @@ import { useState } from 'react';
 import {
   generateIntervalTestGrid,
   generateMaterialTestGrid,
-  generateScanOffsetCalibrationPattern,
   type IntervalTestGridOptions,
   type MaterialTestGridOptions,
-  type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
@@ -20,7 +18,6 @@ import { BoxFitTestHost } from '../box/BoxFitTestHost';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
-import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { RotarySetupHost } from '../laser/RotarySetupHost';
@@ -51,6 +48,7 @@ import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
+import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -173,7 +171,7 @@ function GeneratorDialogs(props: {
       {props.fitTestOpen ? <BoxFitTestHost onClose={props.onFitTestClose} /> : null}
       {props.materialOpen ? <MaterialDialog onClose={props.onMaterialClose} /> : null}
       {props.intervalOpen ? <IntervalDialog onClose={props.onIntervalClose} /> : null}
-      {props.scanOffsetOpen ? <ScanOffsetDialog onClose={props.onScanOffsetClose} /> : null}
+      {props.scanOffsetOpen ? <ScanOffsetCommandDialog onClose={props.onScanOffsetClose} /> : null}
     </>
   );
 }
@@ -273,18 +271,6 @@ function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {
     pushToast(`Generated material test grid (${grid.cells.length} cells).`, 'success');
   };
   return <MaterialTestDialog onCancel={props.onClose} onGenerate={onGenerate} />;
-}
-
-function ScanOffsetDialog(props: { readonly onClose: () => void }): JSX.Element {
-  const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const onGenerate = (options: ScanOffsetCalibrationPatternOptions): void => {
-    const pattern = generateScanOffsetCalibrationPattern(options);
-    replaceSceneWithGeneratedScene(pattern.scene);
-    props.onClose();
-    pushToast(`Generated scan offset test (${pattern.cells.length} swatches).`, 'success');
-  };
-  return <ScanOffsetCalibrationDialog onCancel={props.onClose} onGenerate={onGenerate} />;
 }
 
 function ConvertDialog(props: {

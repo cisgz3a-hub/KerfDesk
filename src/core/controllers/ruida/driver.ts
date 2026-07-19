@@ -45,6 +45,7 @@ export const ruidaDriver: ControllerDriver = {
     unlock: null,
     sleep: null,
     settingsQuery: null,
+    buildInfoQuery: null,
     modalStateQuery: null,
     offsetsQuery: null,
     queuedStatusQuery: null,

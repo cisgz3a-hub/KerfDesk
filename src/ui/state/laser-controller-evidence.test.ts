@@ -31,6 +31,16 @@ describe('invalidateControllerSessionEvidence', () => {
       statusObservation: { sessionEpoch: 5, positionEpoch: 2, sequence: 9, observedAt: 1 },
       controllerSettings: { homingEnabled: true },
       controllerSettingsObservation: { sessionEpoch: 5, observedAt: 1 },
+      controllerBuildInfo: {
+        protocolVersion: '1.1h',
+        buildRevision: '20190830',
+        userInfo: '',
+        optionCodes: ['V', 'M'] as const,
+        plannerBufferBlocks: 15,
+        rxBufferBytes: 128,
+      },
+      controllerBuildInfoRawLines: ['[VER:1.1h.20190830:]', '[OPT:VM,15,128]'],
+      controllerBuildInfoObservation: { sessionEpoch: 5, observedAt: 1 },
       homingState: 'confirmed' as const,
       homingProof: { sessionEpoch: 5, positionEpoch: 2, confirmedStatusSequence: 9 },
     };
@@ -41,6 +51,9 @@ describe('invalidateControllerSessionEvidence', () => {
       statusObservation: null,
       controllerSettings: null,
       controllerSettingsObservation: null,
+      controllerBuildInfo: null,
+      controllerBuildInfoRawLines: [],
+      controllerBuildInfoObservation: null,
       homingState: 'unknown',
       homingProof: null,
     });
@@ -56,6 +69,8 @@ describe('controller evidence lifecycle', () => {
       homingProof: { sessionEpoch: 4, positionEpoch: 0, confirmedStatusSequence: 1 },
       controllerSettings: { homingEnabled: true },
       controllerSettingsObservation: { sessionEpoch: 4, observedAt: 1 },
+      controllerBuildInfoRawLines: ['[OPT:VM,15,128]'],
+      controllerBuildInfoObservation: { sessionEpoch: 4, observedAt: 1 },
     });
     refs.settingsCollectorSessionEpoch = 4;
 
@@ -73,6 +88,9 @@ describe('controller evidence lifecycle', () => {
       statusObservation: null,
       controllerSettings: null,
       controllerSettingsObservation: null,
+      controllerBuildInfo: null,
+      controllerBuildInfoRawLines: [],
+      controllerBuildInfoObservation: null,
       homingState: 'unknown',
       homingProof: null,
     });

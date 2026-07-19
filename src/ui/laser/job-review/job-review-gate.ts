@@ -33,7 +33,11 @@ import {
   type StartExternalEnvironment,
 } from '../start-job-external-environment';
 import { prepareCurrentStartJob } from '../start-job-source';
-import { buildJobReviewModel, type PreparedCurrentStart } from './job-review-model';
+import {
+  buildJobReviewModel,
+  type JobReviewModel,
+  type PreparedCurrentStart,
+} from './job-review-model';
 import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
@@ -53,6 +57,8 @@ export type ReviewedStartBundle = {
 
 export type ConfirmedJobReview = {
   readonly bundle: ReviewedStartBundle;
+  readonly reviewedAtIso: string;
+  readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
 };
@@ -114,6 +120,7 @@ function confirmReviewedStart(bundle: ReviewedStartBundle): ConfirmedJobReview {
     bundle.project,
     bundle.laserModeStartSnapshot,
     () => true,
+    bundle.prepared.gcode,
   );
   const cncSetupAttestation = confirmCncSetup(
     machineKind,
@@ -123,6 +130,8 @@ function confirmReviewedStart(bundle: ReviewedStartBundle): ConfirmedJobReview {
   );
   return {
     bundle,
+    reviewedAtIso: new Date().toISOString(),
+    reviewModel: modelFor(bundle),
     laserModeStartEvidence: laserModeStartEvidence ?? undefined,
     cncSetupAttestation: cncSetupAttestation ?? undefined,
   };

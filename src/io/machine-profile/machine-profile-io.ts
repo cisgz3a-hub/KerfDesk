@@ -52,6 +52,13 @@ export function serializeMachineProfileDocument(document: MachineProfileDocument
   return `${JSON.stringify(canonicalDocument(document), null, 2)}\n`;
 }
 
+/** Stable profile-only representation used for forensic identities. Unlike a
+ * machine-profile document this deliberately excludes import/export labels and
+ * review notes, so the digest describes the executable device contract only. */
+export function serializeCanonicalDeviceProfile(profile: DeviceProfile): string {
+  return `${JSON.stringify(canonicalProfile(profile), null, 2)}\n`;
+}
+
 export function deserializeMachineProfileDocument(
   jsonText: string,
 ): DeserializeMachineProfileDocumentResult {
@@ -247,6 +254,7 @@ function canonicalSource(source: MachineProfileDocumentSource): MachineProfileDo
 }
 
 function canonicalProfile(profile: DeviceProfile): DeviceProfile {
+  const scanningOffsets = normalizeScanOffsetTable(profile.scanningOffsets);
   return {
     ...canonicalIdentityMetadata(profile),
     name: profile.name,
@@ -266,7 +274,15 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     minPowerS: profile.minPowerS,
     laserModeEnabled: profile.laserModeEnabled,
     airAssistCommand: profile.airAssistCommand,
-    scanningOffsets: normalizeScanOffsetTable(profile.scanningOffsets),
+    scanningOffsets,
+    ...(scanningOffsets.length > 0 && profile.scanOffsetCalibrationStatus !== undefined
+      ? { scanOffsetCalibrationStatus: profile.scanOffsetCalibrationStatus }
+      : {}),
+    ...(profile.controlledLaserOffTravelFeedMmPerMin === undefined
+      ? {}
+      : {
+          controlledLaserOffTravelFeedMmPerMin: profile.controlledLaserOffTravelFeedMmPerMin,
+        }),
     noGoZones: profile.noGoZones.map((zone) => ({ ...zone })),
     ...canonicalCameraCalibration(profile),
     ...canonicalCameraAlignment(profile),

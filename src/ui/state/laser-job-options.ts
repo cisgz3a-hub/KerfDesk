@@ -24,7 +24,7 @@ export type StartJobOptions = CreateStreamerOptions & {
   readonly machineKind?: MachineKind;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncSetupAttestation?: CncSetupAttestation;
-  /** Session-bound $32 proof/acknowledgement supplied by operator-facing Starts. */
+  /** Session-bound $30/$32/M7 proof or explicit unknown-state acknowledgement. */
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly canvasPlan?: CanvasMotionPlan;
 };

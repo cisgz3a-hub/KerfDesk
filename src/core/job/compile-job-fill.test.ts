@@ -180,6 +180,45 @@ describe('compileJob fill hatching', () => {
     expect(safe4040?.fillRunwayPolicy).toBe('feed-matched-entry');
   });
 
+  it('applies 4040 one-way fallback and bounded entry runway, then permits calibrated or expert bidirectional fill', () => {
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
+    const requested = fillLayer();
+    const fallback = firstFillGroup(
+      compileJob({ objects: [square], layers: [requested] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+    );
+    const calibrated = firstFillGroup(
+      compileJob(
+        { objects: [square], layers: [requested] },
+        {
+          ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+          scanningOffsets: [{ speedMmPerMin: requested.speed, offsetMm: 0.1 }],
+        },
+      ),
+    );
+    const expert = firstFillGroup(
+      compileJob(
+        {
+          objects: [square],
+          layers: [{ ...requested, allowUncalibratedBidirectionalScan: true }],
+        },
+        NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      ),
+    );
+
+    expect(fallback).toMatchObject({
+      fillRunwayPolicy: 'feed-matched-entry',
+      scanDirection: { bidirectional: false, reason: 'uncalibrated-4040-fallback' },
+    });
+    expect(fallback?.segments.every((segment) => !segment.reverse)).toBe(true);
+    expect(calibrated?.scanDirection).toEqual({
+      bidirectional: true,
+      reason: 'calibrated-bidirectional',
+    });
+    expect(calibrated?.segments.some((segment) => segment.reverse)).toBe(true);
+    expect(expert?.scanDirection).toEqual({ bidirectional: true, reason: 'expert-override' });
+    expect(expert?.segments.some((segment) => segment.reverse)).toBe(true);
+  });
+
   it('compiles Island Fill as one scanline fill group per separate island', () => {
     const layer = { ...fillLayer(), fillStyle: 'island' as never };
     const left = closedSquareObj({ id: 'left', color: '#ff0000', size: 6 });
@@ -216,8 +255,43 @@ describe('compileJob fill hatching', () => {
 
     expect(fills).toHaveLength(1);
     expect(fills[0]?.islandMotionPolicy).toBe('sensitive');
+    expect(fills[0]?.scanDirection).toEqual({
+      bidirectional: false,
+      reason: 'sensitive-island-one-way',
+    });
     expect(fills[0]?.segments.every((segment) => !segment.reverse)).toBe(true);
     expect(segmentsAtMachineY(fills[0], dev.bedHeight - 1)).toHaveLength(2);
+  });
+
+  it('does not let calibration or an expert override overturn sensitive 4040 Island Fill one-way motion', () => {
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 6 });
+    const requested = { ...fillLayer(), fillStyle: 'island' as never };
+    const calibrated = firstFillGroup(
+      compileJob(
+        { objects: [square], layers: [requested] },
+        {
+          ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+          scanningOffsets: [{ speedMmPerMin: requested.speed, offsetMm: 0.1 }],
+        },
+      ),
+    );
+    const expert = firstFillGroup(
+      compileJob(
+        {
+          objects: [square],
+          layers: [{ ...requested, allowUncalibratedBidirectionalScan: true }],
+        },
+        NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      ),
+    );
+
+    for (const group of [calibrated, expert]) {
+      expect(group?.scanDirection).toEqual({
+        bidirectional: false,
+        reason: 'sensitive-island-one-way',
+      });
+      expect(group?.segments.every((segment) => !segment.reverse)).toBe(true);
+    }
   });
 
   it('does not cluster distant tiny Island Fill artwork on the 4040-safe profile', () => {
