@@ -174,6 +174,25 @@ describe('buildJobReviewModel', () => {
     expect(model.warnings).toContainEqual(expect.stringContaining('$32=0'));
   });
 
+  it('carries the M7 compatibility warning when a GRBL 1.1 program uses M7 air assist', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: { ...state.project.device, airAssistCommand: 'M7' },
+        scene: {
+          ...state.project.scene,
+          layers: state.project.scene.layers.map((layer) => ({ ...layer, airAssist: true })),
+        },
+      },
+    }));
+
+    const model = await buildModelFromCurrentStores();
+
+    // Informational only (ADR-228): the warning joins the review list; the M7
+    // stays in the program and nothing blocks Start.
+    expect(model.warnings).toContainEqual(expect.stringContaining('error:20'));
+  });
+
   it('summarizes a CNC job with the tool plan and the exact attestation prompt', async () => {
     useStore.setState((state) => ({
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },

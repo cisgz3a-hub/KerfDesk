@@ -32,6 +32,7 @@ import {
   originTileDetail,
   originTileValue,
 } from './job-review-format';
+import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 
 export type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -73,7 +74,12 @@ export function buildJobReviewModel(args: {
     // prepared.warnings already carries controller/readiness/WCS/override
     // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
     // was previously only a transient toast, so it joins the review here.
-    warnings: dedupe([...args.prepared.warnings, ...detectJobIntentWarnings(args.project)]),
+    // The M7 check runs against the exact prepared program, not the settings.
+    warnings: dedupe([
+      ...args.prepared.warnings,
+      ...detectJobIntentWarnings(args.project),
+      ...detectM7AirAssistWarnings(args.prepared.gcode, args.project.device),
+    ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
     toolPlanLabels: toolPlanLabels(args.prepared.cncToolPlan),
     acknowledgement: buildAcknowledgement(args, machineKind),
