@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.7 — physically valid Frame authorization and a public-spec 4040 hybrid profile (ADR-231), exact-artifact pre-Frame Job Review and a completion-issued Start permit (ADR-230), and the read-only Super console (ADR-229). A completed Frame for the exact current job remains the sole Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 231. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.8 — the actual completed Frame is the spatial source of truth and calculated bounds/settings are warnings only (ADR-232), exact-artifact pre-Frame Job Review and a completion-issued Start permit (ADR-230), a public-spec 4040 hybrid profile (ADR-231), and the read-only Super console (ADR-229). A completed Frame for the exact current job remains the sole Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 232. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -293,7 +293,7 @@ phase; tracked here so they don't get lost.
 
 ### Maintainer authority
 
-21. **Frame is the only Start guard; unsafe motion is not a valid Frame** (ADR-228, ADR-230, ADR-231). A clean completed Frame for the exact current job is the sole ordinary Start authorization on laser and CNC; Start only claims that one-use permit plus unavoidable live transport/handoff facts, and Job Review remains the single warning surface. Under the maintainer's explicit ADR-231 ruling, Frame validity itself fails closed before wire motion for an unconstructable exact artifact, a commanded envelope outside known travel, a known no-go collision, unsafe/unknown CNC Z construction, or a live controller output contract that is known wrong (and for CNC GRBL, cannot be proved). Those are properties of whether Frame can truthfully prove the job, not additional Start policy gates. Every other operator-relevant finding remains a Job Review warning; no unrelated refusal surface may be introduced without a new explicit maintainer ruling.
+21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-228, ADR-230, ADR-232). A clean completed Frame for the exact current job is the sole ordinary Start authorization on laser and CNC; Start only claims that one-use permit plus unavoidable live transport/handoff facts, and Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories.
 
 ---
 

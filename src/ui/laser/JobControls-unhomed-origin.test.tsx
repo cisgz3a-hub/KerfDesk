@@ -9,8 +9,10 @@ import {
   type Project,
 } from '../../core/scene';
 import { useStore } from '../state';
+import type { FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { completeFramedRunCandidateForTest } from './framed-run-testing';
 import { installAutoJobReview } from './job-review';
 import { JobControls } from './JobControls';
 
@@ -38,7 +40,10 @@ describe('JobControls unhomed custom-origin Frame action', () => {
   const originalFrame = useLaserStore.getState().frame;
 
   it('does not block User Origin frame from a negative WCO when homing is disabled', async () => {
-    const frame = vi.fn(async () => undefined);
+    const frame = vi.fn(async (_bounds, _feed, candidate?: FramedRunCandidate) => {
+      if (candidate === undefined) throw new Error('Frame candidate was not supplied.');
+      completeFramedRunCandidateForTest(candidate);
+    });
     useStore.setState({
       project: centeredSmallProject(),
       jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' },
@@ -89,8 +94,11 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     }
   });
 
-  it('refuses User Origin frame when unhomed overscan extends left of the physical bed', async () => {
-    const frame = vi.fn(async () => undefined);
+  it('lets User Origin Frame decide when unhomed overscan extends past calculated bed bounds', async () => {
+    const frame = vi.fn(async (_bounds, _feed, candidate?: FramedRunCandidate) => {
+      if (candidate === undefined) throw new Error('Frame candidate was not supplied.');
+      completeFramedRunCandidateForTest(candidate);
+    });
     useStore.setState({
       project: fillOverscanProject(),
       jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' },
@@ -132,13 +140,11 @@ describe('JobControls unhomed custom-origin Frame action', () => {
 
       await vi.waitFor(() => {
         expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
-          variant: 'error',
+          variant: 'success',
+          message: 'Frame complete — this exact job is ready to start.',
         });
       });
-      expect(frame).not.toHaveBeenCalled();
-      expect(useToastStore.getState().toasts.at(-1)?.message ?? '').toMatch(
-        /^Cannot frame: .*overhangs the bed .*left by 5\.0 mm.*move it onto the bed first\.$/,
-      );
+      expect(frame).toHaveBeenCalledOnce();
     } finally {
       uninstallAutoReview();
       if (root !== null) {

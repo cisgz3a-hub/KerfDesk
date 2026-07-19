@@ -2,7 +2,7 @@
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
 >
-> **Current Start policy — frame-first (ADR-228, ADR-230, ADR-231).** A completed Frame for the exact
+> **Current Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for the exact
 > current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
 > warning surface. Older gate ADRs below that mandated Start blocks are stamped
 > "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
@@ -195,7 +195,8 @@
 | ADR-228 | 2026-07-18 | Accepted (governing) | Frame-first Start gate: Frame is the sole guard |
 | ADR-229 | 2026-07-18 | Accepted | Super console: expanded diagnostics and guarded command dialog |
 | ADR-230 | 2026-07-19 | Accepted | Exact-artifact Frame authorization and one-use Start permit |
-| ADR-231 | 2026-07-19 | Accepted | A valid Frame proves physically safe motion and the live output contract |
+| ADR-231 | 2026-07-19 | Superseded in part by ADR-232 | A valid Frame proves physically safe motion and the live output contract |
+| ADR-232 | 2026-07-19 | Accepted (governing) | Physical Frame completion is the spatial source of truth |
 
 ---
 
@@ -9918,7 +9919,9 @@ where stated below.
 ## ADR-231 - A valid Frame proves physically safe motion and the live output contract
 
 **Date:** 2026-07-19
-**Status:** Accepted (explicit maintainer directive in chat: apply the online-research safety pass)
+**Status:** Superseded in part by ADR-232 — pre-wire calculated bounds/no-go and `$30`/`$32`
+refusals are deleted; unit conversion, cancel settlement, honest profile metadata, and clean
+completion requirements remain accepted.
 
 ### Context
 
@@ -9977,3 +9980,49 @@ and upstream GRBL settings/jogging contracts
 - Start remains simpler than before ADR-228: it neither recompiles nor reruns policy gates.
 - Public documentation plus tests can make defaults honest and protocol behavior defensible, but
   cannot certify the machine's wiring or mechanics. Hardware qualification remains explicitly open.
+
+---
+
+## ADR-232 - Physical Frame completion is the spatial source of truth
+
+**Date:** 2026-07-19
+**Status:** Accepted (explicit maintainer directive in chat: remove the calculated blocker;
+"frame is the source of truth")
+
+### Context
+
+ADR-231 reintroduced policy refusals immediately before Frame dispatch for calculated bed
+overhang, configured no-go zones, and known `$30`/`$32` disagreement. That made profile math and
+software configuration authoritative over the physical Frame, despite ADR-228's standing rule that
+Frame is the only guard. The resulting Start surface could report `Cannot frame: design ...
+overhangs the bed` without attempting the trace the operator explicitly chose as the proof.
+
+### Decision
+
+1. **The actual Frame decides spatial validity.** KerfDesk computes the exact reviewed motion
+   rectangle only to build the Frame command. Calculated bed overhang and configured no-go findings
+   may appear in Job Review, but they never refuse Frame or Start.
+2. **Controller-setting policy is advisory.** Known or unknown `$30`/`$32` findings stay in Job
+   Review and do not prevent Frame dispatch. A policy warning cannot be renamed an output-contract
+   construction failure.
+3. **Only clean completion creates proof.** The controller must accept and complete the exact trace,
+   return to the captured position, and report clean Idle. Alarm, error, cancel, disconnect,
+   interruption, or incomplete return creates no permit. This physical outcome, not calculated
+   placement math, is the source of truth.
+4. **Factual inability still stops the action.** Disconnected/busy transport, empty or
+   unstreamable output, non-finite coordinates, CNC motion that cannot be constructed without the
+   required Z/position inputs, and exact-artifact/evidence drift remain refusals because there is no
+   valid command or matching handoff to perform.
+5. **Delete the misleading refusal machinery.** The dedicated `frame-preflight` bounds/no-go guard
+   and Frame controller-settings guard are removed. Ruida export likewise no longer treats profile
+   bed math as an export veto. Regression coverage must assert that out-of-bed, no-go, and settings
+   findings reach review while a completed Frame can authorize the job.
+
+### Consequences
+
+- The red `Cannot frame: design ... overhangs the bed` Start blocker no longer exists.
+- The operator reviews advisories, watches the tool-off Frame, and can Abort; a failed or
+  interrupted Frame never authorizes Start.
+- ADR-231 remains authoritative for report-unit conversion, cancel-race settlement, honest device
+  metadata, and the requirement for clean completion, but its pre-wire spatial/settings refusals are
+  superseded.

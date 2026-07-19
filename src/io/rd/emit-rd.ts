@@ -1,16 +1,8 @@
 // emitRdFile — the Ruida twin of emitGcode: runs the SAME prepareOutput
-// pipeline (preview = save, ADR-040), applies the geometric preflights that
-// make sense for a binary format (bounds; the G-code text invariants don't
-// apply), then encodes the .rd byte stream.
+// pipeline (preview = save, ADR-040), then encodes the .rd byte stream.
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
-import {
-  computeJobBounds,
-  describeFramePreflightFailure,
-  framePreflight,
-  machineSpaceJob,
-  type JobOriginPlacement,
-} from '../../core/job';
+import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../gcode';
 
@@ -39,16 +31,6 @@ export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitR
     prepared.project.device,
     prepared.project.machine,
   );
-  const bounds = computeJobBounds(machineJob, prepared.project.device);
-  if (bounds !== null) {
-    const pre = framePreflight(bounds, prepared.project.device);
-    if (pre.kind === 'no-go-zone') {
-      return { ok: false, messages: [`Job crosses no-go zone "${pre.zoneName}".`] };
-    }
-    if (pre.kind !== 'ok') {
-      return { ok: false, messages: [describeFramePreflightFailure(pre)] };
-    }
-  }
   const encoded = encodeRdJob(machineJob, prepared.project.device);
   if (!encoded.ok) return { ok: false, messages: [describeRdEncodeError(encoded.error)] };
   return { ok: true, bytes: encoded.bytes };

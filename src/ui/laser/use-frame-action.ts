@@ -26,8 +26,7 @@ import {
 import { prepareCurrentStartJob } from './start-job-source';
 import { runJobReviewGate, type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
-import { preflightFrameCandidate } from './frame-candidate-preflight';
-import { frameControllerSettingsIssues } from './frame-controller-settings';
+import { resolveFrameCandidate } from './frame-candidate';
 
 export function useFrameAction(): () => void {
   return () => {
@@ -57,17 +56,6 @@ export async function runFrameNow(): Promise<boolean> {
 
 async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
   if (!(await requireFrameControllerQueue())) return null;
-  const initialApp = useStore.getState();
-  const initialLaser = useLaserStore.getState();
-  const settingsIssues = frameControllerSettingsIssues(
-    initialApp.project,
-    initialLaser.controllerSettings,
-    initialLaser.capabilities.settings,
-  );
-  if (settingsIssues.length > 0) {
-    reportFramePreparationRefusal(settingsIssues, undefined);
-    return null;
-  }
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
@@ -130,16 +118,12 @@ async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolea
     return false;
   }
 
-  const framePreflight = preflightFrameCandidate(bundle.prepared, {
-    statusReport: currentLaser.statusReport,
-    wcoCache: currentLaser.wcoCache,
-    reportInches: currentLaser.controllerSettings?.reportInches === true,
-  });
-  if (!framePreflight.ok) {
-    reportFrameRefusal(framePreflight.messages);
+  const frameCandidate = resolveFrameCandidate(bundle.prepared);
+  if (!frameCandidate.ok) {
+    reportFrameRefusal(frameCandidate.messages);
     return false;
   }
-  const { jobBounds, motionBounds } = framePreflight;
+  const { jobBounds, motionBounds } = frameCandidate;
   const returnToWorkPosition = currentWorkXy(currentLaser);
   if (returnToWorkPosition === undefined) {
     reportFrameRefusal([

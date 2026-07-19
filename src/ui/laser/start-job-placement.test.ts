@@ -260,8 +260,7 @@ describe('prepareStartJob job placement', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.warnings.join('\n')).toMatch(/selected job origin/i);
-      expect(result.warnings.join('\n')).toMatch(/machine bed/i);
+      expect(result.warnings.join('\n')).toMatch(/out of bed/i);
     }
   });
 

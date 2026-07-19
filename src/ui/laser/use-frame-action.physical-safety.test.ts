@@ -4,9 +4,13 @@ import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../
 import { prepareOutput } from '../../io/gcode';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
+import type { FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { idleControllerStatusForFrameTest } from './framed-run-testing';
+import {
+  completeFramedRunCandidateForTest,
+  idleControllerStatusForFrameTest,
+} from './framed-run-testing';
 import type { ReviewedStartBundle } from './job-review';
 import { runFrameNow } from './use-frame-action';
 
@@ -91,6 +95,13 @@ function setNoGoZone(zone: {
   });
 }
 
+function completingFrame() {
+  return vi.fn(async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {
+    if (candidate === undefined) throw new Error('Frame candidate was not supplied.');
+    completeFramedRunCandidateForTest(candidate);
+  });
+}
+
 beforeEach(() => {
   useCameraStore.setState({
     placementActive: false,
@@ -137,39 +148,39 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Frame physical-safety preflight', () => {
+describe('Frame source-of-truth contract', () => {
   it.each([
     [{ maxPowerS: 255, laserModeEnabled: true }, '$30'],
     [{ maxPowerS: 1000, laserModeEnabled: false }, '$32=0'],
   ] as const)(
-    'sends no Frame motion for a known-wrong live setting %o',
+    'keeps known-wrong live setting %o in review and lets Frame decide',
     async (settings, label) => {
       installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
-      const frame = vi.fn(async () => undefined);
+      const frame = completingFrame();
       useLaserStore.setState({ controllerSettings: settings, frame });
 
-      await expect(runFrameNow()).resolves.toBe(false);
+      await expect(runFrameNow()).resolves.toBe(true);
 
-      expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
-      expect(frame).not.toHaveBeenCalled();
-      expect(useLaserStore.getState().framedRun).toBeNull();
-      expect(useToastStore.getState().toasts.at(-1)?.message).toContain(label);
+      expect(reviewHarness.runJobReviewGate).toHaveBeenCalledOnce();
+      expect(frame).toHaveBeenCalledOnce();
+      expect(useLaserStore.getState().framedRun).not.toBeNull();
+      expect(JSON.stringify(reviewHarness.runJobReviewGate.mock.calls[0])).toContain(label);
     },
   );
 
-  it('sends no Frame motion when the reviewed motion envelope is outside the bed', async () => {
+  it('frames when calculated artwork bounds extend beyond the configured bed', async () => {
     installVectorProject({ minX: 390, minY: 10, maxX: 410, maxY: 20 });
-    const frame = vi.fn(async () => undefined);
+    const frame = completingFrame();
     useLaserStore.setState({ frame });
 
-    await expect(runFrameNow()).resolves.toBe(false);
+    await expect(runFrameNow()).resolves.toBe(true);
 
-    expect(frame).not.toHaveBeenCalled();
-    expect(useLaserStore.getState().framedRun).toBeNull();
-    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/cannot frame.*bed/i);
+    expect(frame).toHaveBeenCalledOnce();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('success');
   });
 
-  it('applies a trusted work offset before checking the physical bed envelope', async () => {
+  it('does not turn a trusted work offset into a calculated bed veto', async () => {
     installVectorProject({ minX: 40, minY: 40, maxX: 50, maxY: 50 });
     const project = useStore.getState().project;
     useStore.setState({
@@ -188,16 +199,16 @@ describe('Frame physical-safety preflight', () => {
       },
       wcoCache: { x: 10, y: 0, z: 0 },
     });
-    const frame = vi.fn(async () => undefined);
+    const frame = completingFrame();
     useLaserStore.setState({ frame });
 
-    await expect(runFrameNow()).resolves.toBe(false);
+    await expect(runFrameNow()).resolves.toBe(true);
 
-    expect(frame).not.toHaveBeenCalled();
-    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/cannot frame.*bed/i);
+    expect(frame).toHaveBeenCalledOnce();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
   });
 
-  it('sends no Frame motion when the perimeter intersects an enabled no-go zone', async () => {
+  it('keeps a perimeter no-go finding advisory and still frames', async () => {
     installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
     const bounds = currentMotionBounds();
     setNoGoZone({
@@ -206,17 +217,17 @@ describe('Frame physical-safety preflight', () => {
       width: 2,
       height: 2,
     });
-    const frame = vi.fn(async () => undefined);
+    const frame = completingFrame();
     useLaserStore.setState({ frame });
 
-    await expect(runFrameNow()).resolves.toBe(false);
+    await expect(runFrameNow()).resolves.toBe(true);
 
-    expect(frame).not.toHaveBeenCalled();
-    expect(useLaserStore.getState().framedRun).toBeNull();
-    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/perimeter.*Clamp/i);
+    expect(frame).toHaveBeenCalledOnce();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
+    expect(JSON.stringify(reviewHarness.runJobReviewGate.mock.calls[0])).toContain('Clamp');
   });
 
-  it('cannot earn a permit when the job crosses a no-go zone inside a clear perimeter', async () => {
+  it('keeps an interior no-go finding advisory and lets the completed Frame authorize', async () => {
     installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
     const bounds = currentMotionBounds();
     setNoGoZone({
@@ -225,13 +236,13 @@ describe('Frame physical-safety preflight', () => {
       width: 2,
       height: 2,
     });
-    const frame = vi.fn(async () => undefined);
+    const frame = completingFrame();
     useLaserStore.setState({ frame });
 
-    await expect(runFrameNow()).resolves.toBe(false);
+    await expect(runFrameNow()).resolves.toBe(true);
 
-    expect(frame).not.toHaveBeenCalled();
-    expect(useLaserStore.getState().framedRun).toBeNull();
-    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/job path.*Clamp/i);
+    expect(frame).toHaveBeenCalledOnce();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
+    expect(JSON.stringify(reviewHarness.runJobReviewGate.mock.calls[0])).toContain('Clamp');
   });
 });
