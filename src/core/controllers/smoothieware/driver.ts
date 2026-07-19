@@ -63,6 +63,7 @@ export const smoothiewareDriver: ControllerDriver = {
     offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: SMOOTHIE_STOP_LASER_LINES,
+    frameToolOffLines: SMOOTHIE_STOP_LASER_LINES,
     settleDwell: SMOOTHIE_CMD_SETTLE,
     setOriginHere: 'G92 X0 Y0',
     clearOrigin: 'G92.1',

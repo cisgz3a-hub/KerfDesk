@@ -39,6 +39,8 @@ export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
   'Release the momentary Fire control before sending another machine command.';
+export const MPG_ACTIVE_MOTION_MESSAGE =
+  'Jog and Frame are unavailable while grblHAL reports MPG mode active. Return motion control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
@@ -183,6 +185,7 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
     state.controllerOperation,
   );
   if (controllerOperationMessage !== null) return controllerOperationMessage;
+  if (state.mpgActive === true) return MPG_ACTIVE_MOTION_MESSAGE;
   if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
   if (state.statusReport.state !== 'Idle') {
     return `Machine must be Idle before jogging or framing (currently ${state.statusReport.state}).`;
@@ -349,6 +352,8 @@ type InitialLaserState = Pick<
   | 'pendingToolLabel'
   | 'pendingToolId'
   | 'frameVerification'
+  | 'framedRun'
+  | 'framedRunStartClaim'
 >;
 
 export function initialLaserState(): InitialLaserState {
@@ -399,6 +404,8 @@ export function initialLaserState(): InitialLaserState {
     workZZeroEvidence: null,
     ...TOOL_CHANGE_STATE_DEFAULTS,
     frameVerification: null,
+    framedRun: null,
+    framedRunStartClaim: null,
   };
 }
 
@@ -439,6 +446,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     workOriginSource: state.workOriginSource === 'g54-persistent' ? 'unknown' : 'none',
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
     frameVerification: null,
+    framedRun: null,
     motionOperation: null,
     controllerOperation: null,
     probeBusy: false,

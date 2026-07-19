@@ -97,7 +97,11 @@ export function buildMachineReviewFacts(project: Project): ReadonlyArray<JobRevi
     fact('Laser power scale', `S max $30 = ${device.maxPowerS}`),
     fact(
       'Air assist command',
-      device.airAssistCommand === 'none' ? 'Not configured' : device.airAssistCommand,
+      device.airAssistCommand === 'none'
+        ? device.laserSubProfile?.airAssist === 'manual'
+          ? 'Manual/external (no M-code)'
+          : 'Not configured'
+        : device.airAssistCommand,
     ),
     ...(device.rotary === undefined
       ? []

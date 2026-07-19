@@ -47,7 +47,7 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId).toBe(
       'neotronics-4040-max-lt4lds-v2-20w',
     );
-    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.capabilities).not.toContain('z-axis');
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.capabilities).toContain('z-axis');
     expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.noGoZones).toEqual([]);
   });
 
@@ -97,7 +97,7 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin).toBeLessThanOrEqual(15000);
   });
 
-  it('ships a Neotronics 4040 Max / LT-4LDS-V2 20W diode profile without guessing Z or air wiring', () => {
+  it('ships an explicit public-spec laser/CNC contract without claiming unverified wiring or origin', () => {
     expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE).toMatchObject({
       name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
       machineFamily: 'neotronics-4040-max',
@@ -111,6 +111,12 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       zTravelMm: 75,
       zTravelConfirmed: false,
       zProbePresent: true,
+      cncSubProfile: {
+        safeZMm: 3.81,
+        spindleMaxRpm: 12000,
+        spindleSpinupSec: 3,
+        coolant: 'off',
+      },
       laserSubProfile: {
         model: 'LASER TREE LT-4LDS-V2',
         technology: 'diode',
@@ -120,9 +126,18 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
         spotSizeMm: { x: 0.16, y: 0.18 },
         focusLengthMm: 40,
         focusMode: 'fixed-lever',
-        airAssist: 'built-in',
+        airAssist: 'manual',
       },
     });
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.capabilities).toEqual(
+      expect.arrayContaining(['grbl', 'wcs', 'laser-output', 'cnc-output', 'z-axis']),
+    );
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.capabilities).not.toEqual(
+      expect.arrayContaining(['verified-origin', 'rotary', 'low-power-fire']),
+    );
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.evidence).toContainEqual(
+      expect.objectContaining({ status: 'public-spec-starter' }),
+    );
   });
 
   it('does not inherit the Falcon-class frame feed for the heavier Neotronics 4040', () => {

@@ -4,6 +4,7 @@ import {
   buildGrblFrameRetract,
 } from '../../core/controllers/grbl/frame-lines';
 import {
+  CNC_FRAME_POSITION_REQUIRED_MESSAGE,
   CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE,
   CNC_FRAME_WORK_Z_REQUIRED_MESSAGE,
   buildCncFrameMotion,
@@ -18,11 +19,12 @@ function plan(overrides: {
   readonly preFrameWorkZMm: number | null;
   readonly hasCurrentWorkZEvidence: boolean;
   readonly buildRetract?: ((zMm: number, feed: number) => string) | undefined;
+  readonly zFeed?: number;
 }): CncFrameMotionPlan {
   return buildCncFrameMotion({
     perimeter: PERIMETER,
     safeZMm: SAFE_Z,
-    feed: FEED,
+    zFeed: overrides.zFeed ?? FEED,
     buildRetract: 'buildRetract' in overrides ? overrides.buildRetract : buildGrblFrameRetract,
     ...overrides,
   });
@@ -50,6 +52,24 @@ describe('buildCncFrameMotion', () => {
     expect(lines[lines.length - 1]).toBe('$J=G90 G21 Z20.000 F1000\n');
   });
 
+  it('uses the separate Z feed without changing the XY perimeter feed', () => {
+    const lines = motion({
+      preFrameWorkZMm: 0,
+      hasCurrentWorkZEvidence: true,
+      zFeed: 300,
+    });
+    expect(lines[0]).toBe('$J=G90 G21 Z3.810 F300\n');
+    expect(lines.slice(1, 1 + PERIMETER.length)).toEqual(PERIMETER);
+    expect(lines[lines.length - 1]).toBe('$J=G90 G21 Z0.000 F300\n');
+  });
+
+  it('leaves a bit that started below work Z0 at safe Z instead of plunging back into stock', () => {
+    const lines = motion({ preFrameWorkZMm: -2, hasCurrentWorkZEvidence: true });
+    expect(lines).toHaveLength(PERIMETER.length + 1);
+    expect(lines[0]).toBe('$J=G90 G21 Z3.810 F1000\n');
+    expect(lines[lines.length - 1]).toBe(PERIMETER[PERIMETER.length - 1]);
+  });
+
   it('blocks when there is no current work-Z evidence', () => {
     expect(plan({ preFrameWorkZMm: 0, hasCurrentWorkZEvidence: false })).toEqual({
       kind: 'blocked',
@@ -66,11 +86,11 @@ describe('buildCncFrameMotion', () => {
     });
   });
 
-  // Unknown pre-frame Z: retract but do not guess a restore target — leave the
-  // bit at safe Z rather than jog somewhere unverified.
-  it('retracts without a restore when the pre-frame Z is unknown', () => {
-    const lines = motion({ preFrameWorkZMm: null, hasCurrentWorkZEvidence: true });
-    expect(lines).toEqual(['$J=G90 G21 Z3.810 F1000\n', ...PERIMETER]);
+  it('blocks when the pre-frame work Z is unknown', () => {
+    expect(plan({ preFrameWorkZMm: null, hasCurrentWorkZEvidence: true })).toEqual({
+      kind: 'blocked',
+      message: CNC_FRAME_POSITION_REQUIRED_MESSAGE,
+    });
   });
 
   it('omits a redundant restore when the bit is already at safe Z', () => {

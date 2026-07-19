@@ -46,7 +46,7 @@ describe('resolveCameraSafeFramePlacement', () => {
     expect(placement.ok).toBe(true);
   });
 
-  it('still refuses framing while camera placement is active without position proof', () => {
+  it('allows a watched tool-off Frame while camera placement is active without position proof', () => {
     useCameraStore.setState({ placementActive: true, confirmedPositionEpoch: null });
     const placement = resolveCameraSafeFramePlacement(
       homingProject(),
@@ -60,6 +60,6 @@ describe('resolveCameraSafeFramePlacement', () => {
         reportInches: false,
       },
     );
-    expect(placement.ok).toBe(false);
+    expect(placement.ok).toBe(true);
   });
 });

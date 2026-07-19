@@ -8,7 +8,7 @@ import { controllerErrorNotice, type ControllerErrorContext } from './laser-safe
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { advanceStream } from './laser-stream-ack';
-import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
 export function handleErrorLine(
   set: SetFn,
@@ -17,21 +17,31 @@ export function handleErrorLine(
   safeWrite: SafeWriteFn,
   code: number | null,
   raw: string | undefined,
-  ackOwner: AckOwner,
+  ackSettlement: AckSettlement,
+  ownedCommandLine?: string,
 ): void {
   const state = get();
   // An error owed to an untracked write (console typo, rejected origin
   // command) is not a stream event: surface it, but leave the streamer's
   // accounting and the auto-stop path alone.
-  const rejectedLine = ackOwner === 'stream' ? state.streamer?.inFlight[0]?.line.trim() : undefined;
+  const rejectedLine =
+    ackSettlement.owner === 'stream'
+      ? state.streamer?.inFlight[0]?.line.trim()
+      : ownedCommandLine?.trim();
+  const rejectedMotionId =
+    ackSettlement.owner === 'untracked' ? ackSettlement.motionOperationId : null;
   const motionErrorPatch =
-    state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
+    rejectedMotionId !== null && state.motionOperation?.operationId === rejectedMotionId
+      ? { motionOperation: { ...state.motionOperation, cancelRequested: true } }
+      : {};
   set({
     lastError: code,
+    frameVerification: null,
+    framedRun: null,
     ...errorNoticePatch(state, code, raw, rejectedLine),
     ...motionErrorPatch,
   });
-  if (ackOwner === 'untracked') return;
+  if (ackSettlement.owner === 'untracked') return;
   requestRealtimeStopAfterStreamError(set, refs, state.streamer, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
@@ -47,14 +57,24 @@ export function handleResendLine(
   requestedLine: number,
 ): void {
   const current = get();
-  set(
-    errorNoticePatch(
+  set({
+    frameVerification: null,
+    framedRun: null,
+    // Retransmission is deliberately unsupported: once firmware reports a
+    // protocol desynchronization, an in-flight Frame/Jog can no longer prove
+    // that every intended motion line executed exactly once. Keep its FIFO
+    // reservation quarantined (Resend is not a terminal ack), but make the
+    // owned candidate permanently ineligible for further dispatch/completion.
+    ...(current.motionOperation === null
+      ? {}
+      : { motionOperation: { ...current.motionOperation, cancelRequested: true } }),
+    ...errorNoticePatch(
       current,
       null,
       `Resend:${requestedLine} — line-number retransmission is not supported`,
       undefined,
     ),
-  );
+  });
   requestRealtimeStopAfterStreamError(set, refs, current.streamer, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }

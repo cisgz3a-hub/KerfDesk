@@ -34,7 +34,7 @@ import {
 } from '../start-job-external-environment';
 import { prepareCurrentStartJob } from '../start-job-source';
 import { buildJobReviewModel, type PreparedCurrentStart } from './job-review-model';
-import { useJobReviewStore } from './job-review-store';
+import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -46,6 +46,9 @@ export type ReviewedStartBundle = {
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly externalEnvironment: StartExternalEnvironment;
+  /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
+   * after that selection, so they must retain the original named WCS fact. */
+  readonly frameWcsNormalizationWarning?: string;
 };
 
 export type ConfirmedJobReview = {
@@ -58,9 +61,11 @@ export async function runJobReviewGate(args: {
   readonly initial: ReviewedStartBundle;
   readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
+  readonly purpose?: JobReviewPurpose;
 }): Promise<ConfirmedJobReview | null> {
+  const purpose = args.purpose ?? 'start';
   let current = args.initial;
-  if (!useJobReviewStore.getState().open(modelFor(current))) return null;
+  if (!useJobReviewStore.getState().open(modelFor(current), purpose)) return null;
   for (;;) {
     const signal = await useJobReviewStore.getState().nextSignal();
     if (signal === 'cancel') {
@@ -73,7 +78,12 @@ export async function runJobReviewGate(args: {
       return confirmed;
     }
     useJobReviewStore.getState().beginPrepare();
-    const rebuilt = await rebuildCurrentStart(args.checkpointToReplace, args.completedReceipt);
+    const rebuilt = await rebuildCurrentStart(
+      args.checkpointToReplace,
+      args.completedReceipt,
+      purpose,
+      current.frameWcsNormalizationWarning,
+    );
     if (!rebuilt.ok) {
       useJobReviewStore.getState().failPrepare(rebuilt.messages);
       continue;
@@ -84,12 +94,15 @@ export async function runJobReviewGate(args: {
 }
 
 function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
-  return buildJobReviewModel({
+  const model = buildJobReviewModel({
     project: bundle.project,
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
   });
+  const warning = bundle.frameWcsNormalizationWarning;
+  if (warning === undefined || model.warnings.includes(warning)) return model;
+  return { ...model, warnings: [warning, ...model.warnings] };
 }
 
 // A Confirm click is the acknowledgement: the dialog showed the exact prompt
@@ -127,6 +140,8 @@ type RebuiltStart =
 async function rebuildCurrentStart(
   checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
+  purpose: JobReviewPurpose,
+  frameWcsNormalizationWarning: string | undefined,
 ): Promise<RebuiltStart> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
@@ -139,6 +154,7 @@ async function rebuildCurrentStart(
     camera,
     externalEnvironment.rotaryRasterAllowed,
     completedReceipt?.artifact.jobOrigin,
+    purpose === 'start',
   );
   if (!prepared.ok) return { ok: false, messages: prepared.messages };
   if (
@@ -159,6 +175,7 @@ async function rebuildCurrentStart(
       prepared,
       laserModeStartSnapshot,
       externalEnvironment,
+      ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
     },
   };
 }

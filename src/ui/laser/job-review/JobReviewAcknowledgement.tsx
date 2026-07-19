@@ -5,6 +5,7 @@
 
 import { assertNever } from '../../../core/scene';
 import type { JobReviewAcknowledgement as AcknowledgementModel } from './job-review-model';
+import type { JobReviewPurpose } from './job-review-store';
 import {
   ackFootnoteStyle,
   ackPromptStyle,
@@ -14,6 +15,7 @@ import {
 
 export function JobReviewAcknowledgement(props: {
   readonly acknowledgement: AcknowledgementModel;
+  readonly purpose?: JobReviewPurpose;
 }): JSX.Element {
   const ack = props.acknowledgement;
   switch (ack.kind) {
@@ -25,9 +27,21 @@ export function JobReviewAcknowledgement(props: {
         </p>
       );
     case 'laser-unverified':
-      return <AcknowledgementBanner heading="Laser mode acknowledgement" prompt={ack.prompt} />;
+      return (
+        <AcknowledgementBanner
+          heading="Laser mode acknowledgement"
+          prompt={ack.prompt}
+          purpose={props.purpose ?? 'start'}
+        />
+      );
     case 'cnc':
-      return <AcknowledgementBanner heading="CNC setup confirmation" prompt={ack.prompt} />;
+      return (
+        <AcknowledgementBanner
+          heading="CNC setup confirmation"
+          prompt={ack.prompt}
+          purpose={props.purpose ?? 'start'}
+        />
+      );
     default:
       return assertNever(ack, 'job review acknowledgement');
   }
@@ -36,6 +50,7 @@ export function JobReviewAcknowledgement(props: {
 function AcknowledgementBanner(props: {
   readonly heading: string;
   readonly prompt: string;
+  readonly purpose: JobReviewPurpose;
 }): JSX.Element {
   return (
     <section
@@ -46,9 +61,9 @@ function AcknowledgementBanner(props: {
       <strong>{props.heading}</strong>
       <p style={ackPromptStyle}>{props.prompt}</p>
       <p style={ackFootnoteStyle}>
-        Pressing Start job records this confirmation for the current controller session and the
-        exact program shown above — the same acknowledgement the previous confirmation dialog
-        recorded.
+        Pressing {props.purpose === 'frame' ? 'Accept & Frame' : 'Start job'} records this
+        confirmation for the current controller session and the exact program shown above — the same
+        acknowledgement the previous confirmation dialog recorded.
       </p>
     </section>
   );

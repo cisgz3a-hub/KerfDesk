@@ -11,6 +11,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -22,7 +23,7 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
-import { frameVerificationForProject } from './frame-verification-testing';
+import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
@@ -98,7 +99,7 @@ function runnableProject() {
   };
 }
 
-function makeLaserModeUnknown(): void {
+async function makeLaserModeUnknown(): Promise<void> {
   useLaserStore.setState((state) => ({
     controllerSettings: {
       maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
@@ -110,10 +111,11 @@ function makeLaserModeUnknown(): void {
     },
     capabilities: { ...state.capabilities, settings: 'readonly-dump' },
   }));
+  await installFramedRunPermitForCurrentState();
 }
 
 describe('laser-mode acknowledgement across Start and recovery', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
     resetStore();
     const project = runnableProject();
@@ -125,6 +127,7 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     useLaserStore.setState({
       ...initialLaserState(),
       connection: { kind: 'connected' },
+      activeWcs: 'G54',
       controllerSessionEpoch: CONTROLLER_EPOCH,
       controllerQualification: {
         kind: 'qualified',
@@ -138,11 +141,9 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
         laserModeEnabled: true,
       },
       controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
-      // Frame-first (ADR-228): the sole Start gate is a completed Frame for
-      // this exact job; record it so the $32 acknowledgement is what gates.
-      frameVerification: frameVerificationForProject(project),
       startJob: vi.fn(async () => undefined),
     });
+    await installFramedRunPermitForCurrentState();
     vi.mocked(jobAwareAlert).mockClear();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
     reviewChoice = 'confirm';
@@ -181,9 +182,14 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
   });
 
   it('requires informed acknowledgement before an ordinary Start with unknown $32', async () => {
-    makeLaserModeUnknown();
+    await makeLaserModeUnknown();
+    const frame = installCompletingFrameMock();
+    useLaserStore.setState({ framedRun: null, frameVerification: null });
     const review = captureJobReviewModels();
 
+    // First press performs the single review and watched Frame. The deliberate
+    // second press consumes the exact completion-issued artifact.
+    await runStartJobFlow(recoveryHarness());
     await runStartJobFlow(recoveryHarness());
 
     review.stop();
@@ -192,6 +198,7 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
       prompt: LASER_MODE_UNVERIFIED_START_PROMPT,
     });
     expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(frame).toHaveBeenCalledTimes(1);
     expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
@@ -205,7 +212,8 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
   });
 
   it('sends no ordinary job when the unknown-$32 review is cancelled', async () => {
-    makeLaserModeUnknown();
+    await makeLaserModeUnknown();
+    useLaserStore.setState({ framedRun: null, frameVerification: null });
     reviewChoice = 'cancel';
     const review = captureJobReviewModels();
 
@@ -221,7 +229,7 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     const checkpoint = await createLegacyCheckpointFromCurrentStart();
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    makeLaserModeUnknown();
+    await makeLaserModeUnknown();
     vi.mocked(jobAwareConfirm).mockClear();
 
     await runCheckpointResumeFlow(checkpoint);
@@ -244,7 +252,7 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     const checkpoint = await createLegacyCheckpointFromCurrentStart();
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    makeLaserModeUnknown();
+    await makeLaserModeUnknown();
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValueOnce(false);
 
     await runCheckpointResumeFlow(checkpoint);
@@ -256,7 +264,7 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
   });
 
   it('uses the same $32 acknowledgement before manual recovery confirmation', async () => {
-    makeLaserModeUnknown();
+    await makeLaserModeUnknown();
 
     await runStartFromLineFlow(2);
 
@@ -273,6 +281,25 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     );
   });
 });
+
+function installCompletingFrameMock() {
+  const frame = vi.fn(
+    async (
+      _bounds: Parameters<ReturnType<typeof useLaserStore.getState>['frame']>[0],
+      _feed: number,
+      candidate?: FramedRunCandidate,
+    ) => {
+      if (candidate === undefined) throw new Error('Expected exact Frame candidate.');
+      const permit = createFramedRunPermit(candidate, useLaserStore.getState());
+      useLaserStore.setState({
+        framedRun: permit,
+        frameVerification: candidate.frameVerification,
+      });
+    },
+  );
+  useLaserStore.setState({ frame });
+  return frame;
+}
 
 async function createLegacyCheckpointFromCurrentStart() {
   await runStartJobFlow(recoveryHarness());

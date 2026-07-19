@@ -51,7 +51,7 @@ export function consoleActions(
   get: GetFn,
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
-): Pick<LaserState, 'sendConsoleCommand' | 'clearTranscript'> {
+): Pick<LaserState, 'sendConsoleCommand' | 'selectPrimaryWcsForFrame' | 'clearTranscript'> {
   return {
     sendConsoleCommand: async (input, options = {}) => {
       const prepared = refs.driver.prepareConsoleCommand(input);
@@ -77,21 +77,57 @@ export function consoleActions(
           lastSettingsReadAt: null,
         });
       }
-      if (hasAccessoryCommand(prepared.command.normalized)) {
-        // Invalidate before the async write yields so Start cannot race a
-        // just-sent M3/M4/M5/M7/M8/M9 while the prior all-off cache remains.
+      const stateEffect = prepared.command.stateEffect;
+      if (stateEffect !== 'read-only') {
+        // Invalidate before the async write yields so Start cannot race any
+        // manually mutated controller state against the prior Frame permit.
         set((state) => ({
-          accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+          framedRun: null,
+          ...(hasAccessoryCommand(prepared.command.normalized)
+            ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
+            : {}),
         }));
       }
       await writeConsoleCommand(refs, write, prepared.command);
-      const stateEffect = prepared.command.stateEffect;
       if (stateEffect !== 'read-only') {
         set((state) => consoleStateEffectPatch(state, stateEffect, prepared.command.normalized));
       }
       // Track the operator's active WCS selection so save/start advisories can
       // warn when it is not the G54 that emission pins (audit C6).
       trackConsoleWcsSelection(set, prepared.command.normalized);
+    },
+    selectPrimaryWcsForFrame: async () => {
+      const prepared = refs.driver.prepareConsoleCommand('G54');
+      if (!prepared.ok) throw new Error(prepared.reason);
+      const stateEffect = prepared.command.stateEffect;
+      if (stateEffect === 'read-only') {
+        throw new Error('The active controller cannot own a G54 Frame selection.');
+      }
+      const blocked = consoleCommandBlockReason(get(), prepared.command, false);
+      if (blocked !== null) throw new Error(blocked);
+      const ownershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
+      if (ownershipBlocked !== null) throw new Error(ownershipBlocked);
+      const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
+      if (idleBlocked !== null) throw new Error(idleBlocked);
+      // Expire any older authorization before the async boundary. The owned
+      // command rejects on error/Resend, so G54 is never assumed from transport
+      // acceptance alone.
+      set({ framedRun: null });
+      await startControllerCommand(
+        refs,
+        (line, action, source) => write(line, action, source ?? 'system'),
+        {
+          kind: 'interactive-command',
+          label: 'Select G54 for Frame',
+          command: prepared.command.wire,
+          action: 'console',
+          source: 'system',
+        },
+      );
+      set((state) => ({
+        ...consoleStateEffectPatch(state, stateEffect, prepared.command.normalized),
+        activeWcs: 'G54',
+      }));
     },
     clearTranscript: () => set({ transcript: [] }),
   };
@@ -211,6 +247,7 @@ function consoleStateEffectPatch(
     ...observationPatch,
     homingProof: null,
     frameVerification: null,
+    framedRun: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
   };
   switch (effect) {
@@ -274,6 +311,7 @@ function consoleObservationPatch(
     // setup/job action can trust Idle, but preserve unrelated position proof.
     statusReport: null,
     statusObservation: null,
+    framedRun: null,
     ...(hasAccessoryCommand(command)
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),

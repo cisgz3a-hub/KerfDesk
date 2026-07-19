@@ -204,7 +204,7 @@ describe('JogPad accessible labels', () => {
     await unmount();
   });
 
-  it('applies the warning Proceed action before turning manual air on', async () => {
+  it('applies Job Air defaults but leaves manual air off until an output is hardware-tested', async () => {
     const setAirAssistEnabled = vi.fn(async () => undefined);
     useLaserStore.setState({ setAirAssistEnabled });
     const { host, unmount } = await renderJogPad();
@@ -220,9 +220,9 @@ describe('JogPad accessible labels', () => {
       proceed.click();
     });
 
-    expect(useStore.getState().project.device.airAssistCommand).toBe('M7');
+    expect(useStore.getState().project.device.airAssistCommand).toBe('none');
     expect(useStore.getState().project.scene.layers.every((layer) => layer.airAssist)).toBe(true);
-    expect(setAirAssistEnabled).toHaveBeenCalledWith(true);
+    expect(setAirAssistEnabled).not.toHaveBeenCalled();
 
     await unmount();
   });

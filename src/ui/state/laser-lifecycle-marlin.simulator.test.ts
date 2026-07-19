@@ -107,6 +107,33 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(sim.state().pos.x).toBe(10);
   });
 
+  it('holds Jog ownership through projected M114 Idle until M400 and a later M114 settle', async () => {
+    const sim = await connectMarlinIdle({ motionMs: 2_000 });
+    await useLaserStore.getState().jog({ dx: 10, feed: 1000 });
+
+    // Normal Marlin M114 reports the projected planner position. Two fast
+    // reports can therefore look Idle while the simulated move is still live.
+    await pump(600);
+    expect(sim.state().pendingMotions).toBe(1);
+    expect(sim.outbound()).toContain('M400\n');
+    expect(useLaserStore.getState().motionOperation).toMatchObject({
+      kind: 'jog',
+      awaitingSettlementAck: true,
+    });
+
+    // Even immediately after the move drains and M400 acknowledges, ownership
+    // remains until a status report causally later than that marker arrives.
+    await pump(1_380);
+    expect(sim.state().pendingMotions).toBe(1);
+    expect(useLaserStore.getState().motionOperation).not.toBeNull();
+    await pump(30);
+    expect(sim.state().pendingMotions).toBe(0);
+    expect(useLaserStore.getState().motionOperation).not.toBeNull();
+
+    await pump(130);
+    expect(useLaserStore.getState().motionOperation).toBeNull();
+  });
+
   it('frames with absolute G0 legs dispatched between idle reports', async () => {
     const sim = await connectMarlinIdle();
     await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 6000);

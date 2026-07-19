@@ -12,6 +12,13 @@ describe('currentWorkZMm', () => {
     ).toBe(20);
   });
 
+  it('normalizes inch-mode WPos and MPos/WCO values to millimetres', () => {
+    expect(currentWorkZMm({ wPos: { x: 0, y: 0, z: 1 }, mPos: null }, null, true)).toBe(25.4);
+    expect(
+      currentWorkZMm({ wPos: null, mPos: { x: 0, y: 0, z: -1 } }, { x: 0, y: 0, z: -2 }, true),
+    ).toBe(25.4);
+  });
+
   it('is unknowable from MPos without a cached offset, or with no report', () => {
     expect(currentWorkZMm({ wPos: null, mPos: { x: 0, y: 0, z: -10 } }, null)).toBeNull();
     expect(currentWorkZMm(null, { x: 0, y: 0, z: -30 })).toBeNull();

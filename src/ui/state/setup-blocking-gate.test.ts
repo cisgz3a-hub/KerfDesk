@@ -7,6 +7,7 @@ import { createStreamer, onAck, step, type StatusReport } from '../../core/contr
 import type { LaserState } from './laser-store';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
+  MPG_ACTIVE_MOTION_MESSAGE,
   TOOL_CHANGE_NOT_IDLE_MESSAGE,
   TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE,
   activeJobCommandBlockMessage,
@@ -113,6 +114,16 @@ describe('setupBlockingJobCommandBlockMessage (CNC-03)', () => {
       statusReport: statusReport('Idle'),
     });
     expect(jogFrameCommandBlockMessage({ ...base, detectedControllerKind: 'grblhal' })).toBeNull();
+  });
+
+  it('refuses Jog and Frame while the pendant/MPG owns motion control', () => {
+    const state = gateState({
+      streamer: null,
+      statusReport: statusReport('Idle'),
+      mpgActive: true,
+    });
+
+    expect(jogFrameCommandBlockMessage(state)).toBe(MPG_ACTIVE_MOTION_MESSAGE);
   });
 
   it('KEEPS Start blocked during a tool change — Start must never unblock', () => {

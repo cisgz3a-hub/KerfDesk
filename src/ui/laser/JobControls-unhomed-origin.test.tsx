@@ -11,6 +11,7 @@ import {
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { installAutoJobReview } from './job-review';
 import { JobControls } from './JobControls';
 
 (
@@ -22,8 +23,10 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     useStore.getState().newProject();
     useLaserStore.setState({
       frame: originalFrame,
+      connection: { kind: 'disconnected' },
       streamer: null,
       statusReport: null,
+      activeWcs: null,
       workOriginActive: false,
       wcoCache: null,
       motionOperation: null,
@@ -42,7 +45,9 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     });
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       streamer: null,
+      activeWcs: 'G54',
       statusReport: {
         state: 'Idle',
         subState: null,
@@ -57,6 +62,7 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     });
     const host = document.createElement('div');
     document.body.appendChild(host);
+    const uninstallAutoReview = installAutoJobReview('confirm');
     let root: Root | null = null;
     try {
       await act(async () => {
@@ -64,17 +70,18 @@ describe('JobControls unhomed custom-origin Frame action', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
       expect(useToastStore.getState().toasts.at(-1)?.message ?? '').not.toMatch(/overhangs/);
     } finally {
+      uninstallAutoReview();
       if (root !== null) {
         await act(async () => root?.unmount());
       }
@@ -82,7 +89,7 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     }
   });
 
-  it('does not block User Origin frame when unhomed overscan extends left of the relative origin', async () => {
+  it('refuses User Origin frame when unhomed overscan extends left of the physical bed', async () => {
     const frame = vi.fn(async () => undefined);
     useStore.setState({
       project: fillOverscanProject(),
@@ -90,7 +97,9 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     });
     useLaserStore.setState({
       frame,
+      connection: { kind: 'connected' },
       streamer: null,
+      activeWcs: 'G54',
       statusReport: {
         state: 'Idle',
         subState: null,
@@ -105,6 +114,7 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     });
     const host = document.createElement('div');
     document.body.appendChild(host);
+    const uninstallAutoReview = installAutoJobReview('confirm');
     let root: Root | null = null;
     try {
       await act(async () => {
@@ -112,17 +122,25 @@ describe('JobControls unhomed custom-origin Frame action', () => {
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
       const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
+        (button) => button.textContent === 'Frame job',
       );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
+      if (frameButton === undefined) throw new Error('Frame job button not rendered');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).toHaveBeenCalledTimes(1);
-      expect(useToastStore.getState().toasts.at(-1)?.message ?? '').not.toMatch(/overhangs/);
+      await vi.waitFor(() => {
+        expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+          variant: 'error',
+        });
+      });
+      expect(frame).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)?.message ?? '').toMatch(
+        /^Cannot frame: .*overhangs the bed .*left by 5\.0 mm.*move it onto the bed first\.$/,
+      );
     } finally {
+      uninstallAutoReview();
       if (root !== null) {
         await act(async () => root?.unmount());
       }

@@ -9,6 +9,7 @@ import {
   continueToolChange as continueToolChangeStreamer,
   createStreamer,
   findOversizedLine,
+  isSendableGcodeLine,
   markErrored,
   step,
   wipeInFlight,
@@ -53,6 +54,8 @@ import { normalizeStartJobOptions } from './laser-job-options';
 import { liveCanvasLifecyclePatch, liveCanvasStartPatch } from './live-canvas-run';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
 import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
+import { consumeClaimedFramedRun } from './framed-run-start-consumption';
+import { originUnknownAfterControllerReset } from './laser-status-line';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -78,6 +81,7 @@ const UNTRACKED_ACK_DRAIN_TIMEOUT_MS = 1_500;
 const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
 export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
   'The compiled tool plan does not match the CNC program pauses. Start was blocked so tool identity cannot drift at a change boundary.';
+const EMPTY_PROGRAM_MESSAGE = 'The job contains no sendable G-code commands.';
 
 export function jobActions(
   set: SetFn,
@@ -111,9 +115,13 @@ async function runStartJob(
   options: StartJobOptions,
 ): Promise<void> {
   const { set, get, safeWrite } = context;
+  assertProgramHasSendableLine(gcode);
   assertStartAllowed(set, get);
   const setupEpoch = captureStartSetupEpoch(get());
-  set({ controllerOperation: { kind: 'start-arming', phase: 'queue-fence' } });
+  set({
+    controllerOperation: { kind: 'start-arming', phase: 'queue-fence' },
+    ...(options.framedRunPermit === undefined ? { frameVerification: null, framedRun: null } : {}),
+  });
   try {
     await prepareStartBoundary(context, gcode, options, setupEpoch);
     // prepareStartBoundary intentionally awaits queue/controller evidence. App
@@ -121,6 +129,7 @@ async function runStartJob(
     // during those awaits, so the owner gets one last synchronous refusal
     // point before streamer/activeRun state or the first program write exists.
     options.assertFinalStartAuthorized?.();
+    consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
     const entersHoldNow = stepped.state.status === 'tool-change';
     set((state) => ({
@@ -157,6 +166,11 @@ async function runStartJob(
   }
 }
 
+function assertProgramHasSendableLine(gcode: string): void {
+  if (gcode.split('\n').some(isSendableGcodeLine)) return;
+  throw new Error(EMPTY_PROGRAM_MESSAGE);
+}
+
 async function prepareStartBoundary(
   context: JobActionContext,
   gcode: string,
@@ -177,6 +191,7 @@ async function prepareStartBoundary(
       label: 'CNC Start queue fence',
       command: `${driver().commands.settleDwell}\n`,
       timeoutMs: UNTRACKED_ACK_DRAIN_TIMEOUT_MS,
+      statusOwnership: 'cnc-start-settle-dwell',
     });
   }
   assertStartReservation(get, setupEpoch);
@@ -241,7 +256,8 @@ async function runStopJob(context: JobActionContext): Promise<void> {
     // ADR-228 amendment: Abort during a frame must kill the proof directly —
     // an aborted trace was not completed, whatever the side effects imply.
     frameVerification: null,
-    ...originPatchAfterSoftReset(state),
+    framedRun: null,
+    ...originUnknownAfterControllerReset(state),
     streamer:
       state.streamer === null
         ? state.streamer
@@ -385,14 +401,10 @@ async function waitForUntrackedAckDrain(get: GetFn): Promise<void> {
   const deadline = Date.now() + UNTRACKED_ACK_DRAIN_TIMEOUT_MS;
   while (hasPendingControllerWrite(get())) {
     if (Date.now() > deadline) throw new Error(startPendingControllerMessage(get()));
-    await sleep(UNTRACKED_ACK_DRAIN_POLL_MS);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, UNTRACKED_ACK_DRAIN_POLL_MS);
+    });
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 // Leave a tool-change hold: drop the swallowed M0 and pump the stream from the
@@ -439,27 +451,4 @@ async function runContinueToolChange(
       throw err;
     }
   }
-}
-
-function originPatchAfterSoftReset(
-  state: LaserState,
-): Pick<
-  LaserState,
-  'workOriginActive' | 'workOriginSource' | 'workZZeroEvidence' | 'workZReferenceEpoch'
-> {
-  // A soft reset voids the bit-to-stock Z relationship (Codex audit P1).
-  if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return {
-      workOriginActive: true,
-      workOriginSource: 'unknown',
-      workZZeroEvidence: null,
-      workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    };
-  }
-  return {
-    workOriginActive: false,
-    workOriginSource: 'none',
-    workZZeroEvidence: null,
-    workZReferenceEpoch: state.workZReferenceEpoch + 1,
-  };
 }

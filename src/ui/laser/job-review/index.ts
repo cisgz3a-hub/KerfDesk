@@ -9,5 +9,5 @@ export {
   type ReviewedStartBundle,
 } from './job-review-gate';
 export { buildJobReviewModel, type JobReviewModel } from './job-review-model';
-export { useJobReviewStore } from './job-review-store';
+export { useJobReviewStore, type JobReviewPurpose, type JobReviewState } from './job-review-store';
 export { captureJobReviewModels, installAutoJobReview } from './testing';

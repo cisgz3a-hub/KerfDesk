@@ -66,6 +66,7 @@ describe('compact operation row and selected operation settings', () => {
       () =>
         useLaserStore.setState({
           motionOperation: {
+            operationId: 1,
             kind: 'frame',
             sawControllerBusy: true,
             idleStatusReports: 0,

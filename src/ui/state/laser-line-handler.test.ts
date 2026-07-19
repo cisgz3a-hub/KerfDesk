@@ -62,6 +62,8 @@ function makeLaserState(): LaserState {
     pendingToolId: null,
     workOriginSource: 'none',
     frameVerification: null,
+    framedRun: null,
+    framedRunStartClaim: null,
     connect: async () => undefined,
     disconnect: async () => undefined,
     home: async () => undefined,
@@ -97,6 +99,7 @@ function makeLaserState(): LaserState {
     retryControllerQualification: async () => undefined,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
+    selectPrimaryWcsForFrame: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
   };
@@ -407,6 +410,7 @@ describe('handleLine status-only Alarm recovery state', () => {
       wcoCache: { x: 25, y: 40, z: 0 },
       workOriginActive: true,
       motionOperation: {
+        operationId: 1,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,
@@ -438,6 +442,7 @@ describe('handleLine Sleep recovery state', () => {
         workOriginActive: true,
       },
       motionOperation: {
+        operationId: 2,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,

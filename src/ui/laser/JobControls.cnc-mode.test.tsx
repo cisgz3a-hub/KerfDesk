@@ -59,15 +59,15 @@ describe('JobControls machine gating (ADR-101 §5)', () => {
     }
   });
 
-  it('hides Auto-focus in CNC mode while Home, Frame, and Start job stay', async () => {
+  it('hides Auto-focus in CNC mode while Home and the Frame-first actions stay', async () => {
     useStore.getState().setMachineKind('cnc');
     const { host, unmount } = await renderJobControls();
     try {
       const labels = buttonLabels(host);
       expect(labels).not.toContain('Auto-focus');
       expect(labels).toContain('Home');
-      expect(labels).toContain('Frame');
-      expect(labels).toContain('Start job');
+      expect(labels).toContain('Frame job');
+      expect(labels).toContain('Set up & Frame');
       expect(labels).not.toContain('Resume from line');
       expect(host.querySelector('input[aria-label="Resume from G-code line"]')).toBeNull();
       expect(host.textContent).toContain('CNC interruption recovery');

@@ -193,6 +193,23 @@ describe('buildJobReviewModel', () => {
     expect(model.warnings).toContainEqual(expect.stringContaining('error:20'));
   });
 
+  it('discloses manual air when the exact job requests air but emits no relay command', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          layers: state.project.scene.layers.map((layer) => ({ ...layer, airAssist: true })),
+        },
+      },
+    }));
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.warnings).toContainEqual(expect.stringContaining('no M7/M8'));
+    expect(model.warnings).toContainEqual(expect.stringContaining('manual air pump'));
+  });
+
   it('summarizes a CNC job with the tool plan and the exact attestation prompt', async () => {
     useStore.setState((state) => ({
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },

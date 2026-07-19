@@ -11,14 +11,17 @@ import {
   type SceneObject,
 } from '../../../core/scene';
 import { useStore } from '../../state';
+import { useCameraStore } from '../../state/camera-store';
 import {
   CNC_SETUP_ATTESTATION_PROMPT,
   cncControllerEpochOf,
   cncSetupAttestationMatches,
 } from '../../state/cnc-setup-attestation';
 import { jobAwareAlert } from '../../state/job-aware-dialogs';
+import type { FramedRunCandidate } from '../../state/framed-run';
 import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
+import { captureLaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { RecoveryRepository } from '../../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
@@ -26,9 +29,12 @@ import {
   type LegacyCheckpointStorage,
 } from '../../state/recovery/testing';
 import { resetStore } from '../../state/test-helpers';
-import { frameVerificationForProject } from '../frame-verification-testing';
+import { completeFramedRunCandidateForTest } from '../framed-run-testing';
+import { captureStartExternalEnvironment } from '../start-job-external-environment';
+import { prepareCurrentStartJob } from '../start-job-source';
 import { useStartBlockerStore } from '../start-blocker-store';
 import { runStartJobFlow } from '../start-job-flow';
+import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
 import { captureJobReviewModels } from './testing';
 
@@ -38,6 +44,7 @@ vi.mock('../../state/job-aware-dialogs', () => ({
 }));
 
 const originalStartJob = useLaserStore.getState().startJob;
+const originalFrame = useLaserStore.getState().frame;
 const CONTROLLER_EPOCH = 7;
 
 const idleStatus: StatusReport = {
@@ -99,8 +106,6 @@ function configureReadyCncStart(): void {
       referenceEpoch: CONTROLLER_EPOCH,
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
     },
-    // The CNC machine compiles a different job, so re-record the Frame for it.
-    frameVerification: frameVerificationForProject(useStore.getState().project),
   });
 }
 
@@ -108,8 +113,46 @@ function startSpy() {
   return vi.mocked(useLaserStore.getState().startJob);
 }
 
+function frameSpy() {
+  return vi.mocked(useLaserStore.getState().frame);
+}
+
+function installCompletingFrame(): void {
+  useLaserStore.setState({
+    frame: vi.fn(async (_bounds, _feed, candidate?: FramedRunCandidate) => {
+      if (candidate === undefined) throw new Error('Frame candidate was not supplied.');
+      completeFramedRunCandidateForTest(candidate);
+    }),
+  });
+}
+
 function reviewState() {
   return useJobReviewStore.getState().state;
+}
+
+async function unframedReviewBundle() {
+  const app = useStore.getState();
+  const laser = useLaserStore.getState();
+  const camera = useCameraStore.getState();
+  const externalEnvironment = captureStartExternalEnvironment(app.project, camera);
+  const prepared = await prepareCurrentStartJob(
+    app,
+    laser,
+    camera,
+    externalEnvironment.rotaryRasterAllowed,
+    undefined,
+    false,
+  );
+  if (!prepared.ok)
+    throw new Error(`Frame review preparation failed: ${prepared.messages.join(' / ')}`);
+  return {
+    app,
+    project: app.project,
+    laser,
+    prepared,
+    laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+    externalEnvironment,
+  };
 }
 
 beforeEach(() => {
@@ -132,6 +175,7 @@ beforeEach(() => {
     ...initialLaserState(),
     connection: { kind: 'connected' },
     statusReport: idleStatus,
+    activeWcs: 'G54',
     controllerSessionEpoch: CONTROLLER_EPOCH,
     controllerQualification: { kind: 'qualified', epoch: CONTROLLER_EPOCH, settings: 'verified' },
     controllerSettings: {
@@ -140,11 +184,9 @@ beforeEach(() => {
       laserModeEnabled: true,
     },
     controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
-    // Frame-first (ADR-228): record the Frame for this exact job so the
-    // review gate — not the frame gate — is what these tests exercise.
-    frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
   });
+  installCompletingFrame();
   useStartBlockerStore.getState().clear();
   useJobReviewStore.getState().close();
   vi.mocked(jobAwareAlert).mockClear();
@@ -153,11 +195,46 @@ beforeEach(() => {
 afterEach(() => {
   useJobReviewStore.getState().close();
   localStorage.clear();
-  useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
+  useLaserStore.setState({
+    ...initialLaserState(),
+    startJob: originalStartJob,
+    frame: originalFrame,
+  });
   vi.restoreAllMocks();
 });
 
 describe('runJobReviewGate through runStartJobFlow', () => {
+  it('preserves frame purpose and rebuilds without requiring an earlier Frame', async () => {
+    useLaserStore.setState({ frameVerification: null });
+    const frameWcsNormalizationWarning =
+      'Controller was using G55. KerfDesk selected G54 because both this physical Frame and the reviewed program run in G54. Your G55 offset was not erased, and neither was any other G54-G59 offset. If you cancel, G54 remains selected.';
+    const initial = { ...(await unframedReviewBundle()), frameWcsNormalizationWarning };
+    const capture = captureJobReviewModels();
+
+    const review = runJobReviewGate({
+      initial,
+      checkpointToReplace: null,
+      completedReceipt: null,
+      purpose: 'frame',
+    });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1));
+    expect(reviewState()).toMatchObject({ kind: 'open', purpose: 'frame' });
+    expect(capture.models[0]?.warnings).toContain(frameWcsNormalizationWarning);
+
+    useJobReviewStore.getState().requestRebuild();
+    await vi.waitFor(() => expect(capture.models).toHaveLength(2));
+    const rebuilt = reviewState();
+    expect(rebuilt.kind === 'open' ? rebuilt.blocker : ['closed']).toBeNull();
+    expect(rebuilt.kind === 'open' ? rebuilt.purpose : null).toBe('frame');
+    expect(capture.models[1]?.warnings).toContain(frameWcsNormalizationWarning);
+
+    useJobReviewStore.getState().confirm();
+    await expect(review).resolves.toMatchObject({
+      bundle: { frameWcsNormalizationWarning },
+    });
+    capture.stop();
+  });
+
   it('cancel closes the review with zero side effects', async () => {
     const repository = recoveryHarness();
 
@@ -175,7 +252,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });
 
-  it('shows the CNC setup attestation and binds it to the unedited compiled program', async () => {
+  it('reviews and Frames on the first press, then starts those exact CNC bytes on the second', async () => {
     configureReadyCncStart();
     const repository = recoveryHarness();
     const capture = captureJobReviewModels();
@@ -189,6 +266,12 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     useJobReviewStore.getState().confirm();
     await flow;
     capture.stop();
+
+    expect(frameSpy()).toHaveBeenCalledTimes(1);
+    expect(startSpy()).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
+
+    await runStartJobFlow(repository);
 
     expect(startSpy()).toHaveBeenCalledTimes(1);
     const gcode = startSpy().mock.calls[0]?.[0];
@@ -232,6 +315,11 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     await flow;
     capture.stop();
 
+    expect(frameSpy()).toHaveBeenCalledTimes(1);
+    expect(startSpy()).not.toHaveBeenCalled();
+
+    await runStartJobFlow(repository);
+
     expect(startSpy()).toHaveBeenCalledTimes(1);
     const gcode = startSpy().mock.calls[0]?.[0];
     const options = startSpy().mock.calls[0]?.[1];
@@ -272,6 +360,11 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     });
     useJobReviewStore.getState().confirm();
     await flow;
+
+    expect(frameSpy()).toHaveBeenCalledTimes(1);
+    expect(startSpy()).not.toHaveBeenCalled();
+
+    await runStartJobFlow(repository);
 
     expect(startSpy()).toHaveBeenCalledTimes(1);
   });

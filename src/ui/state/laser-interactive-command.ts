@@ -11,6 +11,7 @@ import {
   cancelPauseResumeTransition,
   type PauseResumeTransitionRefs,
 } from './laser-pause-resume-transition';
+import type { UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -41,7 +42,7 @@ export type ControllerLifecycleRefs = ControllerStatusWaitRefs &
     // Serial-session/reset generation. Late transport promises from an older
     // epoch must not mutate the current write/ack ledgers.
     writeEpoch?: number;
-  };
+  } & UntrackedAckLedgerRefs;
 
 type ControllerResetWaitRequest = {
   readonly expectedEpoch: number;
@@ -53,9 +54,11 @@ type ControllerResetWaitRequest = {
 type ControllerCommandRequest = {
   readonly kind: ControllerCommandKind;
   readonly label: string;
+  readonly command: string;
   readonly timeoutMs: number;
   readonly timeoutMode: ControllerCommandTimeoutMode;
   readonly completion: ControllerCommandCompletion;
+  readonly statusOwnership?: ControllerCommandStatusOwnership;
   readonly responses: string[];
   readonly resolve: (responses: ReadonlyArray<string>) => void;
   readonly reject: (err: Error) => void;
@@ -89,7 +92,10 @@ export type StartControllerCommandOptions = {
   readonly timeoutMs?: number;
   readonly timeoutMode?: ControllerCommandTimeoutMode;
   readonly completion?: ControllerCommandCompletion;
+  readonly statusOwnership?: ControllerCommandStatusOwnership;
 };
+
+export type ControllerCommandStatusOwnership = 'cnc-start-settle-dwell';
 
 export type FreshIdleWaitOptions = {
   readonly kind: ControllerCommandKind;
@@ -118,9 +124,13 @@ export function startControllerCommand(
     const request: ControllerCommandRequest = {
       kind: options.kind,
       label: options.label,
+      command: options.command,
       timeoutMs,
       timeoutMode: options.timeoutMode ?? 'fixed',
       completion: options.completion ?? 'terminal',
+      ...(options.statusOwnership === undefined
+        ? {}
+        : { statusOwnership: options.statusOwnership }),
       responses: [],
       resolve,
       reject,
@@ -151,6 +161,18 @@ export function startControllerCommand(
   });
 }
 
+/** Exact line owned by the active semantic command arbiter, if any. */
+export function activeControllerCommandLine(refs: ControllerLifecycleRefs): string | undefined {
+  return refs.controllerCommand?.command;
+}
+
+export function controllerCommandOwnsCncStartSettleDwell(refs: ControllerLifecycleRefs): boolean {
+  return (
+    refs.controllerCommand?.kind === 'start-arming' &&
+    refs.controllerCommand.statusOwnership === 'cnc-start-settle-dwell'
+  );
+}
+
 export function consumeControllerCommandResponse(
   refs: ControllerLifecycleRefs,
   response: ControllerEvent,
@@ -173,6 +195,21 @@ export function consumeControllerCommandResponse(
     }
     return true;
   }
+  if (rejectCommandFromTerminalResponse(refs, request, response)) return true;
+  if (response.kind === 'status') {
+    keepCommandAliveFromStatus(refs, request, response.report);
+    observeCompositeCommandStatus(refs, request, response.report);
+    return false;
+  }
+  request.responses.push(rawLine.trim());
+  return true;
+}
+
+function rejectCommandFromTerminalResponse(
+  refs: ControllerLifecycleRefs,
+  request: ControllerCommandRequest,
+  response: ControllerEvent,
+): boolean {
   if (response.kind === 'error') {
     finishControllerCommand(
       refs,
@@ -182,16 +219,17 @@ export function consumeControllerCommandResponse(
     );
     return true;
   }
-  if (response.kind === 'alarm') {
-    finishControllerCommand(refs, request, 'reject', `ALARM:${response.code}`);
+  if (response.kind === 'resend') {
+    finishControllerCommand(
+      refs,
+      request,
+      'reject',
+      `Controller requested unsupported line retransmission at ${response.line}.`,
+    );
     return true;
   }
-  if (response.kind === 'status') {
-    keepCommandAliveFromStatus(refs, request, response.report);
-    observeCompositeCommandStatus(refs, request, response.report);
-    return false;
-  }
-  request.responses.push(rawLine.trim());
+  if (response.kind !== 'alarm') return false;
+  finishControllerCommand(refs, request, 'reject', `ALARM:${response.code}`);
   return true;
 }
 

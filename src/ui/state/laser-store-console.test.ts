@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { createFramedRunPermit, type FramedRunCandidate } from './framed-run';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -83,6 +84,7 @@ afterEach(async () => {
     workOriginSource: 'none',
     workZZeroEvidence: null,
     frameVerification: null,
+    framedRun: null,
     homingState: 'unknown',
     trustedPositionEpoch: 0,
   });
@@ -90,6 +92,55 @@ afterEach(async () => {
 });
 
 describe('laser-store console commands', () => {
+  it('owns and confirms G54 before Frame can prepare against the canonical WCS', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({
+      activeWcs: 'G55',
+      workZZeroEvidence: currentWorkZEvidence(),
+      framedRun: createFramedRunPermit({} as FramedRunCandidate, useLaserStore.getState()),
+    });
+    writes.length = 0;
+
+    let settled = false;
+    const selection = useLaserStore
+      .getState()
+      .selectPrimaryWcsForFrame()
+      .then(() => {
+        settled = true;
+      });
+    await flushConnect();
+
+    expect(writes).toEqual(['G54\n']);
+    expect(settled).toBe(false);
+    expect(useLaserStore.getState().framedRun).toBeNull();
+
+    connection.emitLine('ok');
+    await selection;
+    expect(useLaserStore.getState()).toMatchObject({
+      activeWcs: 'G54',
+      statusReport: null,
+      workZZeroEvidence: null,
+      framedRun: null,
+    });
+  });
+
+  it('does not assume G54 when the controller rejects the owned selection', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({ activeWcs: 'G55' });
+
+    const selection = useLaserStore.getState().selectPrimaryWcsForFrame();
+    await flushConnect();
+    connection.emitLine('error:20');
+
+    await expect(selection).rejects.toThrow(/error:20/i);
+    expect(useLaserStore.getState().activeWcs).toBe('G55');
+  });
+
   it('records inbound and outbound controller traffic in the transcript', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
@@ -215,6 +266,24 @@ describe('laser-store console commands', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,12000>');
     expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
     expect(useLaserStore.getState().accessoryCache).toBeNull();
+  });
+
+  it('does not revive a Frame permit after a manual accessory command and fresh Idle', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    const laser = useLaserStore.getState();
+    // The candidate payload is irrelevant to this store-level invalidation test.
+    const permit = createFramedRunPermit({} as FramedRunCandidate, laser);
+    useLaserStore.setState({ framedRun: permit });
+
+    await useLaserStore.getState().sendConsoleCommand('M3 S12000');
+    expect(useLaserStore.getState().framedRun).toBeNull();
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,12000>');
+    expect(useLaserStore.getState()).toMatchObject({
+      statusReport: { state: 'Idle', mPos: { x: 0, y: 0, z: 0 } },
+      framedRun: null,
+    });
   });
 
   it('invalidates only XY setup truth for an XY-only console origin command', async () => {

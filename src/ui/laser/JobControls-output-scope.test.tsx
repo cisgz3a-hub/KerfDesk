@@ -20,7 +20,7 @@ describe('JobControls output scope controls', () => {
     try {
       await act(async () => root.render(<JobControls disabled onStartJob={() => undefined} />));
       expect(select(host, 'Start from').disabled).toBe(false);
-      expect(button(host, 'Start job')).toHaveProperty('disabled', true);
+      expect(button(host, 'Set up & Frame')).toHaveProperty('disabled', true);
     } finally {
       await act(async () => root.unmount());
     }

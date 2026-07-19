@@ -13,15 +13,16 @@ export function useZeroZAction(): () => void {
   const zeroZHere = useLaserStore((s) => s.zeroZHere);
   const statusReport = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const evidence = useLaserStore((s) => s.workZZeroEvidence);
   const referenceEpoch = useLaserStore((s) => s.workZReferenceEpoch);
   return useCallback((): void => {
     const warning = zeroZOverwriteWarning({
       evidence,
       referenceEpoch,
-      workZMm: currentWorkZMm(statusReport, wcoCache),
+      workZMm: currentWorkZMm(statusReport, wcoCache, reportInches),
     });
     if (warning !== null && !jobAwareConfirm(warning)) return;
     void zeroZHere();
-  }, [evidence, referenceEpoch, statusReport, wcoCache, zeroZHere]);
+  }, [evidence, referenceEpoch, reportInches, statusReport, wcoCache, zeroZHere]);
 }

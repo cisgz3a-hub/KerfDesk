@@ -26,10 +26,10 @@ describe('JobControls action hierarchy', () => {
   it('orders the rail origin, then job actions, then placement, then the guide', async () => {
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Set origin here'), button(view.host, 'Start job'))).toBe(
-        true,
-      );
-      expect(precedes(button(view.host, 'Start job'), startFrom(view.host))).toBe(true);
+      expect(
+        precedes(button(view.host, 'Set origin here'), button(view.host, 'Set up & Frame')),
+      ).toBe(true);
+      expect(precedes(button(view.host, 'Set up & Frame'), startFrom(view.host))).toBe(true);
       expect(
         precedes(startFrom(view.host), button(view.host, 'Release motors to move by hand')),
       ).toBe(true);
@@ -38,11 +38,13 @@ describe('JobControls action hierarchy', () => {
     }
   });
 
-  it('leads the job cluster with Start job, then Frame, then Home', async () => {
+  it('leads the unframed job cluster with setup-and-Frame, Frame job, then Home', async () => {
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Start job'), button(view.host, 'Frame'))).toBe(true);
-      expect(precedes(button(view.host, 'Frame'), button(view.host, 'Home'))).toBe(true);
+      expect(precedes(button(view.host, 'Set up & Frame'), button(view.host, 'Frame job'))).toBe(
+        true,
+      );
+      expect(precedes(button(view.host, 'Frame job'), button(view.host, 'Home'))).toBe(true);
     } finally {
       await view.unmount();
     }
@@ -51,6 +53,7 @@ describe('JobControls action hierarchy', () => {
   it('keeps passive frame status with the job cluster while framing', async () => {
     useLaserStore.setState({
       motionOperation: {
+        operationId: 1,
         kind: 'frame',
         sawControllerBusy: false,
         idleStatusReports: 0,
@@ -63,8 +66,8 @@ describe('JobControls action hierarchy', () => {
       // that caused it — directly under Start/Frame, not above placement.
       expect(
         precedes(
-          button(view.host, 'Start job'),
-          elementContaining(view.host, 'Frame motion is active'),
+          button(view.host, 'Set up & Frame'),
+          elementContaining(view.host, 'Framing exact job'),
         ),
       ).toBe(true);
     } finally {
@@ -91,7 +94,7 @@ describe('JobControls action hierarchy', () => {
     try {
       expect(
         precedes(
-          button(view.host, 'Start job'),
+          button(view.host, 'Set up & Frame'),
           elementContaining(view.host, 'Pause is feed hold only'),
         ),
       ).toBe(true);

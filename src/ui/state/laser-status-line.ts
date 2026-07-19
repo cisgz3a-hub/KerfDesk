@@ -10,24 +10,24 @@ import {
 } from '../../core/controllers/grbl';
 import {
   cancelControllerLifecycleRefs,
+  controllerCommandOwnsCncStartSettleDwell,
   observeControllerIdleWait,
-  type ControllerLifecycleRefs,
 } from './laser-interactive-command';
-import {
-  markMotionOperationDispatched,
-  observeMotionStatus,
-  takeNextFrameJogLine,
-} from './laser-motion-operation';
+import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
+import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
-import type { SafeWriteFn, SetFn } from './laser-line-shared';
+import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { hasCustomXyOrigin } from './origin-actions';
+import { statusObservationPatch } from './laser-status-observation';
 import { liveCanvasStatusPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
+import { framedRunInterruptionPatch } from './framed-run-interruption';
+import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
 
 export function handleStatusLine(
   set: SetFn,
   get: () => LaserState,
-  refs: ControllerLifecycleRefs,
+  refs: HandlerRefs,
   safeWrite: SafeWriteFn,
   report: StatusReport,
 ): void {
@@ -38,12 +38,24 @@ export function handleStatusLine(
     handleInvalidatingStatus(set, refs, state, report, streamer);
     return;
   }
-  const observedOperation = observeMotionStatus(operation, report.state);
-  const queuedFrameDispatch =
-    operation !== null && observedOperation === null ? takeNextFrameJogLine(operation) : null;
+  const mpgOwnsControl = report.mpgActive === true;
+  // Marlin's queued M114 status arrives before that query's own trailing `ok`.
+  // The poller sends M114 only after every earlier ack reaches zero, so its
+  // outstanding ack cannot belong to the Frame line. Realtime-report drivers
+  // have no query ack and retain the strict aggregate terminal fence.
+  const pendingMotionAcks =
+    refs.driver.commands.queuedStatusQuery === null ? state.pendingUntrackedAcks : 0;
+  const motionObservation = observeFrameMotion(
+    operation,
+    report.state,
+    pendingMotionAcks,
+    mpgOwnsControl,
+    state.statusSequence + 1,
+  );
+  const observedOperation = motionObservation.observed;
+  const queuedFrameDispatch = nextFrameDispatch(operation, motionObservation);
   const nextOperation = queuedFrameDispatch?.operation ?? observedOperation;
   const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
-  const frameCompletionPatch = completedFramePatch(operation, nextOperation);
   // Release the job lock once GRBL settles to Idle for BOTH a clean finish
   // ('done') and a rejected line ('errored'). Idle means physical motion has
   // stopped, so it is as safe to clear here as the 'done' case. Without the
@@ -59,34 +71,63 @@ export function handleStatusLine(
 
   const positionInvalidated = report.mpgActive === true && state.mpgActive !== true;
   const nextSequence = state.statusSequence + 1;
+  const positionPatch = statusPositionPatch(report, state.workOriginSource, state.accessoryCache);
+  const completionPatch = frameCompletionPatch({
+    operation,
+    observedOperation,
+    queuedFrameDispatch,
+    positionInvalidated,
+    state,
+    report,
+    nextSequence,
+    positionPatch,
+    frameFailureMessage: motionObservation.frameFailureMessage,
+  });
+  const frameFailurePatch = frameStatusFailurePatch(state, motionObservation.frameFailureMessage);
+  const permitInterruptionPatch = framedRunInterruptionPatch(
+    state,
+    report,
+    controllerCommandOwnsCncStartSettleDwell(refs),
+  );
+  const jogMpgInterruption = jogMpgInterruptionPatch(state, mpgOwnsControl);
   set({
-    ...statusPositionPatch(report, state.workOriginSource, state.accessoryCache),
+    ...positionPatch,
     statusSequence: nextSequence,
-    statusObservation: positionInvalidated
-      ? null
-      : {
-          sessionEpoch: state.controllerSessionEpoch,
-          positionEpoch: state.trustedPositionEpoch ?? 0,
-          sequence: nextSequence,
-          observedAt: Date.now(),
-        },
-    // Promotion first: a same-report MPG takeover (below) must still win and
-    // invalidate the freshly promoted proof.
-    ...frameCompletionPatch,
+    ...statusObservationPatch(state, nextSequence, positionInvalidated),
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
     ...liveCanvasStatusPatch(state, report, streamer),
+    ...completionPatch,
+    ...frameFailurePatch,
+    ...permitInterruptionPatch,
+    ...jogMpgInterruption,
   });
+  observeStatusConsumers(set, refs, state, nextSequence, report);
+  if (queuedFrameDispatch !== null)
+    dispatchQueuedMotionLine(
+      set,
+      get,
+      safeWrite,
+      queuedFrameDispatch.line,
+      queuedFrameDispatch.operation.operationId,
+    );
+}
+
+function observeStatusConsumers(
+  set: SetFn,
+  refs: HandlerRefs,
+  state: LaserState,
+  nextSequence: number,
+  report: StatusReport,
+): void {
   observeControllerIdleWait(set, refs, report);
   observeFreshControllerStatus(
     refs,
     { sessionEpoch: state.controllerSessionEpoch, sequence: nextSequence },
     report,
   );
-  if (queuedFrameDispatch !== null)
-    dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
 }
 
 function isInvalidatingStatusState(state: string): boolean {
@@ -95,7 +136,7 @@ function isInvalidatingStatusState(state: string): boolean {
 
 function handleInvalidatingStatus(
   set: SetFn,
-  refs: ControllerLifecycleRefs,
+  refs: HandlerRefs,
   state: LaserState,
   report: StatusReport,
   streamer: StreamerState | null,
@@ -116,6 +157,7 @@ function handleInvalidatingStatus(
     controllerOperation: null,
     fireActive: false,
     frameVerification: null,
+    framedRun: null,
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
@@ -140,7 +182,7 @@ function liveCanvasLifecyclePatchForInvalidation(
   };
 }
 
-function advanceWriteEpoch(refs: ControllerLifecycleRefs): void {
+function advanceWriteEpoch(refs: HandlerRefs): void {
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
 }
 
@@ -263,6 +305,7 @@ function mpgOwnershipPatch(
     | 'workZReferenceEpoch'
     | 'workZZeroEvidence'
     | 'frameVerification'
+    | 'framedRun'
     | 'statusObservation'
     | 'homingState'
     | 'homingProof'
@@ -279,6 +322,7 @@ function mpgOwnershipPatch(
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
     frameVerification: null,
+    framedRun: null,
   };
 }
 
@@ -297,31 +341,4 @@ function knownOrUnknownOriginSource(
   source: LaserState['workOriginSource'],
 ): LaserState['workOriginSource'] {
   return source === 'none' ? 'unknown' : source;
-}
-
-// A frame op ending status-driven with an empty queue is the one clean
-// completion: every other exit (cancel, alarm, error, disconnect) clears the
-// op elsewhere and discards the armed proof with it (ADR-228 amendment: the
-// proof records when the frame COMPLETES, not when it dispatches).
-function completedFramePatch(
-  operation: LaserState['motionOperation'],
-  nextOperation: LaserState['motionOperation'],
-): Partial<LaserState> {
-  return operation?.kind === 'frame' &&
-    nextOperation === null &&
-    operation.verification !== undefined
-    ? { frameVerification: operation.verification }
-    : {};
-}
-
-function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: string): void {
-  void safeWrite(line, 'frame')
-    .then(() => {
-      set((s) => ({
-        motionOperation: markMotionOperationDispatched(s.motionOperation, 'frame'),
-      }));
-    })
-    .catch(() => {
-      set({ motionOperation: null, frameVerification: null });
-    });
 }

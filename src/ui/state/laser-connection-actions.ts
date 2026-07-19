@@ -193,6 +193,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     workOriginActive: false,
     workOriginSource: 'none',
     frameVerification: null,
+    framedRun: null,
     capabilities: refs.driver.capabilities,
     activeControllerKind: refs.driver.kind,
     detectedControllerKind: null,
@@ -393,6 +394,11 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     // Polling here can otherwise keep pendingTransportWrites continuously
     // non-zero or race the explicitly owned Start observation.
     if (controllerOperationOwnsPolling(s)) return;
+    // Cancel owns a causal settle-marker -> status-query boundary. A periodic
+    // query inserted into that sequence would make an unlabelled status reply
+    // ambiguous again, so polling resumes only after the cancelled owner is
+    // released or the session is reset.
+    if (s.motionOperation?.cancelRequested === true) return;
     if (realtimeQuery !== null) {
       if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
       void safeWrite(realtimeQuery).catch(() => undefined);

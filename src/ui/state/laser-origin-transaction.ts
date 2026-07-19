@@ -77,6 +77,7 @@ export function unknownOriginPatch(): Partial<LaserState> {
     workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,
+    framedRun: null,
   };
 }
 

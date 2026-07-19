@@ -3,7 +3,7 @@ import { actionGridStyle, rowStyle, runningSafetyStyle } from './JobControls.sty
 
 // Regression guard for the machine-rail button-clipping bug: the job-action rows
 // live in a fixed-width side rail whose ancestors set overflow-x:hidden with no
-// scrollbar, so a non-wrapping row pushes its rightmost buttons — Start job and
+// scrollbar, so a non-wrapping row pushes its rightmost Frame-first actions and
 // the controller Abort — off-screen and unreachable. Layout isn't computed in
 // JSDOM, so this asserts the style contract that prevents the clip rather than a
 // rendered width; the visible result is confirmed perceptually.

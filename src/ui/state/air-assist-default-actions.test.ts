@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe('project air assist default sync', () => {
-  it('sets the air output command, output-layer Job Air, and stale object overrides together', () => {
+  it('enables Job Air defaults without guessing an unverified M7/M8 hardware output', () => {
     const redLayer = { ...createLayer({ id: '#ff0000', color: '#ff0000' }), airAssist: false };
     const blueLayer = {
       ...createLayer({ id: '#0000ff', color: '#0000ff' }),
@@ -28,7 +28,7 @@ describe('project air assist default sync', () => {
       disabledOutputLayerCount: 1,
       disabledObjectOverrideCount: 1,
     });
-    expect(state.project.device.airAssistCommand).toBe('M7');
+    expect(state.project.device.airAssistCommand).toBe('none');
     expect(state.project.scene.layers.find((layer) => layer.id === '#ff0000')?.airAssist).toBe(
       true,
     );

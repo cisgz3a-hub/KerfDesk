@@ -121,6 +121,7 @@ describe('marlinDriver', () => {
     expect(marlinDriver.commands.settleDwell).toBe('M400');
     expect(marlinDriver.commands.queuedStatusQuery).toBe('M114');
     expect(marlinDriver.commands.stopLaserLines).toEqual(['M5', 'M107']);
+    expect(marlinDriver.commands.frameToolOffLines).toEqual(['M5', 'M107']);
     expect(marlinDriver.defaultBaudRate).toBe(250000);
   });
 });

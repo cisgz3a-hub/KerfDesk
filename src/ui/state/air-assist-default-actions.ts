@@ -1,4 +1,3 @@
-import type { AirAssistCommand } from '../../core/devices';
 import {
   machineKindOf,
   sceneObjectUsesOperation,
@@ -8,8 +7,6 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { pushUndo, type StateSlice } from './scene-mutations';
-
-export const DEFAULT_MANUAL_AIR_COMMAND: AirAssistCommand = 'M7';
 
 export type AirAssistDefaultSyncSummary = {
   readonly airOutputUnset: boolean;
@@ -74,13 +71,9 @@ export function airAssistDefaultActions(
 }
 
 function projectWithAirAssistDefaults(project: Project): Project {
-  const device =
-    project.device.airAssistCommand === 'none'
-      ? { ...project.device, airAssistCommand: DEFAULT_MANUAL_AIR_COMMAND }
-      : project.device;
   const scene = sceneWithAirAssistDefaults(project);
-  if (device === project.device && scene === project.scene) return project;
-  return { ...project, device, scene };
+  if (scene === project.scene) return project;
+  return { ...project, scene };
 }
 
 function sceneWithAirAssistDefaults(project: Project): Scene {

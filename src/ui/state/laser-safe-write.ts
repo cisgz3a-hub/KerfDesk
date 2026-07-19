@@ -7,13 +7,15 @@ import {
   type TranscriptSource,
 } from './laser-transcript';
 import type { LaserState } from './laser-store';
+import type { LaserMotionOperationId } from './laser-motion-operation';
+import { reserveUntrackedAcks, type UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
 import {
   activeJobCommandBlockMessage,
   pushLog,
   serialWriteErrorMessage,
 } from './laser-store-helpers';
 
-export type SafeWriteRefs = {
+export type SafeWriteRefs = UntrackedAckLedgerRefs & {
   connection: SerialConnection | null;
   readonly driver: ControllerDriver;
   nextTranscriptId: number;
@@ -77,6 +79,9 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
     const owedAcks = owedTerminalAcks(line, writeSource);
     const writeEpoch = refs.writeEpoch ?? 0;
+    const motionOperationId = currentMotionOperationId(get, action);
+    const ownedMotionOperationId = motionOperationId;
+    reserveUntrackedAcks(refs, owedAcks, motionOperationId ?? null);
     // Reserve both transport and terminal-response ownership before the first
     // await. Some adapters can dispatch an immediate controller reply before
     // conn.write() resolves; pre-reserving prevents that valid reply from
@@ -84,16 +89,27 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     set((state) => ({
       pendingTransportWrites: (state.pendingTransportWrites ?? 0) + 1,
       ...(owedAcks > 0 ? { pendingUntrackedAcks: state.pendingUntrackedAcks + owedAcks } : {}),
+      ...motionTransportWritePatch(state, action, 1, ownedMotionOperationId),
     }));
     try {
       await conn.write(line);
       assertCurrentWriteEpoch(refs, writeEpoch);
-      commitSuccessfulWrite(set, refs, line, writeSource);
+      commitSuccessfulWrite(set, refs, line, writeSource, action, ownedMotionOperationId);
     } catch (err) {
-      recordWriteFailure(set, refs, writeEpoch, err, action, owedAcks);
+      recordWriteFailure(set, refs, writeEpoch, err, action, ownedMotionOperationId);
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+function currentMotionOperationId(
+  get: GetFn,
+  action: LaserSafetyAction | undefined,
+): LaserMotionOperationId | undefined {
+  const operation = get().motionOperation;
+  if (action === 'frame' && operation?.kind === 'frame') return operation.operationId;
+  if (action === 'jog' && operation?.kind === 'jog') return operation.operationId;
+  return undefined;
 }
 
 function assertCurrentWriteEpoch(refs: SafeWriteRefs, expected: number): void {
@@ -106,9 +122,12 @@ function commitSuccessfulWrite(
   refs: SafeWriteRefs,
   line: string,
   source: TranscriptSource,
+  action: LaserSafetyAction | undefined,
+  motionOperationId: LaserMotionOperationId | undefined,
 ): void {
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+    ...motionTransportWritePatch(state, action, -1, motionOperationId),
     transcript: appendTranscript(
       state.transcript,
       outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, source),
@@ -122,13 +141,17 @@ function recordWriteFailure(
   expectedEpoch: number,
   err: unknown,
   action: LaserSafetyAction | undefined,
-  reservedAcks: number,
+  motionOperationId: LaserMotionOperationId | undefined,
 ): void {
   if ((refs.writeEpoch ?? 0) !== expectedEpoch) return;
   const message = serialWriteErrorMessage(err);
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
-    pendingUntrackedAcks: Math.max(0, state.pendingUntrackedAcks - reservedAcks),
+    // A queued-write rejection is ambiguous: the controller may have accepted
+    // the line before the adapter failed. Retain its FIFO acknowledgement
+    // reservation as a quarantine until the real terminal response arrives or
+    // a reconnect advances the write epoch.
+    ...motionTransportWritePatch(state, action, -1, motionOperationId),
     lastWriteError: message,
     log: pushLog(
       state,
@@ -137,6 +160,33 @@ function recordWriteFailure(
     ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
   }));
   console.error('Serial write failed:', err);
+}
+
+function motionTransportWritePatch(
+  state: LaserState,
+  action: LaserSafetyAction | undefined,
+  delta: 1 | -1,
+  motionOperationId: LaserMotionOperationId | undefined,
+): Partial<Pick<LaserState, 'motionOperation'>> {
+  const operation = state.motionOperation;
+  if (
+    (action !== 'frame' && action !== 'jog') ||
+    motionOperationId === undefined ||
+    operation === null ||
+    operation.kind !== action ||
+    operation.operationId !== motionOperationId
+  ) {
+    return {};
+  }
+  return {
+    motionOperation: {
+      ...operation,
+      pendingMotionTransportWrites: Math.max(
+        0,
+        (operation.pendingMotionTransportWrites ?? 0) + delta,
+      ),
+    },
+  };
 }
 
 // Every queued (newline-terminated) LINE earns exactly one terminal

@@ -2,7 +2,7 @@
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
 >
-> **Current Start policy — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact
+> **Current Start policy — frame-first (ADR-228, ADR-230, ADR-231).** A completed Frame for the exact
 > current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
 > warning surface. Older gate ADRs below that mandated Start blocks are stamped
 > "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
@@ -194,6 +194,8 @@
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
 | ADR-228 | 2026-07-18 | Accepted (governing) | Frame-first Start gate: Frame is the sole guard |
 | ADR-229 | 2026-07-18 | Accepted | Super console: read-only expanded console dialog |
+| ADR-230 | 2026-07-19 | Accepted | Exact-artifact Frame authorization and one-use Start permit |
+| ADR-231 | 2026-07-19 | Accepted | A valid Frame proves physically safe motion and the live output contract |
 
 ---
 
@@ -9826,3 +9828,143 @@ Commands are still typed in the docked console; the dialog sends nothing to the 
 ### Guard posture (rule 7 / ADR-228)
 Purely informational. No new refusal surface: v1 sends nothing; v2 will reuse the existing
 transport-precondition messages verbatim and only display them.
+
+---
+
+## ADR-230 - Exact-artifact Frame authorization and one-use Start permit
+
+**Date:** 2026-07-19
+**Status:** Accepted (explicit maintainer ruling in chat on 2026-07-19)
+
+### Context
+
+ADR-228 made a completed Frame the sole ordinary-Start guard, and its 2026-07-18 amendment made
+completion rather than dispatch the moment proof exists. The ordinary flow still prepared and
+reviewed the job after Frame, however, so the physical trace and the bytes later offered to Start
+were not one immutable artifact. Current Position could also resolve from the post-Frame head
+position, and an interrupted multi-leg trace could not safely authorize anything.
+
+This decision records the exact-artifact sequencing and the maintainer's rulings without rewriting
+the accepted text of ADR-224, ADR-228, or the merged ADR-228 amendment. Where their ordinary fresh
+Start sequencing or Frame construction-input classification differs, this ADR supersedes those
+portions. Specialized recovery and replay flows retain their separately controlled contracts except
+where stated below.
+
+### Decision
+
+1. **Job Review precedes Frame and owns one exact artifact.** Ordinary **Set up & Frame** and
+   **Frame job** resolve placement, compile the executable program, compute its generated motion
+   envelope, and show that exact candidate in Job Review. The operator acknowledges warnings with
+   **Accept & Frame**. Re-review after an edit produces a new candidate; the accepted candidate's
+   bytes, fingerprint, placement, controller evidence, and origin evidence stay bound together
+   through Frame.
+2. **G54 normalization is an owned, acknowledged serial-controller Frame preparation step.** When
+   preparation for any serial-controller Frame begins with G55-G59 active, KerfDesk selects G54
+   through its owned controller-operation path and waits for the command acknowledgement and fresh
+   position evidence before finalizing the candidate.
+   The durable Job Review warning names the original G55-G59 selection and states both facts: the
+   active selection changed, and the stored G55-G59 offsets were not erased. Cancel or Escape sends
+   no Frame/job bytes and issues no permit, but it does not restore the prior selection; G54 remains
+   active, exactly as the warning says.
+3. **Only clean physical completion authorizes Start.** Frame establishes the driver-produced
+   tool-off state, traces the exact generated motion envelope, and returns to the exact
+   preparation-time work position. Dispatch is never success. Every owned command must receive its
+   terminal acknowledgement, the perimeter queue must drain, controller/origin/settings evidence
+   must remain unchanged, and the controller must report a fresh clean final Idle. Cancel, error,
+   Alarm, interruption, disconnect, MPG takeover, evidence drift, or an incomplete return discards
+   the candidate and earns no permit.
+4. **CNC safe-Z construction inputs are required.** Current-session stock-top Work-Z, a known
+   return position, and a driver safe-Z Frame builder are coordinate/command inputs needed to
+   construct the physical retract, XY trace, exact return, and Z restore. There is no XY-only CNC
+   fallback. Dialect, tool identity, probe-plate state, settings, accessories, overrides, bounds,
+   and no-go findings remain Job Review warnings rather than ordinary Start policy gates.
+5. **The permit is exact and one-use.** Clean completion issues a `FramedRunPermit` for the exact
+   accepted bytes and evidence. **Start framed job** atomically claims that permit and streams its
+   cached bytes without recompiling, reopening Job Review, or rerunning policy gates. Relevant
+   fingerprint/evidence changes invalidate it, and Jog or Home explicitly invalidates it. Live
+   transport facts and exact-handoff consistency remain unavoidable at the wire boundary.
+6. **Run again is the controlled repeat path.** It does not reuse the consumed permit. It performs
+   a fresh compile, fingerprint comparison, and Job Review, and uses the retained compatibility
+   `FrameVerification` proof to authorize the deliberate repeat only while that proof and the new
+   artifact still satisfy the repeat contract. This keeps batch burns available without turning a
+   one-use permit into an unbounded replay token.
+7. **Raster-budget fallback cannot authorize Start.** A `raster-too-large` candidate cannot produce
+   the executable artifact whose real motion envelope must be framed, so it cannot earn an
+   authorizing Frame permit. Any future outline-only positioning feature must be a separately named
+   non-authorizing action; it may not mint, retain, or refresh Start authorization.
+
+### Consequences
+
+- One review now owns the warnings, acknowledgements, exact bytes, and physical trace. Ordinary
+  Start is reduced to claiming the completed permit plus live transport and exact-handoff facts.
+- Selecting G54 is intentionally not rolled back on review cancellation. The durable warning makes
+  the persistent active-WCS change and preservation of all stored G55-G59 offsets explicit before
+  the operator chooses whether to continue.
+- A Frame that merely dispatched, partially moved, failed to return, or never reached fresh clean
+  Idle cannot authorize Start. Code and simulator coverage do not replace tool-off hardware
+  qualification on supported controller, rotary, and CNC safe-Z configurations.
+
+---
+
+## ADR-231 - A valid Frame proves physically safe motion and the live output contract
+
+**Date:** 2026-07-19
+**Status:** Accepted (explicit maintainer directive in chat: apply the online-research safety pass)
+
+### Context
+
+ADR-228 made Frame the sole ordinary-Start guard and ADR-230 bound one reviewed artifact to one
+completion-issued permit. The exact implementation could still command an off-bed/no-go perimeter,
+authorize a job whose known interior path crossed a fixture, restore CNC Z below stock-top zero,
+interpret `$13=1` inches as millimetres, miss GRBL jog cancellation during the Idle-to-Jog race,
+and mint a permit with known-wrong `$30/$32`. A tool-off rectangle cannot prove those facts.
+
+The maintainer cannot perform this qualification physically and asked for the strongest correction
+supported by public information for the RNT/PRT-class 4040. Public sources identify the machine as
+the Neotronics 4040 Max class and the laser as LASER TREE LT-4LDS-V2, but do not publish the exact
+controller board, firmware/settings dump, homing corner, feed limits, selector interlock, or air
+relay wiring. The profile must distinguish documented specifications from assumptions.
+
+### Decision
+
+1. **Unsafe motion is not a valid Frame.** Immediately before wire dispatch, the exact reviewed
+   motion envelope must fit known travel and its perimeter must clear enabled no-go zones. The exact
+   prepared G-code is also rescanned so a known interior/approach-path collision cannot earn a
+   permit. Failure sends no Frame motion. Where physical placement is unknowable on an unhomed
+   machine, the app does not invent machine coordinates; enabled no-go zones fail closed.
+2. **Output semantics are Frame authorization inputs, not Start gates.** Known live `$30/$32`
+   conflicts refuse Frame preparation. GRBL CNC also requires those values to be read because an
+   unknown spindle scale or laser-mode inversion changes plunge/spindle behavior. Unknown laser
+   values remain prominent Job Review warnings. The accepted snapshot is already frozen into the
+   candidate and must remain unchanged through completion. Start itself remains a one-use permit
+   claim with only transport and exact-handoff facts.
+3. **CNC Frame is unit- and stock-safe.** `$13=1` position reports are converted to millimetres
+   before G21 commands are built. Frame retracts to safe Z; it restores only a zero or positive
+   pre-Frame Work-Z, never a negative position inside stock. XY feed is capped by live `$110/$111`
+   and Z independently by `$112` when those settings are available.
+4. **Cancel must cross GRBL's state race.** Cancel intent immediately prevents later legs/permits.
+   After the current write/ack handoff, the app queries controller state; a fresh `Jog` proves the
+   first `0x85` may have arrived too early, so it sends `0x85` again and re-queries. It waits for
+   fresh `Idle` before the queued settlement marker, then requires the existing post-marker Idle.
+5. **The 4040 profile is a public-spec hybrid starter.** It explicitly supports laser and CNC,
+   records the documented 400 x 400 x 75 mm envelope, default 500 W / 12,000 RPM spindle contract,
+   and LT-4LDS-V2 optical metadata. It removes unproved verified-origin, rotary, and low-power-fire
+   capabilities. The integrated nozzle is modeled as external/manual air with no M-code; setup
+   never guesses M7, and an air-requesting exact job warns that no relay command will be emitted.
+6. **No online-only hardware claim.** GRBL version, `$` values, homing/origin, feed ceilings,
+   spindle variant, selector/interlock, PSU headroom, and M7/M8 wiring remain unverified until read
+   or tested on the actual unit. The profile status is `public-spec-starter`, never hardware-verified.
+
+Primary public references: Neotronics 4040 Max product page
+(`https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct`), LASER TREE
+LT-4LDS-V2 product/manual (`https://lasertree.com/products/20w-optical-power-laser-cutting-module`),
+and upstream GRBL settings/jogging contracts
+(`https://github.com/gnea/grbl/tree/master/doc/markdown`).
+
+### Consequences
+
+- "Frame is the source of truth" now means a physically valid, cleanly completed Frame of the
+  exact artifact; dispatching a known unsafe command can never manufacture proof.
+- Start remains simpler than before ADR-228: it neither recompiles nor reruns policy gates.
+- Public documentation plus tests can make defaults honest and protocol behavior defensible, but
+  cannot certify the machine's wiring or mechanics. Hardware qualification remains explicitly open.

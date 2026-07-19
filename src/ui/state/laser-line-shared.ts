@@ -9,6 +9,7 @@ import type { ControllerQualificationScheduleRefs } from './laser-controller-qua
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { TranscriptSource } from './laser-transcript';
 
 export type HandlerRefs = ControllerLifecycleRefs &
@@ -40,3 +41,6 @@ export type SafeWriteFn = (
 // ack accounting; 'untracked' means a console/origin/handshake write sent
 // before the stream owns it (FIFO), so the streamer must not see it.
 export type AckOwner = 'stream' | 'untracked';
+export type AckSettlement =
+  | { readonly owner: 'stream' }
+  | { readonly owner: 'untracked'; readonly motionOperationId: LaserMotionOperationId | null };

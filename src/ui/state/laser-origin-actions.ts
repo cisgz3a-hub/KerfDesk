@@ -287,6 +287,7 @@ function transientXyOriginPatch(
     workOriginSource: 'g92',
     wcoCache: axisHonestWco,
     frameVerification: null,
+    framedRun: null,
   };
 }
 
@@ -302,6 +303,7 @@ function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
     // G92.1, so wait for a fresh WCO-bearing status instead of fabricating it.
     wcoCache: null,
     frameVerification: null,
+    framedRun: null,
   };
 }
 
@@ -313,5 +315,6 @@ function clearedOriginPatch(): Partial<LaserState> {
     workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,
+    framedRun: null,
   };
 }
