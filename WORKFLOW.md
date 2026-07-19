@@ -1068,8 +1068,14 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
 4. **Copy visible** copies the filtered lines with their detail columns. **Close** and
    Escape dismiss the dialog.
 
-#### Success - read-only by design
-1. The dialog sends nothing to the controller; commands are typed in the docked console.
+#### Success - guarded command deck
+1. The dialog and docked panel render the same command deck. Both use the active controller
+   driver's parser, the existing persistent-setting confirmation, and the same
+   `sendConsoleCommand` store action; neither writes directly to the serial transport.
+2. Arrow Up / Arrow Down recall only successfully sent interactive commands. Cancelled,
+   rejected, and automatic settings reads do not enter history.
+3. A command raced against Fire, a job, motion, another controller operation, autofocus, or a
+   non-Idle controller is rechecked and rejected by the existing store boundary.
 
 #### Empty - no traffic
 1. With no transcript entries (or filters excluding everything) the list shows a hint line
@@ -1078,6 +1084,25 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
 #### Edge - long sessions
 1. The transcript store keeps the newest 500 entries; the Super console shows all of them,
    not the docked panel's 150-entry slice.
+#### Success - settings pane (v2)
+1. The dialog's right pane embeds the read-only Machine Settings table (F-B14).
+2. When the dialog opens, it reuses a settings snapshot already read in the current controller
+   session. Otherwise the app waits for the shared read policy to report connected, settled, and
+   Idle, then performs one automatic Read ($$) through the same guarded path. Expected waiting
+   does not create an error/log side effect.
+3. The diagnostic card highlights `$100/$101`, `$110/$111`, `$120/$121`, laser/spindle output,
+   homing, limits, and travel. Motion values are compared with explicitly labelled software
+   profile references; a difference is informational, not proof that firmware is wrong.
+4. **Export current snapshot** saves versioned read-only evidence. Loading Snapshot A and B
+   compares independent axis values neutrally, with no better/worse verdict and no firmware write.
+5. Setting writes stay in Device Setup; the pane sends only the gated read.
+
+#### Success - detailed live transcript
+1. The transcript has Timestamp, Direction, Source, Kind, Raw, and Meaning headings and can keep
+   the scroll position on the newest visible line with **Follow latest**.
+2. Search includes every displayed column. **Copy visible** produces escaped, timestamped TSV so
+   embedded tabs/newlines cannot turn one controller entry into multiple rows.
+3. If clipboard access fails, the dialog exposes the exact TSV in a selectable nonblocking field.
 ### F-B14. Machine Settings read-only backup
 
 #### Success — read connected controller settings

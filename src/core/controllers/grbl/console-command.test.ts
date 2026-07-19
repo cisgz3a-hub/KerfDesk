@@ -68,16 +68,45 @@ describe('prepareConsoleCommand', () => {
         stateEffect: 'configuration-nonpositional',
       },
     });
+    expect(prepareConsoleCommand('$120 = 250')).toMatchObject({
+      ok: true,
+      command: {
+        kind: 'setting-write',
+        normalized: '$120=250',
+        wire: '$120=250\n',
+        requiresConfirmation: true,
+      },
+    });
   });
 
   it('blocks destructive EEPROM reset and startup/build-info writes', () => {
-    for (const input of ['$RST=*', '$RST=$', '$RST=#', '$N0=G92 X0', '$I=foo']) {
+    for (const input of [
+      '$RST=*',
+      '$RST = *',
+      '$RST=$',
+      '$RST=#',
+      '$N0=G92 X0',
+      '$N0 = G92 X0',
+      '$I=foo',
+      '$I = foo',
+    ]) {
       expect(prepareConsoleCommand(input)).toEqual({
         ok: false,
         reason:
           'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.',
       });
     }
+  });
+
+  it('normalizes whitespace in read-only dollar queries before classification', () => {
+    expect(prepareConsoleCommand('$ $')).toMatchObject({
+      ok: true,
+      command: { kind: 'settings-query', normalized: '$$', wire: '$$\n' },
+    });
+    expect(prepareConsoleCommand('$ G')).toMatchObject({
+      ok: true,
+      command: { kind: 'modal-state-query', normalized: '$G', wire: '$G\n' },
+    });
   });
 
   it('classifies arbitrary one-line G-code as idle-only', () => {

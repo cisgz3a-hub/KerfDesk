@@ -173,11 +173,16 @@ describe('laser-store console commands', () => {
     useLaserStore.setState({ detectedSettings: null, controllerSettings: null });
 
     await useLaserStore.getState().sendConsoleCommand('$$');
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'interactive-command',
+      label: 'Reading controller settings',
+    });
     for (const line of ['$30=1000', '$31=0', '$32=1', '$130=400', '$131=400', 'ok']) {
       connection.emitLine(line);
     }
 
     expect(writes.at(-1)).toBe('$$\n');
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().controllerSettings).toMatchObject({
       maxPowerS: 1000,
       minPowerS: 0,

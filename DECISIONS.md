@@ -193,7 +193,7 @@
 | ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
 | ADR-228 | 2026-07-18 | Accepted (governing) | Frame-first Start gate: Frame is the sole guard |
-| ADR-229 | 2026-07-18 | Accepted | Super console: read-only expanded console dialog |
+| ADR-229 | 2026-07-18 | Accepted | Super console: expanded diagnostics and guarded command dialog |
 | ADR-230 | 2026-07-19 | Accepted | Exact-artifact Frame authorization and one-use Start permit |
 | ADR-231 | 2026-07-19 | Accepted | A valid Frame proves physically safe motion and the live output contract |
 
@@ -9789,7 +9789,7 @@ Maintainer approval in chat: "fix both", accepting the post-merge soundness audi
 
 Both changes narrow WHEN the one guard's proof exists; the guard surface itself is unchanged.
 
-## ADR-229 - Super console: read-only expanded console dialog
+## ADR-229 - Super console: expanded diagnostics and guarded command dialog
 
 **Date:** 2026-07-18
 **Status:** Accepted (maintainer request in chat: "Can we upgrade the console to auto read
@@ -9805,8 +9805,8 @@ browser's on-disk storage was easier to read than the in-app surfaces.
 ### Decision
 Add a Super console: a Dialog (size xl) opened by a "Super console" button that lives
 beside the docked ConsolePanel in the Console rail section (ConsolePanel is at its
-file-size limit and keeps its single docked-console responsibility). Version 1 is a
-read-only inspection surface:
+file-size limit and keeps its single docked-console responsibility). Version 1 established
+the inspection surface:
 
 - the full 500-entry transcript (no 150-entry display cap) with time, direction, source,
   kind, raw, and decoded columns;
@@ -9814,20 +9814,29 @@ read-only inspection surface:
   each entry belongs to exactly one group;
 - case-insensitive search over raw and decoded text; Copy visible.
 
-Commands are still typed in the docked console; the dialog sends nothing to the controller.
+Versions 2 and 3 compose the existing settings-read and console-command paths into the same
+dialog. They do not introduce a second transport path or direct serial writes.
 
 ### Phasing
-- v1 (this ADR): transcript inspection, above.
-- v2: machine-settings pane - auto-dispatches the existing gated readMachineSettings ($$)
-  on open when machineSettingsReadBlockReason is null and renders the collected snapshot as
-  a named, united, grouped table with profile diffs (reusing grbl-settings.ts,
-  presentGrblSetting, computeFirmwareDiffs). Read-only; setting writes stay in Device Setup.
-- v3: command input with history inside the dialog, after a tidy-first extraction of the
-  console command gating out of ConsolePanel.
+- v1: transcript inspection, above.
+- v2: the machine-settings pane reuses a settings snapshot already read in the current session;
+  otherwise it waits until the shared machineSettingsReadBlockReason is null, auto-dispatches
+  the existing readMachineSettings ($$) once, and renders named settings plus read-only
+  motion/output diagnostics. Profile motion values are labelled as software references, not
+  desired firmware truth. Versioned snapshot export and
+  neutral A/B import comparison support machine-to-machine investigation without writes.
+- v3: a shared ConsoleCommandDeck, extracted from ConsolePanel, provides the same driver parsing,
+  confirmation, machine-state gates, safe store dispatch, quick commands, and success-only
+  Up/Down history in both the docked and expanded surfaces.
+- transcript polish: the expanded transcript uses semantic column headings, searches every
+  displayed column, follows new traffic on request, and copies timestamped escaped TSV.
 
 ### Guard posture (rule 7 / ADR-228)
-Purely informational. No new refusal surface: v1 sends nothing; v2 will reuse the existing
-transport-precondition messages verbatim and only display them.
+No new refusal surface. The passive auto-read checks the shared readiness policy before calling
+the store, while the store rechecks it authoritatively. Commands use the existing
+sendConsoleCommand -> safeWrite path and its existing confirmations/refusals; UI availability is
+advisory and a raced state change still fails closed at the store. Snapshot import/export and
+diagnostics are read-only and never call writeGrblSetting. No automatic EEPROM writes are added.
 
 ---
 

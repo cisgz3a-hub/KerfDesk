@@ -1,64 +1,21 @@
 import { useMemo, useState } from 'react';
-import {
-  selectControllerDriver,
-  type ConsoleQuickCommand,
-  type ControllerDriver,
-} from '../../core/controllers';
-import { helpProps, type HelpTopicId } from '../help/help-topics';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { controllerOperationCommandBlockMessage } from '../state/laser-controller-operation';
+import { helpProps } from '../help/help-topics';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
+import { ConsoleCommandDeck } from './console/ConsoleCommandDeck';
 
 export function ConsolePanel(): JSX.Element {
-  const transcript = useLaserStore((s) => s.transcript);
-  const connection = useLaserStore((s) => s.connection);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const streamer = useLaserStore((s) => s.streamer);
-  const motionOperation = useLaserStore((s) => s.motionOperation);
-  const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
-  const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
-  const sendConsoleCommand = useLaserStore((s) => s.sendConsoleCommand);
-  const clearTranscript = useLaserStore((s) => s.clearTranscript);
-  // Pure data lookup for the active firmware's console vocabulary (quick
-  // commands + input validation). Guards still gate on capabilities.
-  const driver = selectControllerDriver(activeControllerKind);
+  const transcript = useLaserStore((state) => state.transcript);
+  const clearTranscript = useLaserStore((state) => state.clearTranscript);
   const [showStatus, setShowStatus] = useState(false);
   const [showStream, setShowStream] = useState(false);
-  const [command, setCommand] = useState('');
   const visible = useMemo(
     () => visibleEntries(transcript, { showStatus, showStream }),
     [transcript, showStatus, showStream],
   );
-  const disconnected = connection.kind !== 'connected';
-  const activeOperationReason =
-    (isActiveJob(streamer) && 'A job is active. Request ABORT before sending console commands.') ||
-    (motionOperation !== null &&
-      'A jog or frame operation is active. Wait for it to finish before sending console commands.') ||
-    controllerOperationCommandBlockMessage(controllerOperation) ||
-    (autofocusBusy &&
-      'Auto-focus is active. Wait for it to finish before sending console commands.') ||
-    null;
-  const sendDisabledReason = consoleCommandDisabledReason(driver, command, {
-    disconnected,
-    activeOperationReason,
-    machineState: statusReport?.state ?? null,
-  });
-  const sendHelp = helpProps('control:laser.console.send', sendDisabledReason ?? undefined);
-  const inputHelp = helpProps('control:laser.console.input', sendDisabledReason ?? undefined);
-
-  const handleSend = (): void => {
-    const input = command.trim();
-    if (input === '') return;
-    if (!confirmIfNeeded(driver, input)) return;
-    void sendConsoleCommand(input, confirmedOptions(driver, input)).then(() => setCommand(''));
-  };
 
   const handleCopy = (): void => {
-    const text = visible.map(formatTranscriptLine).join('\n');
-    void navigator.clipboard?.writeText(text);
+    void navigator.clipboard?.writeText(visible.map(formatTranscriptLine).join('\n'));
   };
 
   return (
@@ -69,12 +26,6 @@ export function ConsolePanel(): JSX.Element {
         onCopy={handleCopy}
         onClear={clearTranscript}
       />
-      <QuickCommandRow
-        quickCommands={driver.consoleQuickCommands}
-        disconnected={disconnected}
-        activeOperationReason={activeOperationReason}
-        onSend={sendConsoleCommand}
-      />
       <ConsoleFilters
         showStatus={showStatus}
         showStream={showStream}
@@ -82,15 +33,9 @@ export function ConsolePanel(): JSX.Element {
         onShowStream={setShowStream}
       />
       <ConsoleTranscript visible={visible} />
-      <ConsoleCommandForm
-        command={command}
-        disconnected={disconnected}
-        sendDisabledReason={sendDisabledReason}
-        inputHelp={inputHelp}
-        sendHelp={sendHelp}
-        onCommandChange={setCommand}
-        onSend={handleSend}
-      />
+      <div style={commandDeckWrapStyle}>
+        <ConsoleCommandDeck enableHistory={false} ariaLabel="Docked console commands" />
+      </div>
     </section>
   );
 }
@@ -130,33 +75,6 @@ function ConsoleHeader(props: {
   );
 }
 
-function QuickCommandRow(props: {
-  readonly quickCommands: ReadonlyArray<ConsoleQuickCommand>;
-  readonly disconnected: boolean;
-  readonly activeOperationReason: string | null;
-  readonly onSend: (command: string) => Promise<void>;
-}): JSX.Element {
-  return (
-    <div style={quickStyle}>
-      {props.quickCommands.map((quick) => {
-        const quickHelp = quickHelpProps(quick, props.disconnected, props.activeOperationReason);
-        return (
-          <button
-            key={quick.command}
-            type="button"
-            onClick={() => void props.onSend(quick.command)}
-            disabled={quickDisabled(quick, props.disconnected, props.activeOperationReason)}
-            title={quickHelp.title ?? quick.hint}
-            data-help-id={quickHelp['data-help-id']}
-          >
-            {quick.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function ConsoleFilters(props: {
   readonly showStatus: boolean;
   readonly showStream: boolean;
@@ -165,21 +83,21 @@ function ConsoleFilters(props: {
 }): JSX.Element {
   return (
     <div style={toggleRowStyle}>
-      <label title="Show periodic GRBL status report replies like <Idle|...>.">
+      <label title="Show periodic controller status reports.">
         <input
           type="checkbox"
+          title="Show periodic controller status reports."
           checked={props.showStatus}
-          onChange={(e) => props.onShowStatus(e.target.checked)}
-          title="Show periodic GRBL status report replies like <Idle|...>."
+          onChange={(event) => props.onShowStatus(event.target.checked)}
         />
         Show status
       </label>
       <label title="Show high-volume job stream writes that are hidden by default.">
         <input
           type="checkbox"
-          checked={props.showStream}
-          onChange={(e) => props.onShowStream(e.target.checked)}
           title="Show high-volume job stream writes that are hidden by default."
+          checked={props.showStream}
+          onChange={(event) => props.onShowStream(event.target.checked)}
         />
         Show stream
       </label>
@@ -200,49 +118,11 @@ function ConsoleTranscript(props: {
             <span style={badgeStyle}>{entry.direction.toUpperCase()}</span>
             <span style={kindStyle}>{entry.kind}</span>
             <span style={rawStyle}>{entry.raw}</span>
-            {entry.decoded !== undefined ? <span style={decodedStyle}>{entry.decoded}</span> : null}
+            {entry.decoded === undefined ? null : <span style={decodedStyle}>{entry.decoded}</span>}
           </div>
         ))
       )}
     </div>
-  );
-}
-
-function ConsoleCommandForm(props: {
-  readonly command: string;
-  readonly disconnected: boolean;
-  readonly sendDisabledReason: string | null;
-  readonly inputHelp: ReturnType<typeof helpProps>;
-  readonly sendHelp: ReturnType<typeof helpProps>;
-  readonly onCommandChange: (value: string) => void;
-  readonly onSend: () => void;
-}): JSX.Element {
-  return (
-    <form
-      style={formStyle}
-      onSubmit={(e) => {
-        e.preventDefault();
-        props.onSend();
-      }}
-    >
-      <input
-        aria-label="Console command"
-        value={props.command}
-        onChange={(e) => props.onCommandChange(e.target.value)}
-        placeholder="$I, $$, $G, G0 X0 Y0..."
-        disabled={props.disconnected}
-        title={props.inputHelp.title}
-        data-help-id={props.inputHelp['data-help-id']}
-      />
-      <button
-        type="submit"
-        disabled={props.sendDisabledReason !== null}
-        title={props.sendHelp.title}
-        data-help-id={props.sendHelp['data-help-id']}
-      >
-        Send
-      </button>
-    </form>
   );
 }
 
@@ -256,79 +136,6 @@ function visibleEntries(
     if (!filters.showStatus && entry.source === 'poll') return false;
     return true;
   });
-}
-
-function confirmIfNeeded(driver: ControllerDriver, input: string): boolean {
-  const prepared = driver.prepareConsoleCommand(input);
-  if (!prepared.ok || !prepared.command.requiresConfirmation) return true;
-  return jobAwareConfirm(`Send persistent controller setting?\n\n${prepared.command.normalized}`);
-}
-
-function confirmedOptions(
-  driver: ControllerDriver,
-  input: string,
-): { readonly confirmed: true } | undefined {
-  const prepared = driver.prepareConsoleCommand(input);
-  return prepared.ok && prepared.command.requiresConfirmation ? { confirmed: true } : undefined;
-}
-
-function quickDisabled(
-  quick: ConsoleQuickCommand,
-  disconnected: boolean,
-  activeOperationReason: string | null,
-): boolean {
-  if (disconnected) return true;
-  // Realtime status ('?') stays available during operations; everything else
-  // waits for the machine to be free — same behavior as the pre-driver panel.
-  return quick.command !== '?' && activeOperationReason !== null;
-}
-
-const QUICK_COMMAND_HELP_IDS: Readonly<Record<string, HelpTopicId>> = {
-  $X: 'control:laser.console.quick.$X',
-  $$: 'control:laser.console.quick.$$',
-  '$#': 'control:laser.console.quick.$#',
-  $I: 'control:laser.console.quick.$I',
-  $G: 'control:laser.console.quick.$G',
-  '?': 'control:laser.console.quick.?',
-};
-
-function quickHelpProps(
-  quick: ConsoleQuickCommand,
-  disconnected: boolean,
-  activeOperationReason: string | null,
-): ReturnType<typeof helpProps> {
-  const disabledReason = disconnected
-    ? 'Connect to the laser before sending console commands.'
-    : activeOperationReason;
-  return helpProps(
-    QUICK_COMMAND_HELP_IDS[quick.command] ?? 'control:laser.console',
-    disabledReason ?? undefined,
-  );
-}
-
-function consoleCommandDisabledReason(
-  driver: ControllerDriver,
-  input: string,
-  state: {
-    readonly disconnected: boolean;
-    readonly activeOperationReason: string | null;
-    readonly machineState: string | null;
-  },
-): string | null {
-  if (state.disconnected) return 'Connect to the laser before sending console commands.';
-  const trimmed = input.trim();
-  if (trimmed === '') return 'Enter one command before sending.';
-  const prepared = driver.prepareConsoleCommand(trimmed);
-  if (!prepared.ok) return prepared.reason;
-  if (prepared.command.requiresNoActiveOperation && state.activeOperationReason !== null) {
-    return state.activeOperationReason;
-  }
-  if (!prepared.command.requiresIdle) return null;
-  if (state.machineState === null) return 'Wait for an Idle status report before sending.';
-  if (state.machineState !== 'Idle') {
-    return `Machine must be Idle before sending this command (currently ${state.machineState}).`;
-  }
-  return null;
 }
 
 function formatTranscriptLine(entry: SerialTranscriptEntry): string {
@@ -362,12 +169,6 @@ const headerStyle: React.CSSProperties = {
 };
 const titleStyle: React.CSSProperties = { fontWeight: 700 };
 const headerButtonsStyle: React.CSSProperties = { display: 'flex', gap: 4 };
-const quickStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 4,
-  padding: '0 6px',
-  flexWrap: 'wrap',
-};
 const toggleRowStyle: React.CSSProperties = { display: 'flex', gap: 10, padding: '0 6px' };
 const scrollStyle: React.CSSProperties = {
   maxHeight: 180,
@@ -376,7 +177,7 @@ const scrollStyle: React.CSSProperties = {
   padding: '4px 6px',
   fontFamily: 'ui-monospace, Menlo, monospace',
 };
-const formStyle: React.CSSProperties = { display: 'flex', gap: 4, padding: '0 6px 6px' };
+const commandDeckWrapStyle: React.CSSProperties = { padding: '0 6px 6px' };
 const emptyStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', fontStyle: 'italic' };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 5, whiteSpace: 'pre-wrap' };
 const outboundRowStyle: React.CSSProperties = { ...rowStyle, color: 'var(--lf-accent-fg)' };

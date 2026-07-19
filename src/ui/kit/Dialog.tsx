@@ -17,6 +17,8 @@ export function Dialog(props: {
   readonly title?: string;
   readonly ariaLabel?: string;
   readonly size?: DialogSize;
+  /** Optional feature-specific panel class; shared dialog chrome remains intact. */
+  readonly panelClassName?: string;
   // 'form' renders the panel as a <form> so Enter submits (the
   // CutSettings/Convert pattern); onSubmit must preventDefault itself.
   readonly as?: 'div' | 'form';
@@ -27,7 +29,9 @@ export function Dialog(props: {
   const titleId = useId();
   useDialogA11y(backdropRef, props.onClose);
   useRegisterModal();
-  const panelClass = `lf-dialog lf-dialog--${props.size ?? 'md'}`;
+  const panelClass = ['lf-dialog', `lf-dialog--${props.size ?? 'md'}`, props.panelClassName]
+    .filter((value) => value !== undefined && value !== '')
+    .join(' ');
   const heading =
     props.title === undefined ? null : (
       <h2 className="lf-dialog-title" id={titleId}>

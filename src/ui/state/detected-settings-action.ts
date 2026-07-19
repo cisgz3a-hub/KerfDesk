@@ -35,6 +35,8 @@ export type DetectedSettingsRefs = {
   settingsCollectorSessionEpoch: number | null;
 };
 
+export const SETTINGS_READ_OPERATION_LABEL = 'Reading controller settings';
+
 export function beginSettingsCollection(refs: DetectedSettingsRefs, sessionEpoch: number): void {
   refs.settingsCollector = startCollecting();
   refs.settingsCollectorSessionEpoch = sessionEpoch;

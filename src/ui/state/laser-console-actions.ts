@@ -1,9 +1,13 @@
-import type { SettingsCollectorState } from '../../core/controllers/grbl';
+import {
+  idleCollector,
+  type PreparedConsoleCommand,
+  type SettingsCollectorState,
+} from '../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf } from '../../core/scene';
-import { beginSettingsCollection } from './detected-settings-action';
+import { beginSettingsCollection, SETTINGS_READ_OPERATION_LABEL } from './detected-settings-action';
 import {
   hasAccessoryCommand,
   type ConsoleStateEffect,
@@ -67,34 +71,7 @@ export function consoleActions(
       }
       const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
       if (idleBlocked !== null) return block(set, get, refs, idleBlocked);
-      if (prepared.command.kind === 'settings-query') {
-        beginSettingsCollection(refs, get().controllerSessionEpoch);
-        set({
-          detectedSettings: null,
-          controllerSettings: null,
-          controllerSettingsObservation: null,
-          grblSettingsRows: [],
-          lastSettingsReadAt: null,
-        });
-      }
-      const stateEffect = prepared.command.stateEffect;
-      if (stateEffect !== 'read-only') {
-        // Invalidate before the async write yields so Start cannot race any
-        // manually mutated controller state against the prior Frame permit.
-        set((state) => ({
-          framedRun: null,
-          ...(hasAccessoryCommand(prepared.command.normalized)
-            ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
-            : {}),
-        }));
-      }
-      await writeConsoleCommand(refs, write, prepared.command);
-      if (stateEffect !== 'read-only') {
-        set((state) => consoleStateEffectPatch(state, stateEffect, prepared.command.normalized));
-      }
-      // Track the operator's active WCS selection so save/start advisories can
-      // warn when it is not the G54 that emission pins (audit C6).
-      trackConsoleWcsSelection(set, prepared.command.normalized);
+      await dispatchPreparedConsoleCommand(set, get, refs, write, prepared.command);
     },
     selectPrimaryWcsForFrame: async () => {
       const prepared = refs.driver.prepareConsoleCommand('G54');
@@ -131,6 +108,81 @@ export function consoleActions(
     },
     clearTranscript: () => set({ transcript: [] }),
   };
+}
+
+async function dispatchPreparedConsoleCommand(
+  set: SetFn,
+  get: GetFn,
+  refs: ConsoleActionRefs,
+  write: ConsoleWriteFn,
+  command: PreparedConsoleCommand,
+): Promise<void> {
+  beginConsoleSettingsRead(set, get, refs, command);
+  invalidateConsoleCommandEvidence(set, command);
+  try {
+    await writeConsoleCommand(refs, write, command);
+  } catch (error) {
+    if (command.kind === 'settings-query') releaseFailedConsoleSettingsRead(set, get, refs);
+    throw error;
+  }
+  const stateEffect = command.stateEffect;
+  if (stateEffect !== 'read-only') {
+    set((state) => consoleStateEffectPatch(state, stateEffect, command.normalized));
+  }
+  // Track the operator's active WCS selection so save/start advisories can
+  // warn when it is not the G54 that emission pins (audit C6).
+  trackConsoleWcsSelection(set, command.normalized);
+}
+
+function beginConsoleSettingsRead(
+  set: SetFn,
+  get: GetFn,
+  refs: ConsoleActionRefs,
+  command: PreparedConsoleCommand,
+): void {
+  if (command.kind !== 'settings-query') return;
+  beginSettingsCollection(refs, get().controllerSessionEpoch);
+  set({
+    controllerOperation: {
+      kind: 'interactive-command',
+      phase: 'command',
+      label: SETTINGS_READ_OPERATION_LABEL,
+    },
+    detectedSettings: null,
+    controllerSettings: null,
+    controllerSettingsObservation: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
+  });
+}
+
+function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCommand): void {
+  if (command.stateEffect === 'read-only') return;
+  // Invalidate before the async write yields so Start cannot race manually
+  // mutated controller or accessory state against the prior Frame permit.
+  set((state) => ({
+    framedRun: null,
+    ...(hasAccessoryCommand(command.normalized)
+      ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
+      : {}),
+  }));
+}
+
+function releaseFailedConsoleSettingsRead(set: SetFn, get: GetFn, refs: ConsoleActionRefs): void {
+  const sessionEpoch = get().controllerSessionEpoch;
+  if (refs.settingsCollectorSessionEpoch === sessionEpoch) {
+    refs.settingsCollector = idleCollector();
+    refs.settingsCollectorSessionEpoch = null;
+  }
+  set((state) =>
+    isSettingsReadOperation(state.controllerOperation) ? { controllerOperation: null } : {},
+  );
+}
+
+function isSettingsReadOperation(operation: LaserState['controllerOperation']): boolean {
+  return (
+    operation?.kind === 'interactive-command' && operation.label === SETTINGS_READ_OPERATION_LABEL
+  );
 }
 
 function writeConsoleCommand(
