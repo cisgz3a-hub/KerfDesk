@@ -193,6 +193,7 @@
 | ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
 | ADR-228 | 2026-07-18 | Accepted (governing) | Frame-first Start gate: Frame is the sole guard |
+| ADR-229 | 2026-07-18 | Accepted | Super console: read-only expanded console dialog |
 
 ---
 
@@ -9785,3 +9786,43 @@ Maintainer approval in chat: "fix both", accepting the post-merge soundness audi
    reset side effects.
 
 Both changes narrow WHEN the one guard's proof exists; the guard surface itself is unchanged.
+
+## ADR-229 - Super console: read-only expanded console dialog
+
+**Date:** 2026-07-18
+**Status:** Accepted (maintainer request in chat: "Can we upgrade the console to auto read
+settings etc. make it a super console? maybe press a button and a new big console opens up
+with in detail view etc."; phased scope approved with "go")
+
+### Context
+The docked Console (F-B13) renders the last 150 of 500 transcript entries in a small rail
+panel and omits each line's source and time. During the 2026-07-18 Neotronics 4040
+regression audit, inspecting controller settings and traffic was cumbersome enough that the
+browser's on-disk storage was easier to read than the in-app surfaces.
+
+### Decision
+Add a Super console: a Dialog (size xl) opened by a "Super console" button that lives
+beside the docked ConsolePanel in the Console rail section (ConsolePanel is at its
+file-size limit and keeps its single docked-console responsibility). Version 1 is a
+read-only inspection surface:
+
+- the full 500-entry transcript (no 150-entry display cap) with time, direction, source,
+  kind, raw, and decoded columns;
+- group filters (Errors / Commands / Replies / Status / Stream) with a precedence rule so
+  each entry belongs to exactly one group;
+- case-insensitive search over raw and decoded text; Copy visible.
+
+Commands are still typed in the docked console; the dialog sends nothing to the controller.
+
+### Phasing
+- v1 (this ADR): transcript inspection, above.
+- v2: machine-settings pane - auto-dispatches the existing gated readMachineSettings ($$)
+  on open when machineSettingsReadBlockReason is null and renders the collected snapshot as
+  a named, united, grouped table with profile diffs (reusing grbl-settings.ts,
+  presentGrblSetting, computeFirmwareDiffs). Read-only; setting writes stay in Device Setup.
+- v3: command input with history inside the dialog, after a tidy-first extraction of the
+  console command gating out of ConsolePanel.
+
+### Guard posture (rule 7 / ADR-228)
+Purely informational. No new refusal surface: v1 sends nothing; v2 will reuse the existing
+transport-precondition messages verbatim and only display them.

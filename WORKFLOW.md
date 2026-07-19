@@ -982,6 +982,27 @@ The Live Motion bar shows `completed / total` lines and a percentage beside the 
    as physical completion or controller acknowledgement. If the write fails,
    the existing write-failure safety notice applies and no mutation is assumed.
 
+### F-B13a. Super console (expanded view, ADR-229)
+
+#### Success - open and inspect
+1. The Console rail section shows a **Super console** button beside the docked console.
+2. Clicking it opens a large dialog with the full 500-entry transcript - every line with
+   time, direction, source, kind, raw text, and decoded detail.
+3. Group filters (Errors, Commands, Replies, Status, Stream) and a text search narrow the
+   list; a counter shows visible-of-total lines.
+4. **Copy visible** copies the filtered lines with their detail columns. **Close** and
+   Escape dismiss the dialog.
+
+#### Success - read-only by design
+1. The dialog sends nothing to the controller; commands are typed in the docked console.
+
+#### Empty - no traffic
+1. With no transcript entries (or filters excluding everything) the list shows a hint line
+   instead of rows.
+
+#### Edge - long sessions
+1. The transcript store keeps the newest 500 entries; the Super console shows all of them,
+   not the docked panel's 150-entry slice.
 ### F-B14. Machine Settings read-only backup
 
 #### Success — read connected controller settings
