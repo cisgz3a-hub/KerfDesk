@@ -15,6 +15,7 @@ import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
+import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
 import type { DeviceSetupOpenRequest } from './device-setup';
@@ -179,6 +180,7 @@ function MachineConsoleSection(): JSX.Element {
       title="Show advanced controller commands and communication history."
     >
       <ConsolePanel />
+      <SuperConsoleLauncher />
     </CollapsibleRailSection>
   );
 }
