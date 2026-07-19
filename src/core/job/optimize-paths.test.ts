@@ -6,6 +6,8 @@ import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, FillGroup, FillSegment, Job } from './job';
 import { MAX_NEAREST_NEIGHBOR_SEGMENTS, optimizePaths } from './optimize-paths';
 
+const CUT_TIME_RELATIVE_TOLERANCE = 1e-6;
+
 // All fixtures in this file produce CutGroups; narrow on the union
 // for ergonomic field access in the assertions below.
 function asCut(j: Job, i = 0): CutGroup | undefined {
@@ -40,6 +42,19 @@ function group(segments: ReadonlyArray<CutSegment>): CutGroup {
     airAssist: false,
     segments,
   };
+}
+
+function expectCutTimePreserved(job: Job): void {
+  const before = estimateJobDuration(job, DEFAULT_DEVICE_PROFILE);
+  const after = estimateJobDuration(optimizePaths(job), DEFAULT_DEVICE_PROFILE);
+  const denom = Math.max(before.breakdown.cutSeconds, 1e-9);
+  const relativeDifference =
+    Math.abs(after.breakdown.cutSeconds - before.breakdown.cutSeconds) / denom;
+
+  // The contract is inclusive: a 1 ppm delta is acceptable. Number.EPSILON
+  // absorbs representation error at that exact boundary without materially
+  // widening the tolerance.
+  expect(relativeDifference).toBeLessThanOrEqual(CUT_TIME_RELATIVE_TOLERANCE + Number.EPSILON);
 }
 
 function fillGroup(
@@ -300,7 +315,21 @@ describe('optimizePaths', () => {
     expect(asCut(result)?.segments[1]).toEqual(outer);
   });
 
-  it('property: cut time is preserved exactly (same cuts, same speed)', () => {
+  it('accepts the floating-point representation of the 1 ppm boundary', () => {
+    const job: Job = {
+      groups: [
+        group([
+          seg([1.0000000000000064, 399.9999999999969], [1, 1]),
+          seg([1.0224434558460191, 5.4122445573187585], [1.0000000000000064, 399.9999999999969]),
+          seg([1, 1], [1, 1]),
+        ]),
+      ],
+    };
+
+    expectCutTimePreserved(job);
+  });
+
+  it('property: cut time is preserved within 1 ppm (same cuts, same speed)', () => {
     // Reordering segments doesn't add or remove any cut — the total
     // cut distance and per-layer feed are identical, so cut time
     // must match to float precision.
@@ -329,15 +358,9 @@ describe('optimizePaths', () => {
             closed: false,
           }));
           const job: Job = { groups: [group(segments)] };
-          const before = estimateJobDuration(job, DEFAULT_DEVICE_PROFILE);
-          const after = estimateJobDuration(optimizePaths(job), DEFAULT_DEVICE_PROFILE);
-          // Relative comparison — float-sum order matters per the
-          // planner's trapezoidal integrator. 1 ppm is 1 ms on a
-          // 1000s job; under any user-visible delta.
-          const denom = Math.max(before.breakdown.cutSeconds, 1e-9);
-          const relDiff =
-            Math.abs(after.breakdown.cutSeconds - before.breakdown.cutSeconds) / denom;
-          expect(relDiff).toBeLessThan(1e-6);
+          // Float-sum order matters per the planner's trapezoidal integrator.
+          // 1 ppm is 1 ms on a 1000s job; under any user-visible delta.
+          expectCutTimePreserved(job);
         },
       ),
       { numRuns: 50 },
