@@ -179,7 +179,7 @@ PR review rejects PRs that:
 - Modify source without modifying or adding tests, except for pure refactors flagged as such.
 - Modify the G-code snapshot without an explicit acknowledgment line in the PR description: `Snapshot change acknowledged: <reason>`.
 
-(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, audit, tests, builds, and file-size, none of which inspect test-file presence or the PR description. See line 169 and PROJECT.md #16.)
+(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, audit, tests, builds, and file-size, none of which inspect test-file presence or the PR description. See "Session hygiene" below and PROJECT.md #16.)
 
 ---
 

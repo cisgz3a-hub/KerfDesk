@@ -1,8 +1,18 @@
 # DECISIONS.md — LaserForge 2.0
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
+>
+> **Current Start policy — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact
+> current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
+> warning surface. Older gate ADRs below that mandated Start blocks are stamped
+> "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
+> but their *refusals* do not. Per-gate disposition:
+> `docs/audits/2026-07-18-guard-inventory-frame-first.md`.
 
 ## Decision index
+
+> This index is partial: ADR-019–134 are mostly unlisted here (a known gap — locate any ADR by
+> searching `## ADR-NNN` in the body, which is in insertion order, not numeric order).
 
 | ID | Date | Status | Title |
 |---|---|---|---|
@@ -42,7 +52,7 @@
 | ADR-154 | 2026-07-13 | Accepted | Adaptive pockets require verified constant-load ring sequences |
 | ADR-155 | 2026-07-13 | Accepted | Straight inlays compile as one radius-matched linked pair |
 | ADR-156 | 2026-07-13 | Accepted | Manual CNC tabs use persisted normalized contour anchors |
-| ADR-157 | 2026-07-13 | Accepted | Detected controller identity gates profile transport and output |
+| ADR-157 | 2026-07-13 | Superseded in part (ADR-228: Start qualification deleted) | Detected controller identity gates profile transport and output |
 | ADR-158 | 2026-07-13 | Accepted | Browser smoke is independent from the release and deploy gate |
 | ADR-159 | 2026-07-13 | Accepted | Schema v2 curves are canonical and compatibility polylines are invalidated |
 | ADR-160 | 2026-07-13 | Accepted | Rotary raster is an explicit experimental amendment to ADR-127 |
@@ -50,10 +60,10 @@
 | ADR-162 | 2026-07-13 | Accepted | Low-power Fire is profile-opted, hard-capped, and momentary |
 | ADR-163 | 2026-07-13 | Accepted | Cut Planner exposes five persisted deterministic policies |
 | ADR-164 | 2026-07-13 | Accepted | Adopt bounded offline editing and interoperability already shipped |
-| ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
-| ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
-| ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
-| ADR-179 | 2026-07-13 | Accepted | Block controller-reported active spindle/coolant before CNC Start |
+| ADR-171 | 2026-07-13 | Superseded in part (ADR-228: readiness no longer blocks Start) | Work-Z readiness uses source-qualified, epoch-bound evidence |
+| ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
+| ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
+| ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
 | ADR-184 | 2026-07-13 | Accepted | Probe cycles are exclusive, typed, and settlement-qualified |
 | ADR-185 | 2026-07-13 | Accepted | Commit XYZ corner-probe offsets in one GRBL block |
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
@@ -71,7 +81,7 @@
 | ADR-198 | 2026-07-14 | Superseded | Add a pinned OFL EMS stroke-font family with lazy data loading (see ADR-213) |
 | ADR-199 | 2026-07-14 | Superseded | Fair decorative stroke fonts with the shared trace cubic fitter (see ADR-213) |
 | ADR-200 | 2026-07-14 | Amended (ADR-215) | CNC recovery is evidence-gated and software Abort is not an E-stop |
-| ADR-201 | 2026-07-15 | Amended | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
+| ADR-201 | 2026-07-15 | Amended (ADR-209); Start gate superseded by ADR-228 | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
 | ADR-203 | 2026-07-15 | Amended | Recover Work-Z only from owned controller offset readback (see ADR-209) |
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
@@ -98,6 +108,7 @@
 | ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
 | ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
+| ADR-228 | 2026-07-18 | Accepted (governing) | Frame-first Start gate: Frame is the sole guard |
 
 ---
 
@@ -1505,7 +1516,7 @@ serpentine alternation and emitted every active raster row left-to-right.
 ## ADR-022 - Origin-aware job placement and physical Frame/Start preflight
 
 **Date:** 2026-06-01
-**Status:** Accepted, code shipped, hardware verification pending.
+**Status:** Accepted, code shipped, hardware verification pending. Blocking Start-preflight portions demoted to Job Review warnings by ADR-228 (frame-first); placement math unchanged.
 
 **Context.** ADR-021 shipped the controller half of Set origin here:
 `G92 X0 Y0` makes the current head position work-coordinate (0,0).
@@ -2990,7 +3001,7 @@ guessed default.
 
 ## ADR-053 — Verified Origin: hand-set origin + mandatory verified frame for no-homing / hand-positioned machines
 
-**Status:** Accepted; P1–P4 code shipped, hardware verification pending. | **Date:** 2026-06-17
+**Status:** Accepted; P1–P4 code shipped, hardware verification pending. Generalized by ADR-228 — the verified-origin frame requirement became the universal frame-first gate for every placement mode. | **Date:** 2026-06-17
 
 > Numbered after ADR-052 (scan-offset compensation), which lands via a separate
 > branch. 052/053 are concurrent feature branches off the same main.
@@ -7140,7 +7151,7 @@ interaction undo; hardware remains CLAIMED pending the standing CNC cut protocol
 
 ## ADR-157 - Detected controller identity gates profile transport and output
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-228 — the ordinary-Start controller-qualification refusal was deleted (both machine kinds); transport/output reconciliation and cross-family profile refusal remain. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7319,7 +7330,7 @@ larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems nam
 
 ## ADR-171 - Work-Z readiness uses source-qualified, epoch-bound evidence
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-228 — readiness no longer refuses Start (Job Review warns); the epoch-bound evidence model itself remains in use. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7353,7 +7364,7 @@ evidence and hardware qualification.
 
 ## ADR-172 - Missing qualified work Z blocks CNC Start
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded by ADR-228 — the block is demoted to a Job Review warning; Zero Z and probing remain available in the panel. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7384,7 +7395,7 @@ tool identity, clamping, plate removal, or spindle-at-speed feedback.
 
 ## ADR-173 - Bind work-Z evidence to the compiled CNC tool plan
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-228 — a tool-vs-evidence mismatch warns in Job Review instead of blocking; the binding model remains in use. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7414,7 +7425,7 @@ the compiled plan; it still cannot physically sense the cutter, clamp, touch pla
 
 ## ADR-179 - Block controller-reported active spindle/coolant before CNC Start
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded by ADR-228 — active-accessory findings are Job Review warnings; the live-state fence relaxed to one fresh status report (transport liveness). | **Date:** 2026-07-13
 
 ### Context
 
@@ -8296,7 +8307,7 @@ manual intervention.
 
 ## ADR-201 - Gate CNC Start by protocol capability and exact override acknowledgement
 
-**Status:** Amended by ADR-209 | **Date:** 2026-07-15
+**Status:** Amended by ADR-209; Start-gate portions superseded by ADR-228 (dialect and override findings are Job Review warnings — the reduced-override acknowledgement text lives in the review). | **Date:** 2026-07-15
 
 ### Context
 
@@ -8482,7 +8493,7 @@ beam/spindle behavior, clearances, and calibration remain the operator's hardwar
 
 ## ADR-206 - Require explicit maintainer permission for every new guard
 
-**Status:** Accepted | **Date:** 2026-07-15
+**Status:** Superseded in mechanism by ADR-228 — the permission process is replaced by a standing denial: no guard will ever be created again. | **Date:** 2026-07-15
 
 ### Context
 
