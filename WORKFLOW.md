@@ -458,7 +458,7 @@ Identical to F-A3 except:
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
 G-code**, any failing check surfaces the pre-flight modal and cancels the save
-until it clears. For **Start**, frame-first applies (ADR-228 through ADR-230): the only
+until it clears. For **Start**, frame-first applies (ADR-228, ADR-230, ADR-231): the only
 findings that still cancel the Start are unstreamable output (`non-finite-
 coordinate`, `empty-output`, `relief-needs-cnc`, `no-output-layer`) and compile
 failures. The mandatory Frame has a separate physical-validity contract: it sends no motion and
@@ -767,7 +767,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### CNC — safe-Z retract and restore
 1. CNC Frame requires current-session stock-top Work-Z and a fresh known work position because its
    absolute work-frame safe-Z retract/restore program cannot otherwise be constructed (ADR-192,
-   ADR-229). Work-Z, the known return position, and the driver safe-Z builder are Frame
+   ADR-230). Work-Z, the known return position, and the driver safe-Z builder are Frame
    construction/compile inputs, not ordinary Start policy gates. If Work-Z is missing, the setup
    flow offers **Zero Z here and continue** only when the operator confirms the bit is touching the
    stock top.
