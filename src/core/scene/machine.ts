@@ -5,6 +5,7 @@
 // machine choice; projects without one are laser projects (back-compat).
 
 import type { Vec2 } from './scene-object';
+import type { CncFeedSource } from './cnc-feed-source';
 
 export type MachineKind = 'laser' | 'cnc';
 
@@ -54,6 +55,11 @@ export type CncStock = {
 // spindle, climb keeps material on the LEFT of travel (see motion-polish).
 export type CncCutDirection = 'climb' | 'conventional';
 
+// Provenance for feed / plunge / spindle / depth-per-pass values. Absence is
+// intentional: legacy files and operator-entered values are manual and must
+// never be silently recalculated. Auto-derived settings carry enough identity
+// to explain their source and to refresh them only during an explicit setup
+// action (machine selection, material selection, or new-layer creation).
 export type CncHelixEntrySettings = {
   readonly maxDiameterMm: number;
   readonly minDiameterMm: number;
@@ -136,6 +142,9 @@ export type CncLayerSettings = {
   // key). Absent = feeds were entered manually ("Custom"). Display/round-trip
   // only — does not affect compiled output.
   readonly materialKey?: string;
+  // Display/round-trip provenance only. It never changes emitted output;
+  // numeric settings above remain the source of truth for compilation.
+  readonly feedSource?: CncFeedSource;
   readonly tabsEnabled: boolean; // profile cuts only
   readonly tabHeightMm: number; // material left under a tab
   readonly tabWidthMm: number; // tab length along the path

@@ -197,6 +197,7 @@
 | ADR-230 | 2026-07-19 | Accepted | Exact-artifact Frame authorization and one-use Start permit |
 | ADR-231 | 2026-07-19 | Superseded in part by ADR-232 | A valid Frame proves physically safe motion and the live output contract |
 | ADR-232 | 2026-07-19 | Accepted (governing) | Physical Frame completion is the spatial source of truth |
+| ADR-233 | 2026-07-19 | Accepted | Revisioned machine-aware CNC starters initialize new operations without rewriting jobs |
 
 ---
 
@@ -10026,3 +10027,66 @@ overhangs the bed` without attempting the trace the operator explicitly chose as
 - ADR-231 remains authoritative for report-unit conversion, cancel-race settlement, honest device
   metadata, and the requirement for clean completion, but its pre-wire spatial/settings refusals are
   superseded.
+---
+
+## ADR-233 - Revisioned machine-aware CNC starters initialize new operations without rewriting jobs
+
+**Date:** 2026-07-19
+**Status:** Accepted (maintainer request for automatic per-machine feed and plunge settings, followed
+by explicit implementation approval and "go")
+
+### Context
+
+The global CNC layer fallback (`1000` mm/min feed, `300` mm/min plunge, `1.5` mm/pass) was shared by
+every machine. It was not a useful first operation for the heavier Neotronics 4040, while the public
+machine sources establish only its envelope and default 500 W / 12,000 RPM spindle; they do not
+publish a material-and-cutter recipe. Calling any unqualified number "best" would overstate the
+evidence. Loading a project or reading controller settings also cannot be allowed to reinterpret
+operator-authored machining values.
+
+### Decision
+
+1. Add a revisioned CNC machine-starter catalog resolved by exact device profile id and then machine
+   family. The Neotronics 4040 engineering starter uses the explicit `em-3175` 3.175 mm two-flute
+   end mill with `600` mm/min feed, `120` mm/min plunge, `12000` RPM, and `0.75` mm/pass. It is
+   labelled an engineering starter, not a vendor recipe or hardware-qualified optimum. Seeding
+   requires that exact end-mill id and diameter to exist in the active machine library; KerfDesk
+   never stamps a dangling or identity-reused 3.175 mm override that would compile through a
+   different cutter. The layer card and Job Review explicitly repeat the engineering status and
+   two-flute cutter assumption so catalog provenance cannot be mistaken for hardware qualification.
+2. Resolve the starter only at a boundary that proves an operation is new, or when the operator
+   explicitly converts a laser scene to CNC. Project open, autosave recovery, ordinary profile
+   replacement, controller observation, duplicate/paste, and derived-operation cloning never seed
+   or infer settings for existing operations.
+3. An operator-saved per-color or all-color layer default has highest initialization precedence and
+   is copied byte-for-byte. Otherwise, an explicitly selected project or layer material remains the
+   higher-precedence automatic source.
+   On a machine with a catalog starter, chipload-derived feed, plunge, spindle, and depth/pass values
+   may be lowered to that starter's conservative envelope. Other profiles retain the existing generic
+   chipload calculation.
+4. A completed live GRBL settings observation is transient input for future automatic values only.
+   The slower of `$110/$111` may lower feed and `$112` may lower plunge. `$30` may lower a spindle
+   suggestion only when the same observation reports `$32=0`; a hybrid controller in laser mode
+   commonly uses `$30=1000` as a PWM scale, not a 1000 RPM spindle limit. No controller setting is
+   written automatically.
+5. Persist optional display-only provenance on automatic settings: a revisioned machine-starter id
+   or a material recipe plus flute count. Absence means manual or legacy/unscoped. Editing feed,
+   plunge, spindle, or depth/pass clears automatic provenance and any stale material label; changing
+   a machine-starter tool does the same while preserving its numbers. A material-recipe tool change
+   instead recalculates for the new cutter and retains recipe provenance so the displayed bit and
+   automatic values cannot disagree.
+6. This feature adds no guard. Automatic values are editable suggestions, do not refuse or constrain
+   manual input, do not change compilation authority, and do not participate in Start authorization.
+   Frame remains the sole ordinary-Start guard under ADR-228, ADR-230, and ADR-232.
+
+### Consequences
+
+- A new 4040 CNC operation starts with a shallow, explainable machine-specific setup instead of the
+  global fallback. Selecting a material recalculates within the same conservative machine envelope.
+- Loaded and manual jobs retain their exact numeric settings. Reconnecting or receiving a new `$$`
+  dump cannot mutate the scene.
+- Adding another machine requires a reviewed catalog entry and tests; an unidentified machine keeps
+  existing behavior rather than borrowing the 4040 starter.
+- The starter still requires operator tuning for the installed cutter, material, workholding, tool
+  condition, spindle variant, and machine rigidity. Public research and green tests do not make it a
+  hardware-qualified cutting recipe.

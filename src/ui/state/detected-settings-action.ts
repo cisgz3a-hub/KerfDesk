@@ -26,6 +26,7 @@ import {
 import type { ControllerEvent } from '../../core/controllers';
 import type { DeviceProfile } from '../../core/devices';
 import { useStore } from './store';
+import { cncLiveCapsFromController } from './cnc-controller-caps';
 
 export type DetectedSettingsRefs = {
   // The pure state machine. Owned by the laser-store's `refs` object;
@@ -38,6 +39,9 @@ export type DetectedSettingsRefs = {
 export const SETTINGS_READ_OPERATION_LABEL = 'Reading controller settings';
 
 export function beginSettingsCollection(refs: DetectedSettingsRefs, sessionEpoch: number): void {
+  // The previous dump is no longer qualified while a replacement read is in
+  // flight. Future automatic CNC values must wait for the new observation.
+  clearCncLiveCaps();
   refs.settingsCollector = startCollecting();
   refs.settingsCollectorSessionEpoch = sessionEpoch;
 }
@@ -94,4 +98,12 @@ export function applyDetectedSettingsPatch(patch: Partial<DeviceProfile> | null)
   // through every layer of the laser-store actions object.
   useStore.getState().updateDeviceProfile(patch);
   return true;
+}
+
+export function publishCncLiveCaps(settings: ControllerSettingsSnapshot): void {
+  useStore.getState().setCncLiveCaps(cncLiveCapsFromController(settings));
+}
+
+export function clearCncLiveCaps(): void {
+  useStore.getState().setCncLiveCaps(null);
 }

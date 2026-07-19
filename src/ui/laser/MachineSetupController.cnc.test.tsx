@@ -28,8 +28,18 @@ describe('router controller settings', () => {
   it('shows spindle detection instead of the laser power apply surface', async () => {
     useStore.getState().setMachineKind('cnc');
     useLaserStore.setState({
-      controllerSettings: { maxPowerS: 24000, bedWidth: 750, bedHeight: 610 },
-      detectedSettings: { maxPowerS: 24000, bedWidth: 750, bedHeight: 610 },
+      controllerSettings: {
+        maxPowerS: 24000,
+        laserModeEnabled: false,
+        bedWidth: 750,
+        bedHeight: 610,
+      },
+      detectedSettings: {
+        maxPowerS: 24000,
+        laserModeEnabled: false,
+        bedWidth: 750,
+        bedHeight: 610,
+      },
     });
     const view = await renderPanel();
     try {

@@ -69,18 +69,29 @@ describe('LayerBitSelect', () => {
     const settings: CncLayerSettings = {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       materialKey: 'plywood-mdf',
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 2,
+      },
       feedMmPerMin: staleFeed,
     };
     const { host, root } = await render(settings, onCommit, onCommitSettings);
     try {
       await act(async () => selectBit(host, 'em-6350'));
-      expect(onCommit).toHaveBeenCalledTimes(1);
-      const patch = onCommit.mock.calls[0]?.[0] as Partial<CncLayerSettings>;
-      expect(patch.toolId).toBe('em-6350');
-      expect(patch.feedMmPerMin).toBeGreaterThan(0);
-      expect(patch.feedMmPerMin).not.toBe(staleFeed);
-      expect(patch.plungeMmPerMin).toBeGreaterThan(0);
-      expect(patch.depthPerPassMm).toBeGreaterThan(0);
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(onCommitSettings).toHaveBeenCalledTimes(1);
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next.toolId).toBe('em-6350');
+      expect(next.feedMmPerMin).toBeGreaterThan(0);
+      expect(next.feedMmPerMin).not.toBe(staleFeed);
+      expect(next.plungeMmPerMin).toBeGreaterThan(0);
+      expect(next.depthPerPassMm).toBeGreaterThan(0);
+      expect(next.feedSource).toEqual({
+        kind: 'material-recipe',
+        materialKey: 'plywood-mdf',
+        fluteCount: 2,
+      });
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -91,11 +102,27 @@ describe('LayerBitSelect', () => {
     installCnc();
     const onCommit = vi.fn();
     const onCommitSettings = vi.fn();
-    const { host, root } = await render(DEFAULT_CNC_LAYER_SETTINGS, onCommit, onCommitSettings);
+    const automaticSettings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      feedSource: {
+        kind: 'machine-starter',
+        starterId: 'neotronics-4040-safe',
+        revision: 1,
+      },
+    };
+    const { host, root } = await render(automaticSettings, onCommit, onCommitSettings);
     try {
       await act(async () => selectBit(host, 'em-6350'));
-      expect(onCommit).toHaveBeenCalledTimes(1);
-      expect(onCommit.mock.calls[0]?.[0]).toEqual({ toolId: 'em-6350' });
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(onCommitSettings).toHaveBeenCalledTimes(1);
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next.toolId).toBe('em-6350');
+      expect(next.feedMmPerMin).toBe(automaticSettings.feedMmPerMin);
+      expect(next.plungeMmPerMin).toBe(automaticSettings.plungeMmPerMin);
+      expect(next.spindleRpm).toBe(automaticSettings.spindleRpm);
+      expect(next.depthPerPassMm).toBe(automaticSettings.depthPerPassMm);
+      expect(next.materialKey).toBeUndefined();
+      expect(next.feedSource).toBeUndefined();
     } finally {
       await act(async () => root.unmount());
       host.remove();

@@ -28,7 +28,9 @@ import {
 } from './laser-controller-qualification';
 import { controllerRebootNotice } from './laser-safety-notice';
 import {
+  clearCncLiveCaps,
   consumeSettingsResponse,
+  publishCncLiveCaps,
   SETTINGS_READ_OPERATION_LABEL,
   type DetectedSettingsResult,
 } from './detected-settings-action';
@@ -236,6 +238,7 @@ function publishDetectedSettings(
     lastSettingsReadAt: Date.now(),
     ...(isSettingsReadOperation(current.controllerOperation) ? { controllerOperation: null } : {}),
   }));
+  publishCncLiveCaps(detected.controllerSettings);
 }
 
 function isSettingsReadOperation(operation: LaserState['controllerOperation']): boolean {
@@ -289,6 +292,7 @@ function handleWelcomeLine(
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
+  clearCncLiveCaps();
   observeControllerResetBoundary(refs);
   const resetPolicy = controllerResetBoundaryPolicy(state);
   const mismatchLog =

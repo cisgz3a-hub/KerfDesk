@@ -15,7 +15,8 @@ import {
 } from '../../core/scene';
 import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
-import { seedLayerFromStockMaterial } from './cnc-project-material';
+import { seedFreshCncLayer } from './cnc-auto-seeding';
+import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
@@ -25,12 +26,13 @@ const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 export type LayerSettingsClipboard = Omit<Layer, 'id' | 'name' | 'color'>;
 export type { LayerSubLayerPatch } from './layer-sub-layer-actions';
 
-type LayerActionState = StateSlice & {
-  readonly selectedObjectId: string | null;
-  readonly additionalSelectedIds: ReadonlySet<string>;
-  readonly copiedLayerSettings: LayerSettingsClipboard | null;
-  readonly layerDefaults: LayerDefaultsState;
-};
+type LayerActionState = StateSlice &
+  CncLiveCapsState & {
+    readonly selectedObjectId: string | null;
+    readonly additionalSelectedIds: ReadonlySet<string>;
+    readonly copiedLayerSettings: LayerSettingsClipboard | null;
+    readonly layerDefaults: LayerDefaultsState;
+  };
 
 type LayerActionMutation = {
   readonly project: Project;
@@ -157,7 +159,14 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
         defaults,
       );
       const machine = state.project.machine;
-      const layer = machine?.kind === 'cnc' ? seedLayerFromStockMaterial(base, machine) : base;
+      const layer =
+        machine?.kind === 'cnc' && defaults.cnc === undefined
+          ? seedFreshCncLayer(base, {
+              device: state.project.device,
+              machine,
+              liveCaps: state.cncLiveCaps,
+            })
+          : base;
       const scene = addLayer(state.project.scene, layer);
       return mutation(state, { ...state.project, scene });
     });

@@ -7,6 +7,7 @@ import {
   captureLayerOperationSettings,
   type LayerOperationSettings,
 } from '../../core/scene';
+import { normalizeCncFeedSource } from './normalize-cnc-feed-source';
 
 const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'adaptive']);
 const LINE_ART_CONTOUR_SIDES = new Set<string>(['inner', 'outer', 'both']);
@@ -81,6 +82,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
       : {}),
     ...normalizeInlayFields(raw),
     ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
+    ...optionalCncFeedSource(raw),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['pocketRoughToolId'] === 'string'
       ? { pocketRoughToolId: raw['pocketRoughToolId'] }
@@ -105,6 +107,11 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     // compile default ('inner') applies by omission.
     ...enumPassthrough('lineArtContours', raw['lineArtContours'], LINE_ART_CONTOUR_SIDES),
   };
+}
+
+function optionalCncFeedSource(raw: Record<string, unknown>): Record<string, unknown> {
+  const feedSource = normalizeCncFeedSource(raw['feedSource'], raw['materialKey']);
+  return feedSource === undefined ? {} : { feedSource };
 }
 
 function normalizeInlayFields(raw: Record<string, unknown>): Record<string, unknown> {

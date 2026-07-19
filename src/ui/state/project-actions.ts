@@ -50,7 +50,7 @@ export function projectActions(
 
 function retainedApplicationState(
   state: AppState,
-): Pick<AppState, 'layerDefaults' | 'cncLibrary'> &
+): Pick<AppState, 'layerDefaults' | 'cncLibrary' | 'cncLiveCaps'> &
   ReturnType<typeof currentMaterialLibraryState> &
   ReturnType<typeof currentSavedLibrariesState> {
   return {
@@ -58,5 +58,6 @@ function retainedApplicationState(
     ...currentSavedLibrariesState(state),
     layerDefaults: state.layerDefaults,
     cncLibrary: state.cncLibrary,
+    cncLiveCaps: state.cncLiveCaps,
   };
 }

@@ -12,6 +12,7 @@ import {
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { clearCncLiveCaps } from './detected-settings-action';
 import { pushLog } from './laser-store-helpers';
 
 type SetFn = (
@@ -45,6 +46,7 @@ export function controllerRecoveryActions(
       }
       const softReset = driver().realtime.softReset;
       if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
+      clearCncLiveCaps();
       cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
       const resetWriteEpoch = refs.writeEpoch ?? 0;
       set((state) => ({

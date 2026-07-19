@@ -207,6 +207,46 @@ describe('.lf2 machine / cnc round-trip', () => {
     });
   });
 
+  it('round-trips automatic feed provenance without inferring it for legacy settings', () => {
+    const project = cncProject();
+    const layer = project.scene.layers[0];
+    if (layer?.cnc === undefined) throw new Error('CNC layer missing');
+    const withProvenance: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...layer,
+            cnc: {
+              ...layer.cnc,
+              toolId: 'em-3175',
+              feedMmPerMin: 600,
+              plungeMmPerMin: 120,
+              depthPerPassMm: 0.75,
+              feedSource: {
+                kind: 'machine-starter',
+                starterId: 'neotronics-4040-shallow-wood-mdf',
+                revision: 1,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    expect(
+      deserializeOk(serializeProject(withProvenance)).scene.layers[0]?.cnc?.feedSource,
+    ).toEqual({
+      kind: 'machine-starter',
+      starterId: 'neotronics-4040-shallow-wood-mdf',
+      revision: 1,
+    });
+    expect(
+      deserializeOk(serializeProject(project)).scene.layers[0]?.cnc?.feedSource,
+    ).toBeUndefined();
+  });
+
   it('loads a legacy project without machine as a laser project', () => {
     const loaded = deserializeOk(serializeProject(createProject()));
     expect(loaded.machine).toBeUndefined();

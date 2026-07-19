@@ -7,7 +7,7 @@ import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/wor
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf } from '../../core/scene';
-import { beginSettingsCollection, SETTINGS_READ_OPERATION_LABEL } from './detected-settings-action';
+import * as detectedSettings from './detected-settings-action';
 import {
   hasAccessoryCommand,
   type ConsoleStateEffect,
@@ -141,12 +141,12 @@ function beginConsoleSettingsRead(
   command: PreparedConsoleCommand,
 ): void {
   if (command.kind !== 'settings-query') return;
-  beginSettingsCollection(refs, get().controllerSessionEpoch);
+  detectedSettings.beginSettingsCollection(refs, get().controllerSessionEpoch);
   set({
     controllerOperation: {
       kind: 'interactive-command',
       phase: 'command',
-      label: SETTINGS_READ_OPERATION_LABEL,
+      label: detectedSettings.SETTINGS_READ_OPERATION_LABEL,
     },
     detectedSettings: null,
     controllerSettings: null,
@@ -158,6 +158,7 @@ function beginConsoleSettingsRead(
 
 function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCommand): void {
   if (command.stateEffect === 'read-only') return;
+  if (command.stateEffect.startsWith('configuration')) detectedSettings.clearCncLiveCaps();
   // Invalidate before the async write yields so Start cannot race manually
   // mutated controller or accessory state against the prior Frame permit.
   set((state) => ({
@@ -181,7 +182,8 @@ function releaseFailedConsoleSettingsRead(set: SetFn, get: GetFn, refs: ConsoleA
 
 function isSettingsReadOperation(operation: LaserState['controllerOperation']): boolean {
   return (
-    operation?.kind === 'interactive-command' && operation.label === SETTINGS_READ_OPERATION_LABEL
+    operation?.kind === 'interactive-command' &&
+    operation.label === detectedSettings.SETTINGS_READ_OPERATION_LABEL
   );
 }
 

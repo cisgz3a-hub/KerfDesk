@@ -11,6 +11,7 @@ import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-no
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { clearCncLiveCaps } from './detected-settings-action';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -125,6 +126,7 @@ async function recoverUncertainProbe(
   if (softReset === null) return;
   const resetEpoch = refs.writeEpoch ?? 0;
   const resetBoundary = waitForControllerResetBoundary(refs, resetEpoch);
+  clearCncLiveCaps();
   set((state) => invalidateControllerSessionEvidence(state));
   try {
     try {

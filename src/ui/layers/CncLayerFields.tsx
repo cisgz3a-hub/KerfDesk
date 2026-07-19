@@ -21,6 +21,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
@@ -50,7 +51,7 @@ export function CncLayerFields(props: {
     setLayerParam(layer.id, { cnc: next });
   };
   const commit = (patch: Partial<CncLayerSettings>): void =>
-    commitSettings({ ...settings, ...patch });
+    commitSettings(withManualCncFeedPatch(settings, patch));
 
   return (
     <>

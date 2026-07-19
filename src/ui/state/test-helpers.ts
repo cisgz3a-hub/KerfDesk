@@ -28,6 +28,7 @@ export function resetStore(): void {
     lastSaveTarget: null,
     copiedLayerSettings: null,
     sceneClipboard: null,
+    cncLiveCaps: null,
     layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     materialLibrary: null,
     materialLibraryDirty: false,

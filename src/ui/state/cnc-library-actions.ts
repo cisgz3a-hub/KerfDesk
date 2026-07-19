@@ -12,6 +12,10 @@ import {
   type CncLibrary,
   type CncMachineProfile,
 } from './cnc-library-persistence';
+import {
+  refreshAutomaticCncFeeds,
+  refreshAutomaticCncFeedsAfterToolRemoval,
+} from './cnc-auto-seeding';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
@@ -76,14 +80,31 @@ function customToolActions(
         if (machine?.kind !== 'cnc' || !machine.tools.some((tool) => tool.id === toolId)) {
           return { cncLibrary: library };
         }
-        // Layers referencing the removed bit fall back to the machine bit
-        // at compile time (layerCncTool); the active bit falls back via
-        // activeCncTool. Undoable like any machine edit.
+        const tools = machine.tools.filter((tool) => tool.id !== toolId);
+        const nextMachine: CncMachineConfig = {
+          ...machine,
+          tools,
+          toolId:
+            machine.toolId === toolId && tools[0] !== undefined ? tools[0].id : machine.toolId,
+        };
+        const scene = refreshAutomaticCncFeedsAfterToolRemoval(
+          s.project.scene,
+          {
+            device: s.project.device,
+            machine: nextMachine,
+            liveCaps: s.cncLiveCaps,
+          },
+          toolId,
+        );
+        // Manual/legacy layer settings remain exact. Only material recipes
+        // carrying automatic provenance drop a deleted override and recalculate
+        // against the surviving active bit.
         return {
           cncLibrary: library,
           project: {
             ...s.project,
-            machine: { ...machine, tools: machine.tools.filter((tool) => tool.id !== toolId) },
+            scene,
+            machine: nextMachine,
           },
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
@@ -154,8 +175,14 @@ function machineProfileActions(
             ),
           ],
         };
+        const device = { ...s.project.device, cncSubProfile: { ...machine.params } };
+        const scene = refreshAutomaticCncFeeds(s.project.scene, {
+          device,
+          machine,
+          liveCaps: s.cncLiveCaps,
+        });
         return {
-          project: { ...s.project, machine },
+          project: { ...s.project, scene, device, machine },
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
           dirty: true,

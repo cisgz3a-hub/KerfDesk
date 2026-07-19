@@ -21,7 +21,11 @@ describe('computeCncDetectedApply (ADR-111)', () => {
   });
 
   it('offers spindle max from $30 (maxPowerS) into the CNC params', () => {
-    const apply = computeCncDetectedApply({ maxPowerS: 24000 }, MACHINE, DEVICE);
+    const apply = computeCncDetectedApply(
+      { maxPowerS: 24000, laserModeEnabled: false },
+      MACHINE,
+      DEVICE,
+    );
     expect(apply?.paramsPatch).toEqual({ spindleMaxRpm: 24000 });
     expect(apply?.devicePatch).toEqual({});
     expect(apply?.summary).toBe('spindle max 24000 RPM');
@@ -36,7 +40,7 @@ describe('computeCncDetectedApply (ADR-111)', () => {
 
   it('combines spindle + bed and names a single differing bed dimension', () => {
     const apply = computeCncDetectedApply(
-      { maxPowerS: 30000, bedWidth: 400, bedHeight: 610 },
+      { maxPowerS: 30000, laserModeEnabled: false, bedWidth: 400, bedHeight: 610 },
       MACHINE,
       DEVICE,
     );

@@ -6,6 +6,7 @@ import type { ControllerKind } from '../../core/devices';
 import type { SerialConnection } from '../../platform/types';
 import { cancel as cancelStreamer, wipeInFlight } from '../../core/controllers/grbl';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { clearCncLiveCaps } from './detected-settings-action';
 import { cancelRawControllerLineWait } from './laser-connection-teardown';
 import {
   cancelControllerLifecycleRefs,
@@ -74,6 +75,7 @@ async function runOwnedDisconnectTransaction(
 ): Promise<void> {
   const reset = refs.driver.realtime.softReset;
   if (reset === null) return;
+  clearCncLiveCaps();
   cancelResetCleanup(refs);
   cancelControllerLifecycleRefs(refs, 'Controller abort requested before disconnect.');
   // The startup handshake has one raw line waiter outside the controller

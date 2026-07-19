@@ -16,9 +16,9 @@ import {
   type CncTool,
   type MachineKind,
   type Project,
-  type Scene,
 } from '../../core/scene';
 import type { CncMachinePreset } from '../../core/cnc';
+import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import {
@@ -29,6 +29,7 @@ import {
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
+import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-seeding';
 import { pushUndo } from './scene-mutations';
 
 type MachineState = {
@@ -38,6 +39,7 @@ type MachineState = {
   readonly dirty: boolean;
   readonly jobPlacement: JobPlacementSettings;
   readonly cachedCncMachine: CncMachineConfig | null;
+  readonly cncLiveCaps: CncMachineStarterLiveCaps | null;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
 };
@@ -125,6 +127,11 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
             ...state.project,
             device: { ...state.project.device, cncSubProfile: { ...machine.params } },
             machine,
+            scene: refreshAutomaticCncFeeds(state.project.scene, {
+              device: { ...state.project.device, cncSubProfile: { ...machine.params } },
+              machine,
+              liveCaps: state.cncLiveCaps,
+            }),
           },
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],
@@ -133,7 +140,7 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
       }),
     applyCncStockMaterial: (materialKey) =>
       set((state) => {
-        const project = projectWithStockMaterial(state.project, materialKey);
+        const project = projectWithStockMaterial(state.project, materialKey, state.cncLiveCaps);
         if (project === state.project) return {};
         return {
           project,
@@ -147,9 +154,8 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
         const machine = state.project.machine;
         if (machine?.kind !== 'cnc') return {};
         // Bed lives on the shared device; the spindle ceiling on the CNC
-        // params. Layer RPMs above the new ceiling clamp down in the same
-        // step — otherwise preflight rejects every export until each layer
-        // is edited by hand (Easel clamps to machine limits the same way).
+        // params. Provenance-confirmed automatic settings follow that ceiling;
+        // manual/legacy layer values remain explicit operator intent.
         return cncMachineSetupStatePatch(state, {
           devicePatch: {
             bedWidth: preset.bedWidthMm,
@@ -177,10 +183,18 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
     current?.kind === 'cnc'
       ? { ...state.project.device, cncSubProfile: { ...current.params } }
       : state.project.device;
-  const scene =
+  const preparedScene =
     kind === 'cnc'
       ? applyCncTextDefaultsForScene(state.project.scene, machine)
       : state.project.scene;
+  const scene =
+    kind === 'cnc' && machine.kind === 'cnc'
+      ? seedCncModeSwitchLayers(state.project.scene, preparedScene, {
+          device,
+          machine,
+          liveCaps: state.cncLiveCaps,
+        })
+      : preparedScene;
   return {
     project: { ...state.project, device, machine, scene },
     cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
@@ -200,19 +214,21 @@ function cncMachineSetupStatePatch(
   const device: DeviceProfile = { ...baseDevice, ...patch.devicePatch };
   const params = { ...machine.params, ...patch.paramsPatch };
   const deviceWithCnc: DeviceProfile = { ...device, cncSubProfile: { ...params } };
+  const nextMachine: CncMachineConfig = { ...machine, params };
   const project: Project = {
     ...state.project,
-    scene:
-      patch.paramsPatch?.spindleMaxRpm === undefined
-        ? state.project.scene
-        : sceneWithSpindleCeiling(state.project.scene, patch.paramsPatch.spindleMaxRpm),
+    scene: refreshAutomaticCncFeeds(state.project.scene, {
+      device: deviceWithCnc,
+      machine: nextMachine,
+      liveCaps: state.cncLiveCaps,
+    }),
     device: deviceWithCnc,
     workspace: {
       ...state.project.workspace,
       width: deviceWithCnc.bedWidth,
       height: deviceWithCnc.bedHeight,
     },
-    machine: { ...machine, params },
+    machine: nextMachine,
   };
   return {
     project,
@@ -228,17 +244,4 @@ function cncMachineSetupStatePatch(
     redoStack: [],
     dirty: true,
   };
-}
-
-// Clamp layer spindle RPMs to a new machine ceiling, preserving identity
-// when nothing changes so no-op preset applies stay cheap.
-export function sceneWithSpindleCeiling(scene: Scene, spindleMaxRpm: number): Scene {
-  let changed = false;
-  const layers = scene.layers.map((layer) => {
-    const cnc = layer.cnc;
-    if (cnc === undefined || cnc.spindleRpm <= spindleMaxRpm) return layer;
-    changed = true;
-    return { ...layer, cnc: { ...cnc, spindleRpm: spindleMaxRpm } };
-  });
-  return changed ? { ...scene, layers } : scene;
 }

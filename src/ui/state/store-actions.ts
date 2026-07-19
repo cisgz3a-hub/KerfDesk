@@ -19,7 +19,8 @@ import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
-import { cncMachineWithCustomTools, sceneWithSpindleCeiling } from './machine-actions';
+import { cncMachineWithCustomTools } from './machine-actions';
+import { projectAfterDeviceProfileChange, sceneAfterMachineSetup } from './cnc-machine-setup-scene';
 
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -68,16 +69,8 @@ export function sceneActions(
     updateDeviceProfile: (patch) =>
       set((s) => {
         const nextDevice: DeviceProfile = { ...s.project.device, ...patch };
-        const nextWorkspace =
-          patch.bedWidth !== undefined || patch.bedHeight !== undefined
-            ? {
-                ...s.project.workspace,
-                width: nextDevice.bedWidth,
-                height: nextDevice.bedHeight,
-              }
-            : s.project.workspace;
         return {
-          project: { ...s.project, device: nextDevice, workspace: nextWorkspace },
+          project: projectAfterDeviceProfileChange(s.project, nextDevice, s.cncLiveCaps),
           jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, nextDevice),
           undoStack: pushUndo(s.project, s.undoStack),
           redoStack: [],
@@ -85,21 +78,19 @@ export function sceneActions(
         };
       }),
     replaceDeviceProfile: (profile) =>
-      set((s) => ({
-        project: {
-          ...s.project,
-          device: profile,
-          workspace: {
-            ...s.project.workspace,
-            width: profile.bedWidth,
-            height: profile.bedHeight,
-          },
-        },
-        jobPlacement: jobPlacementAfterProfileSelection(s.jobPlacement, s.project.device, profile),
-        undoStack: pushUndo(s.project, s.undoStack),
-        redoStack: [],
-        dirty: true,
-      })),
+      set((s) => {
+        return {
+          project: projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
+          jobPlacement: jobPlacementAfterProfileSelection(
+            s.jobPlacement,
+            s.project.device,
+            profile,
+          ),
+          undoStack: pushUndo(s.project, s.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
     ...replaceMachineSetupAction(set),
   };
 }
@@ -130,10 +121,13 @@ function replacementMachineSetupState(
   const retainedCnc = retainedCncForSetup(state, nextMachine, retainedMachine);
   const nextCachedCnc = cachedCncWithCustomTools(retainedCnc, state.cncLibrary.customTools);
   const nextProfile = profileWithCncSettings(profile, nextCachedCnc);
-  const scene =
-    nextMachine.kind === 'cnc'
-      ? sceneWithSpindleCeiling(state.project.scene, nextMachine.params.spindleMaxRpm)
-      : state.project.scene;
+  const scene = sceneAfterMachineSetup(
+    state.project.scene,
+    state.project.machine,
+    nextProfile,
+    nextMachine,
+    state.cncLiveCaps,
+  );
   return {
     project: {
       ...state.project,

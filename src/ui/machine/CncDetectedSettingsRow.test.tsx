@@ -59,6 +59,7 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
   it('applies detected spindle max to params and bed to the device, not the stock', async () => {
     const detected: ControllerSettingsSnapshot = {
       maxPowerS: 24000,
+      laserModeEnabled: false,
       bedWidth: 750,
       bedHeight: 610,
     };
@@ -83,20 +84,38 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
     }
   });
 
-  it('applies a lower spindle ceiling and bed as one update, clamping layers and workspace', async () => {
-    const hot = {
-      ...createLayer({ id: 'hot', color: '#ff0000' }),
+  it('applies a lower spindle ceiling and bed without rewriting manual layers', async () => {
+    const manual = {
+      ...createLayer({ id: 'manual', color: '#ff0000' }),
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 12000 },
+    };
+    const automatic = {
+      ...createLayer({ id: 'automatic', color: '#00ff00' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        materialKey: 'plywood-mdf' as const,
+        spindleRpm: 12000,
+        feedSource: {
+          kind: 'material-recipe' as const,
+          materialKey: 'plywood-mdf',
+          fluteCount: 2,
+        },
+      },
     };
     useStore.getState().setMachineKind('cnc');
     useStore.setState((state) => ({
       project: {
         ...state.project,
-        scene: { ...state.project.scene, layers: [hot] },
+        scene: { ...state.project.scene, layers: [manual, automatic] },
       },
     }));
     useLaserStore.setState({
-      controllerSettings: { maxPowerS: 10000, bedWidth: 300, bedHeight: 180 },
+      controllerSettings: {
+        maxPowerS: 10000,
+        laserModeEnabled: false,
+        bedWidth: 300,
+        bedHeight: 180,
+      },
     });
     const { host, root } = await render();
     try {
@@ -108,13 +127,50 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
       const machine = state.project.machine;
       if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
       expect(machine.params.spindleMaxRpm).toBe(10000);
-      expect(state.project.scene.layers[0]?.cnc?.spindleRpm).toBe(10000);
+      expect(
+        state.project.scene.layers.find((layer) => layer.id === 'manual')?.cnc?.spindleRpm,
+      ).toBe(12000);
+      expect(
+        state.project.scene.layers.find((layer) => layer.id === 'automatic')?.cnc?.spindleRpm,
+      ).toBe(10000);
       expect(state.project.device).toMatchObject({ bedWidth: 300, bedHeight: 180 });
       expect(state.project.workspace).toMatchObject({ width: 300, height: 180 });
       expect(state.undoStack).toHaveLength(2); // machine-kind switch + one detected-settings apply
 
       await act(async () => useStore.getState().undo());
-      expect(useStore.getState().project.scene.layers[0]?.cnc?.spindleRpm).toBe(12000);
+      expect(
+        useStore.getState().project.scene.layers.find((layer) => layer.id === 'manual')?.cnc
+          ?.spindleRpm,
+      ).toBe(12000);
+      expect(
+        useStore.getState().project.scene.layers.find((layer) => layer.id === 'automatic')?.cnc
+          ?.spindleRpm,
+      ).toBe(12000);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('ignores detected $30 as a spindle ceiling while the controller is in laser mode', async () => {
+    useLaserStore.setState({
+      controllerSettings: {
+        maxPowerS: 1000,
+        laserModeEnabled: true,
+        bedWidth: 300,
+      },
+    });
+    const { host, root } = await render();
+    try {
+      const button = host.querySelector('button');
+      if (button === null) throw new Error('Apply button missing');
+      await act(async () => button.click());
+
+      const state = useStore.getState();
+      const machine = state.project.machine;
+      if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
+      expect(machine.params.spindleMaxRpm).toBe(12000);
+      expect(state.project.device.bedWidth).toBe(300);
     } finally {
       await act(async () => root.unmount());
       host.remove();

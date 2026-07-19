@@ -34,29 +34,46 @@ describe('applyCncMachinePreset', () => {
     expect(useStore.getState().project.device.bedWidth).toBe(beforeBed);
   });
 
-  it('clamps layer spindle RPMs above the new preset ceiling', () => {
+  it('refreshes automatic material settings without rewriting manual layers', () => {
     // Genmitsu presets cap at 10000 RPM while the layer default is 12000 —
-    // without clamping, preflight rejects every export until the user edits
-    // each layer by hand (Easel clamps to machine limits instead).
+    // Only settings carrying automatic provenance may follow the new ceiling;
+    // absent provenance means manual or legacy operator intent.
     const preset = CNC_MACHINE_CATALOG.find((candidate) => candidate.id === 'genmitsu-3018');
     if (preset === undefined) throw new Error('preset missing');
-    const hot = {
-      ...createLayer({ id: 'hot', color: '#ff0000' }),
+    const manual = {
+      ...createLayer({ id: 'manual', color: '#ff0000' }),
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 12000 },
     };
-    const cool = {
-      ...createLayer({ id: 'cool', color: '#00ff00' }),
+    const legacy = {
+      ...createLayer({ id: 'legacy', color: '#00ff00' }),
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 8000 },
     };
+    const automatic = {
+      ...createLayer({ id: 'automatic', color: '#0000ff' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        materialKey: 'plywood-mdf' as const,
+        spindleRpm: 12000,
+        feedSource: {
+          kind: 'material-recipe' as const,
+          materialKey: 'plywood-mdf',
+          fluteCount: 2,
+        },
+      },
+    };
     useStore.setState((s) => ({
-      project: { ...s.project, scene: { ...s.project.scene, layers: [hot, cool] } },
+      project: {
+        ...s.project,
+        scene: { ...s.project.scene, layers: [manual, legacy, automatic] },
+      },
     }));
 
     useStore.getState().applyCncMachinePreset(preset);
 
     const layers = useStore.getState().project.scene.layers;
-    expect(layers.find((layer) => layer.id === 'hot')?.cnc?.spindleRpm).toBe(10000);
-    expect(layers.find((layer) => layer.id === 'cool')?.cnc?.spindleRpm).toBe(8000);
+    expect(layers.find((layer) => layer.id === 'manual')?.cnc?.spindleRpm).toBe(12000);
+    expect(layers.find((layer) => layer.id === 'legacy')?.cnc?.spindleRpm).toBe(8000);
+    expect(layers.find((layer) => layer.id === 'automatic')?.cnc?.spindleRpm).toBe(10000);
   });
 
   it('is a no-op in laser mode', () => {

@@ -43,6 +43,11 @@ import {
 } from './cnc-library-actions';
 import type { CncLibrary } from './cnc-library-persistence';
 import {
+  cncLiveCapsActions,
+  type CncLiveCapsActions,
+  type CncLiveCapsState,
+} from './cnc-live-caps-actions';
+import {
   layerActions,
   type LayerSettingsClipboard,
   type LayerSubLayerPatch,
@@ -172,6 +177,8 @@ export type AppState = ObjectPropertiesActions &
   SavedLibrariesActions &
   MaterialPresetActions &
   CncLibraryActions &
+  CncLiveCapsState &
+  CncLiveCapsActions &
   MachineActions &
   BoardTileActions &
   AirAssistDefaultActions & {
@@ -339,6 +346,7 @@ function initialState(
   AppState,
   | 'project'
   | 'cachedCncMachine'
+  | 'cncLiveCaps'
   | 'selectedObjectId'
   | 'selectedPathNode'
   | 'selectedPathNodes'
@@ -365,6 +373,7 @@ function initialState(
   return {
     project,
     cachedCncMachine: null,
+    cncLiveCaps: null,
     selectedObjectId: null,
     selectedPathNode: null,
     selectedPathNodes: [],
@@ -400,6 +409,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...reliefParamActions(set),
   ...externalGcodeActions(set),
   ...cncLibraryActions(set),
+  ...cncLiveCapsActions(set),
   ...layerActions(set),
   ...machineActions(set, get),
   ...airAssistDefaultActions(set, get),

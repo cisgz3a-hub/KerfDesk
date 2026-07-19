@@ -23,7 +23,13 @@ export function computeCncDetectedApply(
   machine: CncMachineConfig,
   device: BedDims,
 ): CncDetectedApply | null {
-  const spindleMaxRpm = pickChanged(detected.maxPowerS, machine.params.spindleMaxRpm);
+  // On a hybrid machine $30 is laser PWM scale while $32=1, not spindle RPM.
+  // Offer it as a CNC spindle ceiling only when the controller itself reports
+  // CNC mode; otherwise applying a laser $30=1000 would invent a 1000 RPM cap.
+  const spindleMaxRpm =
+    detected.laserModeEnabled === false
+      ? pickChanged(detected.maxPowerS, machine.params.spindleMaxRpm)
+      : undefined;
   const bedWidth = pickChanged(detected.bedWidth, device.bedWidth);
   const bedHeight = pickChanged(detected.bedHeight, device.bedHeight);
   const paramsPatch = spindleMaxRpm === undefined ? {} : { spindleMaxRpm };

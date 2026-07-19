@@ -2828,9 +2828,14 @@ F-CNC19 tiling.
    percentage, depth-per-pass as a fraction of bit diameter.
 2. "Apply to layer" writes feed / plunge / depth-per-pass / spindle in
    one undoable patch. Cut type, depth, and tabs stay put. The values
-   compose with H.7 presets (calculate once, save as a preset).
+   compose with H.7 presets (calculate once, save as a preset). The applied
+   values carry material, flute-count, and automatic-source provenance.
 3. The chart values are labeled STARTING POINTS ("listen to the cut") —
    PROVISIONAL industry-typical mid-range chiploads per diameter band.
+4. A recognized machine starter and the active CNC machine/controller ceilings
+   can only lower the displayed automatic result. For the Neotronics 4040,
+   Plywood/MDF with the 3.175 mm two-flute starter resolves to 600 mm/min feed,
+   120 mm/min plunge, 12000 RPM, and 0.75 mm/pass rather than the generic result.
 
 #### Error — none (inputs are bounded)
 1. Material and flutes are selects; tiny results floor at 50 mm/min feed
@@ -3028,17 +3033,19 @@ F-CNC19 tiling.
    Softwood / Hardwood / Plywood-MDF / Acrylic / Aluminium). Picking one
    fills feed, plunge, and depth-per-pass in a single undoable patch from
    the chipload engine, using the layer's own bit and a 2-flute
-   assumption. Cut type, depth, bit, and tabs stay put.
-2. The choice is remembered on the layer (materialKey) and round-trips in
-   the .lf2 file; it is display-only and does not change compiled output.
+   assumption. A recognized machine starter and live limits can lower those
+   automatic values. Cut type, depth, bit, and tabs stay put.
+2. The choice and automatic-source provenance are remembered on the layer and
+   round-trip in the .lf2 file; they are display-only and do not change compiled
+   output beyond the persisted numeric settings themselves.
 
 #### Error — none (bounded)
 1. Material is a select; the engine floors tiny results (feed / per-pass)
    rather than emitting zeros, same as the advanced Feeds calculator.
 
 #### Empty
-1. The row renders only in CNC mode. "Custom" clears materialKey and
-   leaves the current feeds untouched for hand-tuning.
+1. The row renders only in CNC mode. "Manual" clears material and automatic
+   provenance while leaving the current numeric values untouched for hand-tuning.
 
 #### Edge — full flute/RPM control
 1. The one-click fill assumes 2 flutes; operators who need a different
@@ -3075,6 +3082,8 @@ F-CNC19 tiling.
    current setup, a "Machine reports …" banner appears atop Material &
    Bit. "Apply" writes the reported spindle max (GRBL $30) to the machine
    and the reported travel ($130/$131) to the bed, then the banner clears.
+   `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
+   in laser mode it is a PWM scale and is not relabeled as RPM.
 
 #### Error — none (opt-in)
 1. Nothing changes until Apply is clicked; ignoring the banner is safe.
@@ -3085,7 +3094,8 @@ F-CNC19 tiling.
 #### Edge — bed vs stock
 1. Travel fills the machine BED (work envelope), never the stock — the
    workpiece footprint stays whatever the operator set. Spindle max is the
-   RPM ceiling; per-layer running speed is unchanged.
+   RPM ceiling; manual per-layer values are unchanged, while provenance-confirmed
+   automatic values may refresh against the explicitly applied ceiling.
 
 ### F-CNC34. See stock/feed advisories against machine limits — ADR-111 #3b
 
@@ -3128,9 +3138,35 @@ F-CNC19 tiling.
 
 #### Edge — per-layer override and other object types
 1. A layer's own Material picker (F-CNC31) overrides the project material for
-   that layer. Text and drawn shapes don't auto-seed (like laser defaults);
-   set their material on the layer card, or re-pick the project material to
-   apply to all.
+   that layer. Fresh text, drawn shapes, raster/trace conversions, fill-isolated
+   operations, and generated box operations use the same new-operation resolver.
+
+### F-CNC36. Initialize new operations from the selected machine — ADR-233
+
+#### Success
+1. With the Neotronics 4040 profile active, a fresh CNC operation starts with
+   the revisioned 3.175 mm two-flute engineering starter: 600 mm/min feed,
+   120 mm/min plunge, 12000 RPM, and 0.75 mm/pass. The layer card and Job Review
+   identify the starter and revision; the numbers remain fully editable.
+2. A selected project material outranks the machine starter. An operator-saved
+   per-color or all-color layer default outranks both and is copied exactly.
+3. A completed `$$` observation can lower only automatic settings: the slower
+   `$110/$111` limits feed, `$112` limits plunge, and `$30` limits RPM only with
+   `$32=0`. Starting a replacement read, reset, or disconnect discards those
+   transient limits until a complete new dump arrives.
+
+#### Empty
+1. An unidentified machine with no catalog starter keeps the existing behavior;
+   KerfDesk never borrows the 4040 values merely because the bed is 400 mm. A
+   machine tool library without the starter's exact end-mill id and diameter also
+   remains unseeded rather than attaching 3.175 mm values to a different cutter.
+
+#### Edge — existing and manual jobs
+1. Project open, autosave restore, controller observation, duplicate/paste, and
+   ordinary profile replacement never seed an absent CNC block. Manual/legacy
+   numeric settings are never rewritten. Explicit machine/profile changes may
+   refresh only values carrying trusted automatic provenance; an unknown, newer,
+   or no-longer-matching starter keeps its numbers and becomes Manual.
 
 ### F-CNC38. Keep origin and work-Z evidence axis-honest — Phase H.11
 
