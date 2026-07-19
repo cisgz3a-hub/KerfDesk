@@ -353,6 +353,7 @@ type InitialLaserState = Pick<
   | 'pendingToolId'
   | 'frameVerification'
   | 'framedRun'
+  | 'framedRunStartClaim'
 >;
 
 export function initialLaserState(): InitialLaserState {
@@ -404,6 +405,7 @@ export function initialLaserState(): InitialLaserState {
     ...TOOL_CHANGE_STATE_DEFAULTS,
     frameVerification: null,
     framedRun: null,
+    framedRunStartClaim: null,
   };
 }
 

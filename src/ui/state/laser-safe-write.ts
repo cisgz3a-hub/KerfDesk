@@ -7,6 +7,7 @@ import {
   type TranscriptSource,
 } from './laser-transcript';
 import type { LaserState } from './laser-store';
+import type { LaserMotionOperationId } from './laser-motion-operation';
 import { reserveUntrackedAcks, type UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
 import {
   activeJobCommandBlockMessage,
@@ -104,7 +105,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
 function currentMotionOperationId(
   get: GetFn,
   action: LaserSafetyAction | undefined,
-): number | undefined {
+): LaserMotionOperationId | undefined {
   const operation = get().motionOperation;
   if (action === 'frame' && operation?.kind === 'frame') return operation.operationId;
   if (action === 'jog' && operation?.kind === 'jog') return operation.operationId;
@@ -122,7 +123,7 @@ function commitSuccessfulWrite(
   line: string,
   source: TranscriptSource,
   action: LaserSafetyAction | undefined,
-  motionOperationId: number | undefined,
+  motionOperationId: LaserMotionOperationId | undefined,
 ): void {
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
@@ -140,7 +141,7 @@ function recordWriteFailure(
   expectedEpoch: number,
   err: unknown,
   action: LaserSafetyAction | undefined,
-  motionOperationId: number | undefined,
+  motionOperationId: LaserMotionOperationId | undefined,
 ): void {
   if ((refs.writeEpoch ?? 0) !== expectedEpoch) return;
   const message = serialWriteErrorMessage(err);
@@ -165,7 +166,7 @@ function motionTransportWritePatch(
   state: LaserState,
   action: LaserSafetyAction | undefined,
   delta: 1 | -1,
-  motionOperationId: number | undefined,
+  motionOperationId: LaserMotionOperationId | undefined,
 ): Partial<Pick<LaserState, 'motionOperation'>> {
   const operation = state.motionOperation;
   if (

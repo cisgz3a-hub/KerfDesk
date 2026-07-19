@@ -93,9 +93,10 @@ export type MachineStartSnapshot = {
   readonly workZReferenceEpoch?: number;
   readonly controllerSessionEpoch?: number;
   readonly wcoCache?: WorkCoordinateOffset | null;
-  // Operator-selected active WCS (G54-G59) tracked from console commands. A
-  // non-G54 value warns that placement (measured from the active offset) will
-  // not match the G54 the job emits (C6).
+  // Active WCS (G54-G59) tracked from console commands and fresh modal
+  // readback. Fresh Frame owns selection of emitted G54 before preparing the
+  // exact artifact and durably discloses a known G55-G59 change in Job Review;
+  // save and replay paths may still surface the direct mismatch advisory (C6).
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   // Last live GRBL Ov: field, cached across intermittent status frames.
   // A known non-default value changes physical feed/RPM independently of the

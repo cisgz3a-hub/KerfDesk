@@ -1,25 +1,25 @@
-import type { FramedRunPermit } from '../state/framed-run';
+import type { FramedRunPermit, FramedRunStartClaim } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 
-/** One synchronous owner for the exact completion-issued permit being handed
- * from the UI flow to the controller store. */
-export type FramedRunStartClaim = {
-  readonly permit: FramedRunPermit;
-};
-
-let activeClaim: FramedRunStartClaim | null = null;
+export type { FramedRunStartClaim } from '../state/framed-run';
 
 export function claimCurrentFramedRunStart(permit: FramedRunPermit): FramedRunStartClaim | null {
-  if (activeClaim !== null || useLaserStore.getState().framedRun !== permit) return null;
   const claim = { permit };
-  activeClaim = claim;
-  return claim;
+  useLaserStore.setState((state) =>
+    state.framedRunStartClaim === null && state.framedRun === permit
+      ? { framedRunStartClaim: claim }
+      : {},
+  );
+  return useLaserStore.getState().framedRunStartClaim === claim ? claim : null;
 }
 
 export function framedRunStartClaimIsCurrent(claim: FramedRunStartClaim): boolean {
-  return activeClaim === claim && useLaserStore.getState().framedRun === claim.permit;
+  const state = useLaserStore.getState();
+  return state.framedRunStartClaim === claim && state.framedRun === claim.permit;
 }
 
 export function releaseFramedRunStartClaim(claim: FramedRunStartClaim): void {
-  if (activeClaim === claim) activeClaim = null;
+  useLaserStore.setState((state) =>
+    state.framedRunStartClaim === claim ? { framedRunStartClaim: null } : {},
+  );
 }

@@ -1,9 +1,11 @@
+import type { LaserMotionOperationId } from './laser-motion-operation';
+
 export type UntrackedAckReservation = {
   readonly writeEpoch: number;
   /** Exact motion generation that emitted this queued line, or null for
    * console/poll/system ownership. Repeated for every ack in a multi-line
    * reservation so an unrelated error can never retire active motion. */
-  readonly motionOperationId: number | null;
+  readonly motionOperationId: LaserMotionOperationId | null;
   remaining: number;
 };
 
@@ -16,7 +18,7 @@ export type UntrackedAckLedgerRefs = {
 export function reserveUntrackedAcks(
   refs: UntrackedAckLedgerRefs,
   count: number,
-  motionOperationId: number | null = null,
+  motionOperationId: LaserMotionOperationId | null = null,
 ): UntrackedAckReservation | null {
   if (count <= 0) return null;
   const queue = currentQueue(refs);
@@ -26,7 +28,7 @@ export function reserveUntrackedAcks(
 }
 
 /** Consume one terminal response from the oldest current-session write. */
-export function consumeUntrackedAck(refs: UntrackedAckLedgerRefs): number | null {
+export function consumeUntrackedAck(refs: UntrackedAckLedgerRefs): LaserMotionOperationId | null {
   const queue = currentQueue(refs);
   const reservation = queue[0];
   if (reservation === undefined) return null;

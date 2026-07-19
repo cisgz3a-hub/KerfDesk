@@ -1,4 +1,7 @@
-import { markMotionOperationDispatched } from './laser-motion-operation';
+import {
+  markMotionOperationDispatched,
+  type LaserMotionOperationId,
+} from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import type { SafeWriteFn, SetFn } from './laser-line-shared';
 
@@ -7,7 +10,7 @@ export function dispatchQueuedMotionLine(
   get: () => LaserState,
   safeWrite: SafeWriteFn,
   line: string,
-  operationId: number,
+  operationId: LaserMotionOperationId,
 ): void {
   const operation = get().motionOperation;
   if (operation?.operationId !== operationId || operation.cancelRequested === true) return;

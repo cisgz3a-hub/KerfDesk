@@ -46,6 +46,9 @@ export type ReviewedStartBundle = {
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly externalEnvironment: StartExternalEnvironment;
+  /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
+   * after that selection, so they must retain the original named WCS fact. */
+  readonly frameWcsNormalizationWarning?: string;
 };
 
 export type ConfirmedJobReview = {
@@ -79,6 +82,7 @@ export async function runJobReviewGate(args: {
       args.checkpointToReplace,
       args.completedReceipt,
       purpose,
+      current.frameWcsNormalizationWarning,
     );
     if (!rebuilt.ok) {
       useJobReviewStore.getState().failPrepare(rebuilt.messages);
@@ -90,12 +94,15 @@ export async function runJobReviewGate(args: {
 }
 
 function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
-  return buildJobReviewModel({
+  const model = buildJobReviewModel({
     project: bundle.project,
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
   });
+  const warning = bundle.frameWcsNormalizationWarning;
+  if (warning === undefined || model.warnings.includes(warning)) return model;
+  return { ...model, warnings: [warning, ...model.warnings] };
 }
 
 // A Confirm click is the acknowledgement: the dialog showed the exact prompt
@@ -134,6 +141,7 @@ async function rebuildCurrentStart(
   checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
   purpose: JobReviewPurpose,
+  frameWcsNormalizationWarning: string | undefined,
 ): Promise<RebuiltStart> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
@@ -167,6 +175,7 @@ async function rebuildCurrentStart(
       prepared,
       laserModeStartSnapshot,
       externalEnvironment,
+      ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
     },
   };
 }

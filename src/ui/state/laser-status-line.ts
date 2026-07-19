@@ -5,7 +5,6 @@
 import {
   cancel as cancelStreamer,
   wipeInFlight,
-  type GrblState,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
@@ -14,26 +13,16 @@ import {
   controllerCommandOwnsCncStartSettleDwell,
   observeControllerIdleWait,
 } from './laser-interactive-command';
-import {
-  applyMotionTerminalAckFence,
-  observeMotionStatus,
-  takeNextMotionLine,
-} from './laser-motion-operation';
 import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
+import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { hasCustomXyOrigin } from './origin-actions';
 import { statusObservationPatch } from './laser-status-observation';
 import { liveCanvasStatusPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
-import { createFramedRunPermit, framedRunCompletionIssue } from './framed-run';
-import { pushLog } from './laser-store-helpers';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
-import {
-  frameStatusFailureMessage,
-  frameStatusFailurePatch,
-  jogMpgInterruptionPatch,
-} from './frame-status-failure';
+import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
 
 export function handleStatusLine(
   set: SetFn,
@@ -139,114 +128,6 @@ function observeStatusConsumers(
     { sessionEpoch: state.controllerSessionEpoch, sequence: nextSequence },
     report,
   );
-}
-
-type FrameMotionObservation = {
-  readonly observed: LaserState['motionOperation'];
-  readonly frameFailureMessage: string | null;
-};
-
-function observeFrameMotion(
-  operation: LaserState['motionOperation'],
-  state: GrblState,
-  pendingUntrackedAcks: number,
-  mpgOwnsControl: boolean,
-  nextStatusSequence: number,
-): FrameMotionObservation {
-  const frameFailureMessage = frameStatusFailureMessage(operation, state, mpgOwnsControl);
-  if (frameFailureMessage !== null) return { observed: null, frameFailureMessage };
-  return {
-    observed: applyMotionTerminalAckFence(
-      operation,
-      observeMotionStatus(operation, state, nextStatusSequence),
-      pendingUntrackedAcks,
-    ),
-    frameFailureMessage: null,
-  };
-}
-
-function nextFrameDispatch(
-  operation: LaserState['motionOperation'],
-  observation: FrameMotionObservation,
-): ReturnType<typeof takeNextMotionLine> {
-  if (observation.frameFailureMessage !== null || operation === null) return null;
-  return observation.observed === null ? takeNextMotionLine(operation) : null;
-}
-
-function frameCompletionPatch(args: {
-  readonly operation: LaserState['motionOperation'];
-  readonly observedOperation: LaserState['motionOperation'];
-  readonly queuedFrameDispatch: ReturnType<typeof takeNextMotionLine>;
-  readonly positionInvalidated: boolean;
-  readonly state: LaserState;
-  readonly report: StatusReport;
-  readonly nextSequence: number;
-  readonly positionPatch: ReturnType<typeof statusPositionPatch>;
-  readonly frameFailureMessage: string | null;
-}): Partial<Pick<LaserState, 'framedRun' | 'frameVerification' | 'lastWriteError' | 'log'>> {
-  if (args.positionInvalidated || args.frameFailureMessage !== null) return {};
-  const completedFrame = cleanCompletedFrameOperation(
-    args.operation,
-    args.observedOperation,
-    args.queuedFrameDispatch,
-  );
-  if (completedFrame === null) return {};
-  const candidate = completedFrame.candidate ?? null;
-  if (candidate === null) {
-    // PR #288 compatibility: legacy callers attach only the verification
-    // record. Preserve that proof after the richer terminal settlement, but
-    // never mint a Start permit without the exact reviewed-job candidate.
-    return completedFrame.verification === undefined
-      ? {}
-      : { frameVerification: completedFrame.verification };
-  }
-  const source = {
-    controllerSessionEpoch: args.state.controllerSessionEpoch,
-    controllerSettings: args.state.controllerSettings,
-    controllerSettingsObservation: args.state.controllerSettingsObservation,
-    statusReport: args.report,
-    statusSequence: args.nextSequence,
-    wcoCache: args.positionPatch.wcoCache ?? args.state.wcoCache,
-    workOriginActive: args.positionPatch.workOriginActive ?? args.state.workOriginActive,
-    workOriginSource: args.positionPatch.workOriginSource ?? args.state.workOriginSource,
-    trustedPositionEpoch: args.state.trustedPositionEpoch ?? 0,
-    workZReferenceEpoch: args.state.workZReferenceEpoch,
-    workZZeroEvidence: args.state.workZZeroEvidence,
-  } as const;
-  const issue = framedRunCompletionIssue(candidate, source);
-  if (issue !== null) {
-    return {
-      framedRun: null,
-      frameVerification: null,
-      lastWriteError: issue,
-      log: pushLog(args.state, `[lf2] ${issue}`),
-    };
-  }
-  return {
-    framedRun: createFramedRunPermit(candidate, source),
-    frameVerification: candidate.frameVerification,
-  };
-}
-
-type FrameMotionOperation = Extract<
-  NonNullable<LaserState['motionOperation']>,
-  { readonly kind: 'frame' }
->;
-
-function cleanCompletedFrameOperation(
-  operation: LaserState['motionOperation'],
-  observed: LaserState['motionOperation'],
-  queued: ReturnType<typeof takeNextMotionLine>,
-): FrameMotionOperation | null {
-  if (
-    operation?.kind !== 'frame' ||
-    operation.cancelRequested === true ||
-    observed !== null ||
-    queued !== null
-  ) {
-    return null;
-  }
-  return operation;
 }
 
 function isInvalidatingStatusState(state: string): boolean {
