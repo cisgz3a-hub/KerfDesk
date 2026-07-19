@@ -333,11 +333,13 @@ describe('optimizePaths', () => {
           const after = estimateJobDuration(optimizePaths(job), DEFAULT_DEVICE_PROFILE);
           // Relative comparison — float-sum order matters per the
           // planner's trapezoidal integrator. 1 ppm is 1 ms on a
-          // 1000s job; under any user-visible delta.
+          // 1000s job; under any user-visible delta. Add machine
+          // epsilon so values that only exceed the boundary by ULP
+          // rounding noise don't fail the property.
           const denom = Math.max(before.breakdown.cutSeconds, 1e-9);
           const relDiff =
             Math.abs(after.breakdown.cutSeconds - before.breakdown.cutSeconds) / denom;
-          expect(relDiff).toBeLessThan(1e-6);
+          expect(relDiff).toBeLessThanOrEqual(1e-6 + Number.EPSILON);
         },
       ),
       { numRuns: 50 },
