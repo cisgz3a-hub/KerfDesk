@@ -14,8 +14,9 @@
 
 import type { Vec2 } from '../scene';
 import type { FillGroup, Group, Job } from './job';
-import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
-import { groupFillSweeps, type FillSpan, type FillSweep } from './fill-sweeps';
+import { expandFillHatchWithRunways } from './fill-runway';
+import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
+import type { FillSpan, FillSweep } from './fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
 import { appendCncGroupSteps, createCncSimState, type CncSimState } from './toolpath-cnc';
 import { appendTravelStep, dist, polylineLength } from './toolpath-math';
@@ -84,17 +85,8 @@ function appendFillGroupSteps(
   }
   const scanOffsetMm = offsetForSpeed(options.scanningOffsets ?? [], group.speed);
   let prevEnd = initialPrevEnd;
-  for (const sweep of groupFillSweeps(group.segments)) {
-    const end = appendFillSweepSteps(
-      steps,
-      prevEnd,
-      sweep,
-      group.color,
-      group.overscanMm,
-      group.fillStyle,
-      group.islandMotionPolicy,
-      scanOffsetMm,
-    );
+  for (const plan of planFillSweeps(group)) {
+    const end = appendFillSweepSteps(steps, prevEnd, plan, group.color, scanOffsetMm);
     if (end !== null) prevEnd = end;
   }
   return prevEnd;
@@ -142,24 +134,15 @@ export function summarizeToolpathDistances(toolpath: Toolpath): ToolpathDistance
 function appendFillSweepSteps(
   steps: ToolpathStep[],
   prevEnd: Vec2 | null,
-  sweep: FillSweep,
+  plan: FillSweepPlan,
   color: string,
-  overscanMm: number,
-  fillStyle: FillGroup['fillStyle'],
-  islandMotionPolicy: FillGroup['islandMotionPolicy'],
   scanOffsetMm: number,
 ): Vec2 | null {
-  const spans = scanOffsetSpans(sweep, scanOffsetMm);
+  const spans = scanOffsetSpans(plan.sweep, scanOffsetMm);
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return null;
-  const overscan = effectiveFillOverscanMm(
-    [first.start, last.end],
-    overscanMm,
-    fillStyle,
-    islandMotionPolicy,
-  );
-  const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+  const run = expandFillHatchWithRunways([first.start, last.end], plan);
   if (run === null) return null;
   appendTravelStep(steps, prevEnd, run.leadStart);
   appendTravelStep(steps, run.leadStart, run.burnStart);

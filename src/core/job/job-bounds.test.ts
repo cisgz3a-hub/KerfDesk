@@ -282,4 +282,50 @@ describe('computeJobMotionBounds', () => {
       maxY: 20,
     });
   });
+
+  it('includes 4040 feed-matched J runways without changing burn bounds', () => {
+    const fillJob: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'script-name',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          fillRunwayPolicy: 'feed-matched-entry',
+          overscanMm: 5,
+          segments: [
+            {
+              polyline: [
+                { x: 6.551, y: 43 },
+                { x: 7.015, y: 43 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+            {
+              polyline: [
+                { x: 16.62, y: 43 },
+                { x: 18.972, y: 43 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(computeJobBounds(fillJob, DEFAULT_DEVICE_PROFILE)).toEqual({
+      minX: 6.551,
+      minY: 43,
+      maxX: 18.972,
+      maxY: 43,
+    });
+    const motionBounds = computeJobMotionBounds(fillJob, DEFAULT_DEVICE_PROFILE);
+    expect(motionBounds).toMatchObject({ minY: 43, maxX: 23.972, maxY: 43 });
+    expect(motionBounds?.minX).toBeCloseTo(1.551, 6);
+  });
 });

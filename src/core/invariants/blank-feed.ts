@@ -30,7 +30,10 @@ export type BlankFeedIssue = Issue & { readonly distanceMm: number };
 
 export type BlankFeedOptions = { readonly thresholdMm: number };
 
-const DISTANCE_EPS_MM = 1e-6;
+// Generated motion coordinates are rounded independently to 0.001 mm. A
+// threshold-length diagonal can therefore parse up to sqrt(2) * 0.001 mm long.
+// Two microns accepts that quantization without masking a materially long feed.
+const DISTANCE_QUANTIZATION_TOLERANCE_MM = 0.002;
 
 export function findLongBlankFeedMoves(
   gcode: string | ReadonlyArray<string>,
@@ -64,7 +67,7 @@ export function findLongBlankFeedMoves(
     if (!isGcodeCommand(stripped, 'G1')) continue;
     if (stickyS !== 0) continue;
     const distanceMm = Math.hypot(x - fromX, y - fromY);
-    if (distanceMm - threshold > DISTANCE_EPS_MM) {
+    if (distanceMm - threshold > DISTANCE_QUANTIZATION_TOLERANCE_MM) {
       issues.push({
         lineNumber: i + 1,
         line: raw,

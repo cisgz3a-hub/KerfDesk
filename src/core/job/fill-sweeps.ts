@@ -38,7 +38,13 @@ const COLLINEAR_EPS_MM = 1e-6;
 export function groupFillSweeps(
   segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2>; readonly reverse: boolean }>,
 ): FillSweep[] {
-  const sweeps: FillSweep[] = [];
+  return groupFillScanlines(segments).flat();
+}
+
+export function groupFillScanlines(
+  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2>; readonly reverse: boolean }>,
+): FillSweep[][] {
+  const scanlines: FillSweep[][] = [];
   let group: Run[] = [];
   for (const seg of segments) {
     const a = seg.polyline[0];
@@ -48,12 +54,12 @@ export function groupFillSweeps(
     if (group.length === 0 || canJoinGroup(group[0] as Run, run)) {
       group.push(run);
     } else {
-      sweeps.push(...buildSweeps(group));
+      scanlines.push(buildSweeps(group));
       group = [run];
     }
   }
-  if (group.length > 0) sweeps.push(...buildSweeps(group));
-  return sweeps;
+  if (group.length > 0) scanlines.push(buildSweeps(group));
+  return scanlines;
 }
 
 function canJoinGroup(first: Run, run: Run): boolean {
@@ -87,13 +93,13 @@ function perpDistance(origin: Vec2, dx: number, dy: number, len: number, p: Vec2
 // up to ~21mm crossed at cutting feed — the "move to a second part" that left a
 // stray line (ADR-035). 5mm sits above the speed break-even (~3.3mm at the
 // default feed) and cleanly separates an inter-region gap from a small hole.
-const GAP_RAPID_THRESHOLD_MM = 5;
+export const FILL_GAP_RAPID_THRESHOLD_MM = 5;
 
 // Order a group's runs along the sweep direction (the first run's start->end),
 // then split into one or more sweeps wherever the gap to the next span exceeds
-// GAP_RAPID_THRESHOLD_MM. Reverse-snake scanlines (first run pointing -x)
+// FILL_GAP_RAPID_THRESHOLD_MM. Reverse-snake scanlines (first run pointing -x)
 // naturally sort right-to-left, and each returned sweep is one continuous pass;
-// the gaps BETWEEN sweeps become G0 rapids in the emitter's per-sweep seek.
+// fill-sweep-plan owns the motion used at boundaries between those sweeps.
 function buildSweeps(runs: Run[]): FillSweep[] {
   const first = runs[0];
   if (first === undefined) return [];
@@ -115,7 +121,7 @@ function buildSweeps(runs: Run[]): FillSweep[] {
     const next = spans[i + 1];
     if (next === undefined) continue;
     const gap = Math.hypot(next.start.x - span.end.x, next.start.y - span.end.y);
-    if (gap > GAP_RAPID_THRESHOLD_MM) {
+    if (gap > FILL_GAP_RAPID_THRESHOLD_MM) {
       sweeps.push({ reverse: first.reverse, spans: current });
       current = [];
     }

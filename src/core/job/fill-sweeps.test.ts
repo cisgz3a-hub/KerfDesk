@@ -57,6 +57,41 @@ describe('groupFillSweeps', () => {
     });
   });
 
+  it('keeps the clean 50.636 mm name row as one continuous 22-span sweep', () => {
+    const spans = [
+      [241.764, 242.595],
+      [242.903, 243.066],
+      [246.13, 246.292],
+      [248.077, 248.797],
+      [250.963, 251.106],
+      [252.913, 253.69],
+      [253.907, 254.046],
+      [258.554, 258.674],
+      [261.363, 262.114],
+      [264.813, 265.511],
+      [268.622, 268.775],
+      [270.558, 271.277],
+      [273.539, 274.19],
+      [276.627, 277.338],
+      [278.925, 279.587],
+      [283.127, 283.245],
+      [285.064, 285.847],
+      [286.065, 286.186],
+      [289.1, 289.408],
+      [291.278, 291.336],
+      [291.548, 291.73],
+      [292.059, 292.4],
+    ] as const;
+    const sweeps = groupFillSweeps(spans.map(([x0, x1]) => seg(x0, 90.4, x1, 90.4)));
+
+    expect(sweeps).toHaveLength(1);
+    expect(sweeps[0]?.spans).toHaveLength(22);
+    expect((sweeps[0]?.spans.at(-1)?.end.x ?? 0) - (sweeps[0]?.spans[0]?.start.x ?? 0)).toBeCloseTo(
+      50.636,
+      6,
+    );
+  });
+
   it('splits collinear runs when reverse metadata differs', () => {
     const sweeps = groupFillSweeps([seg(0, 0, 5, 0), seg(15, 0, 10, 0, true)]);
 

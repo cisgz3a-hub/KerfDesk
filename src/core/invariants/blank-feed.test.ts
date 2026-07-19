@@ -39,6 +39,18 @@ describe('findLongBlankFeedMoves', () => {
     expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toEqual([]);
   });
 
+  it('allows a nominal 5 mm diagonal after three-decimal coordinate quantization', () => {
+    const gcode = ['G0 X6.464 Y6.464 S0', 'G1 X10.000 Y10.000 F1500 S0'].join('\n');
+
+    expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toEqual([]);
+  });
+
+  it('still flags a blank feed beyond the coordinate-quantization allowance', () => {
+    const gcode = ['G0 X0.000 Y0.000 S0', 'G1 X5.003 Y0.000 F1500 S0'].join('\n');
+
+    expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toHaveLength(1);
+  });
+
   it('does not flag powered G1 moves', () => {
     const gcode = ['G1 X0.000 Y0.000 S300', 'G1 X20.000 Y0.000 S300'].join('\n');
 

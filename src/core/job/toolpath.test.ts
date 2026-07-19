@@ -199,6 +199,67 @@ describe('buildToolpath', () => {
     expect(tp.totalLength).toBe(20);
   });
 
+  it('previews the 4040 J split as rapid remainder then 5 mm feed-matched entry', () => {
+    const tp = buildToolpath({
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'script-name',
+          color: '#000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          fillRunwayPolicy: 'feed-matched-entry',
+          overscanMm: 5,
+          segments: [
+            {
+              polyline: [
+                { x: 6.551, y: 43 },
+                { x: 7.015, y: 43 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+            {
+              polyline: [
+                { x: 16.62, y: 43 },
+                { x: 18.972, y: 43 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(tp.steps.map((step) => step.kind)).toEqual([
+      'travel',
+      'cut',
+      'travel',
+      'travel',
+      'cut',
+      'travel',
+    ]);
+    const rapidRemainder = tp.steps[2];
+    expect(rapidRemainder).toMatchObject({
+      kind: 'travel',
+      from: { x: 7.015, y: 43 },
+    });
+    if (rapidRemainder?.kind !== 'travel') throw new Error('Expected rapid remainder');
+    expect(rapidRemainder.to.x).toBeCloseTo(11.62, 6);
+    expect(rapidRemainder.length).toBeCloseTo(4.605, 6);
+    const feedEntry = tp.steps[3];
+    expect(feedEntry).toMatchObject({
+      kind: 'travel',
+      to: { x: 16.62, y: 43 },
+      length: 5,
+    });
+    if (feedEntry?.kind !== 'travel') throw new Error('Expected feed-matched entry');
+    expect(feedEntry.from.x).toBeCloseTo(11.62, 6);
+  });
+
   it('applies device scan offset to reverse fill sweeps in the preview route', () => {
     const tp = buildToolpath(
       {

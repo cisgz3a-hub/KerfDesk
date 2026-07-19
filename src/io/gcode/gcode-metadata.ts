@@ -20,8 +20,9 @@ export type GcodeMetadata = {
 // Bump when the emitter's G-code-shaping behavior changes. Currently covers the
 // continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
 // dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
-// standalone surfacing safe-Z-before-M3 ordering (ADR-103).
-export const EMITTER_REVISION = 'adr-103-surfacing-safe-start-v1';
+// standalone surfacing safe-Z-before-M3 ordering (ADR-103). ADR-234 adds the
+// 4040 profile's bounded feed-matched fill entry runways.
+export const EMITTER_REVISION = 'adr-234-4040-fill-entry-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
@@ -70,7 +71,7 @@ function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string>
   }
   return [
     `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
-    '; safety: G0 carries S0; blank gaps >5mm rapid (G0); fill+raster dynamic power (M4)',
+    '; safety: G0 carries S0; blank feed <=5mm; wider blank gaps include G0; fill+raster dynamic power (M4)',
   ];
 }
 

@@ -19,17 +19,15 @@ import {
   type GrblGcodeDialect,
   type GrblPowerMode,
 } from '../devices';
-import {
-  effectiveFillOverscanMm,
-  expandFillHatchWithOverscan,
-  fillOverscanCommentText,
-} from '../job/fill-overscan';
-import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
+import { expandFillHatchWithRunways } from '../job/fill-runway';
+import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
+import type { FillSpan, FillSweep } from '../job/fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
+import { fillRunwayCommentText } from './fill-runway-comment';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -145,38 +143,21 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   const s = scaleS(group.power, device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
-  const overscanText = fillOverscanCommentText(
-    group.overscanMm,
-    group.fillStyle,
-    group.islandMotionPolicy,
-    fmt,
-  );
+  const overscanText = fillRunwayCommentText(group, fmt);
   chunks.push(
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} ${overscanText}`,
   );
-  // Each scanline's runs become ONE continuous laser-on sweep: a single G1
-  // pass across the row that blanks the interior gaps (holes) with S0 instead
-  // of lifting to a rapid and stopping at every run. This is the structural
-  // fill-speed fix (ADR-034) — it matches how emit-raster.ts sweeps a row and
-  // how LightBurn fills, collapsing thousands of short stop-start runs into a
-  // few hundred continuous sweeps. Normal scanline short-run skip is preserved;
-  // Island Fill gets a capped partial runway so tiny islands do not start
-  // burning from rest.
-  const sweeps = groupFillSweeps(group.segments);
+  // Each scanline's nearby runs become continuous G1 sweeps with S0 gaps
+  // (ADR-034); wide gaps still split for G0 hard-off travel (ADR-035). Legacy
+  // profiles preserve the short-run runway skip. The 4040 plan instead gives
+  // every sweep a bounded feed-matched entry without overlapping its neighbor.
+  const sweepPlans = planFillSweeps(group);
   const scanOffsetMm = offsetForSpeed(device.scanningOffsets, group.speed);
+  const context = { s, feed, scanOffsetMm, dialect };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
-    for (const sweep of sweeps) {
-      const text = emitFillSweep(
-        sweep,
-        s,
-        feed,
-        group.overscanMm,
-        group.fillStyle,
-        group.islandMotionPolicy,
-        scanOffsetMm,
-        dialect,
-      );
+    for (const plan of sweepPlans) {
+      const text = emitFillSweep(plan, context);
       if (text.length > 0) chunks.push(text);
     }
   }
@@ -204,44 +185,45 @@ function emitOffsetFillGroup(
   return chunks.join(LINE_END) + LINE_END;
 }
 
-// One scanline as a continuous sweep. Seek to the optional overscan lead with
-// the laser off (reusing the 1a/1b lead geometry + short-run skip), then keep a
-// single G1 chain: each ink span burns at S{s}, each interior gap crosses
-// at S0 so the head never stops over a hole. Sensitive Island Fill runways on
-// G-code S is modal, so every span re-asserts its value — a missed S0 would fire the
-// beam across a hole, so the per-segment S sequence is asserted exhaustively in
-// the tests.
-function emitFillSweep(
-  sweep: FillSweep,
-  s: number,
-  feed: number,
-  overscanMm: number,
-  fillStyle: FillGroup['fillStyle'],
-  islandMotionPolicy: FillGroup['islandMotionPolicy'],
-  scanOffsetMm: number,
-  dialect: GrblGcodeDialect,
-): string {
-  const spans = scanOffsetSpans(sweep, scanOffsetMm);
+// One planned sweep. Seek to its entry runway with G0/S0, traverse the runway
+// using the plan's rapid or feed-matched mode, then keep one G1 chain across
+// ink and S0 holes. G-code S is modal, so every span re-asserts its value.
+type FillSweepEmissionContext = {
+  readonly s: number;
+  readonly feed: number;
+  readonly scanOffsetMm: number;
+  readonly dialect: GrblGcodeDialect;
+};
+
+function emitFillSweep(plan: FillSweepPlan, context: FillSweepEmissionContext): string {
+  const spans = scanOffsetSpans(plan.sweep, context.scanOffsetMm);
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return '';
-  const overscan = effectiveFillOverscanMm(
-    [first.start, last.end],
-    overscanMm,
-    fillStyle,
-    islandMotionPolicy,
-  );
-  const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+  const run = expandFillHatchWithRunways([first.start, last.end], plan);
   if (run === null) return '';
-  const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, dialect)];
-  if (overscan > 0) {
-    lines.push(travelLine(run.burnStart.x, run.burnStart.y, dialect));
+  const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, context.dialect)];
+  if (plan.leadInMm > 0) {
+    lines.push(runwayLine(run.burnStart, plan, context));
   }
-  for (const line of sweepSpanLines(spans, s, feed, dialect)) lines.push(line);
-  if (overscan > 0) {
-    lines.push(travelLine(run.leadEnd.x, run.leadEnd.y, dialect));
+  for (const line of sweepSpanLines(spans, context.s, context.feed, context.dialect)) {
+    lines.push(line);
+  }
+  if (plan.leadOutMm > 0) {
+    lines.push(runwayLine(run.leadEnd, plan, context));
   }
   return lines.join(LINE_END);
+}
+
+function runwayLine(
+  target: FillSpan['start'],
+  plan: FillSweepPlan,
+  context: FillSweepEmissionContext,
+): string {
+  if (plan.runwayMotion === 'rapid') {
+    return travelLine(target.x, target.y, context.dialect);
+  }
+  return `G1 X${fmt(target.x)} Y${fmt(target.y)} F${context.feed} S0`;
 }
 
 function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<FillSpan> {
@@ -269,7 +251,7 @@ function sweepSpanLines(
   const first = spans[0];
   if (first === undefined) return [];
   const lines: string[] = [];
-  // Head starts where the runway G0 left it: the first span's start.
+  // Head starts where the planned runway move left it: the first span's start.
   let headX = fmt(first.start.x);
   let headY = fmt(first.start.y);
   let feedEmitted = false;
