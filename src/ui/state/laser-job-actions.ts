@@ -30,11 +30,7 @@ import {
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
-import {
-  laserModeStartEvidenceIssue,
-  m7StartEvidenceIssue,
-  type LaserModeStartSnapshotSource,
-} from './laser-mode-start-evidence';
+import { laserModeStartEvidenceIssue } from './laser-mode-start-evidence';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
@@ -205,7 +201,7 @@ async function prepareStartBoundary(
   if (hasPendingControllerWrite(pendingState)) {
     throw new Error(startPendingControllerMessage(pendingState));
   }
-  assertStartControllerEvidence(get(), driver(), machineKind, options, gcode);
+  assertStartControllerEvidence(machineKind, options, gcode);
   assertGcodeFitsController(gcode, options);
 }
 
@@ -277,24 +273,16 @@ function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
 }
 
 function assertStartControllerEvidence(
-  state: LaserState,
-  activeDriver: ControllerDriver,
   machineKind: 'laser' | 'cnc',
   options: StartJobOptions,
   gcode: string,
 ): void {
-  const source: LaserModeStartSnapshotSource = {
-    controllerSessionEpoch: state.controllerSessionEpoch,
-    capabilities: activeDriver.capabilities,
-    controllerSettings: state.controllerSettings,
-    controllerSettingsObservation: state.controllerSettingsObservation,
-    controllerBuildInfo: state.controllerBuildInfo,
-    controllerBuildInfoObservation: state.controllerBuildInfoObservation,
-  };
-  const m7Issue = m7StartEvidenceIssue(source, gcode);
-  if (m7Issue !== null) throw new Error(m7Issue);
+  // M7 support is a Job Review advisory (rule 7 / ADR-228), not a wire-boundary
+  // refusal, so there is no live controller re-check here. For laser output the
+  // reviewed evidence still gates handoff consistency ($30/$32 acknowledgement
+  // and unchanged M7 program shape).
   if (machineKind !== 'laser') return;
-  const issue = laserModeStartEvidenceIssue(source, options.laserModeStartEvidence, gcode);
+  const issue = laserModeStartEvidenceIssue(options.laserModeStartEvidence, gcode);
   if (issue !== null) throw new Error(issue);
 }
 

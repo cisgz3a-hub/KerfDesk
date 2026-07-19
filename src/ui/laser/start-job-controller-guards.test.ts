@@ -143,7 +143,8 @@ describe('laser controller Start guards', () => {
     }
   });
 
-  it('blocks exact M7 output when current stock build info proves no M option', () => {
+  it('surfaces proven M7-unsupported as a Job Review warning without refusing Start', () => {
+    // rule 7 / ADR-228: controller-capability findings inform, never block Start.
     const project = m7Project();
     const result = prepareStartJob(project, readyController, {
       ...readyMachine(project),
@@ -152,11 +153,15 @@ describe('laser controller Start guards', () => {
       controllerBuildInfoObservation: { sessionEpoch: 7, observedAt: 1 },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.messages[0]).toContain('[OPT] does not include M');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings.some((warning) => warning.includes('[OPT] does not include M'))).toBe(
+        true,
+      );
+    }
   });
 
-  it('applies proven exact M7 incompatibility to the machine-neutral controller policy', () => {
+  it('surfaces proven M7 incompatibility as a machine-neutral advisory, never a block', () => {
     const policy = startControllerPolicy(
       { ok: true, errors: [], warnings: [] },
       'G21\nM7\nG1 X1\n',
@@ -167,8 +172,8 @@ describe('laser controller Start guards', () => {
       },
     );
 
-    expect(policy.blocking).toHaveLength(1);
-    expect(policy.blocking[0]).toContain('[OPT] does not include M');
+    expect(policy.advisories).toHaveLength(1);
+    expect(policy.advisories[0]).toContain('[OPT] does not include M');
   });
 
   it('allows option M proof and warns explicitly when M7 support is unknown', () => {

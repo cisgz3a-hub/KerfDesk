@@ -292,9 +292,6 @@ function finalizeStartPreparation({
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
   const controllerPolicy = startControllerPolicy(controller, gcode, machine);
-  if (controllerPolicy.blocking.length > 0) {
-    return { ok: false, messages: controllerPolicy.blocking };
-  }
   const warnings = collectStartWarnings(
     project,
     controllerSettings,

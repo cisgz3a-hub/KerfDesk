@@ -1,9 +1,6 @@
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
-import {
-  evaluateM7AirAssistReadiness,
-  gcodeUsesM7,
-} from '../../core/preflight/m7-air-assist-readiness';
+import { gcodeUsesM7 } from '../../core/preflight/m7-air-assist-readiness';
 import type { SessionObservationStamp } from './laser-controller-observation';
 
 export type LaserModeStartSnapshotSource = {
@@ -66,66 +63,24 @@ export function createLaserModeStartEvidence(
 export function laserModeStartSnapshotIsVerified(
   snapshot: LaserModeStartSnapshot,
   expectedMaxPowerS: number,
-  gcode = '',
 ): boolean {
-  const m7 = evaluateM7AirAssistReadiness(
-    gcode,
-    snapshot.controllerBuildInfo,
-    buildInfoObservationIsCurrent(snapshot),
-  );
-  return (
-    settingsAreVerified(snapshot, expectedMaxPowerS) &&
-    (m7.kind === 'not-required' || m7.kind === 'supported')
-  );
+  return settingsAreVerified(snapshot, expectedMaxPowerS);
 }
 
-export function knownLaserStartContradiction(
-  snapshot: LaserModeStartSnapshot,
-  gcode: string,
-): string | null {
-  const m7 = evaluateM7AirAssistReadiness(
-    gcode,
-    snapshot.controllerBuildInfo,
-    buildInfoObservationIsCurrent(snapshot),
-  );
-  return m7.kind === 'unsupported' ? m7.message : null;
-}
-
-/** Final live check shared by laser and CNC output. Settings remain review
- * advisories; only a current build that proves the exact M7 command cannot run
- * is a wire-boundary incompatibility. */
-export function m7StartEvidenceIssue(
-  current: LaserModeStartSnapshotSource,
-  gcode: string,
-): string | null {
-  const snapshot = captureLaserModeStartSnapshot(current);
-  const m7 = evaluateM7AirAssistReadiness(
-    gcode,
-    snapshot.controllerBuildInfo,
-    buildInfoObservationIsCurrent(snapshot),
-  );
-  return m7.kind === 'unsupported' ? m7.message : null;
-}
-
-/** Final wire-boundary handoff for UI-originated laser Starts. Live $30/$32
- * changes remain review advisories under Frame-first policy. The final boundary
- * therefore proves only that the exact program still has the reviewed M7 shape,
- * that current build evidence does not prove M7 unsupported, and that unverified
- * review evidence was explicitly acknowledged. */
+/** Final wire-boundary handoff for UI-originated laser Starts. Live $30/$32 and
+ * M7 support remain review advisories under Frame-first policy. The final
+ * boundary therefore proves only that the exact program still has the reviewed
+ * M7 shape and that unverified review evidence was explicitly acknowledged. */
 export function laserModeStartEvidenceIssue(
-  current: LaserModeStartSnapshotSource,
   evidence: LaserModeStartEvidence | undefined,
   gcode: string,
 ): string | null {
-  const currentM7Issue = m7StartEvidenceIssue(current, gcode);
-  if (currentM7Issue !== null) return currentM7Issue;
-
   if (evidence === undefined) return LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE;
   if (evidence.m7Required !== gcodeUsesM7(gcode)) {
     return LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE;
   }
   if (
-    !laserModeStartSnapshotIsVerified(evidence, evidence.expectedMaxPowerS, gcode) &&
+    !laserModeStartSnapshotIsVerified(evidence, evidence.expectedMaxPowerS) &&
     !evidence.unverifiedAcknowledged
   ) {
     return LASER_REQUIREMENTS_UNVERIFIED_AT_START_MESSAGE;
@@ -146,12 +101,5 @@ function settingsObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean
     snapshot.settingsCapability !== 'none' &&
     snapshot.settingsObservation !== null &&
     snapshot.settingsObservation.sessionEpoch === snapshot.controllerSessionEpoch
-  );
-}
-
-function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean {
-  return (
-    snapshot.buildInfoObservation !== null &&
-    snapshot.buildInfoObservation.sessionEpoch === snapshot.controllerSessionEpoch
   );
 }

@@ -5,9 +5,7 @@ import {
   LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE,
   createLaserModeStartEvidence,
   laserModeStartEvidenceIssue,
-  m7StartEvidenceIssue,
   type LaserModeStartSnapshot,
-  type LaserModeStartSnapshotSource,
 } from '../state/laser-mode-start-evidence';
 import {
   LASER_MODE_UNVERIFIED_START_PROMPT,
@@ -34,24 +32,6 @@ const m7Build: GrblBuildInfo = {
   plannerBufferBlocks: 15,
   rxBufferBytes: 128,
 };
-
-function source(
-  laserModeEnabled: boolean | undefined,
-  overrides: Partial<LaserModeStartSnapshotSource> = {},
-): LaserModeStartSnapshotSource {
-  return {
-    controllerSessionEpoch: 7,
-    capabilities: { settings: 'grbl-dollar' },
-    controllerSettings: {
-      maxPowerS: 1000,
-      ...(laserModeEnabled === undefined ? {} : { laserModeEnabled }),
-    },
-    controllerSettingsObservation: observation,
-    controllerBuildInfo: null,
-    controllerBuildInfoObservation: null,
-    ...overrides,
-  };
-}
 
 function evidence(
   snapshot: LaserModeStartSnapshot,
@@ -98,16 +78,17 @@ describe('laser Start acknowledgement', () => {
     });
   });
 
-  it('requires confirmation for unknown M7 support and not for current option M proof', () => {
+  it('never forces acknowledgement for M7 support (rule 7 / ADR-228: advisory-only)', () => {
     const project = createProject();
     const gcode = 'M7\nG1 X1 S100\n';
-    expect(laserModeStartAcknowledgementRequired(project, knownSnapshot, gcode)).toBe(true);
-    const supported = {
+    // With $30/$32 verified, neither unknown nor proven-unsupported M7 gates Start.
+    expect(laserModeStartAcknowledgementRequired(project, knownSnapshot, gcode)).toBe(false);
+    const unsupported = {
       ...knownSnapshot,
-      controllerBuildInfo: m7Build,
+      controllerBuildInfo: { ...m7Build, optionCodes: ['V'] as const },
       buildInfoObservation: observation,
     };
-    expect(laserModeStartAcknowledgementRequired(project, supported, gcode)).toBe(false);
+    expect(laserModeStartAcknowledgementRequired(project, unsupported, gcode)).toBe(false);
   });
 
   it('never adds the laser acknowledgement to a CNC/router Start', () => {
@@ -146,110 +127,38 @@ describe('laser Start acknowledgement', () => {
 describe('laser evidence at the first job-write boundary', () => {
   it('does not turn a reviewed $32=0 advisory into a wire incompatibility', () => {
     const disabled = { ...knownSnapshot, laserModeEnabled: false };
-    expect(laserModeStartEvidenceIssue(source(false), evidence(disabled, true), '')).toBeNull();
+    expect(laserModeStartEvidenceIssue(evidence(disabled, true), '')).toBeNull();
   });
 
-  it('hard-refuses proven unsupported M7 even without operator review evidence', () => {
-    expect(
-      laserModeStartEvidenceIssue(
-        source(true, {
-          controllerBuildInfo: { ...m7Build, optionCodes: ['V'] },
-          controllerBuildInfoObservation: observation,
-        }),
-        undefined,
-        'M7\n',
-      ),
-    ).toMatch(/does not include M/);
-  });
-
-  it('applies the exact M7 incompatibility check independently of laser evidence', () => {
-    expect(
-      m7StartEvidenceIssue(
-        source(true, {
-          controllerBuildInfo: { ...m7Build, optionCodes: ['V'] },
-          controllerBuildInfoObservation: observation,
-        }),
-        'M7\n',
-      ),
-    ).toMatch(/does not include M/);
+  it('no longer refuses a Start when the build reports M7 unsupported (advisory-only)', () => {
+    // rule 7 / ADR-228: M7 support is a Job Review advisory, never a wire-boundary refusal.
+    expect(laserModeStartEvidenceIssue(evidence(knownSnapshot, false, true), 'M7\n')).toBeNull();
   });
 
   it('refuses a laser Start without operator review evidence', () => {
-    expect(laserModeStartEvidenceIssue(source(true), undefined, '')).toMatch(
+    expect(laserModeStartEvidenceIssue(undefined, '')).toMatch(
       /requires reviewed controller evidence/i,
     );
   });
 
   it('accepts unchanged verified evidence', () => {
-    expect(
-      laserModeStartEvidenceIssue(source(true), evidence(knownSnapshot, false), ''),
-    ).toBeNull();
+    expect(laserModeStartEvidenceIssue(evidence(knownSnapshot, false), '')).toBeNull();
   });
 
   it('accepts unchanged unknown evidence only after informed acknowledgement', () => {
     const unknownSnapshot = { ...knownSnapshot, settingsObservation: null, maxPowerS: undefined };
-    const current = source(true, {
-      controllerSettings: { laserModeEnabled: true },
-      controllerSettingsObservation: null,
-    });
-    expect(laserModeStartEvidenceIssue(current, evidence(unknownSnapshot, true), '')).toBeNull();
-    expect(laserModeStartEvidenceIssue(current, evidence(unknownSnapshot, false), '')).toMatch(
+    expect(laserModeStartEvidenceIssue(evidence(unknownSnapshot, true), '')).toBeNull();
+    expect(laserModeStartEvidenceIssue(evidence(unknownSnapshot, false), '')).toMatch(
       /not verified/i,
     );
   });
 
-  it('allows fresh $32 drift after review because it remains advisory', () => {
-    expect(
-      laserModeStartEvidenceIssue(
-        source(false, {
-          controllerSettingsObservation: { sessionEpoch: 7, observedAt: 101 },
-        }),
-        evidence(knownSnapshot, false),
-        '',
-      ),
-    ).toBeNull();
-  });
-
-  it('allows fresh $30 drift after review because it remains advisory', () => {
-    expect(
-      laserModeStartEvidenceIssue(
-        source(true, { controllerSettings: { maxPowerS: 255, laserModeEnabled: true } }),
-        evidence(knownSnapshot, false),
-        '',
-      ),
-    ).toBeNull();
-  });
-
-  it('hard-refuses current build information proving M7 unsupported', () => {
-    const unsupported = { ...m7Build, optionCodes: ['V'] as const };
-    expect(
-      laserModeStartEvidenceIssue(
-        source(true, {
-          controllerBuildInfo: unsupported,
-          controllerBuildInfoObservation: observation,
-        }),
-        evidence(knownSnapshot, true, true),
-        'M7\n',
-      ),
-    ).toMatch(/does not include M/);
-  });
-
-  it('allows settings observation or controller-session drift after review', () => {
-    const accepted = evidence(knownSnapshot, false);
-    expect(
-      laserModeStartEvidenceIssue(
-        source(true, { controllerSettingsObservation: { sessionEpoch: 7, observedAt: 101 } }),
-        accepted,
-        '',
-      ),
-    ).toBeNull();
-    expect(
-      laserModeStartEvidenceIssue(source(true, { controllerSessionEpoch: 8 }), accepted, ''),
-    ).toBeNull();
+  it('keeps live $30/$32 drift after review advisory, never a boundary refusal', () => {
+    expect(laserModeStartEvidenceIssue(evidence(knownSnapshot, false), '')).toBeNull();
   });
 
   it('still refuses when the exact program adds M7 after review', () => {
-    expect(laserModeStartEvidenceIssue(source(true), evidence(knownSnapshot, false), 'M7\n')).toBe(
+    expect(laserModeStartEvidenceIssue(evidence(knownSnapshot, false), 'M7\n')).toBe(
       LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE,
     );
   });

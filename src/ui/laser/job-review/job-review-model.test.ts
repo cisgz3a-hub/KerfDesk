@@ -236,10 +236,8 @@ describe('buildJobReviewModel', () => {
     const model = await buildModelFromCurrentStores();
 
     expect(model.warnings).toContainEqual(expect.stringContaining('could not verify M7 support'));
-    expect(model.acknowledgement).toEqual({
-      kind: 'laser-unverified',
-      prompt: LASER_MODE_UNVERIFIED_START_PROMPT,
-    });
+    // rule 7 / ADR-228: M7 support is a Job Review warning; it never forces acknowledgement.
+    expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
   });
 
   it('discloses manual air when the exact job requests air but emits no relay command', async () => {

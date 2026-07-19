@@ -13,21 +13,20 @@ export function startControllerPolicy(
   controller: ControllerReadinessResult,
   gcode: string,
   machine: StartControllerPolicyMachine,
-): { readonly blocking: ReadonlyArray<string>; readonly advisories: ReadonlyArray<string> } {
-  // #296 makes controller-setting findings review advisories for both laser
-  // and CNC output: the completed physical Frame remains the motion-safety
-  // authority. A proven M7 incompatibility is different because the exact
-  // emitted command would be rejected mid-program and Frame never sends M7.
+): { readonly advisories: ReadonlyArray<string> } {
+  // Frame-first (rule 7 / ADR-228): controller-capability findings are Job
+  // Review advisories, never Start refusals. A current stock-GRBL build that
+  // reports no M7 mist support is surfaced here so the operator sees it in Job
+  // Review; the completed physical Frame remains the motion-safety authority.
   const m7 = evaluateM7AirAssistReadiness(
     gcode,
     machine.controllerBuildInfo ?? null,
     buildInfoObservationIsCurrent(machine),
   );
   return {
-    blocking: m7.kind === 'unsupported' ? [m7.message] : [],
     advisories: [
       ...controller.errors.map((issue) => issue.message),
-      ...(m7.kind === 'unknown' ? [m7.message] : []),
+      ...(m7.kind === 'unsupported' || m7.kind === 'unknown' ? [m7.message] : []),
     ],
   };
 }
