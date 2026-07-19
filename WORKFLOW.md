@@ -2,7 +2,20 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC35), Phase I multi-controller, and Phase K box generator flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC45 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
+>
+> **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
+> job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
+> every placement mode. Flows below were written across many phases; wherever one still says
+> Start "blocks", "refuses", "fails closed", or "cannot be overridden" on a policy finding
+> (work-Z zero, tool identity, probe plate, overrides, accessories, $30/$32, bounds, no-go
+> zones, camera placement, controller qualification), that finding is now a **Job Review
+> warning** instead — the dialog informs, the operator decides. The only refusals that remain
+> are transport preconditions (busy / alarm / not-Idle / MPG / no status yet), compile
+> integrity, placement compile-inputs (which offer their fix in place), and handoff/resume
+> consistency. Authoritative per-gate disposition:
+> `docs/audits/2026-07-18-guard-inventory-frame-first.md`. Flow F-A10 reflects the current
+> model; passages that predate it are stamped inline.
 
 ---
 
@@ -753,7 +766,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 1. User clicks **Start job** while connected and idle (toolbar button or Cmd/Ctrl+Return; Run
    again and confirmed checkpoint replacement follow the same path).
 2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. A laser controller that reports `$32=0` is refused before the review opens (unchanged).
+3. A laser controller that reports `$32=0` no longer refuses Start — frame-first (ADR-228)
+   demoted it to the Job Review `$32` acknowledgement banner, which the operator must
+   acknowledge inside the dialog before confirming.
 4. App compiles the project to G-code via `emitGcode`, then opens the **Job Review** dialog
    (ADR-224, v2 look) built from the exact prepared program: five stat tiles (estimated time as
    the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
@@ -2385,17 +2400,17 @@ F-CNC19 tiling.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
-#### Start gate — establish stock-top Z0
-1. CNC Start is blocked until manual Zero Z or a settled probe records
-   work-Z evidence for the current reference epoch. The gate cannot be
-   overridden because KerfDesk's CNC emitter defines Z0 as the stock top.
-2. The evidence also records the Active bit selected when Zero Z/probing begins.
+#### Work-Z evidence at Start *(demoted by frame-first — ADR-228; this section predates it)*
+1. Missing work-Z evidence for the current reference epoch no longer blocks CNC
+   Start — the Job Review dialog carries the warning instead, and Zero Z /
+   probing remain available in the panel. KerfDesk's CNC emitter still defines
+   Z0 as the stock top, so the warning is prominent.
+2. The evidence still records the Active bit selected when Zero Z/probing begins.
    Start compares it with the first bit in the exact compiled tool-section plan;
-   missing or mismatched identity blocks until the planned bit is loaded,
-   selected, and referenced again.
-3. Probe-derived evidence starts with touch-plate removal unconfirmed. Start
-   remains blocked until the operator removes both plate and probe lead and
-   clicks **Confirm plate removed** in the probe panel.
+   missing or mismatched identity is a Job Review warning, not a block.
+3. Probe-derived evidence still starts with touch-plate removal unconfirmed.
+   Unconfirmed removal surfaces as a Job Review warning at ordinary Start (the
+   mid-job tool-change probe-plate check is unchanged — resume/recovery class).
 4. Set Origin establishes XY only and does not satisfy this gate. Laser Start
    is unaffected.
 
@@ -3004,7 +3019,7 @@ F-CNC19 tiling.
    when a persistent G54 Z may still exist; later `$#` readback may prove and
    preserve that distinction.
 
-### F-CNC38. Retract and wait before every CNC cutting start — Phase H.11
+### F-CNC38b. Retract and wait before every CNC cutting start — Phase H.11 *(renumbered from a duplicate F-CNC38)*
 
 #### Success
 1. A native CNC job, a post-tool-change restart, and a standalone surfacing
@@ -3033,10 +3048,12 @@ F-CNC19 tiling.
 3. Once streaming begins, the operator may still adjust overrides deliberately
    through the existing in-job controls.
 
-#### Error — stale override changes the physical plan
-1. CNC Start blocks an increase above 100%, zero/invalid values, or a changed
-   value after acknowledgement. The compiled G-code, fingerprint, and setup
-   attestation do not substitute for this live controller state.
+#### Error — stale override changes the physical plan *(demoted by ADR-228)*
+1. Increases above 100%, zero/invalid values, or a value changed after
+   acknowledgement no longer block CNC Start — the Job Review dialog shows the
+   exact live percentages as a warning the operator confirms. The compiled
+   G-code, fingerprint, and setup attestation still do not substitute for this
+   live controller state, which is why the warning names the live values.
 
 #### Edge — unknown or externally changed state
 1. A missing `Ov:` cache is not presented as observed 100% state. Firmware that
@@ -3051,18 +3068,19 @@ F-CNC19 tiling.
    spindle (`A:C`), flood (`A:F`), and mist (`A:M`) into a cache that survives
    status frames where the intermittent field is absent.
 2. An `Ov:` report without `A:` is the protocol-backed all-off observation.
-   CNC Start proceeds past this gate only when that fresh cache contains no
-   active accessory; generic CNC Resume is disabled by F-CNC41.
+   An active accessory in that fresh cache surfaces as a Job Review warning
+   (ADR-228) rather than refusing Start; generic CNC Resume is disabled by
+   F-CNC41.
 3. When a CNC controller is otherwise idle but reports an active accessory,
    the job panel names every active channel and offers **Stop spindle & coolant**.
    After the operator confirms the cutter is clear of material and stopping is
    safe, the action sends one guarded `M5 M9` block and waits for fresh status
    before Start can become eligible.
 
-#### Error - Idle controller still has an accessory active
-1. CNC Start blocks even though motion state is `Idle`, names the live spindle
-   direction and/or coolant channels, and requires `M5`/`M9` plus a fresh
-   all-off status report.
+#### Error - Idle controller still has an accessory active *(demoted by ADR-228)*
+1. Even though motion state is `Idle`, the Job Review dialog warns with the live
+   spindle direction and/or coolant channels; `M5`/`M9` and the accessory
+   controls remain available, but the warning informs rather than refuses.
 2. A sparse status frame with neither `A:` nor `Ov:` does not erase a previously
    active observation.
 3. Arming any job stream invalidates the previous observation, so a partial
@@ -3084,15 +3102,18 @@ F-CNC19 tiling.
 1. `A:` is GRBL's controller-commanded accessory state. It does not prove
    measured RPM, coolant flow, relay position, or external VFD state.
 2. Before either `A:` or `Ov:` has been observed, or after an app command that
-   can mutate accessories, the cache is unknown and CNC Start fails closed
-   until a fresh report arrives. Firmware that omits those reports cannot run
-   CNC jobs with this gate. Laser Start remains unchanged.
-3. grblHAL `SP1:`/`SPn:` secondary-spindle telemetry hard-blocks CNC Start and
-   suppresses the generic `M5 M9` action. Multi-spindle selection and recovery
-   require a dedicated machine-specific model.
+   can mutate accessories, the cache is unknown — frame-first (ADR-228) reduced
+   the old fail-closed gate to one fresh status report (transport liveness
+   only); an unknown accessory state past that surfaces as a Job Review
+   warning. Laser Start remains unchanged.
+3. grblHAL `SP1:`/`SPn:` secondary-spindle telemetry is a Job Review warning
+   (ADR-228 demoted the old hard block) and still suppresses the generic
+   `M5 M9` action. Multi-spindle selection and recovery require a dedicated
+   machine-specific model.
 4. grblHAL `A:E` spindle-encoder faults and `A:T` pending firmware tool changes
-   hard-block Start and stay latched across ordinary Ov-only frames until an
-   explicit A report or reset proves the exceptional state changed.
+   are Job Review warnings (previously hard blocks) that stay latched across
+   ordinary Ov-only frames until an explicit A report or reset proves the
+   exceptional state changed.
 5. KerfDesk must be the controller's only command owner during Start and the
    job. GRBL cannot atomically bind a status observation to the next program
    bytes, so pendant, WebUI, PLC, macro, or second-sender mutations after the
