@@ -3,11 +3,12 @@ import type { FrameVerification } from './frame-verification';
 import type { FramedRunCandidate } from './framed-run';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
+export type LaserMotionOperationId = number | symbol;
 
 type LaserMotionOperationCommon = {
   /** Stable owner for every async transport/ack continuation belonging to one
    * physical motion operation. Carried unchanged across all Frame legs. */
-  readonly operationId: number;
+  readonly operationId: LaserMotionOperationId;
   readonly sawControllerBusy: boolean;
   readonly idleStatusReports: number;
   readonly dispatchComplete: boolean;
@@ -44,21 +45,13 @@ type LaserMotionOperationCommon = {
 export type LaserMotionOperation = LaserMotionOperationCommon &
   ({ readonly kind: 'jog' } | { readonly kind: 'frame'; readonly candidate?: FramedRunCandidate });
 
-let nextMotionOperationId = 1;
-
-function allocateMotionOperationId(): number {
-  const id = nextMotionOperationId;
-  nextMotionOperationId += 1;
-  return id;
-}
-
 export function startMotionOperation(
   kind: LaserMotionOperationKind,
   pendingLines: ReadonlyArray<string> = [],
   candidate?: FramedRunCandidate,
   acknowledgedPrefixLinesRemaining = 0,
   pendingMotionTransportWrites = 0,
-  operationId = allocateMotionOperationId(),
+  operationId: LaserMotionOperationId = Symbol('motion-operation'),
   settlementLine?: string,
   verification?: FrameVerification,
 ): LaserMotionOperation {
@@ -80,7 +73,7 @@ export function startMotionOperation(
 export function markMotionOperationDispatched(
   operation: LaserMotionOperation | null,
   kind: LaserMotionOperationKind,
-  operationId: number,
+  operationId: LaserMotionOperationId,
 ): LaserMotionOperation | null {
   if (operation === null || operation.kind !== kind || operation.operationId !== operationId) {
     return operation;
@@ -237,7 +230,7 @@ export function takeNextMotionLine(
 
 export function acknowledgeMotionSettlementMarker(
   operation: LaserMotionOperation | null,
-  operationId: number,
+  operationId: LaserMotionOperationId,
   statusSequence: number,
 ): LaserMotionOperation | null {
   if (

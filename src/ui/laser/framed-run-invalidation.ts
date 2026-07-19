@@ -1,3 +1,4 @@
+import { createStore } from 'zustand/vanilla';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -7,7 +8,9 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { isStampedStartRun } from '../state/framed-run-interruption';
 import { framedRunReadinessIssue } from './framed-run-readiness';
 
-let installed = false;
+type InvalidationLifecycle = { readonly owner: symbol | null };
+
+const invalidationLifecycle = createStore<InvalidationLifecycle>(() => ({ owner: null }));
 
 /**
  * Make permit expiry one-way. Deterministic equality checks still explain why
@@ -16,16 +19,19 @@ let installed = false;
  * physical Frame.
  */
 export function ensureFramedRunInvalidationSubscriptions(): void {
-  if (installed) return;
-  installed = true;
-  useStore.subscribe(expireCurrentPermitIfNeeded);
-  useCameraStore.subscribe(expireCurrentPermitIfNeeded);
-  useExperimentalLaserFeatures.subscribe(expireCurrentPermitIfNeeded);
-  usePrintCutSessionStore.subscribe(expireCurrentPermitIfNeeded);
-  useLaserStore.subscribe(expireCurrentPermitIfNeeded);
+  const owner = Symbol('framed-run-invalidation');
+  invalidationLifecycle.setState((state) => (state.owner === null ? { owner } : state));
+  if (invalidationLifecycle.getState().owner !== owner) return;
+  const expireIfOwned = (): void => expireCurrentPermitIfNeeded(owner);
+  useStore.subscribe(expireIfOwned);
+  useCameraStore.subscribe(expireIfOwned);
+  useExperimentalLaserFeatures.subscribe(expireIfOwned);
+  usePrintCutSessionStore.subscribe(expireIfOwned);
+  useLaserStore.subscribe(expireIfOwned);
 }
 
-function expireCurrentPermitIfNeeded(): void {
+function expireCurrentPermitIfNeeded(owner: symbol): void {
+  if (invalidationLifecycle.getState().owner !== owner) return;
   const laser = useLaserStore.getState();
   const permit = laser.framedRun;
   if (permit === null) return;

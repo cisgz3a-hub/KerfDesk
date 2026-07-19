@@ -58,6 +58,7 @@ function makeLaserState(): LaserState {
     workOriginSource: 'none',
     frameVerification: null,
     framedRun: null,
+    framedRunStartClaim: null,
     connect: async () => undefined,
     disconnect: async () => undefined,
     home: async () => undefined,

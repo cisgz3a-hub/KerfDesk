@@ -79,6 +79,11 @@ export type FramedRunPermit = {
   readonly controller: FramedRunControllerSnapshot;
 };
 
+/** One synchronous owner for an exact permit crossing the final Start handoff. */
+export type FramedRunStartClaim = {
+  readonly permit: FramedRunPermit;
+};
+
 export const FRAME_CONTROLLER_CHANGED_MESSAGE =
   'Controller or machine setup changed during Frame. No Start permit was issued; review the setup and Frame again.';
 export const FRAME_RETURN_POSITION_CHANGED_MESSAGE =

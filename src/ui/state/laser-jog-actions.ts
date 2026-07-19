@@ -7,18 +7,15 @@
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
 import { inferCurrentMachinePosition } from './infer-machine-position';
-import {
-  cancelFreshControllerStatusWait,
-  waitForFreshControllerStatus,
-} from './laser-controller-status-wait';
 import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
-import { startControllerCommand } from './laser-interactive-command';
 import {
   markMotionOperationDispatched,
   startMotionOperation,
   type LaserMotionOperation,
+  type LaserMotionOperationId,
 } from './laser-motion-operation';
+import { runCancelJog } from './laser-motion-cancel';
 import { type LaserSafetyAction } from './laser-safety-notice';
 import { settleOwnedMotionPhase } from './laser-owned-motion-settlement';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
@@ -46,8 +43,6 @@ type JogActionContext = {
 // Below this XY delta (mm) a "jog to point" is treated as already-there: GRBL
 // would round it away, and an all-zero jog is rejected as a no-axis command.
 const JOG_TO_POINT_EPSILON_MM = 1e-3;
-const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
-const CANCEL_QUEUE_POLL_MS = 10;
 
 export function jogActions(
   set: SetFn,
@@ -60,7 +55,7 @@ export function jogActions(
     home: () => runHomeAction(set, get, refs, safeWrite, refs.driver),
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
     jog: (params) => runJog(context, params),
-    cancelJog: () => runCancelJog(context),
+    cancelJog: () => runCancelJog(set, get, refs, safeWrite),
     frame: (bounds, feed, candidate) => runFrame(context, bounds, feed, candidate),
   };
 }
@@ -156,137 +151,6 @@ function startSettledJogOperation(refs: LiveRefs): LaserMotionOperation {
   return startMotionOperation('jog', [settlementLine], undefined, 0, 0, undefined, settlementLine);
 }
 
-async function runCancelJog(context: JogActionContext): Promise<void> {
-  const { set, get, refs, safeWrite } = context;
-  const operationId = get().motionOperation?.operationId;
-  // Cancel intent itself expires a completed Frame permit, even when no live
-  // motion owner exists (for example a key/button release after a zero-length
-  // jog). Authorization never survives a realtime cancel attempt.
-  set({ frameVerification: null, framedRun: null });
-  if (operationId !== undefined) {
-    set((state) =>
-      state.motionOperation?.operationId === operationId
-        ? {
-            motionOperation: cancellingMotionOperation(state.motionOperation),
-          }
-        : {},
-    );
-    // A phase barrier may currently own the singleton fresh-status waiter.
-    // Cancel supersedes that proof and must release it before arming the
-    // cancellation marker/status fence of its own.
-    cancelFreshControllerStatusWait(refs, 'Motion settlement was superseded by Cancel.');
-  }
-  const jogCancel = refs.driver.realtime.jogCancel;
-  let cancelError: unknown;
-  if (jogCancel !== null) {
-    try {
-      await safeWrite(jogCancel, 'jog');
-    } catch (error) {
-      cancelError = error;
-    }
-  }
-  try {
-    await waitForCancelledMotionQueue(get, operationId);
-    await armCancelledMotionStatusFence(context, operationId);
-  } catch (settlementError) {
-    throw cancelError ?? settlementError;
-  }
-  if (cancelError !== undefined) throw cancelError;
-}
-
-function cancellingMotionOperation(operation: LaserMotionOperation): LaserMotionOperation {
-  const { cancelStatusQueryAfterSequence: staleFence, ...unstamped } = operation;
-  void staleFence;
-  return { ...unstamped, cancelRequested: true };
-}
-
-async function waitForCancelledMotionQueue(
-  get: GetFn,
-  operationId: number | undefined,
-): Promise<void> {
-  if (operationId === undefined) return;
-  const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
-  while (Date.now() <= deadline) {
-    const state = get();
-    if (state.motionOperation?.operationId !== operationId) return;
-    if (
-      state.pendingUntrackedAcks === 0 &&
-      (state.pendingTransportWrites ?? 0) === 0 &&
-      (state.motionOperation.pendingMotionTransportWrites ?? 0) === 0
-    ) {
-      return;
-    }
-    await sleep(CANCEL_QUEUE_POLL_MS);
-  }
-  throw new Error(
-    'Cancel is waiting for the previous motion command acknowledgement. Reconnect if the controller does not respond.',
-  );
-}
-
-async function armCancelledMotionStatusFence(
-  context: JogActionContext,
-  operationId: number | undefined,
-): Promise<void> {
-  if (operationId === undefined) return;
-  const { set, get, refs, safeWrite } = context;
-  if (get().motionOperation?.operationId !== operationId) return;
-  // A status report has no query identifier, so a delayed response to an old
-  // background `?` cannot itself prove cancellation. First cross the driver's
-  // ack-owned planner-settlement marker. Serial response ordering makes every
-  // later status observation causal to that marker, while the terminal ack
-  // proves the cancelled motion queue reached it.
-  await startControllerCommand(refs, safeWrite, {
-    kind: 'interactive-command',
-    label: 'motion-cancel settle marker',
-    command: `${refs.driver.commands.settleDwell}\n`,
-    action: 'jog',
-    source: 'motion',
-    timeoutMode: 'non-idle-status-activity',
-  });
-  if (get().motionOperation?.operationId !== operationId) return;
-  const statusQuery =
-    refs.driver.realtime.statusQuery ??
-    (refs.driver.commands.queuedStatusQuery === null
-      ? null
-      : `${refs.driver.commands.queuedStatusQuery}\n`);
-  if (statusQuery === null) {
-    throw new Error(
-      'Cancel cannot confirm a fresh controller Idle on this driver. Reconnect before sending more motion.',
-    );
-  }
-  const beforeQuery = get();
-  set((state) =>
-    state.motionOperation?.operationId === operationId
-      ? {
-          motionOperation: {
-            ...state.motionOperation,
-            cancelStatusQueryAfterSequence: state.statusSequence,
-          },
-        }
-      : {},
-  );
-  const confirmation = waitForFreshControllerStatus(refs, {
-    after: {
-      sessionEpoch: beforeQuery.controllerSessionEpoch,
-      sequence: beforeQuery.statusSequence,
-    },
-    accept: (report) => report.state === 'Idle',
-    timeoutMessage: 'Timed out waiting for a post-cancel Idle status report.',
-  });
-  try {
-    await Promise.all([safeWrite(statusQuery, undefined, 'poll'), confirmation]);
-  } catch (error) {
-    cancelFreshControllerStatusWait(refs, 'Motion-cancel status confirmation was cancelled.');
-    throw error;
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 async function runFrame(
   context: JogActionContext,
   bounds: Parameters<LaserState['frame']>[0],
@@ -342,7 +206,11 @@ async function runFrame(
   }
 }
 
-function assertMotionOperationOwner(get: GetFn, operationId: number, label: string): void {
+function assertMotionOperationOwner(
+  get: GetFn,
+  operationId: LaserMotionOperationId,
+  label: string,
+): void {
   const operation = get().motionOperation;
   if (operation?.operationId === operationId && operation.cancelRequested !== true) return;
   throw new Error(`${label} was cancelled or replaced before its first command was dispatched.`);
@@ -358,7 +226,7 @@ function assertMotionQueueSettled(set: SetFn, get: GetFn, action: string): void 
 
 function failOwnedMotionOperation(
   state: LaserState,
-  operationId: number,
+  operationId: LaserMotionOperationId,
 ): Partial<Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun'>> {
   if (state.motionOperation?.operationId !== operationId) return {};
   return {
@@ -368,7 +236,7 @@ function failOwnedMotionOperation(
   };
 }
 
-function resetOwnedMotionPhase(set: SetFn, operationId: number): void {
+function resetOwnedMotionPhase(set: SetFn, operationId: LaserMotionOperationId): void {
   set((state) => {
     const operation = state.motionOperation;
     if (operation?.operationId !== operationId || operation.cancelRequested === true) return {};

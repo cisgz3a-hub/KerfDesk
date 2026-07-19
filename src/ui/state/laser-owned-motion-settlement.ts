@@ -3,6 +3,7 @@ import {
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
 import { startControllerCommand } from './laser-interactive-command';
+import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWriteFn } from './laser-line-shared';
 
@@ -16,7 +17,7 @@ export async function settleOwnedMotionPhase(
   get: () => LaserState,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
-  operationId: number,
+  operationId: LaserMotionOperationId,
   label: string,
 ): Promise<void> {
   await waitForOwnedQueue(get, operationId, label);
@@ -58,7 +59,11 @@ export async function settleOwnedMotionPhase(
   assertOwnedMotion(get, operationId, label);
 }
 
-function assertOwnedMotion(get: () => LaserState, operationId: number, label: string): void {
+function assertOwnedMotion(
+  get: () => LaserState,
+  operationId: LaserMotionOperationId,
+  label: string,
+): void {
   const operation = get().motionOperation;
   if (operation?.operationId === operationId && operation.cancelRequested !== true) return;
   throw new Error(`${label} was cancelled or replaced before it physically settled.`);
@@ -66,7 +71,7 @@ function assertOwnedMotion(get: () => LaserState, operationId: number, label: st
 
 async function waitForOwnedQueue(
   get: () => LaserState,
-  operationId: number,
+  operationId: LaserMotionOperationId,
   label: string,
 ): Promise<void> {
   const deadline = Date.now() + OWNED_QUEUE_TIMEOUT_MS;

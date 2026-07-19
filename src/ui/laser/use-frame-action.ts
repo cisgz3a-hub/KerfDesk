@@ -11,12 +11,15 @@ import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import type { LaserMotionOperation } from '../state/laser-motion-operation';
-import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useToastStore } from '../state/toast-store';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
+import {
+  frameControllerQueueIssue,
+  normalizeFrameWorkCoordinateSystem,
+} from './frame-controller-readiness';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
 import { useStartBlockerStore } from './start-blocker-store';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
@@ -56,12 +59,17 @@ export async function runFrameNow(): Promise<boolean> {
 }
 
 async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
-  if (!(await waitForFrameControllerQueue())) return null;
-  if (!(await normalizeFrameWorkCoordinateSystem())) return null;
+  if (!(await requireFrameControllerQueue())) return null;
+  const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
+  if (!wcsNormalization.ok) {
+    reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
+    return null;
+  }
   const app = useStore.getState();
   const laser = await prepareFrameLaser(
     app.project.machine?.kind === 'cnc',
     useLaserStore.getState(),
+    wcsNormalization.warning,
   );
   if (laser === null) return null;
   const camera = useCameraStore.getState();
@@ -74,7 +82,7 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     reportInches: laser.controllerSettings?.reportInches === true,
   });
   if (!placement.ok) {
-    reportFrameRefusal(placement.messages);
+    reportFramePreparationRefusal(placement.messages, wcsNormalization.warning);
     return null;
   }
   const externalEnvironment = captureStartExternalEnvironment(app.project, camera);
@@ -87,7 +95,7 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     false,
   );
   if (!prepared.ok) {
-    reportFrameRefusal(prepared.messages);
+    reportFramePreparationRefusal(prepared.messages, wcsNormalization.warning);
     return null;
   }
   return {
@@ -97,40 +105,15 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     prepared,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     externalEnvironment,
+    ...(wcsNormalization.warning === undefined
+      ? {}
+      : { frameWcsNormalizationWarning: wcsNormalization.warning }),
   };
-}
-
-async function normalizeFrameWorkCoordinateSystem(): Promise<boolean> {
-  const before = useLaserStore.getState();
-  if (before.capabilities.transport !== 'serial' || before.activeWcs === 'G54') return true;
-  try {
-    await before.selectPrimaryWcsForFrame();
-  } catch (error) {
-    reportFrameRefusal([
-      `Frame could not select the program's G54 coordinate system: ${error instanceof Error ? error.message : String(error)}`,
-    ]);
-    return false;
-  }
-  if (!(await waitForFrameControllerQueue())) return false;
-  const afterSelectionSequence = useLaserStore.getState().statusSequence;
-  if (!(await waitForFreshIdleFramePosition(afterSelectionSequence))) {
-    reportFrameRefusal([
-      'G54 was selected, but the controller did not report a fresh Idle position in that coordinate system. Wait for a complete status report, then Frame again.',
-    ]);
-    return false;
-  }
-  if (useLaserStore.getState().activeWcs !== 'G54') {
-    reportFrameRefusal([
-      'The controller did not confirm the G54 coordinate system required by the prepared program.',
-    ]);
-    return false;
-  }
-  return true;
 }
 
 async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolean> {
   const { bundle } = review;
-  if (!(await waitForFrameControllerQueue())) return false;
+  if (!(await requireFrameControllerQueue())) return false;
   const currentLaser = useLaserStore.getState();
   if (!reviewedFrameIsCurrent(bundle, currentLaser)) {
     reportFrameRefusal([
@@ -195,18 +178,30 @@ async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolea
     ]);
     return false;
   }
-  const accepted = await completion.result;
-  if (accepted) {
+  return reportFrameCompletion(candidate, await completion.result);
+}
+
+function reportFrameCompletion(candidate: FramedRunCandidate, accepted: boolean): boolean {
+  if (!accepted) return false;
+  if (useLaserStore.getState().framedRun?.candidate !== candidate) {
     useToastStore
       .getState()
-      .pushToast('Frame complete — this exact job is ready to start.', 'success');
+      .pushToast(
+        'Frame completed, but the job or machine setup changed. Frame the current job again before starting.',
+        'warning',
+      );
+    return false;
   }
-  return accepted;
+  useToastStore
+    .getState()
+    .pushToast('Frame complete — this exact job is ready to start.', 'success');
+  return true;
 }
 
 async function prepareFrameLaser(
   isCnc: boolean,
   laser: ReturnType<typeof useLaserStore.getState>,
+  wcsNormalizationWarning: string | undefined,
 ): Promise<ReturnType<typeof useLaserStore.getState> | null> {
   if (!isCnc) return laser;
   if (
@@ -223,21 +218,27 @@ async function prepareFrameLaser(
       'If the bit is touching the stock-top Z reference now, choose OK to set Work Z zero and continue preparing Frame. Choose Cancel to jog or probe first.',
   );
   if (!zeroHere) {
-    reportFrameRefusal([CNC_FRAME_WORK_Z_REQUIRED_MESSAGE]);
+    reportFramePreparationRefusal([CNC_FRAME_WORK_Z_REQUIRED_MESSAGE], wcsNormalizationWarning);
     return null;
   }
   try {
     const positionSequenceBeforeZero = laser.statusSequence;
     await laser.zeroZHere();
     if (!(await waitForFreshIdleFramePosition(positionSequenceBeforeZero))) {
-      reportFrameRefusal([
-        'Work Z was set, but the controller did not report the fresh Idle position needed to build an exact Frame. Wait for a complete status report, then Frame again.',
-      ]);
+      reportFramePreparationRefusal(
+        [
+          'Work Z was set, but the controller did not report the fresh Idle position needed to build an exact Frame. Wait for a complete status report, then Frame again.',
+        ],
+        wcsNormalizationWarning,
+      );
       return null;
     }
     return useLaserStore.getState();
   } catch (error) {
-    reportFrameRefusal([error instanceof Error ? error.message : String(error)]);
+    reportFramePreparationRefusal(
+      [error instanceof Error ? error.message : String(error)],
+      wcsNormalizationWarning,
+    );
     return null;
   }
 }
@@ -328,20 +329,18 @@ function reportFrameRefusal(messages: ReadonlyArray<string>): void {
   useToastStore.getState().pushToast(messages[0] ?? 'The job cannot be framed.', 'error');
 }
 
-const FRAME_QUEUE_SETTLE_TIMEOUT_MS = 1_500;
+function reportFramePreparationRefusal(
+  messages: ReadonlyArray<string>,
+  wcsNormalizationWarning: string | undefined,
+): void {
+  reportFrameRefusal(
+    wcsNormalizationWarning === undefined ? messages : [...messages, wcsNormalizationWarning],
+  );
+}
 
-async function waitForFrameControllerQueue(): Promise<boolean> {
-  const deadline = Date.now() + FRAME_QUEUE_SETTLE_TIMEOUT_MS;
-  while (hasPendingControllerWrite(useLaserStore.getState())) {
-    if (Date.now() > deadline) {
-      reportFrameRefusal([
-        'The controller is still finishing a previous command. Wait for its acknowledgement, then Frame again.',
-      ]);
-      return false;
-    }
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 25);
-    });
-  }
-  return true;
+async function requireFrameControllerQueue(): Promise<boolean> {
+  const issue = await frameControllerQueueIssue();
+  if (issue === null) return true;
+  reportFrameRefusal([issue]);
+  return false;
 }

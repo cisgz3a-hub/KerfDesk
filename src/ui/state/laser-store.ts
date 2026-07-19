@@ -48,7 +48,7 @@ import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
-import type { FramedRunPermit } from './framed-run';
+import type { FramedRunPermit, FramedRunStartClaim } from './framed-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
 import type {
@@ -211,17 +211,18 @@ export type LaserState = LaserStoreActions & {
   readonly pendingToolLabel: string | null;
   readonly pendingToolId: string | null;
   /**
-   * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
-   * the current origin. Set when a frame is dispatched in 'verified-origin'
-   * mode; required by Start in that mode. Cleared whenever the origin or
-   * connection changes (set/reset origin, disconnect, port close) or a frame is
-   * cancelled, and invalidated structurally when the job moves/resizes (the
-   * bounds signature stops matching). null = not verified.
+   * Compatibility proof issued only after a clean Frame completion. Ordinary
+   * Start uses the exact `framedRun` permit below; this bounds/origin proof is
+   * retained for recovery and completed-job replay compatibility. Physical or
+   * setup mutations clear it, while project changes invalidate it structurally
+   * when the bounds signature no longer matches. null = not verified.
    */
   readonly frameVerification: FrameVerification | null;
   /** Exact reviewed program authorized only after its Frame physically
    * completes. A pending Frame candidate lives on motionOperation instead. */
   readonly framedRun: FramedRunPermit | null;
+  /** Atomic owner while ordinary Start hands one exact permit to the store. */
+  readonly framedRunStartClaim: FramedRunStartClaim | null;
   /**
    * ADR-094 — capabilities snapshot of the active ControllerDriver. UI
    * components gate controls on these flags, never on the controller kind.
