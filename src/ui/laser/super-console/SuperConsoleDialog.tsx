@@ -48,6 +48,7 @@ export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX
           <label key={group.id} title={group.hint} style={chipStyle}>
             <input
               type="checkbox"
+              title={group.hint}
               checked={groups.has(group.id)}
               onChange={() => toggleGroup(group.id)}
             />
@@ -56,6 +57,7 @@ export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX
         ))}
         <input
           aria-label="Search console lines"
+          title="Filter the full console transcript by raw or decoded text."
           placeholder="Search raw or decoded text…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -67,10 +69,19 @@ export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX
       </div>
       <SuperConsoleTranscriptList entries={visible} />
       <DialogActions>
-        <button type="button" onClick={handleCopy} disabled={visible.length === 0}>
+        <button
+          type="button"
+          title="Copy the currently visible Super console transcript lines to the clipboard."
+          onClick={handleCopy}
+          disabled={visible.length === 0}
+        >
           Copy visible
         </button>
-        <button type="button" onClick={props.onClose}>
+        <button
+          type="button"
+          title="Close the expanded Super console and return to the workspace."
+          onClick={props.onClose}
+        >
           Close
         </button>
       </DialogActions>
