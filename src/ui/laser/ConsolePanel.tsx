@@ -86,6 +86,7 @@ function ConsoleFilters(props: {
       <label title="Show periodic controller status reports.">
         <input
           type="checkbox"
+          title="Show periodic controller status reports."
           checked={props.showStatus}
           onChange={(event) => props.onShowStatus(event.target.checked)}
         />
@@ -94,6 +95,7 @@ function ConsoleFilters(props: {
       <label title="Show high-volume job stream writes that are hidden by default.">
         <input
           type="checkbox"
+          title="Show high-volume job stream writes that are hidden by default."
           checked={props.showStream}
           onChange={(event) => props.onShowStream(event.target.checked)}
         />

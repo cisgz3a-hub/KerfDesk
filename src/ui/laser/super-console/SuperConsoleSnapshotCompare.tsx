@@ -43,7 +43,12 @@ export function SuperConsoleSnapshotCompare(props: {
   const model = useSnapshotCompareModel(props.profile);
   return (
     <details style={panelStyle}>
-      <summary style={summaryStyle}>Compare two controller snapshots</summary>
+      <summary
+        style={summaryStyle}
+        title="Expand or collapse read-only controller snapshot comparison."
+      >
+        Compare two controller snapshots
+      </summary>
       <p style={noticeStyle}>
         Export each machine after a fresh <code>$$</code> read, then load both files here. Values
         are compared neutrally; higher speed or acceleration is not treated as better quality.
@@ -125,6 +130,7 @@ function SnapshotCaptureControls(props: { readonly model: SnapshotCompareModel }
         Current machine label
         <input
           aria-label="Current controller snapshot label"
+          title="Name the connected machine in the exported settings snapshot."
           value={props.model.operatorLabel}
           onChange={(event) => props.model.setOperatorLabel(event.target.value)}
           style={labelInputStyle}
@@ -132,6 +138,11 @@ function SnapshotCaptureControls(props: { readonly model: SnapshotCompareModel }
       </label>
       <button
         type="button"
+        title={
+          props.model.rowsCount === 0
+            ? 'Read controller settings before exporting a snapshot.'
+            : 'Export the current read-only controller settings snapshot.'
+        }
         onClick={props.model.exportCurrent}
         disabled={props.model.rowsCount === 0}
       >
@@ -181,10 +192,23 @@ function SnapshotSlot(props: {
         </span>
       )}
       <div style={buttonRowStyle}>
-        <button type="button" onClick={props.onLoad}>
+        <button
+          type="button"
+          title={`Load a controller settings file into snapshot ${props.label}.`}
+          onClick={props.onLoad}
+        >
           Load {props.label}
         </button>
-        <button type="button" onClick={props.onClear} disabled={props.snapshot === null}>
+        <button
+          type="button"
+          title={
+            props.snapshot === null
+              ? `Snapshot ${props.label} is already empty.`
+              : `Clear snapshot ${props.label} from this comparison.`
+          }
+          onClick={props.onClear}
+          disabled={props.snapshot === null}
+        >
           Clear
         </button>
       </div>
@@ -208,6 +232,7 @@ function SnapshotComparisonResults(props: {
         <label>
           <input
             type="checkbox"
+            title="Include settings whose values are equivalent in both snapshots."
             checked={props.model.showEquivalent}
             onChange={(event) => props.model.setShowEquivalent(event.target.checked)}
           />{' '}

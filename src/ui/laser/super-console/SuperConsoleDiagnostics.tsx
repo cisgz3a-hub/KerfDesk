@@ -52,7 +52,12 @@ function DiagnosticSection(props: {
 }): JSX.Element {
   return (
     <details open style={sectionStyle}>
-      <summary style={summaryStyle}>{SECTION_LABELS[props.section]}</summary>
+      <summary
+        style={summaryStyle}
+        title={`Expand or collapse ${SECTION_LABELS[props.section].toLowerCase()} diagnostics.`}
+      >
+        {SECTION_LABELS[props.section]}
+      </summary>
       <div style={tableWrapStyle}>
         <table style={tableStyle}>
           <thead>

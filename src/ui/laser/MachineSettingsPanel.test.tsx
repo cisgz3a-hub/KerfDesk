@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type LaserState } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
 import type { MachineSettingsPresentationContext } from './machine-settings-presentation';
@@ -71,6 +71,7 @@ describe('MachineSettingsPanel', () => {
     const readMachineSettings = vi.fn(async () => undefined);
     useLaserStore.setState({
       connection: { kind: 'connected' },
+      statusReport: { state: 'Idle' } as LaserState['statusReport'],
       readMachineSettings,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const { host, cleanup } = await renderPanel();
@@ -85,6 +86,21 @@ describe('MachineSettingsPanel', () => {
       await act(async () => {
         useLaserStore.setState({ readMachineSettings: original });
       });
+      await cleanup();
+    }
+  });
+
+  it('waits for a reported Idle state before allowing a read', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: null,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel();
+    try {
+      const read = button(host, 'Read ($$)');
+      expect(read.disabled).toBe(true);
+      expect(read.title).toMatch(/Idle/i);
+    } finally {
       await cleanup();
     }
   });

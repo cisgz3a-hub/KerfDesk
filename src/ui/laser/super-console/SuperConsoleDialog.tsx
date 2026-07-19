@@ -129,6 +129,7 @@ function SuperConsoleToolbar(props: {
       <label style={chipStyle} title="Keep the transcript scrolled to the newest visible line.">
         <input
           type="checkbox"
+          title="Keep the transcript scrolled to the newest visible line."
           checked={props.view.followLatest}
           onChange={(event) => props.view.setFollowLatest(event.target.checked)}
         />
@@ -149,6 +150,7 @@ function ManualCopyFallback(props: {
       <textarea
         readOnly
         aria-label="Super console transcript to copy manually"
+        title="Select this timestamped transcript text and copy it manually."
         value={formatSuperConsoleTsv(props.visible)}
         onFocus={(event) => event.currentTarget.select()}
         style={manualCopyTextStyle}
