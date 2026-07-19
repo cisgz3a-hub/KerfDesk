@@ -99,11 +99,16 @@ describe('controller recovery queue ownership', () => {
     await recovered;
 
     expect(useLaserStore.getState().streamer?.inFlight).toEqual([]);
-    await useLaserStore.getState().sendConsoleCommand('$$');
+    // A console $$ now owns the timeout-armed command arbiter and resolves on
+    // the terminal ok, so the untracked ack is reserved while the read is
+    // pending; settleUntrackedAck still runs before the arbiter consumes the ok.
+    const read = useLaserStore.getState().sendConsoleCommand('$$');
+    await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
     connection.emitLine('ok');
     connection.emitLine('ok');
+    await read;
     await flush();
 
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);

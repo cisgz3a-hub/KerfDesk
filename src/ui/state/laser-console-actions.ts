@@ -14,6 +14,7 @@ import {
 } from '../../core/controllers/console-state-effect';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { isOwnedControllerIdentityCommand, writeConsoleCommand } from './console-command-transport';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
@@ -187,38 +188,6 @@ function isSettingsReadOperation(operation: LaserState['controllerOperation']): 
   );
 }
 
-function writeConsoleCommand(
-  refs: ConsoleActionRefs,
-  write: ConsoleWriteFn,
-  command: {
-    readonly kind: string;
-    readonly normalized: string;
-    readonly wire: string;
-  },
-): Promise<unknown> {
-  if (isOwnedControllerIdentityCommand(refs, command)) {
-    return startControllerCommand(
-      refs,
-      (line, action, source) => write(line, action, source ?? 'console'),
-      {
-        kind: 'controller-identity',
-        label: 'Read controller firmware identity',
-        command: command.wire,
-        action: actionForConsoleCommand(command.kind),
-        source: 'console',
-      },
-    );
-  }
-  return write(command.wire, actionForConsoleCommand(command.kind), 'console');
-}
-
-function isOwnedControllerIdentityCommand(
-  refs: Pick<ConsoleActionRefs, 'driver'>,
-  command: { readonly normalized: string },
-): boolean {
-  return refs.driver.kind === 'marlin' && command.normalized.trim().toUpperCase() === 'M115';
-}
-
 function consoleOwnershipBlockReason(
   state: LaserState,
   refs: ConsoleActionRefs,
@@ -271,10 +240,6 @@ function consoleCommandBlockReason(
     }
   }
   return null;
-}
-
-function actionForConsoleCommand(kind: string): LaserSafetyAction {
-  return kind === 'unlock' ? 'unlock' : 'console';
 }
 
 function trackConsoleWcsSelection(set: SetFn, normalized: string): void {
