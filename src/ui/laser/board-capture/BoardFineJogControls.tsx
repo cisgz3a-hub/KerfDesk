@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { jogAxisSignsForOrigin } from '../../../core/devices';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -109,34 +109,34 @@ function fineJogStep(preferredStep: number): (typeof FINE_JOG_STEPS_MM)[number] 
     : DEFAULT_FINE_JOG_STEP_MM;
 }
 
-const containerStyle: React.CSSProperties = {
+const containerStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   gap: 6,
 };
-const stepFieldsetStyle: React.CSSProperties = {
+const stepFieldsetStyle: CSSProperties = {
   margin: 0,
   padding: 0,
   border: 0,
 };
-const legendStyle: React.CSSProperties = {
+const legendStyle: CSSProperties = {
   marginBottom: 4,
   fontSize: 11,
   color: 'var(--lf-text-muted)',
 };
-const stepButtonsStyle: React.CSSProperties = {
+const stepButtonsStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   justifyContent: 'center',
   gap: 4,
 };
-const feedHintStyle: React.CSSProperties = {
+const feedHintStyle: CSSProperties = {
   margin: 0,
   fontSize: 11,
   color: 'var(--lf-text-muted)',
 };
-const errorStyle: React.CSSProperties = {
+const errorStyle: CSSProperties = {
   minHeight: 15,
   margin: 0,
   fontSize: 11,

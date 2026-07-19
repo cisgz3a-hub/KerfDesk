@@ -118,8 +118,14 @@ export function correctCapturedBoardGeometry(
     if (target.anchor === 'center') {
       return { geometry: { ...geometry, center: confirmed }, crossAxisErrorMm: 0 };
     }
-    const radiusMm = Math.hypot(confirmed.x - geometry.center.x, confirmed.y - geometry.center.y);
-    return radiusMm > 0 ? { geometry: { ...geometry, radiusMm }, crossAxisErrorMm: 0 } : null;
+    const dx = confirmed.x - geometry.center.x;
+    const dy = confirmed.y - geometry.center.y;
+    const radiusMm = Math.hypot(dx, dy);
+    if (radiusMm <= 0) return null;
+    return {
+      geometry: { ...geometry, radiusMm },
+      crossAxisErrorMm: circleRimCrossAxisErrorMm(target.anchor, dx, dy),
+    };
   }
   return null;
 }
@@ -161,6 +167,21 @@ function correctRectangle(
   if (!Number.isFinite(next.widthMm) || !Number.isFinite(next.heightMm)) return null;
   if (next.widthMm <= 0 || next.heightMm <= 0) return null;
   return { geometry: next, crossAxisErrorMm };
+}
+
+function circleRimCrossAxisErrorMm(
+  anchor: Exclude<CircleBoardVerificationAnchor, 'center'>,
+  dx: number,
+  dy: number,
+): number {
+  switch (anchor) {
+    case 'rim-top':
+    case 'rim-bottom':
+      return Math.abs(dx);
+    case 'rim-right':
+    case 'rim-left':
+      return Math.abs(dy);
+  }
 }
 
 function isFinitePoint(point: Vec2): boolean {

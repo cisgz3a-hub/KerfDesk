@@ -1,8 +1,4 @@
-import type { AABB } from '../../../core/scene';
-import type {
-  BoardVerificationTarget,
-  CapturedBoardGeometry,
-} from '../../../core/scene/board-verification';
+import type { AABB, BoardVerificationTarget, CapturedBoardGeometry } from '../../../core/scene';
 import type { ViewTransform } from '../../workspace/view-transform';
 
 export type BoardAnchorOverlayHandle = {

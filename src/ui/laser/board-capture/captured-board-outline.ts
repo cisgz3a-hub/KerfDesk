@@ -1,5 +1,9 @@
-import { findRegistrationBoxes, transformedBBox, type Scene } from '../../../core/scene';
-import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
+import {
+  findRegistrationBoxes,
+  transformedBBox,
+  type CapturedBoardGeometry,
+  type Scene,
+} from '../../../core/scene';
 
 const OUTLINE_SIZE_TOLERANCE_MM = 1e-3;
 

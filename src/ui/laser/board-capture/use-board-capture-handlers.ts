@@ -23,6 +23,8 @@ import {
 } from './use-board-capture';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
+const CROSS_AXIS_NOTICE_MM = 5;
+
 type BoardCaptureHandlerArgs = {
   readonly capture: BoardCapture;
   readonly livePosition: Vec2 | null;
@@ -236,10 +238,10 @@ function assertCaptureEpoch(capture: BoardCapture, current: BoardRegistrationEpo
 }
 
 function setCrossAxisNotice(errorMm: number, setNotice: SetMessage): void {
-  if (errorMm <= 5) return;
+  if (errorMm <= CROSS_AXIS_NOTICE_MM) return;
   setNotice(
     `Point saved, but it was ${errorMm.toFixed(1)} mm off the expected axis. ` +
-      'Place Board assumes the rectangle is square to the bed.',
+      'Check that the intended board point matches the selected verification point.',
   );
 }
 

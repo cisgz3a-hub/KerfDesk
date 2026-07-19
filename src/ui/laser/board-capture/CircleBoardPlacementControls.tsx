@@ -1,4 +1,4 @@
-import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
+import type { CapturedBoardGeometry } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import { AnchorRow, FillBoardControls } from './BoardPlacementControls';

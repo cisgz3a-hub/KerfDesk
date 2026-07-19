@@ -1,9 +1,9 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { findRegistrationBoxBounds } from '../../../core/scene';
-import type {
-  BoardVerificationTarget,
-  CapturedBoardGeometry,
-} from '../../../core/scene/board-verification';
+import {
+  findRegistrationBoxBounds,
+  type BoardVerificationTarget,
+  type CapturedBoardGeometry,
+} from '../../../core/scene';
 import { useStore } from '../../state';
 import { useUiStore } from '../../state/ui-store';
 import { computeView, type ViewTransform } from '../../workspace/view-transform';

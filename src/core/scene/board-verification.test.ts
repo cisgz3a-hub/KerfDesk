@@ -91,6 +91,25 @@ describe('correctCapturedBoardGeometry', () => {
       { x: 150, y: 80 },
     );
     expect(rim?.geometry).toEqual({ ...CIRCLE, radiusMm: 50 });
+    expect(rim?.crossAxisErrorMm).toBe(0);
+  });
+
+  it('reports circle rim confirmation cross-axis error', () => {
+    const top = correctCapturedBoardGeometry(
+      CIRCLE,
+      { kind: 'circle', anchor: 'rim-top' },
+      { x: 106, y: 125 },
+    );
+    expect(top?.geometry).toEqual({ ...CIRCLE, radiusMm: Math.hypot(6, 45) });
+    expect(top?.crossAxisErrorMm).toBe(6);
+
+    const left = correctCapturedBoardGeometry(
+      CIRCLE,
+      { kind: 'circle', anchor: 'rim-left' },
+      { x: 60, y: 87 },
+    );
+    expect(left?.geometry).toEqual({ ...CIRCLE, radiusMm: Math.hypot(-40, 7) });
+    expect(left?.crossAxisErrorMm).toBe(7);
   });
 });
 
