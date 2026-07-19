@@ -91,6 +91,7 @@ afterEach(async () => {
     wcoCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
+    workOriginVersion: 0,
     workZZeroEvidence: null,
     frameVerification: null,
     controllerOperation: null,
@@ -119,7 +120,6 @@ describe('laser-store origin actions', () => {
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
-
     const action = useLaserStore.getState().setOriginHere();
     await flush();
 
@@ -282,6 +282,7 @@ describe('laser-store origin actions', () => {
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
+    const originVersionBefore = useLaserStore.getState().workOriginVersion ?? 0;
 
     // G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
     // advisory (which keys on workZZeroEvidence) must stay live.
@@ -292,6 +293,7 @@ describe('laser-store origin actions', () => {
     await setOrigin;
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
+    expect(useLaserStore.getState().workOriginVersion).toBe(originVersionBefore + 1);
 
     // Zero Z (G92 Z0) is what establishes the stock-top contract.
     const zeroZ = useLaserStore.getState().zeroZHere();
@@ -301,6 +303,7 @@ describe('laser-store origin actions', () => {
     connection.emitLine('ok');
     await zeroZ;
     expect(useLaserStore.getState().workZZeroEvidence).not.toBeNull();
+    expect(useLaserStore.getState().workOriginVersion).toBe(originVersionBefore + 1);
   });
 
   it('marks the XY origin persistent but invalidates Z cleared by G92.1', async () => {

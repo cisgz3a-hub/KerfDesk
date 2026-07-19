@@ -1,24 +1,23 @@
-// use-capture-gating — the board-capture panel's Capture/jog gate, mirroring the
-// JogPad: connected + Idle + no autofocus / motion / active job in flight. Kept
-// out of the panel component so it stays under the function-size cap.
-
 import { useLaserStore } from '../../state/laser-store';
-import { isActiveJob } from '../../state/laser-store-helpers';
+import { jogFrameCommandBlockMessage } from '../../state/laser-store-helpers';
 
-export function useCaptureGating(): { readonly connected: boolean; readonly disabled: boolean } {
-  const connection = useLaserStore((s) => s.connection);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
-  const motionOperation = useLaserStore((s) => s.motionOperation);
-  const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const streamer = useLaserStore((s) => s.streamer);
+export function useCaptureGating(): {
+  readonly connected: boolean;
+  readonly disabled: boolean;
+  readonly blockedReason: string | null;
+} {
+  const connection = useLaserStore((state) => state.connection);
+  const autofocusBusy = useLaserStore((state) => state.autofocusBusy);
+  const pendingUntrackedAcks = useLaserStore((state) => state.pendingUntrackedAcks);
+  const pendingTransportWrites = useLaserStore((state) => state.pendingTransportWrites ?? 0);
+  const commandBlockMessage = useLaserStore(jogFrameCommandBlockMessage);
   const connected = connection.kind === 'connected';
-  const disabled =
-    !connected ||
-    statusReport?.state !== 'Idle' ||
-    autofocusBusy ||
-    motionOperation !== null ||
-    controllerOperation !== null ||
-    isActiveJob(streamer);
-  return { connected, disabled };
+  const blockedReason = !connected
+    ? 'Connect the machine to capture or check a board.'
+    : autofocusBusy
+      ? 'Wait for autofocus to finish.'
+      : pendingUntrackedAcks > 0 || pendingTransportWrites > 0
+        ? 'Wait for the previous controller command to settle.'
+        : commandBlockMessage;
+  return { connected, disabled: blockedReason !== null, blockedReason };
 }

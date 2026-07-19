@@ -125,4 +125,22 @@ describe('jog no-go zone guard (DEV-04)', () => {
     await useLaserStore.getState().jog({ dz: 5, feed: 600 });
     expect(writes.filter((line) => line.startsWith('$J=')).length).toBe(1);
   });
+
+  it('checks an absolute jog as a destination instead of a relative delta', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => void writes.push(data));
+    await useLaserStore.getState().connect(makeAdapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:50.000,50.000,0.000|FS:0,0>');
+    await flush();
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:50.000,50.000,0.000|FS:0,0>');
+    await flush();
+    writes.length = 0;
+
+    await expect(
+      useLaserStore.getState().jog({ dx: 10, dy: 10, feed: 1000, relative: false }),
+    ).rejects.toThrow(/no-go zone "Left clamp"/i);
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([]);
+  });
 });

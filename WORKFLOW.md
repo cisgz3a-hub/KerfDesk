@@ -1743,7 +1743,8 @@ fixtures and deliberately manually-homed Absolute Coordinates workflows.
 
 **ADR:** [ADR-124](DECISIONS.md#adr-124--capture-board-corners-build-the-registration-box-from-jogged-machine-coordinates-2026-07-08).
 
-**Operator intent.** Place a board anywhere on the bed, jog the head to
+**Operator intent.** Place a rectangular or square board anywhere on the bed,
+jog the head to
 each corner and press Capture, and have the app draw the board's outline
 on the canvas at its exact size, set the work origin at the bottom-left
 corner, and let artwork be centered (or corner-snapped) onto it. Solves
@@ -1758,8 +1759,12 @@ operator (bottom-left first — that corner becomes the origin — then the
 other corners in any order), shows the live head position, and offers
 Capture / Undo last / Start over. After four corners it shows the measured
 board and **Create board outline**; once created it shows **Place artwork**
-(Center + four corners) and **Jog head to** (Center + four corners) plus
-**Capture a new board**.
+(Center + four corners), board-verification targets, and **Capture a new
+board**. Selecting any corner on the drawn outline or in the panel moves the
+head there with the beam off.
+The operator can accept the point or fine-jog to the physical corner and confirm;
+confirmation updates the locked outline. Correcting bottom-left also updates the
+work origin, while the other corners update the measured dimensions.
 
 **Manual size (know your dimensions?).** After capturing the bottom-left
 corner (which sets the origin), the panel also shows a **type the board size**
@@ -1819,8 +1824,10 @@ fails, the panel shows an inline error instead of leaving the operator on
 5. Add artwork, select it, **Center** → it lands in the middle of the
    outline. Run a low-power/S=0 test: it should trace centered on the
    physical board.
-6. Try **Jog head to → Center**: the head should move to the middle of the
-   board. Try a corner: the head returns to that corner.
+6. Select each verification corner: the head moves there with the beam
+   off. Accept a correct point, or fine-jog to the physical corner and confirm.
+   The outline updates to the confirmed position; confirming bottom-left also
+   updates the work origin.
 7. **Remove board** deletes the outline; **Capture a new board** resets the panel; re-capturing replaces the
    outline (only one board at a time).
 
@@ -1861,18 +1868,38 @@ design under "fit as many as fit") is capped per axis.
 
 **ADR:** [ADR-126](DECISIONS.md#adr-126---generalize-place-board-to-a-board-shape-union-circle-boards-2026-07-08).
 
-**Operator intent.** Capture a round blank (coaster, medallion) the same way as a rectangle, but a circle has no corners - so capture its CENTRE and give a diameter.
+**Operator intent.** Capture a round blank (coaster, medallion) without having
+to locate an invisible centre by eye. Four well-spaced rim points determine the
+circle's centre and diameter; a visibly marked centre remains a fallback.
 
-**Where in the UI.** The Place Board panel's Rectangle / Circle toggle (top of the capture phase). Circle mode replaces the four-corner steps with a centre capture + a diameter.
+**Where in the UI.** The Place Board panel's Rectangle / Circle toggle (top of
+the capture phase). Circle mode defaults to **Find center from rim** and also
+offers **Center already marked**. After creation, the drawn outline and panel
+expose the centre plus top, right, bottom, and left rim as verification targets.
 
 **The happy path.**
 1. Open Place Board; click Circle.
-2. Jog to the CENTRE of the board; Capture centre. This sets the work origin at the centre.
-3. Type the hand-measured diameter, OR jog to any point on the rim and Capture edge to measure it (diameter = twice the centre-to-rim distance; it pre-fills the field).
-4. Create board outline -> a locked circle draws around the origin, anchored at its centre.
-5. Place / Fit / Array artwork exactly as for a rectangle (the circle is found by the same machinery). "Jog head to: Center" returns the head to the captured centre.
+2. With **Find center from rim** selected, jog to and capture four well-spaced
+   points around the rim. The fit reports the calculated centre and diameter.
+3. Choose **Move to calculated center**. The head moves with the beam off; once
+   motion settles, fine-jog if needed and confirm the current head position as
+   the centre. Confirmation sets the work origin and creates the locked circle.
+4. If the physical centre is already marked, choose **Center already marked**,
+   capture that point, and enter a measured diameter or capture one rim point.
+5. Place / Fit / Array artwork exactly as for a rectangle. To verify the result,
+   select the centre or a cardinal rim point; accept it, or fine-jog to the real
+   point and confirm. A centre correction re-anchors the work origin while
+   preserving the diameter. A rim correction preserves the centre and updates
+   the diameter.
 
-**Edge / empty / error.** A diameter below the minimum is blocked. A rim point on the centre (double-click) is ignored. Switching shape clears the in-progress capture. Fit/Array fill the circle's inscribed square, so a design stays inside the arc.
+**Edge / empty / error.** Fewer than four rim points, tightly clustered points,
+or a degenerate fit cannot create a rim-derived circle. A diameter below the
+minimum is blocked, and a rim point on the centre is ignored in marked-centre
+mode. Switching shape or circle method clears the in-progress capture. Verify
+and confirm controls stay unavailable while motion is active or the live machine
+position is unavailable. Reconnect, Home/manual-position, work-origin, or
+outline/Undo changes invalidate stale physical targets and require recapture.
+Fit/Array fill the circle's inscribed square, so a design stays inside the arc.
 
 ---
 

@@ -110,6 +110,55 @@ describe('addCapturedBoard (circle)', () => {
   });
 });
 
+describe('updateCapturedBoard', () => {
+  beforeEach(() => resetStore());
+
+  it('resizes a rectangle in place while preserving its canvas bottom-left', () => {
+    useStore.getState().addCapturedBoardBox(120, 80);
+    const before = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    const beforeBounds = transformedBBox(before);
+    useStore.getState().updateCapturedBoard({ kind: 'rect', widthMm: 150, heightMm: 60 });
+
+    const after = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    const afterBounds = transformedBBox(after);
+    expect(after.id).toBe(before.id);
+    expect(afterBounds.minX).toBeCloseTo(beforeBounds.minX, 8);
+    expect(afterBounds.maxY).toBeCloseTo(beforeBounds.maxY, 8);
+    expect(after.spec).toMatchObject({ kind: 'rect', widthMm: 150, heightMm: 60 });
+    expect(after).toMatchObject({ locked: true, provenance: 'captured-board' });
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'front-left',
+    });
+  });
+
+  it('resizes a circle in place while preserving its canvas center', () => {
+    useStore.getState().addCapturedBoard({ kind: 'circle', diameterMm: 90 });
+    const before = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    const beforeBounds = transformedBBox(before);
+    const centerBefore = {
+      x: (beforeBounds.minX + beforeBounds.maxX) / 2,
+      y: (beforeBounds.minY + beforeBounds.maxY) / 2,
+    };
+    useStore.getState().updateCapturedBoard({ kind: 'circle', diameterMm: 110 });
+
+    const after = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    const afterBounds = transformedBBox(after);
+    expect(after.id).toBe(before.id);
+    expect((afterBounds.minX + afterBounds.maxX) / 2).toBeCloseTo(centerBefore.x, 8);
+    expect((afterBounds.minY + afterBounds.maxY) / 2).toBeCloseTo(centerBefore.y, 8);
+    expect(after.spec).toMatchObject({ kind: 'ellipse', widthMm: 110, heightMm: 110 });
+  });
+
+  it('does not repurpose a normal registration jig as a captured board', () => {
+    useStore.getState().addRegistrationCircle(80);
+    const before = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    useStore.getState().updateCapturedBoard({ kind: 'circle', diameterMm: 120 });
+    const after = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    expect(after).toEqual(before);
+  });
+});
+
 describe('alignSelectionToRegistrationBox', () => {
   beforeEach(() => resetStore());
 

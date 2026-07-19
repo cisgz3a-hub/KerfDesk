@@ -115,7 +115,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.place-board': {
     family: 'tools',
     tooltip:
-      'Open the board-capture panel: jog to each corner of a placed board to draw it on the canvas at its real size and set the origin.',
+      'Capture a rectangle from its corners or find a circle from four rim points, then verify and fine-adjust points on the drawn outline.',
   },
   'tools.box-generator': {
     family: 'tools',

@@ -6,6 +6,7 @@
 // LiveRefs import — no runtime cycle.
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
+import { isRotaryActive, machineBoundsForDevice, rotaryYLimitMm } from '../../core/devices';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
@@ -38,6 +39,11 @@ type JogActionContext = {
   readonly get: GetFn;
   readonly refs: LiveRefs;
   readonly safeWrite: SafeWriteFn;
+};
+type JogParams = Parameters<LaserState['jog']>[0];
+type JogXyPath = {
+  readonly start: { readonly x: number; readonly y: number };
+  readonly target: { readonly x: number; readonly y: number };
 };
 
 // Below this XY delta (mm) a "jog to point" is treated as already-there: GRBL
@@ -83,7 +89,7 @@ async function runJogToMachinePosition(
   assertMotionQueueSettled(set, get, 'moving to a machine position');
   assertCncPointMoveWorkZReady(set, get);
   const params = { dx, dy, feed };
-  assertJogClearsNoGoZones(set, get, params);
+  assertJogMotionSafe(set, get, params);
   const operation = startSettledJogOperation(refs);
   set({ motionOperation: operation, frameVerification: null, framedRun: null });
   // CNC: after readiness is proven, lift Z to the configured safe height
@@ -116,7 +122,7 @@ async function runJog(
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'jogging');
-  assertJogClearsNoGoZones(set, get, params);
+  assertJogMotionSafe(set, get, params);
   // Any deliberate head move consumes the placement proof even if the
   // head later returns to numerically identical coordinates.
   const operation = startSettledJogOperation(context.refs);
@@ -297,29 +303,66 @@ function assertJogFrameReady(set: SetFn, get: GetFn): void {
   throw new Error(blockedMessage);
 }
 
+// Direct manual jogs share one destination resolver so configured machine
+// bounds and keep-out zones evaluate the same physical segment. A jog with no
+// known machine position cannot be resolved and keeps the legacy controller-
+// guarded behavior; board-point moves always require a live position upstream.
+function assertJogMotionSafe(set: SetFn, get: GetFn, params: JogParams): void {
+  const path = resolveJogXyPath(get, params);
+  if (path === null) return;
+  assertJogTargetWithinConfiguredBounds(set, get, path.target);
+  assertJogClearsNoGoZones(set, get, path);
+}
+
+function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
+  const hasX = params.dx !== undefined;
+  const hasY = params.dy !== undefined;
+  if (!hasX && !hasY) return null;
+  const start = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+  if (start === null) return null;
+  const relative = params.relative !== false;
+  const target = relative
+    ? { x: start.x + (params.dx ?? 0), y: start.y + (params.dy ?? 0) }
+    : { x: params.dx ?? start.x, y: params.dy ?? start.y };
+  return { start, target };
+}
+
+function assertJogTargetWithinConfiguredBounds(
+  set: SetFn,
+  get: GetFn,
+  target: JogXyPath['target'],
+): void {
+  const device = useStore.getState().project.device;
+  const baseBounds = machineBoundsForDevice(device);
+  const bounds = isRotaryActive(device.rotary)
+    ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(device.rotary) }
+    : baseBounds;
+  if (
+    target.x >= bounds.minX &&
+    target.x <= bounds.maxX &&
+    target.y >= bounds.minY &&
+    target.y <= bounds.maxY
+  ) {
+    return;
+  }
+  const message =
+    `Jog blocked: target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
+    `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
+    `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}.`;
+  set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
+  throw new Error(message);
+}
+
 // DEV-04: refuse a direct manual jog whose straight path would drive the head
 // through an enabled no-go/keep-out zone. Framed-job review reports those zones
 // as warnings instead of treating them as a second Start-authorization gate.
-// A relative jog with no known machine position can't be
-// resolved to a target, so it is allowed (the operator has no live position to
-// reason about either); homing and continuous jog are out of scope.
-function assertJogClearsNoGoZones(
-  set: SetFn,
-  get: GetFn,
-  params: { readonly dx?: number; readonly dy?: number },
-): void {
-  const dx = params.dx ?? 0;
-  const dy = params.dy ?? 0;
-  // A Z-only jog (or a no-op) has no XY motion, so no XY keep-out can be crossed.
-  // Testing the degenerate start==end segment would wrongly block a safe Z
-  // retract / touch-off whenever the head is parked inside a zone (DEV-04 audit).
-  if (dx === 0 && dy === 0) return;
+function assertJogClearsNoGoZones(set: SetFn, get: GetFn, path: JogXyPath): void {
+  // Testing a degenerate start==end segment would wrongly block a safe no-op
+  // whenever the head is parked inside a zone (DEV-04 audit).
+  if (path.start.x === path.target.x && path.start.y === path.target.y) return;
   const zones = useStore.getState().project.device.noGoZones;
   if (zones === undefined || zones.length === 0) return;
-  const current = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
-  if (current === null) return;
-  const target = { x: current.x + dx, y: current.y + dy };
-  const zone = firstZoneCrossedBySegment(current, target, zones);
+  const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
   if (zone === null) return;
   const message = `Jog blocked: this move would cross the no-go zone "${zone.name}". Jog around it, or disable the zone in Machine Setup → Safety Zones.`;
   set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });

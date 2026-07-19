@@ -1,59 +1,61 @@
-// use-board-capture — the ephemeral capture-in-progress state (ADR-124,
-// generalized to board shapes in ADR-126): the machine coordinates recorded so
-// far, the shape being captured, and whether the board has been committed to the
-// scene. A pure reducer (mirrors the ADR-092 device-setup wizard) so the
-// transition logic is testable without React.
-//
-// `corners` is shape-relative: for a rectangle it is up to four corner points
-// (index 0 = the bottom-left origin); for a circle it is [centre] or
-// [centre, rim] (index 0 = the centre origin, index 1 = an optional rim point
-// used only to measure the diameter).
-
-import { useReducer } from 'react';
+import { useReducer, useRef } from 'react';
 import {
   assertNever,
-  BOARD_CORNER_COUNT,
-  type BoardShape,
+  boardCornersFromOrigin,
   type BoardShapeKind,
   type Vec2,
 } from '../../../core/scene';
+import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 
-// Two captures closer than this are treated as the same point. A double-click
-// records the identical (stationary-head) machine position twice, which would
-// otherwise inject a zero-length edge; real corners / rim points are far apart.
-const MIN_CORNER_SEPARATION_MM = 1;
+const MIN_CAPTURE_SEPARATION_MM = 1;
+export const CIRCLE_RIM_POINT_COUNT = 4;
 
-// A circle captures at most the centre + one rim point.
-const MAX_CIRCLE_CAPTURES = 2;
+export type CircleCaptureMethod = 'rim-fit' | 'marked-center';
+export type BoardRegistrationEpoch = {
+  readonly controllerSessionEpoch: number;
+  readonly trustedPositionEpoch: number;
+  readonly workOriginVersion: number;
+};
 
 export type BoardCaptureState = {
   readonly shapeKind: BoardShapeKind;
+  readonly circleMethod: CircleCaptureMethod;
+  // Capture-phase samples only. A committed rectangle is canonical BL/BR/TR/TL;
+  // a committed circle keeps its resolved center as the sole point.
   readonly corners: ReadonlyArray<Vec2>;
-  // The resolved shape, set at commit — a circle records its diameter here; a
-  // rectangle derives its size from `corners`, so it stays null.
-  readonly shape: BoardShape | null;
+  readonly captureEpoch: BoardRegistrationEpoch | null;
+  readonly geometry: CapturedBoardGeometry | null;
+  readonly registrationEpoch: BoardRegistrationEpoch | null;
+  readonly outlineId: string | null;
+  readonly sessionRevision: number;
   readonly committed: boolean;
 };
 
 export type BoardCaptureAction =
   | { readonly type: 'set-shape'; readonly shapeKind: BoardShapeKind }
-  | { readonly type: 'capture'; readonly point: Vec2 }
+  | { readonly type: 'set-circle-method'; readonly method: CircleCaptureMethod }
+  | {
+      readonly type: 'capture';
+      readonly point: Vec2;
+      readonly captureEpoch: BoardRegistrationEpoch;
+      readonly expectedSessionRevision: number;
+    }
   | { readonly type: 'undo' }
-  | { readonly type: 'commit' }
-  // Manual-size path (rect): replace the (single captured) corner set with the
-  // four synthesized corners and commit in one step.
-  | { readonly type: 'commit-manual'; readonly corners: ReadonlyArray<Vec2> }
-  // Circle: commit the captured centre + a diameter (typed, or measured from a
-  // rim capture — the caller resolves the value).
-  | { readonly type: 'commit-circle'; readonly diameterMm: number }
+  | {
+      readonly type: 'commit';
+      readonly geometry: CapturedBoardGeometry;
+      readonly registrationEpoch: BoardRegistrationEpoch;
+      readonly outlineId: string;
+      readonly expectedSessionRevision: number;
+    }
+  | {
+      readonly type: 'update-geometry';
+      readonly geometry: CapturedBoardGeometry;
+      readonly registrationEpoch: BoardRegistrationEpoch;
+    }
   | { readonly type: 'reset' };
 
-export const INITIAL_BOARD_CAPTURE: BoardCaptureState = {
-  shapeKind: 'rect',
-  corners: [],
-  shape: null,
-  committed: false,
-};
+export const INITIAL_BOARD_CAPTURE: BoardCaptureState = emptyCaptureState('rect', 'rim-fit');
 
 export function boardCaptureReducer(
   state: BoardCaptureState,
@@ -61,85 +63,227 @@ export function boardCaptureReducer(
 ): BoardCaptureState {
   switch (action.type) {
     case 'set-shape':
-      // Switching shape mid-capture clears the in-progress points; no-op once
-      // committed (the operator resets / captures a new board instead).
-      return state.committed
-        ? state
-        : { shapeKind: action.shapeKind, corners: [], shape: null, committed: false };
+      return changeBoardShape(state, action.shapeKind);
+    case 'set-circle-method':
+      return changeCircleMethod(state, action.method);
     case 'capture':
-      return applyCapture(state, action.point);
+      return applyCapture(state, action.point, action.captureEpoch, action.expectedSessionRevision);
     case 'undo':
-      return applyUndo(state);
+      return undoCapturePoint(state);
     case 'commit':
-      return state.corners.length === BOARD_CORNER_COUNT ? { ...state, committed: true } : state;
-    case 'commit-manual':
-      return applyCommitManual(state, action.corners);
-    case 'commit-circle':
-      return applyCommitCircle(state, action.diameterMm);
+      return applyCommit(
+        state,
+        action.geometry,
+        action.registrationEpoch,
+        action.outlineId,
+        action.expectedSessionRevision,
+      );
+    case 'update-geometry':
+      return applyGeometryUpdate(state, action.geometry, action.registrationEpoch);
     case 'reset':
-      return INITIAL_BOARD_CAPTURE;
+      return emptyCaptureState('rect', 'rim-fit', state.sessionRevision + 1);
     default:
       return assertNever(action, 'BoardCaptureAction');
   }
 }
 
-function maxCaptures(shapeKind: BoardShapeKind): number {
-  return shapeKind === 'circle' ? MAX_CIRCLE_CAPTURES : BOARD_CORNER_COUNT;
-}
-
-function applyCapture(state: BoardCaptureState, point: Vec2): BoardCaptureState {
-  if (state.committed || state.corners.length >= maxCaptures(state.shapeKind)) return state;
-  // Reject a re-capture at (essentially) the previous point — a double-click, or
-  // a circle rim point landing on the centre.
-  const last = state.corners[state.corners.length - 1];
-  if (last !== undefined && distanceMm(last, point) < MIN_CORNER_SEPARATION_MM) return state;
-  return { ...state, corners: [...state.corners, point] };
-}
-
-function applyUndo(state: BoardCaptureState): BoardCaptureState {
+function undoCapturePoint(state: BoardCaptureState): BoardCaptureState {
   if (state.committed || state.corners.length === 0) return state;
-  return { ...state, corners: state.corners.slice(0, -1) };
+  const corners = state.corners.slice(0, -1);
+  return { ...state, corners, captureEpoch: corners.length === 0 ? null : state.captureEpoch };
 }
 
-function applyCommitManual(
+function changeBoardShape(state: BoardCaptureState, shapeKind: BoardShapeKind): BoardCaptureState {
+  return state.committed
+    ? state
+    : emptyCaptureState(shapeKind, state.circleMethod, state.sessionRevision + 1);
+}
+
+function changeCircleMethod(
   state: BoardCaptureState,
-  corners: ReadonlyArray<Vec2>,
+  method: CircleCaptureMethod,
 ): BoardCaptureState {
-  if (state.committed || corners.length !== BOARD_CORNER_COUNT) return state;
-  return { ...state, corners, committed: true };
+  return state.committed || state.shapeKind !== 'circle'
+    ? state
+    : emptyCaptureState('circle', method, state.sessionRevision + 1);
 }
 
-function applyCommitCircle(state: BoardCaptureState, diameterMm: number): BoardCaptureState {
-  // Needs the centre captured (index 0); the rim point is optional.
-  if (state.committed || state.shapeKind !== 'circle' || state.corners.length === 0) return state;
-  return { ...state, shape: { kind: 'circle', diameterMm }, committed: true };
+function emptyCaptureState(
+  shapeKind: BoardShapeKind,
+  circleMethod: CircleCaptureMethod,
+  sessionRevision = 0,
+): BoardCaptureState {
+  return {
+    shapeKind,
+    circleMethod,
+    corners: [],
+    captureEpoch: null,
+    geometry: null,
+    registrationEpoch: null,
+    outlineId: null,
+    sessionRevision,
+    committed: false,
+  };
+}
+
+function applyCapture(
+  state: BoardCaptureState,
+  point: Vec2,
+  captureEpoch: BoardRegistrationEpoch,
+  expectedSessionRevision: number,
+): BoardCaptureState {
+  if (state.sessionRevision !== expectedSessionRevision) return state;
+  if (state.committed || state.corners.length >= maxCaptures(state)) return state;
+  if (state.captureEpoch !== null && !registrationEpochMatches(state.captureEpoch, captureEpoch)) {
+    return state;
+  }
+  if (state.corners.some((sample) => distanceMm(sample, point) < MIN_CAPTURE_SEPARATION_MM)) {
+    return state;
+  }
+  return {
+    ...state,
+    captureEpoch: state.captureEpoch ?? captureEpoch,
+    corners: [...state.corners, point],
+  };
+}
+
+function maxCaptures(state: BoardCaptureState): number {
+  if (state.shapeKind === 'rect') return 4;
+  return state.circleMethod === 'rim-fit' ? CIRCLE_RIM_POINT_COUNT : 2;
+}
+
+function applyCommit(
+  state: BoardCaptureState,
+  geometry: CapturedBoardGeometry,
+  registrationEpoch: BoardRegistrationEpoch,
+  outlineId: string,
+  expectedSessionRevision: number,
+): BoardCaptureState {
+  if (
+    state.sessionRevision !== expectedSessionRevision ||
+    !boardCaptureCanCommit(state, geometry, registrationEpoch)
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    geometry,
+    registrationEpoch,
+    outlineId,
+    corners: canonicalPoints(geometry),
+    committed: true,
+  };
+}
+
+export function boardCaptureCanCommit(
+  state: BoardCaptureState,
+  geometry: CapturedBoardGeometry,
+  registrationEpoch: BoardRegistrationEpoch,
+): boolean {
+  if (state.committed || geometry.kind !== state.shapeKind || !captureCanCommit(state))
+    return false;
+  if (state.captureEpoch === null) return false;
+  const sameMachineFrame =
+    state.captureEpoch.controllerSessionEpoch === registrationEpoch.controllerSessionEpoch &&
+    state.captureEpoch.trustedPositionEpoch === registrationEpoch.trustedPositionEpoch;
+  if (!sameMachineFrame) return false;
+  return (
+    isRimFitCircle(state) ||
+    state.captureEpoch.workOriginVersion === registrationEpoch.workOriginVersion
+  );
+}
+
+function isRimFitCircle(state: BoardCaptureState): boolean {
+  return state.shapeKind === 'circle' && state.circleMethod === 'rim-fit';
+}
+
+function captureCanCommit(state: BoardCaptureState): boolean {
+  if (state.shapeKind === 'rect') return state.corners.length === 1 || state.corners.length === 4;
+  return state.circleMethod === 'rim-fit'
+    ? state.corners.length === CIRCLE_RIM_POINT_COUNT
+    : state.corners.length >= 1;
+}
+
+function applyGeometryUpdate(
+  state: BoardCaptureState,
+  geometry: CapturedBoardGeometry,
+  registrationEpoch: BoardRegistrationEpoch,
+): BoardCaptureState {
+  if (!state.committed || state.geometry?.kind !== geometry.kind) return state;
+  return { ...state, geometry, registrationEpoch, corners: canonicalPoints(geometry) };
+}
+
+function canonicalPoints(geometry: CapturedBoardGeometry): ReadonlyArray<Vec2> {
+  return geometry.kind === 'rect'
+    ? boardCornersFromOrigin(geometry.origin, geometry.widthMm, geometry.heightMm)
+    : [geometry.center];
 }
 
 export type BoardCapture = {
   readonly state: BoardCaptureState;
   readonly setShape: (shapeKind: BoardShapeKind) => void;
-  readonly capture: (point: Vec2) => void;
+  readonly setCircleMethod: (method: CircleCaptureMethod) => void;
+  readonly capture: (point: Vec2, captureEpoch: BoardRegistrationEpoch) => void;
   readonly undo: () => void;
-  readonly commit: () => void;
-  readonly commitManual: (corners: ReadonlyArray<Vec2>) => void;
-  readonly commitCircle: (diameterMm: number) => void;
+  readonly commit: (
+    geometry: CapturedBoardGeometry,
+    registrationEpoch: BoardRegistrationEpoch,
+    outlineId: string,
+  ) => void;
+  readonly updateGeometry: (
+    geometry: CapturedBoardGeometry,
+    registrationEpoch: BoardRegistrationEpoch,
+  ) => void;
+  readonly isSessionCurrent: () => boolean;
   readonly reset: () => void;
 };
+
+export function useBoardCapture(): BoardCapture {
+  const [state, dispatch] = useReducer(boardCaptureReducer, INITIAL_BOARD_CAPTURE);
+  const sessionToken = useRef(0);
+  const renderedSessionToken = sessionToken.current;
+  const resetSession = (action: BoardCaptureAction): void => {
+    sessionToken.current += 1;
+    dispatch(action);
+  };
+  return {
+    state,
+    setShape: (shapeKind) => resetSession({ type: 'set-shape', shapeKind }),
+    setCircleMethod: (method) => resetSession({ type: 'set-circle-method', method }),
+    capture: (point, captureEpoch) =>
+      dispatch({
+        type: 'capture',
+        point,
+        captureEpoch,
+        expectedSessionRevision: state.sessionRevision,
+      }),
+    undo: () => dispatch({ type: 'undo' }),
+    commit: (geometry, registrationEpoch, outlineId) =>
+      dispatch({
+        type: 'commit',
+        geometry,
+        registrationEpoch,
+        outlineId,
+        expectedSessionRevision: state.sessionRevision,
+      }),
+    updateGeometry: (geometry, registrationEpoch) =>
+      dispatch({ type: 'update-geometry', geometry, registrationEpoch }),
+    isSessionCurrent: () => sessionToken.current === renderedSessionToken,
+    reset: () => resetSession({ type: 'reset' }),
+  };
+}
 
 function distanceMm(a: Vec2, b: Vec2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-export function useBoardCapture(): BoardCapture {
-  const [state, dispatch] = useReducer(boardCaptureReducer, INITIAL_BOARD_CAPTURE);
-  return {
-    state,
-    setShape: (shapeKind) => dispatch({ type: 'set-shape', shapeKind }),
-    capture: (point) => dispatch({ type: 'capture', point }),
-    undo: () => dispatch({ type: 'undo' }),
-    commit: () => dispatch({ type: 'commit' }),
-    commitManual: (corners) => dispatch({ type: 'commit-manual', corners }),
-    commitCircle: (diameterMm) => dispatch({ type: 'commit-circle', diameterMm }),
-    reset: () => dispatch({ type: 'reset' }),
-  };
+function registrationEpochMatches(
+  left: BoardRegistrationEpoch,
+  right: BoardRegistrationEpoch,
+): boolean {
+  return (
+    left.controllerSessionEpoch === right.controllerSessionEpoch &&
+    left.trustedPositionEpoch === right.trustedPositionEpoch &&
+    left.workOriginVersion === right.workOriginVersion
+  );
 }

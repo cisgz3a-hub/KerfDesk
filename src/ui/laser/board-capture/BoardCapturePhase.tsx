@@ -1,44 +1,45 @@
-// BoardCapturePhase — chooses the right capture / placement sub-panel for the
-// current shape + committed state (ADR-126), keeping BoardCapturePanel small.
-// Committed → placement controls (rect corners or circle centre); in progress →
-// the shape-specific capture steps.
-
 import type { BestFitRectangle, BoardShapeKind, Vec2 } from '../../../core/scene';
+import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { BoardCaptureSteps } from './BoardCaptureSteps';
 import { BoardPlacementControls } from './BoardPlacementControls';
 import { CircleBoardPlacementControls } from './CircleBoardPlacementControls';
 import { CircleCaptureSteps } from './CircleCaptureSteps';
+import type { CircleCaptureMethod } from './use-board-capture';
+import type { BoardVerificationController } from './use-board-verification';
 
 export function BoardCapturePhase(props: {
   readonly committed: boolean;
   readonly shapeKind: BoardShapeKind;
+  readonly circleMethod: CircleCaptureMethod;
   readonly corners: ReadonlyArray<Vec2>;
-  readonly circleDiameter: number | null;
+  readonly geometry: CapturedBoardGeometry | null;
   readonly rect: BestFitRectangle | null;
   readonly livePosition: Vec2 | null;
   readonly disabled: boolean;
-  readonly feed: number;
+  readonly sessionDisabled: boolean;
+  readonly verification: BoardVerificationController;
+  readonly onCircleMethodChange: (method: CircleCaptureMethod) => void;
+  readonly onMoveToPoint: (point: Vec2) => Promise<void>;
   readonly onCapture: () => void;
   readonly onUndo: () => void;
   readonly onFinishRect: () => void;
   readonly onManualSize: (widthMm: number, heightMm: number) => void;
-  readonly onFinishCircle: (diameterMm: number) => void;
+  readonly onFinishCircle: (center: Vec2, diameterMm: number) => Promise<void>;
   readonly onReset: () => void;
 }): JSX.Element {
-  if (props.committed) {
-    return props.circleDiameter !== null ? (
+  if (props.committed && props.geometry !== null) {
+    return props.geometry.kind === 'circle' ? (
       <CircleBoardPlacementControls
-        corners={props.corners}
-        diameterMm={props.circleDiameter}
-        feed={props.feed}
+        geometry={props.geometry}
         disabled={props.disabled}
+        verification={props.verification}
         onReset={props.onReset}
       />
     ) : (
       <BoardPlacementControls
-        corners={props.corners}
-        feed={props.feed}
+        geometry={props.geometry}
         disabled={props.disabled}
+        verification={props.verification}
         onReset={props.onReset}
       />
     );
@@ -46,13 +47,16 @@ export function BoardCapturePhase(props: {
   if (props.shapeKind === 'circle') {
     return (
       <CircleCaptureSteps
+        method={props.circleMethod}
         corners={props.corners}
         livePosition={props.livePosition}
         disabled={props.disabled}
+        sessionDisabled={props.sessionDisabled}
+        onMethodChange={props.onCircleMethodChange}
+        onMoveToPoint={props.onMoveToPoint}
         onCapture={props.onCapture}
         onUndo={props.onUndo}
         onFinish={props.onFinishCircle}
-        onReset={props.onReset}
       />
     );
   }
@@ -62,6 +66,7 @@ export function BoardCapturePhase(props: {
       livePosition={props.livePosition}
       rect={props.rect}
       disabled={props.disabled}
+      sessionDisabled={props.sessionDisabled}
       onCapture={props.onCapture}
       onUndo={props.onUndo}
       onFinish={props.onFinishRect}

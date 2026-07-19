@@ -14,9 +14,11 @@ const SHAPES: ReadonlyArray<{ readonly kind: BoardShapeKind; readonly label: str
 
 export function BoardShapeToggle({
   shapeKind,
+  disabled,
   onChange,
 }: {
   readonly shapeKind: BoardShapeKind;
+  readonly disabled: boolean;
   readonly onChange: (kind: BoardShapeKind) => void;
 }): JSX.Element {
   return (
@@ -25,6 +27,7 @@ export function BoardShapeToggle({
         <Button
           key={kind}
           variant={kind === shapeKind ? 'primary' : 'ghost'}
+          disabled={disabled}
           aria-pressed={kind === shapeKind}
           title={`Capture a ${label.toLowerCase()} board`}
           onClick={() => onChange(kind)}

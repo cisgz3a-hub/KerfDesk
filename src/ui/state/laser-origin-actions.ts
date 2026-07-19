@@ -137,6 +137,7 @@ async function setOriginHere(
       const { statusReport, wcoCache } = get();
       return transientXyOriginPatch(inferCurrentMachinePosition(statusReport, wcoCache), wcoCache);
     },
+    { changesXyOrigin: true },
   );
   // The controller stayed silent past the wait, so the origin is recorded
   // without a fresh work offset — its machine location is unconfirmed and Start
@@ -188,6 +189,7 @@ async function resetOrigin(
       get().workOriginSource === 'g54-persistent'
         ? persistentOriginAfterTransientClearPatch()
         : clearedOriginPatch(),
+    { changesXyOrigin: true },
   );
 }
 
@@ -205,6 +207,7 @@ async function setPersistentOriginHere(
     'Set persistent origin',
     (write) => setPersistentOriginHereAction(write, usesPrimaryWcs(get())),
     persistentOriginAfterTransientClearPatch,
+    { changesXyOrigin: true },
   );
 }
 
@@ -222,6 +225,7 @@ async function clearPersistentOrigin(
     'Clear persistent origin',
     (write) => clearPersistentOriginAction(write, usesPrimaryWcs(get())),
     clearedOriginPatch,
+    { changesXyOrigin: true },
   );
 }
 
@@ -232,8 +236,15 @@ async function releaseMotors(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   assertOriginActionReady(set, get, refs);
-  await runOriginTransaction(set, refs, safeWrite, 'Release motors', releaseMotorsAction, () =>
-    get().workOriginSource === 'g54-persistent' ? unknownOriginPatch() : clearedOriginPatch(),
+  await runOriginTransaction(
+    set,
+    refs,
+    safeWrite,
+    'Release motors',
+    releaseMotorsAction,
+    () =>
+      get().workOriginSource === 'g54-persistent' ? unknownOriginPatch() : clearedOriginPatch(),
+    { changesXyOrigin: true },
   );
 }
 

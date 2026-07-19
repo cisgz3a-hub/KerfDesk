@@ -1,128 +1,207 @@
 import { describe, expect, it } from 'vitest';
+import type { Vec2 } from '../../../core/scene';
+import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import {
-  boardCaptureReducer,
+  CIRCLE_RIM_POINT_COUNT,
   INITIAL_BOARD_CAPTURE,
+  boardCaptureCanCommit,
+  boardCaptureReducer,
   type BoardCaptureState,
+  type BoardRegistrationEpoch,
 } from './use-board-capture';
 
-const P = (x: number, y: number): { x: number; y: number } => ({ x, y });
+const EPOCH: BoardRegistrationEpoch = {
+  controllerSessionEpoch: 2,
+  trustedPositionEpoch: 4,
+  workOriginVersion: 6,
+};
+const P = (x: number, y: number): Vec2 => ({ x, y });
 
-function withCorners(count: number): BoardCaptureState {
-  let state = INITIAL_BOARD_CAPTURE;
-  for (let i = 0; i < count; i += 1) {
-    state = boardCaptureReducer(state, { type: 'capture', point: P(i, i) });
-  }
-  return state;
+function capture(state: BoardCaptureState, ...points: ReadonlyArray<Vec2>): BoardCaptureState {
+  return points.reduce(
+    (current, point) =>
+      boardCaptureReducer(current, {
+        type: 'capture',
+        point,
+        captureEpoch: EPOCH,
+        expectedSessionRevision: current.sessionRevision,
+      }),
+    state,
+  );
 }
 
-describe('boardCaptureReducer', () => {
-  it('appends corners up to four, then ignores extra captures', () => {
-    const four = withCorners(4);
-    expect(four.corners).toHaveLength(4);
-    const fifth = boardCaptureReducer(four, { type: 'capture', point: P(9, 9) });
-    expect(fifth).toBe(four); // unchanged reference
+function commit(
+  state: BoardCaptureState,
+  geometry: CapturedBoardGeometry,
+  registrationEpoch = EPOCH,
+): BoardCaptureState {
+  return boardCaptureReducer(state, {
+    type: 'commit',
+    geometry,
+    registrationEpoch,
+    outlineId: 'captured-board',
+    expectedSessionRevision: state.sessionRevision,
   });
+}
 
-  it('undoes the last corner but not past empty', () => {
-    const two = withCorners(2);
-    const one = boardCaptureReducer(two, { type: 'undo' });
-    expect(one.corners).toHaveLength(1);
-    const empty = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'undo' });
-    expect(empty).toBe(INITIAL_BOARD_CAPTURE);
-  });
-
-  it('commits only with exactly four corners', () => {
-    expect(boardCaptureReducer(withCorners(3), { type: 'commit' }).committed).toBe(false);
-    const committed = boardCaptureReducer(withCorners(4), { type: 'commit' });
-    expect(committed.committed).toBe(true);
-  });
-
-  it('freezes capture and undo once committed', () => {
-    const committed = boardCaptureReducer(withCorners(4), { type: 'commit' });
-    expect(boardCaptureReducer(committed, { type: 'capture', point: P(1, 1) })).toBe(committed);
-    expect(boardCaptureReducer(committed, { type: 'undo' })).toBe(committed);
-  });
-
-  it('ignores a re-capture at (essentially) the previous corner — a double-click', () => {
-    const one = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(50, 30) });
-    // Exact same point again (stationary-head double-click) → ignored.
-    expect(boardCaptureReducer(one, { type: 'capture', point: P(50, 30) }).corners).toHaveLength(1);
-    // Sub-millimetre jitter is still the same corner → ignored.
-    expect(
-      boardCaptureReducer(one, { type: 'capture', point: P(50.3, 30.2) }).corners,
-    ).toHaveLength(1);
-    // A genuinely distinct corner is captured.
-    expect(boardCaptureReducer(one, { type: 'capture', point: P(150, 30) }).corners).toHaveLength(
-      2,
+describe('boardCaptureReducer rectangle', () => {
+  it('captures at most four distinct points and clears the epoch after undoing all', () => {
+    let state = capture(
+      INITIAL_BOARD_CAPTURE,
+      P(0, 0),
+      P(10, 0),
+      P(0, 0),
+      P(10, 5),
+      P(0, 5),
+      P(99, 99),
     );
+    expect(state.corners).toHaveLength(4);
+    expect(state.captureEpoch).toEqual(EPOCH);
+    for (let index = 0; index < 4; index += 1) {
+      state = boardCaptureReducer(state, { type: 'undo' });
+    }
+    expect(state.corners).toHaveLength(0);
+    expect(state.captureEpoch).toBeNull();
   });
 
-  it('commit-manual replaces corners with the synthesized four and commits', () => {
-    const one = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(10, 10) });
-    const four = [P(10, 10), P(110, 10), P(110, 70), P(10, 70)];
-    const committed = boardCaptureReducer(one, { type: 'commit-manual', corners: four });
-    expect(committed.committed).toBe(true);
-    expect(committed.corners).toEqual(four);
+  it('rejects capture samples from a changed controller, position, or origin epoch', () => {
+    const state = capture(INITIAL_BOARD_CAPTURE, P(0, 0));
+    const changed = { ...EPOCH, controllerSessionEpoch: EPOCH.controllerSessionEpoch + 1 };
+    const next = boardCaptureReducer(state, {
+      type: 'capture',
+      point: P(10, 0),
+      captureEpoch: changed,
+      expectedSessionRevision: state.sessionRevision,
+    });
+    expect(next).toBe(state);
   });
 
-  it('commit-manual is a no-op without exactly four corners or once committed', () => {
-    const one = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(10, 10) });
-    expect(boardCaptureReducer(one, { type: 'commit-manual', corners: [P(0, 0)] })).toBe(one);
-    const four = [P(0, 0), P(1, 0), P(1, 1), P(0, 1)];
-    const committed = boardCaptureReducer(one, { type: 'commit-manual', corners: four });
-    expect(boardCaptureReducer(committed, { type: 'commit-manual', corners: four })).toBe(
-      committed,
-    );
-  });
-
-  it('reset returns to the initial state', () => {
-    expect(boardCaptureReducer(withCorners(3), { type: 'reset' })).toEqual(INITIAL_BOARD_CAPTURE);
-  });
-
-  it('set-shape switches the shape and clears in-progress corners', () => {
-    const circle = boardCaptureReducer(withCorners(2), { type: 'set-shape', shapeKind: 'circle' });
-    expect(circle.shapeKind).toBe('circle');
-    expect(circle.corners).toHaveLength(0);
-    expect(circle.committed).toBe(false);
-  });
-
-  it('set-shape is a no-op once committed', () => {
-    const committed = boardCaptureReducer(withCorners(4), { type: 'commit' });
-    expect(boardCaptureReducer(committed, { type: 'set-shape', shapeKind: 'circle' })).toBe(
-      committed,
-    );
-  });
-
-  it('a circle captures at most the centre + one rim point', () => {
-    let s = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'set-shape', shapeKind: 'circle' });
-    s = boardCaptureReducer(s, { type: 'capture', point: P(100, 100) }); // centre
-    s = boardCaptureReducer(s, { type: 'capture', point: P(140, 100) }); // rim
-    expect(s.corners).toHaveLength(2);
-    expect(boardCaptureReducer(s, { type: 'capture', point: P(200, 200) })).toBe(s); // capped at 2
-  });
-
-  it('commit-circle records the diameter + shape once the centre is captured', () => {
-    let s = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'set-shape', shapeKind: 'circle' });
-    s = boardCaptureReducer(s, { type: 'capture', point: P(100, 100) });
-    const committed = boardCaptureReducer(s, { type: 'commit-circle', diameterMm: 90 });
-    expect(committed.committed).toBe(true);
-    expect(committed.shape).toEqual({ kind: 'circle', diameterMm: 90 });
-  });
-
-  it('commit-circle is a no-op without a centre, on a rect, or once committed', () => {
-    const circleEmpty = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+  it('rejects an async capture action from a replaced capture session', () => {
+    const oldRevision = INITIAL_BOARD_CAPTURE.sessionRevision;
+    const replaced = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
       type: 'set-shape',
       shapeKind: 'circle',
     });
-    expect(boardCaptureReducer(circleEmpty, { type: 'commit-circle', diameterMm: 90 })).toBe(
-      circleEmpty,
-    );
-    const rectOne = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(0, 0) });
-    expect(boardCaptureReducer(rectOne, { type: 'commit-circle', diameterMm: 90 })).toBe(rectOne);
-    const centered = boardCaptureReducer(circleEmpty, { type: 'capture', point: P(10, 10) });
-    const committed = boardCaptureReducer(centered, { type: 'commit-circle', diameterMm: 90 });
-    expect(boardCaptureReducer(committed, { type: 'commit-circle', diameterMm: 50 })).toBe(
-      committed,
-    );
+    const stale = boardCaptureReducer(replaced, {
+      type: 'capture',
+      point: P(10, 10),
+      captureEpoch: EPOCH,
+      expectedSessionRevision: oldRevision,
+    });
+    expect(stale).toBe(replaced);
+    expect(stale.corners).toHaveLength(0);
+  });
+
+  it('commits canonical measured and manual rectangles with an outline binding', () => {
+    const geometry: CapturedBoardGeometry = {
+      kind: 'rect',
+      origin: P(10, 20),
+      widthMm: 100,
+      heightMm: 60,
+    };
+    const measured = capture(INITIAL_BOARD_CAPTURE, P(10, 20), P(110, 20), P(110, 80), P(10, 80));
+    const committed = commit(measured, geometry);
+    expect(committed).toMatchObject({
+      committed: true,
+      geometry,
+      registrationEpoch: EPOCH,
+      outlineId: 'captured-board',
+    });
+    expect(committed.corners).toEqual([P(10, 20), P(110, 20), P(110, 80), P(10, 80)]);
+    expect(commit(capture(INITIAL_BOARD_CAPTURE, P(10, 20)), geometry).committed).toBe(true);
+  });
+});
+
+describe('boardCaptureReducer circle', () => {
+  it('defaults to four-point rim fitting and can switch to marked-center mode', () => {
+    let state = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'circle',
+    });
+    expect(state.circleMethod).toBe('rim-fit');
+    state = capture(state, P(0, 5), P(5, 0), P(0, -5), P(-5, 0), P(99, 99));
+    expect(state.corners).toHaveLength(CIRCLE_RIM_POINT_COUNT);
+    const marked = boardCaptureReducer(state, {
+      type: 'set-circle-method',
+      method: 'marked-center',
+    });
+    expect(marked).toMatchObject({
+      corners: [],
+      captureEpoch: null,
+      circleMethod: 'marked-center',
+    });
+  });
+
+  it('requires all four rim points and permits the intentional origin-version change', () => {
+    const circle = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'circle',
+    });
+    const geometry: CapturedBoardGeometry = { kind: 'circle', center: P(10, 10), radiusMm: 5 };
+    const three = capture(circle, P(10, 5), P(15, 10), P(10, 15));
+    expect(commit(three, geometry).committed).toBe(false);
+    const four = capture(three, P(5, 10));
+    const afterOrigin = { ...EPOCH, workOriginVersion: EPOCH.workOriginVersion + 1 };
+    expect(boardCaptureCanCommit(four, geometry, afterOrigin)).toBe(true);
+    expect(commit(four, geometry, afterOrigin).committed).toBe(true);
+  });
+
+  it('keeps marked-center capture bound to the original work origin', () => {
+    let state = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'circle',
+    });
+    state = boardCaptureReducer(state, {
+      type: 'set-circle-method',
+      method: 'marked-center',
+    });
+    state = capture(state, P(10, 10), P(15, 10));
+    const geometry: CapturedBoardGeometry = { kind: 'circle', center: P(10, 10), radiusMm: 5 };
+    expect(commit(state, geometry).committed).toBe(true);
+    expect(commit(state, geometry, { ...EPOCH, workOriginVersion: 7 }).committed).toBe(false);
+  });
+});
+
+describe('committed capture updates', () => {
+  it('updates same-kind geometry and its origin identity while freezing capture changes', () => {
+    const geometry: CapturedBoardGeometry = {
+      kind: 'rect',
+      origin: P(0, 0),
+      widthMm: 100,
+      heightMm: 60,
+    };
+    const committed = commit(capture(INITIAL_BOARD_CAPTURE, P(0, 0)), geometry);
+    const updatedGeometry = { ...geometry, widthMm: 110 };
+    const nextEpoch = { ...EPOCH, workOriginVersion: 7 };
+    const updated = boardCaptureReducer(committed, {
+      type: 'update-geometry',
+      geometry: updatedGeometry,
+      registrationEpoch: nextEpoch,
+    });
+    expect(updated).toMatchObject({ geometry: updatedGeometry, registrationEpoch: nextEpoch });
+    expect(boardCaptureReducer(updated, { type: 'set-shape', shapeKind: 'circle' })).toBe(updated);
+    expect(
+      boardCaptureReducer(updated, {
+        type: 'capture',
+        point: P(9, 9),
+        captureEpoch: EPOCH,
+        expectedSessionRevision: updated.sessionRevision,
+      }),
+    ).toBe(updated);
+  });
+
+  it('reset returns to a fresh default rectangle session', () => {
+    const circle = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'circle',
+    });
+    const reset = boardCaptureReducer(circle, { type: 'reset' });
+    expect(reset).toMatchObject({
+      shapeKind: 'rect',
+      circleMethod: 'rim-fit',
+      corners: [],
+      committed: false,
+    });
+    expect(reset.sessionRevision).toBeGreaterThan(circle.sessionRevision);
   });
 });

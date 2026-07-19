@@ -9,8 +9,10 @@ import { Button, NumberInput } from '../../kit';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
 
 export function ManualSizeForm({
+  disabled,
   onDraw,
 }: {
+  readonly disabled: boolean;
   readonly onDraw: (widthMm: number, heightMm: number) => void;
 }): JSX.Element {
   const [widthMm, setWidthMm] = useState('');
@@ -25,6 +27,7 @@ export function ManualSizeForm({
         <NumberInput
           aria-label="Board width in mm"
           value={widthMm}
+          disabled={disabled}
           min={MIN_BOARD_DIMENSION_MM}
           step={1}
           style={inputStyle}
@@ -34,6 +37,7 @@ export function ManualSizeForm({
         <NumberInput
           aria-label="Board height in mm"
           value={heightMm}
+          disabled={disabled}
           min={MIN_BOARD_DIMENSION_MM}
           step={1}
           style={inputStyle}
@@ -41,7 +45,11 @@ export function ManualSizeForm({
         />
         <span style={unitStyle}>mm</span>
       </div>
-      <Button variant="primary" disabled={!valid} onClick={() => valid && onDraw(width, height)}>
+      <Button
+        variant="primary"
+        disabled={disabled || !valid}
+        onClick={() => valid && onDraw(width, height)}
+      >
         Draw board at this size
       </Button>
     </div>

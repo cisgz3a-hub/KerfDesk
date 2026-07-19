@@ -125,12 +125,7 @@ export {
   selectionAnchorPoint,
   selectionMetrics,
 } from './selection-transform';
-export type {
-  SelectionAlignEdit,
-  SelectionAlignError,
-  SelectionAlignKind,
-  SelectionAlignResult,
-} from './selection-align';
+export type { SelectionAlignEdit, SelectionAlignKind } from './selection-align';
 export { buildSelectionAlignEdit } from './selection-align';
 export type { BestFitRectangle, BoardAnchor, BoardShape, BoardShapeKind } from './board-capture';
 export {
@@ -141,6 +136,7 @@ export {
   diameterFromCenterEdge,
   firstCornerOffsetMm,
 } from './board-capture';
+export type { BoardVerificationTarget, CapturedBoardGeometry } from './board-verification';
 export type { BoxAnchorAlignError, BoxAnchorAlignResult } from './box-anchor-align';
 export { buildBoxAnchorAlign } from './box-anchor-align';
 export type {

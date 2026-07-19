@@ -13,6 +13,7 @@ import { BoardCapturePanel } from './BoardCapturePanel';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const originalSetOriginHere = useLaserStore.getState().setOriginHere;
+const mountedPanels = new Set<() => Promise<void>>();
 
 function idleAt(x: number, y: number): StatusReport {
   return {
@@ -28,6 +29,16 @@ function idleAt(x: number, y: number): StatusReport {
 
 function buttonByText(host: HTMLElement, text: string): HTMLButtonElement | null {
   return [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) ?? null;
+}
+
+async function clickButton(host: HTMLElement, text: string): Promise<void> {
+  const button = buttonByText(host, text);
+  if (button === null) throw new Error(`button "${text}" missing`);
+  await act(async () => {
+    button.click();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 // Set a controlled <input> value the way React's onChange listens for it.
@@ -57,16 +68,23 @@ async function render(): Promise<{
     root = createRoot(host);
     root.render(<BoardCapturePanel />);
   });
+  let mounted = true;
+  const unmount = async (): Promise<void> => {
+    if (!mounted) return;
+    mounted = false;
+    if (root !== null) await act(async () => root?.unmount());
+    host.remove();
+    mountedPanels.delete(unmount);
+  };
+  mountedPanels.add(unmount);
   return {
     host,
-    unmount: async () => {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    },
+    unmount,
   };
 }
 
-afterEach(() => {
+afterEach(async () => {
+  for (const unmount of [...mountedPanels]) await unmount();
   useLaserStore.setState({
     setOriginHere: originalSetOriginHere,
     connection: { kind: 'disconnected' },
@@ -178,6 +196,7 @@ describe('BoardCapturePanel', () => {
       btn?.click();
       btn?.click();
     });
+    expect(buttonByText(host, 'Circle')?.disabled).toBe(true);
     await act(async () => {
       resolveOrigin();
     });
@@ -251,8 +270,9 @@ describe('BoardCapturePanel', () => {
     const { host, unmount } = await render();
 
     await act(async () => buttonByText(host, 'Circle')?.click());
+    await clickButton(host, 'Center already marked');
     await setMachinePosition(100, 100); // the centre
-    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    await clickButton(host, 'Capture center');
     expect(setOriginHere).toHaveBeenCalledTimes(1);
 
     await act(async () => setNumberInput(host, 'Circle diameter in mm', '90'));
@@ -280,8 +300,9 @@ describe('BoardCapturePanel', () => {
     const { host, unmount } = await render();
 
     await act(async () => buttonByText(host, 'Circle')?.click());
+    await clickButton(host, 'Center already marked');
     await setMachinePosition(100, 100); // centre
-    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    await clickButton(host, 'Capture center');
     await setMachinePosition(145, 100); // rim: 45 mm out -> diameter 90
     await act(async () => buttonByText(host, 'Capture edge')?.click());
 
@@ -303,8 +324,9 @@ describe('BoardCapturePanel', () => {
     const { host, unmount } = await render();
 
     await act(async () => buttonByText(host, 'Circle')?.click());
+    await clickButton(host, 'Center already marked');
     await setMachinePosition(100, 100);
-    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    await clickButton(host, 'Capture center');
     // Type a rough diameter FIRST...
     await act(async () => setNumberInput(host, 'Circle diameter in mm', '90'));
     // ...then measure a precise one (60 mm out -> diameter 120). It must win.
@@ -350,8 +372,9 @@ describe('BoardCapturePanel', () => {
     const { host, unmount } = await render();
 
     await act(async () => buttonByText(host, 'Circle')?.click());
+    await clickButton(host, 'Center already marked');
     await setMachinePosition(100, 100);
-    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    await clickButton(host, 'Capture center');
     await act(async () => setNumberInput(host, 'Circle diameter in mm', '90'));
     await act(async () => buttonByText(host, 'Create board outline')?.click());
     expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(1);
