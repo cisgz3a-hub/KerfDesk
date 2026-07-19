@@ -5,8 +5,8 @@
 
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
-import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
-import { groupFillSweeps } from './fill-sweeps';
+import { expandFillHatchWithRunways } from './fill-runway';
+import { planFillSweeps } from './fill-sweep-plan';
 import {
   cncPassXyPoints,
   type CncGroup,
@@ -109,8 +109,9 @@ function extendBoundsForFill(
 ): boolean {
   let any = extendBoundsForCut(b, group);
   const scanOffsetMm = scanOffsetForGroup(device, group.speed);
-  const sweeps = groupFillSweeps(group.segments);
-  for (const sweep of sweeps) {
+  const plans = planFillSweeps(group);
+  for (const plan of plans) {
+    const sweep = plan.sweep;
     const spans =
       sweep.reverse && scanOffsetMm !== 0
         ? sweep.spans.map((span) => {
@@ -130,13 +131,7 @@ function extendBoundsForFill(
     const last = spans[spans.length - 1];
     if (first === undefined || last === undefined) continue;
     const burnRun = [first.start, last.end] as const;
-    const overscan = effectiveFillOverscanMm(
-      burnRun,
-      group.overscanMm,
-      group.fillStyle,
-      group.islandMotionPolicy,
-    );
-    const run = expandFillHatchWithOverscan(burnRun, overscan);
+    const run = expandFillHatchWithRunways(burnRun, plan);
     if (run === null) continue;
     extendBoundsForPoint(b, run.leadStart);
     extendBoundsForPoint(b, run.leadEnd);

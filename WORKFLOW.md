@@ -1486,6 +1486,10 @@ or traced image) with at least one closed polyline.
 - *Tiny shapes* (cap height < ~2× hatchSpacing): produce only 1–2 hatch
   lines, which engraves as a near-line. Acceptable; no minimum-size
   guard. The user can lower `hatchSpacingMm` or switch to Line mode.
+- *4040-safe scaled lettering*: ordinary scanline fragments separated by more than 5 mm retain a
+  G0/S0 gap remainder, then receive up to 5 mm of feed-matched G1/S0 entry before each burn. This
+  prevents short split letters from burning from rest without changing Default/Falcon, Island Fill,
+  or Offset Fill behavior (ADR-234).
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before

@@ -198,6 +198,7 @@
 | ADR-231 | 2026-07-19 | Superseded in part by ADR-232 | A valid Frame proves physically safe motion and the live output contract |
 | ADR-232 | 2026-07-19 | Accepted (governing) | Physical Frame completion is the spatial source of truth |
 | ADR-233 | 2026-07-19 | Accepted | Revisioned machine-aware CNC starters initialize new operations without rewriting jobs |
+| ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
 
 ---
 
@@ -10090,3 +10091,61 @@ operator-authored machining values.
 - The starter still requires operator tuning for the installed cutter, material, workholding, tool
   condition, spindle variant, and machine rigidity. Public research and green tests do not make it a
   hardware-qualified cutting recipe.
+
+---
+
+## ADR-234 - Bounded feed-matched fill entries for the 4040-safe profile
+
+**Date:** 2026-07-19
+**Status:** Accepted, hardware verification pending
+
+### Context
+
+A fill that burned cleanly on the Falcon produced uneven script letters on the 4040. The attached
+4040 job was 112.013 x 111.8 mm; the clean Falcon job was 62.472 x 62.4 mm. At the larger scale,
+letter gaps crossed ADR-035's fixed 5 mm sweep-split threshold. The script area rose from 2.88 to
+6.88 sweeps per row, and 75.6% of those sweeps had no runway under ADR-033's short-sweep rule.
+
+The exact J row entered a standalone 2.352 mm sweep immediately after a 9.605 mm G0. The exact C
+rows had equivalent 6.683 and 7.048 mm boundaries. A second defect existed nearby: symmetric
+runways on both sides of split sweeps overlapped at 60 boundaries, creating 120 collinear
+180-degree reversals, 194.643 mm of reverse excursion, and 389.286 mm of excess commanded path.
+
+Globally raising the 5 mm split threshold would reconnect the J/C rows, but it would weaken the
+hardware-motivated blank-feed cap from ADR-035. Giving every fragment two full runways would create
+more overlap and backtracking. Row-outer-only runways would leave the internal J/C G0-to-burn
+transitions untouched, especially on alternating reverse rows.
+
+### Decision
+
+1. Ordinary scanline Fill compiled for the `neotronics-4040-safe` dialect carries a
+   `feed-matched-entry` runway policy. Default/Falcon-compatible motion bodies remain
+   byte-compatible; exported metadata intentionally advances to the new emitter revision. Offset
+   Fill and Island Fill keep their existing policies.
+2. ADR-035's 5 mm split threshold remains unchanged. At every internal split, the preceding sweep
+   owns no trailing runway. The next sweep starts with G0/S0 over the gap remainder, followed by up
+   to `min(configured overscan, 5 mm)` of monotonic `G1 F<fill feed> S0` before laser-on motion.
+3. The first sweep on a scanline receives the same feed-matched entry. Only the final sweep receives
+   a feed-matched exit. Short sweeps do not lose these bounded runways under ADR-033.
+4. Emission, duration planning, preview geometry, and motion bounds consume one shared sweep plan.
+   Export provenance advances to `adr-234-4040-fill-entry-v1`.
+
+### Consequences
+
+- J 9.605 mm becomes G0 for 4.605 mm, then G1/S0 for 5 mm before burn. C 6.683 and 7.048 mm become
+  G0 for 1.683 and 2.048 mm, then the same 5 mm feed entry.
+- Internal runways are monotonic and cannot overlap or reverse. Every blank G1 remains at or below
+  the existing 5 mm preflight threshold; wider gaps still contain a hard-off G0 portion.
+- The bad file's motion audit estimates roughly three additional ideal minutes versus all-rapid
+  split entries. This is a deliberate quality trade for the 4040 profile, not a global fill change.
+- Software tests cannot prove the physical burn. A same-material 4040 A/B coupon is still required
+  to assess the J/C edge quality and to separate motion effects from scan offset, belt/backlash,
+  focus, optics, and material variation.
+
+### Verification
+
+- Exact J and C fixtures assert the G0 remainder, 5 mm G1/S0 entry, unchanged powered coordinates,
+  no long blank feed, and laser-off rapid invariants.
+- A property test covers arbitrary split gaps and proves monotonic non-overlapping entry geometry.
+- Generic/Falcon emitter tests remain byte-identical, while planner, preview, and motion-bounds
+  tests assert parity with the emitted 4040 runway geometry.

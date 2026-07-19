@@ -34,6 +34,7 @@ import {
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
+import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import { offsetFillContours } from './offset-fill';
@@ -162,11 +163,14 @@ function vectorGroupsForLayer(
     const segments = collectFillSegmentsForLayer(objects, layer, device);
     if (segments.length === 0) return [];
     const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
+    const fillRunwayPolicy =
+      layer.fillStyle === 'offset' ? undefined : fillRunwayPolicyForDevice(device);
     return [
       {
         ...common,
         kind: 'fill' as const,
         fillStyle: layer.fillStyle,
+        ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
         overscanMm: Math.max(0, layer.fillOverscanMm),
         segments,
       },

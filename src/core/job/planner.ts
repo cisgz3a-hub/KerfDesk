@@ -35,8 +35,8 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
-import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
-import { groupFillSweeps } from './fill-sweeps';
+import { expandFillHatchWithRunways } from './fill-runway';
+import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Job } from './job';
 
 const SECONDS_PER_MINUTE = 60;
@@ -115,9 +115,10 @@ function appendFillGroupBlocks(
   travelV: number,
 ): Vec2 {
   let cursor = initialCursor;
-  const sweeps = groupFillSweeps(group.segments);
+  const plans = planFillSweeps(group);
   for (let pass = 0; pass < group.passes; pass += 1) {
-    for (const sweep of sweeps) {
+    for (const plan of plans) {
+      const sweep = plan.sweep;
       const first = sweep.spans[0];
       const last = sweep.spans[sweep.spans.length - 1];
       if (first === undefined || last === undefined) continue;
@@ -125,19 +126,18 @@ function appendFillGroupBlocks(
       // so the burn is a SINGLE cut block from the first span's start to the
       // last span's end — no per-run full stop (ADR-034). The gaps move at feed
       // too, so pricing the whole span as one cut block is accurate for total
-      // time. Overscan runway is laser-off rapid travel.
-      const overscan = effectiveFillOverscanMm(
-        [first.start, last.end],
-        group.overscanMm,
-        group.fillStyle,
-        group.islandMotionPolicy,
-      );
-      const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+      // time. The 4040 policy's S0 runways use the same feed and stay in that
+      // continuous block; legacy runways remain rapid travel.
+      const run = expandFillHatchWithRunways([first.start, last.end], plan);
       if (run === null) continue;
       appendTravel(out, cursor, run.leadStart, travelV);
-      appendTravel(out, run.leadStart, run.burnStart, travelV);
-      appendCut(out, run.burnStart, run.burnEnd, cutV);
-      appendTravel(out, run.burnEnd, run.leadEnd, travelV);
+      if (plan.runwayMotion === 'feed-matched') {
+        appendCut(out, run.leadStart, run.leadEnd, cutV);
+      } else {
+        appendTravel(out, run.leadStart, run.burnStart, travelV);
+        appendCut(out, run.burnStart, run.burnEnd, cutV);
+        appendTravel(out, run.burnEnd, run.leadEnd, travelV);
+      }
       cursor = run.leadEnd;
     }
   }

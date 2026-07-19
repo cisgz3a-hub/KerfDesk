@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
-import type { Job } from '../job';
+import { findLaserOnTravelIssues, findLongBlankFeedMoves } from '../invariants';
+import type { FillGroup, Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
 
 const singleCutJob: Job = {
@@ -107,6 +108,48 @@ const tinySensitiveIslandFillJob: Job = {
       ],
     },
   ],
+};
+
+const enlargedJFillGroup: FillGroup = {
+  kind: 'fill',
+  layerId: 'script-name',
+  color: '#000000',
+  power: 30,
+  speed: 1500,
+  passes: 1,
+  airAssist: false,
+  fillRunwayPolicy: 'feed-matched-entry',
+  overscanMm: 5,
+  segments: [
+    {
+      polyline: [
+        { x: 6.551, y: 43 },
+        { x: 7.015, y: 43 },
+      ],
+      closed: false,
+      reverse: false,
+    },
+    {
+      polyline: [
+        { x: 16.62, y: 43 },
+        { x: 18.108, y: 43 },
+      ],
+      closed: false,
+      reverse: false,
+    },
+    {
+      polyline: [
+        { x: 18.693, y: 43 },
+        { x: 18.972, y: 43 },
+      ],
+      closed: false,
+      reverse: false,
+    },
+  ],
+};
+
+const enlargedJFillJob: Job = {
+  groups: [enlargedJFillGroup],
 };
 
 type MotionArtifact = {
@@ -228,6 +271,64 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).toContain('G0 X23.000 Y5.000 S0');
     expect(out).toContain('G0 X37.000 Y5.000 S0');
     expect(out).toContain('G0 X53.000 Y5.000 S0');
+  });
+
+  it('gives the enlarged J fragment a feed-matched 5 mm entry after a shorter rapid', () => {
+    const out = grblStrategy.emit(enlargedJFillJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+
+    expect(out).toContain(
+      [
+        'G1 X7.015 Y43.000 F1500 S300',
+        'G0 X11.620 Y43.000 S0',
+        'G1 X16.620 Y43.000 F1500 S0',
+        'G1 X18.108 Y43.000 F1500 S300',
+      ].join('\n'),
+    );
+    expect(out).not.toContain('G0 X16.620 Y43.000 S0');
+    expect(findLaserOnTravelIssues(out)).toEqual([]);
+    expect(findLongBlankFeedMoves(out, { thresholdMm: 5 })).toEqual([]);
+  });
+
+  it('gives both enlarged C gaps monotonic 5 mm feed entries without overlap', () => {
+    const cJob: Job = {
+      groups: [
+        {
+          ...enlargedJFillGroup,
+          segments: [
+            {
+              polyline: [
+                { x: 0, y: 46 },
+                { x: 1.275, y: 46 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+            {
+              polyline: [
+                { x: 7.958, y: 46 },
+                { x: 10.434, y: 46 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+            {
+              polyline: [
+                { x: 17.482, y: 46 },
+                { x: 19.197, y: 46 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    };
+    const out = grblStrategy.emit(cJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+
+    expect(out).toContain('G0 X2.958 Y46.000 S0\nG1 X7.958 Y46.000 F1500 S0');
+    expect(out).toContain('G0 X12.482 Y46.000 S0\nG1 X17.482 Y46.000 F1500 S0');
+    expect(out).not.toContain('G0 X7.958 Y46.000 S0');
+    expect(out).not.toContain('G0 X17.482 Y46.000 S0');
   });
 
   it('uses ordinary laser-off rapid travel for sensitive Island Fill runways', () => {

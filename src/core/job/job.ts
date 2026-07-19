@@ -19,6 +19,7 @@ import {
 } from '../scene';
 import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
+import type { FillRunwayPolicy } from './fill-runway-policy';
 
 export type CutSegment = {
   // Polyline in mm, in machine coordinates (post-origin-transform). For a
@@ -48,6 +49,7 @@ export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;
+  readonly fillRunwayPolicy?: FillRunwayPolicy;
   readonly overscanMm: number;
   readonly segments: ReadonlyArray<FillSegment>;
 };

@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-103-surfacing-safe-start-v1');
+    expect(EMITTER_REVISION).toBe('adr-234-4040-fill-entry-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
@@ -35,6 +35,9 @@ describe('gcodeMetadataHeader', () => {
   it('records the assumed $30 power scale and laser mode', () => {
     const header = gcodeMetadataHeader(META, { kind: 'laser', maxPowerS: 255 });
     expect(header).toContain('; assumes: GRBL $30=255 (max S), $32=1 (laser mode)');
+    expect(header).toContain(
+      '; safety: G0 carries S0; blank feed <=5mm; wider blank gaps include G0',
+    );
   });
 
   // ADR-103 defect fix: router exports carried the laser-worded banner. The

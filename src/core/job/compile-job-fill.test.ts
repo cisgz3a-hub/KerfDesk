@@ -168,6 +168,18 @@ describe('compileJob fill hatching', () => {
     expect(segments.filter(isVerticalSegment).some((segment) => segment.reverse)).toBe(true);
   });
 
+  it('selects feed-matched scanline entries only for the 4040-safe profile', () => {
+    const layer = fillLayer();
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
+    const generic = firstFillGroup(compileJob({ objects: [square], layers: [layer] }, dev));
+    const safe4040 = firstFillGroup(
+      compileJob({ objects: [square], layers: [layer] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+    );
+
+    expect(generic?.fillRunwayPolicy).toBeUndefined();
+    expect(safe4040?.fillRunwayPolicy).toBe('feed-matched-entry');
+  });
+
   it('compiles Island Fill as one scanline fill group per separate island', () => {
     const layer = { ...fillLayer(), fillStyle: 'island' as never };
     const left = closedSquareObj({ id: 'left', color: '#ff0000', size: 6 });
