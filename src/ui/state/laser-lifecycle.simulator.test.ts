@@ -122,6 +122,20 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(useLaserStore.getState().motionOperation).toBeNull();
   });
 
+  it('caps framing to the slower live XY-axis maximum', async () => {
+    const sim = await connectIdle({
+      settings: [
+        [110, '1500.000'],
+        [111, '900.000'],
+      ],
+    });
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 2000);
+    await pump(6000);
+    const frameJogs = sim.outbound().filter((line) => line.startsWith('$J=G90'));
+    expect(frameJogs).toHaveLength(5);
+    expect(frameJogs.every((line) => line.endsWith('F900\n'))).toBe(true);
+  });
+
   it('homes: $H then settle dwell, confirmed after a fresh Idle', async () => {
     const sim = await connectIdle();
     const home = useLaserStore.getState().home();

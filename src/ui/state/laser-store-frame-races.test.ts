@@ -150,6 +150,8 @@ describe('Frame transport and permit races', () => {
     expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(useLaserStore.getState().motionOperation).toMatchObject({ cancelRequested: true });
     releaseCancel();
+    await vi.waitFor(() => expect(writes.at(-1)).toBe('?'));
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
     connection.emitLine('ok');
     await vi.waitFor(() => expect(writes.at(-1)).toBe('?'));
@@ -175,6 +177,8 @@ describe('Frame transport and permit races', () => {
     });
 
     connection.emitLine('ok');
+    await vi.waitFor(() => expect(writes.at(-1)).toBe('?'));
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
     expect(useLaserStore.getState().motionOperation).toMatchObject({
       cancelRequested: true,

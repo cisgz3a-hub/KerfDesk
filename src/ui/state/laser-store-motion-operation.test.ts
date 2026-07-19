@@ -38,7 +38,7 @@ afterEach(async () => {
 
 describe('laser-store motion operation lifecycle', () => {
   it('writes a jog when detected firmware differs from the user-selected profile', async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn(async (_data: string) => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
@@ -391,7 +391,7 @@ describe('laser-store motion operation lifecycle', () => {
   });
 
   it('sends jog-cancel and clears the active operation on a fresh post-cancel Idle', async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn(async (_data: string) => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     setMotionOperation({ kind: 'frame', sawControllerBusy: false });
@@ -401,9 +401,13 @@ describe('laser-store motion operation lifecycle', () => {
 
     expect(write).toHaveBeenCalledWith(RT_JOG_CANCEL);
     expect(getMotionOperation()).toMatchObject({ cancelRequested: true });
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('?'));
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith('G4 P0.01\n'));
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('?'));
+    await vi.waitFor(() =>
+      expect(write.mock.calls.filter(([line]) => line === '?')).toHaveLength(2),
+    );
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await cancel;
     expect(getMotionOperation()).toBeNull();

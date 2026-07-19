@@ -445,12 +445,14 @@ Identical to F-A3 except:
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
 G-code**, any failing check surfaces the pre-flight modal and cancels the save
-until it clears. For **Start**, frame-first applies (ADR-228/ADR-229): the only
+until it clears. For **Start**, frame-first applies (ADR-228 through ADR-230): the only
 findings that still cancel the Start are unstreamable output (`non-finite-
 coordinate`, `empty-output`, `relief-needs-cnc`, `no-output-layer`) and compile
-failures — every other finding (bounds, no-go zones, travel heuristics, layer
-values, controller readiness) is carried into the Job Review dialog as a
-warning the operator confirms before the mandatory Frame trace.
+failures. The mandatory Frame has a separate physical-validity contract: it sends no motion and
+earns no permit when the exact commanded envelope is outside known travel, its perimeter or known
+full path crosses a no-go zone, CNC Z motion cannot be constructed safely, or the live output
+contract is known wrong (or unproved for CNC GRBL). All remaining policy findings are carried into
+Job Review as warnings before the Frame trace; Start itself adds no policy gate.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -492,8 +494,9 @@ grouped by what each validates:
 21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
 
 For **Save G-code**, all applicable blocking checks must pass. For the ordinary
-job flow, only factual placement/compile-integrity failures stop preparation;
-all policy findings are confirmed in Job Review before Frame.
+job flow, factual placement/compile-integrity failures stop preparation and the
+physical-validity checks above can refuse Frame; all other policy findings are
+confirmed in Job Review.
 
 ---
 
@@ -711,26 +714,32 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Success
 1. User clicks **Frame job** while connected and the controller is Idle.
-2. App resolves placement once. For any serial Frame, if G55-G59 is active, preparation selects G54
+2. Frame preparation compares the live controller output contract with the selected process.
+   Known `$30`/`$32` conflicts refuse before review because a tool-off trace cannot prove power or
+   spindle semantics. A GRBL CNC Frame also requires those settings to be read; unknown laser
+   values remain explicit Job Review warnings.
+3. App resolves placement once. For any serial Frame, if G55-G59 is active, preparation selects G54
    through an owned controller operation and waits for its terminal acknowledgement plus fresh
    position evidence. This changes only the active WCS selection; it does not erase the stored
    G55-G59 offsets.
-3. App compiles one exact executable artifact through the shared
+4. App compiles one exact executable artifact through the shared
    `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
-   Unstreamable/empty output refuses; bed, no-go, homing, camera, settings, accessory, override,
-   dialect, tool, and other policy findings remain warnings.
-4. **Job Review** shows those warnings and the exact artifact. When preparation changed G55-G59 to
+   Unstreamable/empty output refuses; homing, camera, accessory, override, dialect, tool, and other
+   non-Frame-validity policy findings remain warnings.
+5. **Job Review** shows those warnings and the exact artifact. When preparation changed G55-G59 to
    G54, a durable warning names the original WCS and states that the active selection changed, the
    stored offsets were not erased, and cancelling leaves G54 selected. The operator accepts with
    **Accept & Frame**; an edit inside review re-prepares before acceptance.
-5. Frame establishes driver-produced tool-off state, then builds the watched absolute jog sequence
-   around the exact generated motion envelope. Every line is dispatched only after the prior line
-   completes and receives its terminal acknowledgement.
-6. After tracing the box, Frame returns to the exact work position occupied when the artifact was
+6. Immediately before dispatch, Frame checks the exact generated motion envelope against known
+   travel and no-go zones and rescans the exact prepared path for interior no-go collisions. A
+   failure sends no Frame motion and issues no permit. Otherwise Frame establishes driver-produced
+   tool-off state and runs the watched absolute jog sequence. Every line is dispatched only after
+   the prior line completes and receives its terminal acknowledgement.
+7. After tracing the box, Frame returns to the exact work position occupied when the artifact was
    prepared — the acknowledged G54 work position when serial preparation began under G55-G59. A
    final fresh clean `Idle`, all acknowledgements, and unchanged controller/origin/settings
    evidence issue a one-run permit for that exact artifact.
-7. Cancel, error, Alarm, non-motion controller state, MPG takeover, disconnect, manual controller
+8. Cancel, error, Alarm, non-motion controller state, MPG takeover, disconnect, manual controller
    mutation, or evidence drift drops the candidate and issues no permit.
 
 #### Canvas start markers
@@ -750,10 +759,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    flow offers **Zero Z here and continue** only when the operator confirms the bit is touching the
    stock top.
 2. Frame writes tool/spindle/coolant off, retracts to `<safeZ>`, traces and returns in XY while
-   retracted, then restores the exact pre-Frame work Z. Missing Work-Z, unknown return Z, or a driver
+   retracted, then restores a zero or positive pre-Frame Work-Z. If Frame began below Work Z0, it
+   deliberately stays at safe Z instead of plunging back into stock. Missing Work-Z, unknown return Z, or a driver
    without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
-3. CNC dialect, tool identity, probe-plate state, controller settings, accessories, overrides,
-   bounds, and no-go findings remain Job Review warnings and never become Frame policy gates.
+3. XY Frame feed is capped by live `$110`/`$111` when reported and Z independently by `$112`; `$13=1`
+   positions are converted to millimetres before any G21 restore is built.
+4. CNC dialect, tool identity, probe-plate state, accessories, and overrides remain Job Review
+   warnings. The output contract and physical envelope/no-go facts follow the Frame-validity rules above.
 
 #### Error — origin cannot be resolved
 1. Placement resolution fails (e.g. selection origin requested with nothing usable); error toast, no bytes sent.
@@ -766,7 +778,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    it cannot mint, retain, or refresh Start authorization.
 
 #### Edge — cancel mid-frame
-1. **Cancel** writes the real-time jog-cancel byte (`0x85`); pending frame lines are dropped and the motion operation clears.
+1. **Cancel** records permanent cancel intent and writes real-time jog-cancel (`0x85`); pending Frame
+   lines are dropped immediately. After the old command handoff settles, the app queries state. If
+   GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
+   settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
    intact.
 
@@ -787,8 +802,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    **Frame job**). User activates either while connected and Idle.
 2. App follows F-B4 preparation: it resolves placement once, completes any owned and acknowledged
    serial G55-G59-to-G54 selection, and compiles one exact executable artifact. Transport and
-   compile integrity failures stop here; policy findings such as `$30`/`$32`, bounds, homing,
-   camera, overrides, accessories, and CNC setup remain warnings.
+   compile integrity failures stop here. Known-wrong output settings stop Frame preparation;
+   physical bounds/no-go failures stop Frame dispatch. Homing, camera, overrides, accessories,
+   unknown laser settings, and other non-validity policy findings remain warnings.
 3. App opens the **Job Review** dialog
    (ADR-224, v2 look) built from the exact prepared program: five stat tiles (estimated time as
    the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
@@ -1208,11 +1224,11 @@ separate exact replay receipt.
    controller-setting writes start one epoch-bound qualification flow. GRBL-family
    controllers own one `$$` read after fresh Idle; unsupported dumps are
    `not-required`, and late prior-epoch replies are ignored.
-2. Frame-first (ADR-228): **ordinary Start on BOTH machine kinds never gates on
-   qualification.** All `$30`/`$32` findings — absent evidence, a known mismatch, and a known
-   `$32=0`/`$32=1` inversion — surface as Job Review warnings with the unverified-laser-mode
-   acknowledgement where applicable. Only supervised recovery still requires fresh
-   qualification before re-entry.
+2. Frame-first: **ordinary Start on BOTH machine kinds never gates on qualification.** Before a
+   Frame may earn that permit, known `$30`/`$32` mismatches refuse because tool-off motion cannot
+   prove power/spindle semantics; GRBL CNC also fails closed when those values were not read.
+   Unknown laser values surface as Job Review warnings with the unverified-laser-mode
+   acknowledgement. Supervised recovery retains its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
    stream); the blocked-Start dialog offers Unlock/Home in place.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
@@ -2464,8 +2480,8 @@ F-CNC19 tiling.
    Set Origin establishes XY only. This is Frame-motion compile input, not an additional Start gate.
 2. If Work-Z is missing and the bit is touching stock top, **Zero Z here and continue** performs the
    acknowledged setup in place and waits for a fresh position before preparing the artifact.
-3. Active-bit identity, probe-plate removal, controller settings, and accessory state are shown in
-   Job Review as warnings. They do not block ordinary Frame or Start.
+3. Active-bit identity, probe-plate removal, and accessory state are shown in Job Review as
+   warnings. Controller `$30`/`$32` follows the Frame output-contract rule; none becomes a Start gate.
 4. Once the exact CNC Frame completes, ordinary Start consumes its permit with no further Work-Z,
    tool, plate, accessory, override, or dialect policy check.
 
@@ -3020,9 +3036,8 @@ F-CNC19 tiling.
    controller would clamp it). Advisory only — the export/stream proceeds.
 
 #### Error — none (advisory, not a gate)
-1. These never block Save/Start. Bed-bounds findings also remain non-blocking
-   for ordinary Frame/Start and appear in Job Review; Save G-code retains its
-   separate export preflight.
+1. Feed/stock advisories never block Save/Start. A known out-of-bed physical Frame envelope does
+   refuse Frame motion and cannot authorize Start; Save G-code retains its separate export preflight.
 
 #### Empty
 1. No connection (no reported limits) means no limit advisories — only the
@@ -3426,8 +3441,8 @@ F-CNC19 tiling.
 #### Edge — box larger than the bed
 1. Panels insert normally even when the sheet exceeds the workspace
    (LightBurn parity: generation is not bounds-gated); the existing
-   bounds finding appears in Job Review before ordinary Frame instead of
-   blocking Frame/Start. Save G-code may still require the user to re-nest
+   bounds finding appears in Job Review, and the physical Frame then refuses before motion instead
+   of authorizing an off-bed job. Save G-code may still require the user to re-nest
    panels across exports.
 
 ### F-K2. Validation rejects an impossible spec

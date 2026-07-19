@@ -107,6 +107,8 @@ async function armCancelledMotionStatusFence(
   if (operationId === undefined || context.get().motionOperation?.operationId !== operationId) {
     return;
   }
+  await waitForCancelledMotionIdleBeforeMarker(context, operationId);
+  if (context.get().motionOperation?.operationId !== operationId) return;
   await crossCancellationSettlementMarker(context);
   if (context.get().motionOperation?.operationId !== operationId) return;
   const statusQuery = cancellationStatusQuery(context.refs);
@@ -116,6 +118,66 @@ async function armCancelledMotionStatusFence(
     );
   }
   await confirmCancelledMotionIdle(context, operationId, statusQuery);
+}
+
+async function waitForCancelledMotionIdleBeforeMarker(
+  context: CancelContext,
+  operationId: LaserMotionOperationId,
+): Promise<void> {
+  const statusQuery = cancellationStatusQuery(context.refs);
+  if (statusQuery === null) {
+    throw new Error(
+      'Cancel cannot confirm that motion stopped on this driver. Reconnect before sending more motion.',
+    );
+  }
+  const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
+  while (context.get().motionOperation?.operationId === operationId) {
+    await waitForCancelledMotionQueue(context.get, operationId);
+    const report = await queryCancellationStatus(context, statusQuery, deadline);
+    if (report.state === 'Idle') return;
+    if (report.state === 'Jog') {
+      // GRBL ignores 0x85 unless it has already entered STATE_JOG. A first
+      // cancel written during the command -> Jog transition is therefore not
+      // proof. Re-send only after a fresh Jog report, then query again.
+      const retryError = await writeJogCancel(context.refs, context.safeWrite);
+      if (retryError !== undefined) throw retryError;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(CANCEL_QUEUE_POLL_MS);
+  }
+  throw new Error(
+    'Timed out waiting for motion to stop after Cancel. Reconnect before sending more motion.',
+  );
+}
+
+async function queryCancellationStatus(
+  context: CancelContext,
+  statusQuery: string,
+  deadline: number,
+): Promise<Awaited<ReturnType<typeof waitForFreshControllerStatus>>> {
+  const beforeQuery = context.get();
+  const confirmation = waitForFreshControllerStatus(context.refs, {
+    after: {
+      sessionEpoch: beforeQuery.controllerSessionEpoch,
+      sequence: beforeQuery.statusSequence,
+    },
+    accept: () => true,
+    timeoutMs: Math.max(1, deadline - Date.now()),
+    timeoutMessage: 'Timed out waiting for controller state after Cancel.',
+  });
+  try {
+    const [, report] = await Promise.all([
+      context.safeWrite(statusQuery, undefined, 'poll'),
+      confirmation,
+    ]);
+    return report;
+  } catch (error) {
+    cancelFreshControllerStatusWait(
+      context.refs,
+      'Motion-cancel status observation was cancelled.',
+    );
+    throw error;
+  }
 }
 
 async function crossCancellationSettlementMarker(context: CancelContext): Promise<void> {

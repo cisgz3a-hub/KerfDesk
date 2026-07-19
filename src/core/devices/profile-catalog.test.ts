@@ -58,7 +58,12 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
   });
 
   it('marks the brand starter profiles as public-spec starters so operators confirm specs', () => {
-    for (const profileId of ['xtool-d1-pro', 'sculpfun-s30', 'ortur-laser-master-3'] as const) {
+    for (const profileId of [
+      'neotronics-4040-max-lt4lds-v2-20w',
+      'xtool-d1-pro',
+      'sculpfun-s30',
+      'ortur-laser-master-3',
+    ] as const) {
       const entry = profileCatalogEntryById(profileId);
       if (entry === undefined) throw new Error(`missing catalog profile: ${profileId}`);
       expect(validateMachineProfile(entry.profile)).toEqual([]);
@@ -79,7 +84,7 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'Default starter',
       'Hardware verified',
       'Simulator tested',
-      'Simulator tested',
+      'Public-spec starter',
       'Public-spec starter',
       'Public-spec starter',
       'Public-spec starter',
@@ -97,9 +102,16 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     expect(entry === undefined ? false : profileSupportsCapability(entry.profile, 'grbl')).toBe(
       true,
     );
-    expect(entry === undefined ? false : profileSupportsCapability(entry.profile, 'rotary')).toBe(
-      true,
-    );
+    for (const capability of ['laser-output', 'cnc-output', 'z-axis'] as const) {
+      expect(
+        entry === undefined ? false : profileSupportsCapability(entry.profile, capability),
+      ).toBe(true);
+    }
+    for (const unverifiedCapability of ['verified-origin', 'rotary', 'low-power-fire'] as const) {
+      expect(
+        entry === undefined ? true : profileSupportsCapability(entry.profile, unverifiedCapability),
+      ).toBe(false);
+    }
     const marlin = profileCatalogEntryById('generic-marlin-laser');
     expect(marlin === undefined ? true : profileSupportsCapability(marlin.profile, 'rotary')).toBe(
       false,

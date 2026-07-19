@@ -1,7 +1,7 @@
 // cnc-frame-lines — assembles the CNC framing motion: a Z-safe retract, the XY
-// perimeter, then a restore back to the pre-frame Z so the bit ends where it
-// started instead of parked at safe height (ADR-192, fixes the "frame lifts the
-// bit even after Zero Z" report).
+// perimeter, then a restore back to a nonnegative pre-frame Z so the bit ends
+// where it started instead of parked at safe height. A bit that started below
+// the stock-top zero remains retracted after Frame (ADR-192).
 //
 // ADR-094: this module never hardcodes protocol bytes — it only ORDERS lines
 // produced by the driver seam (the XY perimeter and the absolute-Z jog builder).
@@ -32,13 +32,13 @@ export function buildCncFrameMotion(input: {
   readonly returnLine?: string;
   /** Configured clearance above the stock top (work Z). */
   readonly safeZMm: number;
-  /** Bit's work Z before framing, restored afterward. Null when unknowable. */
+  /** Bit's work Z before framing; nonnegative values are restored afterward. */
   readonly preFrameWorkZMm: number | null;
   /** Whether a current-session work-Z zero is established. */
   readonly hasCurrentWorkZEvidence: boolean;
   /** Driver builder for an absolute `$J=` Z jog; undefined on drivers without one. */
   readonly buildRetract: ((zMm: number, feed: number) => string) | undefined;
-  readonly feed: number;
+  readonly zFeed: number;
 }): CncFrameMotionPlan {
   if (!input.hasCurrentWorkZEvidence) {
     return { kind: 'blocked', message: CNC_FRAME_WORK_Z_REQUIRED_MESSAGE };
@@ -49,11 +49,11 @@ export function buildCncFrameMotion(input: {
   if (input.buildRetract === undefined) {
     return { kind: 'blocked', message: CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE };
   }
-  const retract = input.buildRetract(input.safeZMm, input.feed);
+  const retract = input.buildRetract(input.safeZMm, input.zFeed);
   const restore = frameZRestoreLine(
     input.preFrameWorkZMm,
     input.safeZMm,
-    input.feed,
+    input.zFeed,
     input.buildRetract,
   );
   const xyMoves =
@@ -71,6 +71,9 @@ function frameZRestoreLine(
   feed: number,
   buildRetract: (zMm: number, feed: number) => string,
 ): string | undefined {
+  // A negative work Z is inside the stock contract. Frame proves the XY
+  // envelope tool-off; it must not finish by plunging the bit back into stock.
+  if (preFrameWorkZMm < 0) return undefined;
   if (Math.abs(preFrameWorkZMm - safeZMm) < FRAME_Z_RESTORE_EPSILON_MM) return undefined;
   return buildRetract(preFrameWorkZMm, feed);
 }

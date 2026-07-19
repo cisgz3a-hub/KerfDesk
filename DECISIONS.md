@@ -100,6 +100,7 @@
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
 | ADR-228 | 2026-07-17 | Accepted | Frame-first Start gate: Frame is the sole guard |
 | ADR-229 | 2026-07-19 | Accepted | Exact-artifact Frame authorization and one-use Start permit |
+| ADR-230 | 2026-07-19 | Accepted | Physically valid Frame authorization and public-spec 4040 hybrid contract |
 
 ---
 
@@ -9767,3 +9768,68 @@ where stated below.
 - A Frame that merely dispatched, partially moved, failed to return, or never reached fresh clean
   Idle cannot authorize Start. Code and simulator coverage do not replace tool-off hardware
   qualification on supported controller, rotary, and CNC safe-Z configurations.
+
+---
+
+## ADR-230 - A valid Frame proves physically safe motion and the live output contract
+
+**Date:** 2026-07-19
+**Status:** Accepted (explicit maintainer directive in chat: apply the online-research safety pass)
+
+### Context
+
+ADR-228 made Frame the sole ordinary-Start guard and ADR-229 bound one reviewed artifact to one
+completion-issued permit. The exact implementation could still command an off-bed/no-go perimeter,
+authorize a job whose known interior path crossed a fixture, restore CNC Z below stock-top zero,
+interpret `$13=1` inches as millimetres, miss GRBL jog cancellation during the Idle-to-Jog race,
+and mint a permit with known-wrong `$30/$32`. A tool-off rectangle cannot prove those facts.
+
+The maintainer cannot perform this qualification physically and asked for the strongest correction
+supported by public information for the RNT/PRT-class 4040. Public sources identify the machine as
+the Neotronics 4040 Max class and the laser as LASER TREE LT-4LDS-V2, but do not publish the exact
+controller board, firmware/settings dump, homing corner, feed limits, selector interlock, or air
+relay wiring. The profile must distinguish documented specifications from assumptions.
+
+### Decision
+
+1. **Unsafe motion is not a valid Frame.** Immediately before wire dispatch, the exact reviewed
+   motion envelope must fit known travel and its perimeter must clear enabled no-go zones. The exact
+   prepared G-code is also rescanned so a known interior/approach-path collision cannot earn a
+   permit. Failure sends no Frame motion. Where physical placement is unknowable on an unhomed
+   machine, the app does not invent machine coordinates; enabled no-go zones fail closed.
+2. **Output semantics are Frame authorization inputs, not Start gates.** Known live `$30/$32`
+   conflicts refuse Frame preparation. GRBL CNC also requires those values to be read because an
+   unknown spindle scale or laser-mode inversion changes plunge/spindle behavior. Unknown laser
+   values remain prominent Job Review warnings. The accepted snapshot is already frozen into the
+   candidate and must remain unchanged through completion. Start itself remains a one-use permit
+   claim with only transport and exact-handoff facts.
+3. **CNC Frame is unit- and stock-safe.** `$13=1` position reports are converted to millimetres
+   before G21 commands are built. Frame retracts to safe Z; it restores only a zero or positive
+   pre-Frame Work-Z, never a negative position inside stock. XY feed is capped by live `$110/$111`
+   and Z independently by `$112` when those settings are available.
+4. **Cancel must cross GRBL's state race.** Cancel intent immediately prevents later legs/permits.
+   After the current write/ack handoff, the app queries controller state; a fresh `Jog` proves the
+   first `0x85` may have arrived too early, so it sends `0x85` again and re-queries. It waits for
+   fresh `Idle` before the queued settlement marker, then requires the existing post-marker Idle.
+5. **The 4040 profile is a public-spec hybrid starter.** It explicitly supports laser and CNC,
+   records the documented 400 x 400 x 75 mm envelope, default 500 W / 12,000 RPM spindle contract,
+   and LT-4LDS-V2 optical metadata. It removes unproved verified-origin, rotary, and low-power-fire
+   capabilities. The integrated nozzle is modeled as external/manual air with no M-code; setup
+   never guesses M7, and an air-requesting exact job warns that no relay command will be emitted.
+6. **No online-only hardware claim.** GRBL version, `$` values, homing/origin, feed ceilings,
+   spindle variant, selector/interlock, PSU headroom, and M7/M8 wiring remain unverified until read
+   or tested on the actual unit. The profile status is `public-spec-starter`, never hardware-verified.
+
+Primary public references: Neotronics 4040 Max product page
+(`https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct`), LASER TREE
+LT-4LDS-V2 product/manual (`https://lasertree.com/products/20w-optical-power-laser-cutting-module`),
+and upstream GRBL settings/jogging contracts
+(`https://github.com/gnea/grbl/tree/master/doc/markdown`).
+
+### Consequences
+
+- "Frame is the source of truth" now means a physically valid, cleanly completed Frame of the
+  exact artifact; dispatching a known unsafe command can never manufacture proof.
+- Start remains simpler than before ADR-228: it neither recompiles nor reruns policy gates.
+- Public documentation plus tests can make defaults honest and protocol behavior defensible, but
+  cannot certify the machine's wiring or mechanics. Hardware qualification remains explicitly open.

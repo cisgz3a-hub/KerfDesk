@@ -1,4 +1,5 @@
 import { buildCncFrameMotion, type CncFrameMotionPlan } from './cnc-frame-lines';
+import { frameMotionFeeds } from './frame-feed-limits';
 import { currentWorkZMm } from './infer-machine-position';
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
@@ -10,8 +11,8 @@ const FRAME_RETURN_EPSILON_MM = 1e-3;
 // driver-owned tool-off sequence under the same watched/acknowledged operation
 // as the motion. Laser projects then trace the driver's Z-silent XY perimeter;
 // CNC projects wrap it with a safe-Z retract (the bit would otherwise drag
-// through stock) and restore to the pre-frame Z (ADR-192). Only driver-produced
-// protocol bytes are ordered here (ADR-094).
+// through stock) and restore only a nonnegative pre-frame Z (ADR-192). Only
+// driver-produced protocol bytes are ordered here (ADR-094).
 export function buildFrameDispatchPlan(
   refs: LiveRefs,
   get: () => LaserState,
@@ -19,9 +20,16 @@ export function buildFrameDispatchPlan(
   feed: number,
   candidate: Parameters<LaserState['frame']>[2],
 ): CncFrameMotionPlan {
+  const state = get();
+  const feeds = frameMotionFeeds(feed, state.controllerSettings);
   const toolOffLines = refs.driver.commands.frameToolOffLines.map((line) => `${line}\n`);
-  const perimeter = refs.driver.commands.buildFrameLines(bounds, feed);
-  const returnLine = frameReturnLine(refs, bounds, feed, candidate?.returnToWorkPosition);
+  const perimeter = refs.driver.commands.buildFrameLines(bounds, feeds.xyMmPerMin);
+  const returnLine = frameReturnLine(
+    refs,
+    bounds,
+    feeds.xyMmPerMin,
+    candidate?.returnToWorkPosition,
+  );
   const machine = useStore.getState().project.machine;
   if (machine?.kind !== 'cnc') {
     return {
@@ -32,19 +40,22 @@ export function buildFrameDispatchPlan(
           : [...toolOffLines, ...perimeter, returnLine],
     };
   }
-  const state = get();
   const motion = buildCncFrameMotion({
     perimeter,
     ...(returnLine === undefined ? {} : { returnLine }),
     safeZMm: machine.params.safeZMm,
-    preFrameWorkZMm: currentWorkZMm(state.statusReport, state.wcoCache),
+    preFrameWorkZMm: currentWorkZMm(
+      state.statusReport,
+      state.wcoCache,
+      state.controllerSettings?.reportInches === true,
+    ),
     hasCurrentWorkZEvidence: isWorkZEvidenceCurrentForStart(
       state.workZZeroEvidence,
       state.workZReferenceEpoch,
       state.controllerSessionEpoch,
     ),
     buildRetract: refs.driver.commands.buildFrameRetract,
-    feed,
+    zFeed: feeds.zMmPerMin,
   });
   if (motion.kind === 'blocked') return motion;
   return { kind: 'ready', lines: [...toolOffLines, ...motion.lines] };

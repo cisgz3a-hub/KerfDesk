@@ -19,11 +19,12 @@ function plan(overrides: {
   readonly preFrameWorkZMm: number | null;
   readonly hasCurrentWorkZEvidence: boolean;
   readonly buildRetract?: ((zMm: number, feed: number) => string) | undefined;
+  readonly zFeed?: number;
 }): CncFrameMotionPlan {
   return buildCncFrameMotion({
     perimeter: PERIMETER,
     safeZMm: SAFE_Z,
-    feed: FEED,
+    zFeed: overrides.zFeed ?? FEED,
     buildRetract: 'buildRetract' in overrides ? overrides.buildRetract : buildGrblFrameRetract,
     ...overrides,
   });
@@ -49,6 +50,24 @@ describe('buildCncFrameMotion', () => {
   it('restores to a parked height above the stock (post-probe park)', () => {
     const lines = motion({ preFrameWorkZMm: 20, hasCurrentWorkZEvidence: true });
     expect(lines[lines.length - 1]).toBe('$J=G90 G21 Z20.000 F1000\n');
+  });
+
+  it('uses the separate Z feed without changing the XY perimeter feed', () => {
+    const lines = motion({
+      preFrameWorkZMm: 0,
+      hasCurrentWorkZEvidence: true,
+      zFeed: 300,
+    });
+    expect(lines[0]).toBe('$J=G90 G21 Z3.810 F300\n');
+    expect(lines.slice(1, 1 + PERIMETER.length)).toEqual(PERIMETER);
+    expect(lines[lines.length - 1]).toBe('$J=G90 G21 Z0.000 F300\n');
+  });
+
+  it('leaves a bit that started below work Z0 at safe Z instead of plunging back into stock', () => {
+    const lines = motion({ preFrameWorkZMm: -2, hasCurrentWorkZEvidence: true });
+    expect(lines).toHaveLength(PERIMETER.length + 1);
+    expect(lines[0]).toBe('$J=G90 G21 Z3.810 F1000\n');
+    expect(lines[lines.length - 1]).toBe(PERIMETER[PERIMETER.length - 1]);
   });
 
   it('blocks when there is no current work-Z evidence', () => {

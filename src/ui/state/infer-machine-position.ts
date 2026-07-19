@@ -1,4 +1,5 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { WorkCoordinateOffset } from './origin-actions';
 
 export function inferCurrentMachinePosition(
@@ -31,10 +32,17 @@ export function inferCurrentMachinePosition(
 export function currentWorkZMm(
   report: Pick<StatusReport, 'mPos' | 'wPos'> | null,
   wcoCache: WorkCoordinateOffset | null,
+  reportInches = false,
 ): number | null {
-  if (report?.wPos !== null && report?.wPos !== undefined) return report.wPos.z;
+  if (report?.wPos !== null && report?.wPos !== undefined) {
+    return positionUnitToMm(report.wPos.z, reportInches);
+  }
   if (report?.mPos !== null && report?.mPos !== undefined && wcoCache !== null) {
-    return report.mPos.z - wcoCache.z;
+    return positionUnitToMm(report.mPos.z - wcoCache.z, reportInches);
   }
   return null;
+}
+
+function positionUnitToMm(value: number, reportInches: boolean): number {
+  return normalizeReportedMPosToMm([0, 0, value], reportInches)[2];
 }

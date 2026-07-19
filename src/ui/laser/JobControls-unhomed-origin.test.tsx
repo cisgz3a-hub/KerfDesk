@@ -89,7 +89,7 @@ describe('JobControls unhomed custom-origin Frame action', () => {
     }
   });
 
-  it('does not block User Origin frame when unhomed overscan extends left of the relative origin', async () => {
+  it('refuses User Origin frame when unhomed overscan extends left of the physical bed', async () => {
     const frame = vi.fn(async () => undefined);
     useStore.setState({
       project: fillOverscanProject(),
@@ -130,8 +130,15 @@ describe('JobControls unhomed custom-origin Frame action', () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      await vi.waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
-      expect(useToastStore.getState().toasts.at(-1)?.message ?? '').not.toMatch(/overhangs/);
+      await vi.waitFor(() => {
+        expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+          variant: 'error',
+        });
+      });
+      expect(frame).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)?.message ?? '').toMatch(
+        /^Cannot frame: .*overhangs the bed .*left by 5\.0 mm.*move it onto the bed first\.$/,
+      );
     } finally {
       uninstallAutoReview();
       if (root !== null) {

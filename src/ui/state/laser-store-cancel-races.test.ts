@@ -63,6 +63,7 @@ describe('motion-cancel authorization and status races', () => {
       if (data !== '?' || !respondToCancelQuery) return;
       queryCount += 1;
       connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+      if (queryCount === 1) return;
       await new Promise<void>((resolve) => {
         releaseQuery = resolve;
       });
@@ -79,12 +80,43 @@ describe('motion-cancel authorization and status races', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     expect(getMotionOperation()).toMatchObject({ cancelRequested: true });
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(queryCount).toBe(1));
+    await vi.waitFor(() => expect(queryCount).toBe(2));
 
     expect(getMotionOperation()).toBeNull();
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
     releaseQuery();
     await cancel;
     expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+  });
+
+  it('retries jog-cancel after GRBL proves the first byte arrived before Jog state', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+    setMotionOperation({ kind: 'frame', sawControllerBusy: false });
+
+    const cancel = useLaserStore.getState().cancelJog();
+    await vi.waitFor(() => expect(writes).toContain('?'));
+    expect(writes.filter((line) => line === RT_JOG_CANCEL)).toHaveLength(1);
+
+    // The first realtime byte was sent during the Idle -> Jog race and GRBL
+    // ignored it. A fresh Jog report must cause a second 0x85 before any
+    // queued planner marker is allowed onto the wire.
+    connection.emitLine('<Jog|MPos:1.000,0.000,0.000|FS:1000,0>');
+    await vi.waitFor(() => expect(writes.filter((line) => line === RT_JOG_CANCEL)).toHaveLength(2));
+    expect(writes).not.toContain('G4 P0.01\n');
+
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+    connection.emitLine('<Idle|MPos:1.500,0.000,0.000|FS:0,0>');
+    await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
+    connection.emitLine('ok');
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(3));
+    connection.emitLine('<Idle|MPos:1.500,0.000,0.000|FS:0,0>');
+
+    await cancel;
+    expect(getMotionOperation()).toBeNull();
   });
 });

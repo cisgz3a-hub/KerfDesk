@@ -1,9 +1,4 @@
-import {
-  computeJobBounds,
-  computeJobMotionBounds,
-  frameBoundsSignature,
-  machineSpaceJob,
-} from '../../core/job';
+import { frameBoundsSignature } from '../../core/job';
 import { currentOutputScope, useStore } from '../state';
 import { framedRunControllerSnapshot, type FramedRunCandidate } from '../state/framed-run';
 import { useCameraStore } from '../state/camera-store';
@@ -31,6 +26,8 @@ import {
 import { prepareCurrentStartJob } from './start-job-source';
 import { runJobReviewGate, type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
+import { preflightFrameCandidate } from './frame-candidate-preflight';
+import { frameControllerSettingsIssues } from './frame-controller-settings';
 
 export function useFrameAction(): () => void {
   return () => {
@@ -60,6 +57,17 @@ export async function runFrameNow(): Promise<boolean> {
 
 async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
   if (!(await requireFrameControllerQueue())) return null;
+  const initialApp = useStore.getState();
+  const initialLaser = useLaserStore.getState();
+  const settingsIssues = frameControllerSettingsIssues(
+    initialApp.project,
+    initialLaser.controllerSettings,
+    initialLaser.capabilities.settings,
+  );
+  if (settingsIssues.length > 0) {
+    reportFramePreparationRefusal(settingsIssues, undefined);
+    return null;
+  }
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
@@ -122,20 +130,16 @@ async function dispatchReviewedFrame(review: ConfirmedJobReview): Promise<boolea
     return false;
   }
 
-  const prepared = bundle.prepared.prepared;
-  const framedJob = machineSpaceJob(
-    prepared.job,
-    prepared.project.device,
-    prepared.project.machine,
-  );
-  const jobBounds = computeJobBounds(framedJob, prepared.project.device);
-  if (jobBounds === null) {
-    reportFrameRefusal(['Nothing to frame — enable Output on at least one layer.']);
+  const framePreflight = preflightFrameCandidate(bundle.prepared, {
+    statusReport: currentLaser.statusReport,
+    wcoCache: currentLaser.wcoCache,
+    reportInches: currentLaser.controllerSettings?.reportInches === true,
+  });
+  if (!framePreflight.ok) {
+    reportFrameRefusal(framePreflight.messages);
     return false;
   }
-  // Frame the actual generated motion envelope, including raster/vector
-  // overscan, rather than only the artwork/burn rectangle.
-  const motionBounds = computeJobMotionBounds(framedJob, prepared.project.device) ?? jobBounds;
+  const { jobBounds, motionBounds } = framePreflight;
   const returnToWorkPosition = currentWorkXy(currentLaser);
   if (returnToWorkPosition === undefined) {
     reportFrameRefusal([

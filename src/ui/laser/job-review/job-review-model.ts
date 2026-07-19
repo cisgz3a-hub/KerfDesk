@@ -33,6 +33,7 @@ import {
   originTileValue,
 } from './job-review-format';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
+import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 
 export type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -79,6 +80,7 @@ export function buildJobReviewModel(args: {
       ...args.prepared.warnings,
       ...detectJobIntentWarnings(args.project),
       ...detectM7AirAssistWarnings(args.prepared.gcode, args.project.device),
+      ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
     toolPlanLabels: toolPlanLabels(args.prepared.cncToolPlan),

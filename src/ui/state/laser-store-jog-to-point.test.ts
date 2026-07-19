@@ -344,10 +344,22 @@ describe('jogToMachinePosition', () => {
     await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
 
     const cancel = useLaserStore.getState().cancelJog();
-    await vi.waitFor(() => expect(writes).toContain(RT_JOG_CANCEL));
-    await vi.waitFor(() => expect(writes.filter((line) => line === 'G4 P0.01\n')).toHaveLength(2));
-    connection.emitLine('ok');
+    await vi.waitFor(() => expect(writes.filter((line) => line === RT_JOG_CANCEL)).toHaveLength(1));
     await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+
+    // A cancel sent during the command-to-Jog transition is not sufficient:
+    // the hardened fence observes Jog, re-sends 0x85, and asks again.
+    connection.emitLine('<Jog|MPos:50.000,30.000,3.810|FS:1000,0>');
+    await vi.waitFor(() => expect(writes.filter((line) => line === RT_JOG_CANCEL)).toHaveLength(2));
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(3));
+
+    // Only a fresh Idle may put the cancellation marker behind the stopped
+    // motion queue. The marker ack is then followed by one final Idle proof.
+    connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
+    await vi.waitFor(() => expect(writes.filter((line) => line === 'G4 P0.01\n')).toHaveLength(2));
+    expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
+    connection.emitLine('ok');
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(4));
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
 
     await cancel;

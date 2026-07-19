@@ -25,7 +25,12 @@ export function JogPadAirAssist(): JSX.Element {
   const proceedWithSetup = (): void => {
     syncProjectAirAssistDefaults();
     setSetupOpen(false);
-    void setAirAssistEnabled(true).catch(() => undefined);
+    // Never guess M7 or M8. With no verified relay command, Proceed only
+    // normalizes the per-job Air flags; the external/manual pump stays a
+    // physical operator action disclosed in Job Review.
+    if (!setupSummary.airOutputUnset) {
+      void setAirAssistEnabled(true).catch(() => undefined);
+    }
   };
   return (
     <>
@@ -113,14 +118,17 @@ function AirAssistSetupWarning(props: {
 
 function airSetupSummaryText(summary: AirAssistDefaultSyncSummary): string {
   const changes: string[] = [];
-  if (summary.airOutputUnset) changes.push('set air output to M7');
   if (summary.disabledOutputLayerCount > 0) {
     changes.push(`enable Job Air on ${summary.disabledOutputLayerCount} output layer(s)`);
   }
   if (summary.disabledObjectOverrideCount > 0) {
     changes.push(`clear ${summary.disabledObjectOverrideCount} stale object air override(s)`);
   }
-  return changes.length === 0 ? '' : ` This will ${changes.join(', ')}.`;
+  const updates = changes.length === 0 ? '' : ` This will ${changes.join(', ')}.`;
+  const outputNotice = summary.airOutputUnset
+    ? ' No M7/M8 output will be selected; configure one in Machine Setup only after a hardware test, or operate the external air pump manually.'
+    : '';
+  return `${updates}${outputNotice}`;
 }
 
 function airAssistButtonStyle(enabled: boolean, setupNeeded: boolean): React.CSSProperties {
