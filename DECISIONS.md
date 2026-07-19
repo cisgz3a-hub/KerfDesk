@@ -1,8 +1,19 @@
 # DECISIONS.md — LaserForge 2.0
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
+>
+> **Current Start policy — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact
+> current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
+> warning surface. Older gate ADRs below that mandated Start blocks are stamped
+> "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
+> but their *refusals* do not. Per-gate disposition:
+> `docs/audits/2026-07-18-guard-inventory-frame-first.md`.
 
 ## Decision index
+
+> The index is numerically complete; gaps in the numbering are reserved blocks with no ADR body
+> (e.g. most of 054–091, reserved by the build plan). The body itself is in insertion order, not
+> numeric order — locate any ADR by searching `## ADR-NNN`.
 
 | ID | Date | Status | Title |
 |---|---|---|---|
@@ -24,7 +35,86 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-019 | — | Accepted | Phase F kickoff: Fill is a geometry decision in `compileJob` |
+| ADR-020 | — | Accepted | Phase F.2 raster image engrave (kickoff) |
+| ADR-021 | 2026-05-28 | Accepted, code shipped, hardware verification pending | Phase F.3 set-work-origin via G92 (kickoff) |
+| ADR-022 | 2026-06-01 | Accepted, code shipped, hardware verification pending | Origin-aware job placement and physical Frame/Start preflight |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
+| ADR-025 | 2026-05-29 | Accepted, harness shipped, scope limits documented below | Perceptual fidelity harness for the trace pipeline |
+| ADR-026 | — | Accepted | Trace keeps its source image (LightBurn-style overlay) |
+| ADR-027 | 2026-05-29 | Accepted | LightBurn is the source of truth; divergences are defects to redesign |
+| ADR-028 | 2026-05-29 | Accepted | Raster engrave preview renders in scene space via the compile path's dither |
+| ADR-029 | 2026-05-29 | Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage... | Convert to Bitmap (vector → raster engrave source) |
+| ADR-030 | 2026-05-29 | Proposed (documentation gate | Trace control model realigned to LightBurn (Cutoff/Threshold band) |
+| ADR-031 | 2026-06-01 | Accepted | Fill hatch overscan lead-in/out |
+| ADR-032 | 2026-06-01 | Accepted | Bidirectional raster rows after overscan runtime regression |
+| ADR-033 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Skip fill overscan on short hatch runs; emit runway as rapid |
+| ADR-034 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Continuous-sweep fill: one G1 per scanline, S0-blanked gaps |
+| ADR-035 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Split a fill scanline at large gaps so the emitter rapids across them |
+| ADR-036 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Fill engraving emits M4 dynamic power (was M3 constant); supersedes ADR-020 #4 |
+| ADR-037 | 2026-06-03 | Accepted, code shipped, visual verification pending | Raise the image-trace decode cap 1024 -> 2048 px for small-feature fidelity |
+| ADR-038 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Per-layer unidirectional fill option (was: snake hardcoded) |
+| ADR-039 | 2026-06-03 | Accepted, code shipped, hardware verification pending | Split a raster row at wide white gaps so the emitter rapids across them |
+| ADR-040 | 2026-06-03 | Accepted, code shipped | Shared prepared-output pipeline (preview = save = start = estimate) |
+| ADR-041 | 2026-06-04 | Accepted, code shipped | A GRBL error:N ack is terminal for the stream (stop sending + safety notice) |
+| ADR-042 | 2026-06-04 | Accepted, code shipped | Ack-driven follow-up write failure raises the disconnect safety notice (P0-3) |
+| ADR-043 | 2026-06-05 | Accepted, code shipped | Trace is vector-only; remove the Photo and Detailed trace presets |
+| ADR-044 | 2026-06-09 | Accepted | Minimal Material/Interval Test calibration workflow |
+| ADR-045 | 2026-06-09 | Accepted | Native Material Library IO foundation |
+| ADR-046 | 2026-06-10 | Accepted | SVG import unit resolution (viewBox scaling + 96 DPI px) |
+| ADR-047 | 2026-06-10 | Superseded by ADR-049 (chrome is now light | Design tokens + shared chrome classes (dark chrome, light bed) |
+| ADR-048 | 2026-06-11 | Accepted | Metadata-less bitmap imports default to 254 DPI (LightBurn parity) |
+| ADR-049 | 2026-06-13 | Accepted | Unified light chrome (supersedes ADR-047's dark-chrome decision) |
+| ADR-050 | 2026-06-13 | Accepted | Module-level memoization caches in core/job (narrow exception to "no module-level mutable") |
+| ADR-051 | 2026-06-14 | Accepted | Phase G: on-canvas drawing tools (shape SceneObject variant + tool-mode) |
+| ADR-052 | 2026-06-17 | Accepted | Scanning offset compensation: a per-speed table cancels the bidirectional zipper |
+| ADR-053 | 2026-06-17 | Accepted | Verified Origin: hand-set origin + mandatory verified frame for no-homing / hand-positioned machines |
+| ADR-057 | 2026-06-24 | Accepted | Registration Box: camera-free placement jig |
+| ADR-058 | 2026-06-25 | Accepted | Centerline trace rework: a measured pixel-centering bar + junction chaining |
+| ADR-059 | 2026-06-25 | Accepted | Edge Detection trace mode: clean-room Canny → single-stroke vectors |
+| ADR-060 | 2026-06-26 | Accepted | Offline-first PWA: installable service worker + safe update model |
+| ADR-092 | 2026-06-24 | Accepted | Connect-time Device Setup wizard (manual, draft-commit, guarded firmware sync) |
+| ADR-093 | 2026-06-26 | Accepted | In-app multi-library Material Library UI: create/edit wizard, Saved Libraries browser, auto-save |
+| ADR-094 | 2026-07-02 | Accepted | Phase H multi-controller architecture: ControllerDriver seam + capability-gated UI |
+| ADR-095 | 2026-07-02 | Accepted | Marlin controller support (queued status, stream-side pause, inline/fan dialects) |
+| ADR-096 | 2026-07-02 | Accepted | Smoothieware controller support (fractional S power scale) |
+| ADR-097 | 2026-07-02 | Accepted | Ruida: experimental .rd export, file-only transport |
+| ADR-098 | 2026-07-02 | Amended by ADR-209 | CNC router mode becomes a first-class product track (Phase H "Router") |
+| ADR-100 | — | Accepted | Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params |
+| ADR-101 | 2026-07-02 | Accepted | CNC/laser UI separation policy: gate-and-hide |
+| ADR-102 | 2026-07-03 | Accepted | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
+| ADR-103 | — | accepted (maintainer session directive) | Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03) |
+| ADR-104 | — | accepted (recorded at the merge of `claude/determined-dew... | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
+| ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
+| ADR-106 | — | accepted (maintainer-approved build plan, 2026-07-03) | Parametric finger-joint box generator: claim-model joinery (2026-07-03) |
+| ADR-107 | 2026-06-27 | Accepted | Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4) |
+| ADR-108 | 2026-06-28 | Accepted | Camera Mode v2: fisheye lens calibration + de-fisheye render |
+| ADR-109 | 2026-07-03 | Accepted | Camera Mode v3: automatic marker alignment (no-click homography) |
+| ADR-110 | 2026-07-03 | Accepted | Camera Mode v4: capture-to-trace at true bed coordinates |
+| ADR-111 | — | accepted (maintainer directive after a real 4040 cut wand... | CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04) |
+| ADR-112 | — | accepted (maintainer follow-up to ADR-111: on the live ap... | Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04) |
+| ADR-113 | — | accepted (maintainer-directed follow-up to the trace-fide... | Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05) |
+| ADR-114 | — | Accepted | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
+| ADR-115 | — | accepted (maintainer-directed after rejecting ADR-059's l... | Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05) |
+| ADR-116 | — | accepted (maintainer directive: "I need my box designer t... | Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07) |
+| ADR-117 | — | accepted | Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07) |
+| ADR-118 | — | amended (isolated IndexedDB execution artifacts, 2026-07-15) | Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07) |
+| ADR-119 | — | accepted | Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07) |
+| ADR-120 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
+| ADR-121 | — | accepted | Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07) |
+| ADR-122 | — | accepted | Camera-driven positioning and burn-target alignment wizard (Camera, 2026-07-07) |
+| ADR-123 | 2026-07-08 | Accepted | Own-engine trace: remove the potrace-derived backend (closes the ADR-120 blocker) |
+| ADR-124 | — | accepted (maintainer directive: "jog the head to each cor... | Capture Board Corners: build the registration box from jogged machine coordinates (2026-07-08) |
+| ADR-125 | — | accepted (maintainer directive: expand Place Board — chos... | Fill the board: auto-fit + array artwork onto the placed board (2026-07-08) |
+| ADR-126 | — | accepted (maintainer directive: capture round boards - "o... | Generalize Place Board to a board-shape union; circle boards (2026-07-08) |
+| ADR-127 | — | Accepted | Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09) |
+| ADR-128 | — | Accepted | Measured-boundary trace pipeline: sub-pixel extraction, supersampling, and fair-then-fit finishing |
+| ADR-129 | — | accepted (audit DEV-04: no-go zones gated Start/Frame/exp... | Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10) |
+| ADR-130 | — | accepted (audit CAM-04: the Registration Jig panel could... | Registration-box provenance: protect a captured board from the jig panel (2026-07-10) |
+| ADR-131 | — | accepted (audit ARC-01/ARC-02: core geometry ops throw us... | Canonical Result<T, E> for core control-flow errors (2026-07-11) |
+| ADR-132 | — | accepted (audit ARC-03: the 250 soft tier promised by ADR... | The 250-line soft tier is a report-only script, not an ESLint warning (2026-07-11) |
+| ADR-133 | — | accepted (audit ELE-02: residual-risk hardening of ADR-12... | Camera bridge trusts only the exact production origins and refuses all loopback frame-proxy targets (2026-07-11) |
+| ADR-134 | — | accepted (Codex re-audit R2: the overlay applied a rectif... | The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11) |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Superseded | CNC interruption recovery rewinds to a retract-first safe boundary (see ADR-143) |
 | ADR-137 | 2026-07-11 | Accepted | Trace reliability: latest request wins and completed work is reusable |
@@ -42,7 +132,7 @@
 | ADR-154 | 2026-07-13 | Accepted | Adaptive pockets require verified constant-load ring sequences |
 | ADR-155 | 2026-07-13 | Accepted | Straight inlays compile as one radius-matched linked pair |
 | ADR-156 | 2026-07-13 | Accepted | Manual CNC tabs use persisted normalized contour anchors |
-| ADR-157 | 2026-07-13 | Accepted | Detected controller identity gates profile transport and output |
+| ADR-157 | 2026-07-13 | Superseded in part (ADR-228: Start qualification deleted) | Detected controller identity gates profile transport and output |
 | ADR-158 | 2026-07-13 | Accepted | Browser smoke is independent from the release and deploy gate |
 | ADR-159 | 2026-07-13 | Accepted | Schema v2 curves are canonical and compatibility polylines are invalidated |
 | ADR-160 | 2026-07-13 | Accepted | Rotary raster is an explicit experimental amendment to ADR-127 |
@@ -50,10 +140,14 @@
 | ADR-162 | 2026-07-13 | Accepted | Low-power Fire is profile-opted, hard-capped, and momentary |
 | ADR-163 | 2026-07-13 | Accepted | Cut Planner exposes five persisted deterministic policies |
 | ADR-164 | 2026-07-13 | Accepted | Adopt bounded offline editing and interoperability already shipped |
-| ADR-171 | 2026-07-13 | Accepted | Work-Z readiness uses source-qualified, epoch-bound evidence |
-| ADR-172 | 2026-07-13 | Accepted | Missing qualified work Z blocks CNC Start |
-| ADR-173 | 2026-07-13 | Accepted | Bind work-Z evidence to the compiled CNC tool plan |
-| ADR-179 | 2026-07-13 | Accepted | Block controller-reported active spindle/coolant before CNC Start |
+| ADR-171 | 2026-07-13 | Superseded in part (ADR-228: readiness no longer blocks Start) | Work-Z readiness uses source-qualified, epoch-bound evidence |
+| ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
+| ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
+| ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
+| ADR-180 | 2026-07-13 | Accepted | Generic same-session CNC Resume is manual-recovery-only |
+| ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
+| ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
+| ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
 | ADR-184 | 2026-07-13 | Accepted | Probe cycles are exclusive, typed, and settlement-qualified |
 | ADR-185 | 2026-07-13 | Accepted | Commit XYZ corner-probe offsets in one GRBL block |
 | ADR-186 | 2026-07-14 | Accepted | Keep guided device setup machine-relevant and directly repairable |
@@ -71,7 +165,7 @@
 | ADR-198 | 2026-07-14 | Superseded | Add a pinned OFL EMS stroke-font family with lazy data loading (see ADR-213) |
 | ADR-199 | 2026-07-14 | Superseded | Fair decorative stroke fonts with the shared trace cubic fitter (see ADR-213) |
 | ADR-200 | 2026-07-14 | Amended (ADR-215) | CNC recovery is evidence-gated and software Abort is not an E-stop |
-| ADR-201 | 2026-07-15 | Amended | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
+| ADR-201 | 2026-07-15 | Amended (ADR-209); Start gate superseded by ADR-228 | Gate CNC Start by protocol capability and exact override acknowledgement (see ADR-209) |
 | ADR-202 | 2026-07-15 | Accepted | Separate burn raster fidelity from bounded preview and stream work |
 | ADR-203 | 2026-07-15 | Amended | Recover Work-Z only from owned controller offset readback (see ADR-209) |
 | ADR-204 | 2026-07-15 | Accepted | Refuse project saves that would normalize machine or output semantics |
@@ -98,9 +192,8 @@
 | ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
 | ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |
-| ADR-228 | 2026-07-17 | Accepted | Frame-first Start gate: Frame is the sole guard |
-| ADR-229 | 2026-07-19 | Accepted | Exact-artifact Frame authorization and one-use Start permit |
-| ADR-230 | 2026-07-19 | Accepted | Physically valid Frame authorization and public-spec 4040 hybrid contract |
+| ADR-228 | 2026-07-18 | Accepted (governing) | Frame-first Start gate: Frame is the sole guard |
+| ADR-229 | 2026-07-18 | Accepted | Super console: read-only expanded console dialog |
 
 ---
 
@@ -1508,7 +1601,7 @@ serpentine alternation and emitted every active raster row left-to-right.
 ## ADR-022 - Origin-aware job placement and physical Frame/Start preflight
 
 **Date:** 2026-06-01
-**Status:** Accepted, code shipped, hardware verification pending.
+**Status:** Accepted, code shipped, hardware verification pending. Blocking Start-preflight portions demoted to Job Review warnings by ADR-228 (frame-first); placement math unchanged.
 
 **Context.** ADR-021 shipped the controller half of Set origin here:
 `G92 X0 Y0` makes the current head position work-coordinate (0,0).
@@ -2993,7 +3086,7 @@ guessed default.
 
 ## ADR-053 — Verified Origin: hand-set origin + mandatory verified frame for no-homing / hand-positioned machines
 
-**Status:** Accepted; P1–P4 code shipped, hardware verification pending. | **Date:** 2026-06-17
+**Status:** Accepted; P1–P4 code shipped, hardware verification pending. Generalized by ADR-228 — the verified-origin frame requirement became the universal frame-first gate for every placement mode. | **Date:** 2026-06-17
 
 > Numbered after ADR-052 (scan-offset compensation), which lands via a separate
 > branch. 052/053 are concurrent feature branches off the same main.
@@ -7143,7 +7236,7 @@ interaction undo; hardware remains CLAIMED pending the standing CNC cut protocol
 
 ## ADR-157 - Detected controller identity gates profile transport and output
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-228 — the ordinary-Start controller-qualification refusal was deleted (both machine kinds); transport/output reconciliation and cross-family profile refusal remain. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7322,7 +7415,7 @@ larger geometry, cloud-data, font-discovery, or LightBurn round-trip systems nam
 
 ## ADR-171 - Work-Z readiness uses source-qualified, epoch-bound evidence
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-228 — readiness no longer refuses Start (Job Review warns); the epoch-bound evidence model itself remains in use. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7356,7 +7449,7 @@ evidence and hardware qualification.
 
 ## ADR-172 - Missing qualified work Z blocks CNC Start
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded by ADR-228 — the block is demoted to a Job Review warning; Zero Z and probing remain available in the panel. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7387,7 +7480,7 @@ tool identity, clamping, plate removal, or spindle-at-speed feedback.
 
 ## ADR-173 - Bind work-Z evidence to the compiled CNC tool plan
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded in part by ADR-228 — a tool-vs-evidence mismatch warns in Job Review instead of blocking; the binding model remains in use. | **Date:** 2026-07-13
 
 ### Context
 
@@ -7417,7 +7510,7 @@ the compiled plan; it still cannot physically sense the cutter, clamp, touch pla
 
 ## ADR-179 - Block controller-reported active spindle/coolant before CNC Start
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Superseded by ADR-228 — active-accessory findings are Job Review warnings; the live-state fence relaxed to one fresh status report (transport liveness). | **Date:** 2026-07-13
 
 ### Context
 
@@ -8299,7 +8392,7 @@ manual intervention.
 
 ## ADR-201 - Gate CNC Start by protocol capability and exact override acknowledgement
 
-**Status:** Amended by ADR-209 | **Date:** 2026-07-15
+**Status:** Amended by ADR-209; Start-gate portions superseded by ADR-228 (dialect and override findings are Job Review warnings — the reduced-override acknowledgement text lives in the review). | **Date:** 2026-07-15
 
 ### Context
 
@@ -8485,7 +8578,7 @@ beam/spindle behavior, clearances, and calibration remain the operator's hardwar
 
 ## ADR-206 - Require explicit maintainer permission for every new guard
 
-**Status:** Accepted | **Date:** 2026-07-15
+**Status:** Superseded in mechanism by ADR-228 — the permission process is replaced by a standing denial: no guard will ever be created again. | **Date:** 2026-07-15
 
 ### Context
 
@@ -9694,142 +9787,42 @@ Maintainer approval in chat: "fix both", accepting the post-merge soundness audi
 
 Both changes narrow WHEN the one guard's proof exists; the guard surface itself is unchanged.
 
----
+## ADR-229 - Super console: read-only expanded console dialog
 
-## ADR-229 - Exact-artifact Frame authorization and one-use Start permit
-
-**Date:** 2026-07-19
-**Status:** Accepted (explicit maintainer ruling in chat on 2026-07-19)
-
-### Context
-
-ADR-228 made a completed Frame the sole ordinary-Start guard, and its 2026-07-18 amendment made
-completion rather than dispatch the moment proof exists. The ordinary flow still prepared and
-reviewed the job after Frame, however, so the physical trace and the bytes later offered to Start
-were not one immutable artifact. Current Position could also resolve from the post-Frame head
-position, and an interrupted multi-leg trace could not safely authorize anything.
-
-This decision records the exact-artifact sequencing and the maintainer's rulings without rewriting
-the accepted text of ADR-224, ADR-228, or the merged ADR-228 amendment. Where their ordinary fresh
-Start sequencing or Frame construction-input classification differs, this ADR supersedes those
-portions. Specialized recovery and replay flows retain their separately controlled contracts except
-where stated below.
-
-### Decision
-
-1. **Job Review precedes Frame and owns one exact artifact.** Ordinary **Set up & Frame** and
-   **Frame job** resolve placement, compile the executable program, compute its generated motion
-   envelope, and show that exact candidate in Job Review. The operator acknowledges warnings with
-   **Accept & Frame**. Re-review after an edit produces a new candidate; the accepted candidate's
-   bytes, fingerprint, placement, controller evidence, and origin evidence stay bound together
-   through Frame.
-2. **G54 normalization is an owned, acknowledged serial-controller Frame preparation step.** When
-   preparation for any serial-controller Frame begins with G55-G59 active, KerfDesk selects G54
-   through its owned controller-operation path and waits for the command acknowledgement and fresh
-   position evidence before finalizing the candidate.
-   The durable Job Review warning names the original G55-G59 selection and states both facts: the
-   active selection changed, and the stored G55-G59 offsets were not erased. Cancel or Escape sends
-   no Frame/job bytes and issues no permit, but it does not restore the prior selection; G54 remains
-   active, exactly as the warning says.
-3. **Only clean physical completion authorizes Start.** Frame establishes the driver-produced
-   tool-off state, traces the exact generated motion envelope, and returns to the exact
-   preparation-time work position. Dispatch is never success. Every owned command must receive its
-   terminal acknowledgement, the perimeter queue must drain, controller/origin/settings evidence
-   must remain unchanged, and the controller must report a fresh clean final Idle. Cancel, error,
-   Alarm, interruption, disconnect, MPG takeover, evidence drift, or an incomplete return discards
-   the candidate and earns no permit.
-4. **CNC safe-Z construction inputs are required.** Current-session stock-top Work-Z, a known
-   return position, and a driver safe-Z Frame builder are coordinate/command inputs needed to
-   construct the physical retract, XY trace, exact return, and Z restore. There is no XY-only CNC
-   fallback. Dialect, tool identity, probe-plate state, settings, accessories, overrides, bounds,
-   and no-go findings remain Job Review warnings rather than ordinary Start policy gates.
-5. **The permit is exact and one-use.** Clean completion issues a `FramedRunPermit` for the exact
-   accepted bytes and evidence. **Start framed job** atomically claims that permit and streams its
-   cached bytes without recompiling, reopening Job Review, or rerunning policy gates. Relevant
-   fingerprint/evidence changes invalidate it, and Jog or Home explicitly invalidates it. Live
-   transport facts and exact-handoff consistency remain unavoidable at the wire boundary.
-6. **Run again is the controlled repeat path.** It does not reuse the consumed permit. It performs
-   a fresh compile, fingerprint comparison, and Job Review, and uses the retained compatibility
-   `FrameVerification` proof to authorize the deliberate repeat only while that proof and the new
-   artifact still satisfy the repeat contract. This keeps batch burns available without turning a
-   one-use permit into an unbounded replay token.
-7. **Raster-budget fallback cannot authorize Start.** A `raster-too-large` candidate cannot produce
-   the executable artifact whose real motion envelope must be framed, so it cannot earn an
-   authorizing Frame permit. Any future outline-only positioning feature must be a separately named
-   non-authorizing action; it may not mint, retain, or refresh Start authorization.
-
-### Consequences
-
-- One review now owns the warnings, acknowledgements, exact bytes, and physical trace. Ordinary
-  Start is reduced to claiming the completed permit plus live transport and exact-handoff facts.
-- Selecting G54 is intentionally not rolled back on review cancellation. The durable warning makes
-  the persistent active-WCS change and preservation of all stored G55-G59 offsets explicit before
-  the operator chooses whether to continue.
-- A Frame that merely dispatched, partially moved, failed to return, or never reached fresh clean
-  Idle cannot authorize Start. Code and simulator coverage do not replace tool-off hardware
-  qualification on supported controller, rotary, and CNC safe-Z configurations.
-
----
-
-## ADR-230 - A valid Frame proves physically safe motion and the live output contract
-
-**Date:** 2026-07-19
-**Status:** Accepted (explicit maintainer directive in chat: apply the online-research safety pass)
+**Date:** 2026-07-18
+**Status:** Accepted (maintainer request in chat: "Can we upgrade the console to auto read
+settings etc. make it a super console? maybe press a button and a new big console opens up
+with in detail view etc."; phased scope approved with "go")
 
 ### Context
-
-ADR-228 made Frame the sole ordinary-Start guard and ADR-229 bound one reviewed artifact to one
-completion-issued permit. The exact implementation could still command an off-bed/no-go perimeter,
-authorize a job whose known interior path crossed a fixture, restore CNC Z below stock-top zero,
-interpret `$13=1` inches as millimetres, miss GRBL jog cancellation during the Idle-to-Jog race,
-and mint a permit with known-wrong `$30/$32`. A tool-off rectangle cannot prove those facts.
-
-The maintainer cannot perform this qualification physically and asked for the strongest correction
-supported by public information for the RNT/PRT-class 4040. Public sources identify the machine as
-the Neotronics 4040 Max class and the laser as LASER TREE LT-4LDS-V2, but do not publish the exact
-controller board, firmware/settings dump, homing corner, feed limits, selector interlock, or air
-relay wiring. The profile must distinguish documented specifications from assumptions.
+The docked Console (F-B13) renders the last 150 of 500 transcript entries in a small rail
+panel and omits each line's source and time. During the 2026-07-18 Neotronics 4040
+regression audit, inspecting controller settings and traffic was cumbersome enough that the
+browser's on-disk storage was easier to read than the in-app surfaces.
 
 ### Decision
+Add a Super console: a Dialog (size xl) opened by a "Super console" button that lives
+beside the docked ConsolePanel in the Console rail section (ConsolePanel is at its
+file-size limit and keeps its single docked-console responsibility). Version 1 is a
+read-only inspection surface:
 
-1. **Unsafe motion is not a valid Frame.** Immediately before wire dispatch, the exact reviewed
-   motion envelope must fit known travel and its perimeter must clear enabled no-go zones. The exact
-   prepared G-code is also rescanned so a known interior/approach-path collision cannot earn a
-   permit. Failure sends no Frame motion. Where physical placement is unknowable on an unhomed
-   machine, the app does not invent machine coordinates; enabled no-go zones fail closed.
-2. **Output semantics are Frame authorization inputs, not Start gates.** Known live `$30/$32`
-   conflicts refuse Frame preparation. GRBL CNC also requires those values to be read because an
-   unknown spindle scale or laser-mode inversion changes plunge/spindle behavior. Unknown laser
-   values remain prominent Job Review warnings. The accepted snapshot is already frozen into the
-   candidate and must remain unchanged through completion. Start itself remains a one-use permit
-   claim with only transport and exact-handoff facts.
-3. **CNC Frame is unit- and stock-safe.** `$13=1` position reports are converted to millimetres
-   before G21 commands are built. Frame retracts to safe Z; it restores only a zero or positive
-   pre-Frame Work-Z, never a negative position inside stock. XY feed is capped by live `$110/$111`
-   and Z independently by `$112` when those settings are available.
-4. **Cancel must cross GRBL's state race.** Cancel intent immediately prevents later legs/permits.
-   After the current write/ack handoff, the app queries controller state; a fresh `Jog` proves the
-   first `0x85` may have arrived too early, so it sends `0x85` again and re-queries. It waits for
-   fresh `Idle` before the queued settlement marker, then requires the existing post-marker Idle.
-5. **The 4040 profile is a public-spec hybrid starter.** It explicitly supports laser and CNC,
-   records the documented 400 x 400 x 75 mm envelope, default 500 W / 12,000 RPM spindle contract,
-   and LT-4LDS-V2 optical metadata. It removes unproved verified-origin, rotary, and low-power-fire
-   capabilities. The integrated nozzle is modeled as external/manual air with no M-code; setup
-   never guesses M7, and an air-requesting exact job warns that no relay command will be emitted.
-6. **No online-only hardware claim.** GRBL version, `$` values, homing/origin, feed ceilings,
-   spindle variant, selector/interlock, PSU headroom, and M7/M8 wiring remain unverified until read
-   or tested on the actual unit. The profile status is `public-spec-starter`, never hardware-verified.
+- the full 500-entry transcript (no 150-entry display cap) with time, direction, source,
+  kind, raw, and decoded columns;
+- group filters (Errors / Commands / Replies / Status / Stream) with a precedence rule so
+  each entry belongs to exactly one group;
+- case-insensitive search over raw and decoded text; Copy visible.
 
-Primary public references: Neotronics 4040 Max product page
-(`https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct`), LASER TREE
-LT-4LDS-V2 product/manual (`https://lasertree.com/products/20w-optical-power-laser-cutting-module`),
-and upstream GRBL settings/jogging contracts
-(`https://github.com/gnea/grbl/tree/master/doc/markdown`).
+Commands are still typed in the docked console; the dialog sends nothing to the controller.
 
-### Consequences
+### Phasing
+- v1 (this ADR): transcript inspection, above.
+- v2: machine-settings pane - auto-dispatches the existing gated readMachineSettings ($$)
+  on open when machineSettingsReadBlockReason is null and renders the collected snapshot as
+  a named, united, grouped table with profile diffs (reusing grbl-settings.ts,
+  presentGrblSetting, computeFirmwareDiffs). Read-only; setting writes stay in Device Setup.
+- v3: command input with history inside the dialog, after a tidy-first extraction of the
+  console command gating out of ConsolePanel.
 
-- "Frame is the source of truth" now means a physically valid, cleanly completed Frame of the
-  exact artifact; dispatching a known unsafe command can never manufacture proof.
-- Start remains simpler than before ADR-228: it neither recompiles nor reruns policy gates.
-- Public documentation plus tests can make defaults honest and protocol behavior defensible, but
-  cannot certify the machine's wiring or mechanics. Hardware qualification remains explicitly open.
+### Guard posture (rule 7 / ADR-228)
+Purely informational. No new refusal surface: v1 sends nothing; v2 will reuse the existing
+transport-precondition messages verbatim and only display them.

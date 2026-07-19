@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.7 — physically valid Frame authorization and public-spec 4040 hybrid profile (ADR-230), exact-artifact pre-Frame Job Review and completion-issued Start permit (ADR-229), machine-rail control order and go-green coaching (ADR-225), OFL CNC stroke fonts (ADR-226), and the status-bar PWA Update control (ADR-227); ADR tail at 230. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.6 — **frame-first Start gate (ADR-228, 2026-07-18): a completed Frame for the exact current job is the sole Start guard on laser and CNC, and the Job Review dialog (ADR-224) is the single warning surface.** Every prior Start gate's disposition (kept as transport/compile/handoff, demoted to a warning, or deleted) is tabulated in `docs/audits/2026-07-18-guard-inventory-frame-first.md`; see non-negotiable #21. Also recent: machine-rail control order and go-green coaching (ADR-225), OFL CNC stroke fonts (ADR-226), status-bar PWA Update control (ADR-227). ADR tail at 228. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
