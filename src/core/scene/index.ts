@@ -125,10 +125,7 @@ export {
   selectionAnchorPoint,
   selectionMetrics,
 } from './selection-transform';
-export type {
-  SelectionAlignEdit,
-  SelectionAlignKind,
-} from './selection-align';
+export type { SelectionAlignEdit, SelectionAlignKind } from './selection-align';
 export { buildSelectionAlignEdit } from './selection-align';
 export type { BestFitRectangle, BoardAnchor, BoardShape, BoardShapeKind } from './board-capture';
 export {
