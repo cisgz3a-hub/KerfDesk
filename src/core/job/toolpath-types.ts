@@ -9,6 +9,7 @@ import type { ScanOffsetPoint } from './scan-offset';
 // Z extent of a step (CNC, Phase H.2). Laser steps omit it; CNC steps carry
 // it so the simulator can depth-shade and the scrubber can report head Z.
 export type ZSpan = { readonly from: number; readonly to: number };
+export type TravelMotion = 'rapid' | 'feed';
 
 export type ToolpathStep =
   | {
@@ -16,6 +17,9 @@ export type ToolpathStep =
       readonly from: Vec2;
       readonly to: Vec2;
       readonly length: number;
+      // Absent means legacy/unspecified travel and is treated as rapid. Fill
+      // previews tag G1/S0 motion as feed so playback can pace it separately.
+      readonly motion?: TravelMotion;
       readonly z?: ZSpan;
     }
   | {

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
+import { shouldAdvise4040FillPolicySelection } from '../../../core/job/fill-runway-policy';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -34,6 +35,7 @@ export function DeviceSetupControls(props: {
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const device = useStore((s) => s.project.device);
   const needsSetup = shouldPromptDeviceSetup({ connected, device, configured });
+  const needs4040ProfileReview = connected && shouldAdvise4040FillPolicySelection(device);
   useEffect(() => {
     if (props.openRequest === undefined) return;
     setInitialStep(props.openRequest.initialStep);
@@ -53,7 +55,7 @@ export function DeviceSetupControls(props: {
   return (
     <>
       <Button
-        variant={needsSetup ? 'primary' : 'default'}
+        variant={needsSetup || needs4040ProfileReview ? 'primary' : 'default'}
         onClick={() => openSetup('identify')}
         {...helpProps('control:laser.machine-setup.launch')}
       >
@@ -62,6 +64,14 @@ export function DeviceSetupControls(props: {
       {needsSetup && (
         <p style={mutedNoteStyle} role="note">
           This machine isn&apos;t set up yet.
+        </p>
+      )}
+      {needs4040ProfileReview && (
+        <p style={warningNoteStyle} role="note">
+          4040 fill-quality policy is inactive because {device.name} is selected. KerfDesk cannot
+          identify a Neotronics 4040 from its work area or controller settings. If this is that
+          machine, open Machine Setup, choose the Neotronics 4040 profile, review it, and Save
+          before the next Scanline Fill.
         </p>
       )}
       {machineSetupOpen && (
@@ -79,4 +89,10 @@ const mutedNoteStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 11,
   color: 'var(--lf-text-muted)',
+};
+const warningNoteStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 11,
+  lineHeight: 1.4,
+  color: 'var(--lf-warning-fg)',
 };

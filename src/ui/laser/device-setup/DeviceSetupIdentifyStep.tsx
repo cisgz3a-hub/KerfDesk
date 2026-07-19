@@ -5,6 +5,7 @@
 import {
   GRBL_GCODE_DIALECTS,
   MARLIN_GCODE_DIALECTS,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   profileConfidenceLabel,
   suggestMachineProfiles,
   type ControllerKind,
@@ -12,6 +13,10 @@ import {
   type MachineProfileSuggestion,
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
+import {
+  fillRunwayPolicyForDevice,
+  shouldAdvise4040FillPolicySelection,
+} from '../../../core/job/fill-runway-policy';
 import { Button } from '../../kit';
 import {
   badgeStyle,
@@ -256,9 +261,9 @@ function ProfileCatalog({ state, dispatch }: DeviceSetupStepProps): JSX.Element 
     settingsRows: [],
   });
   return (
-    <details style={detailsStyle}>
+    <details style={detailsStyle} open={shouldAdvise4040FillPolicySelection(state.draft)}>
       <summary style={summaryStyle} title="Show or hide reviewed machine-profile suggestions.">
-        Optional: start from a tested machine profile
+        Start from a reviewed machine profile
       </summary>
       <p style={mutedStyle}>
         A profile supplies useful defaults. You will still review work area, origin, homing, power,
@@ -269,13 +274,22 @@ function ProfileCatalog({ state, dispatch }: DeviceSetupStepProps): JSX.Element 
           <PresetCard
             key={suggestion.profileId}
             suggestion={suggestion}
-            isActive={state.draft.profileId === suggestion.profile.profileId}
+            isActive={profilePresetIsActive(state.draft, suggestion)}
             onUse={() => dispatch({ kind: 'apply-preset', profile: suggestion.profile })}
           />
         ))}
       </div>
     </details>
   );
+}
+
+function profilePresetIsActive(
+  draft: DeviceProfile,
+  suggestion: MachineProfileSuggestion,
+): boolean {
+  if (draft.profileId !== suggestion.profile.profileId) return false;
+  if (suggestion.profile.profileId !== NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId) return true;
+  return fillRunwayPolicyForDevice(draft) !== undefined;
 }
 
 function PresetCard(props: {

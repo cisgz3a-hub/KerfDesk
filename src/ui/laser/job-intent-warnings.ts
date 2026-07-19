@@ -5,6 +5,7 @@ import {
   isSensitiveIslandFillPolicy,
   rasterBoundsInMachineCoords,
 } from '../../core/job';
+import { shouldAdvise4040FillPolicySelection } from '../../core/job/fill-runway-policy';
 import { pixelExtentForMm } from '../../core/raster';
 import {
   pathUsesOperation,
@@ -19,6 +20,7 @@ import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
   const job = compileJob(project.scene, project.device);
   const warnings = [...detectUncalibratedJobWarnings(job, project.scene.layers)];
+  append4040FillPolicyWarning(project, job, warnings);
   appendFillHeatWarnings(job, warnings);
 
   const outputLayers = project.scene.layers.filter((layer) => layer.output);
@@ -43,6 +45,25 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   }
 
   return warnings;
+}
+
+function append4040FillPolicyWarning(
+  project: Project,
+  job: ReturnType<typeof compileJob>,
+  warnings: string[],
+): void {
+  if (project.machine?.kind === 'cnc') return;
+  if (!shouldAdvise4040FillPolicySelection(project.device)) return;
+  const hasScanlineFill = job.groups.some(
+    (group) =>
+      group.kind === 'fill' &&
+      (group.fillStyle ?? 'scanline') === 'scanline' &&
+      group.segments.length > 0,
+  );
+  if (!hasScanlineFill) return;
+  warnings.push(
+    `4040 fill-quality policy is inactive because ${project.device.name} is selected. KerfDesk cannot identify a Neotronics 4040 from bed size or controller settings. If this is that machine, open Machine Setup, choose Neotronics 4040 Max / LT-4LDS-V2, review it, and Save before this Scanline Fill.`,
+  );
 }
 
 function appendFillHeatWarnings(job: ReturnType<typeof compileJob>, warnings: string[]): void {

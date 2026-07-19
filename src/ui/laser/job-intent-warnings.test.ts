@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Buffer } from 'node:buffer';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
+import { FALCON_COMPATIBLE_PROFILE } from '../../core/devices/falcon-profiles';
 import {
   createLayer,
   createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type Project,
@@ -27,6 +29,30 @@ const traced: SceneObject = {
             { x: 10, y: 0 },
           ],
           closed: false,
+        },
+      ],
+    },
+  ],
+};
+
+const closedTraced: SceneObject = {
+  kind: 'traced-image',
+  id: 'trace-closed',
+  source: 'wedding-script.png',
+  bounds: { minX: 0, minY: 0, maxX: 30, maxY: 30 },
+  transform: IDENTITY_TRANSFORM,
+  paths: [
+    {
+      color: '#ff0000',
+      polylines: [
+        {
+          points: [
+            { x: 0, y: 0 },
+            { x: 30, y: 0 },
+            { x: 30, y: 30 },
+            { x: 0, y: 30 },
+          ],
+          closed: true,
         },
       ],
     },
@@ -112,6 +138,60 @@ const largeIsland: SceneObject = {
 };
 
 describe('detectJobIntentWarnings', () => {
+  it('warns before generic-profile Scanline Fill without claiming the machine was identified', () => {
+    const warnings = detectJobIntentWarnings(projectWith(closedTraced, 'fill'));
+    const warning = warnings.find((item) => item.includes('4040 fill-quality policy is inactive'));
+
+    expect(warning).toContain('Default 400');
+    expect(warning).toContain('cannot identify a Neotronics 4040');
+    expect(warning).toContain('Machine Setup');
+  });
+
+  it('does not emit the 4040 profile warning for active Neotronics or Falcon profiles', () => {
+    for (const device of [NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, FALCON_COMPATIBLE_PROFILE]) {
+      const project = { ...projectWith(closedTraced, 'fill'), device };
+      expect(
+        detectJobIntentWarnings(project).some((item) =>
+          item.includes('4040 fill-quality policy is inactive'),
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it('limits the 4040 profile warning to ordinary Scanline Fill', () => {
+    const line = projectWith(largeIsland, 'line');
+    const image = projectWith(smallRaster, 'image');
+    const island = projectWith(largeIsland, 'fill');
+    const layer = island.scene.layers[0];
+    const islandFill: Project = {
+      ...island,
+      scene: {
+        ...island.scene,
+        layers: layer === undefined ? [] : [{ ...layer, fillStyle: 'island' }],
+      },
+    };
+    for (const project of [line, image, islandFill]) {
+      expect(
+        detectJobIntentWarnings(project).some((item) =>
+          item.includes('4040 fill-quality policy is inactive'),
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it('does not emit the laser-only 4040 profile warning for a CNC project', () => {
+    const project: Project = {
+      ...projectWith(closedTraced, 'fill'),
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+    };
+
+    expect(
+      detectJobIntentWarnings(project).some((item) =>
+        item.includes('4040 fill-quality policy is inactive'),
+      ),
+    ).toBe(false);
+  });
+
   // H12 (AUDIT-2026-06-10): the engrave luma is extracted from the
   // 2048-px-capped decode (ADR-037, a TRACE runtime cap), and compile
   // nearest-neighbor UPSAMPLES it to the burn grid — silently, while the

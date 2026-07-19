@@ -4,6 +4,10 @@ import {
   type DeviceProfile,
   type ProfileCapability,
 } from '../../core/devices';
+import {
+  fillRunwayPolicyForDevice,
+  shouldAdvise4040FillPolicySelection,
+} from '../../core/job/fill-runway-policy';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
@@ -14,7 +18,8 @@ type DeviceRowsProps = {
 
 export function ProfileRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
-  const active = device.machineFamily === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.machineFamily;
+  const active = fillRunwayPolicyForDevice(device) !== undefined;
+  const needsReview = shouldAdvise4040FillPolicySelection(device);
   const laserLabel = device.laserSubProfile?.model ?? 'Generic GRBL diode';
   return (
     <>
@@ -32,7 +37,12 @@ export function ProfileRows(props: DeviceRowsProps): JSX.Element {
       </Row>
       <Row label="Laser">
         <span style={profileTextStyle}>
-          {active ? 'Neotronics profile active' : 'Profile not selected'} - {laserLabel}
+          {active
+            ? '4040 fill-quality policy active'
+            : needsReview
+              ? '4040 fill-quality policy inactive'
+              : 'Current profile fill behavior unchanged'}{' '}
+          — {laserLabel}
         </span>
       </Row>
     </>

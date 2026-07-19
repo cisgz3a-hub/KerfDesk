@@ -167,9 +167,12 @@ describe('junctionVelocity', () => {
     expect(v).toBeCloseTo(4.92, 1);
   });
 
-  it('returns 0 for a junction across cut/travel boundary (laser on/off transition)', () => {
-    const travel = { ...cutBlock(1, 0), kind: 'travel' as const };
-    expect(junctionVelocity(cutBlock(1, 0), travel, accel, jd)).toBe(0);
+  it('stops at rapid/feed boundaries but keeps laser-off feed motion continuous', () => {
+    const rapid = { ...cutBlock(1, 0), kind: 'travel' as const, motion: 'rapid' as const };
+    const blankFeed = { ...cutBlock(1, 0), kind: 'travel' as const, motion: 'feed' as const };
+
+    expect(junctionVelocity(cutBlock(1, 0), rapid, accel, jd)).toBe(0);
+    expect(junctionVelocity(cutBlock(1, 0), blankFeed, accel, jd)).toBe(Number.POSITIVE_INFINITY);
   });
 
   it('rises monotonically as the turn opens from a reversal toward straight', () => {

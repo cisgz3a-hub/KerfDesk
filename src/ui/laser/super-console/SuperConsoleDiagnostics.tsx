@@ -2,6 +2,10 @@ import type { GrblSettingRow } from '../../../core/controllers/grbl';
 import type { DeviceProfile } from '../../../core/devices';
 import type { MachineConfig } from '../../../core/scene';
 import {
+  fillRunwayPolicyForDevice,
+  shouldAdvise4040FillPolicySelection,
+} from '../../../core/job/fill-runway-policy';
+import {
   buildSuperConsoleSettingsDiagnostics,
   type SuperConsoleDiagnosticSection,
   type SuperConsoleDiagnosticStatus,
@@ -16,6 +20,8 @@ export function SuperConsoleDiagnostics(props: {
   const diagnostics = buildSuperConsoleSettingsDiagnostics(props.profile, props.rows, {
     ...(props.machine === undefined ? {} : { machine: props.machine }),
   });
+  const fillPolicyActive = fillRunwayPolicyForDevice(props.profile) !== undefined;
+  const fillPolicyNeedsReview = shouldAdvise4040FillPolicySelection(props.profile);
 
   return (
     <section aria-label="Controller diagnostics" style={panelStyle}>
@@ -28,6 +34,17 @@ export function SuperConsoleDiagnostics(props: {
         context for investigation; they do not identify the attached hardware and a difference is
         not automatically wrong.
       </p>
+      {fillPolicyActive ? (
+        <p role="status" style={policyActiveStyle}>
+          4040 fill-quality policy active: Scanline Fill uses feed-matched laser-off entries.
+        </p>
+      ) : fillPolicyNeedsReview ? (
+        <p role="alert" style={policyWarningStyle}>
+          4040 fill-quality policy inactive. Controller settings and a 400 x 400 work area do not
+          identify the attached machine. If this is a Neotronics 4040, open Machine Setup, choose
+          the Neotronics 4040 profile, review it, and Save before the next Scanline Fill.
+        </p>
+      ) : null}
       {diagnostics.length === 0 ? (
         <p style={emptyStyle}>Diagnostics appear after the controller returns a settings dump.</p>
       ) : (
@@ -154,6 +171,20 @@ const readOnlyBadgeStyle: React.CSSProperties = {
 const noticeStyle: React.CSSProperties = {
   margin: '6px 0',
   color: 'var(--lf-text-muted)',
+  lineHeight: 1.35,
+};
+const policyActiveStyle: React.CSSProperties = {
+  margin: '6px 0',
+  color: 'var(--lf-success-fg)',
+  fontWeight: 600,
+  lineHeight: 1.35,
+};
+const policyWarningStyle: React.CSSProperties = {
+  margin: '6px 0',
+  padding: 6,
+  border: '1px solid var(--lf-warning)',
+  borderRadius: 4,
+  color: 'var(--lf-warning-fg)',
   lineHeight: 1.35,
 };
 const emptyStyle: React.CSSProperties = {

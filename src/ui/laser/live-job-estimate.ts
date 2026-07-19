@@ -7,6 +7,7 @@ import {
   PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
   type Job,
 } from '../../core/job';
+import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 import {
   DEFAULT_OUTPUT_SCOPE,
   validateOutputScope,
@@ -31,10 +32,7 @@ export type LiveJobEstimate =
       readonly kind: 'estimated';
       readonly label: string;
       readonly totalSeconds: number;
-      readonly breakdown: {
-        readonly cutSeconds: number;
-        readonly travelSeconds: number;
-      };
+      readonly breakdown: JobDurationBreakdown;
     }
   | { readonly kind: 'too-large' };
 

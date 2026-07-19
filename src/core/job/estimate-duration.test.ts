@@ -232,10 +232,10 @@ describe('estimateJobDuration', () => {
     expect(runwaySeconds).toBeLessThan(0.5);
   });
 
-  it('prices a multi-span sweep as one continuous cut block over the envelope (ADR-034)', () => {
+  it('keeps a multi-span sweep continuous while accounting S0 holes as feed travel', () => {
     // Three ink spans on one scanline (two holes). The continuous sweep moves at
-    // feed across the whole row (ink + S0-blanked gaps), so its cut time equals a
-    // single span over the full envelope, not three separate stop-start runs.
+    // feed across the whole row (ink + S0-blanked gaps), so its total time equals
+    // a single span over the full envelope without three stop-start runs.
     const multiSpan: FillGroup = {
       kind: 'fill',
       layerId: 'fill',
@@ -250,7 +250,9 @@ describe('estimateJobDuration', () => {
     const oneSpan: FillGroup = { ...multiSpan, segments: [fillSeg([0, 0], [20, 0])] };
     const multi = estimateJobDuration({ groups: [multiSpan] }, device);
     const single = estimateJobDuration({ groups: [oneSpan] }, device);
-    expect(multi.breakdown.cutSeconds).toBeCloseTo(single.breakdown.cutSeconds, 6);
+    expect(multi.breakdown.cutSeconds).toBeLessThan(single.breakdown.cutSeconds);
+    expect(multi.breakdown.feedTravelSeconds).toBeGreaterThan(0);
+    expect(single.breakdown.feedTravelSeconds).toBe(0);
     expect(multi.totalSeconds).toBeCloseTo(single.totalSeconds, 6);
   });
 
