@@ -108,7 +108,7 @@ function pureWhiteImage(width: number, height: number): RawImageData {
 describe('traceImageWithFallback — end-to-end pipeline', () => {
   it('traces a black-on-white square under Line Art (default preset)', async () => {
     const image = whiteWithBlackSquare(32, 32, 8, 8, 16);
-    const { paths, bounds } = await traceImageWithFallback(image, LINE_ART);
+    const { paths, bounds, width, height } = await traceImageWithFallback(image, LINE_ART);
 
     // At least one ColoredPath in the result.
     expect(paths.length).toBeGreaterThan(0);
@@ -125,6 +125,7 @@ describe('traceImageWithFallback — end-to-end pipeline', () => {
     expect(bounds.maxX).toBeLessThanOrEqual(32);
     expect(bounds.minY).toBeGreaterThanOrEqual(0);
     expect(bounds.maxY).toBeLessThanOrEqual(32);
+    expect({ width, height }).toEqual({ width: 32, height: 32 });
     // Non-degenerate area.
     expect(bounds.maxX - bounds.minX).toBeGreaterThan(0);
     expect(bounds.maxY - bounds.minY).toBeGreaterThan(0);
@@ -141,7 +142,7 @@ describe('traceImageWithFallback — end-to-end pipeline', () => {
 
   it('traces thick line art as open centerline paths under Centerline preset', async () => {
     const image = whiteWithBlackRect(24, 12, 4, 4, 16, 3);
-    const { paths, bounds } = await traceImageWithFallback(image, CENTERLINE);
+    const { paths, bounds, width, height } = await traceImageWithFallback(image, CENTERLINE);
     const polylines = paths[0]?.polylines ?? [];
 
     expect(paths).toHaveLength(1);
@@ -149,6 +150,7 @@ describe('traceImageWithFallback — end-to-end pipeline', () => {
     expect(polylines.length).toBeGreaterThan(0);
     expect(polylines.every((pl) => !pl.closed)).toBe(true);
     expect(bounds.maxY - bounds.minY).toBeLessThanOrEqual(0.5);
+    expect({ width, height }).toEqual({ width: 24, height: 12 });
   });
 
   it('survives a pure-white image without crashing (returns 0 paths)', async () => {

@@ -1,33 +1,8 @@
-// ImportImageDialog — the Trace tool's modal. Trace runs on a bitmap
-// the operator ALREADY imported and selected (LightBurn's model,
-// ADR-027); the dialog is seeded with that RasterImage, never a blank
-// file picker.
-//
-// Flow:
-//   1. Toolbar's "Trace…" (enabled only with a raster-image selected)
-//      seeds ui-store.imageDialog with the chosen RasterImage.
-//   2. Its embedded dataUrl is round-tripped back into a File
-//      (dataUrlToFile) so the existing File-keyed preview + trace
-//      pipeline (useTracePreview, loadImageAsRawData) runs unchanged.
-//   3. User picks a preset + tunes Trace settings, with live preview
-//      via useTracePreview while they tune.
-//   4. Submit → traceImage (Web Worker if available, inline fallback)
-//      → ColoredPath[] directly from imagetracerjs tracedata
-//      (bypassing parseSvg's curve-flattening) → overlay the vector
-//      trace onto the existing bitmap via traceExistingImage
-//      (ADR-026): the trace takes the source's transform so they
-//      register pixel-for-pixel, draws on top, becomes the selection,
-//      and the source is re-tagged 'trace-source' as the deletable
-//      backing.
-//
-// Result is tagged with `kind: 'traced-image'` plus the source raster id so
-// "Re-trace Original" can reopen this dialog from the kept backing image.
-//
-// Presentational pieces (SourceLabel, PresetPicker, DialogActions,
-// styles) live in dialog-parts.tsx; the pure-data option transforms
-// (hasAggressivePreprocessing, relaxAggressivePreprocessing) live in
-// trace-options.ts. This file
-// only owns state + the commit flow + the dialog shell.
+// Trace runs on the selected RasterImage (ADR-027), preserving the existing
+// File-keyed preview and worker trace pipeline. Laser projects default to
+// materializing that trace through the Raster/Image pipeline; editable vectors
+// remain optional, and CNC stays vector-only. Both outputs retain source
+// provenance for Re-trace Original. Pure UI pieces live in dialog-parts.tsx.
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -47,14 +22,14 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { Dialog } from '../kit';
 import {
-  CncTraceHint,
   DialogActions,
   DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
   SourceLabel,
-  TraceFillStylePicker,
+  TraceOutputFields,
   type TraceFillStyle,
+  type TraceOutput,
 } from './dialog-parts';
 import { dataUrlToFile } from './image-loader';
 import type { PreparedTrace } from './prepared-trace';
@@ -65,6 +40,7 @@ import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { resolveTraceCommitResult } from './trace-commit-result';
+import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
 
 export function ImportImageDialog(): JSX.Element | null {
@@ -77,6 +53,28 @@ export function ImportImageDialog(): JSX.Element | null {
   );
 }
 
+type TraceCommitArgs = {
+  readonly file: File;
+  readonly options: TraceOptions;
+  readonly seed: RasterImage;
+  readonly traceOutput?: TraceOutput;
+  readonly traceFillStyle?: TraceFillStyle;
+  readonly deleteSourceAfterTrace?: boolean;
+  readonly replaceTraceId?: string;
+  readonly boundary?: TraceBoundary | null;
+  readonly boundaryMode?: BoundaryMode;
+  readonly preparedTrace?: PreparedTrace;
+};
+
+type TraceCommitContext = {
+  readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
+  readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
+  readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
+  readonly close: () => void;
+  readonly setBusy: (v: boolean) => void;
+  readonly getCurrentProject: () => ReturnType<typeof useStore.getState>['project'];
+};
+
 function DialogBody(props: {
   readonly seed: RasterImage;
   readonly replaceTraceId?: string;
@@ -84,15 +82,16 @@ function DialogBody(props: {
   const { seed } = props;
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
+  const commitRasterizedTrace = useStore((s) => s.commitRasterizedTrace);
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
   const [preset, setPreset] = useState<string>('Line Art');
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
+  const [traceOutput, setTraceOutput] = useState<TraceOutput>('raster');
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
-  const { boundary, setBoundary, boundaryMode, setBoundaryMode, clearBoundary } =
-    useBoundarySelection();
+  const boundarySelection = useBoundarySelection();
   const [busy, setBusy] = useState(false);
   // Layer the LightBurn-style trace settings on top of the preset.
   // Image-level edits stay in Adjust Image, so Trace Image keeps one
@@ -113,7 +112,8 @@ function DialogBody(props: {
     [presetOptions, traceSettings],
   );
   const supportsTraceFillStyle = isFilledContourTraceOptions(options);
-  const preview = useTracePreview(file, options, boundary, boundaryMode);
+  const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
+  const preview = useSelectedTracePreview(file, options, boundarySelection, seed);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -121,13 +121,16 @@ function DialogBody(props: {
       file,
       options,
       seed,
-      traceFillStyle: supportsTraceFillStyle ? traceFillStyle : 'scanline',
+      traceOutput: effectiveTraceOutput,
+      traceFillStyle:
+        effectiveTraceOutput === 'vector' && supportsTraceFillStyle ? traceFillStyle : 'scanline',
       deleteSourceAfterTrace,
-      boundary,
-      boundaryMode,
+      boundary: boundarySelection.boundary,
+      boundaryMode: boundarySelection.boundaryMode,
       preview,
       replaceTraceId: props.replaceTraceId,
       traceExistingImage,
+      commitRasterizedTrace,
       pushToast,
       close,
       setBusy,
@@ -139,26 +142,22 @@ function DialogBody(props: {
     <Dialog onClose={close} ariaLabel="Trace image" as="form" onSubmit={onSubmit} size="md">
       <h2 className="lf-dialog-title">Trace Image</h2>
       <SourceLabel name={seed.source} />
-      {machineKind === 'cnc' ? <CncTraceHint /> : null}
+      <TraceOutputFields
+        machineKind={machineKind}
+        traceOutput={traceOutput}
+        onTraceOutputChange={setTraceOutput}
+        supportsFillStyle={supportsTraceFillStyle}
+        traceFillStyle={traceFillStyle}
+        onTraceFillStyleChange={setTraceFillStyle}
+      />
       <PresetPicker value={preset} onChange={setPreset} />
-      {supportsTraceFillStyle ? (
-        <TraceFillStylePicker value={traceFillStyle} onChange={setTraceFillStyle} />
-      ) : null}
       <TraceSettingsControls
         preset={presetOptions}
         overrides={traceSettings}
         sourceHasTransparency={traceSourceHasTransparency(preview)}
         onChange={setTraceSettings}
       />
-      <TracePreviewPanel
-        preview={preview}
-        seed={seed}
-        boundary={boundary}
-        setBoundary={setBoundary}
-        onBoundaryClear={clearBoundary}
-        boundaryMode={boundaryMode}
-        onBoundaryModeChange={setBoundaryMode}
-      />
+      <TracePreviewPanel preview={preview} seed={seed} boundarySelection={boundarySelection} />
       <DeleteImageAfterTraceToggle
         checked={deleteSourceAfterTrace}
         onChange={setDeleteSourceAfterTrace}
@@ -175,6 +174,18 @@ function preparedTraceEntry(preview: ReturnType<typeof useTracePreview>): {
   return preview.kind === 'ready' && preview.preparedTrace !== undefined
     ? { preparedTrace: preview.preparedTrace }
     : {};
+}
+
+function useSelectedTracePreview(
+  file: File | null,
+  options: TraceOptions,
+  selection: ReturnType<typeof useBoundarySelection>,
+  seed: RasterImage,
+): ReturnType<typeof useTracePreview> {
+  return useTracePreview(file, options, selection.boundary, selection.boundaryMode, {
+    width: seed.pixelWidth,
+    height: seed.pixelHeight,
+  });
 }
 
 function isFilledContourTraceOptions(options: TraceOptions): boolean {
@@ -213,24 +224,21 @@ function useTraceSourceFile(
 function TracePreviewPanel(props: {
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
-  readonly boundary: TraceBoundary | null;
-  readonly setBoundary: (boundary: TraceBoundary | null) => void;
-  readonly onBoundaryClear: () => void;
-  readonly boundaryMode: BoundaryMode;
-  readonly onBoundaryModeChange: (mode: BoundaryMode) => void;
+  readonly boundarySelection: ReturnType<typeof useBoundarySelection>;
 }): JSX.Element {
+  const selection = props.boundarySelection;
   return (
     <>
       <TracePreview
         state={props.preview}
         sourceDataUrl={props.seed.dataUrl}
         imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
-        boundary={props.boundary}
-        onBoundaryChange={props.setBoundary}
-        onBoundaryClear={props.onBoundaryClear}
+        boundary={selection.boundary}
+        onBoundaryChange={selection.setBoundary}
+        onBoundaryClear={selection.clearBoundary}
       />
-      {props.boundary !== null ? (
-        <BoundaryModePicker value={props.boundaryMode} onChange={props.onBoundaryModeChange} />
+      {selection.boundary !== null ? (
+        <BoundaryModePicker value={selection.boundaryMode} onChange={selection.setBoundaryMode} />
       ) : null}
     </>
   );
@@ -243,6 +251,7 @@ function submitTraceDialog(deps: {
   readonly file: File | null;
   readonly options: TraceOptions;
   readonly seed: RasterImage;
+  readonly traceOutput: TraceOutput;
   readonly traceFillStyle: TraceFillStyle;
   readonly deleteSourceAfterTrace: boolean;
   readonly boundary: TraceBoundary | null;
@@ -250,6 +259,7 @@ function submitTraceDialog(deps: {
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly replaceTraceId: string | undefined;
   readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
+  readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
   readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
@@ -262,6 +272,7 @@ function submitTraceDialog(deps: {
     file: deps.file,
     options: deps.options,
     seed: deps.seed,
+    traceOutput: deps.traceOutput,
     traceFillStyle: deps.traceFillStyle,
     deleteSourceAfterTrace: deps.deleteSourceAfterTrace,
     boundary: deps.boundary,
@@ -271,34 +282,16 @@ function submitTraceDialog(deps: {
   };
   void commit(traceArgs, {
     traceExistingImage: deps.traceExistingImage,
+    commitRasterizedTrace: deps.commitRasterizedTrace,
     pushToast: deps.pushToast,
     close: deps.close,
     setBusy: deps.setBusy,
-    getCurrentObject: (id) => useStore.getState().project.scene.objects.find((o) => o.id === id),
+    getCurrentProject: () => useStore.getState().project,
   });
 }
 
 // Exported for testing the source-revalidation guard (P2-A).
-export async function commit(
-  args: {
-    readonly file: File;
-    readonly options: TraceOptions;
-    readonly seed: RasterImage;
-    readonly traceFillStyle?: TraceFillStyle;
-    readonly deleteSourceAfterTrace?: boolean;
-    readonly replaceTraceId?: string;
-    readonly boundary?: TraceBoundary | null;
-    readonly boundaryMode?: BoundaryMode;
-    readonly preparedTrace?: PreparedTrace;
-  },
-  ctx: {
-    readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
-    readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
-    readonly close: () => void;
-    readonly setBusy: (v: boolean) => void;
-    readonly getCurrentObject: (id: string) => SceneObject | undefined;
-  },
-): Promise<void> {
+export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Promise<void> {
   ctx.setBusy(true);
   try {
     // Direct tracedata path: ColoredPath[] directly, skipping the
@@ -312,7 +305,10 @@ export async function commit(
     // re-traces the region supersampled and patches it into the full trace
     // (ADR-113). Either way geometry returns in source-image coordinates so
     // preview, commit, and overlay registration stay on the same pixels.
-    const { paths, bounds } = await resolveTraceCommitResult(args);
+    const { paths, bounds, width, height } = await resolveTraceCommitResult({
+      ...args,
+      sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
+    });
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
@@ -331,35 +327,27 @@ export async function commit(
       source: args.seed.source,
       traceSourceId: args.seed.id,
       traceMode,
+      tracePixelWidth: width,
+      tracePixelHeight: height,
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,
       ...(operationOverride === undefined ? {} : { operationOverride }),
     };
+    const liveProject = ctx.getCurrentProject();
+    const liveSource = liveProject.scene.objects.find((object) => object.id === args.seed.id);
     // P2-A: refuse to commit if the live source changed (content/grid) or was
-    // removed while the modal was open — overlaying then would misregister the
-    // trace. A transform-only move is fine (applyTraceToExisting registers to
-    // the live source's transform).
-    if (!sameTraceSource(ctx.getCurrentObject(args.seed.id), args.seed)) {
+    // removed while the modal was open. Vector output may follow a moved source;
+    // raster output captures the complete live object and operation references
+    // below, then checks them again after its asynchronous bitmap build.
+    if (!sameTraceSource(liveSource, args.seed)) {
       ctx.pushToast(
         `The source image for ${args.seed.source} changed or was removed — re-open Trace to continue.`,
         'error',
       );
       return;
     }
-    const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
-    const traceOptions = {
-      deleteSourceAfterTrace,
-      ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
-    };
-    ctx.traceExistingImage(args.seed.id, traced, traceOptions);
-    const colorCount = traced.paths.length;
-    const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
-    ctx.pushToast(
-      `Traced ${args.seed.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`,
-      'success',
-    );
-    ctx.close();
+    if (await commitTraceOutput(args, ctx, traced, liveProject)) ctx.close();
   } catch (err) {
     ctx.pushToast(
       `Could not trace ${args.seed.source}: ${err instanceof Error ? err.message : String(err)}`,

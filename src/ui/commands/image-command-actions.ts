@@ -25,7 +25,12 @@ export function traceSourceForTracedImage(
   project: Project,
   selected: SceneObject | null,
 ): RasterImage | null {
-  if (selected?.kind !== 'traced-image' || selected.traceSourceId === undefined) return null;
+  if (
+    (selected?.kind !== 'traced-image' && selected?.kind !== 'raster-image') ||
+    selected.traceSourceId === undefined
+  ) {
+    return null;
+  }
   const source = project.scene.objects.find((object) => object.id === selected.traceSourceId);
   return source?.kind === 'raster-image' ? source : null;
 }
@@ -37,7 +42,7 @@ export function retraceOriginalAction(
   pushToast: PushToast,
 ): () => void {
   return () => {
-    if (selected?.kind !== 'traced-image') return;
+    if (selected?.kind !== 'traced-image' && selected?.kind !== 'raster-image') return;
     const source = traceSourceForTracedImage(project, selected);
     if (source === null) {
       pushToast(

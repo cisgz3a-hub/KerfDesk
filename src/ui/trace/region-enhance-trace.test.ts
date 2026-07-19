@@ -56,6 +56,8 @@ describe('traceImageWithBoundaryMode — crop mode', () => {
     vi.mocked(traceImageWithFallback).mockResolvedValue({
       paths: cropPaths,
       bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+      width: 10,
+      height: 10,
     });
 
     const result = await traceImageWithBoundaryMode(image, options, region, 'crop');
@@ -78,6 +80,9 @@ describe('traceImageWithBoundaryMode — crop mode', () => {
         ],
       },
     ]);
+    // Geometry was offset into the original working image, so the result must
+    // not leak the cropped request's 10x10 grid.
+    expect(result).toMatchObject({ width: 20, height: 20 });
   });
 
   it('delegates the full-image trace when there is no boundary', async () => {
@@ -95,6 +100,8 @@ describe('traceImageWithBoundaryMode — crop mode', () => {
     vi.mocked(traceImageWithFallback).mockResolvedValue({
       paths: fullPaths,
       bounds: { minX: 0, minY: 0, maxX: 19, maxY: 19 },
+      width: 20,
+      height: 20,
     });
 
     const result = await traceImageWithBoundaryMode(image, options, null, 'enhance');
@@ -102,6 +109,7 @@ describe('traceImageWithBoundaryMode — crop mode', () => {
     expect(traceImageWithFallback).toHaveBeenCalledTimes(1);
     expect(traceImageWithFallback).toHaveBeenCalledWith(image, options);
     expect(result.paths).toEqual(fullPaths);
+    expect(result).toMatchObject({ width: 20, height: 20 });
   });
 });
 
@@ -141,10 +149,17 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
     ];
 
     vi.mocked(traceImageWithFallback)
-      .mockResolvedValueOnce({ paths: fullTrace, bounds: { minX: 0, minY: 0, maxX: 19, maxY: 19 } })
+      .mockResolvedValueOnce({
+        paths: fullTrace,
+        bounds: { minX: 0, minY: 0, maxX: 19, maxY: 19 },
+        width: 20,
+        height: 20,
+      })
       .mockResolvedValueOnce({
         paths: enhancedCrop,
         bounds: { minX: 8, minY: 8, maxX: 12, maxY: 12 },
+        width: 20,
+        height: 20,
       });
 
     const result = await traceImageWithBoundaryMode(image, options, region, 'enhance');
@@ -165,6 +180,7 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
     );
 
     const polylines = result.paths.flatMap((p) => p.polylines);
+    expect(result).toMatchObject({ width: 20, height: 20 });
     // The outside corner survived.
     expect(polylines).toContainEqual(
       polyline([

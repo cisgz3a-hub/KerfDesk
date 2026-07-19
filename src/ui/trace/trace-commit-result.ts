@@ -7,6 +7,7 @@ import {
 } from './prepared-trace';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
 import type { TraceResult } from './use-trace-worker-client';
+import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 
 export async function resolveTraceCommitResult(args: {
   readonly file: File;
@@ -14,6 +15,7 @@ export async function resolveTraceCommitResult(args: {
   readonly boundary?: TraceBoundary | null;
   readonly boundaryMode?: BoundaryMode;
   readonly preparedTrace?: PreparedTrace;
+  readonly sourceGrid?: TraceGrid;
 }): Promise<TraceResult> {
   const request: TracePreparationRequest = {
     file: args.file,
@@ -25,10 +27,6 @@ export async function resolveTraceCommitResult(args: {
   if (prepared !== undefined) return prepared;
 
   const image = await loadImageAsRawData(args.file);
-  return traceImageWithBoundaryMode(
-    image,
-    args.options,
-    args.boundary ?? null,
-    args.boundaryMode ?? 'crop',
-  );
+  const boundary = traceBoundaryForWorkingGrid(args.boundary, args.sourceGrid, image);
+  return traceImageWithBoundaryMode(image, args.options, boundary, args.boundaryMode ?? 'crop');
 }
