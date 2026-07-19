@@ -8,7 +8,11 @@ import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from './store';
 import { requestActiveWcsReadback } from './active-wcs-readback';
-import { beginSettingsCollection, SETTINGS_READ_OPERATION_LABEL } from './detected-settings-action';
+import {
+  beginSettingsCollection,
+  clearCncLiveCaps,
+  SETTINGS_READ_OPERATION_LABEL,
+} from './detected-settings-action';
 import {
   failedControllerQualificationPatch,
   qualifiedController,
@@ -128,6 +132,7 @@ async function writeGrblSettingAction(
     value,
   );
   if (blocked !== null) return blockWrite(set, get, blocked);
+  clearCncLiveCaps();
   const qualificationEpoch = get().controllerSessionEpoch;
   const trimmed = value.trim();
   set({

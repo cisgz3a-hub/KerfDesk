@@ -7,6 +7,7 @@ import { armResetCleanup } from './laser-reset-cleanup';
 import { controllerErrorNotice, type ControllerErrorContext } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { clearCncLiveCaps } from './detected-settings-action';
 import { advanceStream } from './laser-stream-ack';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
@@ -125,6 +126,7 @@ function requestRealtimeStopAfterStreamError(
     })().catch(() => undefined);
     return;
   }
+  clearCncLiveCaps();
   set((state) => invalidateControllerSessionEvidence(state));
   void safeWrite(softReset, 'stop', 'system')
     .then(() => {

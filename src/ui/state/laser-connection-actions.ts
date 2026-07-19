@@ -52,6 +52,7 @@ import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment
 import type { LaserState, LiveRefs } from './laser-store';
 import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
+import { clearCncLiveCaps } from './detected-settings-action';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -75,8 +76,9 @@ export function connectionActions(
   safeWrite: SafeWriteFn,
 ): Pick<LaserState, 'connect' | 'disconnect' | 'forgetDevice'> {
   return {
-    connect: (adapter, options = {}) =>
-      runConnectAction(
+    connect: (adapter, options = {}) => {
+      clearCncLiveCaps();
+      return runConnectAction(
         set,
         refs,
         adapter,
@@ -85,12 +87,15 @@ export function connectionActions(
         connectingStatePatch,
         (connection, baudRate) =>
           attachConnectedController(set, get, refs, safeWrite, connection, baudRate),
-      ),
+      );
+    },
     disconnect: () => {
+      clearCncLiveCaps();
       cancelConnectAttempt(refs, false);
       return runDisconnect(set, get, refs, safeWrite, false);
     },
     forgetDevice: () => {
+      clearCncLiveCaps();
       cancelConnectAttempt(refs, true);
       return runDisconnect(set, get, refs, safeWrite, true);
     },
@@ -125,6 +130,7 @@ function attachConnectedController(
   refs.unsubscribeClose = connection.onClose(() => {
     if (refs.connection !== connection) return;
     teardownConnectionRefs(refs);
+    clearCncLiveCaps();
     set(buildPortClosePatch);
   });
   set(connectedControllerStatePatch);

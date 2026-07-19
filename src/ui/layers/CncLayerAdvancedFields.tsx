@@ -37,7 +37,12 @@ export function CncLayerAdvancedGroup(props: {
   return (
     <section aria-label="Advanced cut settings" style={advancedSectionStyle}>
       <div style={advancedHeadingStyle}>Advanced</div>
-      <FeedHelperRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <FeedHelperRows
+        layer={props.layer}
+        settings={props.settings}
+        onCommit={props.onCommit}
+        onCommitSettings={props.onCommitSettings}
+      />
       <StepoverField
         layer={props.layer}
         settings={props.settings}
@@ -131,11 +136,16 @@ function FeedHelperRows(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
     <>
       <CncFeedPresetRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
-      <FeedsCalculatorRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <FeedsCalculatorRow
+        layer={props.layer}
+        settings={props.settings}
+        onCommitSettings={props.onCommitSettings}
+      />
     </>
   );
 }

@@ -5,6 +5,7 @@
 // editors for structural changes.
 
 import type { CncLayerSettings, LayerOperationSettings } from '../../../core/scene';
+import { withManualCncFeedPatch } from '../../state/cnc-feed-provenance';
 import {
   airCellLabelStyle,
   detailCellStyle,
@@ -148,21 +149,27 @@ export function CncRowCells(props: {
         value={settings.depthPerPassMm}
         min={MIN_CNC_DEPTH_MM}
         step="any"
-        onCommit={(depthPerPassMm) => props.onCommit({ ...settings, depthPerPassMm })}
+        onCommit={(depthPerPassMm) =>
+          props.onCommit(withManualCncFeedPatch(settings, { depthPerPassMm }))
+        }
       />
       <ReviewNumberCell
         label={`Feed mm/min for ${props.ariaContext}`}
         value={settings.feedMmPerMin}
         min={MIN_FEED_MM_PER_MIN}
         max={props.maxFeedMmPerMin}
-        onCommit={(feedMmPerMin) => props.onCommit({ ...settings, feedMmPerMin })}
+        onCommit={(feedMmPerMin) =>
+          props.onCommit(withManualCncFeedPatch(settings, { feedMmPerMin }))
+        }
       />
       <ReviewNumberCell
         label={`Plunge mm/min for ${props.ariaContext}`}
         value={settings.plungeMmPerMin}
         min={MIN_FEED_MM_PER_MIN}
         max={props.maxFeedMmPerMin}
-        onCommit={(plungeMmPerMin) => props.onCommit({ ...settings, plungeMmPerMin })}
+        onCommit={(plungeMmPerMin) =>
+          props.onCommit(withManualCncFeedPatch(settings, { plungeMmPerMin }))
+        }
       />
       <ReviewNumberCell
         label={`Spindle RPM for ${props.ariaContext}`}
@@ -170,7 +177,7 @@ export function CncRowCells(props: {
         min={0}
         max={props.spindleMaxRpm}
         isInteger
-        onCommit={(spindleRpm) => props.onCommit({ ...settings, spindleRpm })}
+        onCommit={(spindleRpm) => props.onCommit(withManualCncFeedPatch(settings, { spindleRpm }))}
       />
     </>
   );

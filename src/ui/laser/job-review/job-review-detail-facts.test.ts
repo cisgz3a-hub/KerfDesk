@@ -57,7 +57,9 @@ describe('laserOperationDetail', () => {
 
 describe('cncOperationDetail', () => {
   it('summarizes the default profile cut with a computed pass count', () => {
-    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe('1 pass · stepover 40% · tabs off');
+    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe(
+      '1 pass · stepover 40% · tabs off · Manual feeds',
+    );
   });
 
   it('includes direction, tabs, entry, finish allowance, strategy, and material feeds', () => {
@@ -76,7 +78,34 @@ describe('cncOperationDetail', () => {
       materialKey: 'plywood-mdf',
     };
     expect(cncOperationDetail(settings)).toBe(
-      '5 passes · stepover 40% · climb · tabs 3 per shape (6 × 2 mm) · ramp entry 3° · finish allowance 0.5 mm · raster-x pocket · Plywood / MDF feeds',
+      '5 passes · stepover 40% · climb · tabs 3 per shape (6 × 2 mm) · ramp entry 3° · finish allowance 0.5 mm · raster-x pocket · Plywood / MDF feeds (legacy/unscoped)',
+    );
+  });
+
+  it('names a persisted machine starter and revision', () => {
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      feedSource: {
+        kind: 'machine-starter',
+        starterId: 'neotronics-4040-shallow-wood-mdf',
+        revision: 1,
+      },
+    };
+    expect(cncOperationDetail(settings)).toContain(
+      'Machine starter values: Neotronics 4040 shallow wood / MDF starter (revision 1)',
+    );
+    expect(cncOperationDetail(settings)).toContain(
+      'Engineering starter — assumes a 3.175 mm 2-flute cutter; verify on this machine.',
+    );
+  });
+
+  it('shows the persisted id when a starter is no longer in the catalog', () => {
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      feedSource: { kind: 'machine-starter', starterId: 'retired-starter', revision: 3 },
+    };
+    expect(cncOperationDetail(settings)).toContain(
+      'Machine starter values: retired-starter (revision 3; catalog entry unavailable)',
     );
   });
 });

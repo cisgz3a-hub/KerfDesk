@@ -29,6 +29,7 @@ import {
 } from './cnc-live-start-readiness';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { clearCncLiveCaps } from './detected-settings-action';
 import {
   laserModeStartEvidenceIssue,
   type LaserModeStartSnapshotSource,
@@ -214,6 +215,7 @@ async function runStopJob(context: JobActionContext): Promise<void> {
   cancelPauseResumeTransition(refs, transitionCancellationMessage);
   const softReset = driver().realtime.softReset;
   if (softReset !== null) {
+    clearCncLiveCaps();
     const resetWriteEpoch = refs.writeEpoch ?? 0;
     const cleanupLines = resetCleanupLines(driver());
     // Freeze host refill before the first wire await. If the transport write

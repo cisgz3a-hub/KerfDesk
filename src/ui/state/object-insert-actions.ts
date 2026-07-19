@@ -6,8 +6,6 @@
 
 import {
   findRegistrationBoxes,
-  pathUsesOperation,
-  sceneObjectUsesOperation,
   type EmbeddedFont,
   type Layer,
   type Project,
@@ -18,10 +16,12 @@ import {
 import { applyInsertBoxPanels, type InsertablePart } from './box-insert-mutation';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
-import { seedLayerFromStockMaterial } from './cnc-project-material';
+import { seedFreshCncLayer } from './cnc-auto-seeding';
+import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
+import { sourceColorForOperation } from './operation-source-color';
 import {
   applyFreshImport,
   applyReimport,
@@ -55,34 +55,10 @@ export function objectInsertActions(
   | 'setRegistrationBoxLocked'
 > {
   return {
-    importSvgObject: (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
-      const existing = findReimportTarget(get().project.scene, object);
-      let outcome: ImportOutcome = { kind: 'added' };
-      set((s) => {
-        if (existing !== null && object.kind === 'imported-svg') {
-          const next = applyReimport(s, existing, object);
-          outcome = next.outcome;
-          return next.state;
-        }
-        return applyLayerDefaultsToFreshLayers(
-          s.project.scene.layers,
-          applyFreshImport(s, object, batchOffsetIdx),
-          s.layerDefaults,
-        );
-      });
-      // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
-      fitAllObjects(get);
-      return outcome;
-    },
-    upsertTextObject: (text: TextObject, embeddedFont?: EmbeddedFont) => {
-      set((s) => applyTextAndEmbeddedFont(s, text, embeddedFont));
-    },
-    drawShape: (shape: ShapeObject) => {
-      set((s) => applyDrawShape(s, shape));
-    },
-    insertBoxPanels: (panels: ReadonlyArray<InsertablePart>) => {
-      set((s) => applyInsertBoxPanels(s, panels) ?? s);
-    },
+    importSvgObject: importSvgObjectAction(set, get),
+    upsertTextObject: upsertTextObjectAction(set),
+    drawShape: drawShapeAction(set),
+    insertBoxPanels: insertBoxPanelsAction(set),
     addRegistrationBox: (widthMm: number, heightMm: number) => {
       set((s) => {
         // Replace-in-place: keep an existing box's position and lock state so
@@ -125,6 +101,76 @@ export function objectInsertActions(
   };
 }
 
+function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObject'] {
+  return (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
+    const existing = findReimportTarget(get().project.scene, object);
+    let outcome: ImportOutcome = { kind: 'added' };
+    set((state) => {
+      if (existing !== null && object.kind === 'imported-svg') {
+        const next = applyReimport(state, existing, object);
+        outcome = next.outcome;
+        return applyLayerDefaultsToFreshLayers(
+          state.project.scene.layers,
+          next.state,
+          state.layerDefaults,
+          state.cncLiveCaps,
+        );
+      }
+      return applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        applyFreshImport(state, object, batchOffsetIdx),
+        state.layerDefaults,
+        state.cncLiveCaps,
+      );
+    });
+    // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
+    fitAllObjects(get);
+    return outcome;
+  };
+}
+
+function upsertTextObjectAction(set: Setter): AppState['upsertTextObject'] {
+  return (text: TextObject, embeddedFont?: EmbeddedFont) => {
+    set((state) =>
+      applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        applyTextAndEmbeddedFont(state, text, embeddedFont),
+        state.layerDefaults,
+        state.cncLiveCaps,
+      ),
+    );
+  };
+}
+
+function drawShapeAction(set: Setter): AppState['drawShape'] {
+  return (shape: ShapeObject) => {
+    set((state) =>
+      applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        applyDrawShape(state, shape),
+        state.layerDefaults,
+        state.cncLiveCaps,
+      ),
+    );
+  };
+}
+
+function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
+  return (panels: ReadonlyArray<InsertablePart>) => {
+    set((state) => {
+      const next = applyInsertBoxPanels(state, panels);
+      return next === null
+        ? state
+        : applyLayerDefaultsToFreshLayers(
+            state.project.scene.layers,
+            next,
+            state.layerDefaults,
+            state.cncLiveCaps,
+          );
+    });
+  };
+}
+
 function applyTextAndEmbeddedFont(state: AppState, text: TextObject, embeddedFont?: EmbeddedFont) {
   const next = applyUpsertText(state, text);
   if (embeddedFont === undefined) return next;
@@ -137,6 +183,7 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
   previousLayers: ReadonlyArray<Layer>,
   result: T,
   defaults: LayerDefaultsState,
+  liveCaps: CncLiveCapsState['cncLiveCaps'],
 ): T {
   const existing = new Set(previousLayers.map((layer) => layer.id));
   const machine = result.project.machine;
@@ -152,7 +199,13 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
     // Seed fresh CNC layers from the project stock material (ADR-112); no-op
     // for laser or when no material is chosen.
     const seeded =
-      machine?.kind === 'cnc' ? seedLayerFromStockMaterial(withDefaults, machine) : withDefaults;
+      machine?.kind === 'cnc' && settings.cnc === undefined
+        ? seedFreshCncLayer(withDefaults, {
+            device: result.project.device,
+            machine,
+            liveCaps,
+          })
+        : withDefaults;
     if (seeded !== layer) changed = true;
     return seeded;
   });
@@ -164,21 +217,4 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
       scene: { ...result.project.scene, layers },
     },
   };
-}
-
-function sourceColorForOperation(
-  objects: ReadonlyArray<SceneObject>,
-  operation: Layer,
-): string | null {
-  for (const object of objects) {
-    if ('paths' in object) {
-      const path = object.paths.find((candidate) =>
-        pathUsesOperation(object, candidate, operation),
-      );
-      if (path !== undefined) return path.color;
-      continue;
-    }
-    if (sceneObjectUsesOperation(object, operation)) return object.color;
-  }
-  return null;
 }

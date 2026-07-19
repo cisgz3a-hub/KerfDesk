@@ -5,38 +5,39 @@
 // see core/cnc/feeds-calculator.ts); every number stays editable after.
 
 import { useState } from 'react';
-import {
-  calculateFeeds,
-  CHIPLOAD_MATERIALS,
-  type ChiploadMaterial,
-  type FeedsCalculatorResult,
-} from '../../core/cnc';
+import { CHIPLOAD_MATERIALS, chiploadFor, type ChiploadMaterial } from '../../core/cnc';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { materialFeedsPatch } from '../state/cnc-project-material';
 
 const DEFAULT_FLUTES = 2;
 
 export function FeedsCalculatorRow(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
-  const maxFeed = useStore((s) => s.project.device.maxFeed);
+  const profile = useStore((s) => s.project.device);
+  const liveCaps = useStore((s) => s.cncLiveCaps);
   const [material, setMaterial] = useState<ChiploadMaterial>('plywood-mdf');
   const [flutes, setFlutes] = useState(DEFAULT_FLUTES);
   if (machine?.kind !== 'cnc') return null;
 
   const tool = layerCncTool(machine, props.settings);
   const rpm = props.settings.spindleRpm;
-  const result = calculateFeeds({
-    material,
-    bitDiameterMm: tool.diameterMm,
-    flutes,
-    rpm,
-    maxFeedMmPerMin: maxFeed,
-  });
-  const canApply = result.kind === 'ok';
+  const result = materialFeedResult(
+    materialFeedsPatch(
+      material,
+      tool,
+      rpm,
+      profile,
+      machine.params.spindleMaxRpm,
+      liveCaps,
+      flutes,
+    ),
+  );
+  const canApply = result !== null;
   return (
     <details style={boxStyle}>
       <summary
@@ -62,20 +63,19 @@ export function FeedsCalculatorRow(props: {
           </select>
         </label>
       </div>
-      <FeedsCalculatorResultText toolName={tool.name} rpm={rpm} result={result} />
+      <FeedsCalculatorResultText
+        toolName={tool.name}
+        chiploadMm={chiploadFor(material, tool.diameterMm)}
+        result={result}
+      />
       <button
         type="button"
         disabled={!canApply}
         onClick={() => {
-          if (result.kind !== 'ok') return;
-          props.onCommit({
-            feedMmPerMin: result.feedMmPerMin,
-            plungeMmPerMin: result.plungeMmPerMin,
-            depthPerPassMm: result.depthPerPassMm,
-            spindleRpm: rpm,
-          });
+          if (result === null) return;
+          props.onCommitSettings({ ...props.settings, ...result });
         }}
-        title="Write these feeds into the layer (one undo step). Cut type, depth, and tabs stay put."
+        title="Apply machine-aware material starting values, limited by the active profile, CNC spindle ceiling, and connected controller when available."
       >
         Apply to layer
       </button>
@@ -111,18 +111,55 @@ function MaterialSelect(props: {
 
 function FeedsCalculatorResultText(props: {
   readonly toolName: string;
-  readonly rpm: number;
-  readonly result: FeedsCalculatorResult;
+  readonly chiploadMm: number;
+  readonly result: MaterialFeedResult | null;
 }): JSX.Element {
-  const { toolName, rpm, result } = props;
-  if (result.kind === 'error') return <p style={errorStyle}>{result.reason}</p>;
+  const { toolName, result } = props;
+  if (result === null) {
+    return <p style={errorStyle}>No valid machine-aware starting values are available.</p>;
+  }
   return (
     <p style={resultStyle}>
-      {toolName} at {rpm.toLocaleString()} RPM → chipload {result.chiploadMm.toFixed(3)} mm: feed{' '}
-      <strong>{result.feedMmPerMin}</strong>, plunge <strong>{result.plungeMmPerMin}</strong>{' '}
-      mm/min, {result.depthPerPassMm.toFixed(1)} mm/pass. Starting points — listen to the cut.
+      {toolName} at {result.spindleRpm.toLocaleString()} RPM → chart chipload{' '}
+      {props.chiploadMm.toFixed(3)} mm: machine-aware feed <strong>{result.feedMmPerMin}</strong>,
+      plunge <strong>{result.plungeMmPerMin}</strong> mm/min, {result.depthPerPassMm.toFixed(2)}{' '}
+      mm/pass. Active machine limits are applied; verify the cut.
     </p>
   );
+}
+
+type MaterialFeedResult = {
+  readonly materialKey: string;
+  readonly feedMmPerMin: number;
+  readonly plungeMmPerMin: number;
+  readonly spindleRpm: number;
+  readonly depthPerPassMm: number;
+  readonly feedSource: Extract<
+    NonNullable<CncLayerSettings['feedSource']>,
+    { readonly kind: 'material-recipe' }
+  >;
+};
+
+function materialFeedResult(patch: Partial<CncLayerSettings> | null): MaterialFeedResult | null {
+  if (
+    patch === null ||
+    typeof patch.materialKey !== 'string' ||
+    typeof patch.feedMmPerMin !== 'number' ||
+    typeof patch.plungeMmPerMin !== 'number' ||
+    typeof patch.spindleRpm !== 'number' ||
+    typeof patch.depthPerPassMm !== 'number' ||
+    patch.feedSource?.kind !== 'material-recipe'
+  ) {
+    return null;
+  }
+  return {
+    materialKey: patch.materialKey,
+    feedMmPerMin: patch.feedMmPerMin,
+    plungeMmPerMin: patch.plungeMmPerMin,
+    spindleRpm: patch.spindleRpm,
+    depthPerPassMm: patch.depthPerPassMm,
+    feedSource: patch.feedSource,
+  };
 }
 
 const boxStyle: React.CSSProperties = {

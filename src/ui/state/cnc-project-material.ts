@@ -3,7 +3,12 @@
 // layer's feeds from a material so the picker's bulk apply and the new-layer
 // seeding hooks stay in lockstep. No store access — callers thread the project.
 
-import { calculateFeeds, isChiploadMaterialKey } from '../../core/cnc';
+import { isChiploadMaterialKey } from '../../core/cnc';
+import {
+  resolveCncMaterialFeedPatch,
+  type CncMachineStarterLiveCaps,
+} from '../../core/cnc/machine-starters';
+import type { DeviceProfile } from '../../core/devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -26,15 +31,20 @@ const ASSUMED_FLUTES = 2;
 export function layerWithCncMaterial(
   layer: Layer,
   machine: CncMachineConfig,
+  profile: DeviceProfile,
   materialKey: string,
-  maxFeedMmPerMin?: number,
+  liveCaps?: CncMachineStarterLiveCaps | null,
+  fluteCount = ASSUMED_FLUTES,
 ): Layer {
   const cnc = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const patch = materialFeedsPatch(
     materialKey,
     layerCncTool(machine, cnc),
     cnc.spindleRpm,
-    maxFeedMmPerMin,
+    profile,
+    machine.params.spindleMaxRpm,
+    liveCaps,
+    fluteCount,
   );
   if (patch === null) return layer;
   return { ...layer, cnc: { ...cnc, ...patch } };
@@ -47,30 +57,31 @@ export function materialFeedsPatch(
   materialKey: string,
   tool: CncTool,
   spindleRpm: number,
-  maxFeedMmPerMin?: number,
+  profile: DeviceProfile,
+  machineSpindleMaxRpm: number,
+  liveCaps?: CncMachineStarterLiveCaps | null,
+  fluteCount = ASSUMED_FLUTES,
 ): Partial<CncLayerSettings> | null {
-  if (!isChiploadMaterialKey(materialKey)) return null;
-  const feeds = calculateFeeds({
-    material: materialKey,
-    bitDiameterMm: tool.diameterMm,
-    flutes: ASSUMED_FLUTES,
-    rpm: spindleRpm,
-    ...(maxFeedMmPerMin === undefined ? {} : { maxFeedMmPerMin }),
-  });
-  if (feeds.kind === 'error') return null;
-  return {
+  return resolveCncMaterialFeedPatch({
+    profile,
+    tool,
     materialKey,
-    feedMmPerMin: feeds.feedMmPerMin,
-    plungeMmPerMin: feeds.plungeMmPerMin,
-    depthPerPassMm: feeds.depthPerPassMm,
-  };
+    spindleRpm,
+    machineSpindleMaxRpm,
+    fluteCount,
+    ...(liveCaps === null || liveCaps === undefined ? {} : { liveCaps }),
+  });
 }
 
 // Set (or clear, when null) the project stock material and auto-fill every
 // layer's feeds from it. Clearing drops only the project association — layers
 // keep their current feeds, mirroring the per-layer "Custom". No-op (same
 // reference) for a laser project.
-export function projectWithStockMaterial(project: Project, materialKey: string | null): Project {
+export function projectWithStockMaterial(
+  project: Project,
+  materialKey: string | null,
+  liveCaps?: CncMachineStarterLiveCaps | null,
+): Project {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return project;
   if (materialKey !== null && !isChiploadMaterialKey(materialKey)) return project;
@@ -80,7 +91,7 @@ export function projectWithStockMaterial(project: Project, materialKey: string |
     materialKey === null
       ? project.scene.layers
       : project.scene.layers.map((layer) =>
-          layerWithCncMaterial(layer, machine, materialKey, project.device.maxFeed),
+          layerWithCncMaterial(layer, machine, project.device, materialKey, liveCaps),
         );
   return {
     ...project,
@@ -91,9 +102,16 @@ export function projectWithStockMaterial(project: Project, materialKey: string |
 
 // Seed a freshly-created CNC layer from the project stock material (new-layer
 // hooks call this). No project material, or laser mode, leaves the layer as-is.
-export function seedLayerFromStockMaterial(layer: Layer, machine: CncMachineConfig): Layer {
+export function seedLayerFromStockMaterial(
+  layer: Layer,
+  machine: CncMachineConfig,
+  profile: DeviceProfile,
+  liveCaps?: CncMachineStarterLiveCaps | null,
+): Layer {
   const materialKey = machine.stock.materialKey;
-  return materialKey === undefined ? layer : layerWithCncMaterial(layer, machine, materialKey);
+  return materialKey === undefined
+    ? layer
+    : layerWithCncMaterial(layer, machine, profile, materialKey, liveCaps);
 }
 
 function stockWithoutMaterial(stock: CncStock): CncStock {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateFeeds } from '../../core/cnc';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -15,6 +16,7 @@ import {
 } from './cnc-project-material';
 
 const MACHINE = DEFAULT_CNC_MACHINE_CONFIG; // active bit em-3175 = 3.175 mm, layer spindle 12000
+const PROFILE = DEFAULT_DEVICE_PROFILE;
 
 // Expected feeds for the default 1/8" bit at the default spindle, 2 flutes —
 // computed, not hard-coded, so the test verifies the wiring (material, bit,
@@ -36,27 +38,36 @@ function cncProject(layers: ReadonlyArray<Layer>): Project {
 
 describe('layerWithCncMaterial (ADR-112)', () => {
   it('fills feeds from the material + bit and tags the layer, preserving the rest', () => {
-    const filled = layerWithCncMaterial(cncLayer('#ff0000'), MACHINE, 'plywood-mdf');
+    const filled = layerWithCncMaterial(cncLayer('#ff0000'), MACHINE, PROFILE, 'plywood-mdf');
     const feeds = expectedFeeds('plywood-mdf');
     expect(filled.cnc?.materialKey).toBe('plywood-mdf');
     expect(filled.cnc?.feedMmPerMin).toBe(feeds.feedMmPerMin);
     expect(filled.cnc?.plungeMmPerMin).toBe(feeds.plungeMmPerMin);
     expect(filled.cnc?.depthPerPassMm).toBe(feeds.depthPerPassMm);
+    expect(filled.cnc?.feedSource).toEqual({
+      kind: 'material-recipe',
+      materialKey: 'plywood-mdf',
+      fluteCount: 2,
+    });
     expect(filled.cnc?.depthMm).toBe(10); // untouched
   });
 
   it('is a no-op for an unknown material key', () => {
     const layer = cncLayer('#ff0000');
-    expect(layerWithCncMaterial(layer, MACHINE, 'kryptonite')).toBe(layer);
+    expect(layerWithCncMaterial(layer, MACHINE, PROFILE, 'kryptonite')).toBe(layer);
   });
 
-  it('does not persist material feeds when the layer spindle is non-finite', () => {
+  it('repairs a non-finite layer spindle from the valid machine ceiling', () => {
     const layer = {
       ...cncLayer('#ff0000'),
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: Number.NaN },
     };
 
-    expect(layerWithCncMaterial(layer, MACHINE, 'hardwood')).toBe(layer);
+    expect(layerWithCncMaterial(layer, MACHINE, PROFILE, 'hardwood').cnc).toMatchObject({
+      materialKey: 'hardwood',
+      spindleRpm: MACHINE.params.spindleMaxRpm,
+      feedSource: { kind: 'material-recipe', materialKey: 'hardwood', fluteCount: 2 },
+    });
   });
 });
 
@@ -98,13 +109,13 @@ describe('projectWithStockMaterial (ADR-112)', () => {
 describe('seedLayerFromStockMaterial (ADR-112)', () => {
   it('applies the stock material to a new layer when one is set', () => {
     const machine = { ...MACHINE, stock: { ...MACHINE.stock, materialKey: 'plywood-mdf' } };
-    const seeded = seedLayerFromStockMaterial(cncLayer('#aa0000'), machine);
+    const seeded = seedLayerFromStockMaterial(cncLayer('#aa0000'), machine, PROFILE);
     expect(seeded.cnc?.materialKey).toBe('plywood-mdf');
     expect(seeded.cnc?.feedMmPerMin).toBe(expectedFeeds('plywood-mdf').feedMmPerMin);
   });
 
   it('leaves the layer unchanged when no stock material is set', () => {
     const layer = cncLayer('#aa0000');
-    expect(seedLayerFromStockMaterial(layer, MACHINE)).toBe(layer);
+    expect(seedLayerFromStockMaterial(layer, MACHINE, PROFILE)).toBe(layer);
   });
 });

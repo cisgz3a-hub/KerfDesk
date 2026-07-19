@@ -10,9 +10,11 @@ import {
 import { grblDriver } from '../../core/controllers';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
+import { useStore } from './store';
 
 afterEach(() => {
   vi.useRealTimers();
+  useStore.getState().setCncLiveCaps(null);
 });
 
 function makeLaserState(): LaserState {
@@ -343,6 +345,15 @@ describe('handleLine controller reset boundary', () => {
     handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
     expect(get().detectedControllerKind).toBe('grbl-v1.1');
     expect(get().activeWcs).toBeNull();
+  });
+
+  it('discards CNC live caps from the prior controller-settings epoch', () => {
+    const { refs, set, get } = makeHarness();
+    useStore.getState().setCncLiveCaps({ xMaxFeedMmPerMin: 500 });
+
+    handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
+
+    expect(useStore.getState().cncLiveCaps).toBeNull();
   });
 });
 

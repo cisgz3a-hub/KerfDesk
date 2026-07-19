@@ -4,6 +4,7 @@
 // table renders these as a muted detail line under each row.
 
 import { CHIPLOAD_MATERIALS } from '../../../core/cnc';
+import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { formatMm } from './job-review-format';
@@ -76,7 +77,7 @@ export function cncOperationDetail(settings: CncLayerSettings): string {
     ...(settings.pocketStrategy !== undefined && settings.pocketStrategy !== 'offset'
       ? [`${settings.pocketStrategy} pocket`]
       : []),
-    ...chiploadPart(settings.materialKey),
+    feedSourcePart(settings),
   ].join(SEPARATOR);
 }
 
@@ -122,10 +123,23 @@ function powerModePart(settings: LayerOperationSettings): ReadonlyArray<string> 
   return settings.powerMode === undefined ? [] : [`${settings.powerMode} power`];
 }
 
-function chiploadPart(materialKey: string | undefined): ReadonlyArray<string> {
-  if (materialKey === undefined) return [];
+function feedSourcePart(settings: CncLayerSettings): string {
+  const source = settings.feedSource;
+  if (source?.kind === 'machine-starter') {
+    const starter = findCncMachineStarterById(source.starterId);
+    const identity = starter?.label ?? source.starterId;
+    if (starter === null) {
+      return `Machine starter values: ${identity} (revision ${source.revision}; catalog entry unavailable)`;
+    }
+    return `Machine starter values: ${identity} (revision ${source.revision}) · ${starter.operatorNotice}`;
+  }
+  const materialKey =
+    source?.kind === 'material-recipe' ? source.materialKey : settings.materialKey;
   const material = CHIPLOAD_MATERIALS.find((entry) => entry.value === materialKey);
-  return material === undefined ? [] : [`${material.label} feeds`];
+  if (material !== undefined && source?.kind === 'material-recipe') {
+    return `${material.label} recipe (${source.fluteCount} flutes)`;
+  }
+  return material === undefined ? 'Manual feeds' : `${material.label} feeds (legacy/unscoped)`;
 }
 
 function capitalizeToken(token: string): string {

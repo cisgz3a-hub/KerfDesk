@@ -14,6 +14,7 @@ import {
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
+import { withoutCncFeedProvenance } from '../state/cnc-feed-provenance';
 
 export function useCncTools(): ReadonlyArray<CncTool> {
   return useStore((s) =>
@@ -40,29 +41,44 @@ export function LayerBitSelect(props: {
 }): JSX.Element {
   const tools = useCncTools();
   const machine = useStore((s) => s.project.machine);
-  const maxFeed = useStore((s) => s.project.device.maxFeed);
+  const profile = useStore((s) => s.project.device);
+  const liveCaps = useStore((s) => s.cncLiveCaps);
   // A material-driven layer must recompute its feeds for the NEW bit's
   // diameter — otherwise the material hint claims feeds that were computed
   // for the old bit.
-  const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> => {
-    const materialKey = props.settings.materialKey;
-    if (machine?.kind !== 'cnc' || materialKey === undefined) return {};
+  const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> | null => {
+    const source = props.settings.feedSource;
+    if (machine?.kind !== 'cnc' || source?.kind !== 'material-recipe') return null;
     const tool = toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
-    if (tool === undefined) return {};
-    return materialFeedsPatch(materialKey, tool, props.settings.spindleRpm, maxFeed) ?? {};
+    if (tool === undefined) return null;
+    return materialFeedsPatch(
+      source.materialKey,
+      tool,
+      props.settings.spindleRpm,
+      profile,
+      machine.params.spindleMaxRpm,
+      liveCaps,
+      source.fluteCount,
+    );
   };
   return (
     <Row label="Bit">
       <select
         value={props.settings.toolId ?? ''}
         onChange={(e) => {
+          const toolId = e.target.value === '' ? undefined : e.target.value;
+          const feeds = feedsForBit(toolId);
+          let base: CncLayerSettings;
           if (e.target.value === '') {
             // Clearing the override removes the key (exact optional field).
             const { toolId: _removed, ...rest } = props.settings;
-            props.onCommitSettings({ ...rest, ...feedsForBit(undefined) });
+            base = rest;
           } else {
-            props.onCommit({ toolId: e.target.value, ...feedsForBit(e.target.value) });
+            base = { ...props.settings, toolId: e.target.value };
           }
+          props.onCommitSettings(
+            feeds === null ? withoutCncFeedProvenance(base) : { ...base, ...feeds },
+          );
         }}
         aria-label={`Bit for ${props.layer.color}`}
         title="Which bit cuts this layer. Layers with different bits become a multi-bit job with M0 tool-change pauses."

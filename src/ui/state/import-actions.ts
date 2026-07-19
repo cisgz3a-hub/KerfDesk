@@ -19,13 +19,25 @@ import {
   type TraceExistingImageOptions,
 } from './scene-mutations';
 import { fitAllObjects, type ProjectSlice } from './viewport-actions';
+import { projectWithFreshCncLayers } from './cnc-auto-seeding';
+import type { CncLiveCapsState } from './cnc-live-caps-actions';
+import {
+  DEFAULT_LAYER_DEFAULTS_STATE,
+  defaultSettingsForColor,
+  type LayerDefaultsState,
+} from './layer-default-actions';
+import { sourceColorForOperation } from './operation-source-color';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
 // returning a MutationResult. AppState's full Setter is assignable to
 // this (MutationResult is a subset of Partial<AppState>, and AppState
 // is a subset of StateSlice), so store.ts passes its own `set` through
 // unchanged.
-type ImportSet = (fn: (s: StateSlice) => MutationResult) => void;
+type ImportState = StateSlice &
+  Partial<CncLiveCapsState> & {
+    readonly layerDefaults?: LayerDefaultsState;
+  };
+type ImportSet = (fn: (s: ImportState) => MutationResult) => void;
 
 export function imageImportActions(
   set: ImportSet,
@@ -43,19 +55,47 @@ export function imageImportActions(
     importRasterImage: (object, batchIdx) => {
       // batchIdx staggers multi-image drops by 10 mm each (F-A3); a single
       // import or the toolbar picker passes nothing → 0.
-      set((s) => applyFreshImport(s, object, batchIdx ?? 0));
+      set((s) => withFreshCncLayers(s, applyFreshImport(s, object, batchIdx ?? 0)));
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
     },
     traceExistingImage: (sourceId, traced, options) => {
-      set((s) => applyTraceToExisting(s, sourceId, traced, options));
+      set((s) => withFreshCncLayers(s, applyTraceToExisting(s, sourceId, traced, options)));
       fitAllObjects(get);
     },
     // No fitAllObjects: Convert replaces the vector(s) in place (same combined
     // bounds), so re-fitting would only jerk the camera. Consistent with the
     // store convention that the import/add paths re-fit, not in-place edits.
     convertToBitmap: (sourceIds, raster) => {
-      set((s) => applyConvertToBitmap(s, sourceIds, raster));
+      set((s) => withFreshCncLayers(s, applyConvertToBitmap(s, sourceIds, raster)));
     },
+  };
+}
+
+function withFreshCncLayers(state: ImportState, result: MutationResult): MutationResult {
+  const existingIds = new Set(state.project.scene.layers.map((layer) => layer.id));
+  const savedDefaultLayerIds = new Set<string>();
+  const defaults = state.layerDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE;
+  const layers = result.project.scene.layers.map((layer) => {
+    if (existingIds.has(layer.id)) return layer;
+    const sourceColor = sourceColorForOperation(result.project.scene.objects, layer) ?? layer.color;
+    const savedCnc = defaultSettingsForColor(defaults, sourceColor).cnc;
+    if (savedCnc === undefined) return layer;
+    savedDefaultLayerIds.add(layer.id);
+    // Image and trace mutations own structural settings such as mode and
+    // density. Only the operator's saved CNC block participates here.
+    return { ...layer, cnc: savedCnc };
+  });
+  const project = layers.some((layer, index) => layer !== result.project.scene.layers[index])
+    ? { ...result.project, scene: { ...result.project.scene, layers } }
+    : result.project;
+  return {
+    ...result,
+    project: projectWithFreshCncLayers(
+      state.project.scene.layers,
+      project,
+      state.cncLiveCaps ?? null,
+      savedDefaultLayerIds,
+    ),
   };
 }

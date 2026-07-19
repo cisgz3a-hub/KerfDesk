@@ -14,16 +14,19 @@ import {
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
+import { seedFreshCncLayer } from './cnc-auto-seeding';
+import type { CncLiveCapsState } from './cnc-live-caps-actions';
 
 export type FillSelectionActions = {
   readonly fillSelectionSeparately: () => void;
 };
 
-type FillSelectionState = StateSlice & {
-  readonly selectedObjectId: string | null;
-  readonly additionalSelectedIds: ReadonlySet<string>;
-  readonly layerDefaults: LayerDefaultsState;
-};
+type FillSelectionState = StateSlice &
+  CncLiveCapsState & {
+    readonly selectedObjectId: string | null;
+    readonly additionalSelectedIds: ReadonlySet<string>;
+    readonly layerDefaults: LayerDefaultsState;
+  };
 
 type FillSelectionMutation = {
   readonly project: Project;
@@ -75,10 +78,19 @@ function isolateSelectionToNewFillOperation(
     name: selectedIds.size === 1 ? `${artworkOperationName(first)} Fill` : 'Selection Fill',
   });
   const defaults = defaultSettingsForColor(state.layerDefaults, created.operation.color);
-  const operation = {
+  const withDefaults = {
     ...applyLayerDefaultSettings(created.operation, defaults),
     mode: 'fill' as const,
   };
+  const machine = state.project.machine;
+  const operation =
+    machine?.kind === 'cnc' && defaults.cnc === undefined
+      ? seedFreshCncLayer(withDefaults, {
+          device: state.project.device,
+          machine,
+          liveCaps: state.cncLiveCaps,
+        })
+      : withDefaults;
   const objects = state.project.scene.objects.map((object) =>
     selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [operation.id]) : object,
   );
