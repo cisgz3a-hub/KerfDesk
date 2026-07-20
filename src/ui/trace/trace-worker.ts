@@ -38,6 +38,8 @@ export type TraceWorkerResponse =
       readonly kind: 'ok';
       readonly paths: ColoredPath[];
       readonly bounds: Bounds;
+      readonly width: number;
+      readonly height: number;
     }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };
 
@@ -47,7 +49,14 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
     try {
       const paths = await traceImageToColoredPaths(image, options);
       const bounds = boundsFromColoredPaths(paths);
-      const response: TraceWorkerResponse = { id, kind: 'ok', paths, bounds };
+      const response: TraceWorkerResponse = {
+        id,
+        kind: 'ok',
+        paths,
+        bounds,
+        width: image.width,
+        height: image.height,
+      };
       self.postMessage(response);
     } catch (err) {
       const response: TraceWorkerResponse = {

@@ -198,6 +198,12 @@ export type TracedImage = ObjectPowerScale & {
   readonly id: string;
   readonly source: string;
   readonly traceSourceId?: string;
+  // Full pixel grid whose coordinate space `paths` and `bounds` use. Trace
+  // previews may run on a downsampled copy of the imported raster, so these
+  // dimensions can intentionally differ from the source image's pixel grid.
+  // Missing means a legacy trace whose grid matches its source raster.
+  readonly tracePixelWidth?: number;
+  readonly tracePixelHeight?: number;
   // Missing means legacy filled-contour trace.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
   readonly bounds: Bounds;
@@ -239,6 +245,9 @@ export type RasterImage = ObjectPowerScale & {
   readonly kind: 'raster-image';
   readonly id: string;
   readonly source: string;
+  // Original bitmap retained for Re-trace Original. Rasterized trace results
+  // carry this just like vector traces do; ordinary imported photos omit it.
+  readonly traceSourceId?: string;
   readonly dataUrl: string; // 'data:image/png;base64,...'
   readonly pixelWidth: number;
   readonly pixelHeight: number;

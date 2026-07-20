@@ -199,7 +199,8 @@
 | ADR-232 | 2026-07-19 | Accepted (governing) | Physical Frame completion is the spatial source of truth |
 | ADR-233 | 2026-07-19 | Accepted | Revisioned machine-aware CNC starters initialize new operations without rewriting jobs |
 | ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
-| ADR-235 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
+| ADR-235 | 2026-07-19 | Accepted, hardware verification pending | New laser traces default to materialized Raster/Image output |
+| ADR-236 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
 
 ---
 
@@ -10227,7 +10228,83 @@ transitions untouched, especially on alternating reverse rows.
 
 ---
 
-## ADR-235 - Profile-scoped 4040 scan quality hardening
+## ADR-235 - New laser traces default to materialized Raster/Image output
+
+**Date:** 2026-07-19
+**Status:** Accepted, hardware verification pending
+
+### Context
+
+The same 4040 produced a clean direct-photo engraving but uneven lettering after the photo was
+traced. These are different output paths: an imported photo is a `RasterImage` compiled into image
+scan rows, while Trace historically committed a `TracedImage` compiled as vector Fill or Line.
+Changing only a traced object's layer mode to Image is not a solution: the vector compiler skips
+Image layers and the raster compiler accepts only real `RasterImage` objects, so that combination
+would emit no artwork.
+
+The raster emitter can still split long white gaps, but every active span receives its normal
+laser-off feed runway. That is the motion property wanted for sparse traced lettering. Rasterizing
+a trace cannot restore grayscale or detail the trace algorithm already discarded; it preserves the
+selected silhouette, centerline, or edge result and changes its downstream engraving pipeline.
+
+A second correctness issue existed at this boundary. Burn imports may retain a larger pixel grid
+than Trace's bounded working grid. Trace placement used the burn bitmap dimensions as the divisor,
+so a large source traced on the smaller grid could be committed at the wrong physical size.
+
+### Decision
+
+1. The laser Trace dialog exposes an explicit output choice. **Raster scan** is the default and
+   recommended engraving output; **Vector paths** preserves the editable Fill/Line workflow. CNC
+   remains vector-only because the CNC compiler has no raster-image machining contract.
+2. Raster output materializes a real `RasterImage` during trace acceptance by reusing the existing
+   bounded Convert-to-Bitmap worker and luma/PNG assembly. Filled-contour traces use Fill All;
+   centerline and edge traces use Outlines. Trace ink is black on white. Resolution uses the
+   highest density required by every active bound Image operation, and those complete operation
+   bindings are snapshotted and revalidated across the asynchronous conversion.
+3. The actual trace working width and height travel with every worker, inline, region, preview, and
+   prepared result. Placement maps that grid through the live source bounds and transform before
+   vector-to-bitmap conversion bakes rotation, mirroring, scale, and translation into the output
+   pixels. Boundary selections are remapped from the retained burn grid to the capped trace grid.
+   The live source and complete Image-operation set are revalidated after conversion.
+4. Commit is atomic and records one undo entry. The original image is either retained as the
+   excluded `trace-source` backing or removed by the existing delete toggle; re-trace replaces the
+   prior result in place so stacking, artwork order, and group references remain stable. Raster
+   trace provenance round-trips so **Re-trace Original** still works while the backing source
+   exists. Budget or conversion failure makes no scene change.
+5. No compiler or G-code-emitter special case is added. Once committed, the result follows the
+   ordinary Raster/Image Preview, Estimate, Save, Frame, Start, preflight, and emission paths.
+   Existing saved vector traces are not migrated silently; imported SVG, Text, Shape, ordinary
+   Line/Fill, and direct-photo jobs keep their established behavior.
+6. Binary trace appearance takes precedence over a source photo's Negative Image setting: the
+   derived result forces `negativeImage: false` so black preview ink burns and white stays off.
+   Pass Through uses the trace working-grid density; if preserving that grid would exceed the
+   supported 25 lines/mm conversion ceiling, acceptance fails without mutation and directs the
+   operator to disable Pass Through, resize, or choose Editable vectors.
+
+### Consequences
+
+- New laser traces use raster scan motion by default across all letters and traced artwork, rather
+  than applying a glyph-specific J/C workaround.
+- Direct photographs remain the highest-fidelity choice for tonal images. A rasterized trace is
+  still binary silhouette/line art and must not be described as restored photographic grayscale.
+- The same Image settings that produced a good direct-photo burn carry into the derived trace
+  output except Negative Image, which is neutralized for trace-preview parity. Material, focus,
+  mechanics, and the physical 4040 result still require a controlled scrap qualification.
+
+### Verification
+
+- Trace-result tests pin the real working grid through worker, inline, crop, enhance, preview, and
+  prepared-result reuse.
+- Registration tests cover a burn source larger than the trace grid, high-resolution crop/enhance
+  boundaries, and rotated/mirrored/non-uniformly-scaled sources.
+- State tests cover retained/deleted backing images, replacement, provenance, layer settings, and
+  one-step undo, stable Re-trace ordering, Negative Image neutralization, and active sublayers.
+- Workflow tests cover laser Raster default, Vector escape, centerline/edge outline rendering, CNC
+  exclusion, Pass Through refusal, and one-dimensional outline rasterization. A 4040-profile
+  acceptance test proves raster-only compilation and `M4 S0` -> feed-speed `S0` runway -> powered
+  burn ordering.
+
+## ADR-236 - Profile-scoped 4040 scan quality hardening
 
 **Date:** 2026-07-19
 **Status:** Accepted, hardware verification pending (controller-setting policy remains governed by

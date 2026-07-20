@@ -8,10 +8,10 @@ export function fillRunwayCommentText(
 ): string {
   const setting = `overscan ${formatMm(group.overscanMm)} mm`;
   if (group.fillRunwayPolicy === 'full') {
-    return `${setting} (full feed-matched Island runway where split geometry permits; ADR-235)`;
+    return `${setting} (full feed-matched Island runway where split geometry permits; ADR-236)`;
   }
   if (group.fillRunwayPolicy === 'raster-full') {
-    return `${setting} (full feed-matched runway on every raster-model sweep; ADR-235)`;
+    return `${setting} (full feed-matched runway on every raster-model sweep; ADR-236)`;
   }
   if (group.fillRunwayPolicy === 'raster-bounded') {
     return `${setting} (bounded feed-matched raster split runways; ADR-039)`;

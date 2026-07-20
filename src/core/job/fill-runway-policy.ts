@@ -28,7 +28,7 @@ export function fillRunwayPolicyForDevice(
 ): FillRunwayPolicy | undefined {
   if (resolveGrblDialect(device).id !== 'neotronics-4040-safe') return undefined;
   // ADR-234 governs ordinary scanline Fill with bounded, non-overlapping entry
-  // runways. Sensitive Island Fill keeps ADR-235's full two-sided runway.
+  // runways. Sensitive Island Fill keeps ADR-236's full two-sided runway.
   return fillStyle === 'island' ? 'full' : 'feed-matched-entry';
 }
 

@@ -28,6 +28,12 @@ import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 export type TraceResult = {
   readonly paths: ColoredPath[];
   readonly bounds: Bounds;
+  // Pixel grid whose coordinate space `paths` and `bounds` use. This is
+  // intentionally carried with the result: preview tracing may run on a
+  // downsampled working image, so callers cannot safely infer it from the
+  // original imported raster.
+  readonly width: number;
+  readonly height: number;
 };
 
 export class TraceRequestSupersededError extends Error {
@@ -98,7 +104,12 @@ function handleWorkerMessage(e: MessageEvent<TraceWorkerResponse>): void {
   if (pending === undefined) return;
   pendingByRequestId.delete(e.data.id);
   if (e.data.kind === 'ok') {
-    pending.resolve({ paths: e.data.paths, bounds: e.data.bounds });
+    pending.resolve({
+      paths: e.data.paths,
+      bounds: e.data.bounds,
+      width: e.data.width,
+      height: e.data.height,
+    });
     return;
   }
   // A kind:'error' response is scoped to this request. The worker
@@ -171,7 +182,12 @@ async function traceInlineIfSafe(image: RawImageData, options: TraceOptions): Pr
 
 async function traceInline(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
   const paths = await traceImageToColoredPaths(image, options);
-  return { paths, bounds: boundsFromColoredPaths(paths) };
+  return {
+    paths,
+    bounds: boundsFromColoredPaths(paths),
+    width: image.width,
+    height: image.height,
+  };
 }
 
 function traceInWorker(

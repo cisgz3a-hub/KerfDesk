@@ -46,5 +46,12 @@ export async function traceImageWithBoundaryMode(
     options,
     trace: (img, opts) => traceImageWithFallback(img, opts).then((result) => result.paths),
   });
-  return { paths, bounds: boundsFromColoredPaths(paths) };
+  return {
+    paths,
+    bounds: boundsFromColoredPaths(paths),
+    // `paths` combines the full trace and a region re-trace patched back into
+    // that same full coordinate space. Preserve the full trace's actual grid.
+    width: full.width,
+    height: full.height,
+  };
 }

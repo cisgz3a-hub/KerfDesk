@@ -11,6 +11,7 @@
 
 import type { RasterImage, SceneObject, TracedImage } from '../../core/scene';
 import { applyConvertToBitmap } from './convert-to-bitmap';
+import { applyRasterizedTraceToExisting } from './rasterized-trace-mutation';
 import {
   applyFreshImport,
   applyTraceToExisting,
@@ -49,6 +50,11 @@ export function imageImportActions(
     traced: TracedImage,
     options?: TraceExistingImageOptions,
   ) => void;
+  readonly commitRasterizedTrace: (
+    sourceId: string,
+    raster: RasterImage,
+    options?: TraceExistingImageOptions,
+  ) => void;
   readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
 } {
   return {
@@ -62,6 +68,13 @@ export function imageImportActions(
     traceExistingImage: (sourceId, traced, options) => {
       set((s) => withFreshCncLayers(s, applyTraceToExisting(s, sourceId, traced, options)));
       fitAllObjects(get);
+    },
+    // Rasterized traces retain the source's placement and Image operation, so
+    // committing them is an in-place swap and must not move the viewport.
+    commitRasterizedTrace: (sourceId, raster, options) => {
+      set((s) =>
+        withFreshCncLayers(s, applyRasterizedTraceToExisting(s, sourceId, raster, options)),
+      );
     },
     // No fitAllObjects: Convert replaces the vector(s) in place (same combined
     // bounds), so re-fitting would only jerk the camera. Consistent with the

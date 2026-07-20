@@ -24,10 +24,12 @@ import {
   sceneObjectUsesOperation,
   type TextObject,
   type TracedImage,
-  type Transform,
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateArtworkWithOperations } from './duplicate-artwork';
+import { positionTraceOverRasterSource } from './trace-placement';
+
+export { positionTraceOverRasterSource } from './trace-placement';
 
 // Shared undo/redo stack ceiling. store-actions caps the redo stack against the
 // same value, so it lives here (the module both stacks depend on) rather than
@@ -68,8 +70,7 @@ export type TraceExistingImageOptions = {
 
 type PreparedTraceSource = {
   readonly scene: Scene;
-  readonly transform: Transform;
-  readonly traceSourceId?: string;
+  readonly source?: RasterImage;
   readonly shouldPruneLayers: boolean;
 };
 
@@ -246,40 +247,18 @@ function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
   return object.operationOverride?.mode ?? 'line';
 }
 
-// Build the transform that lands a trace pixel-for-pixel over the bitmap
-// it was traced from. imagetracerjs emits polylines in the source's PIXEL
-// space (1 unit = 1 px), but the bitmap was imported in millimetres — its
-// object-local `bounds` span the mm size (import-DPI sizing — density
-// metadata when present, else the ADR-048 default; ADR-027) while
-// `pixelWidth/Height` record the original px grid. Both objects are
-// drawn through the SAME applyTransform (scale→mirror→rotate→translate),
-// so reusing the bitmap's raw transform would leave pixel-unit vectors
-// (extent = pixelWidth) over an mm-unit bitmap (extent = widthMm) — off by
-// the bitmap's own widthMm/pixelWidth (mm-per-pixel) ratio, so the trace
-// renders far too large. Folding the bitmap's mm-per-pixel into the trace's
-// scale converts
-// the pixel points into the same mm frame. Rotation, mirror, and the
-// translate are inherited unchanged; this is exact because imported rasters
-// always have bounds anchored at (0,0) (so there is no bounds offset for
-// the scale to interact with). Degenerate 0-px sources fall back to the
-// raw transform — a 0-px image traces to nothing anyway.
-function overlayTransformForRaster(source: RasterImage): Transform {
-  if (source.pixelWidth === 0 || source.pixelHeight === 0) return source.transform;
-  const mmPerPxX = (source.bounds.maxX - source.bounds.minX) / source.pixelWidth;
-  const mmPerPxY = (source.bounds.maxY - source.bounds.minY) / source.pixelHeight;
-  return {
-    ...source.transform,
-    scaleX: source.transform.scaleX * mmPerPxX,
-    scaleY: source.transform.scaleY * mmPerPxY,
-  };
-}
-
+// Trace paths use the actual capped working grid reported by the tracer, while
+// the imported burn bitmap can retain a larger pixel grid. The shared placement
+// helper maps that trace grid across the bitmap's complete local-mm bounds and
+// then composes its scale, mirror, rotation, and translation. This keeps both
+// full-image and region traces registered even when bounds are non-zero or the
+// burn and trace decode sizes differ.
 // ADR-026 (unified image flow): a trace overlays the bitmap it was
 // traced FROM — which the operator imported first as a standalone raster
 // (LightBurn's model: Trace is a tool run on a SELECTED image, not a
 // second import). We find that existing bitmap by id and give the trace a
 // transform that maps its pixel-space points onto the bitmap's mm extent
-// (overlayTransformForRaster) so the vectors land pixel-for-pixel over the
+// (positionTraceOverRasterSource) so the vectors land pixel-for-pixel over the
 // features they came from, then tag the bitmap 'trace-source' so the
 // canvas tints it as the deletable backing. The trace is appended last
 // (drawn on top) and becomes the selection, so "delete the source to
@@ -297,18 +276,24 @@ export function applyTraceToExisting(
   options: TraceExistingImageOptions = {},
 ): MutationResult {
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
-  const prepared = prepareTraceSource(s.project.scene, existing, traced, options);
+  const prepared = prepareTraceSource(s.project.scene, existing, options);
   let scene = prepared.scene;
-  const positionedTrace = positionTrace(traced, prepared.transform, prepared.traceSourceId);
-  if (options.replaceTraceId !== undefined) {
+  const positionedTrace =
+    prepared.source === undefined ? traced : positionTraceOverRasterSource(prepared.source, traced);
+  if (options.replaceTraceId !== undefined && options.replaceTraceId !== positionedTrace.id) {
     scene = removeObject(scene, options.replaceTraceId);
   }
+  const replaceInPlace =
+    options.replaceTraceId === positionedTrace.id &&
+    scene.objects.some((object) => object.id === positionedTrace.id);
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
   });
-  scene = addObject(scene, created.object);
+  scene = replaceInPlace
+    ? replaceObject(scene, positionedTrace.id, created.object)
+    : addObject(scene, created.object);
   for (const operation of created.operations) scene = addLayer(scene, operation);
-  if (prepared.shouldPruneLayers) {
+  if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined) {
     scene = pruneOrphanLayers(scene);
   }
   return {
@@ -323,46 +308,23 @@ export function applyTraceToExisting(
 function prepareTraceSource(
   scene: Scene,
   existing: SceneObject | undefined,
-  traced: TracedImage,
   options: TraceExistingImageOptions,
 ): PreparedTraceSource {
   if (existing === undefined || existing.kind !== 'raster-image') {
-    return traced.traceSourceId === undefined
-      ? { scene, transform: traced.transform, shouldPruneLayers: false }
-      : {
-          scene,
-          transform: traced.transform,
-          traceSourceId: traced.traceSourceId,
-          shouldPruneLayers: false,
-        };
+    return { scene, shouldPruneLayers: false };
   }
-  const transform = overlayTransformForRaster(existing);
   if (options.deleteSourceAfterTrace === true) {
     return {
       scene: removeObject(scene, existing.id),
-      transform,
-      traceSourceId: existing.id,
+      source: existing,
       shouldPruneLayers: true,
     };
   }
   const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
   return {
     scene: replaceObject(scene, existing.id, taggedSource),
-    transform,
-    traceSourceId: existing.id,
+    source: existing,
     shouldPruneLayers: false,
-  };
-}
-
-function positionTrace(
-  traced: TracedImage,
-  transform: Transform,
-  traceSourceId: string | undefined,
-): TracedImage {
-  return {
-    ...traced,
-    ...(traceSourceId === undefined ? {} : { traceSourceId }),
-    transform,
   };
 }
 

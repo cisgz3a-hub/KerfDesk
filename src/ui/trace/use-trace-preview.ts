@@ -29,6 +29,7 @@ import {
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
 import type { PreparedTrace, TracePreparationRequest } from './prepared-trace';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
+import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
 
 export type TracePreviewState =
@@ -56,6 +57,7 @@ export function useTracePreview(
   options: TraceOptions,
   boundary?: TraceBoundary | null,
   boundaryMode: BoundaryMode = 'crop',
+  sourceGrid?: TraceGrid,
 ): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
   const decodedRef = useRef<RawImageData | null>(null);
@@ -72,6 +74,7 @@ export function useTracePreview(
   const optionsRef = useLatest(options);
   const boundaryRef = useLatest<TraceBoundary | null>(boundary ?? null);
   const boundaryModeRef = useLatest<BoundaryMode>(boundaryMode);
+  const sourceGridRef = useLatest<TraceGrid | null>(sourceGrid ?? null);
 
   useEffect(() => {
     if (file === null) {
@@ -92,15 +95,13 @@ export function useTracePreview(
         // Read options through the ref so the latest preset wins even
         // if the user changed it between picking the file and decode
         // completing (R-H1 fix).
-        const currentOptions = optionsRef.current;
-        const currentBoundary = boundaryRef.current;
-        const currentBoundaryMode = boundaryModeRef.current;
         startPreviewTrace({
           img,
           file,
-          options: currentOptions,
-          boundary: currentBoundary,
-          boundaryMode: currentBoundaryMode,
+          options: optionsRef.current,
+          boundary: boundaryRef.current,
+          boundaryMode: boundaryModeRef.current,
+          sourceGrid: sourceGridRef.current,
           sourceHasTransparency,
           isCurrent: () => tokenRef.current === myToken,
           setState,
@@ -120,7 +121,7 @@ export function useTracePreview(
     // it as a dep — a preset switch is handled by the separate
     // effect below so a file with the same identity doesn't trigger
     // a full re-decode each time the user nudges a knob.
-  }, [file, optionsRef, boundaryRef, boundaryModeRef]);
+  }, [file, optionsRef, boundaryRef, boundaryModeRef, sourceGridRef]);
 
   useEffect(() => {
     const img = decodedRef.current;
@@ -137,6 +138,7 @@ export function useTracePreview(
         options,
         boundary: boundary ?? null,
         boundaryMode,
+        sourceGrid: sourceGridRef.current,
         sourceHasTransparency,
         isCurrent: () => tokenRef.current === myToken,
         setState,
@@ -145,7 +147,7 @@ export function useTracePreview(
     return () => {
       window.clearTimeout(timer);
     };
-  }, [file, options, boundary, boundaryMode]);
+  }, [file, options, boundary, boundaryMode, sourceGrid?.width, sourceGrid?.height, sourceGridRef]);
 
   return state;
 }
@@ -162,6 +164,7 @@ function startPreviewTrace(args: {
   readonly options: TraceOptions;
   readonly boundary: TraceBoundary | null;
   readonly boundaryMode: BoundaryMode;
+  readonly sourceGrid: TraceGrid | null;
   readonly sourceHasTransparency: boolean;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
@@ -182,6 +185,7 @@ export function runTrace(args: {
   readonly options: TraceOptions;
   readonly boundary?: TraceBoundary | null;
   readonly boundaryMode?: BoundaryMode;
+  readonly sourceGrid?: TraceGrid | null;
   readonly sourceHasTransparency?: boolean | undefined;
   readonly request?: TracePreparationRequest;
   readonly isCurrent: () => boolean;
@@ -193,20 +197,21 @@ export function runTrace(args: {
   // preview's ready/error state (P2-A). Returns the promise so tests can await it.
   return (async () => {
     try {
+      const workingBoundary = traceBoundaryForWorkingGrid(args.boundary, args.sourceGrid, args.img);
       const result = await traceImageWithBoundaryMode(
         args.img,
         args.options,
-        args.boundary ?? null,
+        workingBoundary,
         args.boundaryMode ?? 'crop',
       );
-      const { paths } = result;
+      const { paths, width, height } = result;
       if (!args.isCurrent()) return;
-      const svg = coloredPathsToSvg(paths, args.img.width, args.img.height);
+      const svg = coloredPathsToSvg(paths, width, height);
       args.setState({
         kind: 'ready',
         svg,
-        width: args.img.width,
-        height: args.img.height,
+        width,
+        height,
         paths,
         ...(args.request === undefined ? {} : { preparedTrace: { request: args.request, result } }),
         sourceHasTransparency: args.sourceHasTransparency,

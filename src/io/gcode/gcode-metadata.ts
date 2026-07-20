@@ -21,7 +21,7 @@ export type GcodeMetadata = {
 // continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
 // dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
 // standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
-// 4040 Fill entry geometry, and ADR-235's controlled seeks/scan-quality policy.
+// 4040 Fill entry geometry, and ADR-236's controlled seeks/scan-quality policy.
 export const EMITTER_REVISION = 'adr-235-4040-quality-controlled-v2';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports

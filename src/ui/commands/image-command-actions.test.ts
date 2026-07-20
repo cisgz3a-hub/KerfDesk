@@ -38,6 +38,23 @@ function trace(sourceId = 'src1'): TracedImage {
   };
 }
 
+function rasterTrace(sourceId = 'src1'): RasterImage {
+  return {
+    kind: 'raster-image',
+    id: 'raster-trace',
+    source: 'logo.png (bitmap)',
+    traceSourceId: sourceId,
+    dataUrl: 'data:image/png;base64,AAAA',
+    pixelWidth: 20,
+    pixelHeight: 10,
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'threshold',
+    linesPerMm: 10,
+  };
+}
+
 function projectWith(...objects: Project['scene']['objects']): Project {
   const base = createProject();
   return { ...base, scene: { ...base.scene, objects } };
@@ -55,6 +72,19 @@ describe('retraceOriginalAction', () => {
     const openImageDialog = vi.fn();
     const pushToast = vi.fn();
 
+    retraceOriginalAction(projectWith(source, selected), selected, openImageDialog, pushToast)();
+
+    expect(openImageDialog).toHaveBeenCalledWith(source, { replaceTraceId: selected.id });
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it('opens the original raster when the selected trace result is also a raster', () => {
+    const source = raster();
+    const selected = rasterTrace();
+    const openImageDialog = vi.fn();
+    const pushToast = vi.fn();
+
+    expect(traceSourceForTracedImage(projectWith(source, selected), selected)).toBe(source);
     retraceOriginalAction(projectWith(source, selected), selected, openImageDialog, pushToast)();
 
     expect(openImageDialog).toHaveBeenCalledWith(source, { replaceTraceId: selected.id });
