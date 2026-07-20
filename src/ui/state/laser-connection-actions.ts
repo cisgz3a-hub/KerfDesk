@@ -152,6 +152,10 @@ function startConnectedControllerHandshake(
   baudRate: number,
 ): void {
   const ownership = controllerHandshakeOwnership(get, refs, connection);
+  // Captured so the poll-start below can tell an Alarm (keep the connection,
+  // start polling) apart from Forget/disconnect/replacement (do not). Only the
+  // latter bump connectAttemptRevision via cancelConnectAttempt/beginConnectAttempt.
+  const connectAttemptRevision = refs.connectAttemptRevision;
   void runControllerHandshake(set, get, refs, safeWrite, baudRate, ownership.adopt)
     .catch((error: unknown) => {
       if (!ownership.isCurrent()) return;
@@ -167,11 +171,23 @@ function startConnectedControllerHandshake(
       );
     })
     .finally(() => {
-      if (!ownership.isCurrent()) return;
-      // A reset transaction replaces the handshake and owns subsequent polling.
-      if (get().controllerOperation?.kind !== 'connection-handshake') return;
-      set({ controllerOperation: null });
-      startStatusPolling(set, get, refs, safeWrite);
+      // The status poll belongs to the CONNECTION, not the handshake's write
+      // epoch. An Alarm (or reset) status bumps the WRITE epoch mid-handshake,
+      // so the old ownership.isCurrent() guard (which checked the write epoch)
+      // bailed and left the poll dead — connecting into an Alarm made the app
+      // permanently DEAF: no fresh status arrived, so the Alarm never cleared
+      // the stuck jog/controller operation, and jog, unlock, and the console
+      // `$X` all froze greyed out. Gate instead on the connect-attempt revision,
+      // which Forget/disconnect/replacement bump (via cancelConnectAttempt /
+      // beginConnectAttempt) but an Alarm never touches: the poll starts for a
+      // live Alarm yet still refuses to restart after Forget. pollHandle guards
+      // against double-starting when a reset already owns polling.
+      if (refs.connection !== connection) return;
+      if (refs.connectAttemptRevision !== connectAttemptRevision) return;
+      if (get().controllerOperation?.kind === 'connection-handshake') {
+        set({ controllerOperation: null });
+      }
+      if (refs.pollHandle === null) startStatusPolling(set, get, refs, safeWrite);
     });
 }
 
