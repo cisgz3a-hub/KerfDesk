@@ -54,7 +54,15 @@ export type SerialConnection = {
   readonly forget?: () => Promise<void>;
 };
 
+/** Browser-exposed transport identity. VID/PID describe the USB adapter/model;
+ * Web Serial does not expose a unique physical-unit serial number. */
+export type SerialPortIdentity = {
+  readonly usbVendorId?: number;
+  readonly usbProductId?: number;
+};
+
 export type SerialPortRef = {
+  readonly info?: SerialPortIdentity;
   // Open the port at the requested baud rate. The returned SerialConnection
   // is the active duplex stream until close() is called or the port drops.
   readonly open: (req: SerialOpenRequest) => Promise<SerialConnection>;

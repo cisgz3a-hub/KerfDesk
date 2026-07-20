@@ -71,6 +71,7 @@ export const grblDriver: ControllerDriver = {
     unlock: CMD_UNLOCK,
     sleep: CMD_SLEEP,
     settingsQuery: CMD_SETTINGS,
+    buildInfoQuery: CMD_BUILD_INFO,
     modalStateQuery: CMD_MODAL_STATE,
     offsetsQuery: CMD_OFFSETS,
     queuedStatusQuery: null,

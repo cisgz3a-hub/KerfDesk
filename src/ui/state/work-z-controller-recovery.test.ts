@@ -5,6 +5,7 @@ import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
+import { respondToTestGrblBuildInfo, settleTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
@@ -64,6 +65,7 @@ describe('owned controller Work-Z recovery', () => {
     const writes: string[] = [];
     const connection = makeConnection((data, conn) => {
       writes.push(data);
+      respondToTestGrblBuildInfo(data, conn.emitLine);
       queueMicrotask(() => {
         if (data === '$G\n') {
           conn.emitLine('[GC:G0 G55 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
@@ -82,7 +84,7 @@ describe('owned controller Work-Z recovery', () => {
     await flush();
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await flush();
+    await settleTestGrblHandshake();
 
     await useLaserStore.getState().recoverWorkZFromController({
       activeToolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,

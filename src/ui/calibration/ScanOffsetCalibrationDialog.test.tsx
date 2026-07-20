@@ -11,6 +11,7 @@ import { ScanOffsetCalibrationDialog } from './ScanOffsetCalibrationDialog';
 async function renderDialog(
   onGenerate = vi.fn(),
   onCancel = vi.fn(),
+  options: { readonly hasCalibratedOffsets?: boolean; readonly maxFeedMmPerMin?: number } = {},
 ): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
@@ -21,7 +22,9 @@ async function renderDialog(
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<ScanOffsetCalibrationDialog onCancel={onCancel} onGenerate={onGenerate} />);
+    root.render(
+      <ScanOffsetCalibrationDialog onCancel={onCancel} onGenerate={onGenerate} {...options} />,
+    );
   });
   return { host, root, onGenerate, onCancel };
 }
@@ -45,6 +48,7 @@ describe('ScanOffsetCalibrationDialog', () => {
         Simulate.change(speedMax);
         swatchWidth.value = '20';
         Simulate.change(swatchWidth);
+        checkbox(host, 'Accept uncorrected bidirectional calibration override').click();
       });
 
       const generate = [...host.querySelectorAll('button')].find((button) =>
@@ -56,8 +60,36 @@ describe('ScanOffsetCalibrationDialog', () => {
       });
 
       expect(onGenerate).toHaveBeenCalledWith(
-        expect.objectContaining({ steps: 4, speedMax: 4500, swatchWidthMm: 20 }),
+        expect.objectContaining({
+          mode: 'baseline',
+          steps: 4,
+          speedMax: 4500,
+          swatchWidthMm: 20,
+        }),
       );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('generates a profile-corrected verification coupon only when offsets exist', async () => {
+    const { host, root, onGenerate } = await renderDialog(vi.fn(), vi.fn(), {
+      hasCalibratedOffsets: true,
+    });
+    try {
+      const purpose = host.querySelector('select[aria-label="Coupon purpose"]');
+      if (!(purpose instanceof HTMLSelectElement)) throw new Error('Purpose select missing');
+      await act(async () => {
+        purpose.value = 'verification';
+        Simulate.change(purpose);
+      });
+      const generate = [...host.querySelectorAll('button')].find((button) =>
+        button.textContent?.includes('Generate verification coupon'),
+      );
+      if (!(generate instanceof HTMLButtonElement)) throw new Error('Generate button missing');
+      expect(generate.disabled).toBe(false);
+      await act(async () => generate.click());
+      expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ mode: 'verification' }));
     } finally {
       await act(async () => root.unmount());
     }
@@ -67,5 +99,11 @@ describe('ScanOffsetCalibrationDialog', () => {
 function input(host: HTMLElement, label: string): HTMLInputElement {
   const element = host.querySelector(`input[aria-label="${label}"]`);
   if (!(element instanceof HTMLInputElement)) throw new Error(`${label} input missing`);
+  return element;
+}
+
+function checkbox(host: HTMLElement, label: string): HTMLInputElement {
+  const element = host.querySelector(`input[aria-label="${label}"]`);
+  if (!(element instanceof HTMLInputElement)) throw new Error(`${label} checkbox missing`);
   return element;
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { startMotionOperation } from './laser-motion-operation';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
@@ -75,17 +76,21 @@ describe('CNC jog-to-point readiness ordering', () => {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      respondToTestGrblHandshake(data, emitLine);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine,
   };
 }
 
@@ -104,7 +109,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
   connection.emitLine('ok');
-  await flush();
+  await settleTestGrblHandshake();
 }
 
 async function flush(): Promise<void> {

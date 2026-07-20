@@ -59,6 +59,7 @@ export const smoothiewareDriver: ControllerDriver = {
     unlock: SMOOTHIE_CMD_UNLOCK,
     sleep: null,
     settingsQuery: null,
+    buildInfoQuery: null,
     modalStateQuery: null,
     offsetsQuery: null,
     queuedStatusQuery: null,

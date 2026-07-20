@@ -6,6 +6,7 @@
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
 import {
+  analyzeFillHeatRisk,
   computeJobBounds,
   computeJobMotionBounds,
   estimateJobDuration,
@@ -32,6 +33,7 @@ import {
   originTileDetail,
   originTileValue,
 } from './job-review-format';
+import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 
@@ -60,6 +62,7 @@ export type JobReviewModel = {
   readonly resolvedOriginLabel: string;
   readonly toolPlanLabels: ReadonlyArray<string>;
   readonly acknowledgement: JobReviewAcknowledgement;
+  readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
 };
 
 export function buildJobReviewModel(args: {
@@ -79,13 +82,28 @@ export function buildJobReviewModel(args: {
     warnings: dedupe([
       ...args.prepared.warnings,
       ...detectJobIntentWarnings(args.project),
-      ...detectM7AirAssistWarnings(args.prepared.gcode, args.project.device),
+      ...detectM7AirAssistWarnings(
+        args.prepared.gcode,
+        args.laserModeStartSnapshot.controllerBuildInfo,
+        buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
+      ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
     toolPlanLabels: toolPlanLabels(args.prepared.cncToolPlan),
     acknowledgement: buildAcknowledgement(args, machineKind),
+    outputQualityFacts: buildOutputQualityReviewFacts(
+      args.prepared.prepared.job,
+      args.project.scene.layers,
+    ),
   };
+}
+
+function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean {
+  return (
+    snapshot.buildInfoObservation !== null &&
+    snapshot.buildInfoObservation.sessionEpoch === snapshot.controllerSessionEpoch
+  );
 }
 
 function buildStatTiles(
@@ -96,11 +114,29 @@ function buildStatTiles(
   const job = prepared.prepared.job;
   const device = project.device;
   return [
-    timeTile(job, device),
+    timeTile(job, device, prepared.jobOrigin),
     sizeTile(job, device),
     operationsTile(job, machineKind, prepared.cncToolPlan),
+    ...fillRunwayTiles(job),
     gcodeTile(prepared.gcode),
     originTile(prepared.jobOrigin),
+  ];
+}
+
+function fillRunwayTiles(job: Job): ReadonlyArray<JobReviewStatTile> {
+  const coverage = analyzeFillHeatRisk(job);
+  if (coverage.fillSweepCount === 0) return [];
+  const requested = coverage.fillRequestedRunwayValuesMm.join(' / ');
+  return [
+    {
+      label: 'Fill runway',
+      value: `${formatCount(coverage.fillFullRunwaySweepCount)} / ${formatCount(coverage.fillSweepCount)} full`,
+      detail:
+        `Requested ${requested} mm · ` +
+        `${formatCount(coverage.fillPartialRunwaySweepCount)} partial · ` +
+        `${formatCount(coverage.fillNoRunwaySweepCount)} skipped · ` +
+        `${formatCount(coverage.fillDisabledRunwaySweepCount)} disabled`,
+    },
   ];
 }
 
@@ -116,8 +152,18 @@ function originTile(origin: PreparedCurrentStart['jobOrigin']): JobReviewStatTil
   };
 }
 
-function timeTile(job: Job, device: DeviceProfile): JobReviewStatTile {
-  const estimate = estimateJobDuration(job, device);
+function timeTile(
+  job: Job,
+  device: DeviceProfile,
+  origin: PreparedCurrentStart['jobOrigin'],
+): JobReviewStatTile {
+  const finishPosition =
+    origin?.startFrom === 'current-position' ? origin.currentPosition : undefined;
+  const estimate = estimateJobDuration(
+    job,
+    device,
+    finishPosition === undefined ? {} : { initialPosition: finishPosition, finishPosition },
+  );
   return {
     label: 'Estimated time',
     value: formatDuration(estimate.totalSeconds),
@@ -179,6 +225,7 @@ function gcodeTile(gcode: string): JobReviewStatTile {
 function buildAcknowledgement(
   args: {
     readonly project: Project;
+    readonly prepared: PreparedCurrentStart;
     readonly laserModeStartSnapshot: LaserModeStartSnapshot;
     readonly overrides: OverrideValues | null;
   },
@@ -187,7 +234,11 @@ function buildAcknowledgement(
   if (machineKind === 'cnc') {
     return { kind: 'cnc', prompt: cncSetupAttestationPrompt(args.overrides) };
   }
-  return laserModeStartAcknowledgementRequired(args.project, args.laserModeStartSnapshot)
+  return laserModeStartAcknowledgementRequired(
+    args.project,
+    args.laserModeStartSnapshot,
+    args.prepared.gcode,
+  )
     ? { kind: 'laser-unverified', prompt: LASER_MODE_UNVERIFIED_START_PROMPT }
     : { kind: 'laser-verified' };
 }

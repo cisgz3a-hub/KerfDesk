@@ -1,4 +1,5 @@
 export {
+  createArchivedControllerObservation,
   createExecutionArtifact,
   createRunId,
   type ExecutionArtifactV1,

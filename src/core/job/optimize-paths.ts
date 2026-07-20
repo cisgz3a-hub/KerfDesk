@@ -39,10 +39,12 @@
 //
 // Pure-core compliant: no clock, no random, no I/O.
 
+import type { ScanOffsetPoint } from '../devices';
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
-import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
-import { groupFillSweeps } from './fill-sweeps';
+import { expandFillHatchWithRunways } from './fill-runway';
+import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
+import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
@@ -61,13 +63,14 @@ const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
 export function optimizePaths(
   job: Job,
   settings: PathOptimizationSettings = DEFAULT_PATH_OPTIMIZATION,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
 ): Job {
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
   return {
     groups:
       settings.travelPolicy === 'source-order'
         ? prioritized
-        : optimizeGroups(prioritized, settings),
+        : optimizeGroups(prioritized, settings, scanningOffsets),
   };
 }
 
@@ -106,7 +109,11 @@ function reverseLayerGroups(groups: ReadonlyArray<Group>): Group[] {
   return order.reverse().flatMap((layerId) => byLayer.get(layerId) ?? []);
 }
 
-function optimizeGroups(groups: ReadonlyArray<Group>, settings: PathOptimizationSettings): Group[] {
+function optimizeGroups(
+  groups: ReadonlyArray<Group>,
+  settings: PathOptimizationSettings,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): Group[] {
   const out: Group[] = [];
   let i = 0;
   while (i < groups.length) {
@@ -125,7 +132,7 @@ function optimizeGroups(groups: ReadonlyArray<Group>, settings: PathOptimization
       run.push(next);
       i += 1;
     }
-    out.push(...optimizeIslandFillGroups(run, settings));
+    out.push(...optimizeIslandFillGroups(run, settings, scanningOffsets));
   }
   return out;
 }
@@ -162,9 +169,10 @@ function optimizeOffsetFillGroup(group: FillGroup, settings: PathOptimizationSet
 function optimizeIslandFillGroups(
   groups: ReadonlyArray<FillGroup>,
   settings: PathOptimizationSettings,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): FillGroup[] {
   if (groups.length <= 1 || groups.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return [...groups];
-  const endpoints = groups.map(islandGroupEndpoints);
+  const endpoints = groups.map((group) => islandGroupEndpoints(group, scanningOffsets));
   if (endpoints.some((entry) => entry === null)) return [...groups];
 
   const remaining = new Set<number>();
@@ -349,25 +357,28 @@ function isCompatibleIslandFillGroup(first: FillGroup, candidate: Group): candid
     candidate.passes === first.passes &&
     candidate.airAssist === first.airAssist &&
     candidate.overscanMm === first.overscanMm &&
-    candidate.islandMotionPolicy === first.islandMotionPolicy
+    candidate.islandMotionPolicy === first.islandMotionPolicy &&
+    candidate.fillRunwayPolicy === first.fillRunwayPolicy &&
+    candidate.bidirectionalScanOffsetMm === first.bidirectionalScanOffsetMm
   );
 }
 
-function islandGroupEndpoints(group: FillGroup): RouteEndpoints | null {
-  const sweeps = groupFillSweeps(group.segments);
+function islandGroupEndpoints(
+  group: FillGroup,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): RouteEndpoints | null {
+  const plans = planFillSweeps(group);
+  const scanOffsetMm =
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
   let entry: Vec2 | null = null;
   let exit: Vec2 | null = null;
-  for (const sweep of sweeps) {
+  for (const plan of plans) {
+    const sweep = plan.sweep;
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
     if (first === undefined || last === undefined) continue;
-    const overscan = effectiveFillOverscanMm(
-      [first.start, last.end],
-      group.overscanMm,
-      group.fillStyle,
-      group.islandMotionPolicy,
-    );
-    const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+    const burn = shiftedScanSweepEndpoints(first, last, sweep.reverse, scanOffsetMm);
+    const run = expandFillHatchWithRunways([burn.start, burn.end], plan);
     if (run === null) continue;
     if (entry === null) entry = run.leadStart;
     exit = run.leadEnd;

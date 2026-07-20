@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -8,17 +9,28 @@ type FakeConnection = SerialConnection & {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -49,7 +61,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flushConnect(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 describe('laser-store profile streaming options', () => {
@@ -70,9 +82,9 @@ describe('laser-store profile streaming options', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    await expect(
-      useLaserStore.getState().startJob('G21\nG1 X1234567890\n', { rxBufferBytes: 10 }),
-    ).rejects.toThrow(/10-byte RX buffer/i);
+    await expect(startTestLaserJob('G21\nG1 X1234567890\n', { rxBufferBytes: 10 })).rejects.toThrow(
+      /10-byte RX buffer/i,
+    );
 
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(writes).toEqual([]);
@@ -86,9 +98,7 @@ describe('laser-store profile streaming options', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    await useLaserStore
-      .getState()
-      .startJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
+    await startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
 
     expect(writes[0]).toBe('G21\n');
     expect(useLaserStore.getState().streamer).toMatchObject({

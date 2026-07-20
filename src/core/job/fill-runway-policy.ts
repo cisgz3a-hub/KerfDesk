@@ -4,13 +4,32 @@ import {
   resolveGrblDialect,
   type DeviceProfile,
 } from '../devices';
+import type { LayerFillStyle } from '../scene';
 
-export type FillRunwayPolicy = 'feed-matched-entry';
+/**
+ * Executable runway semantics carried by a compiled fill group.
+ *
+ * `feed-matched-entry` is the governing 4040 fill policy from ADR-234. The
+ * remaining values are retained for explicit legacy fixtures and for the
+ * raster-to-fill planner model. `raster-bounded` mirrors the emitter's
+ * monotonic split-gap runways; `raster-full` preserves the former model.
+ */
+export type FillRunwayPolicy =
+  | 'feed-matched-entry'
+  | 'full'
+  | 'raster-bounded'
+  | 'raster-full'
+  | 'legacy-skip'
+  | 'island-capped';
 
-export function fillRunwayPolicyForDevice(device: DeviceProfile): FillRunwayPolicy | undefined {
-  return resolveGrblDialect(device).id === 'neotronics-4040-safe'
-    ? 'feed-matched-entry'
-    : undefined;
+export function fillRunwayPolicyForDevice(
+  device: DeviceProfile,
+  fillStyle: LayerFillStyle | undefined = 'scanline',
+): FillRunwayPolicy | undefined {
+  if (resolveGrblDialect(device).id !== 'neotronics-4040-safe') return undefined;
+  // ADR-234 governs ordinary scanline Fill with bounded, non-overlapping entry
+  // runways. Sensitive Island Fill keeps ADR-236's full two-sided runway.
+  return fillStyle === 'island' ? 'full' : 'feed-matched-entry';
 }
 
 // The generic 400 x 400 starter is deliberately not treated as proof of

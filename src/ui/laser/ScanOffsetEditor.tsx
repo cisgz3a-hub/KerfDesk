@@ -4,6 +4,7 @@ import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
 type ScanOffsetEditorProps = {
   readonly value: ReadonlyArray<ScanOffsetPoint>;
+  readonly maxOffsetMagnitudeMm: number;
   readonly onChange: (next: ReadonlyArray<ScanOffsetPoint>) => void;
 };
 
@@ -23,6 +24,7 @@ export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
               key={`${point.speedMmPerMin}:${index}`}
               point={point}
               index={index}
+              maxOffsetMagnitudeMm={props.maxOffsetMagnitudeMm}
               onChange={(patch) => props.onChange(updatePoint(points, index, patch))}
               onRemove={() => props.onChange(removePoint(points, index))}
             />
@@ -43,6 +45,7 @@ export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
 function ScanOffsetRow(props: {
   readonly point: ScanOffsetPoint;
   readonly index: number;
+  readonly maxOffsetMagnitudeMm: number;
   readonly onChange: (patch: Partial<ScanOffsetPoint>) => void;
   readonly onRemove: () => void;
 }): JSX.Element {
@@ -66,10 +69,18 @@ function ScanOffsetRow(props: {
       <span style={unitStyle}>mm/min</span>
       <input
         type="number"
+        min={-props.maxOffsetMagnitudeMm}
+        max={props.maxOffsetMagnitudeMm}
         step={0.01}
         value={props.point.offsetMm}
         onChange={(event) =>
-          props.onChange({ offsetMm: parseFinite(event.target.value, props.point.offsetMm) })
+          props.onChange({
+            offsetMm: parseBoundedFinite(
+              event.target.value,
+              props.point.offsetMm,
+              props.maxOffsetMagnitudeMm,
+            ),
+          })
         }
         style={numInputStyle}
         aria-label={`Scan offset value ${rowNumber}`}
@@ -118,9 +129,9 @@ function parsePositiveFinite(value: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function parseFinite(value: string, fallback: number): number {
+function parseBoundedFinite(value: string, fallback: number, maxMagnitude: number): number {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  return Number.isFinite(parsed) && Math.abs(parsed) <= maxMagnitude ? parsed : fallback;
 }
 
 const editorStyle: React.CSSProperties = {

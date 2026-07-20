@@ -31,10 +31,12 @@ export async function streamResumeFromRawLine(
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return;
   }
+  const resumeGcode = resume.lines.join('\n');
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
     project,
     laserModeStartSnapshot,
     jobAwareConfirm,
+    resumeGcode,
   );
   if (laserModeStartEvidence === null) return;
   const proceed = jobAwareConfirm(
@@ -54,7 +56,6 @@ export async function streamResumeFromRawLine(
   }
   try {
     const laser = useLaserStore.getState();
-    const resumeGcode = resume.lines.join('\n');
     const initialPosition = reportedWorkPositionMm(
       laser,
       laser.controllerSettings?.reportInches === true,

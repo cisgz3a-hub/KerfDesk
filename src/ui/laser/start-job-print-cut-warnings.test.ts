@@ -77,4 +77,49 @@ describe('Print-and-Cut Frame warnings', () => {
       ]),
     );
   });
+
+  it.each([
+    ['art only', 'art'],
+    ['registration box only', 'registration-box'],
+  ])(
+    'does not claim combined output when selected scope contains %s',
+    async (_label, selectedId) => {
+      const project = projectWithMixedRegistrationOutput();
+      const actualSelectedId =
+        selectedId === 'art'
+          ? 'art'
+          : (project.scene.objects.find((object) => object.id !== 'art')?.id ?? selectedId);
+      const result = await prepareStartJobSnapshot(
+        project,
+        { maxPowerS: 1000, minPowerS: 0, laserModeEnabled: true },
+        {
+          statusReport: idleStatus,
+          alarmCode: null,
+          hasActiveStreamer: false,
+        },
+        { startFrom: 'absolute', anchor: 'front-left' },
+        {
+          cutSelectedGraphics: true,
+          useSelectionOrigin: false,
+          selectedObjectIds: [actualSelectedId],
+        },
+        false,
+        {
+          clock: () => new Date('2026-07-19T00:00:00.000Z'),
+          renderVariableText: unusedRenderer,
+          registration: { scale: 1, rotationRad: 0, translation: { x: 1, y: 2 } },
+          requireFrame: false,
+        },
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.prepared.project.scene.objects.map((object) => object.id)).toEqual([
+        actualSelectedId,
+      ]);
+      expect(result.warnings.some((warning) => warning.includes('box and your artwork'))).toBe(
+        false,
+      );
+    },
+  );
 });

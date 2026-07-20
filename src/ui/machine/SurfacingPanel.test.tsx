@@ -67,7 +67,7 @@ describe('SurfacingPanel save path', () => {
     const data = write.mock.calls[0]?.[0];
     expect(typeof data).toBe('string');
     if (typeof data !== 'string') throw new Error('expected text output');
-    expect(data).toContain('; emitter: adr-234-4040-fill-entry-v1');
+    expect(data).toContain('; emitter: adr-235-4040-quality-controlled-v2');
     expect(data.indexOf('G0 Z3.810')).toBeLessThan(data.indexOf('M3 S12000'));
     expect(data).toContain('F500.000');
     expect(data).not.toContain('F2500.000');

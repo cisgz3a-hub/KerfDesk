@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ImportedSvg } from '../scene';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { compileJob } from './compile-job';
 import { generateScanOffsetCalibrationPattern } from './scan-offset-calibration-pattern';
 
@@ -58,14 +58,70 @@ describe('generateScanOffsetCalibrationPattern', () => {
       hatchSpacingMm: 1,
     });
 
-    const job = compileJob(pattern.scene, DEFAULT_DEVICE_PROFILE);
+    const job = compileJob(pattern.scene, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     const fillGroups = job.groups.filter((group) => group.kind === 'fill');
 
     expect(fillGroups.map((group) => group.speed)).toEqual([2000, 1000]);
     for (const group of fillGroups) {
       expect(group.segments.some((segment) => segment.reverse === false)).toBe(true);
       expect(group.segments.some((segment) => segment.reverse === true)).toBe(true);
+      expect(group.bidirectionalScanOffsetMm).toBe(0);
+      expect(group.scanDirection?.reason).toBe('calibration-baseline');
     }
+  });
+
+  it('lets verification coupons use the saved profile table instead of the zero override', () => {
+    const pattern = generateScanOffsetCalibrationPattern({
+      mode: 'verification',
+      steps: 1,
+      speedMin: 2000,
+      speedMax: 2000,
+      power: 10,
+      swatchWidthMm: 12,
+      swatchHeightMm: 4,
+      hatchSpacingMm: 1,
+    });
+    const device = {
+      ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: 2000, offsetMm: 0.2 }],
+      scanOffsetCalibrationStatus: 'pending' as const,
+    };
+
+    const fill = compileJob(pattern.scene, device).groups.find((group) => group.kind === 'fill');
+
+    expect(fill?.kind).toBe('fill');
+    if (fill?.kind !== 'fill') throw new Error('Expected verification fill group');
+    expect(fill.bidirectionalScanOffsetMm).toBeUndefined();
+    expect(fill.scanDirection).toEqual({
+      bidirectional: true,
+      reason: 'calibration-verification',
+    });
+  });
+
+  it('forces a truthful zero-offset baseline even when an old table exists', () => {
+    const pattern = generateScanOffsetCalibrationPattern({
+      mode: 'baseline',
+      steps: 1,
+      speedMin: 2000,
+      speedMax: 2000,
+      power: 10,
+      swatchWidthMm: 12,
+      swatchHeightMm: 4,
+      hatchSpacingMm: 1,
+    });
+    const device = {
+      ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: 2000, offsetMm: 0.2 }],
+      scanOffsetCalibrationStatus: 'verified' as const,
+    };
+
+    const fill = compileJob(pattern.scene, device).groups.find((group) => group.kind === 'fill');
+
+    expect(fill?.bidirectionalScanOffsetMm).toBe(0);
+    expect(fill?.scanDirection).toEqual({
+      bidirectional: true,
+      reason: 'calibration-baseline',
+    });
   });
 
   it('burns a speed label under each swatch so the apply UI can read it', () => {

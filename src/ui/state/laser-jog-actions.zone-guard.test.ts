@@ -3,23 +3,28 @@ import { createProject } from '../../core/scene';
 import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../../core/devices';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      respondToTestGrblHandshake(data, emitLine);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine,
   };
 }
 
@@ -59,7 +64,7 @@ async function connectIdleAtOrigin(connection: FakeConnection): Promise<void> {
   await flush();
   connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  await flush();
+  await settleTestGrblHandshake();
 }
 
 async function flush(): Promise<void> {
@@ -118,7 +123,7 @@ describe('jog no-go zone guard (DEV-04)', () => {
     connection.emitLine('ok');
     // Park the head at (30,30) — inside the clamp (20..40).
     connection.emitLine('<Idle|MPos:30.000,30.000,0.000|FS:0,0>');
-    await flush();
+    await settleTestGrblHandshake();
     writes.length = 0;
 
     // A Z-only retract has no XY motion, so an XY keep-out cannot block it.
@@ -135,7 +140,7 @@ describe('jog no-go zone guard (DEV-04)', () => {
     await flush();
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:50.000,50.000,0.000|FS:0,0>');
-    await flush();
+    await settleTestGrblHandshake();
     writes.length = 0;
 
     await expect(

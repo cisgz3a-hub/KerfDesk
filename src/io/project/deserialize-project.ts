@@ -14,6 +14,7 @@ import {
   normalizeScanOffsetTable,
   streamingModeForController,
 } from '../../core/devices';
+import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -246,6 +247,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
   const controllerKind = isKnownControllerKind(dev['controllerKind'])
     ? dev['controllerKind']
     : undefined;
+  const scanningOffsets = normalizeScanOffsetTable(dev['scanningOffsets']);
   return {
     ...dev,
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
@@ -266,7 +268,19 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     ),
     rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
-    scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
+    scanningOffsets,
+    scanOffsetCalibrationStatus: normalizeScanOffsetCalibrationStatus(
+      dev['scanOffsetCalibrationStatus'],
+      scanningOffsets,
+    ),
+    controlledLaserOffTravelFeedMmPerMin:
+      typeof dev['controlledLaserOffTravelFeedMmPerMin'] === 'number' &&
+      Number.isFinite(dev['controlledLaserOffTravelFeedMmPerMin']) &&
+      dev['controlledLaserOffTravelFeedMmPerMin'] > 0 &&
+      typeof dev['maxFeed'] === 'number' &&
+      dev['controlledLaserOffTravelFeedMmPerMin'] <= dev['maxFeed']
+        ? dev['controlledLaserOffTravelFeedMmPerMin']
+        : undefined,
     // Override (not merge) the raw value so a malformed persisted calibration is
     // dropped to undefined rather than trusted; JSON.stringify omits the undefined.
     cameraCalibration: normalizeCameraCalibration(dev['cameraCalibration']),

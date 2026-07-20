@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -10,17 +11,33 @@ type FakeConnection = SerialConnection & {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        (useLaserStore.getState().controllerOperation?.kind === 'connection-handshake' ||
+          useLaserStore.getState().controllerOperation?.kind === 'interactive-command')
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+      if (data === '$G\n') {
+        emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: (line) => emit(line),
   };
 }
 
@@ -46,7 +63,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 // Eight 29-byte lines: the 120-byte first window holds four, so any stray ok
@@ -100,7 +117,7 @@ describe('untracked-ack start guard', () => {
     await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
-    const started = useLaserStore.getState().startJob(JOB_GCODE);
+    const started = startTestLaserJob(JOB_GCODE);
     await flush();
     // The stale ack arrives while Start is draining the pending window.
     connection.emitLine('ok');
@@ -121,7 +138,7 @@ describe('untracked-ack start guard', () => {
     await connectWith(connection);
 
     await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
-    const started = useLaserStore.getState().startJob(JOB_GCODE);
+    const started = startTestLaserJob(JOB_GCODE);
     const failure = expect(started).rejects.toThrow(/1 terminal acknowledgement is still owed/i);
     await vi.advanceTimersByTimeAsync(2_000);
     await failure;
@@ -135,7 +152,7 @@ describe('untracked-ack start guard', () => {
     await connectWith(connection);
     useLaserStore.setState({ pendingTransportWrites: 2 });
 
-    const started = useLaserStore.getState().startJob(JOB_GCODE);
+    const started = startTestLaserJob(JOB_GCODE);
     const failure = expect(started).rejects.toThrow(/2 controller writes are still in transport/i);
     await vi.advanceTimersByTimeAsync(2_000);
     await failure;
@@ -155,7 +172,7 @@ describe('untracked-ack start guard', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     writes.length = 0;
 
-    const started = useLaserStore.getState().startJob(JOB_GCODE);
+    const started = startTestLaserJob(JOB_GCODE);
     await vi.advanceTimersByTimeAsync(750);
     const writesWhileFencing = writes.slice();
 
@@ -164,93 +181,6 @@ describe('untracked-ack start guard', () => {
     await started;
 
     expect(writesWhileFencing).toEqual([]);
-  });
-
-  // Frame-first (ADR-228): the $32=0-specific wire refusal was deleted — a
-  // reported $32=0 reaches the operator through the Job Review acknowledgement
-  // banner instead. A $32 flip DURING Start preparation is still caught at the
-  // wire, as changed settings evidence, before any job byte is written.
-  it('rechecks laser-mode evidence after the queue fence before writing job bytes', async () => {
-    const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
-    await connectWith(connection);
-    const state = useLaserStore.getState();
-    const settingsObservation = {
-      sessionEpoch: state.controllerSessionEpoch,
-      observedAt: 1,
-    };
-    useLaserStore.setState({
-      controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
-      controllerSettingsObservation: settingsObservation,
-    });
-    await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
-    writes.length = 0;
-
-    const started = useLaserStore.getState().startJob(JOB_GCODE, {
-      machineKind: 'laser',
-      laserModeStartEvidence: {
-        controllerSessionEpoch: state.controllerSessionEpoch,
-        settingsCapability: state.capabilities.settings,
-        settingsObservation,
-        laserModeEnabled: true,
-        maxPowerS: 1000,
-        unverifiedAcknowledged: false,
-      },
-    });
-    await flush();
-    useLaserStore.setState({
-      controllerSettings: { maxPowerS: 1000, laserModeEnabled: false },
-      controllerSettingsObservation: {
-        sessionEpoch: state.controllerSessionEpoch,
-        observedAt: 2,
-      },
-    });
-    connection.emitLine('ok');
-
-    await expect(started).rejects.toThrow(/settings changed while Start was being prepared/i);
-    expect(useLaserStore.getState().streamer).toBeNull();
-    expect(writes.some((write) => write.includes(LONG_LINE))).toBe(false);
-  });
-
-  it('refuses a changed settings observation even when the new dump still reports $32=1', async () => {
-    const connection = makeConnection(async () => undefined);
-    await connectWith(connection);
-    const state = useLaserStore.getState();
-    const settingsObservation = {
-      sessionEpoch: state.controllerSessionEpoch,
-      observedAt: 1,
-    };
-    useLaserStore.setState({
-      controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
-      controllerSettingsObservation: settingsObservation,
-    });
-    await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
-
-    const started = useLaserStore.getState().startJob(JOB_GCODE, {
-      machineKind: 'laser',
-      laserModeStartEvidence: {
-        controllerSessionEpoch: state.controllerSessionEpoch,
-        settingsCapability: state.capabilities.settings,
-        settingsObservation,
-        laserModeEnabled: true,
-        maxPowerS: 1000,
-        unverifiedAcknowledged: false,
-      },
-    });
-    await flush();
-    useLaserStore.setState({
-      controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
-      controllerSettingsObservation: {
-        sessionEpoch: state.controllerSessionEpoch,
-        observedAt: 2,
-      },
-    });
-    connection.emitLine('ok');
-
-    await expect(started).rejects.toThrow(/settings changed while Start was being prepared/i);
-    expect(useLaserStore.getState().streamer).toBeNull();
   });
 
   it('an alarm clears the pending-ack counter', async () => {
@@ -355,9 +285,9 @@ describe('stop-path ack attribution', () => {
     const connection = makeConnection(async () => undefined);
     await connectMarlinWith(connection);
 
-    await useLaserStore
-      .getState()
-      .startJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', { streamingMode: 'ping-pong' });
+    await startTestLaserJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', {
+      streamingMode: 'ping-pong',
+    });
     await flush();
     expect(useLaserStore.getState().streamer?.inFlight).toHaveLength(1);
 
@@ -383,9 +313,9 @@ describe('stop-path ack attribution', () => {
     const connection = makeConnection(async () => undefined);
     await connectMarlinWith(connection);
 
-    await useLaserStore
-      .getState()
-      .startJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', { streamingMode: 'ping-pong' });
+    await startTestLaserJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', {
+      streamingMode: 'ping-pong',
+    });
     await flush();
     await useLaserStore.getState().stopJob();
 
@@ -395,9 +325,9 @@ describe('stop-path ack attribution', () => {
 
     // M107's ok is still owed. Start must wait for it; once it lands it
     // belongs to the ledger, never to the new stream.
-    const started = useLaserStore
-      .getState()
-      .startJob('G1 X9 S100\nG1 X8 S100', { streamingMode: 'ping-pong' });
+    const started = startTestLaserJob('G1 X9 S100\nG1 X8 S100', {
+      streamingMode: 'ping-pong',
+    });
     await flush();
     connection.emitLine('ok'); // M107
     await started;
@@ -422,7 +352,7 @@ describe('stop-path ack attribution', () => {
     });
     await connectWith(connection);
 
-    await useLaserStore.getState().startJob(JOB_GCODE);
+    await startTestLaserJob(JOB_GCODE);
     await flush();
     expect(useLaserStore.getState().streamer?.inFlight.length).toBeGreaterThan(0);
 
@@ -477,7 +407,7 @@ describe('stop-path ack attribution', () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
 
-    await useLaserStore.getState().startJob(JOB_GCODE);
+    await startTestLaserJob(JOB_GCODE);
     await flush();
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
 

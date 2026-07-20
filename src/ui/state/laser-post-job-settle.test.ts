@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -14,17 +15,28 @@ type ControllerOperationSnapshot = {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -51,7 +63,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 function controllerOperation(): ControllerOperationSnapshot {
@@ -70,7 +82,7 @@ const IDLE_WAIT_TIMEOUT_MS = 8_000;
 const FRESH_STATUS_INTERVAL_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS / 2;
 
 async function runJobUntilSettleAwaitsIdle(connection: FakeConnection): Promise<void> {
-  await useLaserStore.getState().startJob(JOB_GCODE);
+  await startTestLaserJob(JOB_GCODE);
   for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
   await flush();
   expect(useLaserStore.getState().streamer?.status).toBe('done');

@@ -69,7 +69,14 @@ export function currentLaserForAuthorizedStartNow(
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();
-  if (controllerStartPreparationStillCurrent(args.preparedAgainst, current)) {
+  if (
+    controllerStartPreparationStillCurrent(args.preparedAgainst, current, {
+      // ADR-232: a completion-issued ordinary-Start permit survives a later
+      // $30/$32 or $I refresh. Settings stay advisory, while the store checks
+      // the exact program against current M7 evidence at the queue fence.
+      ignoreAdvisoryControllerEvidence: args.framedRunClaim !== undefined,
+    })
+  ) {
     return { ok: true, laser: current };
   }
   return {
@@ -85,12 +92,17 @@ export function currentLaserForAuthorizedStartNow(
 export function controllerStartPreparationStillCurrent(
   preparedAgainst: ReturnType<typeof useLaserStore.getState> | FramedRunControllerSnapshot,
   current: ReturnType<typeof useLaserStore.getState>,
-  options: { readonly ignoreStatusState?: boolean } = {},
+  options: {
+    readonly ignoreStatusState?: boolean;
+    readonly ignoreAdvisoryControllerEvidence?: boolean;
+  } = {},
 ): boolean {
   return (
-    current.controllerSessionEpoch === preparedAgainst.controllerSessionEpoch &&
-    current.controllerSettings === preparedAgainst.controllerSettings &&
-    current.controllerSettingsObservation === preparedAgainst.controllerSettingsObservation &&
+    sameControllerEvidence(
+      preparedAgainst,
+      current,
+      options.ignoreAdvisoryControllerEvidence === true,
+    ) &&
     sameStartStatus(
       current.statusReport,
       preparedAgainst.statusReport,
@@ -102,6 +114,21 @@ export function controllerStartPreparationStillCurrent(
     current.trustedPositionEpoch === preparedAgainst.trustedPositionEpoch &&
     current.workZReferenceEpoch === preparedAgainst.workZReferenceEpoch &&
     current.workZZeroEvidence === preparedAgainst.workZZeroEvidence
+  );
+}
+
+function sameControllerEvidence(
+  preparedAgainst: ReturnType<typeof useLaserStore.getState> | FramedRunControllerSnapshot,
+  current: ReturnType<typeof useLaserStore.getState>,
+  ignoreAdvisoryEvidence: boolean,
+): boolean {
+  if (current.controllerSessionEpoch !== preparedAgainst.controllerSessionEpoch) return false;
+  if (ignoreAdvisoryEvidence) return true;
+  return (
+    current.controllerSettings === preparedAgainst.controllerSettings &&
+    current.controllerSettingsObservation === preparedAgainst.controllerSettingsObservation &&
+    current.controllerBuildInfo === preparedAgainst.controllerBuildInfo &&
+    current.controllerBuildInfoObservation === preparedAgainst.controllerBuildInfoObservation
   );
 }
 

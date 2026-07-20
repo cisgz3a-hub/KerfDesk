@@ -22,6 +22,7 @@ import {
   type RecoveryCapsule,
   type RecoveryRepository,
 } from '../state/recovery';
+import { cncPassRecoveryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import {
   cncPassRecoveryReviewIssue,
@@ -38,6 +39,15 @@ import {
 } from './cnc-supervised-recovery-stream';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
+type PlannedPassRecovery = Omit<CncRecoveryStreamPlan, 'executionEvidence'> & {
+  readonly provenanceContext: {
+    readonly review: CncPassRecoveryReview;
+    readonly computedDefault: ReturnType<typeof cncPassRecoveryDefaultPoint>;
+    readonly laterThanComputedDefault: boolean;
+    readonly warningsShown: ReadonlyArray<string>;
+  };
+};
+
 export async function runCncPassRecoveryFlow(
   capsule: RecoveryCapsule,
   review: CncPassRecoveryReview,
@@ -52,7 +62,19 @@ export async function runCncPassRecoveryFlow(
   if (attestation === null) return false;
   const claimed = await claimCncRecoveryCapsule(capsule, repository);
   if (claimed === null) return false;
-  return streamCncRecoveryProgram(planned, attestation, claimed, repository);
+  const executionEvidence = cncPassRecoveryExecutionEvidence({
+    sourceRunId: claimed.runId,
+    sourceRevision: claimed.revision,
+    ...planned.provenanceContext,
+    reviewedAtIso: new Date().toISOString(),
+    cncSetupAttestation: attestation,
+  });
+  return streamCncRecoveryProgram(
+    { ...planned, executionEvidence },
+    attestation,
+    claimed,
+    repository,
+  );
 }
 
 function sealedCncArtifact(capsule: RecoveryCapsule): ExecutionArtifactV1 | null {
@@ -90,11 +112,12 @@ function planPassRecovery(
   capsule: RecoveryCapsule,
   artifact: ExecutionArtifactV1,
   review: CncPassRecoveryReview,
-): CncRecoveryStreamPlan | null {
+): PlannedPassRecovery | null {
   const source = prepareArchivedRecoverySource(artifact);
   if (source === null) return null;
   const resumePoint = cncPassRecoveryDefaultPoint(capsule);
-  if (isLaterThanDefault(review, resumePoint) && resumePoint?.kind === 'resume-at-pass') {
+  const laterThanComputedDefault = isLaterThanDefault(review, resumePoint);
+  if (laterThanComputedDefault && resumePoint?.kind === 'resume-at-pass') {
     if (!jobAwareConfirm(latePickWarning(resumePoint))) return null;
   }
   const resume = buildCncPassResumeJob(source.prepared.job, review.groupIndex, review.passIndex);
@@ -119,7 +142,15 @@ function planPassRecovery(
   }
   if (!confirmWarnings(source.warnings)) return null;
   if (!confirmPlan(review, resume)) return null;
-  return passRecoveryStreamPlan(capsule, review, source, resume, emitted.gcode);
+  return passRecoveryStreamPlan(
+    capsule,
+    review,
+    source,
+    resume,
+    emitted.gcode,
+    resumePoint,
+    laterThanComputedDefault,
+  );
 }
 
 function passRecoveryStreamPlan(
@@ -128,11 +159,19 @@ function passRecoveryStreamPlan(
   source: PreparedRecoverySource,
   resume: Extract<ReturnType<typeof buildCncPassResumeJob>, { kind: 'resume-job' }>,
   gcode: string,
-): CncRecoveryStreamPlan {
+  computedDefault: ReturnType<typeof cncPassRecoveryDefaultPoint>,
+  laterThanComputedDefault: boolean,
+): PlannedPassRecovery {
   return {
     source,
     recovery: { job: resume.job },
     gcode,
+    provenanceContext: {
+      review: { ...review, position: { ...review.position } },
+      computedDefault,
+      laterThanComputedDefault,
+      warningsShown: [...source.warnings],
+    },
     ...(review.position.kind === 'retained-confirmed'
       ? { assertFinalStartConditions: () => assertRetainedPositionStillConfirmed(capsule) }
       : {}),
@@ -165,7 +204,7 @@ function confirmPlan(
   );
 }
 
-function confirmRecoveryStart(planned: CncRecoveryStreamPlan): CncSetupAttestation | null {
+function confirmRecoveryStart(planned: { readonly gcode: string }): CncSetupAttestation | null {
   if (!jobAwareConfirm(CNC_SETUP_ATTESTATION_PROMPT)) return null;
   const laser = useLaserStore.getState();
   return createCncSetupAttestation(

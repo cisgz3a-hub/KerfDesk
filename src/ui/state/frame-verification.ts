@@ -1,15 +1,17 @@
 // FrameVerification — proof that a clean required Frame ran for the current
-// Verified Origin job (ADR-053 P2).
+// compiled job (ADR-053 P2 / ADR-228).
 //
-// Recorded when a frame is dispatched for Verified Origin, holding the framed
-// rectangle's signature plus the origin identity (WCO + active flag) at that
-// moment. Start compares it against the live values; any drift means the frame
-// no longer proves the job fits, so Start is blocked until a fresh frame.
+// Recorded when a frame is dispatched, holding the bounds identity the Frame
+// safety check proved plus the origin identity (WCO + active flag) at that
+// moment. For laser work this is the complete emitted-motion envelope, including
+// runways and scan offsets; CNC preserves its traced XY-bounds identity. Start
+// compares it against the live values, so motion-envelope drift requires a new
+// Frame even when the artwork's burn rectangle did not change.
 //
 // Invalidation is mostly structural — the recorded WCO / workOriginActive differ
 // from the live ones after a disconnect, soft-reset, or origin move (the store
 // also clears this explicitly at those sites for the no-position-feedback case),
-// and the bounds signature differs after any resize/reposition. Lives in
+// and the bounds signature differs after any relevant motion change. Lives in
 // ui/state (not ui/laser) so the laser-store can own the field without a
 // state -> laser dependency.
 

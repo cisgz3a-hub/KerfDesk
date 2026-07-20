@@ -102,6 +102,8 @@ async function startAcceptedFramedRun(): Promise<{
   const controllerSessionEpoch = useLaserStore.getState().controllerSessionEpoch;
   useLaserStore.setState({
     statusReport: idleStatus,
+    controllerOperation: null,
+    pendingUntrackedAcks: 0,
     controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
     controllerSettingsObservation: { sessionEpoch: controllerSessionEpoch, observedAt: 1 },
     controllerQualification: {
@@ -114,7 +116,15 @@ async function startAcceptedFramedRun(): Promise<{
 
   await runStartJobFlow(recoveryRepository());
 
-  expect(useLaserStore.getState().streamer).not.toBeNull();
+  const startedState = useLaserStore.getState();
+  expect(
+    startedState.streamer,
+    [
+      ...useStartBlockerStore.getState().messages,
+      startedState.lastWriteError ?? '',
+      ...startedState.log.slice(-5),
+    ].join('\n'),
+  ).not.toBeNull();
   expect(useLaserStore.getState().framedRun).toBeNull();
   expect(useLaserStore.getState().frameVerification).toBe(permit.candidate.frameVerification);
   return { connection, verification: permit.candidate.frameVerification };
@@ -155,6 +165,48 @@ afterEach(() => {
 });
 
 describe('ordinary framed Start permit claim', () => {
+  it('keeps and starts a completed permit across an advisory settings and build-info refresh', async () => {
+    const permit = useLaserStore.getState().framedRun;
+    if (permit === null) throw new Error('Expected a framed-run permit.');
+
+    // readMachineSettings clears both observations before installing fresh
+    // objects. Neither phase may turn advisory $30/$32/$I evidence into a
+    // second physical-Frame requirement.
+    useLaserStore.setState({
+      controllerSettings: null,
+      controllerSettingsObservation: null,
+      controllerBuildInfo: null,
+      controllerBuildInfoObservation: null,
+    });
+    expect(useLaserStore.getState().framedRun).toBe(permit);
+
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 255, laserModeEnabled: false },
+      controllerSettingsObservation: { sessionEpoch: 7, observedAt: 2 },
+      controllerBuildInfo: {
+        protocolVersion: '1.1h',
+        buildRevision: '20190830',
+        userInfo: '',
+        optionCodes: ['V'],
+        plannerBufferBlocks: 15,
+        rxBufferBytes: 128,
+      },
+      controllerBuildInfoObservation: { sessionEpoch: 7, observedAt: 2 },
+    });
+    expect(useLaserStore.getState().framedRun).toBe(permit);
+
+    await runStartJobFlow(recoveryRepository());
+
+    expect(useLaserStore.getState().startJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('still revokes a completed permit when the controller session changes', () => {
+    useLaserStore.setState({ controllerSessionEpoch: 8 });
+
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
+  });
+
   it('refuses a permit revoked while exact-artifact staging is pending', async () => {
     const repository = recoveryRepository();
     const paused = pauseNextArtifactStage(repository);
@@ -228,6 +280,10 @@ describe('ordinary framed Start permit claim', () => {
   it('keeps the permit live through the final assertion and consumes it before streaming', async () => {
     const permit = useLaserStore.getState().framedRun;
     if (permit === null) throw new Error('Expected a framed-run permit.');
+    const laserModeStartEvidence = permit.candidate.laserModeStartEvidence;
+    if (laserModeStartEvidence === undefined) {
+      throw new Error('Expected the laser fixture to retain reviewed Start evidence.');
+    }
     const finalAssertion = vi.fn(() => {
       expect(useLaserStore.getState().framedRun).toBe(permit);
     });
@@ -237,6 +293,7 @@ describe('ordinary framed Start permit claim', () => {
       useLaserStore.getState().startJob('G21\nG90\nM5\n', {
         framedRunPermit: permit,
         assertFinalStartAuthorized: finalAssertion,
+        laserModeStartEvidence,
       }),
     ).rejects.toThrow('No active serial connection');
 

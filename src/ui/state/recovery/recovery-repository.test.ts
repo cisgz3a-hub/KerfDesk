@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createJobCheckpoint, serializeJobCheckpoint } from '../../../core/recovery';
-import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../../core/scene';
-import type { PreparedOutput } from '../../../io/gcode';
-import type { CanvasMotionPlan } from '../canvas-motion-plan';
+import { DEFAULT_OUTPUT_SCOPE } from '../../../core/scene';
 import {
-  createExecutionArtifact,
   type ArchivedControllerObservationInput,
   type ExecutionArtifactV1,
   type RunId,
@@ -13,6 +10,7 @@ import type { LegacyCheckpointStorage } from './legacy-checkpoint-migration';
 import { MemoryRecoveryStorageBackend } from './recovery-backend';
 import { MemoryRecoveryGenerationStore } from './recovery-generation';
 import { RecoveryRepository } from './recovery-repository';
+import { createCurrentTestExecutionArtifact } from './testing/execution-artifact-test-fixture';
 
 const NOW = '2026-07-15T10:00:00.000Z';
 const LATER = '2026-07-15T10:01:00.000Z';
@@ -65,37 +63,17 @@ function artifact(
   runId: RunId,
   gcode = 'G21\nG90\nG1 X1\nM5\n',
   observation?: ArchivedControllerObservationInput,
-): ExecutionArtifactV1 {
-  const project = {
-    device: {
-      controllerKind: 'grbl-v1.1',
-      streamingMode: 'char-counted',
-      rxBufferBytes: 120,
-    },
-  } as unknown as Project;
-  const prepared = {
-    ok: true,
-    project,
-    job: { groups: [] },
-    jobOriginOffset: { x: 0, y: 0 },
-  } as Extract<PreparedOutput, { readonly ok: true }>;
-  const canvasPlan = {
-    retentionKey: `signature-${runId}`,
-  } as CanvasMotionPlan;
-  return createExecutionArtifact({
+): Promise<ExecutionArtifactV1> {
+  return createCurrentTestExecutionArtifact({
     runId,
     gcode,
-    prepared,
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    canvasPlan,
-    controllerSettings: { maxPowerS: 1_000, laserModeEnabled: true },
     ...(observation === undefined ? {} : { controllerObservation: observation }),
     createdAtIso: NOW,
   });
 }
 
 async function activeThenInterrupted(repo: RecoveryRepository, runId: RunId): Promise<void> {
-  expect((await repo.stageArtifact(artifact(runId))).ok).toBe(true);
+  expect((await repo.stageArtifact(await artifact(runId))).ok).toBe(true);
   expect((await repo.activateFreshRun(runId, NOW)).ok).toBe(true);
   expect((await repo.updateProgress(runId, 2, LATER)).ok).toBe(true);
   expect(
@@ -108,7 +86,7 @@ describe('RecoveryRepository', () => {
   it('round-trips exact multi-megabyte G-code without rewriting it on progress', async () => {
     const { repository } = harness();
     const largeGcode = `${'G1 X1 Y1\n'.repeat(600_000)}M5\n`;
-    const exact = artifact('run-large', largeGcode);
+    const exact = await artifact('run-large', largeGcode);
 
     expect((await repository.stageArtifact(exact)).ok).toBe(true);
     expect((await repository.activateFreshRun(exact.runId, NOW)).ok).toBe(true);
@@ -125,7 +103,7 @@ describe('RecoveryRepository', () => {
     await activeThenInterrupted(repository, 'run-a');
     const previous = repository.getSnapshot().recoveryCapsule;
 
-    expect((await repository.stageArtifact(artifact('run-b'))).ok).toBe(true);
+    expect((await repository.stageArtifact(await artifact('run-b'))).ok).toBe(true);
     expect(repository.getSnapshot().recoveryCapsule).toEqual(previous);
     expect((await repository.activateFreshRun('run-b', LATER)).ok).toBe(true);
     expect(repository.getSnapshot().activeRun?.runId).toBe('run-b');
@@ -134,7 +112,7 @@ describe('RecoveryRepository', () => {
 
   it('settles a completed very-short run that finishes before activation', async () => {
     const { repository } = harness();
-    await repository.stageArtifact(artifact('run-fast-complete'));
+    await repository.stageArtifact(await artifact('run-fast-complete'));
 
     expect(resultValue(await repository.completeRun('run-fast-complete', LATER))).toBe(true);
     expect(repository.getSnapshot().activeRun).toBeNull();
@@ -148,7 +126,7 @@ describe('RecoveryRepository', () => {
   it('settles an interrupted very-short run only after acceptance replaces the old capsule', async () => {
     const { repository, backend } = harness();
     await activeThenInterrupted(repository, 'run-old');
-    await repository.stageArtifact(artifact('run-fast-interrupt'));
+    await repository.stageArtifact(await artifact('run-fast-interrupt'));
 
     expect(
       resultValue(
@@ -165,13 +143,16 @@ describe('RecoveryRepository', () => {
     await repository.activateFreshRun('run-fast-interrupt', NOW);
     expect(repository.getSnapshot().activeRun).toBeNull();
     expect(repository.getSnapshot().recoveryCapsule?.runId).toBe('run-fast-interrupt');
-    expect(await backend.getArtifact('run-old')).toBeNull();
+    expect(repository.getSnapshot().executionHistory.map((record) => record.runId)).toContain(
+      'run-old',
+    );
+    expect(await backend.getArtifact('run-old')).not.toBeNull();
   });
 
   it('drops deferred settlement with a failed pre-acceptance staged run', async () => {
     const { repository, backend } = harness();
     await activeThenInterrupted(repository, 'run-old');
-    await repository.stageArtifact(artifact('run-first-write-failed'));
+    await repository.stageArtifact(await artifact('run-first-write-failed'));
     await repository.interruptRun(
       'run-first-write-failed',
       0,
@@ -186,11 +167,11 @@ describe('RecoveryRepository', () => {
 
   it('keeps artifacts immutable when a runId is accidentally reused', async () => {
     const { repository } = harness();
-    const original = artifact('run-fixed', 'G1 X1\n');
+    const original = await artifact('run-fixed', 'G1 X1\n');
     expect((await repository.stageArtifact(original)).ok).toBe(true);
     expect((await repository.stageArtifact(original)).ok).toBe(true);
 
-    expect(await repository.stageArtifact(artifact('run-fixed', 'G1 X9\n'))).toEqual({
+    expect(await repository.stageArtifact(await artifact('run-fixed', 'G1 X9\n'))).toEqual({
       ok: false,
       error: 'conflict',
     });
@@ -203,7 +184,7 @@ describe('RecoveryRepository', () => {
     await activeThenInterrupted(repository, 'run-a');
     backend.failNext('put-artifact');
 
-    expect(await repository.stageArtifact(artifact('run-b'))).toEqual({
+    expect(await repository.stageArtifact(await artifact('run-b'))).toEqual({
       ok: false,
       error: 'storage-unavailable',
     });
@@ -215,8 +196,8 @@ describe('RecoveryRepository', () => {
   it('never lets equal-sized foreign runs advance or complete one another', async () => {
     const { repository } = harness();
     const sameSize = 'G1 X1\nG1 X2\n';
-    await repository.stageArtifact(artifact('run-a', sameSize));
-    await repository.stageArtifact(artifact('run-b', sameSize));
+    await repository.stageArtifact(await artifact('run-a', sameSize));
+    await repository.stageArtifact(await artifact('run-b', sameSize));
     await repository.activateFreshRun('run-a', NOW);
 
     expect(resultValue(await repository.updateProgress('run-b', 2, LATER))).toBe(false);
@@ -227,7 +208,7 @@ describe('RecoveryRepository', () => {
 
   it('moves only the owned active run to a replay receipt and discards it atomically', async () => {
     const { repository } = harness();
-    await repository.stageArtifact(artifact('run-done'));
+    await repository.stageArtifact(await artifact('run-done'));
     await repository.activateFreshRun('run-done', NOW);
     expect(resultValue(await repository.completeRun('run-done', LATER))).toBe(true);
     expect(repository.getSnapshot().activeRun).toBeNull();
@@ -280,7 +261,7 @@ describe('RecoveryRepository', () => {
     await activeThenInterrupted(first.repository, 'run-claim-refresh-failure');
     const offered = first.repository.getSnapshot().recoveryCapsule;
     expect(offered).not.toBeNull();
-    first.backend.failNext('get-artifact');
+    first.backend.failNext('read-slots');
 
     expect(
       await first.repository.claimRecovery({
@@ -329,7 +310,7 @@ describe('RecoveryRepository', () => {
 
   it('promotes a stale active run to an interrupted capsule on a new initialization', async () => {
     const first = harness();
-    await first.repository.stageArtifact(artifact('run-stale'));
+    await first.repository.stageArtifact(await artifact('run-stale'));
     await first.repository.activateFreshRun('run-stale', NOW);
     await first.repository.updateProgress('run-stale', 2, LATER);
 
@@ -412,15 +393,15 @@ describe('RecoveryRepository', () => {
     const listener = vi.fn();
     const unsubscribe = repository.subscribe(listener);
     await repository.refresh();
-    await repository.stageArtifact(artifact('run-a'));
+    await repository.stageArtifact(await artifact('run-a'));
     await repository.activateFreshRun('run-a', NOW);
     unsubscribe();
     await repository.updateProgress('run-a', 1, LATER);
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it('retains controller observations strictly as archived artifact evidence', () => {
-    const exact = artifact('run-evidence', undefined, {
+  it('retains controller observations strictly as archived artifact evidence', async () => {
+    const exact = await artifact('run-evidence', undefined, {
       activeControllerKind: 'grbl-v1.1',
       detectedControllerKind: 'fluidnc',
       controllerSessionEpoch: 7,

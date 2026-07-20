@@ -5,6 +5,7 @@
 import type { Dispatch } from 'react';
 import { selectControllerDriver } from '../../../core/controllers';
 import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
+import { deviceProfileWithInteractivePatch } from '../../../core/devices/device-profile-patch';
 import {
   controllerCompatibleProfile,
   validateMachineProfile,
@@ -194,7 +195,9 @@ function reduceDraftAction(
 ): DeviceSetupState {
   switch (action.kind) {
     case 'edit':
-      return invalidateFirmwarePlan(state, { draft: { ...state.draft, ...action.patch } });
+      return invalidateFirmwarePlan(state, {
+        draft: deviceProfileWithInteractivePatch(state.draft, action.patch),
+      });
     case 'edit-machine':
       return editMachineDraft(state, action.machine);
     case 'set-machine-kinds':
@@ -286,7 +289,7 @@ function toggleFirmwareWrite(state: DeviceSetupState, id: number): DeviceSetupSt
 function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>): DeviceSetupState {
   const profilePatch = profilePatchForMachineKind(patch, state.machineKind);
   const draft = controllerCompatibleProfile(
-    { ...state.draft, ...profilePatch },
+    deviceProfileWithInteractivePatch(state.draft, profilePatch),
     state.draft.controllerKind,
   ).profile;
   if (state.machineKind !== 'cnc' || !positive(patch.maxPowerS ?? 0)) {

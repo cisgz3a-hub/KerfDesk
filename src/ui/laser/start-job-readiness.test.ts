@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GrblState, StatusReport } from '../../core/controllers/grbl';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
-import { computeJobBounds, frameBoundsSignature } from '../../core/job';
+import { computeJobBounds, computeJobMotionBounds, frameBoundsSignature } from '../../core/job';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_RASTER_LAYER_COLOR,
@@ -196,7 +196,7 @@ describe('prepareStartJob', () => {
   });
 
   it('warns when connected controller $30 differs from project max S', () => {
-    // Frame-first (ADR-228): controller-readiness errors inform, never block.
+    // Frame-first (#296): controller-readiness errors inform, never block.
     const project = calibratedProject();
     const result = prepareStartJob(
       project,
@@ -295,16 +295,19 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('accepts a Verified Frame signature computed from scan-offset-aware bounds', () => {
+  it('accepts a Verified Frame signature computed from the scan-offset-aware motion envelope', () => {
     const project = rasterProjectWithScanOffset();
     const jobOrigin = { startFrom: 'verified-origin' as const, anchor: 'front-left' as const };
     const prepared = prepareOutput(project, { jobOrigin });
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) return;
-    const bounds = computeJobBounds(prepared.job, project.device);
-    expect(bounds).not.toBeNull();
-    if (bounds === null) return;
-    expect(bounds.maxX).toBe(12);
+    const burnBounds = computeJobBounds(prepared.job, project.device);
+    const motionBounds = computeJobMotionBounds(prepared.job, project.device);
+    expect(burnBounds).not.toBeNull();
+    expect(motionBounds).not.toBeNull();
+    if (burnBounds === null || motionBounds === null) return;
+    expect(burnBounds.maxX).toBe(12);
+    expect(motionBounds.maxX).toBeGreaterThan(burnBounds.maxX);
 
     const result = prepareStartJob(
       project,
@@ -313,7 +316,7 @@ describe('prepareStartJob', () => {
         ...readyMachine,
         workOriginActive: true,
         frameVerification: {
-          boundsSignature: frameBoundsSignature(bounds),
+          boundsSignature: frameBoundsSignature(motionBounds),
           wco: null,
           workOriginActive: true,
         },

@@ -26,9 +26,18 @@ function droppableConnection(): DroppableConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
   let releaseBlockedWrite: () => void = () => undefined;
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
     write: async (data) => {
       if (data !== '$I\n') return;
+      if (useLaserStore.getState().controllerOperation?.kind === 'connection-handshake') {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+        return;
+      }
       await new Promise<void>((resolve) => {
         releaseBlockedWrite = resolve;
       });
@@ -42,9 +51,7 @@ function droppableConnection(): DroppableConnection {
       return () => closeHandlers.delete(handler);
     },
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
     emitClose: () => {
       for (const handler of closeHandlers) handler();
     },
@@ -54,8 +61,19 @@ function droppableConnection(): DroppableConnection {
 
 function zeroZConnection(capture: (release: () => void) => void): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
     write: async (data) => {
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
       if (data.includes('G92 Z0')) await new Promise<void>((resolve) => capture(resolve));
     },
     onLine: (handler) => {
@@ -64,9 +82,7 @@ function zeroZConnection(capture: (release: () => void) => void): FakeConnection
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -83,7 +99,7 @@ function adapter(connection: SerialConnection): PlatformAdapter {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 afterEach(async () => {
@@ -219,9 +235,9 @@ describe('safe-write transport epochs', () => {
     await flush();
 
     const zeroing = useLaserStore.getState().zeroZHere();
-    const zeroFailure = expect(zeroing).rejects.toThrow(
-      /serial session changed|controller rebooted/i,
-    );
+    const zeroFailure = (async () => {
+      await expect(zeroing).rejects.toThrow(/serial session changed|controller rebooted/i);
+    })();
     expect(useLaserStore.getState().pendingTransportWrites).toBe(1);
     const previousEpoch = useLaserStore.getState().workZReferenceEpoch;
 

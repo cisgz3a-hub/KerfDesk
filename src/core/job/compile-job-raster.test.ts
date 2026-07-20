@@ -5,7 +5,7 @@
 // exclusion.
 
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
 import { compileJob } from './compile-job';
 import type { Job, RasterGroup } from './job';
@@ -125,6 +125,32 @@ describe('compileJob raster image groups', () => {
     const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [layer] }, dev);
 
     expect(firstRasterGroup(job)?.bidirectional).toBe(false);
+  });
+
+  it('falls back to one-way for an uncalibrated 4040 image and permits the expert override', () => {
+    const fallback = firstRasterGroup(
+      compileJob(
+        { objects: [rasterObject('AP//AA==')], layers: [imageLayer()] },
+        NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      ),
+    );
+    const expert = firstRasterGroup(
+      compileJob(
+        {
+          objects: [rasterObject('AP//AA==')],
+          layers: [imageLayer({ allowUncalibratedBidirectionalScan: true })],
+        },
+        NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      ),
+    );
+    expect(fallback).toMatchObject({
+      bidirectional: false,
+      scanDirection: { bidirectional: false, reason: 'uncalibrated-4040-fallback' },
+    });
+    expect(expert).toMatchObject({
+      bidirectional: true,
+      scanDirection: { bidirectional: true, reason: 'expert-override' },
+    });
   });
 
   it('treats missing luma as white so legacy rasters fail safe', () => {

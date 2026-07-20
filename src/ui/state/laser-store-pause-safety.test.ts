@@ -4,6 +4,7 @@ import { RT_SAFETY_DOOR } from '../../core/controllers/grbl/commands';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -11,17 +12,28 @@ type FakeConnection = SerialConnection & {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -51,7 +63,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flushConnect(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -93,7 +105,7 @@ describe('laser-store pause safety', () => {
     });
     liveConnection = connection;
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
     writes.length = 0;
 
     await useLaserStore.getState().pauseJob();
@@ -202,7 +214,7 @@ describe('laser-store pause safety', () => {
     liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
     writes.length = 0;
 
     await useLaserStore.getState().pauseJob();
@@ -229,7 +241,7 @@ describe('laser-store pause at end of stream', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await useLaserStore.getState().startJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5');
+    await startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5');
     for (let index = 0; index < 5; index += 1) connection.emitLine('ok');
     connection.emitLine(stateLine);
     await flushConnect();
@@ -271,7 +283,7 @@ describe('laser-store pause at end of stream', () => {
     liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
     await useLaserStore.getState().pauseJob();
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
 

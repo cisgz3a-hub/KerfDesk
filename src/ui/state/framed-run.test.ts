@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import {
   createFramedRunPermit,
   FRAME_CONTROLLER_CHANGED_MESSAGE,
@@ -19,12 +20,23 @@ const statusReport: StatusReport = {
   spindle: 0,
   wco: { x: 2, y: 4, z: 0 },
 };
+const controllerBuildInfo: GrblBuildInfo = {
+  protocolVersion: '1.1h',
+  buildRevision: '20190830',
+  userInfo: '',
+  optionCodes: ['V', 'N', 'M'],
+  plannerBufferBlocks: 15,
+  rxBufferBytes: 128,
+};
+const controllerBuildInfoObservation = { sessionEpoch: 7, observedAt: 101 } as const;
 
 function controllerSource(): FramedRunControllerSource {
   return {
     controllerSessionEpoch: 7,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    controllerBuildInfo,
+    controllerBuildInfoObservation,
     statusReport,
     statusSequence: 19,
     wcoCache: { x: 2, y: 4, z: 0 },
@@ -48,6 +60,8 @@ describe('FramedRun completion evidence', () => {
       controllerSessionEpoch: 7,
       controllerSettings: null,
       controllerSettingsObservation: null,
+      controllerBuildInfo,
+      controllerBuildInfoObservation,
       statusReport,
       wcoCache: { x: 2, y: 4, z: 0 },
       workOriginActive: true,
@@ -88,6 +102,16 @@ describe('FramedRun completion evidence', () => {
       framedRunCompletionIssue(candidateFor(source), {
         ...source,
         wcoCache: { x: 3, y: 4, z: 0 },
+      }),
+    ).toBe(FRAME_CONTROLLER_CHANGED_MESSAGE);
+  });
+
+  it('refuses build-info evidence drift during Frame', () => {
+    const source = controllerSource();
+    expect(
+      framedRunCompletionIssue(candidateFor(source), {
+        ...source,
+        controllerBuildInfoObservation: { sessionEpoch: 7, observedAt: 102 },
       }),
     ).toBe(FRAME_CONTROLLER_CHANGED_MESSAGE);
   });

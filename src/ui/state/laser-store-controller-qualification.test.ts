@@ -3,6 +3,7 @@ import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { recoveryRepository } from './recovery';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
@@ -22,6 +23,15 @@ function makeConnection(writes: string[]): FakeConnection {
       // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {
         emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        emit('ok');
+      }
+      if (
+        data === '$I\n' &&
+        (useLaserStore.getState().controllerOperation?.kind === 'connection-handshake' ||
+          useLaserStore.getState().controllerOperation?.kind === 'interactive-command')
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
         emit('ok');
       }
     },
@@ -49,7 +59,7 @@ function adapter(connection: SerialConnection): PlatformAdapter {
 }
 
 async function flush(): Promise<void> {
-  for (let index = 0; index < 8; index += 1) await Promise.resolve();
+  for (let index = 0; index < 30; index += 1) await Promise.resolve();
 }
 
 async function settleTimers(): Promise<void> {
@@ -114,6 +124,15 @@ describe('epoch-bound controller qualification', () => {
       settings: 'verified',
     });
     expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
+    expect(writes.filter((line) => line === '$I\n')).toHaveLength(1);
+    expect(useLaserStore.getState().controllerBuildInfo?.optionCodes).toEqual(['V', 'M']);
+    expect(useLaserStore.getState().controllerBuildInfoRawLines).toEqual([
+      '[VER:1.1h.20190830:test]',
+      '[OPT:VM,15,128]',
+    ]);
+    expect(useLaserStore.getState().controllerBuildInfoObservation?.sessionEpoch).toBe(
+      useLaserStore.getState().controllerSessionEpoch,
+    );
   });
 
   it('keeps an empty settings read failed until the inline Retry succeeds', async () => {
@@ -226,7 +245,7 @@ describe('epoch-bound controller qualification', () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await connectQualified(connection);
-    await useLaserStore.getState().startJob('G1 X1 S100\nG1 X2 S100');
+    await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
     await useLaserStore.getState().stopJob();
 
     expect(useLaserStore.getState().controllerQualification).toMatchObject({
@@ -248,7 +267,7 @@ describe('epoch-bound controller qualification', () => {
     await flush();
     expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
 
-    await expect(useLaserStore.getState().startJob('G1 X9 S100')).resolves.toBeUndefined();
+    await expect(startTestLaserJob('G1 X9 S100')).resolves.toBeUndefined();
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
   });
 

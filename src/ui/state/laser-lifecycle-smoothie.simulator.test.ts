@@ -11,6 +11,7 @@ import {
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -120,7 +121,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
   it('pauses with realtime ! WITHOUT the $32 proof and resumes with ~', async () => {
     const sim = await connectSmoothieIdle();
     expect(useLaserStore.getState().controllerSettings).toBeNull();
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(30);
     await useLaserStore.getState().pauseJob(); // must NOT throw the $32 message
     expect(sim.outbound()).toContain('!');
@@ -135,7 +136,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
 
   it('stops with Ctrl-X + M5/M9; halt recovers via M999 unlock', async () => {
     const sim = await connectSmoothieIdle();
-    await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(20);
     await useLaserStore.getState().stopJob();
     await pump(50);
@@ -176,7 +177,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
     const sim = await connectSmoothieIdle({
       rejectLines: [{ pattern: /X13\b/, error: 'Unknown g code' }],
     });
-    await useLaserStore.getState().startJob(jobLines(30), { streamingMode: 'ping-pong' });
+    await startTestLaserJob(jobLines(30), { streamingMode: 'ping-pong' });
     await pump(100);
     expect(useLaserStore.getState().safetyNotice).not.toBeNull();
     expect(sim.outbound()).toContain('\x18'); // realtime abort after stream error

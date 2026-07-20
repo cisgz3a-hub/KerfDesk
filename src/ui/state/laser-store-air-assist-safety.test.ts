@@ -4,6 +4,7 @@ import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -14,17 +15,28 @@ function makeConnection(
   close: () => Promise<void> = async () => undefined,
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -55,7 +67,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flushConnect(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -147,7 +159,7 @@ describe('laser store air assist safety cleanup', () => {
       writes.push(data);
     });
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nM8\nG1 X1 F600 S100\nM9\nM5\n');
+    await startTestLaserJob('G21\nM8\nG1 X1 F600 S100\nM9\nM5\n');
 
     writes.length = 0;
     await useLaserStore.getState().stopJob();
@@ -169,7 +181,7 @@ describe('laser store air assist safety cleanup', () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write, close);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
 
     write.mockClear();
@@ -190,7 +202,7 @@ describe('laser store air assist safety cleanup', () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write, close);
     await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     connection.emitLine('error:7');
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
 

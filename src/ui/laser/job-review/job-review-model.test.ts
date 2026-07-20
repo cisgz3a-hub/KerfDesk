@@ -153,10 +153,61 @@ describe('buildJobReviewModel', () => {
     });
   });
 
-  it('carries the acknowledgement and a warning — not a block — for a reported $32=0', async () => {
-    // Frame-first (ADR-228): $32=0 no longer refuses the Start anywhere. The
-    // readiness error joins the review warnings and the $32 acknowledgement
-    // banner covers the reported-disabled case.
+  it('puts exact Fill runway coverage in the always-visible stats row', async () => {
+    const square: SceneObject = {
+      kind: 'imported-svg',
+      id: 'fill-square',
+      source: 'fill.svg',
+      bounds: { minX: 20, minY: 20, maxX: 24, maxY: 24 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 20, y: 20 },
+                { x: 24, y: 20 },
+                { x: 24, y: 24 },
+                { x: 20, y: 24 },
+                { x: 20, y: 20 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: [square],
+          layers: [
+            {
+              ...createLayer({ id: 'fill', color: '#ff0000', mode: 'fill' }),
+              hatchSpacingMm: 1,
+              fillOverscanMm: 5,
+              passes: 2,
+            },
+          ],
+        },
+      },
+    }));
+
+    const model = await buildModelFromCurrentStores();
+    const runway = model.stats.find((tile) => tile.label === 'Fill runway');
+
+    expect(runway?.value).toMatch(/^0 \/ \d+ full$/);
+    expect(runway?.detail).toContain('Requested 5 mm');
+    expect(runway?.detail).toMatch(/\d+ skipped/);
+    expect(model.outputQualityFacts).toContainEqual(
+      expect.objectContaining({ label: 'Fill runway coverage' }),
+    );
+  });
+
+  it('keeps a reported $32=0 visible in Job Review', async () => {
     useLaserStore.setState({
       controllerSettings: {
         maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
@@ -167,10 +218,6 @@ describe('buildJobReviewModel', () => {
 
     const model = await buildModelFromCurrentStores();
 
-    expect(model.acknowledgement).toEqual({
-      kind: 'laser-unverified',
-      prompt: LASER_MODE_UNVERIFIED_START_PROMPT,
-    });
     expect(model.warnings).toContainEqual(expect.stringContaining('$32=0'));
   });
 
@@ -188,9 +235,9 @@ describe('buildJobReviewModel', () => {
 
     const model = await buildModelFromCurrentStores();
 
-    // Informational only (ADR-228): the warning joins the review list; the M7
-    // stays in the program and nothing blocks Start.
-    expect(model.warnings).toContainEqual(expect.stringContaining('error:20'));
+    expect(model.warnings).toContainEqual(expect.stringContaining('could not verify M7 support'));
+    // rule 7 / ADR-228: M7 support is a Job Review warning; it never forces acknowledgement.
+    expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
   });
 
   it('discloses manual air when the exact job requests air but emits no relay command', async () => {

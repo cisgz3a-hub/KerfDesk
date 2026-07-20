@@ -66,7 +66,8 @@ export function StartFromLineControl(props: {
       </div>
       <p style={hintStyle}>
         Requires the same work zero as the original run. The head moves to the recorded position
-        with the beam off, then the remaining laser program is replayed.
+        with the beam off, then the remaining laser program is replayed. This manual tool is not an
+        exact sealed replay and creates no execution-archive or recovery record.
       </p>
     </details>
   );

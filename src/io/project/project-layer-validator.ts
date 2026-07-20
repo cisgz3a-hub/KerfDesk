@@ -36,6 +36,8 @@ export function validateLayerOperationSettings(value: unknown, path: string): st
     optionalNonNegativeNumber(value, `${path}.fillOverscanMm`),
     optionalLiteral(value, `${path}.fillStyle`, ['scanline', 'offset', 'island']),
     optionalBoolean(value, `${path}.fillBidirectional`),
+    optionalBoolean(value, `${path}.allowUncalibratedBidirectionalScan`),
+    optionalNumber(value, `${path}.bidirectionalScanOffsetMm`),
     optionalBoolean(value, `${path}.fillCrossHatch`),
     optionalDither(value, `${path}.ditherAlgorithm`),
     optionalPositiveNumber(value, `${path}.linesPerMm`),

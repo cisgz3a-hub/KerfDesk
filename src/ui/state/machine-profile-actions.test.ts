@@ -42,4 +42,25 @@ describe('machine profile store actions', () => {
       anchor: 'center',
     });
   });
+
+  it('clamps controlled laser-off travel when max feed is lowered', () => {
+    const before = useStore.getState();
+    useStore.setState({
+      project: {
+        ...before.project,
+        device: {
+          ...before.project.device,
+          maxFeed: 1000,
+          controlledLaserOffTravelFeedMmPerMin: 800,
+        },
+      },
+    });
+
+    useStore.getState().updateDeviceProfile({ maxFeed: 500 });
+
+    expect(useStore.getState().project.device).toMatchObject({
+      maxFeed: 500,
+      controlledLaserOffTravelFeedMmPerMin: 500,
+    });
+  });
 });

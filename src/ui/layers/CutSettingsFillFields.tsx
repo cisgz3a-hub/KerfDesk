@@ -61,6 +61,7 @@ export function CutSettingsFillFields(props: {
           title="Scan fill lines in both directions to reduce travel time."
         />
       </Field>
+      <ExpertOverrideField enabled={props.layer.allowUncalibratedBidirectionalScan === true} />
       <Field label="Cross-Hatch">
         <input
           name="fillCrossHatch"
@@ -73,6 +74,20 @@ export function CutSettingsFillFields(props: {
         />
       </Field>
     </fieldset>
+  );
+}
+
+function ExpertOverrideField(props: { readonly enabled: boolean }): JSX.Element {
+  return (
+    <Field label="Expert override">
+      <input
+        name="allowUncalibratedBidirectionalScan"
+        type="checkbox"
+        className="lf-checkbox"
+        defaultChecked={props.enabled}
+        title="Allow bidirectional scanning without a scan-offset calibration. This can double or blur edges on the 4040."
+      />
+    </Field>
   );
 }
 

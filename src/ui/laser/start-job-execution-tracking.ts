@@ -4,13 +4,19 @@ import type { OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
+import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
+import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import {
+  createArchivedControllerObservation,
   createExecutionArtifact,
   type LastCompletedReceipt,
   type RecoveryRepository,
   type RunId,
 } from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
+import type { JobReviewModel } from './job-review';
+import { createExecutionProvenance } from '../state/recovery/execution-provenance';
+import { ordinaryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import type { prepareCurrentStartJob } from './start-job-source';
 
@@ -70,8 +76,49 @@ export async function stageFreshExecutionArtifact(args: {
   readonly outputScope: OutputScope;
   readonly laser: LaserState;
   readonly repository: RecoveryRepository;
+  readonly reviewedAtIso: string;
+  readonly reviewModel: JobReviewModel;
+  readonly laserModeStartEvidence?: LaserModeStartEvidence;
+  readonly cncSetupAttestation?: CncSetupAttestation;
+  readonly completedReplaySourceRunId?: RunId;
 }): Promise<boolean> {
   try {
+    const evidence = ordinaryExecutionEvidence({
+      reviewedAtIso: args.reviewedAtIso,
+      warningsShown: args.reviewModel.warnings,
+      acknowledgement: args.reviewModel.acknowledgement,
+      ...(args.completedReplaySourceRunId === undefined
+        ? {}
+        : { completedReplaySourceRunId: args.completedReplaySourceRunId }),
+      ...(args.laserModeStartEvidence === undefined
+        ? {}
+        : { laserModeStartEvidence: args.laserModeStartEvidence }),
+      ...(args.cncSetupAttestation === undefined
+        ? {}
+        : { cncSetupAttestation: args.cncSetupAttestation }),
+    });
+    const createdAtIso = new Date().toISOString();
+    const archivedControllerObservation = createArchivedControllerObservation({
+      controllerSettings: args.laser.controllerSettings,
+      observedAtIso: createdAtIso,
+      controllerObservation: {
+        statusReport: args.laser.statusReport,
+        wco: args.laser.wcoCache,
+        overrides: args.laser.ovCache,
+        accessories: args.laser.accessoryCache ?? null,
+        workZZeroEvidence: args.laser.workZZeroEvidence,
+        activeControllerKind: args.laser.activeControllerKind,
+        detectedControllerKind: args.laser.detectedControllerKind,
+        controllerSessionEpoch: args.laser.controllerSessionEpoch,
+      },
+    });
+    const provenance = await createExecutionProvenance({
+      gcode: args.prepared.gcode,
+      profile: args.prepared.prepared.project.device,
+      laser: args.laser,
+      archivedControllerObservation,
+      ...evidence,
+    });
     const artifact = createExecutionArtifact({
       runId: args.runId,
       gcode: args.prepared.gcode,
@@ -83,17 +130,9 @@ export async function stageFreshExecutionArtifact(args: {
         ? {}
         : { cncToolPlan: args.prepared.cncToolPlan }),
       controllerSettings: args.laser.controllerSettings,
-      controllerObservation: {
-        statusReport: args.laser.statusReport,
-        wco: args.laser.wcoCache,
-        overrides: args.laser.ovCache,
-        accessories: args.laser.accessoryCache ?? null,
-        workZZeroEvidence: args.laser.workZZeroEvidence,
-        activeControllerKind: args.laser.activeControllerKind,
-        detectedControllerKind: args.laser.detectedControllerKind,
-        controllerSessionEpoch: args.laser.controllerSessionEpoch,
-      },
-      createdAtIso: new Date().toISOString(),
+      archivedControllerObservation,
+      createdAtIso,
+      provenance,
     });
     const staged = await args.repository.stageArtifact(artifact);
     if (staged.ok) return true;
@@ -112,11 +151,11 @@ export async function activateAcceptedFreshRun(
     const activated = await repository.activateFreshRun(runId);
     if (activated.ok && activated.value) return;
   }
-  await repository.noteUntrackedRunAccepted();
+  await repository.noteUntrackedRunAccepted(runId);
   useToastStore
     .getState()
     .pushToast(
-      'Job recovery is unavailable for this run. The job can continue normally.',
+      'Job recovery is unavailable for this run, and no execution archive was retained. The job can continue, but this burn will not have a forensic record.',
       'warning',
     );
 }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -10,9 +11,13 @@ type FakeConnection = SerialConnection & {
 function makeConnection(writes: string[]): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of [...lineHandlers]) handler(line);
+  };
   return {
     write: async (data) => {
       writes.push(data);
+      respondToTestGrblHandshake(data, emitLine);
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -23,9 +28,7 @@ function makeConnection(writes: string[]): FakeConnection {
       return () => closeHandlers.delete(handler);
     },
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of [...lineHandlers]) handler(line);
-    },
+    emitLine,
     emitClose: () => {
       for (const handler of [...closeHandlers]) handler();
     },
@@ -51,7 +54,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await flush();
   connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  await flush();
+  await settleTestGrblHandshake();
 }
 
 beforeEach(() => {

@@ -1,4 +1,6 @@
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
+import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
+import { gcodeUsesM7 } from '../../core/preflight/m7-air-assist-readiness';
 import type { SessionObservationStamp } from './laser-controller-observation';
 
 export type LaserModeStartSnapshotSource = {
@@ -6,6 +8,8 @@ export type LaserModeStartSnapshotSource = {
   readonly capabilities: { readonly settings: ReadinessSettingsCapability };
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly controllerSettingsObservation: SessionObservationStamp | null;
+  readonly controllerBuildInfo?: GrblBuildInfo | null;
+  readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
 };
 
 export type LaserModeStartSnapshot = {
@@ -14,17 +18,24 @@ export type LaserModeStartSnapshot = {
   readonly settingsObservation: SessionObservationStamp | null;
   readonly laserModeEnabled: boolean | undefined;
   readonly maxPowerS: number | undefined;
+  readonly controllerBuildInfo: GrblBuildInfo | null;
+  readonly buildInfoObservation: SessionObservationStamp | null;
 };
 
 export type LaserModeStartEvidence = LaserModeStartSnapshot & {
+  readonly expectedMaxPowerS: number;
+  readonly m7Required: boolean;
   readonly unverifiedAcknowledged: boolean;
 };
 
 export const LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE =
-  'Controller settings changed while Start was being prepared. Start again so KerfDesk can re-check $30 and $32 before sending job G-code.';
+  'The exact job changed whether M7 is required while Start was being prepared. Start again so Job Review matches the program KerfDesk will send.';
 
-const LASER_MODE_UNVERIFIED_AT_START_MESSAGE =
-  'Controller laser mode is not verified for this Start. Start again and review the $32 acknowledgement before sending job G-code.';
+export const LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE =
+  'Laser Start requires reviewed controller evidence for $30, $32, and M7 support. Start again from Job Review. No job G-code was sent.';
+
+const LASER_REQUIREMENTS_UNVERIFIED_AT_START_MESSAGE =
+  'Controller requirements are not verified for this Start. Start again and review the $30, $32, and M7 acknowledgement before sending job G-code.';
 
 export function captureLaserModeStartSnapshot(
   source: LaserModeStartSnapshotSource,
@@ -35,67 +46,60 @@ export function captureLaserModeStartSnapshot(
     settingsObservation: source.controllerSettingsObservation,
     laserModeEnabled: source.controllerSettings?.laserModeEnabled,
     maxPowerS: source.controllerSettings?.maxPowerS,
+    controllerBuildInfo: source.controllerBuildInfo ?? null,
+    buildInfoObservation: source.controllerBuildInfoObservation ?? null,
   };
 }
 
 export function createLaserModeStartEvidence(
   snapshot: LaserModeStartSnapshot,
+  expectedMaxPowerS: number,
+  m7Required: boolean,
   unverifiedAcknowledged: boolean,
 ): LaserModeStartEvidence {
-  return { ...snapshot, unverifiedAcknowledged };
+  return { ...snapshot, expectedMaxPowerS, m7Required, unverifiedAcknowledged };
 }
 
-export function laserModeStartSnapshotIsVerified(snapshot: LaserModeStartSnapshot): boolean {
-  return (
-    snapshot.settingsCapability !== 'none' &&
-    snapshot.laserModeEnabled === true &&
-    snapshot.settingsObservation !== null &&
-    snapshot.settingsObservation.sessionEpoch === snapshot.controllerSessionEpoch
-  );
+export function laserModeStartSnapshotIsVerified(
+  snapshot: LaserModeStartSnapshot,
+  expectedMaxPowerS: number,
+): boolean {
+  return settingsAreVerified(snapshot, expectedMaxPowerS);
 }
 
-/**
- * Final wire-boundary proof for UI-originated laser Starts. The queue fence may
- * await an older settings query, so evidence accepted before that wait is valid
- * only when the same controller session and settings observation still own it.
- */
+/** Final wire-boundary handoff for UI-originated laser Starts. Live $30/$32 and
+ * M7 support remain review advisories under Frame-first policy. The final
+ * boundary therefore proves only that the exact program still has the reviewed
+ * M7 shape and that unverified review evidence was explicitly acknowledged. */
 export function laserModeStartEvidenceIssue(
-  current: LaserModeStartSnapshotSource,
   evidence: LaserModeStartEvidence | undefined,
+  gcode: string,
 ): string | null {
-  // Low-level store tests and controller harnesses call startJob directly.
-  // Every operator-reachable Start path supplies evidence and is checked here.
-  if (evidence === undefined) return null;
-
-  // Frame-first (2026-07-17): a reported $32=0 no longer refuses the Start —
-  // the Job Review acknowledgement banner carries it as the warning instead.
-  const snapshot = captureLaserModeStartSnapshot(current);
-  if (!sameLaserModeStartSnapshot(snapshot, evidence)) {
+  if (evidence === undefined) return LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE;
+  if (evidence.m7Required !== gcodeUsesM7(gcode)) {
     return LASER_MODE_START_EVIDENCE_CHANGED_MESSAGE;
   }
-  if (!laserModeStartSnapshotIsVerified(snapshot) && !evidence.unverifiedAcknowledged) {
-    return LASER_MODE_UNVERIFIED_AT_START_MESSAGE;
+  if (
+    !laserModeStartSnapshotIsVerified(evidence, evidence.expectedMaxPowerS) &&
+    !evidence.unverifiedAcknowledged
+  ) {
+    return LASER_REQUIREMENTS_UNVERIFIED_AT_START_MESSAGE;
   }
   return null;
 }
 
-function sameLaserModeStartSnapshot(
-  current: LaserModeStartSnapshot,
-  evidence: LaserModeStartEvidence,
-): boolean {
+function settingsAreVerified(snapshot: LaserModeStartSnapshot, expectedMaxPowerS: number): boolean {
   return (
-    current.controllerSessionEpoch === evidence.controllerSessionEpoch &&
-    current.settingsCapability === evidence.settingsCapability &&
-    sameObservation(current.settingsObservation, evidence.settingsObservation) &&
-    current.laserModeEnabled === evidence.laserModeEnabled &&
-    current.maxPowerS === evidence.maxPowerS
+    settingsObservationIsCurrent(snapshot) &&
+    snapshot.laserModeEnabled === true &&
+    snapshot.maxPowerS === expectedMaxPowerS
   );
 }
 
-function sameObservation(
-  left: SessionObservationStamp | null,
-  right: SessionObservationStamp | null,
-): boolean {
-  if (left === null || right === null) return left === right;
-  return left.sessionEpoch === right.sessionEpoch && left.observedAt === right.observedAt;
+function settingsObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean {
+  return (
+    snapshot.settingsCapability !== 'none' &&
+    snapshot.settingsObservation !== null &&
+    snapshot.settingsObservation.sessionEpoch === snapshot.controllerSessionEpoch
+  );
 }

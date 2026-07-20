@@ -6,11 +6,14 @@ import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canv
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import {
+  createArchivedControllerObservation,
   createExecutionArtifact,
   createRunId,
   type RecoveryCapsule,
   type RecoveryRepository,
 } from '../state/recovery';
+import { createExecutionProvenance } from '../state/recovery/execution-provenance';
+import type { ExecutionProvenanceEvidenceV2 } from '../state/recovery/execution-workflow-evidence';
 import type { PreparedRecoverySource } from './start-job-source';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
@@ -25,6 +28,7 @@ export type CncRecoveryStreamPlan = {
   // Operator's qualification attestation, archived into the recovery artifact
   // for auditability (audit A1).
   readonly recoveryQualification?: string;
+  readonly executionEvidence: ExecutionProvenanceEvidenceV2;
   // Flow-specific synchronous re-validation composed into the final
   // wire-boundary authorization (e.g. the pass flow's retained-WCO re-check).
   // Throws to refuse; runs after the generic recovery assertion.
@@ -96,7 +100,7 @@ export async function streamCncRecoveryProgram(
     recoveryRunId,
   });
   if (!activated.ok || !activated.value) {
-    await repository.noteUntrackedRunAccepted();
+    await repository.noteUntrackedRunAccepted(recoveryRunId);
     jobAwareAlert(
       'CNC recovery started, but recovery tracking is unavailable for this attempt. Supervise the machine continuously and use the physical E-stop if unsafe.',
     );
@@ -104,7 +108,7 @@ export async function streamCncRecoveryProgram(
   return true;
 }
 
-function buildRecoveryArtifact(
+async function buildRecoveryArtifact(
   planned: CncRecoveryStreamPlan,
   claimedCapsule: RecoveryCapsule,
   recoveryRunId: string,
@@ -112,6 +116,19 @@ function buildRecoveryArtifact(
   laser: ReturnType<typeof useLaserStore.getState>,
 ) {
   const toolPlan = cncToolPlan(planned.recovery.job);
+  const createdAtIso = new Date().toISOString();
+  const archivedControllerObservation = createArchivedControllerObservation({
+    controllerSettings: laser.controllerSettings,
+    controllerObservation: controllerObservation(laser),
+    observedAtIso: createdAtIso,
+  });
+  const provenance = await createExecutionProvenance({
+    gcode: planned.gcode,
+    profile: planned.source.project.device,
+    laser,
+    archivedControllerObservation,
+    ...planned.executionEvidence,
+  });
   return createExecutionArtifact({
     runId: recoveryRunId,
     gcode: planned.gcode,
@@ -121,11 +138,12 @@ function buildRecoveryArtifact(
     canvasPlan,
     ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
     controllerSettings: laser.controllerSettings,
-    controllerObservation: controllerObservation(laser),
+    archivedControllerObservation,
     ...(planned.recoveryQualification === undefined
       ? {}
       : { recoveryQualification: planned.recoveryQualification }),
-    createdAtIso: new Date().toISOString(),
+    createdAtIso,
+    provenance,
   });
 }
 
@@ -137,10 +155,16 @@ async function stageRecoveryAttempt(
   laser: ReturnType<typeof useLaserStore.getState>,
   repository: RecoveryRepository,
 ): Promise<boolean> {
-  const staged = await repository.stageArtifact(
-    buildRecoveryArtifact(planned, claimedCapsule, recoveryRunId, canvasPlan, laser),
-  );
-  if (staged.ok && staged.value === recoveryRunId) {
+  let staged: Awaited<ReturnType<RecoveryRepository['stageArtifact']>> | null = null;
+  try {
+    staged = await repository.stageArtifact(
+      await buildRecoveryArtifact(planned, claimedCapsule, recoveryRunId, canvasPlan, laser),
+    );
+  } catch {
+    // The common cleanup below releases the claim and discards any partial
+    // attempt when current provenance cannot be sealed.
+  }
+  if (staged?.ok === true && staged.value === recoveryRunId) {
     const armed = await repository.armClaimedRecoveryStart({
       sourceRunId: claimedCapsule.runId,
       sourceRevision: claimedCapsule.revision,
@@ -233,7 +257,7 @@ async function resolveFailedRecoveryAttempt(
       message,
     });
   } else {
-    await repository.noteUntrackedRunAccepted();
+    await repository.noteUntrackedRunAccepted(recoveryRunId);
   }
   jobAwareAlert(
     `CNC recovery transmission became uncertain:\n\n${message}\n\nUse the physical E-stop if unsafe, then inspect and requalify the machine.`,

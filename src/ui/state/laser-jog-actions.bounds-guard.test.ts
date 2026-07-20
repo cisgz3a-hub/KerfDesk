@@ -3,6 +3,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
@@ -101,17 +102,21 @@ function configureDevice(origin: 'rear-left' | 'center'): void {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      respondToTestGrblHandshake(data, emitLine);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine,
   };
 }
 
@@ -131,7 +136,7 @@ async function connectIdleAt(connection: FakeConnection, x: number, y: number): 
   await flush();
   connection.emitLine('ok');
   connection.emitLine(`<Idle|MPos:${x.toFixed(3)},${y.toFixed(3)},0.000|FS:0,0>`);
-  await flush();
+  await settleTestGrblHandshake();
 }
 
 async function flush(): Promise<void> {

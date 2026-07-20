@@ -127,6 +127,19 @@ describe('project device profile metadata persistence', () => {
     expect(result.reason).toMatch(/device\.streamingMode|device\.rxBufferBytes/);
   });
 
+  it('rejects a persisted controlled seek feed above the device feed ceiling', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.maxFeed = 1000;
+    raw.device.controlledLaserOffTravelFeedMmPerMin = 1001;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result).toEqual({
+      kind: 'invalid',
+      reason: 'device.controlledLaserOffTravelFeedMmPerMin must not exceed device.maxFeed',
+    });
+  });
+
   it('rejects unknown loaded device capabilities', () => {
     const raw = JSON.parse(serializeProject(createProject()));
     raw.device.capabilities = ['grbl', 'macro-runner'];

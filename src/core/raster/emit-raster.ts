@@ -15,10 +15,9 @@
 //     so a row of identical S values becomes one G1, and a checker
 //     pattern becomes N G1s. The X coordinate on each G1 is the far
 //     edge of the run in the current sweep direction.
-//   - Overscan: each row's rapid arrives `overscanMm` to the left of
-//     bounds.minX, then sweeps past bounds.maxX by `overscanMm` with
-//     S0 on the exit. Gives the head room to accelerate / decelerate
-//     with the laser off so corners don't over-burn.
+//   - Overscan: each row keeps full entry and exit runways around its outer
+//     ink bounds. Wide internal gaps use one bounded entry runway so the head
+//     never reverses over a completed island. All runways keep the laser off.
 //   - S=0 pixels (white in the source) emit normally — they're part
 //     of the sweep but the dynamic-power M4 controller automatically
 //     keeps the diode dark when S=0.
@@ -30,16 +29,15 @@
 //   - Async-iterable emit for >100 KB jobs (ADR-020 Q3 threshold).
 //   - Per-pixel feed modulation for grayscale-on-non-M4 controllers.
 
+import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
+import {
+  planRasterRowSweeps,
+  rasterControllerCoordinateMm,
+  type RasterRowSweepPlan,
+} from './raster-sweep-plan';
+
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
-
-// A white gap WIDER than this between two ink islands on one raster row is
-// crossed with a G0 rapid (laser hard-off) instead of a slow G1 S0 feed move:
-// the raster analogue of ADR-035's fill gap-rapid split (ADR-039). 5 mm matches
-// the fill threshold and the long-blank-feed preflight (P0-A) so fresh raster
-// output passes that invariant. Smaller interior gaps stay within one sweep,
-// blanked at feed as before.
-const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
 
 function fmt(n: number): string {
   return n.toFixed(DECIMAL_PLACES);
@@ -78,6 +76,7 @@ export type EmitRasterInput = {
   readonly laserModeCommand?: 'M3' | 'M4';
   readonly modalFeedrate?: boolean;
   readonly emitSOnEveryBurnMove?: boolean;
+  readonly controlledLaserOffTravelFeedMmPerMin?: number;
   // Optional comment fields written above the data for the operator
   // (and the job-time estimator). Same shape as grbl-strategy emits.
   readonly layerId?: string;
@@ -122,27 +121,32 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
     let feedEmitted = false;
     for (let y = 0; y < input.height; y += 1) {
       const row = inputRow(input, y);
-      const spans = activeSpans(row, pixelWidthMm);
-      if (spans.length === 0) continue;
-      const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
       // Snake direction alternates per emitted ROW; within a reverse row the
       // ink islands sweep right-to-left too.
       const reverse = (input.bidirectional ?? true) && emittedRowCount % 2 === 1;
-      const ordered = reverse ? [...spans].reverse() : spans;
-      for (const span of ordered) {
-        // Each island is its own sweep, so the G0 lead-in to the NEXT island
-        // crosses the wide white gap between them as a rapid (laser off) rather
-        // than a slow G1 S0 feed move — the raster analogue of ADR-035 (ADR-039).
+      const sweepPlans = planRasterRowSweeps({
+        row,
+        pixelWidthMm,
+        overscanMm: input.overscanMm,
+        reverse,
+        dotWidthCorrectionMm,
+        minXWorldMm: input.bounds.minX,
+      });
+      if (sweepPlans.length === 0) continue;
+      const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
+      for (const sweepPlan of sweepPlans) {
+        // Each island is its own sweep. Internal exits stop at the burn edge;
+        // the next bounded lead-in crosses the remainder with the laser off —
+        // the raster analogue of ADR-035 (ADR-039), without path reversal.
         // F rides only the very first G1 of the whole group.
         yield `${emitSpanSweep(
           input,
-          row,
           worldY,
           pixelWidthMm,
           feed,
           !feedEmitted,
           reverse,
-          span,
+          sweepPlan,
           dotWidthCorrectionMm,
         )}${LINE_END}`;
         feedEmitted = true;
@@ -169,64 +173,46 @@ function inputRow(input: EmitRasterInput, y: number): Uint16Array {
   return input.sValues.subarray(start, start + input.width);
 }
 
-type ActiveSpan = { readonly firstX: number; readonly lastX: number };
-
-// The ink islands of one row, each an inclusive [firstX, lastX] column range.
-// Consecutive ink separated by a white gap WIDER than
-// RASTER_GAP_RAPID_THRESHOLD_MM is split into separate spans, so the emitter
-// crosses that gap with a G0 rapid (ADR-039); smaller interior gaps stay within
-// one span (blanked at feed, as before). Returns [] for an all-white row.
-function activeSpans(row: Uint16Array, pixelWidthMm: number): ActiveSpan[] {
-  const spans: ActiveSpan[] = [];
-  let firstX = -1;
-  let lastInk = -1;
-  for (let i = 0; i < row.length; i += 1) {
-    if ((row[i] ?? 0) === 0) continue;
-    if (firstX === -1) {
-      firstX = i;
-      lastInk = i;
-      continue;
-    }
-    const gapMm = (i - lastInk - 1) * pixelWidthMm;
-    if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
-      spans.push({ firstX, lastX: lastInk });
-      firstX = i;
-    }
-    lastInk = i;
-  }
-  if (firstX !== -1) spans.push({ firstX, lastX: lastInk });
-  return spans;
-}
-
 function emitSpanSweep(
   input: EmitRasterInput,
-  row: Uint16Array,
   worldY: number,
   pixelWidthMm: number,
   feed: number,
   emitFeed: boolean,
   reverse: boolean,
-  span: ActiveSpan,
+  sweepPlan: RasterRowSweepPlan,
   dotWidthCorrectionMm: number,
 ): string {
   const lines: string[] = [];
+  const span = sweepPlan.span;
   // Sweep extents are the ACTIVE span's pixel edges plus overscan,
   // not the full image bounds. For a row with content only in cols
   // 40..60 of a 200-col image, the head only visits world X from
   // (minX + 40*pw - overscan) to (minX + 61*pw + overscan).
   const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm;
   const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
-  const startX = reverse ? activeEndX + input.overscanMm : activeStartX - input.overscanMm;
-  const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
+  const startX = reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm;
+  const endX = reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm;
   const rowShiftX = reverse ? -(input.scanOffsetMm ?? 0) : 0;
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
-  lines.push(formatLaserOffTravel(startX + rowShiftX, worldY));
+  lines.push(
+    formatLaserOffTravel(startX + rowShiftX, worldY, input.controlledLaserOffTravelFeedMmPerMin),
+  );
   let prevS = -1;
-  let shouldEmitFeed = emitFeed;
+  // The controller only sees three-decimal coordinates. Track that formatted
+  // head position so a positive-power fragment which exists in floating-point
+  // geometry, but collapses on the controller grid, is never armed in place.
+  let controllerHeadX = rasterControllerCoordinateMm(startX + rowShiftX);
+  // A controlled G1 seek changes modal F, unlike G0. Reassert the engraving
+  // feed on the first runway/burn move after every such seek.
+  let shouldEmitFeed = emitFeed || input.controlledLaserOffTravelFeedMmPerMin !== undefined;
   const pushRun = (x: number, s: number): void => {
+    const targetX = x + rowShiftX;
+    const controllerTargetX = rasterControllerCoordinateMm(targetX);
+    if (s > 0 && controllerTargetX === controllerHeadX) return;
     lines.push(
       formatRunG1(
-        x + rowShiftX,
+        targetX,
         s,
         prevS,
         feed,
@@ -237,181 +223,33 @@ function emitSpanSweep(
     );
     shouldEmitFeed = false;
     prevS = s;
+    controllerHeadX = controllerTargetX;
   };
-  if (input.overscanMm > 0) {
+  if (sweepPlan.leadInMm > 0) {
     pushRun(reverse ? activeEndX : activeStartX, 0);
   }
-  emitRowRuns(input, row, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+  for (const run of sweepPlan.runs) {
+    pushRun(run.endXWorldMm, run.s);
+  }
   // Exit overscan with S0 so the diode is dark during deceleration. The
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
-  if (input.overscanMm > 0 || dotWidthCorrectionMm <= 0) {
+  if (sweepPlan.leadOutMm > 0 || dotWidthCorrectionMm <= 0) {
     lines.push(formatLaserOffG1(endX + rowShiftX, feed, input.modalFeedrate ?? true));
   }
   return lines.join(LINE_END);
 }
 
-function formatLaserOffTravel(x: number, y: number): string {
+function formatLaserOffTravel(x: number, y: number, controlledFeed: number | undefined): string {
+  if (controlledFeed !== undefined) {
+    return `G1 X${fmt(x)} Y${fmt(y)} F${Math.max(1, Math.round(controlledFeed))} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+  }
   return `G0 X${fmt(x)} Y${fmt(y)} S0`;
 }
 
 function formatLaserOffG1(x: number, feed: number, modalFeedrate: boolean): string {
   const feedWord = modalFeedrate ? '' : ` F${feed}`;
   return `G1 X${fmt(x)}${feedWord} S0`;
-}
-
-type PushRasterRun = (x: number, s: number) => void;
-
-function emitRowRuns(
-  input: EmitRasterInput,
-  row: Uint16Array,
-  pixelWidthMm: number,
-  span: ActiveSpan,
-  reverse: boolean,
-  dotWidthCorrectionMm: number,
-  pushRun: PushRasterRun,
-): void {
-  if (dotWidthCorrectionMm > 0) {
-    emitCorrectedRowRuns(input, row, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
-    return;
-  }
-  if (reverse) {
-    emitReverseRowRuns(input, row, pixelWidthMm, span, pushRun);
-    return;
-  }
-  emitForwardRowRuns(input, row, pixelWidthMm, span, pushRun);
-}
-
-type RasterRun = {
-  readonly firstX: number;
-  readonly lastX: number;
-  readonly s: number;
-};
-
-function emitCorrectedRowRuns(
-  input: EmitRasterInput,
-  row: Uint16Array,
-  pixelWidthMm: number,
-  span: ActiveSpan,
-  reverse: boolean,
-  dotWidthCorrectionMm: number,
-  pushRun: PushRasterRun,
-): void {
-  const runs = rowRuns(row, span);
-  if (reverse) {
-    emitCorrectedReverseRowRuns(
-      input,
-      pixelWidthMm,
-      [...runs].reverse(),
-      dotWidthCorrectionMm,
-      pushRun,
-    );
-    return;
-  }
-  emitCorrectedForwardRowRuns(input, pixelWidthMm, runs, dotWidthCorrectionMm, pushRun);
-}
-
-function rowRuns(row: Uint16Array, span: ActiveSpan): RasterRun[] {
-  const runs: RasterRun[] = [];
-  let firstX = span.firstX;
-  let s = row[firstX] ?? 0;
-  for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
-    const cellS = row[i] ?? 0;
-    if (cellS === s) continue;
-    runs.push({ firstX, lastX: i - 1, s });
-    firstX = i;
-    s = cellS;
-  }
-  runs.push({ firstX, lastX: span.lastX, s });
-  return runs;
-}
-
-function emitCorrectedForwardRowRuns(
-  input: EmitRasterInput,
-  pixelWidthMm: number,
-  runs: ReadonlyArray<RasterRun>,
-  dotWidthCorrectionMm: number,
-  pushRun: PushRasterRun,
-): void {
-  for (const run of runs) {
-    const startX = input.bounds.minX + run.firstX * pixelWidthMm;
-    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm;
-    if (run.s <= 0) {
-      pushRun(endX, 0);
-      continue;
-    }
-    const burnStartX = startX + dotWidthCorrectionMm;
-    const burnEndX = endX - dotWidthCorrectionMm;
-    if (burnEndX <= burnStartX) {
-      pushRun(endX, 0);
-      continue;
-    }
-    pushRun(burnStartX, 0);
-    pushRun(burnEndX, run.s);
-    pushRun(endX, 0);
-  }
-}
-
-function emitCorrectedReverseRowRuns(
-  input: EmitRasterInput,
-  pixelWidthMm: number,
-  runs: ReadonlyArray<RasterRun>,
-  dotWidthCorrectionMm: number,
-  pushRun: PushRasterRun,
-): void {
-  for (const run of runs) {
-    const startX = input.bounds.minX + run.firstX * pixelWidthMm;
-    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm;
-    if (run.s <= 0) {
-      pushRun(startX, 0);
-      continue;
-    }
-    const burnStartX = endX - dotWidthCorrectionMm;
-    const burnEndX = startX + dotWidthCorrectionMm;
-    if (burnStartX <= burnEndX) {
-      pushRun(startX, 0);
-      continue;
-    }
-    pushRun(burnStartX, 0);
-    pushRun(burnEndX, run.s);
-    pushRun(startX, 0);
-  }
-}
-
-function emitReverseRowRuns(
-  input: EmitRasterInput,
-  row: Uint16Array,
-  pixelWidthMm: number,
-  span: ActiveSpan,
-  pushRun: PushRasterRun,
-): void {
-  let runS = row[span.lastX] ?? 0;
-  for (let i = span.lastX - 1; i >= span.firstX; i -= 1) {
-    const cellS = row[i] ?? 0;
-    if (cellS !== runS) {
-      pushRun(input.bounds.minX + (i + 1) * pixelWidthMm, runS);
-      runS = cellS;
-    }
-  }
-  pushRun(input.bounds.minX + span.firstX * pixelWidthMm, runS);
-}
-
-function emitForwardRowRuns(
-  input: EmitRasterInput,
-  row: Uint16Array,
-  pixelWidthMm: number,
-  span: ActiveSpan,
-  pushRun: PushRasterRun,
-): void {
-  let runS = row[span.firstX] ?? 0;
-  for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
-    const cellS = row[i] ?? 0;
-    if (cellS !== runS) {
-      pushRun(input.bounds.minX + i * pixelWidthMm, runS);
-      runS = cellS;
-    }
-  }
-  pushRun(input.bounds.minX + (span.lastX + 1) * pixelWidthMm, runS);
 }
 
 // One G1 closing a run. Emits S only when it changed from the
@@ -477,6 +315,13 @@ function validate(input: EmitRasterInput): void {
   }
   if (!Number.isFinite(input.scanOffsetMm ?? 0)) {
     throw new Error('emitRasterGroup: scanOffsetMm must be finite');
+  }
+  validateControlledLaserOffTravelFeed(input.controlledLaserOffTravelFeedMmPerMin);
+}
+
+function validateControlledLaserOffTravelFeed(value: number | undefined): void {
+  if (value !== undefined && !isPositiveFinite(value)) {
+    throw new Error('emitRasterGroup: controlled laser-off travel feed must be finite and > 0');
   }
 }
 

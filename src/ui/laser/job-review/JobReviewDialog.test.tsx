@@ -23,12 +23,18 @@ const model: JobReviewModel = {
     { label: 'Estimated time', value: '2m 5s', detail: 'Cut 1m 50s · travel 15s' },
     { label: 'Job size', value: '8 × 8 mm', detail: 'X 1 to 9 · Y 1 to 9 mm' },
     { label: 'Operations', value: '1 operation', detail: '1 pass total' },
+    {
+      label: 'Fill runway',
+      value: '8 / 8 full',
+      detail: 'Requested 5 mm · 0 partial · 0 skipped · 0 disabled',
+    },
     { label: 'G-code', value: '12 lines', detail: '1.2 KB' },
     { label: 'Origin', value: 'User origin', detail: 'Anchor front left', emphasis: 'text' },
   ],
   warnings: ['Island fill can overburn small details.'],
   resolvedOriginLabel: 'User origin — anchor front left',
   toolPlanLabels: [],
+  outputQualityFacts: [],
   acknowledgement: { kind: 'laser-unverified', prompt: 'Controller laser mode prompt body.' },
 };
 
@@ -88,6 +94,8 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('Review job before starting');
     expect(host.textContent).toContain('2m 5s');
     expect(host.textContent).toContain('8 × 8 mm');
+    expect(host.textContent).toContain('Fill runway');
+    expect(host.textContent).toContain('8 / 8 full');
     expect(host.textContent).toContain('Warnings (1)');
     expect(host.textContent).toContain('Island fill can overburn small details.');
     expect(host.textContent).toContain('User origin — anchor front left');
@@ -176,6 +184,7 @@ describe('JobReviewDialog', () => {
       ...model,
       machineKind: 'cnc',
       toolPlanLabels: ['1. 3.175 mm (1/8") end mill', '2. 60° V-bit'],
+      outputQualityFacts: [],
       acknowledgement: { kind: 'cnc', prompt: 'CNC attestation prompt body.' },
     });
     await render();

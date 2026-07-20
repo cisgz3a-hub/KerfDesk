@@ -201,7 +201,7 @@ describe('buildToolpath', () => {
     expect(tp.totalLength).toBe(20);
   });
 
-  it('previews the 4040 J split as rapid remainder then 5 mm feed-matched entry', () => {
+  it('previews the 4040 J split as controlled remainder then 5 mm feed-matched entry', () => {
     const tp = buildToolpath({
       groups: [
         {
@@ -244,15 +244,17 @@ describe('buildToolpath', () => {
       'cut',
       'travel',
     ]);
-    const rapidRemainder = tp.steps[2];
-    expect(rapidRemainder).toMatchObject({
+    const controlledRemainder = tp.steps[2];
+    expect(controlledRemainder).toMatchObject({
       kind: 'travel',
       motion: 'rapid',
       from: { x: 7.015, y: 43 },
     });
-    if (rapidRemainder?.kind !== 'travel') throw new Error('Expected rapid remainder');
-    expect(rapidRemainder.to.x).toBeCloseTo(11.62, 6);
-    expect(rapidRemainder.length).toBeCloseTo(4.605, 6);
+    if (controlledRemainder?.kind !== 'travel') {
+      throw new Error('Expected controlled-travel remainder');
+    }
+    expect(controlledRemainder.to.x).toBeCloseTo(11.62, 6);
+    expect(controlledRemainder.length).toBeCloseTo(4.605, 6);
     const feedEntry = tp.steps[3];
     expect(feedEntry).toMatchObject({
       kind: 'travel',

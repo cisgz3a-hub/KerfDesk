@@ -300,19 +300,11 @@ describe('optimizePaths', () => {
     expect(asCut(result)?.segments[1]).toEqual(outer);
   });
 
-  it('property: cut time is preserved exactly (same cuts, same speed)', () => {
-    // Reordering segments doesn't add or remove any cut — the total
-    // cut distance and per-layer feed are identical, so cut time
-    // must match to float precision.
+  it('property: optimization preserves every cut segment', () => {
     fc.assert(
       fc.property(
         fc.array(
           fc.tuple(
-            // Constrain coords to [1, 400] mm — any cut must have
-            // meaningful length. Allowing 1e-28 mm segments lets
-            // fast-check shrink to degenerate ULP-edge inputs that
-            // pass the algorithm but trip any precision threshold.
-            // Real lasering coords are always millimetres+.
             fc.double({ min: 1, max: 400, noNaN: true, noDefaultInfinity: true }),
             fc.double({ min: 1, max: 400, noNaN: true, noDefaultInfinity: true }),
             fc.double({ min: 1, max: 400, noNaN: true, noDefaultInfinity: true }),
@@ -329,21 +321,28 @@ describe('optimizePaths', () => {
             closed: false,
           }));
           const job: Job = { groups: [group(segments)] };
-          const before = estimateJobDuration(job, DEFAULT_DEVICE_PROFILE);
-          const after = estimateJobDuration(optimizePaths(job), DEFAULT_DEVICE_PROFILE);
-          // Relative comparison — float-sum order matters per the
-          // planner's trapezoidal integrator. 1 ppm is 1 ms on a
-          // 1000s job; under any user-visible delta. Add machine
-          // epsilon so values that only exceed the boundary by ULP
-          // rounding noise don't fail the property.
-          const denom = Math.max(before.breakdown.cutSeconds, 1e-9);
-          const relDiff =
-            Math.abs(after.breakdown.cutSeconds - before.breakdown.cutSeconds) / denom;
-          expect(relDiff).toBeLessThanOrEqual(1e-6 + Number.EPSILON);
+          const optimized = asCut(optimizePaths(job))?.segments ?? [];
+          const canonical = (segment: CutSegment): string => {
+            const forward = JSON.stringify(segment.polyline);
+            const reverse = JSON.stringify([...segment.polyline].reverse());
+            return `${String(segment.closed)}:${forward < reverse ? forward : reverse}`;
+          };
+          expect(optimized.map(canonical).sort()).toEqual(segments.map(canonical).sort());
         },
       ),
       { numRuns: 50 },
     );
+  });
+
+  it('reflects connected-cut continuity after path optimization', () => {
+    const job: Job = {
+      groups: [group([seg([10, 0], [20, 0]), seg([0, 0], [10, 0])])],
+    };
+    const before = estimateJobDuration(job, DEFAULT_DEVICE_PROFILE);
+    const after = estimateJobDuration(optimizePaths(job), DEFAULT_DEVICE_PROFILE);
+    // Optimization joins the two collinear cuts. With no intervening laser-off
+    // travel, the motion planner carries junction speed across the shared point.
+    expect(after.breakdown.cutSeconds).toBeLessThan(before.breakdown.cutSeconds);
   });
 
   it('improves travel on a deliberately bad ordering (concrete fixture)', () => {

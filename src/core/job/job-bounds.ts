@@ -108,7 +108,7 @@ function extendBoundsForFill(
   device: DeviceProfile | undefined,
 ): boolean {
   let any = extendBoundsForCut(b, group);
-  const scanOffsetMm = scanOffsetForGroup(device, group.speed);
+  const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
   const plans = planFillSweeps(group);
   for (const plan of plans) {
     const sweep = plan.sweep;
@@ -147,7 +147,7 @@ function extendBoundsForRaster(
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
 ): boolean {
-  const scanOffsetMm = scanOffsetForGroup(device, group.speed);
+  const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
   const reverseShiftX = hasActiveReverseRasterRow(group) ? -scanOffsetMm : 0;
   if (group.bounds.minX < b.minX) b.minX = group.bounds.minX;
   if (group.bounds.maxX > b.maxX) b.maxX = group.bounds.maxX;

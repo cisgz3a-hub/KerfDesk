@@ -1,5 +1,4 @@
 import { DITHER_ALGORITHMS, RELIEF_EMBED_TRIANGLE_LIMIT } from '../../core/scene';
-import { isScanOffsetTable } from '../../core/devices';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateCurveSubpaths } from './project-curve-shape-validator';
@@ -13,6 +12,7 @@ import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import { validateCncTabAnchors } from './project-cnc-tab-validator';
 import { validateOptionalArtworkOrder } from './project-artwork-order-validator';
+import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
 import {
   firstError,
@@ -35,7 +35,6 @@ import {
   requireString,
   requireUnitRatio,
   validateArray,
-  valueAtPath,
 } from './project-shape-primitives';
 
 // Bound source allocation before the target burn-grid budget runs. 256M pixels
@@ -84,7 +83,11 @@ function validateDevice(device: Record<string, unknown>): string | null {
     profileField.optionalProfileCapabilities(device, 'device.capabilities'),
     profileField.optionalLaserSubProfile(device, 'device.laserSubProfile'),
     profileField.optionalCameraProfile(device, 'device.cameraProfile'),
-    optionalScanOffsetTable(device, 'device.scanningOffsets'),
+    validateProjectScanOffsetProfile(device),
+    profileField.optionalControlledLaserOffTravelFeed(
+      device,
+      'device.controlledLaserOffTravelFeedMmPerMin',
+    ),
     profileField.optionalNoGoZones(device, 'device.noGoZones'),
     optionalPositiveNumber(device, 'device.zTravelMm'),
     optionalBoolean(device, 'device.zTravelConfirmed'),
@@ -430,9 +433,4 @@ function validatePoints(value: unknown, path: string): string | null {
 function validatePoint(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([requireCoordinate(value, `${path}.x`), requireCoordinate(value, `${path}.y`)]);
-}
-
-function optionalScanOffsetTable(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || isScanOffsetTable(value) ? null : `missing or invalid \`${path}\``;
 }

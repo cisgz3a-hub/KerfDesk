@@ -14,6 +14,7 @@ import {
 } from '../scene';
 import { createRegistrationBox } from '../shapes';
 import { createRectangle } from '../shapes/primitives';
+import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { runPreEmitPreflight } from './pre-emit';
 
 it('rejects canonical curve geometry above the bounded machine segment budget', () => {
@@ -160,6 +161,60 @@ function projectWithMultipleImageOperations(): Project {
 }
 
 describe('runPreEmitPreflight', () => {
+  it('leaves a finite controlled seek feed above the device ceiling for Job Review', () => {
+    const project = createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      maxFeed: 1000,
+      controlledLaserOffTravelFeedMmPerMin: 1001,
+    });
+
+    expect(runPreEmitPreflight(project)).toEqual({ ok: true, issues: [] });
+  });
+
+  it('leaves a finite scan-offset override above the profile cap for Job Review', () => {
+    const project = createProject();
+    const layer = {
+      ...createLayer({ id: 'offset-fill', color: '#ff0000', mode: 'fill' }),
+      bidirectionalScanOffsetMm: 4.01,
+    };
+
+    expect(
+      runPreEmitPreflight({
+        ...project,
+        scene: { ...project.scene, layers: [layer] },
+      }),
+    ).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
+  it('refuses only non-executable controlled feeds and scan offsets before compile', () => {
+    const project = createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      controlledLaserOffTravelFeedMmPerMin: 0,
+    });
+    const layer = {
+      ...createLayer({ id: 'invalid-offset', color: '#ff0000', mode: 'fill' }),
+      bidirectionalScanOffsetMm: Number.NaN,
+    };
+
+    expect(
+      runPreEmitPreflight({
+        ...project,
+        scene: { ...project.scene, layers: [layer] },
+      }).issues,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'speed-out-of-range' }),
+        expect.objectContaining({
+          code: 'scan-offset-out-of-range',
+          message: expect.stringContaining('must be finite'),
+        }),
+      ]),
+    );
+  });
+
   it('passes a modest raster (10x10mm @ 10 lines/mm = 100x100 px)', () => {
     expect(runPreEmitPreflight(projectWithRaster({ boundsMax: 10, linesPerMm: 10 })).ok).toBe(true);
   });

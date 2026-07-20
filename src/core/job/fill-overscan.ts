@@ -1,4 +1,5 @@
 import type { LayerFillStyle, Vec2 } from '../scene';
+import type { FillRunwayPolicy } from './fill-runway-policy';
 import { isSensitiveIslandFillPolicy, type IslandFillMotionPolicy } from './island-fill-motion';
 
 export type FillOverscanRun = {
@@ -69,9 +70,11 @@ export function fillOverscanCommentText(
   fillStyle: LayerFillStyle | undefined,
   islandMotionPolicy: IslandFillMotionPolicy | undefined,
   formatMm: (n: number) => string,
+  fillRunwayPolicy?: FillRunwayPolicy,
 ): string {
   const setting = `overscan ${formatMm(overscanMm)} mm`;
   if (overscanMm <= 0) return setting;
+  if (fillRunwayPolicy === 'full') return `${setting} (full on every sweep)`;
   if (fillStyle === 'island') {
     if (isSensitiveIslandFillPolicy(islandMotionPolicy)) return setting;
     return `${setting} (capped on runs shorter than ${formatMm(OVERSCAN_MIN_BURN_RATIO * overscanMm)} mm; ADR-033)`;
@@ -84,17 +87,27 @@ export function effectiveFillOverscanMm(
   overscanMm: number,
   fillStyle: LayerFillStyle | undefined,
   islandMotionPolicy?: IslandFillMotionPolicy | undefined,
+  fillRunwayPolicy?: FillRunwayPolicy,
 ): number {
+  if (fillRunwayPolicy === 'full') {
+    if (overscanMm <= 0) return 0;
+    const length = twoPointPolylineLength(polyline);
+    return length !== null && length > 0 ? overscanMm : 0;
+  }
   if (fillStyle !== 'island') return effectiveOverscanMm(polyline, overscanMm);
   if (overscanMm <= 0) return 0;
-  const a = polyline[0];
-  const b = polyline[1];
-  if (a === undefined || b === undefined || polyline.length !== 2) return 0;
-  const length = Math.hypot(b.x - a.x, b.y - a.y);
-  if (length <= 0) return 0;
+  const length = twoPointPolylineLength(polyline);
+  if (length === null || length <= 0) return 0;
   if (isSensitiveIslandFillPolicy(islandMotionPolicy)) return overscanMm;
   // Island Fill intentionally keeps a capped runway even for short island
   // sweeps. That avoids starting the burn from rest while still preventing the
   // old full-overscan runtime blowup on thousands of tiny traced features.
   return Math.min(overscanMm, length / OVERSCAN_MIN_BURN_RATIO);
+}
+
+function twoPointPolylineLength(polyline: ReadonlyArray<Vec2>): number | null {
+  const a = polyline[0];
+  const b = polyline[1];
+  if (a === undefined || b === undefined || polyline.length !== 2) return null;
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }

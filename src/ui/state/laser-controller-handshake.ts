@@ -12,6 +12,10 @@ import {
   qualifyingController,
 } from './laser-controller-qualification';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import {
+  emptyControllerBuildInfoState,
+  readControllerBuildInfo,
+} from './laser-controller-build-info';
 import type { LaserState, LiveRefs } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import { appendSystemNotice } from './laser-system-notice';
@@ -186,6 +190,7 @@ async function qualifyConnectedController(
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -211,6 +216,8 @@ async function qualifyConnectedController(
           'The controller settings response was empty. Retry reading controller settings.',
         ),
   );
+  if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
+  await refreshHandshakeBuildInfo(set, get, refs, safeWrite, connection, guard, qualificationEpoch);
   // After qualification, ask the controller for its modal state ($G) so a
   // non-G54 frame left active by a $N startup block or an external session
   // becomes visible to the placement-mismatch advisory (C6) with no operator
@@ -220,6 +227,50 @@ async function qualifyConnectedController(
   // handshake's microtask depth unchanged.
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
   await requestActiveWcsReadback(get, refs.driver, safeWrite, guard.expectedSessionEpoch);
+}
+
+async function refreshHandshakeBuildInfo(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: NonNullable<LiveRefs['connection']>,
+  guard: HandshakeEpochGuard,
+  qualificationEpoch: number,
+): Promise<void> {
+  if (refs.driver.commands.buildInfoQuery === null) return;
+  try {
+    const evidence = await readControllerBuildInfo({
+      driver: refs.driver,
+      refs,
+      write: safeWrite,
+      commandKind: 'connection-handshake',
+      sessionEpoch: qualificationEpoch,
+      isCurrent: () =>
+        handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch) &&
+        get().controllerSessionEpoch === qualificationEpoch,
+      source: 'system',
+    });
+    if (evidence === null) return;
+    set((state) => ({
+      ...evidence,
+      log: pushLog(
+        state,
+        evidence.controllerBuildInfo === null
+          ? '[lf2] Controller $I response was not recognized as stock GRBL build information; M7 support remains unverified.'
+          : `[lf2] Controller build information read (${evidence.controllerBuildInfo.protocolVersion}; options ${evidence.controllerBuildInfo.optionCodes.join('') || 'none'}).`,
+      ),
+    }));
+  } catch (err) {
+    if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
+    const message = err instanceof Error ? err.message : String(err);
+    set((state) => ({
+      log: pushLog(
+        state,
+        `[lf2] Controller build information could not be read; M7 support remains unverified (${message}).`,
+      ),
+    }));
+  }
 }
 
 function qualificationCompleted(state: LaserState, expectedEpoch: number): boolean {

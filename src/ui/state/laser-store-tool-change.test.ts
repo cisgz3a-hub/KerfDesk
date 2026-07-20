@@ -16,6 +16,7 @@ import { useCameraStore } from './camera-store';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 import { TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE } from './laser-store-helpers';
+import { respondToTestGrblBuildInfo, startTestLaserJob } from './laser-test-start-helpers';
 import { PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE } from './work-z-zero-evidence';
 
 type FakeConnection = SerialConnection & {
@@ -61,6 +62,7 @@ function makeConnection(writes: string[], statusMode: LiveStatusMode = 'off'): F
           connection.emitLine(`<Idle|MPos:0.000,0.000,0.000|FS:0,0${suffix}>`);
         }, 0);
       }
+      respondToTestGrblBuildInfo(data, connection.emitLine);
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -92,7 +94,7 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 async function connectWith(connection: FakeConnection): Promise<void> {
@@ -325,7 +327,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
       }
     });
 
-    const starting = useLaserStore.getState().startJob('G1 X1 S100\n', {
+    const starting = startTestLaserJob('G1 X1 S100\n', {
       runId: 'async-boundary-run',
       machineKind: 'laser',
       assertFinalStartAuthorized,
@@ -462,9 +464,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
   it('leaves the tool label null for a laser job M0 (no CNC tool change) (R5)', async () => {
     const writes: string[] = [];
     await connectWith(makeConnection(writes));
-    await useLaserStore
-      .getState()
-      .startJob(`${TOOL_CHANGE_LOAD_PREFIX}ignored\nG1 X1 S100\nM0`, { machineKind: 'laser' });
+    await startTestLaserJob(`${TOOL_CHANGE_LOAD_PREFIX}ignored\nG1 X1 S100\nM0`);
     expect(useLaserStore.getState().pendingToolLabel).toBeNull();
   });
 
@@ -474,9 +474,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     await connectWith(connection);
 
     writes.length = 0;
-    await useLaserStore.getState().startJob('G1 X1 Y1 S100\nM0\nG1 X2 Y2 S100\n', {
-      machineKind: 'laser',
-    });
+    await startTestLaserJob('G1 X1 Y1 S100\nM0\nG1 X2 Y2 S100\n');
 
     expect(useLaserStore.getState().streamer?.status).not.toBe('tool-change');
     expect(writes.join('')).toContain('M0');

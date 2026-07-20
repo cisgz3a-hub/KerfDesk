@@ -1,4 +1,5 @@
 import type { GrblSettingRow } from '../../core/controllers/grbl';
+import { effectiveScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { analyzeFillHeatRisk, compileJob, type FillHeatRiskSummary } from '../../core/job';
 import { LAYER_DEFAULTS, type Layer, type Project } from '../../core/scene';
 import { layerFromSubLayer } from '../../core/scene';
@@ -122,6 +123,7 @@ function buildRasterDiagnostics(
   const defaultLineIntervalLayers = [...imageLayers, ...fillLayers].filter(usesStarterLineInterval);
   const sMax = settingSummary(rows, 30, lastSettingsReadAt);
   const laserMode = settingSummary(rows, 32, lastSettingsReadAt);
+  const scanOffsetStatus = effectiveScanOffsetCalibrationStatus(project.device);
   const fillHeatRisk = analyzeFillHeatRisk(compileJob(project.scene, project.device));
   const warnings = rasterWarnings({
     project,
@@ -135,10 +137,7 @@ function buildRasterDiagnostics(
   });
 
   return {
-    scanOffsetSummary:
-      project.device.scanningOffsets.length === 0
-        ? 'No scan-offset calibration'
-        : `${project.device.scanningOffsets.length} calibrated speed point(s)`,
+    scanOffsetSummary: scanOffsetSummary(project, scanOffsetStatus),
     imageSummary: `${imageLayers.length} active, Bidirectional image layers: ${bidirectionalImageLayers.length}`,
     fillSummary: `${fillLayers.length} active, Bidirectional fill layers: ${bidirectionalFillLayers.length}`,
     overscanSummary: `Low overscan layers: ${lowOverscanLayers.length}`,
@@ -160,6 +159,41 @@ function buildRasterDiagnostics(
   };
 }
 
+function scanOffsetSummary(
+  project: Project,
+  status: ReturnType<typeof effectiveScanOffsetCalibrationStatus>,
+): string {
+  const count = project.device.scanningOffsets.length;
+  switch (status) {
+    case 'uncalibrated':
+      return 'No scan-offset calibration';
+    case 'pending':
+      return `${count} saved speed point(s), verification pending`;
+    case 'verified':
+      return `${count} verified speed point(s)`;
+    case 'legacy-verified':
+      return `${count} legacy speed point(s), treated as verified`;
+  }
+}
+
+function scanOffsetWarnings(
+  project: Project,
+  bidirectionalLayerCount: number,
+): ReadonlyArray<string> {
+  if (bidirectionalLayerCount === 0) return [];
+  const status = effectiveScanOffsetCalibrationStatus(project.device);
+  if (status === 'uncalibrated') {
+    return [
+      'Bidirectional raster or fill is active without scan-offset calibration. This can show up as double or fat small text on one machine while another machine burns cleanly.',
+    ];
+  }
+  return status === 'pending'
+    ? [
+        'The saved scan-offset table is awaiting a real verification burn. Normal 4040 output remains one-way until the operator marks that coupon passed.',
+      ]
+    : [];
+}
+
 function rasterWarnings(args: {
   readonly project: Project;
   readonly bidirectionalLayers: ReadonlyArray<Layer>;
@@ -170,12 +204,7 @@ function rasterWarnings(args: {
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<string> {
-  const warnings: string[] = [];
-  if (args.bidirectionalLayers.length > 0 && args.project.device.scanningOffsets.length === 0) {
-    warnings.push(
-      'Bidirectional raster or fill is active without scan-offset calibration. This can show up as double or fat small text on one machine while another machine burns cleanly.',
-    );
-  }
+  const warnings = [...scanOffsetWarnings(args.project, args.bidirectionalLayers.length)];
   if (args.lowOverscanLayers.length > 0) {
     warnings.push('Low overscan layers may leave the head accelerating during burn moves.');
   }
@@ -238,15 +267,19 @@ function bidirectionalCheck(args: {
   readonly project: Project;
   readonly bidirectionalLayers: ReadonlyArray<Layer>;
 }): DiagnosticCheck {
-  const missingOffsets =
-    args.bidirectionalLayers.length > 0 && args.project.device.scanningOffsets.length === 0;
+  const calibrationStatus = effectiveScanOffsetCalibrationStatus(args.project.device);
+  const offsetsNotReady =
+    args.bidirectionalLayers.length > 0 &&
+    (calibrationStatus === 'uncalibrated' || calibrationStatus === 'pending');
   return {
     label: 'Bidirectional compensation',
-    status: missingOffsets ? 'warn' : 'ok',
+    status: offsetsNotReady ? 'warn' : 'ok',
     detail:
-      args.bidirectionalLayers.length > 0
-        ? 'Disable bidirectional output for a test burn, then add calibrated scan offsets if the doubled letters disappear.'
-        : 'No active bidirectional raster or fill layers were found.',
+      calibrationStatus === 'pending'
+        ? 'Burn and inspect “Verify saved table,” then mark the table verified. Normal 4040 jobs stay one-way while pending.'
+        : args.bidirectionalLayers.length > 0
+          ? 'Disable bidirectional output for a test burn, then add calibrated scan offsets if the doubled letters disappear.'
+          : 'No active bidirectional raster or fill layers were found.',
   };
 }
 

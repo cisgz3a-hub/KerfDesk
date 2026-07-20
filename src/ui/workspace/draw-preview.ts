@@ -22,6 +22,7 @@ import {
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
+import { resolveGrblDialect } from '../../core/devices';
 import {
   prepareOutput,
   prepareOutputSnapshot,
@@ -156,7 +157,7 @@ export function buildPreviewToolpath(
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
-  return previewFromPrepared(project, prepared);
+  return previewFromPrepared(project, prepared, options.jobOrigin);
 }
 
 export async function buildPreviewToolpathSnapshot(
@@ -178,10 +179,14 @@ export async function buildPreviewToolpathSnapshot(
     return emptyPreviewToolpath({ kind: 'too-complex' });
   }
   const prepared = await prepareOutputSnapshot(project, options);
-  return previewFromPrepared(project, prepared);
+  return previewFromPrepared(project, prepared, options.jobOrigin);
 }
 
-function previewFromPrepared(project: Project, prepared: PreparedOutput): PreviewToolpath {
+function previewFromPrepared(
+  project: Project,
+  prepared: PreparedOutput,
+  jobOrigin?: JobOriginPlacement,
+): PreviewToolpath {
   if (!prepared.ok) {
     return emptyPreviewToolpath({
       kind: 'preparation-failed',
@@ -191,15 +196,32 @@ function previewFromPrepared(project: Project, prepared: PreparedOutput): Previe
   // The prepared job is in machine/work coordinates; the canvas (ghost +
   // raster sim) draws in scene space. Map back so the overlay registers with
   // the design instead of mirroring about the bed midline (H3).
+  const startPoint = previewStartPoint(jobOrigin);
+  const parkPoint = previewParkPoint(project, jobOrigin);
   return mapToolpathToScene(
     buildToolpath(prepared.job, {
-      startPoint: { x: 0, y: 0 },
-      parkPoint: { x: 0, y: 0 },
+      startPoint,
+      ...(parkPoint === undefined ? {} : { parkPoint }),
       scanningOffsets: project.device.scanningOffsets,
     }),
     prepared.jobOriginOffset,
     project.device,
   );
+}
+
+function previewStartPoint(jobOrigin: JobOriginPlacement | undefined): Vec2 {
+  return jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : { x: 0, y: 0 };
+}
+
+function previewParkPoint(
+  project: Project,
+  jobOrigin: JobOriginPlacement | undefined,
+): Vec2 | undefined {
+  if (jobOrigin?.startFrom === 'current-position') return jobOrigin.currentPosition;
+  if (project.machine?.kind === 'cnc' || resolveGrblDialect(project.device).parkAtOriginAfterJob) {
+    return { x: 0, y: 0 };
+  }
+  return undefined;
 }
 
 function emptyPreviewToolpath(previewIssue: PreviewIssue): PreviewToolpath {

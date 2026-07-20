@@ -5,12 +5,10 @@ import {
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
-import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../core/scene';
-import type { PreparedOutput } from '../../io/gcode';
-import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
-import { createExecutionArtifact, RecoveryRepository } from '../state/recovery';
+import { RecoveryRepository } from '../state/recovery';
 import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
 import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
+import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { installJobCheckpointTracking } from './use-job-checkpoint';
@@ -38,25 +36,9 @@ function repository(): RecoveryRepository {
 }
 
 function executionArtifact(runId: string) {
-  const project = {
-    device: {
-      controllerKind: 'grbl-v1.1',
-      streamingMode: 'char-counted',
-      rxBufferBytes: 120,
-    },
-  } as unknown as Project;
-  return createExecutionArtifact({
+  return createCurrentTestExecutionArtifact({
     runId,
     gcode: GCODE,
-    prepared: {
-      ok: true,
-      project,
-      job: { groups: [] },
-      jobOriginOffset: { x: 0, y: 0 },
-    } as Extract<PreparedOutput, { readonly ok: true }>,
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    canvasPlan: { retentionKey: runId } as CanvasMotionPlan,
-    controllerSettings: null,
     createdAtIso: NOW,
   });
 }
@@ -66,7 +48,7 @@ function baseStreamer(): StreamerState {
 }
 
 async function startTrackedRun(repo: RecoveryRepository, runId: string): Promise<void> {
-  await repo.stageArtifact(executionArtifact(runId));
+  await repo.stageArtifact(await executionArtifact(runId));
   await repo.activateFreshRun(runId, NOW);
   useLaserStore.setState({
     activeRunId: runId,
@@ -253,7 +235,7 @@ describe('installJobCheckpointTracking', () => {
     const repo = repository();
     await repo.initialize();
     uninstall = installJobCheckpointTracking(() => LATER, repo);
-    await repo.stageArtifact(executionArtifact('run-tiny'));
+    await repo.stageArtifact(await executionArtifact('run-tiny'));
     const base = baseStreamer();
     useLaserStore.setState({
       activeRunId: 'run-tiny',

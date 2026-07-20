@@ -30,10 +30,7 @@ import {
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
-import {
-  laserModeStartEvidenceIssue,
-  type LaserModeStartSnapshotSource,
-} from './laser-mode-start-evidence';
+import { laserModeStartEvidenceIssue } from './laser-mode-start-evidence';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
@@ -204,7 +201,7 @@ async function prepareStartBoundary(
   if (hasPendingControllerWrite(pendingState)) {
     throw new Error(startPendingControllerMessage(pendingState));
   }
-  assertLaserModeStartEvidence(get(), driver(), machineKind, options);
+  assertStartControllerEvidence(machineKind, options, gcode);
   assertGcodeFitsController(gcode, options);
 }
 
@@ -275,20 +272,17 @@ function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
   return lines.some((line) => line.trim().toUpperCase() === 'M5') ? lines : ['M5', ...lines];
 }
 
-function assertLaserModeStartEvidence(
-  state: LaserState,
-  activeDriver: ControllerDriver,
+function assertStartControllerEvidence(
   machineKind: 'laser' | 'cnc',
   options: StartJobOptions,
+  gcode: string,
 ): void {
+  // M7 support is a Job Review advisory (rule 7 / ADR-228), not a wire-boundary
+  // refusal, so there is no live controller re-check here. For laser output the
+  // reviewed evidence still gates handoff consistency ($30/$32 acknowledgement
+  // and unchanged M7 program shape).
   if (machineKind !== 'laser') return;
-  const source: LaserModeStartSnapshotSource = {
-    controllerSessionEpoch: state.controllerSessionEpoch,
-    capabilities: activeDriver.capabilities,
-    controllerSettings: state.controllerSettings,
-    controllerSettingsObservation: state.controllerSettingsObservation,
-  };
-  const issue = laserModeStartEvidenceIssue(source, options.laserModeStartEvidence);
+  const issue = laserModeStartEvidenceIssue(options.laserModeStartEvidence, gcode);
   if (issue !== null) throw new Error(issue);
 }
 

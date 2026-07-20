@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -12,19 +13,34 @@ type ControllerOperationSnapshot = {
   readonly idleReports?: number;
 } | null;
 
-function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
+function makeConnection(
+  write: (data: string) => Promise<void>,
+  autoModalResponse = true,
+): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      if (data === '$I\n') {
+        emit('[VER:1.1f.20170801:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
+      if (data === '$G\n' && autoModalResponse) {
+        emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        emit('ok');
+      }
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
   };
 }
 
@@ -51,7 +67,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 function controllerOperation(): ControllerOperationSnapshot {
@@ -176,7 +192,7 @@ describe('laser controller lifecycle operations', () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
-    });
+    }, false);
     // A fully-qualifying connect (real settings rows) issues the modal query.
     await useLaserStore.getState().connect(makeAdapter(connection));
     connection.emitLine('Grbl 1.1f');
@@ -216,7 +232,7 @@ describe('laser controller lifecycle operations', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
     for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
     await flush();
 
@@ -263,7 +279,7 @@ describe('laser controller lifecycle operations', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
     for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
     await flush();
 

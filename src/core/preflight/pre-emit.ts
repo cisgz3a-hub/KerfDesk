@@ -21,9 +21,20 @@ import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
 import { outputOperationLayers, sceneObjectUsesOperation } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
+import { controlledLaserOffTravelFeedIssue } from './laser-off-motion-policy';
+import { operationScanOffsetIssues } from './scan-offset-policy';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
   const issues: PreflightIssue[] = [];
+  const controlledFeed = project.device.controlledLaserOffTravelFeedMmPerMin;
+  const controlledTravelIssue = controlledLaserOffTravelFeedIssue(project.device);
+  if (
+    controlledFeed !== undefined &&
+    (!Number.isFinite(controlledFeed) || controlledFeed <= 0) &&
+    controlledTravelIssue !== null
+  ) {
+    issues.push({ code: 'speed-out-of-range', message: controlledTravelIssue });
+  }
   if (scenePreparationTooComplex(project.scene)) {
     issues.push({
       code: 'vector-segment-budget-exceeded',
@@ -32,6 +43,7 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
     });
   }
   issues.push(...rasterBudgetIssues(project));
+  issues.push(...operationScanOffsetIssues(project, { nonFiniteOnly: true }));
   return { ok: issues.length === 0, issues };
 }
 

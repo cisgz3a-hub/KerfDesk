@@ -15,6 +15,7 @@ describe('fillRunwayPolicyForDevice', () => {
     expect(fillRunwayPolicyForDevice(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)).toBe(
       'feed-matched-entry',
     );
+    expect(fillRunwayPolicyForDevice(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, 'island')).toBe('full');
   });
 
   it('advises the ambiguous generic starter without identifying Falcon as a 4040', () => {

@@ -5,7 +5,6 @@ import {
   createLayer,
   createProject,
   DEFAULT_CNC_MACHINE_CONFIG,
-  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type SceneObject,
@@ -19,15 +18,12 @@ import {
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import {
-  createExecutionArtifact,
-  RecoveryRepository,
-  type RecoveryCapsule,
-} from '../state/recovery';
+import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
+import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
@@ -150,11 +146,10 @@ async function saveInterruptedRun(repo: RecoveryRepository): Promise<RecoveryCap
   if (!prepared.ok) {
     throw new Error(`Expected ready CNC job: ${prepared.messages.join('; ')}`);
   }
-  const artifact = createExecutionArtifact({
+  const artifact = await createCurrentTestExecutionArtifact({
     runId: 'run-archived-cnc',
     gcode: prepared.gcode,
     prepared: prepared.prepared,
-    outputScope: DEFAULT_OUTPUT_SCOPE,
     ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
     canvasPlan: prepared.canvasPlan,
     ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
@@ -236,6 +231,26 @@ describe('runCncSupervisedRecoveryFlow', () => {
       | undefined;
     expect(options?.machineKind).toBe('cnc');
     expect(options?.runId).toBe(repo.getSnapshot().activeRun?.runId);
+    expect(repo.getSnapshot().activeRun?.artifact.provenance).toMatchObject({
+      schemaVersion: 2,
+      workflow: {
+        kind: 'cnc-supervised-recovery',
+        sourceRunId: capsule.runId,
+        uncertaintyEventId: completeRecoveryReview.uncertaintyEventId,
+        qualificationId: completeRecoveryReview.qualificationId,
+        reviewId: expect.any(String),
+        clearedPathProofId: expect.any(String),
+        completedPrefixProofId: expect.any(String),
+      },
+      review: {
+        acknowledgement: {
+          kind: 'cnc-supervised-recovery',
+          review: completeRecoveryReview,
+          recoveryPackageConfirmed: true,
+          cncSetupConfirmed: true,
+        },
+      },
+    });
     expect(
       cncSetupAttestationMatches(
         options?.cncSetupAttestation,

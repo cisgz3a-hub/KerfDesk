@@ -119,6 +119,11 @@ describe('effectiveFillOverscanMm', () => {
     expect(effectiveFillOverscanMm(hatch(3), 5, 'island', 'sensitive')).toBe(5);
     expect(effectiveFillOverscanMm(hatch(9.5), 5, 'island', 'sensitive')).toBe(5);
   });
+
+  it('uses the full configured runway for short 4040 quality-policy sweeps', () => {
+    expect(effectiveFillOverscanMm(hatch(3), 5, 'scanline', undefined, 'full')).toBe(5);
+    expect(effectiveFillOverscanMm(hatch(3), 5, 'island', 'sensitive', 'full')).toBe(5);
+  });
 });
 
 describe('fillOverscanCommentText', () => {
@@ -146,5 +151,8 @@ describe('fillOverscanCommentText', () => {
     expect(fillOverscanCommentText(0, 'scanline', undefined, fmt)).toBe('overscan 0.000 mm');
     expect(fillOverscanCommentText(0, 'island', undefined, fmt)).toBe('overscan 0.000 mm');
     expect(fillOverscanCommentText(5, 'island', 'sensitive', fmt)).toBe('overscan 5.000 mm');
+    expect(fillOverscanCommentText(5, 'scanline', undefined, fmt, 'full')).toBe(
+      'overscan 5.000 mm (full on every sweep)',
+    );
   });
 });

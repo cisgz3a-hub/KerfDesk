@@ -19,7 +19,13 @@
 // closed before showing the picker so the user-facing port.open() doesn't
 // throw "port is already open".
 
-import type { SerialAdapter, SerialConnection, SerialOpenRequest, SerialPortRef } from '../types';
+import type {
+  SerialAdapter,
+  SerialConnection,
+  SerialOpenRequest,
+  SerialPortIdentity,
+  SerialPortRef,
+} from '../types';
 
 export const webSerial: SerialAdapter = {
   isSupported: () => typeof navigator !== 'undefined' && 'serial' in navigator,
@@ -59,7 +65,9 @@ async function closeStalePairedPorts(): Promise<void> {
 }
 
 function makePortRef(port: SerialPort): SerialPortRef {
+  const info = serialPortIdentity(port);
   return {
+    ...(info === null ? {} : { info }),
     open: async (req: SerialOpenRequest): Promise<SerialConnection> => {
       await openWithRetry(port, req.baudRate);
       return makeConnection(port);
@@ -72,6 +80,29 @@ function makePortRef(port: SerialPort): SerialPortRef {
       }
     },
   };
+}
+
+function serialPortIdentity(port: SerialPort): SerialPortIdentity | null {
+  try {
+    const info = port.getInfo();
+    const usbVendorId = boundedUsbId(info.usbVendorId);
+    const usbProductId = boundedUsbId(info.usbProductId);
+    if (usbVendorId === undefined && usbProductId === undefined) return null;
+    return {
+      ...(usbVendorId === undefined ? {} : { usbVendorId }),
+      ...(usbProductId === undefined ? {} : { usbProductId }),
+    };
+  } catch {
+    // Identity evidence is diagnostic only; inability to read it must not make
+    // a previously usable controller port impossible to open.
+    return null;
+  }
+}
+
+function boundedUsbId(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffff
+    ? value
+    : undefined;
 }
 
 // If port.open() throws "port is already open" we try one defensive close

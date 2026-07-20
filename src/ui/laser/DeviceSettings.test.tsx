@@ -233,6 +233,35 @@ describe('DeviceSettings air assist command', () => {
   });
 });
 
+describe('DeviceSettings controlled seek feed', () => {
+  it('caps the editor at the machine feed ceiling and ignores larger values', async () => {
+    useStore.getState().updateDeviceProfile({
+      maxFeed: 1000,
+      controlledLaserOffTravelFeedMmPerMin: 800,
+    });
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const input = host.querySelector('input[aria-label="Controlled laser-off seek feed"]');
+      if (!(input instanceof HTMLInputElement)) throw new Error('Controlled seek feed missing');
+      expect(input.max).toBe('1000');
+
+      await act(async () => {
+        input.value = '1001';
+        Simulate.change(input);
+      });
+      expect(useStore.getState().project.device.controlledLaserOffTravelFeedMmPerMin).toBe(800);
+
+      await act(async () => {
+        input.value = '900';
+        Simulate.change(input);
+      });
+      expect(useStore.getState().project.device.controlledLaserOffTravelFeedMmPerMin).toBe(900);
+    } finally {
+      await unmount();
+    }
+  });
+});
+
 describe('DeviceSettings in CNC mode (ADR-101 §6)', () => {
   it('hides the laser-only fields but keeps the machine-agnostic ones', async () => {
     useStore.getState().setMachineKind('cnc');
@@ -296,6 +325,7 @@ describe('DeviceSettings scan offsets', () => {
       expect(useStore.getState().project.device.scanningOffsets).toEqual([
         { speedMmPerMin: 3000, offsetMm: 0 },
       ]);
+      expect(useStore.getState().project.device.scanOffsetCalibrationStatus).toBe('pending');
 
       const speed = input(host, 'Scan offset speed 1');
       await act(async () => {
@@ -336,6 +366,28 @@ describe('DeviceSettings scan offsets', () => {
 
       expect(useStore.getState().project.device.scanningOffsets).toEqual([
         { speedMmPerMin: 6000, offsetMm: 0.12 },
+      ]);
+      expect(useStore.getState().project.device.scanOffsetCalibrationStatus).toBe('pending');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('rejects huge manual scan offsets at the profile-relative input bound', async () => {
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      await act(async () => button(host, 'Add offset').click());
+      const offset = input(host, 'Scan offset value 1');
+      expect(offset.min).toBe('-4');
+      expect(offset.max).toBe('4');
+
+      await act(async () => {
+        offset.value = '1e308';
+        Simulate.change(offset);
+      });
+
+      expect(useStore.getState().project.device.scanningOffsets).toEqual([
+        { speedMmPerMin: 3000, offsetMm: 0 },
       ]);
     } finally {
       await unmount();

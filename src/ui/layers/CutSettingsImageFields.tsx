@@ -74,6 +74,12 @@ export function CutSettingsImageFields(props: {
         title="Alternate raster rows in both directions. Turn off for scan-offset diagnosis."
       />
       <ImageCheckboxField
+        label="Expert override"
+        name="allowUncalibratedBidirectionalScan"
+        checked={props.layer.allowUncalibratedBidirectionalScan === true}
+        title="Allow bidirectional scanning without a scan-offset calibration. This can double or blur edges on the 4040."
+      />
+      <ImageCheckboxField
         label="Pass-through"
         name="passThrough"
         checked={props.layer.passThrough}

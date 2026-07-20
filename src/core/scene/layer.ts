@@ -16,6 +16,7 @@ export type LayerMode = 'line' | 'fill' | 'image';
 export type LayerDitherAlgorithm = DitherAlgorithm;
 export type LayerFillStyle = 'scanline' | 'offset' | 'island';
 export type LayerPowerMode = 'constant' | 'dynamic';
+export type ScanOffsetCalibrationMode = 'baseline' | 'verification';
 
 export type LayerOperationSettings = {
   readonly mode: LayerMode;
@@ -35,6 +36,8 @@ export type LayerOperationSettings = {
   readonly fillOverscanMm: number;
   readonly fillStyle: LayerFillStyle;
   readonly fillBidirectional: boolean;
+  readonly allowUncalibratedBidirectionalScan?: boolean;
+  readonly bidirectionalScanOffsetMm?: number;
   readonly fillCrossHatch: boolean;
   readonly ditherAlgorithm: LayerDitherAlgorithm;
   readonly linesPerMm: number;
@@ -67,6 +70,9 @@ export type Layer = LayerOperationSettings & {
   readonly output: boolean;
   readonly subLayers: ReadonlyArray<LayerSubLayer>;
   readonly materialBinding?: LinkedMaterialBinding;
+  /** Identifies generated calibration coupons so the 4040 direction policy can
+   * distinguish them from normal production jobs after project reload. */
+  readonly scanOffsetCalibrationMode?: ScanOffsetCalibrationMode;
   // CNC operation for this layer, used only when the project machine is
   // 'cnc'. Laser fields above are ignored in CNC mode and vice versa, so a
   // project can switch machine kinds without losing either setup.
@@ -120,6 +126,8 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'fillOverscanMm',
   'fillStyle',
   'fillBidirectional',
+  'allowUncalibratedBidirectionalScan',
+  'bidirectionalScanOffsetMm',
   'fillCrossHatch',
   'ditherAlgorithm',
   'linesPerMm',
@@ -182,6 +190,12 @@ export function captureLayerOperationSettings(
     fillOverscanMm: layer.fillOverscanMm,
     fillStyle: layer.fillStyle,
     fillBidirectional: layer.fillBidirectional,
+    ...(layer.allowUncalibratedBidirectionalScan !== undefined
+      ? { allowUncalibratedBidirectionalScan: layer.allowUncalibratedBidirectionalScan }
+      : {}),
+    ...(layer.bidirectionalScanOffsetMm !== undefined
+      ? { bidirectionalScanOffsetMm: layer.bidirectionalScanOffsetMm }
+      : {}),
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
     linesPerMm: layer.linesPerMm,

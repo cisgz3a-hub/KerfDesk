@@ -11,8 +11,9 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { grblDriver, type ControllerDriver } from '../../core/controllers';
-import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import * as controllerOperation from './laser-controller-operation';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
+import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import {
@@ -169,7 +170,7 @@ export function motionOperationCommandBlockMessage(state: LaserState): string | 
   if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
   return state.motionOperation !== null
     ? MOTION_OPERATION_ACTIVE_MESSAGE
-    : controllerOperationCommandBlockMessage(state.controllerOperation);
+    : controllerOperation.controllerOperationCommandBlockMessage(state.controllerOperation);
 }
 
 export function setupCommandBlockMessage(state: LaserState): string | null {
@@ -181,7 +182,7 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   if (activeJobMessage !== null) return activeJobMessage;
   const motionOperationMessage = motionOperationCommandBlockMessage(state);
   if (motionOperationMessage !== null) return motionOperationMessage;
-  const controllerOperationMessage = controllerOperationCommandBlockMessage(
+  const controllerOperationMessage = controllerOperation.controllerOperationCommandBlockMessage(
     state.controllerOperation,
   );
   if (controllerOperationMessage !== null) return controllerOperationMessage;
@@ -306,6 +307,7 @@ type InitialLaserState = Pick<
   | 'activeControllerKind'
   | 'detectedControllerKind'
   | 'connection'
+  | 'serialPortInfo'
   | 'statusReport'
   | 'controllerSessionEpoch'
   | 'statusSequence'
@@ -335,6 +337,9 @@ type InitialLaserState = Pick<
   | 'detectedSettings'
   | 'controllerSettings'
   | 'controllerSettingsObservation'
+  | 'controllerBuildInfo'
+  | 'controllerBuildInfoRawLines'
+  | 'controllerBuildInfoObservation'
   | 'controllerQualification'
   | 'grblSettingsRows'
   | 'lastSettingsReadAt'
@@ -363,6 +368,7 @@ export function initialLaserState(): InitialLaserState {
     activeControllerKind: grblDriver.kind,
     detectedControllerKind: null,
     connection: { kind: 'disconnected' },
+    serialPortInfo: null,
     statusReport: null,
     controllerSessionEpoch: 0,
     statusSequence: 0,
@@ -392,6 +398,7 @@ export function initialLaserState(): InitialLaserState {
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: disconnectedControllerQualification(0),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -421,11 +428,12 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     wasActiveJob ||
     state.fireActive ||
     state.motionOperation !== null ||
-    isUnsafeControllerOperation(state.controllerOperation);
+    controllerOperation.isUnsafeControllerOperation(state.controllerOperation);
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
   return {
     connection: { kind: 'disconnected' },
+    serialPortInfo: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
@@ -433,6 +441,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     detectedControllerKind: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -474,8 +483,4 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
         ? { safetyNotice: disconnectDuringJobNotice() }
         : {}),
   };
-}
-
-function isUnsafeControllerOperation(operation: LaserState['controllerOperation']): boolean {
-  return operation !== null && operation.kind !== 'connection-handshake';
 }

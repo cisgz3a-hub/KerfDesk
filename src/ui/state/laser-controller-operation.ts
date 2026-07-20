@@ -55,6 +55,10 @@ export function controllerOperationCommandBlockMessage(
   return operation === null ? null : CONTROLLER_OPERATION_ACTIVE_MESSAGE;
 }
 
+export function isUnsafeControllerOperation(operation: LaserControllerOperation | null): boolean {
+  return operation !== null && operation.kind !== 'connection-handshake';
+}
+
 export function describeControllerOperation(operation: LaserControllerOperation | null): string {
   if (operation?.kind === 'connection-handshake') {
     return describeConnectionHandshake(operation.phase);

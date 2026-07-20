@@ -29,11 +29,34 @@ export function normalizeLayer(layer: unknown): unknown {
     out['name'] = 'Operation';
   }
   normalizeCommonLayerFields(out);
+  normalizeScanMotionOverrides(out);
+  normalizeScanOffsetCalibrationMode(out);
   normalizeFillLayerFields(out);
   normalizeImageLayerFields(out);
   normalizeCncLayerField(out);
   normalizeSubLayers(out);
   return out;
+}
+
+function normalizeScanOffsetCalibrationMode(out: Record<string, unknown>): void {
+  if (
+    out['scanOffsetCalibrationMode'] !== 'baseline' &&
+    out['scanOffsetCalibrationMode'] !== 'verification'
+  ) {
+    delete out['scanOffsetCalibrationMode'];
+  }
+}
+
+function normalizeScanMotionOverrides(out: Record<string, unknown>): void {
+  if (typeof out['allowUncalibratedBidirectionalScan'] !== 'boolean') {
+    delete out['allowUncalibratedBidirectionalScan'];
+  }
+  if (
+    typeof out['bidirectionalScanOffsetMm'] !== 'number' ||
+    !Number.isFinite(out['bidirectionalScanOffsetMm'])
+  ) {
+    delete out['bidirectionalScanOffsetMm'];
+  }
 }
 
 // Optional CNC operation block. Absent stays absent (defaults apply at

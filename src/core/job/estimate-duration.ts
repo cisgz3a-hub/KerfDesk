@@ -28,13 +28,9 @@ import {
   cncPassXyPoints,
   type CncGroup,
   type CutGroup,
-  type FillGroup,
-  type FillSegment,
   type Job,
-  type RasterGroup,
 } from './job';
-import { estimateWithPlanner } from './planner';
-import { rasterRow } from './raster-rows';
+import { estimateWithPlanner, type PlannerEndMotionOptions } from './planner';
 
 export type JobDurationBreakdown = {
   readonly cutSeconds: number;
@@ -51,13 +47,15 @@ export type JobDurationEstimate = {
   readonly breakdown: JobDurationBreakdown;
 };
 
-const PIXEL_CENTER_OFFSET = 0.5;
-const SWEEP_DIRECTION_PERIOD = 2;
-const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
+export type JobDurationEstimateOptions = PlannerEndMotionOptions;
 
-export function estimateJobDuration(job: Job, device: DeviceProfile): JobDurationEstimate {
-  const plannerJob = jobWithCncAsCutGroups(jobWithRasterSweeps(job));
-  const estimate = estimateWithPlanner(plannerJob, device);
+export function estimateJobDuration(
+  job: Job,
+  device: DeviceProfile,
+  options: JobDurationEstimateOptions = {},
+): JobDurationEstimate {
+  const plannerJob = jobWithCncAsCutGroups(job);
+  const estimate = estimateWithPlanner(plannerJob, device, options);
   const plungeSeconds = cncPlungeSeconds(job, device);
   const cutSeconds =
     (estimate.breakdown.cutSeconds + plungeSeconds) * timingScale(device.estimateCutTimeScale);
@@ -126,96 +124,6 @@ function cncPlungeSeconds(job: Job, device: DeviceProfile): number {
     }
   }
   return seconds;
-}
-
-function jobWithRasterSweeps(job: Job): Job {
-  let changed = false;
-  const groups = job.groups.map((group) => {
-    if (group.kind !== 'raster') return group;
-    changed = true;
-    return rasterAsFillSweepGroup(group);
-  });
-  return changed ? { groups } : job;
-}
-
-function rasterAsFillSweepGroup(group: RasterGroup): FillGroup {
-  return {
-    kind: 'fill',
-    layerId: group.layerId,
-    color: group.color,
-    power: group.power,
-    speed: group.speed,
-    passes: group.passes,
-    airAssist: group.airAssist,
-    overscanMm: group.overscanMm,
-    segments: rasterActiveSweepSegments(group),
-  };
-}
-
-function rasterActiveSweepSegments(group: RasterGroup): FillGroup['segments'] {
-  if (group.pixelWidth <= 0 || group.pixelHeight <= 0) return [];
-  const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
-  const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
-  if (pixelWidthMm <= 0 || pixelHeightMm <= 0) return [];
-
-  const segments: FillSegment[] = [];
-  let sweepIndex = 0;
-  for (let y = 0; y < group.pixelHeight; y += 1) {
-    const spans = rasterActiveSpans(group, y, pixelWidthMm);
-    if (spans.length === 0) continue;
-    const worldY = group.bounds.minY + (y + PIXEL_CENTER_OFFSET) * pixelHeightMm;
-    const isReverseSweep = sweepIndex % SWEEP_DIRECTION_PERIOD === 1;
-    for (const span of spans) {
-      const startX = group.bounds.minX + span.firstX * pixelWidthMm;
-      const endX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
-      segments.push({
-        polyline: isReverseSweep
-          ? [
-              { x: endX, y: worldY },
-              { x: startX, y: worldY },
-            ]
-          : [
-              { x: startX, y: worldY },
-              { x: endX, y: worldY },
-            ],
-        closed: false,
-        reverse: isReverseSweep,
-      });
-    }
-    sweepIndex += 1;
-  }
-  return segments;
-}
-
-type RasterSpan = { readonly firstX: number; readonly lastX: number };
-
-function rasterActiveSpans(
-  group: RasterGroup,
-  y: number,
-  pixelWidthMm: number,
-): ReadonlyArray<RasterSpan> {
-  const row = rasterRow(group, y);
-  const spans: RasterSpan[] = [];
-  let firstX = -1;
-  for (let x = 0; x < group.pixelWidth; x += 1) {
-    if ((row[x] ?? 0) > 0) {
-      firstX = x;
-      break;
-    }
-  }
-  if (firstX === -1) return spans;
-  let lastInk = firstX;
-  for (let x = firstX + 1; x < group.pixelWidth; x += 1) {
-    if ((row[x] ?? 0) <= 0) continue;
-    const gapMm = (x - lastInk - 1) * pixelWidthMm;
-    if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
-      spans.push({ firstX, lastX: lastInk });
-      firstX = x;
-    }
-    lastInk = x;
-  }
-  spans.push({ firstX, lastX: lastInk });
-  return spans;
 }
 
 // Human-readable formatter — "4m 23s" / "47s" / "1h 12m". Co-located with

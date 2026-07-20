@@ -99,6 +99,8 @@ export type ObjectOperationOverride = {
   readonly fillOverscanMm?: number;
   readonly fillStyle?: 'scanline' | 'offset' | 'island';
   readonly fillBidirectional?: boolean;
+  readonly allowUncalibratedBidirectionalScan?: boolean;
+  readonly bidirectionalScanOffsetMm?: number;
   readonly fillCrossHatch?: boolean;
   readonly ditherAlgorithm?: DitherAlgorithm;
   readonly linesPerMm?: number;

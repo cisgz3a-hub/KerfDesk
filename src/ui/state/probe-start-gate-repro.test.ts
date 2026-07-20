@@ -34,6 +34,7 @@ import {
 } from '../job-placement';
 import type { FrameVerification } from './frame-verification';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
 import {
   isWorkZZeroEvidenceCurrent,
@@ -93,8 +94,14 @@ const controllerSettings = { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: f
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      respondToTestGrblHandshake(data, emitLine);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
@@ -104,9 +111,7 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
       return () => closeHandlers.delete(handler);
     },
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine,
     emitClose: () => {
       for (const handler of closeHandlers) handler();
     },

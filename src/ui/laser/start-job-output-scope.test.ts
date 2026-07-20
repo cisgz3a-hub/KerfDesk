@@ -10,6 +10,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { frameVerificationForProject } from './frame-verification-testing';
+import { frameVerificationBlockedMessage } from './frame-verification-policy';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -56,6 +57,44 @@ describe('prepareStartJob output scope', () => {
       expect(result.gcode).not.toContain('X10');
     }
   });
+
+  it('re-blocks when selection-origin mode changes after Frame', () => {
+    const project = twoLineProject();
+    const framedScope = selectedScope(['B'], false);
+    const changedScope = selectedScope(['B'], true);
+    const placement = { startFrom: 'user-origin' as const, anchor: 'front-left' as const };
+    const wco = { x: 0, y: 0, z: 0 };
+    const result = prepareStartJob(
+      project,
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: wco,
+        frameVerification: frameVerificationForProject(project, {
+          jobOrigin: placement,
+          outputScope: framedScope,
+          wco,
+          workOriginActive: true,
+        }),
+      },
+      placement,
+      changedScope,
+    );
+
+    expect(result).toEqual({ ok: false, messages: [frameVerificationBlockedMessage()] });
+  });
+
+  it('re-blocks when a selected-only Frame is reused for the full canvas', () => {
+    const project = twoLineProject();
+    const framedScope = selectedScope(['B']);
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      frameVerification: frameVerificationForProject(project, { outputScope: framedScope }),
+    });
+
+    expect(result).toEqual({ ok: false, messages: [frameVerificationBlockedMessage()] });
+  });
 });
 
 function twoLineProject(): Project {
@@ -93,10 +132,13 @@ function lineObject(id: string, x: number): SceneObject {
   };
 }
 
-function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
+function selectedScope(
+  selectedObjectIds: ReadonlyArray<string>,
+  useSelectionOrigin = false,
+): OutputScope {
   return {
     cutSelectedGraphics: true,
-    useSelectionOrigin: false,
+    useSelectionOrigin,
     selectedObjectIds,
   };
 }

@@ -33,11 +33,13 @@
 //
 // Pure-core compliant: no clock, no random, no I/O.
 
-import type { DeviceProfile } from '../devices';
+import { resolveGrblDialect, type DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
-import type { CutGroup, FillGroup, Job } from './job';
+import type { CutGroup, FillGroup, Job, RasterGroup } from './job';
+import { rasterDurationMotion } from './raster-duration-motion';
+import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
@@ -53,6 +55,8 @@ type Block = {
   readonly motion?: BlockMotion;
   readonly distance: number; // mm
   readonly targetVelocity: number; // mm/sec
+  /** Legacy narrow tag for a continuous S0/burn chain without motion metadata. */
+  readonly feedMatchedLaserMotion?: boolean;
   // Unit direction vector. Travels with zero length are filtered out
   // before block creation so this is always defined for real blocks.
   readonly direction: Vec2;
@@ -68,11 +72,35 @@ export type PlannedDuration = {
   };
 };
 
-export function estimateWithPlanner(job: Job, device: DeviceProfile): PlannedDuration {
+export type PlannerEndMotionOptions = {
+  /** Trusted physical head position at program start. Defaults to work zero for
+   * export/general estimates that have no live placement evidence. */
+  readonly initialPosition?: Vec2;
+  readonly finishPosition?: Vec2 | null;
+};
+
+export function estimateWithPlanner(
+  job: Job,
+  device: DeviceProfile,
+  options: PlannerEndMotionOptions = {},
+): PlannedDuration {
   const accel = Math.max(1, device.accelMmPerSec2);
   const jd = Math.max(0, device.junctionDeviationMm);
-  const travelV = Math.max(1, device.maxFeed) / SECONDS_PER_MINUTE;
-  const blocks = buildBlocks(job, device, travelV);
+  const travelV =
+    Math.max(1, device.controlledLaserOffTravelFeedMmPerMin ?? device.maxFeed) / SECONDS_PER_MINUTE;
+  const finishPosition =
+    options.finishPosition === undefined
+      ? resolveGrblDialect(device).parkAtOriginAfterJob
+        ? ORIGIN
+        : null
+      : options.finishPosition;
+  const blocks = buildBlocks(
+    job,
+    device,
+    travelV,
+    options.initialPosition ?? ORIGIN,
+    finishPosition,
+  );
   if (blocks.length === 0) {
     return {
       totalSeconds: 0,
@@ -106,30 +134,65 @@ export function estimateWithPlanner(job: Job, device: DeviceProfile): PlannedDur
 
 // Block decomposition. Walks every cut segment and produces one block
 // per polyline edge (cut, full feed), preceded by a one-block travel
-// from the previous cursor position. Postamble back to origin is a
-// final travel block. Multi-pass repeats the cut blocks.
-function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] {
+// from the previous cursor position. The final travel mirrors the selected
+// output dialect (or an explicit current-position finish). Multi-pass repeats
+// the cut blocks.
+function buildBlocks(
+  job: Job,
+  device: DeviceProfile,
+  travelV: number,
+  initialPosition: Vec2,
+  finishPosition: Vec2 | null,
+): Block[] {
   const out: Block[] = [];
-  let cursor: Vec2 = ORIGIN;
+  let cursor: Vec2 = initialPosition;
   for (const group of job.groups) {
-    // F.2.d: planner-aware estimator works on vector blocks (one
-    // per polyline edge). Raster groups produce a different motion
-    // model (constant-feed sweeps) — skipped here and accounted
-    // for separately in estimate-duration's raster path. CNC groups
-    // are likewise pre-transformed into cut groups by the estimator.
-    if (group.kind === 'raster' || group.kind === 'cnc') continue;
+    // CNC groups are pre-transformed into XY cut groups by estimate-duration.
+    // Raster groups retain their emitted per-power runs so S0 and powered G1
+    // legs share one continuous feed-motion chain in the planner.
+    if (group.kind === 'cnc') continue;
     const cutV = groupCutVelocity(group, device);
+    if (group.kind === 'raster') {
+      cursor = appendRasterGroupBlocks(out, cursor, group, cutV, travelV, device);
+      continue;
+    }
     cursor =
       group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
-        ? appendFillGroupBlocks(out, cursor, group, cutV, travelV)
+        ? appendFillGroupBlocks(out, cursor, group, cutV, travelV, device)
         : appendCutGroupBlocks(out, cursor, group, cutV, travelV);
   }
-  appendTravel(out, cursor, ORIGIN, travelV);
+  if (finishPosition !== null) appendTravel(out, cursor, finishPosition, travelV);
   return out;
 }
 
-function groupCutVelocity(group: CutGroup | FillGroup, device: DeviceProfile): number {
+function groupCutVelocity(
+  group: CutGroup | FillGroup | RasterGroup,
+  device: DeviceProfile,
+): number {
   return Math.max(1, Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
+}
+
+function appendRasterGroupBlocks(
+  out: Block[],
+  initialCursor: Vec2,
+  group: RasterGroup,
+  cutV: number,
+  travelV: number,
+  device: DeviceProfile,
+): Vec2 {
+  let cursor = initialCursor;
+  for (const motion of rasterDurationMotion(group, initialCursor, device.scanningOffsets)) {
+    if (motion.kind === 'cut') appendCut(out, motion.from, motion.to, cutV);
+    else if (motion.kind === 'feed-travel') {
+      appendFeedTravel(out, motion.from, motion.to, cutV);
+    } else if (device.controlledLaserOffTravelFeedMmPerMin !== undefined) {
+      appendFeedTravel(out, motion.from, motion.to, travelV);
+    } else {
+      appendTravel(out, motion.from, motion.to, travelV);
+    }
+    cursor = motion.to;
+  }
+  return cursor;
 }
 
 function appendFillGroupBlocks(
@@ -138,15 +201,33 @@ function appendFillGroupBlocks(
   group: FillGroup,
   cutV: number,
   travelV: number,
+  device: DeviceProfile,
 ): Vec2 {
   let cursor = initialCursor;
   const plans = planFillSweeps(group);
+  const scanOffsetMm =
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, group.speed);
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const plan of plans) {
-      cursor = appendFillSweepBlocks(out, cursor, plan, cutV, travelV);
+      cursor = appendFillSweepBlocks(
+        out,
+        cursor,
+        fillPlanWithScanOffset(plan, scanOffsetMm),
+        cutV,
+        travelV,
+      );
     }
   }
   return cursor;
+}
+
+function fillPlanWithScanOffset(plan: FillSweepPlan, scanOffsetMm: number): FillSweepPlan {
+  if (!plan.sweep.reverse || scanOffsetMm === 0) return plan;
+  const spans = plan.sweep.spans.map((span) => {
+    const shifted = shiftedScanSweepEndpoints(span, span, true, scanOffsetMm);
+    return { start: shifted.start, end: shifted.end };
+  });
+  return { ...plan, sweep: { ...plan.sweep, spans } };
 }
 
 function appendFillSweepBlocks(
@@ -336,7 +417,8 @@ export function junctionVelocity(prev: Block, next: Block, accel: number, jd: nu
   // Rapid and feed motion retain the estimator's conservative stop boundary.
   // Laser state is not a motion boundary: G1/S0 feed travel blends through a
   // powered G1 span exactly as the emitted continuous sweep does.
-  if (blockMotion(prev) !== blockMotion(next)) return 0;
+  if (blockMotion(prev) !== blockMotion(next) && !isContinuousFeedMatchedLaserJunction(prev, next))
+    return 0;
   const cosTheta = prev.direction.x * next.direction.x + prev.direction.y * next.direction.y;
   // Clamp to handle float noise just outside [-1, 1].
   const clamped = Math.min(1, Math.max(-1, cosTheta));
@@ -352,6 +434,14 @@ export function junctionVelocity(prev: Block, next: Block, accel: number, jd: nu
   if (sinHalf >= 1) return Number.POSITIVE_INFINITY; // straight
   if (sinHalf <= 0) return 0; // reversal
   return Math.sqrt((accel * jd * sinHalf) / (1 - sinHalf));
+}
+
+function isContinuousFeedMatchedLaserJunction(prev: Block, next: Block): boolean {
+  return (
+    prev.feedMatchedLaserMotion === true &&
+    next.feedMatchedLaserMotion === true &&
+    prev.targetVelocity === next.targetVelocity
+  );
 }
 
 // Generalized trapezoidal time from v_entry through optional v_peak

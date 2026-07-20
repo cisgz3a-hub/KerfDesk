@@ -5,7 +5,7 @@
 
 import type { MachineKind } from '../../../core/scene';
 import { useStore } from '../../state';
-import { buildMachineReviewFacts } from './job-review-live-rows';
+import { buildMachineReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import {
   detailsStyle,
   detailsSummaryCountStyle,
@@ -19,9 +19,10 @@ import { JobReviewFactRow } from './JobReviewFactRow';
 export function JobReviewMachineSection(props: {
   readonly machineKind: MachineKind;
   readonly toolPlanLabels: ReadonlyArray<string>;
+  readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
 }): JSX.Element {
   const project = useStore((s) => s.project);
-  const facts = buildMachineReviewFacts(project);
+  const facts = [...buildMachineReviewFacts(project), ...props.outputQualityFacts];
   return (
     <details style={detailsStyle}>
       <summary

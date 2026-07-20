@@ -15,6 +15,7 @@ import {
   type ProfileCapability,
   type ProfileEvidenceStatus,
 } from '../../core/devices';
+import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import {
   normalizeCameraAlignment,
   normalizeCameraCalibration,
@@ -49,6 +50,7 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
   return (
     validateProfileIdentity(value) ??
     validateProfileMachineFields(value) ??
+    validateScanOffsetCalibrationLifecycle(value) ??
     validateProfileHoming(value['homing']) ??
     validateProfileOptionalZ(value) ??
     validateProfileCapabilities(value['capabilities']) ??
@@ -59,6 +61,20 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateCameraAlignment(value['cameraAlignment']) ??
     validateLaserFireControl(value['fireControl'])
   );
+}
+
+function validateScanOffsetCalibrationLifecycle(value: Record<string, unknown>): string | null {
+  const status = value['scanOffsetCalibrationStatus'];
+  if (status !== undefined && !isScanOffsetCalibrationStatus(status)) {
+    return 'profile.scanOffsetCalibrationStatus is invalid';
+  }
+  if (
+    status !== undefined &&
+    (!Array.isArray(value['scanningOffsets']) || value['scanningOffsets'].length === 0)
+  ) {
+    return 'profile.scanOffsetCalibrationStatus requires scanningOffsets';
+  }
+  return null;
 }
 
 function validateProfileIdentity(value: Record<string, unknown>): string | null {
@@ -84,8 +100,20 @@ function validateProfileMachineFields(value: Record<string, unknown>): string | 
   return (
     validateProfileStreamingFields(value) ??
     validateProfilePositiveMachineFields(value) ??
+    validateControlledLaserOffTravelFeed(value) ??
     validateProfileScalarMachineFields(value)
   );
+}
+
+function validateControlledLaserOffTravelFeed(value: Record<string, unknown>): string | null {
+  const feed = value['controlledLaserOffTravelFeedMmPerMin'];
+  if (feed === undefined) return null;
+  if (!isPositiveFinite(feed)) {
+    return 'profile.controlledLaserOffTravelFeedMmPerMin must be positive';
+  }
+  return typeof value['maxFeed'] === 'number' && feed > value['maxFeed']
+    ? 'profile.controlledLaserOffTravelFeedMmPerMin must not exceed maxFeed'
+    : null;
 }
 
 function validateProfileStreamingFields(value: Record<string, unknown>): string | null {

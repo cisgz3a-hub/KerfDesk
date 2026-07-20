@@ -181,6 +181,8 @@ function machineSnapshot(
     workZZeroEvidence: laser.workZZeroEvidence,
     workZReferenceEpoch: laser.workZReferenceEpoch,
     controllerSessionEpoch: laser.controllerSessionEpoch,
+    controllerBuildInfo: laser.controllerBuildInfo,
+    controllerBuildInfoObservation: laser.controllerBuildInfoObservation,
     wcoCache: laser.wcoCache,
     activeWcs: laser.activeWcs,
     ovCache: laser.ovCache,

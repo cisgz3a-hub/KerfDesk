@@ -24,6 +24,10 @@ import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
+import {
+  emptyControllerBuildInfoState,
+  readControllerBuildInfo,
+} from './laser-controller-build-info';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -34,6 +38,8 @@ type SettingsWriteFn = (
   action?: LaserSafetyAction,
   source?: TranscriptSource,
 ) => Promise<void>;
+
+const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
 
 export type GrblSettingsActionRefs = ControllerLifecycleRefs & {
   driver: ControllerDriver;
@@ -86,6 +92,7 @@ async function readMachineSettingsAction(
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -99,6 +106,23 @@ async function readMachineSettingsAction(
       source: 'console',
     });
     finishSettingsQualification(set, get, refs, qualificationEpoch);
+    if (refs.driver.commands.buildInfoQuery !== null) {
+      // The settings line handler releases its narrow $$ operation as soon as
+      // that response completes. Re-claim the multi-query workflow while $I
+      // is in flight so Super Console actions cannot interleave with it.
+      set((state) =>
+        state.controllerSessionEpoch === qualificationEpoch
+          ? {
+              controllerOperation: {
+                kind: 'interactive-command',
+                phase: 'command',
+                label: BUILD_INFO_READ_OPERATION_LABEL,
+              },
+            }
+          : {},
+      );
+    }
+    await refreshControllerBuildInfo(set, get, refs, write, qualificationEpoch);
     clearInteractiveOperation(set, qualificationEpoch);
     // A reset banner nulls activeWcs and this action is the post-reset
     // re-qualification (refs.runControllerQualification), so a completed read
@@ -106,6 +130,56 @@ async function readMachineSettingsAction(
     await requestActiveWcsReadback(get, refs.driver, write, qualificationEpoch);
   } catch (err) {
     failSettingsOperation(set, refs, qualificationEpoch, 'read', err);
+  }
+}
+
+async function refreshControllerBuildInfo(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  write: SettingsWriteFn,
+  qualificationEpoch: number,
+): Promise<void> {
+  if (
+    refs.driver.commands.buildInfoQuery === null ||
+    get().controllerSessionEpoch !== qualificationEpoch
+  ) {
+    return;
+  }
+  try {
+    const evidence = await readControllerBuildInfo({
+      driver: refs.driver,
+      refs,
+      write,
+      commandKind: 'interactive-command',
+      sessionEpoch: qualificationEpoch,
+      isCurrent: () => get().controllerSessionEpoch === qualificationEpoch,
+      action: 'console',
+      source: 'console',
+    });
+    if (evidence === null) return;
+    set((state) =>
+      state.controllerSessionEpoch === qualificationEpoch
+        ? {
+            ...evidence,
+            log: pushLog(
+              state,
+              evidence.controllerBuildInfo === null
+                ? '[lf2] Controller $I response was not recognized as stock GRBL build information; M7 support remains unverified.'
+                : `[lf2] Controller build information refreshed (${evidence.controllerBuildInfo.protocolVersion}; options ${evidence.controllerBuildInfo.optionCodes.join('') || 'none'}).`,
+            ),
+          }
+        : {},
+    );
+  } catch (err) {
+    if (get().controllerSessionEpoch !== qualificationEpoch) return;
+    const message = err instanceof Error ? err.message : String(err);
+    set((state) => ({
+      log: pushLog(
+        state,
+        `[lf2] Controller build information could not be read; M7 support remains unverified (${message}).`,
+      ),
+    }));
   }
 }
 

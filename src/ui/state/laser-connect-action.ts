@@ -1,5 +1,5 @@
 import { selectControllerDriver } from '../../core/controllers';
-import type { PlatformAdapter, SerialPortRef } from '../../platform/types';
+import type { PlatformAdapter, SerialPortIdentity, SerialPortRef } from '../../platform/types';
 import {
   beginConnectAttempt,
   connectAttemptIsCurrent,
@@ -16,7 +16,11 @@ type SetFn = (
 ) => void;
 type LiveConnection = NonNullable<LiveRefs['connection']>;
 type ClosePreviousFn = (connection: LiveConnection) => Promise<void>;
-type AttachConnectionFn = (connection: LiveConnection, baudRate: number) => void;
+type AttachConnectionFn = (
+  connection: LiveConnection,
+  baudRate: number,
+  portInfo: SerialPortIdentity | null,
+) => void;
 type ConnectingPatchFn = (state: LaserState, refs: LiveRefs) => Partial<LaserState>;
 
 export async function runConnectAction(
@@ -74,7 +78,7 @@ export async function runConnectAction(
       await closeCancelledConnection(refs, attempt, connection);
       return;
     }
-    attachConnection(connection, baudRate);
+    attachConnection(connection, baudRate, portRef.info ?? null);
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission().catch(() => undefined);

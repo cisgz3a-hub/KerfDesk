@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
@@ -11,17 +12,24 @@ type FakeConnection = SerialConnection & {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emit = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      if (useLaserStore.getState().controllerOperation?.kind === 'connection-handshake') {
+        respondToTestGrblHandshake(data, emit);
+        return;
+      }
+      await write(data);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine: emit,
     listenerCount: () => lineHandlers.size,
   };
 }
@@ -49,7 +57,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+  for (let index = 0; index < 30; index += 1) await Promise.resolve();
 }
 
 async function acknowledge(connection: FakeConnection, action: Promise<void>): Promise<void> {
@@ -69,9 +77,7 @@ async function acknowledgeTwoLines(
   await action;
 }
 
-beforeEach(() => {
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
-});
+beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => undefined));
 
 afterEach(async () => {
   useLaserStore.setState({ autofocusBusy: false });
@@ -133,9 +139,7 @@ describe('laser-store origin actions', () => {
     await expect(useLaserStore.getState().sendConsoleCommand('$I')).rejects.toThrow(
       /controller operation/i,
     );
-    await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
-      /controller operation/i,
-    );
+    await expect(startTestLaserJob('G21\nG90\nM5\n')).rejects.toThrow(/controller operation/i);
 
     connection.emitLine('ok');
     // Set Origin now waits for the post-G92 work-offset report before finishing,

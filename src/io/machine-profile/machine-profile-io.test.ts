@@ -89,6 +89,7 @@ describe('LaserForge machine profile documents', () => {
         gcodeDialect: { dialectId: 'neotronics-4040-safe' },
         streamingMode: 'char-counted',
         rxBufferBytes: 120,
+        controlledLaserOffTravelFeedMmPerMin: 800,
         baudRate: 250000,
         cameraCalibration: {
           intrinsics: { fx: 900, fy: 905, cx: 640, cy: 360 },
@@ -133,6 +134,7 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.gcodeDialect.dialectId).toBe('neotronics-4040-safe');
     expect(result.document.profile.streamingMode).toBe('char-counted');
     expect(result.document.profile.rxBufferBytes).toBe(120);
+    expect(result.document.profile.controlledLaserOffTravelFeedMmPerMin).toBe(800);
     expect(result.document.profile.baudRate).toBe(250000);
     expect(result.document.profile.cameraCalibration).toEqual(
       profileWithCalibration().cameraCalibration,
@@ -144,6 +146,23 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.estimateCutTimeScale).toBe(1.18);
     expect(result.document.profile.estimateTravelTimeScale).toBe(1.07);
     expect(result.document.profile.noGoZones).toHaveLength(1);
+  });
+
+  it('roundtrips pending calibration status and preserves legacy absent status', () => {
+    const pending = deserializeProfilePatch({ scanOffsetCalibrationStatus: 'pending' });
+    const legacy = deserializeProfilePatch({ scanOffsetCalibrationStatus: undefined });
+
+    expect(pending.kind).toBe('ok');
+    if (pending.kind === 'ok') {
+      expect(pending.document.profile.scanOffsetCalibrationStatus).toBe('pending');
+      expect(JSON.parse(serializeMachineProfileDocument(pending.document)).profile).toMatchObject({
+        scanOffsetCalibrationStatus: 'pending',
+      });
+    }
+    expect(legacy.kind).toBe('ok');
+    if (legacy.kind === 'ok') {
+      expect(legacy.document.profile.scanOffsetCalibrationStatus).toBeUndefined();
+    }
   });
 
   it('roundtrips explicit profile streaming settings', () => {
@@ -234,6 +253,15 @@ describe('LaserForge machine profile documents', () => {
     expect(result).toEqual({ kind: 'invalid', reason: 'profile.scanningOffsets is invalid' });
   });
 
+  it('rejects offsets beyond the profile-relative physical safety bound', () => {
+    const result = deserializeProfilePatch({
+      scanningOffsets: [{ speedMmPerMin: 3000, offsetMm: 1e308 }],
+    });
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') expect(result.reason).toMatch(/scanningOffsets/);
+  });
+
   it('rejects malformed machine-profile streaming settings', () => {
     expect(deserializeProfilePatch({ streamingMode: 'burst' })).toEqual({
       kind: 'invalid',
@@ -246,6 +274,19 @@ describe('LaserForge machine profile documents', () => {
     expect(deserializeProfilePatch({ baudRate: 115200.5 })).toEqual({
       kind: 'invalid',
       reason: 'profile.baudRate must be a positive integer',
+    });
+    expect(deserializeProfilePatch({ controlledLaserOffTravelFeedMmPerMin: 0 })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.controlledLaserOffTravelFeedMmPerMin must be positive',
+    });
+    expect(
+      deserializeProfilePatch({
+        maxFeed: 1000,
+        controlledLaserOffTravelFeedMmPerMin: 1001,
+      }),
+    ).toEqual({
+      kind: 'invalid',
+      reason: 'profile.controlledLaserOffTravelFeedMmPerMin must not exceed maxFeed',
     });
     expect(deserializeProfilePatch({ estimateCutTimeScale: 0 })).toEqual({
       kind: 'invalid',

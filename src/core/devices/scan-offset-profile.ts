@@ -3,6 +3,105 @@ export type ScanOffsetPoint = {
   readonly offsetMm: number;
 };
 
+export type ScanOffsetCalibrationStatus = 'pending' | 'verified';
+export type EffectiveScanOffsetCalibrationStatus =
+  | 'uncalibrated'
+  | 'pending'
+  | 'verified'
+  | 'legacy-verified';
+
+/** Scan offset is a timing/backlash correction, not a geometry transform. A
+ * value above 1% of the shorter bed axis is almost certainly a units or
+ * measurement error; the absolute 5 mm ceiling keeps unusually large beds
+ * conservative too. */
+export const MAX_SCAN_OFFSET_BED_FRACTION = 0.01;
+export const ABSOLUTE_MAX_SCAN_OFFSET_MM = 5;
+
+type ScanOffsetBed = {
+  readonly bedWidth: number;
+  readonly bedHeight: number;
+};
+
+type ScanOffsetCalibrationProfile = {
+  readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
+  readonly scanOffsetCalibrationStatus?: ScanOffsetCalibrationStatus | undefined;
+};
+
+type ScanOffsetValidationProfile = ScanOffsetBed & {
+  readonly scanningOffsets: unknown;
+  readonly scanOffsetCalibrationStatus?: unknown;
+};
+
+export function scanOffsetMagnitudeLimitMm(profile: ScanOffsetBed): number {
+  const shorterAxis = Math.min(profile.bedWidth, profile.bedHeight);
+  if (!Number.isFinite(shorterAxis) || shorterAxis <= 0) return 0;
+  return Math.min(ABSOLUTE_MAX_SCAN_OFFSET_MM, shorterAxis * MAX_SCAN_OFFSET_BED_FRACTION);
+}
+
+export function isScanOffsetTableForProfile(
+  value: unknown,
+  profile: ScanOffsetBed,
+): value is ReadonlyArray<ScanOffsetPoint> {
+  if (!isScanOffsetTable(value)) return false;
+  return value.every((point) => isScanOffsetMagnitudeForProfile(point.offsetMm, profile));
+}
+
+export function isScanOffsetMagnitudeForProfile(
+  value: unknown,
+  profile: ScanOffsetBed,
+): value is number {
+  const limit = scanOffsetMagnitudeLimitMm(profile);
+  return isFiniteNumber(value) && limit > 0 && Math.abs(value) <= limit;
+}
+
+export function isScanOffsetCalibrationStatus(
+  value: unknown,
+): value is ScanOffsetCalibrationStatus {
+  return value === 'pending' || value === 'verified';
+}
+
+export function effectiveScanOffsetCalibrationStatus(
+  profile: ScanOffsetCalibrationProfile,
+): EffectiveScanOffsetCalibrationStatus {
+  if (profile.scanningOffsets.length === 0) return 'uncalibrated';
+  if (profile.scanOffsetCalibrationStatus === 'pending') return 'pending';
+  if (profile.scanOffsetCalibrationStatus === 'verified') return 'verified';
+  // Profiles saved before the lifecycle field existed already treated a
+  // nonempty table as calibrated. Preserve that contract on import/load.
+  return 'legacy-verified';
+}
+
+export function normalizeScanOffsetCalibrationStatus(
+  value: unknown,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): ScanOffsetCalibrationStatus | undefined {
+  return scanningOffsets.length > 0 && isScanOffsetCalibrationStatus(value) ? value : undefined;
+}
+
+export function validateScanOffsetProfile(
+  profile: ScanOffsetValidationProfile,
+): ReadonlyArray<string> {
+  const errors: string[] = [];
+  if (!isScanOffsetTableForProfile(profile.scanningOffsets, profile)) {
+    errors.push(
+      `scanningOffsets must use unique positive speeds and offsets no larger than ${scanOffsetMagnitudeLimitMm(profile)} mm`,
+    );
+  }
+  if (
+    profile.scanOffsetCalibrationStatus !== undefined &&
+    !isScanOffsetCalibrationStatus(profile.scanOffsetCalibrationStatus)
+  ) {
+    errors.push('scanOffsetCalibrationStatus must be pending or verified');
+  }
+  if (
+    profile.scanOffsetCalibrationStatus !== undefined &&
+    (!Array.isArray(profile.scanningOffsets) || profile.scanningOffsets.length === 0)
+  ) {
+    errors.push('scanOffsetCalibrationStatus requires at least one scanningOffsets point');
+  }
+  return errors;
+}
+
 export function isScanOffsetTable(value: unknown): value is ReadonlyArray<ScanOffsetPoint> {
   if (!Array.isArray(value)) return false;
   const seenSpeeds = new Set<number>();

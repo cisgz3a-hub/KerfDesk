@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { recoveryRepository } from './recovery';
 
 type FakeConnection = SerialConnection & {
@@ -17,6 +18,9 @@ function makeConnection(
   return {
     write: async (data) => {
       events.push(`${label}:write:${JSON.stringify(data)}`);
+      respondToTestGrblHandshake(data, (line) => {
+        for (const handler of lineHandlers) handler(line);
+      });
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -66,7 +70,7 @@ async function connectReady(connection: FakeConnection, events: string[]): Promi
   );
   connection.emitLine('$32=1');
   connection.emitLine('ok');
-  await vi.waitFor(() => expect(useLaserStore.getState().controllerOperation).toBeNull());
+  await settleTestGrblHandshake();
 }
 
 async function flush(): Promise<void> {

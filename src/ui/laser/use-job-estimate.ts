@@ -8,7 +8,8 @@
 // the badge fresh ~a quarter second after the user stops moving, while a
 // drag costs zero recompiles.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { JobOriginPlacement } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import {
@@ -20,6 +21,7 @@ import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { resolveJobPlacement } from '../job-placement';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -27,16 +29,21 @@ type Settled = {
   readonly project: Project | null;
   readonly outputScopeKey: string;
   readonly registrationKey: string;
+  readonly placementKey: string;
   readonly estimate: LiveJobEstimate;
 };
 
 export function useJobEstimate(): LiveJobEstimate {
   const project = useStore((s) => s.project);
   const outputScope = useStore((s) => currentOutputScope(s));
+  const jobPlacement = useStore((s) => s.jobPlacement);
   const outputScopeKey = JSON.stringify(outputScope);
   const positionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
   const firstRegistrationPoint = usePrintCutSessionStore((state) => state.first);
   const secondRegistrationPoint = usePrintCutSessionStore((state) => state.second);
+  const resolvedPlacement = useEstimatePlacement(jobPlacement);
+  const placementKey = JSON.stringify(resolvedPlacement);
+  const jobOrigin = resolvedPlacement.ok ? resolvedPlacement.jobOrigin : undefined;
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,
@@ -44,19 +51,66 @@ export function useJobEstimate(): LiveJobEstimate {
   });
   const initialRegistration = currentPrintCutOutputRegistration(project);
   const initiallyAsync = hasVariableText(project) || initialRegistration !== undefined;
-  // First render computes synchronously so the badge is present on load;
-  // later project mutations re-estimate only after a quiet period.
+  return useSettledEstimate({
+    project,
+    outputScope,
+    outputScopeKey,
+    registrationKey,
+    placementKey,
+    jobOrigin,
+    initiallyAsync,
+  });
+}
+
+function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>['jobPlacement']) {
+  const statusReport = useLaserStore((state) => state.statusReport);
+  const workOriginActive = useLaserStore((state) => state.workOriginActive);
+  const wcoCache = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
+  return useMemo(
+    () =>
+      resolveJobPlacement(jobPlacement, {
+        statusReport,
+        workOriginActive,
+        wcoCache,
+        reportInches,
+      }),
+    [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches],
+  );
+}
+
+function useSettledEstimate(args: {
+  readonly project: Project;
+  readonly outputScope: ReturnType<typeof currentOutputScope>;
+  readonly outputScopeKey: string;
+  readonly registrationKey: string;
+  readonly placementKey: string;
+  readonly jobOrigin: JobOriginPlacement | undefined;
+  readonly initiallyAsync: boolean;
+}): LiveJobEstimate {
+  const {
+    project,
+    outputScope,
+    outputScopeKey,
+    registrationKey,
+    placementKey,
+    jobOrigin,
+    initiallyAsync,
+  } = args;
+  // Compute the first badge synchronously, then debounce later mutations.
   const [settled, setSettled] = useState<Settled>(() => ({
     project: initiallyAsync ? null : project,
     outputScopeKey,
     registrationKey,
-    estimate: estimateLiveJob(project, outputScope),
+    placementKey,
+    estimate: estimateLiveJob(project, outputScope, jobOrigin),
   }));
   useEffect(() => {
     if (
       settled.project === project &&
       settled.outputScopeKey === outputScopeKey &&
-      settled.registrationKey === registrationKey
+      settled.registrationKey === registrationKey &&
+      settled.placementKey === placementKey
     ) {
       return undefined;
     }
@@ -71,10 +125,13 @@ export function useJobEstimate(): LiveJobEstimate {
               () => new Date(),
               renderVariableText,
               registration,
+              jobOrigin,
             )
-          : Promise.resolve(estimateLiveJob(project, outputScope));
+          : Promise.resolve(estimateLiveJob(project, outputScope, jobOrigin));
       void estimate.then((value) => {
-        if (!cancelled) setSettled({ project, outputScopeKey, registrationKey, estimate: value });
+        if (!cancelled) {
+          setSettled({ project, outputScopeKey, registrationKey, placementKey, estimate: value });
+        }
       });
     }, JOB_ESTIMATE_DEBOUNCE_MS);
     return () => {
@@ -88,10 +145,10 @@ export function useJobEstimate(): LiveJobEstimate {
     settled.project,
     settled.outputScopeKey,
     settled.registrationKey,
+    settled.placementKey,
     registrationKey,
-    positionEpoch,
-    firstRegistrationPoint,
-    secondRegistrationPoint,
+    placementKey,
+    jobOrigin,
   ]);
   return settled.estimate;
 }

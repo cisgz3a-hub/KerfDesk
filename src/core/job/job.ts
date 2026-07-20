@@ -20,6 +20,7 @@ import {
 import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 import type { FillRunwayPolicy } from './fill-runway-policy';
+import type { EffectiveScanDirection } from './scan-direction-policy';
 
 export type CutSegment = {
   // Polyline in mm, in machine coordinates (post-origin-transform). For a
@@ -50,6 +51,8 @@ export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;
   readonly fillRunwayPolicy?: FillRunwayPolicy;
+  readonly scanDirection?: EffectiveScanDirection;
+  readonly bidirectionalScanOffsetMm?: number;
   readonly overscanMm: number;
   readonly segments: ReadonlyArray<FillSegment>;
 };
@@ -87,6 +90,7 @@ export type RasterGroup = {
   readonly initialXOffsetMm?: number;
   readonly bidirectionalScanOffsetMm?: number;
   readonly bidirectional?: boolean;
+  readonly scanDirection?: EffectiveScanDirection;
 };
 
 // CNC (router/mill) passes. Pre-expanded by core/cnc/compile-cnc-job.ts

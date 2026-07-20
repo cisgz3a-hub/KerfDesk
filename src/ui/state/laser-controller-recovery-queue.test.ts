@@ -6,6 +6,7 @@ import {
 } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -15,10 +16,11 @@ type FakeConnection = SerialConnection & {
 function fakeConnection(writes: string[]): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   let writeHandler = async (_data: string): Promise<void> => undefined;
-  return {
+  const connection: FakeConnection = {
     write: async (data) => {
       writes.push(data);
       await writeHandler(data);
+      respondToTestGrblHandshake(data, connection.emitLine);
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -33,6 +35,7 @@ function fakeConnection(writes: string[]): FakeConnection {
       writeHandler = handler;
     },
   };
+  return connection;
 }
 
 function adapter(connection: SerialConnection): PlatformAdapter {

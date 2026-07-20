@@ -1,19 +1,42 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_JOG_CANCEL } from '../../core/controllers/grbl';
 import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
 import {
   acknowledgeAndSettleFrameLeg,
   acknowledgeFrameToolOffPrelude,
   acknowledgeMotionSettlement,
   acknowledgeToolOffLine,
-  connectWith,
-  flush,
+  connectWith as connectWithBase,
+  type FakeConnection,
   framedRunCandidate,
   getMotionOperation,
-  makeConnection,
+  makeConnection as makeConnectionBase,
   setMotionOperation,
 } from './laser-store-motion-operation.test-support';
+
+function makeConnection(
+  write: (data: string) => Promise<void>,
+  close: () => Promise<void> = async () => undefined,
+): FakeConnection {
+  let emitLine = (_line: string): void => undefined;
+  const connection = makeConnectionBase(async (data) => {
+    await write(data);
+    respondToTestGrblHandshake(data, emitLine);
+  }, close);
+  emitLine = connection.emitLine;
+  return connection;
+}
+
+async function connectWith(connection: FakeConnection): Promise<void> {
+  await connectWithBase(connection);
+  await settleTestGrblHandshake();
+}
+
+async function flush(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+}
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -414,12 +437,14 @@ describe('laser-store motion operation lifecycle', () => {
   });
 
   it('retains a cancelled owner when jog-cancel write fails', async () => {
-    const write = vi.fn(async () => {
-      throw new Error('cancel rejected');
+    let rejectWrites = false;
+    const write = vi.fn(async (_data: string) => {
+      if (rejectWrites) throw new Error('cancel rejected');
     });
     const connection = makeConnection(write);
     await connectWith(connection);
     setMotionOperation({ kind: 'frame', sawControllerBusy: false });
+    rejectWrites = true;
 
     await expect(useLaserStore.getState().cancelJog()).rejects.toThrow('cancel rejected');
 

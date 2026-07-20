@@ -3,6 +3,7 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PAUSE_RESUME_TRANSITION_TIMEOUT_MS } from './laser-pause-resume-transition';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
+import { startTestLaserJob } from './laser-test-start-helpers';
 
 const GRBL_SAFETY_DOOR = '\x84';
 const GRBL_SOFT_RESET = '\x18';
@@ -26,6 +27,14 @@ function makeConnection(
     write: async (data) => {
       writes.push(data);
       await writeOverride?.(data);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        emit('[VER:1.1h.20190830:test]');
+        emit('[OPT:VM,15,128]');
+        emit('ok');
+      }
       // Real GRBL answers the connect-time $G modal query (C6) with its state
       // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {
@@ -62,7 +71,7 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 }
 
 async function flushPromises(): Promise<void> {
-  for (let index = 0; index < 5; index += 1) await Promise.resolve();
+  for (let index = 0; index < 30; index += 1) await Promise.resolve();
 }
 
 function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
@@ -108,7 +117,7 @@ describe('Pause and Resume transition liveness', () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await connectWith(connection);
-    await useLaserStore.getState().startJob(['G21', 'G90', 'M4 S0', 'G1 X1 S100', 'M5'].join('\n'));
+    await startTestLaserJob(['G21', 'G90', 'M4 S0', 'G1 X1 S100', 'M5'].join('\n'));
     writes.length = 0;
 
     const pause = useLaserStore.getState().pauseJob();
@@ -129,7 +138,7 @@ describe('Pause and Resume transition liveness', () => {
       data === GRBL_SAFETY_DOOR ? pauseWrite.promise : Promise.resolve(),
     );
     await connectWith(connection);
-    await useLaserStore.getState().startJob(['G21', 'G90', 'M4 S0', 'G1 X1 S100', 'M5'].join('\n'));
+    await startTestLaserJob(['G21', 'G90', 'M4 S0', 'G1 X1 S100', 'M5'].join('\n'));
     writes.length = 0;
 
     let settled = false;

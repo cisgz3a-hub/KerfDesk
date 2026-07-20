@@ -57,6 +57,38 @@ afterEach(() => {
 });
 
 describe('webSerial connection cleanup', () => {
+  it('exposes bounded USB VID/PID transport identity on the selected port', async () => {
+    const port = new MockPort();
+    port.getInfo.mockReturnValue({ usbVendorId: 0x1a86, usbProductId: 0x7523 });
+    installMockSerial(port);
+
+    const ref = await webSerial.requestPort();
+
+    expect(ref?.info).toEqual({ usbVendorId: 0x1a86, usbProductId: 0x7523 });
+  });
+
+  it('drops malformed diagnostic USB IDs without blocking the selected port', async () => {
+    const port = new MockPort();
+    port.getInfo.mockReturnValue({ usbVendorId: -1, usbProductId: 0x7523 });
+    installMockSerial(port);
+
+    const ref = await webSerial.requestPort();
+
+    expect(ref).not.toBeNull();
+    expect(ref?.info).toEqual({ usbProductId: 0x7523 });
+  });
+
+  it.each([65_536, 1.5, Number.NaN])('omits wholly invalid USB identity %s', async (invalid) => {
+    const port = new MockPort();
+    port.getInfo.mockReturnValue({ usbVendorId: invalid, usbProductId: invalid });
+    installMockSerial(port);
+
+    const ref = await webSerial.requestPort();
+
+    expect(ref).not.toBeNull();
+    expect(ref?.info).toBeUndefined();
+  });
+
   it('closes stale paired ports before requesting a new port', async () => {
     const stalePort = new MockPort();
     installMockSerial(new MockPort(), [stalePort]);

@@ -29,16 +29,22 @@ import {
   type MotionBoundsOffset,
 } from '../invariants';
 import { machineBoundsForDevice } from '../devices';
-import { DEFAULT_OVERSCAN_MM } from '../job';
 import { findLayerModeMismatchIssues } from './layer-mode-preflight';
+import {
+  controlledLaserOffTravelFeedIssue,
+  isConfiguredIntentionalLaserOffMotion,
+  maxOutputOverscanMm,
+} from './laser-off-motion-policy';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
+import { operationScanOffsetIssues } from './scan-offset-policy';
 
 export type PreflightCode =
   | 'no-output-layer'
   | 'out-of-bed'
   | 'power-out-of-range'
   | 'speed-out-of-range'
+  | 'scan-offset-out-of-range'
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'offset-fill-open-contour'
@@ -102,6 +108,11 @@ export function runPreflight(
 ): PreflightResult {
   const issues: PreflightIssue[] = [];
   const outputLayers = project.scene.layers.flatMap(outputOperationLayers);
+  const controlledTravelIssue = controlledLaserOffTravelFeedIssue(project.device);
+  if (controlledTravelIssue !== null) {
+    issues.push({ code: 'speed-out-of-range', message: controlledTravelIssue });
+  }
+  issues.push(...operationScanOffsetIssues(project));
 
   if (outputLayers.length === 0) {
     issues.push({
@@ -132,7 +143,7 @@ export function runPreflight(
 
   appendLaserOnTravelIssues(gcodeLines, issues);
 
-  appendLongBlankFeedIssues(gcodeLines, issues);
+  appendLongBlankFeedIssues(project, gcodeLines, issues);
 
   if (!gcodeLines.some((line) => /\bG1\b/.test(line))) {
     issues.push(emptyOutputIssue(project, outputLayers));
@@ -402,23 +413,6 @@ function boundsWithHeightOverride(
   return { ...bounds, height: overrideMm, minY: 0, maxY: overrideMm };
 }
 
-function maxOutputOverscanMm(scene: Scene): number {
-  const outputLayers = scene.layers.flatMap(outputOperationLayers);
-  const imageLayers = outputLayers.filter((layer) => layer.mode === 'image');
-  const hasImageOutput = scene.objects.some(
-    (obj) =>
-      obj.kind === 'raster-image' &&
-      obj.role !== 'trace-source' &&
-      imageLayers.some((layer) => sceneObjectUsesOperation(obj, layer)),
-  );
-  const imageOverscan = hasImageOutput ? DEFAULT_OVERSCAN_MM : 0;
-  const fillOverscan = Math.max(
-    0,
-    ...outputLayers.filter((l) => l.mode === 'fill').map((l) => Math.max(0, l.fillOverscanMm)),
-  );
-  return Math.max(imageOverscan, fillOverscan);
-}
-
 // Last line of defense against a non-finite coordinate (XNaN, X-Infinity)
 // reaching the machine. The bounds scanner cannot see these — parseGcodeWord
 // nulls a malformed word exactly as it nulls an absent one — so a NaN produced
@@ -455,12 +449,13 @@ function appendLaserOnTravelIssues(
 // invariant (the "moved to the second part and left a stray line" class). Fresh
 // post-ADR-035 output is clean; a hit means a regression or an old export.
 function appendLongBlankFeedIssues(
+  project: Project,
   gcodeLines: ReadonlyArray<string>,
   issues: PreflightIssue[],
 ): void {
   const blankFeed = findLongBlankFeedMoves(gcodeLines, {
     thresholdMm: LONG_BLANK_FEED_THRESHOLD_MM,
-  });
+  }).filter((issue) => !isConfiguredIntentionalLaserOffMotion(project, issue));
   for (const issue of blankFeed.slice(0, MAX_BLANK_FEED_ISSUES)) {
     issues.push({
       code: 'long-blank-feed',

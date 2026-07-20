@@ -37,6 +37,10 @@ export type ControllerCommands = {
   readonly unlock: string | null;
   readonly sleep: string | null;
   readonly settingsQuery: string | null;
+  /** Read-only firmware build/options query. Stock GRBL answers `$I` with
+   *  `[VER:...]` and `[OPT:...]`; null means the driver's response grammar is
+   *  not qualified for the strict stock-GRBL parser. */
+  readonly buildInfoQuery: string | null;
   /** Owned active-modal query used with offsetsQuery for Work-Z recovery. */
   readonly modalStateQuery: string | null;
   /** Owned WCS-offset query used with modalStateQuery for Work-Z recovery. */

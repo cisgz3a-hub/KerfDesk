@@ -206,7 +206,7 @@ describe('estimateJobDuration', () => {
     expect(sensitive.totalSeconds).toBeGreaterThan(adaptive.totalSeconds);
   });
 
-  it('prices sensitive Island Fill laser-off runways as rapid travel', () => {
+  it('prices full-policy 4040 Fill laser-off runways at the burn feed', () => {
     const base: FillGroup = {
       kind: 'fill',
       layerId: 'fill',
@@ -224,12 +224,18 @@ describe('estimateJobDuration', () => {
       { groups: [{ ...base, overscanMm: 0 }] },
       neotronicsDevice,
     );
-    const withRunway = estimateJobDuration({ groups: [base] }, neotronicsDevice);
+    const legacySeekPriced = estimateJobDuration({ groups: [base] }, neotronicsDevice);
+    const fullRunway = estimateJobDuration(
+      { groups: [{ ...base, fillRunwayPolicy: 'full' }] },
+      neotronicsDevice,
+    );
     const runwaySeconds =
-      withRunway.breakdown.travelSeconds - withoutRunway.breakdown.travelSeconds;
+      fullRunway.breakdown.travelSeconds - withoutRunway.breakdown.travelSeconds;
 
     expect(runwaySeconds).toBeGreaterThan(0);
-    expect(runwaySeconds).toBeLessThan(0.5);
+    expect(fullRunway.breakdown.travelSeconds).toBeLessThan(
+      legacySeekPriced.breakdown.travelSeconds,
+    );
   });
 
   it('keeps a multi-span sweep continuous while accounting S0 holes as feed travel', () => {

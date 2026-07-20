@@ -6,6 +6,7 @@ import {
   PREPARATION_COMPILED_SEGMENT_BUDGET,
   PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
   type Job,
+  type JobOriginPlacement,
 } from '../../core/job';
 import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 import {
@@ -39,6 +40,7 @@ export type LiveJobEstimate =
 export function estimateLiveJob(
   project: Project,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
+  jobOrigin?: JobOriginPlacement,
 ): LiveJobEstimate {
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
@@ -55,8 +57,11 @@ export function estimateLiveJob(
 
   // Same prepared job as Save / Start / Preview, so ETA times the path the
   // machine runs. Over-budget raster preparation reports too-large instead.
-  const prepared = prepareOutput(project, { outputScope });
-  return estimatePrepared(prepared);
+  const prepared = prepareOutput(project, {
+    outputScope,
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+  });
+  return estimatePrepared(prepared, jobOrigin);
 }
 
 export async function estimateLiveJobSnapshot(
@@ -65,6 +70,7 @@ export async function estimateLiveJobSnapshot(
   clock: () => Date,
   renderVariableText: VariableTextRenderer,
   registration?: SimilarityTransform | null,
+  jobOrigin?: JobOriginPlacement,
 ): Promise<LiveJobEstimate> {
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
@@ -81,18 +87,30 @@ export async function estimateLiveJobSnapshot(
     clock,
     renderVariableText,
     ...(registration === undefined ? {} : { registration }),
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared);
+  return estimatePrepared(prepared, jobOrigin);
 }
 
-function estimatePrepared(prepared: PreparedOutput): LiveJobEstimate {
+function estimatePrepared(
+  prepared: PreparedOutput,
+  jobOrigin?: JobOriginPlacement,
+): LiveJobEstimate {
   if (!prepared.ok) return { kind: 'too-large' };
   if (prepared.job.groups.length === 0) return { kind: 'empty' };
   if (countCompiledCutSegments(prepared.job) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
 
-  const result = estimateJobDuration(prepared.job, prepared.project.device);
+  const currentPosition =
+    jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
+  const result = estimateJobDuration(
+    prepared.job,
+    prepared.project.device,
+    currentPosition === undefined
+      ? {}
+      : { initialPosition: currentPosition, finishPosition: currentPosition },
+  );
   return result.totalSeconds > 0
     ? {
         kind: 'estimated',

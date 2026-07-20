@@ -124,6 +124,8 @@ async function streamFramedRun(
     laser: currentLaser,
     prepared: permit.candidate.preparedStart,
     machineKind: machineKindOf(permit.candidate.project.machine),
+    reviewedAtIso: permit.candidate.reviewedAtIso,
+    reviewModel: permit.candidate.reviewModel,
     laserModeStartEvidence: permit.candidate.laserModeStartEvidence,
     cncSetupAttestation: permit.candidate.cncSetupAttestation,
     checkpointToReplace: null,
@@ -206,7 +208,8 @@ async function runStartJobFlowWithCheckpoint(
     completedReceipt,
   });
   if (review === null) return;
-  const { bundle, laserModeStartEvidence, cncSetupAttestation } = review;
+  const { bundle, reviewedAtIso, reviewModel, laserModeStartEvidence, cncSetupAttestation } =
+    review;
   const machineKind = machineKindOf(bundle.project.machine);
   const currentLaser = await currentLaserForAuthorizedStart({
     preparedAgainst: bundle.laser,
@@ -223,6 +226,8 @@ async function runStartJobFlowWithCheckpoint(
     laser: currentLaser,
     prepared: bundle.prepared,
     machineKind,
+    reviewedAtIso,
+    reviewModel,
     laserModeStartEvidence,
     cncSetupAttestation,
     checkpointToReplace,
@@ -276,6 +281,17 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
     outputScope: args.outputScope,
     laser: args.laser,
     repository: args.repository,
+    reviewedAtIso: args.reviewedAtIso,
+    reviewModel: args.reviewModel,
+    ...(args.laserModeStartEvidence === undefined
+      ? {}
+      : { laserModeStartEvidence: args.laserModeStartEvidence }),
+    ...(args.cncSetupAttestation === undefined
+      ? {}
+      : { cncSetupAttestation: args.cncSetupAttestation }),
+    ...(args.completedReceipt === null
+      ? {}
+      : { completedReplaySourceRunId: args.completedReceipt.runId }),
   });
   if (
     args.completedReceipt !== null &&

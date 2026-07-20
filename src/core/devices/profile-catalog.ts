@@ -13,6 +13,7 @@ import { validateCameraProfileShape } from '../camera';
 import { isGcodeDialectSelection } from './gcode-dialects';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
 import { isStreamingModeCompatible } from './controller-streaming-mode';
+import { validateScanOffsetProfile } from './scan-offset-profile';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -306,9 +307,20 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   requirePositive(profile.maxPowerS, 'maxPowerS', errors);
   requireNonNegative(profile.minPowerS, 'minPowerS', errors);
   requirePositive(profile.framingFeedMmPerMin, 'framingFeedMmPerMin', errors);
+  if (profile.controlledLaserOffTravelFeedMmPerMin !== undefined) {
+    requirePositive(
+      profile.controlledLaserOffTravelFeedMmPerMin,
+      'controlledLaserOffTravelFeedMmPerMin',
+      errors,
+    );
+    if (profile.controlledLaserOffTravelFeedMmPerMin > profile.maxFeed) {
+      errors.push('controlledLaserOffTravelFeedMmPerMin must not exceed maxFeed');
+    }
+  }
   if (profile.minPowerS > profile.maxPowerS) {
     errors.push('minPowerS must not exceed maxPowerS');
   }
+  errors.push(...validateScanOffsetProfile(profile));
   appendLaserSubProfileErrors(profile.laserSubProfile, errors);
   appendCameraCapabilityErrors(profile, errors);
   appendCameraProfileErrors(profile.cameraProfile, errors);

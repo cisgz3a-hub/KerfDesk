@@ -16,9 +16,14 @@ type PersistTerminal = (
   terminal: PendingRecoveryTerminal,
 ) => Promise<RecoveryRepositoryResult<boolean>>;
 
+type PendingTerminalEntry = {
+  readonly terminal: PendingRecoveryTerminal;
+  inFlight: Promise<RecoveryRepositoryResult<boolean>> | null;
+};
+
 export class RecoveryTerminalCoordinator {
   private readonly stagedRunIds = new Set<RunId>();
-  private readonly pendingTerminals = new Map<RunId, PendingRecoveryTerminal>();
+  private readonly pendingTerminals = new Map<RunId, PendingTerminalEntry>();
 
   noteStaged(runId: RunId): void {
     this.stagedRunIds.add(runId);
@@ -38,26 +43,35 @@ export class RecoveryTerminalCoordinator {
     return this.stagedRunIds.has(runId);
   }
 
+  stagedRuns(): ReadonlySet<RunId> {
+    return new Set(this.stagedRunIds);
+  }
+
   async settleOrDefer(
     runId: RunId,
     terminal: PendingRecoveryTerminal,
     persist: PersistTerminal,
     canDefer: () => boolean,
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    const first = await persist(runId, terminal);
-    if (!first.ok || first.value || !this.stagedRunIds.has(runId) || !canDefer()) return first;
+    const canSettleAfterActivation = this.stagedRunIds.has(runId) && canDefer();
+    if (!canSettleAfterActivation) return persist(runId, terminal);
 
-    // The streamer is visible before its first accepted transport write
-    // resolves. Do not disturb an older capsule until activation proves that
-    // the new machine stream was accepted.
-    this.pendingTerminals.set(runId, terminal);
+    // Install the terminal before starting storage work. Activation can then
+    // find this entry and await the same attempt instead of racing a duplicate
+    // slot mutation against it.
+    const entry = this.pendingTerminals.get(runId) ?? { terminal, inFlight: null };
+    this.pendingTerminals.set(runId, entry);
+    const first = await this.persistPending(runId, entry, persist);
+    if (first.ok && first.value) {
+      this.deletePending(runId, entry);
+      return first;
+    }
 
     // Close the ordering window where activation committed immediately before
-    // the deferred marker was installed. If it is still pending, activation
-    // consumes the marker instead.
-    const retry = await persist(runId, terminal);
+    // the first terminal mutation. A concurrent activation shares this retry.
+    const retry = await this.persistPending(runId, entry, persist);
     if (!retry.ok || !retry.value) return retry.ok ? { ok: true, value: true } : retry;
-    this.pendingTerminals.delete(runId);
+    this.deletePending(runId, entry);
     return retry;
   }
 
@@ -71,15 +85,36 @@ export class RecoveryTerminalCoordinator {
       return activated;
     }
     this.stagedRunIds.delete(runId);
-    const terminal = this.pendingTerminals.get(runId);
-    if (terminal === undefined) return activated;
+    const entry = this.pendingTerminals.get(runId);
+    if (entry === undefined) return activated;
 
-    // Retry one transient storage failure. Neither failure may refuse or pause
-    // the already accepted machine stream.
-    let settled = await persist(runId, terminal);
-    if (!settled.ok) settled = await persist(runId, terminal);
+    // Await an attempt already started by the terminal callback, then retry one
+    // failure or pre-activation no-op. All callers share each per-run attempt.
+    let settled = await this.persistPending(runId, entry, persist);
+    if (!settled.ok || !settled.value) {
+      settled = await this.persistPending(runId, entry, persist);
+    }
     if (!settled.ok || !settled.value) return settled;
-    this.pendingTerminals.delete(runId);
+    this.deletePending(runId, entry);
     return activated;
+  }
+
+  private async persistPending(
+    runId: RunId,
+    entry: PendingTerminalEntry,
+    persist: PersistTerminal,
+  ): Promise<RecoveryRepositoryResult<boolean>> {
+    if (entry.inFlight !== null) return entry.inFlight;
+    const inFlight = Promise.resolve().then(() => persist(runId, entry.terminal));
+    entry.inFlight = inFlight;
+    try {
+      return await inFlight;
+    } finally {
+      if (entry.inFlight === inFlight) entry.inFlight = null;
+    }
+  }
+
+  private deletePending(runId: RunId, entry: PendingTerminalEntry): void {
+    if (this.pendingTerminals.get(runId) === entry) this.pendingTerminals.delete(runId);
   }
 }

@@ -23,6 +23,8 @@ import { AirAssistRow, FireControlRow, LaserPowerRows } from './DeviceProfilePow
 import { ProfileRows, ZRows } from './DeviceProfileRows';
 import { PlannerAdvanced } from './PlannerAdvanced';
 import { ScanOffsetEditor } from './ScanOffsetEditor';
+import { ControlledLaserOffTravelRow } from './ControlledLaserOffTravelRow';
+import { scanOffsetMagnitudeLimitMm } from '../../core/devices/scan-offset-profile';
 
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
@@ -55,7 +57,20 @@ export function DeviceSettings(): JSX.Element {
             <FireControlRow device={device} update={update} />
             <ScanOffsetEditor
               value={device.scanningOffsets}
-              onChange={(scanningOffsets) => update({ scanningOffsets })}
+              maxOffsetMagnitudeMm={scanOffsetMagnitudeLimitMm(device)}
+              onChange={(scanningOffsets) =>
+                update({
+                  scanningOffsets,
+                  scanOffsetCalibrationStatus: scanningOffsets.length > 0 ? 'pending' : undefined,
+                })
+              }
+            />
+            <ControlledLaserOffTravelRow
+              value={device.controlledLaserOffTravelFeedMmPerMin}
+              maxFeed={device.maxFeed}
+              onChange={(controlledLaserOffTravelFeedMmPerMin) =>
+                update({ controlledLaserOffTravelFeedMmPerMin })
+              }
             />
           </>
         )}

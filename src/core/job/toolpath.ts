@@ -89,7 +89,8 @@ function appendFillGroupSteps(
       group.passes,
     );
   }
-  const scanOffsetMm = offsetForSpeed(options.scanningOffsets ?? [], group.speed);
+  const scanOffsetMm =
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(options.scanningOffsets ?? [], group.speed);
   let prevEnd = initialPrevEnd;
   const plans = planFillSweeps(group);
   for (let pass = 0; pass < group.passes; pass += 1) {

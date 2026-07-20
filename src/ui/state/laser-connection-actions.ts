@@ -4,6 +4,7 @@
 // profile's baud rate. Type-only LaserState/LiveRefs imports — no runtime
 // cycle (same pattern as the sibling action modules).
 
+import type { SerialPortIdentity } from '../../platform/types';
 import { selectControllerDriver } from '../../core/controllers';
 import { runConnectAction } from './laser-connect-action';
 import { cancelConnectAttempt } from './laser-connect-attempt';
@@ -43,13 +44,17 @@ import {
   buildPortClosePatch,
   detectStreamStall,
   disconnectStopCommands,
-  hasUnsettledStreamAcks,
   initialLaserState,
-  isActiveJob,
   pushLog,
 } from './laser-store-helpers';
 import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment';
+import {
+  canSendQueuedStatusQuery,
+  controllerOperationOwnsPolling,
+  shouldFastPoll,
+} from './laser-status-polling-policy';
 import type { LaserState, LiveRefs } from './laser-store';
+import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
 import { clearCncLiveCaps } from './detected-settings-action';
@@ -85,8 +90,8 @@ export function connectionActions(
         options,
         (connection) => closeConnectionForReplacement(set, get, refs, safeWrite, connection),
         connectingStatePatch,
-        (connection, baudRate) =>
-          attachConnectedController(set, get, refs, safeWrite, connection, baudRate),
+        (connection, baudRate, portInfo) =>
+          attachConnectedController(set, get, refs, safeWrite, connection, baudRate, portInfo),
       );
     },
     disconnect: () => {
@@ -121,6 +126,7 @@ function attachConnectedController(
   safeWrite: SafeWriteFn,
   connection: LiveConnection,
   baudRate: number,
+  portInfo: SerialPortIdentity | null,
 ): void {
   refs.connection = connection;
   refs.unsubscribeLine = connection.onLine((line) => {
@@ -133,7 +139,7 @@ function attachConnectedController(
     clearCncLiveCaps();
     set(buildPortClosePatch);
   });
-  set(connectedControllerStatePatch);
+  set((state) => ({ ...connectedControllerStatePatch(state), serialPortInfo: portInfo }));
   startConnectedControllerHandshake(set, get, refs, safeWrite, connection, baudRate);
 }
 
@@ -173,12 +179,14 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
   const nextEpoch = state.controllerSessionEpoch + 1;
   return {
     connection: { kind: 'connecting' },
+    serialPortInfo: null,
     controllerSessionEpoch: nextEpoch,
     statusReport: null,
     statusObservation: null,
     detectedSettings: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
+    ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(nextEpoch, 'controller-response'),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -416,30 +424,7 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     // ok would resolve the wrong request). A 'done' stream with nothing in
     // flight DOES poll — the post-job settle needs Idle reports to finish.
     if (queuedQuery === null) return;
-    if (!canSendQueuedStatusQuery(s, refs, pollTick)) return;
+    if (!canSendQueuedStatusQuery(s, refs, pollTick, IDLE_POLL_DIVISOR)) return;
     void safeWrite(`${queuedQuery}\n`).catch(() => undefined);
   }, STATUS_POLL_MS);
-}
-
-function controllerOperationOwnsPolling(state: LaserState): boolean {
-  const operation = state.controllerOperation;
-  if (operation?.kind === 'start-arming') return true;
-  return operation?.kind === 'recovery' && operation.phase === 'reset';
-}
-
-function canSendQueuedStatusQuery(state: LaserState, refs: LiveRefs, pollTick: number): boolean {
-  if (hasUnsettledStreamAcks(state.streamer)) return false;
-  if (state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0) return false;
-  if (refs.controllerCommand !== null) return false;
-  return shouldFastPoll(state) || pollTick % IDLE_POLL_DIVISOR === 0;
-}
-
-function shouldFastPoll(state: LaserState): boolean {
-  return (
-    isActiveJob(state.streamer) ||
-    state.motionOperation !== null ||
-    state.controllerOperation !== null ||
-    state.autofocusBusy ||
-    state.probeBusy
-  );
 }

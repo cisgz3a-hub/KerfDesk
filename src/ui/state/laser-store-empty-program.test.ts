@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { respondToStockGrblHandshakeQuery } from './laser-controller-handshake.test-support';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -8,17 +9,21 @@ type FakeConnection = SerialConnection & {
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
+  const emitLine = (line: string): void => {
+    for (const handler of lineHandlers) handler(line);
+  };
   return {
-    write,
+    write: async (data) => {
+      await write(data);
+      respondToStockGrblHandshakeQuery(data, emitLine);
+    },
     onLine: (handler) => {
       lineHandlers.add(handler);
       return () => lineHandlers.delete(handler);
     },
     onClose: () => () => undefined,
     close: async () => undefined,
-    emitLine: (line) => {
-      for (const handler of lineHandlers) handler(line);
-    },
+    emitLine,
   };
 }
 
@@ -38,14 +43,14 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(connection));
   connection.emitLine('Grbl 1.1f');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
-  await flush();
+  await flushHandshake();
   connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
-  await flush();
+  await flushHandshake();
 }
 
-async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+async function flushHandshake(): Promise<void> {
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 afterEach(async () => {

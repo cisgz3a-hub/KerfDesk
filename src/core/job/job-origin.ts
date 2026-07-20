@@ -1,3 +1,4 @@
+import type { DeviceProfile } from '../devices';
 import { assertNever, type Vec2 } from '../scene';
 import type {
   CncGroup,
@@ -74,8 +75,12 @@ export const USER_ORIGIN_JOB_PLACEMENT: JobOriginPlacement = {
   anchor: 'front-left',
 };
 
-export function applyJobOrigin(job: Job, placement: JobOriginPlacement): Job {
-  const offset = jobOriginOffset(job, placement);
+export function applyJobOrigin(
+  job: Job,
+  placement: JobOriginPlacement,
+  device?: DeviceProfile,
+): Job {
+  const offset = jobOriginOffset(job, placement, device);
   return applyJobOriginOffset(job, offset);
 }
 
@@ -87,10 +92,14 @@ export function applyJobOriginOffset(job: Job, offset: Vec2): Job {
 // The translation applyJobOrigin applies for this job + placement (zero for
 // absolute placements). Exposed so the preview can undo the placement when
 // mapping the prepared job back into the scene frame (H3).
-export function jobOriginOffset(job: Job, placement: JobOriginPlacement): Vec2 {
+export function jobOriginOffset(
+  job: Job,
+  placement: JobOriginPlacement,
+  device?: DeviceProfile,
+): Vec2 {
   const target = targetPoint(placement);
   if (target === null) return { x: 0, y: 0 };
-  const bounds = computeJobBounds(job);
+  const bounds = computeJobBounds(job, device);
   if (bounds === null) return { x: 0, y: 0 };
   const anchor = anchorPoint(bounds, placement.anchor);
   return { x: target.x - anchor.x, y: target.y - anchor.y };

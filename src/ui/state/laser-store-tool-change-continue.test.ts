@@ -26,6 +26,14 @@ function makeConnection(writes: string[]): FakeConnection {
       writes.push(data);
       if (data === 'G4 P0.01\n') setTimeout(() => connection.emitLine('ok'), 0);
       if (data === '?') setTimeout(() => connection.emitLine(IDLE), 0);
+      if (
+        data === '$I\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+      ) {
+        connection.emitLine('[VER:1.1h.20190830:test]');
+        connection.emitLine('[OPT:VM,15,128]');
+        connection.emitLine('ok');
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -53,7 +61,7 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
 }
 
 async function connectWith(connection: FakeConnection): Promise<void> {

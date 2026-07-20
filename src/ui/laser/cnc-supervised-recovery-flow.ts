@@ -28,6 +28,7 @@ import {
   type RecoveryCapsule,
   type RecoveryRepository,
 } from '../state/recovery';
+import { cncSupervisedRecoveryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
 import {
   claimCncRecoveryCapsule,
   streamCncRecoveryProgram,
@@ -59,6 +60,7 @@ type RecoveryContext = {
   readonly completedPrefixProofId: string;
   readonly profile: CncRunwayProfile;
   readonly uncertaintyEventId: string;
+  readonly operatorReview: CncSupervisedRecoveryReview;
 };
 type PlannedRecovery = RecoveryContext & {
   readonly recovery: CncSupervisedRecoveryJob;
@@ -79,10 +81,25 @@ export async function runCncSupervisedRecoveryFlow(
   if (attestation === null) return false;
   const claimed = await claimCncRecoveryCapsule(capsule, repository);
   if (claimed === null) return false;
+  const executionEvidence = cncSupervisedRecoveryExecutionEvidence({
+    sourceRunId: claimed.runId,
+    sourceRevision: claimed.revision,
+    reviewId: planned.reviewId,
+    clearedPathProofId: planned.clearedPathProofId,
+    completedPrefixProofId: planned.completedPrefixProofId,
+    review: planned.operatorReview,
+    reviewedAtIso: new Date().toISOString(),
+    warningsShown: planned.source.warnings,
+    cncSetupAttestation: attestation,
+  });
   // Archive the operator's qualification attestation verbatim with the run so
   // it is auditable, not just checked non-empty at review time (audit A1).
   return streamCncRecoveryProgram(
-    { ...planned, recoveryQualification: planned.profile.qualificationId.trim() },
+    {
+      ...planned,
+      recoveryQualification: planned.profile.qualificationId.trim(),
+      executionEvidence,
+    },
     attestation,
     claimed,
     repository,
@@ -126,6 +143,7 @@ function prepareRecoveryContext(
       source.project.device.accelMmPerSec2,
       review.qualificationId,
     ),
+    operatorReview: { ...review },
   };
 }
 
