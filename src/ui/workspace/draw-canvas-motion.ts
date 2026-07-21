@@ -17,6 +17,10 @@ export type CanvasMotionOverlay = {
 };
 
 const RED = '#dc2626';
+// The completed trail strokes every burned segment at a fixed device width, so on a
+// dense hatch fill the strokes overlap into a solid mass that hides the artwork
+// underneath. A lighter red keeps the progress reading obvious without the blackout.
+const COMPLETED = '#f87171';
 const PLANNED = 'rgba(71, 85, 105, 0.28)';
 const START_LABEL_TEXT_OPACITY = 0.5;
 const START_LABEL_BACKGROUND_OPACITY = 0.2;
@@ -27,7 +31,7 @@ export function drawCanvasMotionOverlay(
   view: ViewTransform,
 ): void {
   const { plan, run } = overlay;
-  if (run !== null) drawCanvasMotionRoute(ctx, plan, run, view, PLANNED, RED);
+  if (run !== null) drawCanvasMotionRoute(ctx, plan, run, view, PLANNED, COMPLETED);
   drawApproach(ctx, plan, run, view);
   if (overlay.showStartMarkers !== false) drawStartMarkers(ctx, plan, view);
   if (
