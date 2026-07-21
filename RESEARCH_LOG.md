@@ -1096,3 +1096,54 @@ proof exists.
 - **No runtime dependency added.** The generated data is lazy-loaded and the
   complete OFL text, source metadata, revisions, and hashes ship in the
   generated third-party notices.
+
+
+---
+
+## Image Studio kickoff — raster-editor library survey (2026-07-21)
+
+Per ADR-017, libraries surveyed at phase kickoff (Phase L, ADR-242). Full cited
+evidence: `docs/audits/2026-07-21-image-editor-web-research.md`; roadmap:
+`docs/audits/2026-07-21-image-editor-research-and-roadmap.md`.
+
+**Use case:** Photoshop-grade in-app raster editing of `RasterImage` sources
+(paint/erase/line tools, selections, adjustments, filters, retouch).
+
+**Candidates evaluated (license / verdict):**
+
+- **OpenCV.js** (Apache-2.0) — ~7.6-8 MB wasm (~4.2 MB trimmed); kills the
+  <1 MB bundle budget. Rejected; lazy-load re-evaluation only if
+  GrabCut/inpaint-class features are ever committed.
+- **wasm-vips** (LGPL-2.1) — license-hostile per ADR-017 + ~4.6 MB. Rejected.
+- **photon-rs** (Apache-2.0, wasm) — fine license; overlaps ops we write in
+  30-150 LOC each; adds a wasm toolchain. Not adopted; IE-4 re-evaluation.
+- **glfx.js / CamanJS / WebGLImageFilter** (MIT) — dead (glfx last real commit
+  2013). MIT shader references only.
+- **Jimp / image-js** (MIT) — maintained but far too slow for an interactive
+  editor loop. Rejected.
+- **miniPaint** (MIT, v4.14.3 2026-04, alive) — full-featured but a vanilla-JS
+  monolith application; incompatible with strict-TS/pure-core/size rules.
+  Feature checklist + algorithm reference only.
+- **toast-ui image-editor** (MIT, dead ~2022), **Filerobot** (MIT,
+  crop-widget scope), **Pintura** (commercial/closed), **tldraw** (custom
+  watermark license, vector domain), **fabric.js** (MIT, object-canvas — wrong
+  substrate) — all rejected.
+- **Graphite** (Apache-2.0, Rust/wasm) — most important newcomer; raster still
+  experimental, not embeddable. Watch only.
+- **ML background removal** — BRIA RMBG-1.4/2.0 weights are NON-COMMERCIAL
+  (rejected outright); MODNet / U-2-Net are Apache-2.0 and would be the only
+  acceptable weights, but multi-MB models conflict with offline-first + bundle
+  budget. Classical border-flood + color-distance removal needs no dependency.
+
+- **Evaluated:** 2026-07-21 (Claude Code session)
+- **Outcome:** self-implement, pure TypeScript, ZERO new runtime dependencies
+  through IE-3 (matches the Phase F scanline-fill precedent above). Algorithms
+  from classical literature: Tanner Helland dither survey, losingfight.com
+  wand/marching-ants pair, Substance/Photoshop brush-stamping semantics
+  (spacing/hardness/flow-vs-opacity), separable Gaussian + unsharp mask,
+  scanline flood fill.
+- **Patent note:** PatchMatch-class healing (Adobe content-aware-fill family)
+  is deliberately avoided; spot-heal ships as masked median/edge-aware blend.
+- **Re-evaluate if:** IE-4 profiling demands GPU/wasm acceleration, or ML
+  matting becomes a committed feature (then MODNet/U-2-Net only, explicit
+  opt-in download, never RMBG).

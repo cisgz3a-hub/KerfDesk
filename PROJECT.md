@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.9 — revisioned machine-aware CNC starters (ADR-233), bounded 4040 fill entries (ADR-234), profile-scoped 4040 scan quality hardening (ADR-235), and the actual completed Frame as the spatial source of truth with calculated bounds/settings kept advisory (ADR-232). Exact-artifact pre-Frame Job Review and a completion-issued Start permit remain governed by ADR-230, with the public-spec 4040 hybrid profile in ADR-231 and the read-only Super console in ADR-229. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 235. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.0 — Phase L "Image Studio" adopted: in-app Photoshop-grade raster editing of `RasterImage` sources, staged IE-1..IE-4, build started 2026-07-21 (ADR-242; research + roadmap in `docs/audits/2026-07-21-image-editor-research-and-roadmap.md`). Carried from v3.9: revisioned machine-aware CNC starters (ADR-233), bounded 4040 fill entries (ADR-234), profile-scoped 4040 scan quality hardening (ADR-235), and the actual completed Frame as the spatial source of truth with calculated bounds/settings kept advisory (ADR-232). Exact-artifact pre-Frame Job Review and a completion-issued Start permit remain governed by ADR-230, with the public-spec 4040 hybrid profile in ADR-231 and the read-only Super console in ADR-229. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 242. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -222,6 +222,26 @@ mandatory play). Every new junction type extends the assembly referee
 and the seeded benchmark — new categories must score 100% without
 regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
 lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
+
+### Phase L — v0.11 "Image Studio" [In progress — IE-1 under construction]
+
+Full in-app raster editing of `RasterImage` engrave/trace sources — the pixel-repair loop
+LightBurn lacks (it has no painting, selections, levels, or background removal; verified
+2026-07-21). Governed by **ADR-242**; research + phased roadmap in
+`docs/audits/2026-07-21-image-editor-research-and-roadmap.md` (external evidence:
+`...-web-research.md` beside it). In-house pure-TS engine in new `src/core/image-edit/` +
+lazy-loaded `src/ui/image-editor/` overlay; **zero new runtime dependencies through IE-3**;
+RGBA bake-on-Apply into the existing `RasterImage` (compile/preview/emit untouched);
+editor-local tile-based undo; resumable sessions with no confirmation surfaces (rule #7);
+Abort stays reachable while a job streams (non-negotiable #9). The edit→re-trace loop
+(ADR-026 kept source + `tools.retrace-original`) is the headline workflow.
+
+| Stage | Delivers | Status |
+|---|---|---|
+| IE-1 | Line work & selections: editor overlay + session store, brush/pencil/eraser/line tools, marquee/lasso/wand selections with delete/fill/paint-clipped/move, crop, editor-local undo/History, Apply→re-trace, engrave-preview view | In progress |
+| IE-2 | Adjust & filters: levels/curves/histogram, Enhance (unsharp) parity, blur/median/despeckle, selection-scoped adjustments, Image/Canvas Size with bilinear resample, arbitrary rotate, Halftone/Newsprint/Sketch image modes, live trace overlay | Planned |
+| IE-3 | Retouch & content: clone stamp, dodge/burn, classical background removal, raster text stamp, gradient fill, non-PatchMatch spot-heal | Planned |
+| IE-4 | Layers/blend modes/masks, `.lf2` session persistence, acceleration — each requires its own ADR | Deferred |
 
 ### Anything past Phase F
 
