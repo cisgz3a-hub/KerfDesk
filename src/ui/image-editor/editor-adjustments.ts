@@ -12,6 +12,7 @@ import {
   curveLut,
   gaussianBlurInPlace,
   grayscaleLut,
+  halftoneScreenInPlace,
   highPassInPlace,
   invertLut,
   levelsLut,
@@ -33,7 +34,9 @@ export type AdjustmentId =
   | 'gaussian-blur'
   | 'unsharp-mask'
   | 'high-pass'
-  | 'median';
+  | 'median'
+  | 'halftone'
+  | 'line-screen';
 
 /** The identity diagonal Curves opens with. */
 export const DEFAULT_CURVE_POINTS: readonly CurvePoint[] = [
@@ -167,6 +170,28 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     hasHistogram: false,
     params: [{ key: 'radius', label: 'Radius (px)', min: 1, max: 4, step: 1, defaultValue: 1 }],
   },
+  halftone: {
+    id: 'halftone',
+    label: 'Halftone (Dots)',
+    menu: 'filter',
+    shortcutHint: '',
+    hasHistogram: false,
+    params: [
+      { key: 'spacing', label: 'Cell size (px)', min: 4, max: 64, step: 1, defaultValue: 8 },
+      { key: 'angle', label: 'Angle (°)', min: 0, max: 90, step: 1, defaultValue: 45 },
+    ],
+  },
+  'line-screen': {
+    id: 'line-screen',
+    label: 'Line Screen (Newsprint)',
+    menu: 'filter',
+    shortcutHint: '',
+    hasHistogram: false,
+    params: [
+      { key: 'spacing', label: 'Line pitch (px)', min: 4, max: 64, step: 1, defaultValue: 8 },
+      { key: 'angle', label: 'Angle (°)', min: 0, max: 90, step: 1, defaultValue: 0 },
+    ],
+  },
 };
 
 export const ADJUSTMENTS: readonly AdjustmentSpec[] = Object.values(BY_ID);
@@ -187,6 +212,58 @@ function p(spec: AdjustmentSpec, params: Readonly<Record<string, number>>, key: 
   return params[key] ?? fallback;
 }
 
+type RunArgs = {
+  readonly spec: AdjustmentSpec;
+  readonly params: Readonly<Record<string, number>>;
+  readonly doc: RgbaBuffer;
+  readonly rect: PixelRect | null;
+  readonly mask: SelectionMask | null;
+};
+
+// Record dispatch keeps each runner at trivial complexity and the compiler
+// enforces totality: a new AdjustmentId without a runner fails to build.
+const RUNNERS: Record<AdjustmentId, (args: RunArgs) => void> = {
+  'brightness-contrast': ({ spec, params, doc, rect, mask }) =>
+    applyLutInPlace(
+      doc,
+      brightnessContrastLut(p(spec, params, 'brightness'), p(spec, params, 'contrast')),
+      rect,
+      mask,
+    ),
+  levels: ({ spec, params, doc, rect, mask }) =>
+    applyLutInPlace(doc, levelsLut(levelsFrom(spec, params)), rect, mask),
+  // Custom point lists route through the session bridge; the catalog runner
+  // stays total with the identity diagonal.
+  curves: ({ doc, rect, mask }) => applyLutInPlace(doc, curveLut(DEFAULT_CURVE_POINTS), rect, mask),
+  threshold: ({ spec, params, doc, rect, mask }) =>
+    applyLumaLutInPlace(doc, thresholdLut(p(spec, params, 'level')), rect, mask),
+  posterize: ({ spec, params, doc, rect, mask }) =>
+    applyLutInPlace(doc, posterizeLut(p(spec, params, 'levels')), rect, mask),
+  invert: ({ doc, rect, mask }) => applyLutInPlace(doc, invertLut(), rect, mask),
+  desaturate: ({ doc, rect, mask }) => applyLumaLutInPlace(doc, grayscaleLut(), rect, mask),
+  'gaussian-blur': ({ spec, params, doc, rect, mask }) =>
+    gaussianBlurInPlace(doc, p(spec, params, 'sigma'), rect, mask),
+  'unsharp-mask': ({ spec, params, doc, rect, mask }) =>
+    unsharpMaskInPlace(
+      doc,
+      {
+        amountPercent: p(spec, params, 'amount'),
+        sigma: p(spec, params, 'sigma'),
+        threshold: p(spec, params, 'threshold'),
+      },
+      rect,
+      mask,
+    ),
+  'high-pass': ({ spec, params, doc, rect, mask }) =>
+    highPassInPlace(doc, p(spec, params, 'sigma'), rect, mask),
+  median: ({ spec, params, doc, rect, mask }) =>
+    medianInPlace(doc, p(spec, params, 'radius'), rect, mask),
+  halftone: ({ spec, params, doc, rect, mask }) =>
+    halftoneScreenInPlace(doc, screenFrom(spec, params, 'dot'), rect, mask),
+  'line-screen': ({ spec, params, doc, rect, mask }) =>
+    halftoneScreenInPlace(doc, screenFrom(spec, params, 'line'), rect, mask),
+};
+
 /** Run one adjustment against the document (rect/mask = selection clamp). */
 export function runAdjustment(
   id: AdjustmentId,
@@ -195,58 +272,19 @@ export function runAdjustment(
   rect: PixelRect | null,
   mask: SelectionMask | null,
 ): void {
-  const spec = BY_ID[id];
-  switch (id) {
-    case 'brightness-contrast':
-      applyLutInPlace(
-        doc,
-        brightnessContrastLut(p(spec, params, 'brightness'), p(spec, params, 'contrast')),
-        rect,
-        mask,
-      );
-      return;
-    case 'levels':
-      applyLutInPlace(doc, levelsLut(levelsFrom(spec, params)), rect, mask);
-      return;
-    case 'curves':
-      // Custom point lists route through the session bridge; the catalog
-      // runner stays total with the identity diagonal.
-      applyLutInPlace(doc, curveLut(DEFAULT_CURVE_POINTS), rect, mask);
-      return;
-    case 'threshold':
-      applyLumaLutInPlace(doc, thresholdLut(p(spec, params, 'level')), rect, mask);
-      return;
-    case 'posterize':
-      applyLutInPlace(doc, posterizeLut(p(spec, params, 'levels')), rect, mask);
-      return;
-    case 'invert':
-      applyLutInPlace(doc, invertLut(), rect, mask);
-      return;
-    case 'desaturate':
-      applyLumaLutInPlace(doc, grayscaleLut(), rect, mask);
-      return;
-    case 'gaussian-blur':
-      gaussianBlurInPlace(doc, p(spec, params, 'sigma'), rect, mask);
-      return;
-    case 'unsharp-mask':
-      unsharpMaskInPlace(
-        doc,
-        {
-          amountPercent: p(spec, params, 'amount'),
-          sigma: p(spec, params, 'sigma'),
-          threshold: p(spec, params, 'threshold'),
-        },
-        rect,
-        mask,
-      );
-      return;
-    case 'high-pass':
-      highPassInPlace(doc, p(spec, params, 'sigma'), rect, mask);
-      return;
-    case 'median':
-      medianInPlace(doc, p(spec, params, 'radius'), rect, mask);
-      return;
-  }
+  RUNNERS[id]({ spec: BY_ID[id], params, doc, rect, mask });
+}
+
+function screenFrom(
+  spec: AdjustmentSpec,
+  params: Readonly<Record<string, number>>,
+  shape: 'dot' | 'line',
+) {
+  return {
+    spacingPx: p(spec, params, 'spacing'),
+    angleDeg: p(spec, params, 'angle'),
+    shape,
+  };
 }
 
 function levelsFrom(spec: AdjustmentSpec, params: Readonly<Record<string, number>>) {
