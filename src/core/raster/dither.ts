@@ -58,7 +58,7 @@ const DEFAULT_THRESHOLD = 128;
 
 export function dither(input: DitherInput, options: DitherOptions): Uint16Array {
   if (isErrorDiffusionMode(options.algorithm)) {
-    return ditherErrorDiffusion(input, options, kernelFor(options.algorithm));
+    return ditherErrorDiffusion(input, options, errorDiffusionKernel(options.algorithm));
   }
   switch (options.algorithm) {
     case 'threshold':
@@ -119,7 +119,7 @@ function independentDitherValue(
   }
 }
 
-type ErrorDiffusionMode =
+export type ErrorDiffusionMode =
   | 'floyd-steinberg'
   | 'jarvis'
   | 'stucki'
@@ -129,12 +129,17 @@ type ErrorDiffusionMode =
   | 'sierra2'
   | 'sierra-lite';
 
-type DiffusionKernel = {
+export type DiffusionKernel = {
   readonly offsets: ReadonlyArray<readonly [number, number, number]>;
   readonly divisor: number;
 };
 
-function isErrorDiffusionMode(mode: DitherAlgorithm): mode is ErrorDiffusionMode {
+/** Luma cutoff the error-diffusion quantizer uses (shared with dither-rows so
+ * the streamed row ditherer reproduces dither() bit-for-bit). */
+export const ERROR_DIFFUSION_QUANTIZE_LUMA = DEFAULT_THRESHOLD;
+
+/** True for the kernels that propagate quantization error to later pixels. */
+export function isErrorDiffusionMode(mode: DitherAlgorithm): mode is ErrorDiffusionMode {
   return (
     mode === 'floyd-steinberg' ||
     mode === 'jarvis' ||
@@ -147,7 +152,9 @@ function isErrorDiffusionMode(mode: DitherAlgorithm): mode is ErrorDiffusionMode
   );
 }
 
-function kernelFor(mode: ErrorDiffusionMode): DiffusionKernel {
+/** Diffusion kernel table for a mode. Every kernel reaches at most 2 rows
+ * ahead (dy <= 2), which is what makes the 3-row streamed ditherer possible. */
+export function errorDiffusionKernel(mode: ErrorDiffusionMode): DiffusionKernel {
   switch (mode) {
     case 'floyd-steinberg':
       return FLOYD_STEINBERG;

@@ -34,7 +34,7 @@ describe('compiled work preflight', () => {
     expect(runCompiledWorkPreflight(job).ok).toBe(true);
   });
 
-  it('blocks measured raster output expansion even when its source grid is tiny', () => {
+  it('flags measured raster output expansion as an advisory even when its source grid is tiny', () => {
     const raster: RasterGroup = {
       kind: 'raster',
       layerId: 'image',

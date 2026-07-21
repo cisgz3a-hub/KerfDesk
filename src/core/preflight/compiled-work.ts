@@ -69,6 +69,10 @@ function measureCompiledWorkUntilLimit(
   return { motionSegments, estimatedOutputBytes, isComplete: true };
 }
 
+// Since ADR-243 these findings are ADVISORY: consumers surface them in the
+// Job Review warnings list; nothing refuses preparation over them. The
+// measurement is still bounded — it stops counting shortly past the
+// thresholds, and messages say "at least" when it stopped early.
 export function runCompiledWorkPreflight(job: Job): PreflightResult {
   const work = measureCompiledWorkUntilLimit(job, {
     motionSegments: MAX_COMPILED_MOTION_SEGMENTS,
@@ -78,13 +82,13 @@ export function runCompiledWorkPreflight(job: Job): PreflightResult {
   if (work.motionSegments > MAX_COMPILED_MOTION_SEGMENTS) {
     issues.push({
       code: 'compiled-output-budget-exceeded',
-      message: `Compiled job contains ${work.isComplete ? '' : 'at least '}${work.motionSegments.toLocaleString()} motion segments; the safe preparation limit is ${MAX_COMPILED_MOTION_SEGMENTS.toLocaleString()}. Simplify or split the job.`,
+      message: `Large program: ${work.isComplete ? '' : 'at least '}${work.motionSegments.toLocaleString()} motion segments (advisory threshold ${MAX_COMPILED_MOTION_SEGMENTS.toLocaleString()}). Preparation, preview, and streaming may be slow.`,
     });
   }
   if (work.estimatedOutputBytes > MAX_ESTIMATED_OUTPUT_BYTES) {
     issues.push({
       code: 'compiled-output-budget-exceeded',
-      message: `Compiled job would emit ${work.isComplete ? 'approximately' : 'at least'} ${formatMegabytes(work.estimatedOutputBytes)} MB; the safe in-memory output limit is ${formatMegabytes(MAX_ESTIMATED_OUTPUT_BYTES)} MB. Reduce raster detail or split the job.`,
+      message: `Large program: ${work.isComplete ? 'approximately' : 'at least'} ${formatMegabytes(work.estimatedOutputBytes)} MB of G-code (advisory threshold ${formatMegabytes(MAX_ESTIMATED_OUTPUT_BYTES)} MB). Preparing it may take a while and use significant memory.`,
     });
   }
   return { ok: issues.length === 0, issues };

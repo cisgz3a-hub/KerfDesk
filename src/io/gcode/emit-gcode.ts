@@ -100,22 +100,31 @@ export function emitPreparedGcodeWithCncPassSpans(
   // projects pick their controller dialect via the ADR-094 driver seam. Both
   // receive the current-position finish so a head-relative job parks back at
   // its own start instead of rapiding to work zero (arbitrary on no-homing).
-  const cncEmission =
-    machine !== undefined && machine.kind === 'cnc'
-      ? emitCncJobWithPassSpans(
-          job,
-          prepared.project.device,
-          finishOptionsForJobOrigin(options.jobOrigin),
-        )
-      : null;
-  const body =
-    cncEmission !== null
-      ? cncEmission.gcode
-      : selectOutputStrategy(prepared.project.device).emit(
-          job,
-          prepared.project.device,
-          finishOptionsForJobOrigin(options.jobOrigin),
-        );
+  const emission = materializeProgram(() => {
+    const cnc =
+      machine !== undefined && machine.kind === 'cnc'
+        ? emitCncJobWithPassSpans(
+            job,
+            prepared.project.device,
+            finishOptionsForJobOrigin(options.jobOrigin),
+          )
+        : null;
+    return {
+      cnc,
+      body:
+        cnc !== null
+          ? cnc.gcode
+          : selectOutputStrategy(prepared.project.device).emit(
+              job,
+              prepared.project.device,
+              finishOptionsForJobOrigin(options.jobOrigin),
+            ),
+    };
+  });
+  if (emission.kind === 'too-large') {
+    return { gcode: '', preflight: emission.preflight, spans: null };
+  }
+  const { cnc: cncEmission, body } = emission.value;
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
@@ -125,6 +134,41 @@ export function emitPreparedGcodeWithCncPassSpans(
     : body;
   const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
   return { gcode, preflight, spans };
+}
+
+export const PROGRAM_MATERIALIZATION_FAILED_MESSAGE =
+  'The compiled program is too large to hold as a single G-code file in this environment, so it cannot be produced. Lower the image resolution (lines/mm), reduce passes, or split the job.';
+
+type MaterializedProgram<T> =
+  | { readonly kind: 'ok'; readonly value: T }
+  | { readonly kind: 'too-large'; readonly preflight: PreflightResult };
+
+/**
+ * Runs an emitter and converts an engine string-overflow (RangeError) into a
+ * compile-integrity preflight failure instead of an unhandled crash. This is
+ * the ONE genuine size boundary left after ADR-243 — it fires only when the
+ * engine factually failed, never on a predictive estimate.
+ */
+export function materializeProgram<T>(build: () => T): MaterializedProgram<T> {
+  try {
+    return { kind: 'ok', value: build() };
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return {
+        kind: 'too-large',
+        preflight: {
+          ok: false,
+          issues: [
+            {
+              code: 'program-materialization-failed',
+              message: PROGRAM_MATERIALIZATION_FAILED_MESSAGE,
+            },
+          ],
+        },
+      };
+    }
+    throw error;
+  }
 }
 
 function runEmitPreflight(

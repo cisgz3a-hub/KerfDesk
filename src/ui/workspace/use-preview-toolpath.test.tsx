@@ -26,6 +26,12 @@ const previewMocks = vi.hoisted(() => ({
 
 vi.mock('./draw-preview', () => previewMocks);
 
+const workerMocks = vi.hoisted(() => ({
+  prepareLargeJobOffThread: vi.fn(),
+}));
+
+vi.mock('./preparation-worker-client', () => workerMocks);
+
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -54,6 +60,8 @@ beforeEach(() => {
   resetStore();
   previewMocks.buildPreviewToolpath.mockReset();
   previewMocks.buildPreviewToolpath.mockReturnValue(builtToolpath);
+  workerMocks.prepareLargeJobOffThread.mockReset();
+  workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -148,6 +156,58 @@ describe('usePreviewToolpath', () => {
 
     expect(previewMocks.buildPreviewToolpath).not.toHaveBeenCalled();
     expect(probe.current).toBeNull();
+  });
+
+  it('fills a paused over-budget preview in from the preparation worker (ADR-244)', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    const pausedToolpath = {
+      totalLength: 0,
+      steps: [],
+      previewIssue: { kind: 'too-complex' as const },
+    };
+    previewMocks.buildPreviewToolpath.mockReturnValue(pausedToolpath);
+    let resolveWorker: (value: { toolpath: unknown; estimate: unknown }) => void = () => undefined;
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(
+      new Promise((resolve) => {
+        resolveWorker = resolve;
+      }),
+    );
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+
+    expect(
+      (probe.current as { readonly previewIssue?: { kind: string } } | null)?.previewIssue,
+    ).toEqual({ kind: 'preparing-large-job' });
+
+    await act(async () => {
+      resolveWorker({ toolpath: builtToolpath, estimate: { kind: 'estimated' } });
+    });
+    expect(probe.current).toBe(builtToolpath);
+  });
+
+  it('keeps the paused banner when workers are unavailable', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    const pausedToolpath = {
+      totalLength: 0,
+      steps: [],
+      previewIssue: { kind: 'too-complex' as const },
+    };
+    previewMocks.buildPreviewToolpath.mockReturnValue(pausedToolpath);
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+
+    expect(probe.current).toBe(pausedToolpath);
   });
 });
 

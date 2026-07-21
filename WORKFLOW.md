@@ -795,11 +795,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Error — origin cannot be resolved
 1. Placement resolution fails (e.g. selection origin requested with nothing usable); error toast, no bytes sent.
 
-#### Edge — raster job exceeds the raster budget
-1. The exact artifact cannot be produced, so `raster-too-large` refuses the authorizing Frame and
-   cannot issue a Start permit. It never substitutes an approximate artwork rectangle for the
-   motion envelope actually produced by the executable artifact.
-2. Any future outline-only positioning feature must be a separately named, non-authorizing action;
+#### Edge — very large raster or vector job
+1. Any pixel size compiles and streams (ADR-243): rasters stream row-by-row for every dither
+   algorithm, so no size budget refuses Frame or Start. The live canvas preview and estimate pause
+   above the work-unit budget for responsiveness, and Job Review carries "large job" / "very large
+   image" advisories saying preparation and streaming may take minutes.
+2. The one genuine size boundary left is compile integrity: if the JS engine factually fails to
+   materialize the program string (RangeError), `program-materialization-failed` refuses with the
+   remedy in the message (lower lines/mm, reduce passes, or split the job). A job that cannot be
+   produced still cannot earn an authorizing Frame (ADR-230 rule: no artifact, no permit). The
+   refusal fires only on the actual engine failure, never on a predictive estimate.
+3. Any future outline-only positioning feature must be a separately named, non-authorizing action;
    it cannot mint, retain, or refresh Start authorization.
 
 #### Edge — cancel mid-frame
@@ -3835,7 +3841,7 @@ F-CNC19 tiling.
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
 
-## Phase L flows (Image Studio — ADR-242)
+## Phase L flows (Image Studio — ADR-243)
 
 ### F-L1. Open, edit, apply
 
@@ -3949,7 +3955,7 @@ F-CNC19 tiling.
 #### Edge — app reload
 1. Sessions are in-memory (IE-1..3): reloading the app drops unapplied
    editor sessions. Applied work is in the project and its undo history.
-   Session persistence is an IE-4 schema decision (ADR-242).
+   Session persistence is an IE-4 schema decision (ADR-243).
 
 ## Camera Mode flows
 

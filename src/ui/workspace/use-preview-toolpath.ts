@@ -2,8 +2,8 @@
 // entering Preview can paint first and cancel stale builds before they start.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildToolpath, EMPTY_JOB } from '../../core/job';
-import type { Project } from '../../core/scene';
+import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
+import type { OutputScope, Project } from '../../core/scene';
 import {
   resolveExportJobPlacement,
   resolveJobPlacement,
@@ -12,6 +12,7 @@ import {
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-preview';
+import { prepareLargeJobOffThread } from './preparation-worker-client';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
 import { renderVariableText } from '../text/render-variable-text';
@@ -75,17 +76,28 @@ export function usePreviewToolpath(
         outputScope,
       };
       const registration = currentPrintCutOutputRegistration(project);
-      const next =
-        hasVariableText(project) || registration !== undefined
-          ? buildPreviewToolpathSnapshot(project, {
-              ...options,
-              clock: () => new Date(),
-              renderVariableText,
-              ...(registration === undefined ? {} : { registration }),
-            })
-          : Promise.resolve(buildPreviewToolpath(project, options));
+      // The worker prepares plain projects only: variable text and print-cut
+      // registration need the snapshot pipeline's clock/renderer, which
+      // cannot cross the worker boundary.
+      const needsSnapshot = hasVariableText(project) || registration !== undefined;
+      const next = needsSnapshot
+        ? buildPreviewToolpathSnapshot(project, {
+            ...options,
+            clock: () => new Date(),
+            renderVariableText,
+            ...(registration === undefined ? {} : { registration }),
+          })
+        : Promise.resolve(buildPreviewToolpath(project, options));
       void next.then((built) => {
-        if (!cancelled) setToolpath(built);
+        if (cancelled) return;
+        settleBuiltToolpath({
+          built,
+          project,
+          options,
+          canPrepareOffThread: !needsSnapshot,
+          isCancelled: () => cancelled,
+          setToolpath,
+        });
       });
     });
     return () => {
@@ -130,6 +142,35 @@ function usePreviewPlacement(jobPlacement: JobPlacementSettings) {
 function hasVariableText(project: Project): boolean {
   return project.scene.objects.some(
     (object) => object.kind === 'text' && object.variableTemplate !== undefined,
+  );
+}
+
+// Over-budget scenes pause the synchronous preview; the ADR-244 worker
+// prepares the real toolpath in the background and fills the canvas in when
+// done. Rejections (superseded/no worker) keep the paused banner.
+function settleBuiltToolpath(args: {
+  readonly built: PreviewToolpath;
+  readonly project: Project;
+  readonly options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope };
+  readonly canPrepareOffThread: boolean;
+  readonly isCancelled: () => boolean;
+  readonly setToolpath: (toolpath: PreviewToolpath) => void;
+}): void {
+  const { built, setToolpath } = args;
+  const offThread =
+    built.previewIssue?.kind === 'too-complex' && args.canPrepareOffThread
+      ? prepareLargeJobOffThread(args.project, args.options)
+      : null;
+  if (offThread === null) {
+    setToolpath(built);
+    return;
+  }
+  setToolpath({ ...built, previewIssue: { kind: 'preparing-large-job' } });
+  offThread.then(
+    (prepared) => {
+      if (!args.isCancelled()) setToolpath(prepared.toolpath);
+    },
+    () => undefined,
   );
 }
 

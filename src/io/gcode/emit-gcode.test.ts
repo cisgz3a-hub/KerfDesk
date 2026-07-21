@@ -8,7 +8,7 @@ import {
   type OutputScope,
   type SceneObject,
 } from '../../core/scene';
-import { emitGcode } from './emit-gcode';
+import { emitGcode, materializeProgram } from './emit-gcode';
 
 const sampleObject: SceneObject = {
   kind: 'imported-svg',
@@ -77,34 +77,45 @@ describe('emitGcode', () => {
     expect(withMeta.preflight.ok).toBe(withoutMeta.preflight.ok);
   });
 
-  it('refuses an oversized raster before compile, returning empty g-code (P1-A)', () => {
+  it('emits an error-diffusion raster above the former working-set budget (ADR-243)', () => {
+    // 2500x2500 pass-through floyd-steinberg was refused pre-ADR-243
+    // ("materialized working set exceeds the 64 MB budget"). It now streams.
+    // The source is white except one dark pixel, so the emit stays fast while
+    // still proving a burn move is produced.
     const base = createProject();
     const color = '#808080';
+    const side = 2500;
+    const luma = new Uint8Array(side * side).fill(255);
+    // Center pixel, so the sweep's overscan runways stay inside the bed.
+    luma[(side / 2) * side + side / 2] = 0;
     const raster: SceneObject = {
       kind: 'raster-image',
       id: 'R1',
       color,
       source: 'x.png',
-      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-      pixelWidth: 4,
-      pixelHeight: 4,
+      dataUrl: 'data:image/png;base64,unused',
+      lumaBase64: Buffer.from(luma).toString('base64'),
+      pixelWidth: side,
+      pixelHeight: side,
       dither: 'floyd-steinberg',
-      linesPerMm: 25,
-      bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      linesPerMm: 10,
+      bounds: { minX: 0, minY: 0, maxX: 250, maxY: 250 },
       transform: IDENTITY_TRANSFORM,
     };
     const project = {
       ...base,
       scene: addLayer(addObject(base.scene, raster), {
         ...createLayer({ id: color, color, mode: 'image' }),
-        linesPerMm: 25,
+        passThrough: true,
+        ditherAlgorithm: 'floyd-steinberg' as const,
+        linesPerMm: 10,
       }),
     };
     const { gcode, preflight } = emitGcode(project);
-    expect(preflight.ok).toBe(false);
-    expect(preflight.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
-    // No compile ran, so nothing was allocated and no g-code was produced.
-    expect(gcode).toBe('');
+    expect(preflight.issues).toEqual([]);
+    expect(gcode).toContain('M4 S0');
+    // The dark pixel produced a powered run somewhere in the sweep.
+    expect(gcode).toMatch(/G1 X[\d.]+ F\d+ S\d+/);
   });
 
   it('emits only selected artwork when Cut Selected Graphics is enabled', () => {
@@ -131,6 +142,32 @@ describe('emitGcode', () => {
     const { preflight } = emitGcode(project);
     expect(preflight.ok).toBe(false);
     expect(preflight.issues.some((i) => i.code === 'no-output-layer')).toBe(true);
+  });
+});
+
+describe('materializeProgram', () => {
+  it('passes emitter output through unchanged', () => {
+    const result = materializeProgram(() => 'G21');
+    expect(result).toEqual({ kind: 'ok', value: 'G21' });
+  });
+
+  it('converts an engine string-overflow RangeError into a compile-integrity failure', () => {
+    const result = materializeProgram((): string => {
+      throw new RangeError('Invalid string length');
+    });
+    expect(result.kind).toBe('too-large');
+    if (result.kind === 'too-large') {
+      expect(result.preflight.ok).toBe(false);
+      expect(result.preflight.issues[0]?.code).toBe('program-materialization-failed');
+    }
+  });
+
+  it('rethrows non-RangeError failures untouched', () => {
+    expect(() =>
+      materializeProgram((): string => {
+        throw new Error('emitter bug');
+      }),
+    ).toThrow('emitter bug');
   });
 });
 

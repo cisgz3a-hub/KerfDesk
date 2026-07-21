@@ -20,7 +20,6 @@ import {
 } from '../../core/job';
 import { compileCncJob } from '../../core/cnc';
 import { runPreEmitPreflight, type PreflightResult } from '../../core/preflight';
-import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
 import {
   DEFAULT_OUTPUT_SCOPE,
   validateOutputScope,
@@ -66,14 +65,13 @@ export function prepareOutput(
   }
   const outputProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
-  // Budget guard FIRST so an over-budget raster never reaches compileJob's large
-  // allocations (P1-A). A failure flows out as the preflight result; every
-  // consumer turns that into "can't" (empty g-code, empty preview, too-large).
+  // No size refusal remains here (ADR-241/ADR-243): vector scenes of any
+  // segment count compile, and rasters of any pixel size stream row-by-row.
+  // Compiled-work size measurements surface as Job Review advisories in the
+  // Start path instead of failing preparation.
   const preEmit = runPreEmitPreflight(outputProject);
   if (!preEmit.ok) return { ok: false, preflight: preEmit };
   const compiled = compileForMachine(outputProject);
-  const compiledWork = runCompiledWorkPreflight(compiled);
-  if (!compiledWork.ok) return { ok: false, preflight: compiledWork };
   const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   const offset = options.jobOrigin
     ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)

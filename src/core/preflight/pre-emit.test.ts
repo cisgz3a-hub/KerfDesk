@@ -217,33 +217,24 @@ describe('runPreEmitPreflight', () => {
     expect(runPreEmitPreflight(projectWithRaster({ boundsMax: 10, linesPerMm: 10 })).ok).toBe(true);
   });
 
-  it('rejects an oversized raster before compile (300x300mm @ 25 lines/mm = 7500x7500 px)', () => {
-    const result = runPreEmitPreflight(projectWithRaster({ boundsMax: 300, linesPerMm: 25 }));
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+  it('passes an oversized raster — any pixel size streams (ADR-243)', () => {
+    expect(runPreEmitPreflight(projectWithRaster({ boundsMax: 300, linesPerMm: 25 }))).toEqual({
+      ok: true,
+      issues: [],
+    });
   });
 
-  it('rejects an oversized raster on an image sub-layer before compile', () => {
-    const result = runPreEmitPreflight(
-      projectWithRasterSubLayer({ boundsMax: 300, linesPerMm: 25 }),
-    );
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+  it('passes an oversized raster on an image sub-layer (ADR-243)', () => {
+    expect(
+      runPreEmitPreflight(projectWithRasterSubLayer({ boundsMax: 300, linesPerMm: 25 })).ok,
+    ).toBe(true);
   });
 
-  it('checks every matching image operation layer, not only the first one', () => {
-    const result = runPreEmitPreflight(projectWithMultipleImageOperations());
-
-    expect(result.ok).toBe(false);
-    expect(result.issues).toEqual([
-      expect.objectContaining({
-        code: 'raster-too-large',
-        message: expect.stringContaining(`${COLOR}:image-pass image would engrave at 7500x7500 px`),
-      }),
-    ]);
+  it('passes a raster with multiple oversized image operations (ADR-243)', () => {
+    expect(runPreEmitPreflight(projectWithMultipleImageOperations()).ok).toBe(true);
   });
 
-  it('allows a previously rejected pass-through raster when local dither can stream rows', () => {
+  it('passes a large pass-through raster with a row-independent dither', () => {
     const result = runPreEmitPreflight(
       projectWithRaster({
         boundsMax: 10,
@@ -258,7 +249,7 @@ describe('runPreEmitPreflight', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('still rejects the same raster when error diffusion requires full-image state', () => {
+  it('passes the same raster with error diffusion — the 3-row window streams it (ADR-243)', () => {
     const result = runPreEmitPreflight(
       projectWithRaster({
         boundsMax: 10,
@@ -270,8 +261,7 @@ describe('runPreEmitPreflight', () => {
       }),
     );
 
-    expect(result.ok).toBe(false);
-    expect(result.issues[0]?.message).toContain('materialized working set');
+    expect(result).toEqual({ ok: true, issues: [] });
   });
 
   it('does not reject a small pass-through source because of large physical bounds', () => {

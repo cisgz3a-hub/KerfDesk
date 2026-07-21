@@ -22,6 +22,7 @@ import {
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
+import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { resolveGrblDialect } from '../../core/devices';
 import {
   prepareOutput,
@@ -142,7 +143,8 @@ export function buildPreviewToolpath(
   // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
   // shows the exact path ORDER the machine runs (roadmap P1-C). Cheap scoped
   // complexity gates run first so huge traces/fills never reach synchronous
-  // compile. Over-budget rasters still fail in prepareOutput before large work.
+  // compile on the MAIN thread; the worker path (ADR-244) prepares them
+  // unbounded off-thread instead.
   const scoped =
     options.outputScope === undefined
       ? null
@@ -151,8 +153,24 @@ export function buildPreviewToolpath(
     return emptyPreviewToolpath({ kind: 'preparation-failed', messages: scoped.messages });
   }
   const complexityScene = scoped === null ? project.scene : scoped.scene;
+  // Canvas-responsiveness fallbacks only (ADR-241/ADR-243): Start, Save, and
+  // Frame prepare these scenes regardless; the live preview pauses.
   if (scenePreparationTooComplex(complexityScene))
     return emptyPreviewToolpath({ kind: 'too-complex' });
+  if (rasterPreparationTooComplex({ ...project, scene: complexityScene }))
+    return emptyPreviewToolpath({ kind: 'too-complex' });
+  return buildPreviewToolpathUnbounded(project, options);
+}
+
+/**
+ * buildPreviewToolpath without the canvas-responsiveness complexity gates.
+ * Runs the full prepare (compile + optimize) no matter the scene size — only
+ * call this off the main thread (the ADR-244 preparation worker) or in tests.
+ */
+export function buildPreviewToolpathUnbounded(
+  project: Project,
+  options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope } = {},
+): PreviewToolpath {
   const prepared = prepareOutput(project, {
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
@@ -176,6 +194,9 @@ export async function buildPreviewToolpathSnapshot(
   }
   const complexityScene = scoped === null ? project.scene : scoped.scene;
   if (scenePreparationTooComplex(complexityScene)) {
+    return emptyPreviewToolpath({ kind: 'too-complex' });
+  }
+  if (rasterPreparationTooComplex({ ...project, scene: complexityScene })) {
     return emptyPreviewToolpath({ kind: 'too-complex' });
   }
   const prepared = await prepareOutputSnapshot(project, options);

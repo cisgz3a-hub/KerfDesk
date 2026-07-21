@@ -9,6 +9,9 @@ import type { Project } from '../../core/scene';
 
 export type PreviewIssue =
   | { readonly kind: 'too-complex' }
+  // The scene is over the responsiveness budget and the ADR-244 preparation
+  // worker is computing the real toolpath in the background.
+  | { readonly kind: 'preparing-large-job' }
   | { readonly kind: 'preparation-failed'; readonly messages: ReadonlyArray<string> }
   // resolveJobPlacement refused (e.g. custom origin with no live position);
   // carries the placement failure messages so the overlay can name the reason

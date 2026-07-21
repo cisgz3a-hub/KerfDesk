@@ -172,11 +172,15 @@ describe('prepareOutput', () => {
     expect(prepared.job.groups.map((group) => group.sourceObjectId)).toEqual(['B', 'A']);
   });
 
-  it('refuses an over-budget raster (ok:false) without producing a job', () => {
+  it('prepares a raster above the former work-unit budget as a streamed group (ADR-243)', () => {
     const prepared = prepareOutput(hugeRasterProject());
-    expect(prepared.ok).toBe(false);
-    if (!prepared.ok) {
-      expect(prepared.preflight.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+
+    expect(prepared.ok).toBe(true);
+    if (prepared.ok) {
+      const raster = prepared.job.groups.find((group) => group.kind === 'raster');
+      expect(raster).toMatchObject({ pixelWidth: 7500, pixelHeight: 7500 });
+      expect(raster?.kind === 'raster' ? raster.sValues.length : -1).toBe(0);
+      expect(raster?.kind === 'raster' ? raster.rowProvider : undefined).toBeTypeOf('function');
     }
   });
 

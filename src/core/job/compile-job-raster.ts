@@ -8,23 +8,20 @@ import {
   pixelExtentForMm,
   resampleLumaNearest,
 } from '../raster';
-import { ditherIndependentRow } from '../raster/dither';
-import {
-  STREAMED_RASTER_PIXEL_THRESHOLD,
-  supportsStreamedRasterRows,
-} from '../raster/raster-budget';
+import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
 import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
+import {
+  originFlipsRasterX,
+  originFlipsRasterY,
+  streamedRasterRowProvider,
+} from './compile-job-raster-stream';
 import { layerWithObjectOverride } from './compile-job-object-policy';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
-import {
-  isRotatedRaster,
-  rotatedMaskedRasterLuma,
-  rotatedRasterRow,
-} from './raster-rotated-sample';
+import { isRotatedRaster, rotatedMaskedRasterLuma } from './raster-rotated-sample';
 import { resolveImageScanDirection } from './scan-direction-policy';
 import { validatedScanOffsetMm } from './scan-offset';
 
@@ -71,10 +68,10 @@ function compileRasterGroup(
     : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
   const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
   const maskObject = imageMaskObjectFor(obj, objects);
-  const streamRows =
-    pixelWidth * pixelHeight > STREAMED_RASTER_PIXEL_THRESHOLD &&
-    maskObject === null &&
-    supportsStreamedRasterRows(layer.ditherAlgorithm);
+  // Streaming works for every dither algorithm and for masked images
+  // (ADR-243), so the only decision left is size: small rasters keep the
+  // one-shot materialized dither, large ones hold O(width) state instead.
+  const streamRows = pixelWidth * pixelHeight > STREAMED_RASTER_PIXEL_THRESHOLD;
   const rasterValues = streamRows
     ? {
         sValues: new Uint16Array(0),
@@ -85,6 +82,7 @@ function compileRasterGroup(
           pixelWidth,
           pixelHeight,
           obj,
+          maskObject,
           device,
           bounds,
           algorithm: layer.ditherAlgorithm,
@@ -192,61 +190,6 @@ function materializedRasterValues(input: MaterializedRasterInput): Uint16Array {
   );
 }
 
-type StreamedRasterInput = {
-  readonly sourceLuma: Uint8Array;
-  readonly sourceWidth: number;
-  readonly sourceHeight: number;
-  readonly pixelWidth: number;
-  readonly pixelHeight: number;
-  readonly obj: RasterImage;
-  readonly device: DeviceProfile;
-  readonly bounds: RasterMachineBounds;
-  readonly algorithm: Layer['ditherAlgorithm'];
-  readonly sMax: number;
-  readonly sMin: number;
-};
-
-function streamedRasterRowProvider(input: StreamedRasterInput): (y: number) => Uint16Array {
-  const ditherOptions = { algorithm: input.algorithm, sMax: input.sMax, sMin: input.sMin };
-  if (isRotatedRaster(input.obj)) {
-    return (y: number): Uint16Array =>
-      ditherIndependentRow(rotatedRasterRow(input, y), y, ditherOptions);
-  }
-  const objFlipX = input.obj.transform.mirrorX !== input.obj.transform.scaleX < 0;
-  const objFlipY = input.obj.transform.mirrorY !== input.obj.transform.scaleY < 0;
-  const flipX = originFlipsRasterX(input.device) !== objFlipX;
-  const flipY = originFlipsRasterY(input.device) !== objFlipY;
-  return (y: number): Uint16Array => {
-    const luma = resampledOrientedRow(input, y, flipX, flipY);
-    return ditherIndependentRow(luma, y, ditherOptions);
-  };
-}
-
-function resampledOrientedRow(
-  input: StreamedRasterInput,
-  y: number,
-  flipX: boolean,
-  flipY: boolean,
-): Uint8Array {
-  const targetY = flipY ? input.pixelHeight - 1 - y : y;
-  const sourceY = nearestSourceCoordinate(targetY, input.sourceHeight, input.pixelHeight);
-  const row = new Uint8Array(input.pixelWidth);
-  for (let x = 0; x < input.pixelWidth; x += 1) {
-    const targetX = flipX ? input.pixelWidth - 1 - x : x;
-    const sourceX = nearestSourceCoordinate(targetX, input.sourceWidth, input.pixelWidth);
-    row[x] = input.sourceLuma[sourceY * input.sourceWidth + sourceX] ?? WHITE_LUMA_BYTE;
-  }
-  return row;
-}
-
-function nearestSourceCoordinate(
-  target: number,
-  sourceExtent: number,
-  targetExtent: number,
-): number {
-  return Math.min(sourceExtent - 1, Math.floor(((target + 0.5) * sourceExtent) / targetExtent));
-}
-
 function imageMaskObjectFor(
   obj: RasterImage,
   objects: ReadonlyArray<SceneObject>,
@@ -276,14 +219,4 @@ function orientRasterLumaForMachine(
     }
   }
   return out;
-}
-
-function originFlipsRasterX(device: DeviceProfile): boolean {
-  return device.origin === 'front-right' || device.origin === 'rear-right';
-}
-
-function originFlipsRasterY(device: DeviceProfile): boolean {
-  return (
-    device.origin === 'front-left' || device.origin === 'front-right' || device.origin === 'center'
-  );
 }

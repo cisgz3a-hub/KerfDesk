@@ -3,8 +3,10 @@
 // the small set of emit failures that cannot produce an executable program.
 
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
-import { scenePreparationTooComplex } from '../../core/job';
+import { scenePreparationTooComplex, type Job } from '../../core/job';
+import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import type { PreflightIssue } from '../../core/preflight';
+import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
 import { machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
@@ -34,10 +36,27 @@ export function demotedPolicyWarnings(project: Project, machine: MachineStartSna
 export const LARGE_JOB_PREPARATION_WARNING =
   'Large job: this design is over the live preview and estimate budget, so those stay paused. Preparing and streaming the program may take longer than usual.';
 
+export const LARGE_RASTER_PREPARATION_WARNING =
+  'Very large image: this engraving is over the live preview and estimate budget, so those stay paused. Preparing and streaming may take several minutes.';
+
 // The former pre-emit curve/fill segment budget refusal, demoted to a Job
 // Review advisory (rule 7 / ADR-241): the operator is informed, never blocked.
 export function largeJobPreparationWarning(scene: Scene): string | null {
   return scenePreparationTooComplex(scene) ? LARGE_JOB_PREPARATION_WARNING : null;
+}
+
+// The former pre-emit raster-too-large refusal, demoted the same way
+// (ADR-243): any pixel size streams; the operator is told it will be slow.
+export function largeRasterPreparationWarning(project: Project): string | null {
+  return rasterPreparationTooComplex(project) ? LARGE_RASTER_PREPARATION_WARNING : null;
+}
+
+// The former prepareOutput compiled-work refusal (motion segments / estimated
+// program bytes), demoted to Job Review advisories (ADR-243). The measurement
+// stays bounded: it stops counting once past its limits, and the messages say
+// "at least" when it does.
+export function compiledWorkAdvisories(job: Job): ReadonlyArray<string> {
+  return runCompiledWorkPreflight(job).issues.map((issue) => issue.message);
 }
 
 const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = new Set([
@@ -45,6 +64,9 @@ const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = new Set([
   'empty-output',
   'relief-needs-cnc',
   'no-output-layer',
+  // Engine factually failed to materialize the program string (ADR-243) —
+  // compile integrity, not policy.
+  'program-materialization-failed',
 ]);
 
 export function partitionEmitPreflight(preflight: {

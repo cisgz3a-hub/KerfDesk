@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { RasterGroup } from '../job';
 import { runCompiledWorkPreflight } from './compiled-work';
 
-describe('compiled raster work refusal', () => {
-  it('stops requesting streamed rows once a refusal is proven', () => {
+describe('compiled raster work advisory', () => {
+  it('stops requesting streamed rows once the advisory threshold is proven', () => {
     const width = 1_000;
     const height = 1_000;
     const alternating = Uint16Array.from({ length: width }, (_, x) => (x % 2 === 0 ? 100 : 0));
