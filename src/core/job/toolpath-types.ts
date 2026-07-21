@@ -62,6 +62,9 @@ export type BuildToolpathOptions = {
   readonly startPoint?: Vec2;
   readonly parkPoint?: Vec2;
   readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
+  // Bed extents for bounding ADR-239 contour entries; absent previews the
+  // unclamped entry (safe over-coverage when the device is unknown).
+  readonly bedSizeMm?: { readonly widthMm: number; readonly heightMm: number };
 };
 
 export type ToolpathDistanceSummary = {

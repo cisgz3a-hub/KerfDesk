@@ -5,6 +5,7 @@
 
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
+import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import {
@@ -66,8 +67,11 @@ function extendBoundsForGroup(
   device: DeviceProfile | undefined,
 ): boolean {
   switch (group.kind) {
-    case 'cut':
-      return extendBoundsForCut(b, group);
+    case 'cut': {
+      const any = extendBoundsForCut(b, group);
+      extendBoundsForContourEntries(b, group, includeOverscanMotion, device);
+      return any;
+    }
     case 'fill':
       return extendBoundsForFill(b, group, includeOverscanMotion, device);
     case 'raster':
@@ -108,6 +112,8 @@ function extendBoundsForFill(
   device: DeviceProfile | undefined,
 ): boolean {
   let any = extendBoundsForCut(b, group);
+  // Only Follow Shape (offset) groups carry entryRunwayMm (ADR-239).
+  extendBoundsForContourEntries(b, group, includeOverscanMotion, device);
   const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
   const plans = planFillSweeps(group);
   for (const plan of plans) {
@@ -166,6 +172,25 @@ function extendBoundsForRaster(
     }
   }
   return true;
+}
+
+// ADR-239: tangential contour entries are physical motion outside the artwork
+// AABB, so the Frame motion envelope must include them — the same contract
+// fill runways honor above.
+function extendBoundsForContourEntries(
+  b: MutableBounds,
+  group: CutGroup | FillGroup,
+  includeOverscanMotion: boolean,
+  device: DeviceProfile | undefined,
+): void {
+  const entryRunwayMm = group.entryRunwayMm ?? 0;
+  if (!includeOverscanMotion || entryRunwayMm <= 0) return;
+  const bed =
+    device === undefined ? undefined : { widthMm: device.bedWidth, heightMm: device.bedHeight };
+  for (const seg of group.segments) {
+    const entry = contourEntryPoint(seg.polyline, entryRunwayMm, bed);
+    if (entry !== null) extendBoundsForPoint(b, entry);
+  }
 }
 
 function extendBoundsForPoint(

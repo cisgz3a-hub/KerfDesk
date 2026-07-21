@@ -14,6 +14,7 @@
 
 import type { Vec2 } from '../scene';
 import type { FillGroup, Group, Job } from './job';
+import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { FillSpan, FillSweep } from './fill-sweeps';
@@ -66,7 +67,14 @@ function appendGroupSteps(
     case 'fill':
       return appendFillGroupSteps(steps, prevEnd, group, options);
     case 'cut':
-      return appendContourGroupSteps(steps, prevEnd, group.segments, group.color, group.passes);
+      return appendContourGroupSteps(
+        steps,
+        prevEnd,
+        group.segments,
+        group.color,
+        group.passes,
+        contourEntryOptions(group.entryRunwayMm, options),
+      );
     case 'cnc':
       // Z-aware CNC steps (H.2): retract/travel/plunge/cut mirroring the
       // emitter's motion contract, with per-step Z spans for depth shading.
@@ -87,6 +95,7 @@ function appendFillGroupSteps(
       group.segments,
       group.color,
       group.passes,
+      contourEntryOptions(group.entryRunwayMm, options),
     );
   }
   const scanOffsetMm =
@@ -102,19 +111,46 @@ function appendFillGroupSteps(
   return prevEnd;
 }
 
+// ADR-239 entry context for contour previews: the group's runway length plus
+// the caller-provided bed used to bound it. Null when the group has no entry.
+type ContourEntryOptions = {
+  readonly runwayMm: number;
+  readonly bed?: BuildToolpathOptions['bedSizeMm'];
+};
+
+function contourEntryOptions(
+  entryRunwayMm: number | undefined,
+  options: BuildToolpathOptions,
+): ContourEntryOptions | null {
+  if (entryRunwayMm === undefined || entryRunwayMm <= 0) return null;
+  return { runwayMm: entryRunwayMm, bed: options.bedSizeMm };
+}
+
 function appendContourGroupSteps(
   steps: ToolpathStep[],
   initialPrevEnd: Vec2 | null,
   segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2> }>,
   color: string,
   passes: number,
+  entryOptions: ContourEntryOptions | null,
 ): Vec2 | null {
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {
     for (const seg of segments) {
       const first = seg.polyline[0];
       if (first === undefined) continue;
-      appendTravelStep(steps, prevEnd, first);
+      // ADR-239: preview the tangential entry the emitter produces — a rapid
+      // to the entry point, then a laser-off feed ramp into the first vertex.
+      const entry =
+        entryOptions === null
+          ? null
+          : contourEntryPoint(seg.polyline, entryOptions.runwayMm, entryOptions.bed);
+      if (entry === null) {
+        appendTravelStep(steps, prevEnd, first);
+      } else {
+        appendTravelStep(steps, prevEnd, entry, 'rapid');
+        appendTravelStep(steps, entry, first, 'feed');
+      }
       steps.push({
         kind: 'cut',
         color,

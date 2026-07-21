@@ -390,6 +390,10 @@ function firstSurfaceProcessPoint(
 ): Vec2 | null {
   const toolpath = buildToolpath(prepared.job, {
     scanningOffsets: prepared.project.device.scanningOffsets,
+    bedSizeMm: {
+      widthMm: prepared.project.device.bedWidth,
+      heightMm: prepared.project.device.bedHeight,
+    },
   });
   const step = toolpath.steps.find((candidate) => candidate.kind === 'cut');
   return step?.kind === 'cut' ? (step.polyline[0] ?? null) : null;
