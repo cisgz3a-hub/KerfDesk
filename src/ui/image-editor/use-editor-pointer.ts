@@ -17,6 +17,7 @@ import {
   type EditorDrag,
 } from './editor-drag';
 import { useAdjustDialogStore } from './adjust-dialog-store';
+import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
 import type { EditorView } from './image-editor-types';
@@ -217,12 +218,13 @@ function startToolDrag(
   update(beginDrag(state.tool, point, modifiers, selection !== null, insideSelection));
 }
 
-// Alt-click eyedropper: sample the document pixel under the cursor into the
-// foreground color.
+// Alt-click eyedropper: sample the VISIBLE pixel under the cursor (the layer
+// composite, ADR-245) into the foreground color.
 function sampleForeground(x: number, y: number): void {
   const store = useImageEditorStore.getState();
-  const doc = store.session?.doc;
-  if (doc === undefined) return;
+  const session = store.session;
+  if (session === null) return;
+  const doc = compositeSession(session);
   const px = Math.floor(x);
   const py = Math.floor(y);
   if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) return;

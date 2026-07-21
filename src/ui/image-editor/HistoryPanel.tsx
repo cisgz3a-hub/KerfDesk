@@ -76,15 +76,12 @@ export function HistoryPanel(): JSX.Element | null {
   );
 }
 
-const PANEL_WIDTH = 168;
-
+// Geometry (width, dock border) belongs to the overlay's panel dock.
 const panelStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  width: PANEL_WIDTH,
-  minWidth: PANEL_WIDTH,
-  borderLeft: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-1)',
+  flex: 1,
+  minHeight: 0,
   overflow: 'hidden',
 };
 

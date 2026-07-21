@@ -8,6 +8,7 @@ import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
 import { maskBounds, type SelectionMask } from '../../core/image-select';
 import { adjustmentById, runAdjustment, type AdjustmentId } from './editor-adjustments';
 import type { EditorSession } from './editor-session';
+import { compositeSession } from './editor-session-layers';
 
 function selectionRect(session: EditorSession): PixelRect | null {
   return session.selection === null ? null : maskBounds(session.selection);
@@ -49,7 +50,11 @@ export function commitAdjustment(
   };
 }
 
-/** The dialog's live preview: the document is never touched. */
+/**
+ * The dialog's live preview: the document is never touched. Multi-layer
+ * sessions preview the full composite with the adjusted active layer
+ * substituted in, so what the dialog shows is what OK produces (ADR-245).
+ */
 export function computeAdjustPreview(
   session: EditorSession,
   id: AdjustmentId,
@@ -58,5 +63,9 @@ export function computeAdjustPreview(
 ): RgbaBuffer {
   const clone = cloneRgbaBuffer(session.doc);
   runOp(id, params, curvePoints, clone, selectionRect(session), session.selection);
-  return clone;
+  if (session.layers.length === 1) return clone;
+  const layers = session.layers.map((layer) =>
+    layer.buffer === session.doc ? { ...layer, buffer: clone } : layer,
+  );
+  return compositeSession({ ...session, doc: clone, layers });
 }

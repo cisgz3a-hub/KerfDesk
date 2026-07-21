@@ -22,6 +22,7 @@ import {
   type RgbaBuffer,
 } from '../../core/image-edit';
 import { paintStrokeInPlace, snapLineEnd45, strokeDirtyRect } from '../../core/image-edit';
+import { layerFromBuffer, type EditorLayer } from '../../core/image-layers';
 import {
   blitFloatingInPlace,
   borderMask,
@@ -34,6 +35,8 @@ import {
   smoothMask,
   type SelectionMask,
 } from '../../core/image-select';
+
+export const BACKGROUND_LAYER_ID = 'background';
 
 export type SelectionModifyKind = 'expand' | 'contract' | 'border' | 'smooth' | 'feather';
 
@@ -85,8 +88,15 @@ export type BrushSettings = {
 export type EditorSession = {
   readonly objectId: string;
   readonly sourceName: string;
-  /** Mutable working document — mutated in place by session ops. */
+  /**
+   * Mutable working document — mutated in place by session ops. ADR-245
+   * invariant: this IS the active layer's buffer (pointer-shared), so every
+   * op edits the active layer without knowing layers exist.
+   */
   readonly doc: RgbaBuffer;
+  /** Bottom-up layer stack; index 0 is the Background (ADR-245). */
+  readonly layers: readonly EditorLayer[];
+  readonly activeLayerId: string;
   /** As-opened pixels, for the explicit Revert action (F-L4). */
   readonly base: RgbaBuffer;
   /** Where the doc sits inside the as-opened image (crop accumulates). */
@@ -111,6 +121,8 @@ export function createSession(
     objectId,
     sourceName,
     doc,
+    layers: [layerFromBuffer(BACKGROUND_LAYER_ID, 'Background', doc)],
+    activeLayerId: BACKGROUND_LAYER_ID,
     base: cloneRgbaBuffer(doc),
     cropOffset: { x: 0, y: 0 },
     sourceBounds,
@@ -121,11 +133,14 @@ export function createSession(
   };
 }
 
-/** Explicit Revert: back to the as-opened pixels (un-crops too). */
+/** Explicit Revert: back to the as-opened pixels (un-crops, un-layers too). */
 export function revertSession(session: EditorSession): EditorSession {
+  const doc = cloneRgbaBuffer(session.base);
   return {
     ...session,
-    doc: cloneRgbaBuffer(session.base),
+    doc,
+    layers: [layerFromBuffer(BACKGROUND_LAYER_ID, 'Background', doc)],
+    activeLayerId: BACKGROUND_LAYER_ID,
     cropOffset: { x: 0, y: 0 },
     history: createEditHistory(),
     selection: null,
@@ -171,20 +186,40 @@ export function commitCrop(session: EditorSession, rect: PixelRect): EditorSessi
   const width = Math.max(1, Math.min(session.doc.width - x, Math.round(rect.width)));
   const height = Math.max(1, Math.min(session.doc.height - y, Math.round(rect.height)));
   if (width <= 0 || height <= 0) return session;
-  const data = new Uint8ClampedArray(width * height * 4);
-  for (let row = 0; row < height; row += 1) {
-    const src = ((y + row) * session.doc.width + x) * 4;
-    data.set(session.doc.data.subarray(src, src + width * 4), row * width * 4);
-  }
+  // Every layer crops identically so dimensions stay uniform (ADR-245); the
+  // active layer's cropped buffer becomes the new doc pointer.
+  const layers = session.layers.map((layer) => ({
+    ...layer,
+    buffer: cropBuffer(layer.buffer, x, y, width, height),
+  }));
+  const active = layers.find((layer) => layer.id === session.activeLayerId) ?? layers[0];
+  if (active === undefined) return session;
   return {
     ...session,
-    doc: { width, height, data },
+    doc: active.buffer,
+    layers,
+    activeLayerId: active.id,
     cropOffset: { x: session.cropOffset.x + x, y: session.cropOffset.y + y },
     history: createEditHistory(),
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
   };
+}
+
+function cropBuffer(
+  source: RgbaBuffer,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): RgbaBuffer {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const src = ((y + row) * source.width + x) * 4;
+    data.set(source.data.subarray(src, src + width * 4), row * width * 4);
+  }
+  return { width, height, data };
 }
 
 /** BrushParams for a paint tool (pencil = pixel tip, others = soft tip). */

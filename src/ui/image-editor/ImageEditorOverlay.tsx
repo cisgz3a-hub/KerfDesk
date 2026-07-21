@@ -9,6 +9,7 @@ import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { HistoryPanel } from './HistoryPanel';
+import { LayersPanel } from './LayersPanel';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
@@ -77,11 +78,26 @@ export function ImageEditorOverlay(): JSX.Element | null {
             <span>Esc closes — session is kept · Apply commits one undo step</span>
           </footer>
         </div>
-        {isHistoryOpen ? <HistoryPanel /> : null}
+        {isHistoryOpen ? (
+          <div style={dockStyle}>
+            <LayersPanel />
+            <HistoryPanel />
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
+
+const dockStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  width: 168,
+  minWidth: 168,
+  borderLeft: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-1)',
+  overflow: 'hidden',
+};
 
 type TopBarActions = {
   readonly undo: () => void;
@@ -113,9 +129,9 @@ function TopBar(props: {
           className={props.isHistoryOpen ? 'lf-btn' : 'lf-btn lf-btn--ghost'}
           onClick={props.onToggleHistory}
           aria-pressed={props.isHistoryOpen}
-          title="Show or hide the History panel (click any step to jump there)"
+          title="Show or hide the Layers and History panels"
         >
-          History
+          Panels
         </button>
         <button
           type="button"

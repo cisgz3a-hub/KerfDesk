@@ -29,9 +29,18 @@ export function commitImageSize(
   if (w === session.doc.width && h === session.doc.height) return session;
   const scaleX = w / session.doc.width;
   const scaleY = h / session.doc.height;
+  // Every layer resamples identically (ADR-245: uniform dimensions).
+  const layers = session.layers.map((layer) => ({
+    ...layer,
+    buffer: resampleBuffer(layer.buffer, w, h),
+  }));
+  const active = layers.find((layer) => layer.id === session.activeLayerId) ?? layers[0];
+  if (active === undefined) return session;
   return {
     ...session,
-    doc: resampleBuffer(session.doc, w, h),
+    doc: active.buffer,
+    layers,
+    activeLayerId: active.id,
     base: resampleBuffer(session.base, session.base.width * scaleX, session.base.height * scaleY),
     cropOffset: {
       x: Math.round(session.cropOffset.x * scaleX),
@@ -61,9 +70,19 @@ export function commitCanvasSize(
   if (w === session.doc.width && h === session.doc.height) return session;
   const offsetX = Math.round((w - session.doc.width) * anchor.x);
   const offsetY = Math.round((h - session.doc.height) * anchor.y);
+  // The Background pads opaque white (ADR-242 empty); upper layers pad
+  // transparent so lower layers keep showing through (ADR-245).
+  const layers = session.layers.map((layer, index) => ({
+    ...layer,
+    buffer: padBlit(layer.buffer, w, h, offsetX, offsetY, index === 0 ? 'white' : 'transparent'),
+  }));
+  const active = layers.find((layer) => layer.id === session.activeLayerId) ?? layers[0];
+  if (active === undefined) return session;
   return {
     ...session,
-    doc: padBlit(session.doc, w, h, offsetX, offsetY),
+    doc: active.buffer,
+    layers,
+    activeLayerId: active.id,
     cropOffset: { x: session.cropOffset.x - offsetX, y: session.cropOffset.y - offsetY },
     history: createEditHistory(),
     selection: null,
@@ -72,17 +91,18 @@ export function commitCanvasSize(
   };
 }
 
-// Copy the source into an opaque-white w×h buffer at (offsetX, offsetY),
-// clipping whatever falls outside.
+// Copy the source into a w×h buffer at (offsetX, offsetY), clipping whatever
+// falls outside; padding is opaque white or fully transparent.
 function padBlit(
   source: RgbaBuffer,
   w: number,
   h: number,
   offsetX: number,
   offsetY: number,
+  fill: 'white' | 'transparent',
 ): RgbaBuffer {
   const data = new Uint8ClampedArray(w * h * RGBA_CHANNELS);
-  data.fill(255);
+  if (fill === 'white') data.fill(255);
   for (let y = 0; y < source.height; y += 1) {
     const ty = y + offsetY;
     if (ty < 0 || ty >= h) continue;
