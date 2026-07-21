@@ -6,10 +6,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdjustPreviewDoc } from './adjust-dialog-store';
 import { docToCanvas, drawEditorScene, drawTransformPreview } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
-import { BRUSH_CURSOR_STYLE, useBrushCursor } from './use-brush-cursor';
+import { BRUSH_CURSOR_STYLE } from './use-brush-cursor';
 import { useCanvasFit } from './use-canvas-fit';
+import { useCanvasHover } from './use-canvas-hover';
 import { useEditorPointer } from './use-editor-pointer';
-import { MODE_BADGE_STYLE, useModeBadge } from './use-mode-badge';
+import { INFO_READOUT_STYLE } from './use-info-readout';
+import { MODE_BADGE_STYLE } from './use-mode-badge';
 
 const ANTS_TICK_MS = 120;
 
@@ -46,8 +48,7 @@ export function EditorCanvas(): JSX.Element {
 
   const activeView = view ?? { scale: 1, panX: 0, panY: 0 };
   const pointer = useEditorPointer(activeView, setView);
-  const cursor = useBrushCursor(tool, brush, activeView, isSpacePanning);
-  const badge = useModeBadge();
+  const hover = useCanvasHover(hostRef, tool, brush, activeView, isSpacePanning);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -80,24 +81,21 @@ export function EditorCanvas(): JSX.Element {
     <div ref={hostRef} style={hostStyle}>
       <canvas
         ref={canvasRef}
-        style={{ ...canvasStyle, cursor: cursor.canvasCursor }}
+        style={{ ...canvasStyle, cursor: hover.canvasCursor }}
         onPointerDown={pointer.onPointerDown}
         onPointerMove={(e) => {
-          cursor.moveCursor(e, hostRef.current);
-          badge.updateBadge(e, hostRef.current);
+          hover.onHoverMove(e);
           pointer.onPointerMove(e);
         }}
         onPointerUp={pointer.onPointerUp}
         onPointerCancel={pointer.cancelDrag}
-        onPointerLeave={() => {
-          cursor.hideCursor();
-          badge.hideBadge();
-        }}
+        onPointerLeave={hover.onHoverLeave}
         onWheel={pointer.onWheel}
         aria-label="Image Studio document canvas"
       />
-      <div ref={cursor.cursorRef} style={BRUSH_CURSOR_STYLE} aria-hidden="true" />
-      <div ref={badge.badgeRef} style={MODE_BADGE_STYLE} aria-hidden="true" />
+      <div ref={hover.cursorRef} style={BRUSH_CURSOR_STYLE} aria-hidden="true" />
+      <div ref={hover.badgeRef} style={MODE_BADGE_STYLE} aria-hidden="true" />
+      <div ref={hover.infoRef} style={INFO_READOUT_STYLE} aria-hidden="true" />
     </div>
   );
 }
