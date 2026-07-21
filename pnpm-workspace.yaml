@@ -46,11 +46,24 @@ minimumReleaseAgeExclude:
 # GHSA-p88m-4jfj-68fv, GHSA-35p6-xmwp-9g52, and GHSA-g8m3-5g58-fq7m
 # patches; Electron/Wrangler pull Undici 7.x below the GHSA-vmh5-mc38-953g
 # and GHSA-pr7r-676h-xcf6 patches.
+#
+# 2026-07-21 advisory wave, all denial-of-service and all build/dev-only —
+# nothing here reaches the shipped web bundle. Electron-builder's
+# app-builder-lib and node-gyp paths pull `tar` below the GHSA-w8wr-v893-vjvp,
+# GHSA-gvwx-54wh-qm9j, and unlimited-input-decompression patches (7.5.19 clears
+# all three). ESLint/minimatch chains pull `brace-expansion` below its
+# exponential-expansion patch on three separate majors, so each vulnerable
+# range is pinned to its own patched line. `js-yaml` moves 4.2.0 -> 4.3.0 for
+# the merge-key quadratic-CPU advisory.
 overrides:
   tmp@<0.2.6: ^0.2.6
   esbuild@<0.28.1: ^0.28.1
   ws@<8.21.0: 8.21.0
   form-data@<4.0.6: 4.0.6
-  js-yaml@<4.2.0: 4.2.0
+  js-yaml@<4.3.0: 4.3.0
+  tar@<7.5.19: 7.5.19
+  brace-expansion@<1.1.16: 1.1.16
+  brace-expansion@>=2.0.0 <2.1.2: 2.1.2
+  brace-expansion@>=3.0.0 <5.0.7: 5.0.7
   undici@>=6.0.0 <6.27.0: 6.27.0
   undici@>=7.0.0 <7.28.0: 7.28.0
