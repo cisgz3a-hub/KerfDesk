@@ -4,8 +4,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdjustPreviewDoc } from './adjust-dialog-store';
-import { docToCanvas, drawEditorScene, drawTransformPreview } from './editor-canvas-draw';
+import {
+  docToCanvas,
+  drawEditorScene,
+  drawQuickMaskOverlay,
+  drawTransformPreview,
+} from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
+import { useQuickMaskStore } from './quick-mask-store';
 import { BRUSH_CURSOR_STYLE } from './use-brush-cursor';
 import { useCanvasFit } from './use-canvas-fit';
 import { useCanvasHover } from './use-canvas-hover';
@@ -25,6 +31,8 @@ export function EditorCanvas(): JSX.Element {
   const isSpacePanning = useImageEditorStore((s) => s.isSpacePanning);
   const pendingCrop = useImageEditorStore((s) => s.pendingCrop);
   const transform = useImageEditorStore((s) => s.transform);
+  const rubylith = useQuickMaskStore((s) => s.rubylith);
+  useQuickMaskStore((s) => s.revision);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [antsPhase, setAntsPhase] = useState(0);
@@ -67,6 +75,7 @@ export function EditorCanvas(): JSX.Element {
       },
       pendingCrop,
     );
+    if (rubylith !== null) drawQuickMaskOverlay(ctx, activeView, rubylith);
     if (transform !== null) {
       drawTransformPreview(ctx, activeView, {
         rect: transform.floating.rect,

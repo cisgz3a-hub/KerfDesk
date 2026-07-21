@@ -15,6 +15,7 @@ import { EditorToolStrip } from './EditorToolStrip';
 import { ResizeDialogPanel } from './ResizeDialog';
 import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
+import { useQuickMaskStore } from './quick-mask-store';
 
 export function ImageEditorOverlay(): JSX.Element | null {
   const session = useImageEditorStore((s) => s.session);
@@ -25,6 +26,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
   const revert = useImageEditorStore((s) => s.revert);
   const apply = useImageEditorStore((s) => s.apply);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const isQuickMask = useQuickMaskStore((s) => s.rubylith !== null);
   useRegisterModal();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -65,7 +67,11 @@ export function ImageEditorOverlay(): JSX.Element | null {
           <ResizeDialogPanel />
           <footer style={statusStyle}>
             <span>
-              {session.selection === null ? 'No selection' : 'Selection active'}
+              {isQuickMask
+                ? 'Quick Mask — paint the selection, Q to finish'
+                : session.selection === null
+                  ? 'No selection'
+                  : 'Selection active'}
               {trimmed > 0 ? ` · ${trimmed} older history steps trimmed` : ''}
             </span>
             <span>Esc closes — session is kept · Apply commits one undo step</span>

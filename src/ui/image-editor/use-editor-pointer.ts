@@ -18,6 +18,7 @@ import {
 } from './editor-drag';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import { useImageEditorStore } from './image-editor-store';
+import { useQuickMaskStore } from './quick-mask-store';
 import type { EditorView } from './image-editor-types';
 import { canvasToDoc } from './editor-canvas-draw';
 import { dragTransform, hitTransformHandle } from './editor-transform';
@@ -179,6 +180,12 @@ function moveTransformDrag(
   );
 }
 
+function isPaintToolKind(
+  kind: ReturnType<typeof useImageEditorStore.getState>['tool']['kind'],
+): boolean {
+  return kind === 'brush' || kind === 'pencil' || kind === 'eraser' || kind === 'line';
+}
+
 // Left-button tool dispatch: Alt-click eyedropper inside paint tools, wand
 // click with boolean modifiers, otherwise begin the pure drag state.
 function startToolDrag(
@@ -187,11 +194,9 @@ function startToolDrag(
   update: (drag: EditorDrag) => void,
 ): void {
   const state = useImageEditorStore.getState();
-  const isPaintTool =
-    state.tool.kind === 'brush' ||
-    state.tool.kind === 'pencil' ||
-    state.tool.kind === 'eraser' ||
-    state.tool.kind === 'line';
+  const isPaintTool = isPaintToolKind(state.tool.kind);
+  // Quick Mask parks everything except painting (which routes to the mask).
+  if (useQuickMaskStore.getState().rubylith !== null && !isPaintTool) return;
   if (isPaintTool && e.altKey) {
     sampleForeground(point.x, point.y);
     return;
@@ -248,9 +253,12 @@ function completeActionDrag(
 ): void {
   switch (drag.kind) {
     case 'paint':
+      // An active Quick Mask consumes the stroke into the rubylith.
+      if (useQuickMaskStore.getState().strokeInto(drag.points)) return;
       store.stroke(drag.points);
       return;
     case 'line':
+      if (useQuickMaskStore.getState().lineInto(drag.from, drag.to, drag.shift)) return;
       completeLine(store, drag);
       return;
     case 'marquee':
