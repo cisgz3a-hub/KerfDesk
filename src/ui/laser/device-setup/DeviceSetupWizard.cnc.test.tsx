@@ -44,15 +44,13 @@ describe('DeviceSetupWizard router commit', () => {
     });
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // connect & read
+      await act(async () => button(view.host, 'Next').click()); // connect & confirm
       await act(async () => button(view.host, 'Use detected values').click());
-      await act(async () => button(view.host, 'Next').click()); // work area
       expect(input(view.host, 'Bed width (mm)').value).toBe('750');
-      await act(async () => button(view.host, 'Next').click()); // machine output
       expect(input(view.host, 'Spindle maximum').value).toBe('24000');
       expect(view.host.textContent).not.toContain('Laser output and accessories');
 
-      await advanceUntil(view.host, 'Step 7 of 7 — Review & hardware handoff');
+      await advanceUntil(view.host, 'Step 4 of 4 — Review & save');
       await act(async () => button(view.host, 'Save machine setup').click());
 
       const state = useStore.getState();
@@ -90,12 +88,10 @@ describe('DeviceSetupWizard router commit', () => {
           lastSettingsReadAt: null,
         });
       });
-      await act(async () => button(view.host, 'Next').click()); // connect & read
+      await act(async () => button(view.host, 'Next').click()); // connect & confirm
       expect(view.host.textContent).toContain('No mapped values have been read');
       expect(view.host.textContent).not.toContain('Use detected values');
-      await act(async () => button(view.host, 'Next').click()); // work area
       expect(view.host.textContent).toContain('No controller values were imported');
-      await act(async () => button(view.host, 'Next').click()); // machine output
       expect(input(view.host, 'Spindle maximum').value).toBe('12000');
     } finally {
       await view.unmount();

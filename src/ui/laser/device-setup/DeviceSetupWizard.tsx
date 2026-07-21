@@ -29,17 +29,14 @@ import {
 } from './device-setup-flow';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupMachineStep } from './DeviceSetupMachineStep';
+import { DeviceSetupOptionsStep } from './DeviceSetupOptionsStep';
 import { DeviceSetupReviewStep } from './DeviceSetupReviewStep';
-import { DeviceSetupSafetyStep } from './DeviceSetupSafetyStep';
 
 const STEP_TITLES: Record<DeviceSetupStep, string> = {
-  identify: 'Machine & controller',
-  connect: 'Connect & read',
-  confirm: 'Work area & coordinates',
-  machine: 'Machine output',
-  safety: 'Safety & calibration',
-  firmware: 'Firmware review',
-  review: 'Review & hardware handoff',
+  identify: 'Choose your machine',
+  connect: 'Connect & confirm',
+  options: 'Options & calibration',
+  review: 'Review & save',
 };
 
 type DeviceSetupWizardProps = {
@@ -266,6 +263,10 @@ function saveButtonLabel(saving: boolean, firmwareWriteCount: number): string {
   return `Save setup and write ${firmwareWriteCount} setting${firmwareWriteCount === 1 ? '' : 's'}`;
 }
 
+// The connect and review pages stack the previously separate step
+// components on one flat scrollable page (ADR-239): connect/read, then the
+// coordinate model, then machine output; firmware comparison sits above the
+// review cards so Save follows the queued-write summary it executes.
 function renderStep(
   state: DeviceSetupState,
   dispatch: React.Dispatch<DeviceSetupAction>,
@@ -274,17 +275,22 @@ function renderStep(
     case 'identify':
       return <DeviceSetupIdentifyStep state={state} dispatch={dispatch} />;
     case 'connect':
-      return <DeviceSetupConnectStep state={state} dispatch={dispatch} />;
-    case 'confirm':
-      return <DeviceSetupConfirmStep state={state} dispatch={dispatch} />;
-    case 'machine':
-      return <DeviceSetupMachineStep state={state} dispatch={dispatch} />;
-    case 'safety':
-      return <DeviceSetupSafetyStep state={state} dispatch={dispatch} />;
-    case 'firmware':
-      return <DeviceSetupFirmwareStep state={state} dispatch={dispatch} />;
+      return (
+        <div style={stackedStepStyle}>
+          <DeviceSetupConnectStep state={state} dispatch={dispatch} />
+          <DeviceSetupConfirmStep state={state} dispatch={dispatch} />
+          <DeviceSetupMachineStep state={state} dispatch={dispatch} />
+        </div>
+      );
+    case 'options':
+      return <DeviceSetupOptionsStep state={state} dispatch={dispatch} />;
     case 'review':
-      return <DeviceSetupReviewStep state={state} dispatch={dispatch} />;
+      return (
+        <div style={stackedStepStyle}>
+          <DeviceSetupFirmwareStep state={state} dispatch={dispatch} />
+          <DeviceSetupReviewStep state={state} dispatch={dispatch} />
+        </div>
+      );
     default:
       return assertNever(state.step);
   }
@@ -340,6 +346,11 @@ const stepNumberStyle: React.CSSProperties = {
   fontSize: 11,
 };
 const contentStyle: React.CSSProperties = { minWidth: 0, overflow: 'hidden' };
+const stackedStepStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 18,
+};
 const bodyStyle: React.CSSProperties = {
   minHeight: 440,
   maxHeight: 560,

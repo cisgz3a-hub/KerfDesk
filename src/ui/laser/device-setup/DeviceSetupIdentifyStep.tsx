@@ -1,32 +1,16 @@
 // Step 1: choose what the machine is and how KerfDesk must communicate with
-// it. Connection deliberately comes second so the first serial open uses the
-// reviewed driver and baud rate.
+// it. The reviewed-profile catalog leads (one click fills the draft, ADR-239);
+// connection deliberately comes on the next step so the first serial open
+// uses the reviewed driver and baud rate.
 
 import {
   GRBL_GCODE_DIALECTS,
   MARLIN_GCODE_DIALECTS,
-  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-  profileConfidenceLabel,
-  suggestMachineProfiles,
   type ControllerKind,
   type DeviceProfile,
-  type MachineProfileSuggestion,
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
-import {
-  fillRunwayPolicyForDevice,
-  shouldAdvise4040FillPolicySelection,
-} from '../../../core/job/fill-runway-policy';
-import { Button } from '../../kit';
-import {
-  badgeStyle,
-  buttonRowStyle,
-  cardHeaderStyle,
-  cardStyle,
-  catalogGridStyle,
-  mutedStyle,
-  notesStyle,
-} from '../MachineSetupStyles';
+import { mutedStyle } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
 import { ImportExportPanel } from '../MachineSetupImportExport';
 import {
@@ -36,6 +20,7 @@ import {
 } from './device-setup-flow';
 import { DeviceSetupCncPreset } from './DeviceSetupCncPreset';
 import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
+import { DeviceSetupProfilePicker } from './DeviceSetupProfilePicker';
 import {
   machineSetupControllerGuide,
   machineSetupControllerGuides,
@@ -49,6 +34,9 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
   return (
     <section style={sectionStyle}>
       <SetupIntroduction />
+      {deviceSetupSupportsMachineKind(state, 'laser') ? (
+        <DeviceSetupProfilePicker state={state} dispatch={dispatch} />
+      ) : null}
       <DeviceSetupMachineCapability state={state} dispatch={dispatch} />
       <DeviceSetupCncPreset state={state} dispatch={dispatch} />
       <ControllerContract
@@ -66,9 +54,6 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
       {driver.capabilities.transport === 'serial' ? (
         <AdvancedConnection state={state} controllerKind={controllerKind} update={update} />
       ) : null}
-      {deviceSetupSupportsMachineKind(state, 'laser') ? (
-        <ProfileCatalog state={state} dispatch={dispatch} />
-      ) : null}
       <ProfileImport state={state} dispatch={dispatch} />
     </section>
   );
@@ -79,8 +64,9 @@ function SetupIntroduction(): JSX.Element {
     <div style={introStyle}>
       <strong>Start here before connecting.</strong>
       <span>
-        Choose every toolhead this physical machine supports, then choose the one KerfDesk should
-        make active after Save. The active mode alone controls commands, output, and safety gates.
+        Pick your machine from the reviewed profiles — one click fills the whole setup — or
+        configure the identity manually below. The active mode alone controls commands, output, and
+        safety gates after Save.
       </span>
     </div>
   );
@@ -251,93 +237,6 @@ function ProfileImport({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
       />
     </details>
   );
-}
-
-function ProfileCatalog({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
-  const suggestions = suggestMachineProfiles({
-    detectedControllerKind: state.detectedControllerKind ?? null,
-    detectedProfilePatch: state.detected,
-    controllerSettings: state.controllerRead ? state.detected : null,
-    settingsRows: [],
-  });
-  return (
-    <details style={detailsStyle} open={shouldAdvise4040FillPolicySelection(state.draft)}>
-      <summary style={summaryStyle} title="Show or hide reviewed machine-profile suggestions.">
-        Start from a reviewed machine profile
-      </summary>
-      <p style={mutedStyle}>
-        A profile supplies useful defaults. You will still review work area, origin, homing, power,
-        and accessories before saving.
-      </p>
-      <div style={catalogGridStyle}>
-        {suggestions.map((suggestion) => (
-          <PresetCard
-            key={suggestion.profileId}
-            suggestion={suggestion}
-            isActive={profilePresetIsActive(state.draft, suggestion)}
-            onUse={() => dispatch({ kind: 'apply-preset', profile: suggestion.profile })}
-          />
-        ))}
-      </div>
-    </details>
-  );
-}
-
-function profilePresetIsActive(
-  draft: DeviceProfile,
-  suggestion: MachineProfileSuggestion,
-): boolean {
-  if (draft.profileId !== suggestion.profile.profileId) return false;
-  if (suggestion.profile.profileId !== NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId) return true;
-  return fillRunwayPolicyForDevice(draft) !== undefined;
-}
-
-function PresetCard(props: {
-  readonly suggestion: MachineProfileSuggestion;
-  readonly isActive: boolean;
-  readonly onUse: () => void;
-}): JSX.Element {
-  const profile = props.suggestion.profile;
-  const buttonTitle = props.isActive
-    ? 'This machine is selected.'
-    : `Start from ${profile.name}'s defaults.`;
-  const buttonLabel = props.isActive ? 'Selected' : `Use ${profile.name}`;
-  return (
-    <article style={cardStyle}>
-      <div style={cardHeaderStyle}>
-        <strong>{profile.name}</strong>
-        <span style={buttonRowStyle}>
-          <span style={badgeStyle}>{suggestionConfidenceLabel(props.suggestion.confidence)}</span>
-          <span style={badgeStyle}>{profileConfidenceLabel(profile)}</span>
-        </span>
-      </div>
-      <p style={mutedStyle}>
-        {profile.bedWidth} × {profile.bedHeight} mm
-        {profile.laserSubProfile?.opticalPowerW !== undefined
-          ? `, ${profile.laserSubProfile.opticalPowerW} W`
-          : ''}
-      </p>
-      <ul style={notesStyle}>
-        {props.suggestion.entry.reviewNotes.slice(0, 2).map((note) => (
-          <li key={note}>{note}</li>
-        ))}
-      </ul>
-      <Button
-        variant={props.isActive ? 'default' : 'primary'}
-        disabled={props.isActive}
-        onClick={props.onUse}
-        title={buttonTitle}
-      >
-        {buttonLabel}
-      </Button>
-    </article>
-  );
-}
-
-function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confidence']): string {
-  if (confidence === 'suggested') return 'Suggested match';
-  if (confidence === 'possible') return 'Possible match';
-  return 'Manual choice';
 }
 
 const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };

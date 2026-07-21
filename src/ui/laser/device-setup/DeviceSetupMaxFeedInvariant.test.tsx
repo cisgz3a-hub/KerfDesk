@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import { LASER_MACHINE_CONFIG } from '../../../core/scene';
 import { deviceSetupReducer, initDeviceSetup } from './device-setup-flow';
-import { DeviceSetupSafetyStep } from './DeviceSetupSafetyStep';
+import { DeviceSetupOptionsStep } from './DeviceSetupOptionsStep';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -29,7 +29,7 @@ describe('Device Setup controlled travel feed invariant', () => {
     const root = createRoot(host);
     try {
       await act(async () =>
-        root.render(<DeviceSetupSafetyStep state={state} dispatch={vi.fn()} />),
+        root.render(<DeviceSetupOptionsStep state={state} dispatch={vi.fn()} />),
       );
       const field = host.querySelector('input[aria-label="Controlled laser-off seek feed"]');
       expect(field).toBeInstanceOf(HTMLInputElement);

@@ -23,15 +23,7 @@ describe('unified machine setup flow', () => {
   it('starts with machine/controller selection before connection', () => {
     const state = open();
     expect(state.step).toBe('identify');
-    expect(DEVICE_SETUP_STEP_ORDER).toEqual([
-      'identify',
-      'connect',
-      'confirm',
-      'machine',
-      'safety',
-      'firmware',
-      'review',
-    ]);
+    expect(DEVICE_SETUP_STEP_ORDER).toEqual(['identify', 'connect', 'options', 'review']);
   });
 
   it('walks the same beginner sequence for laser and CNC without running a probe', () => {
@@ -218,12 +210,15 @@ describe('unified machine setup flow', () => {
     expect(state.detectedApplied).toBe(false);
   });
 
-  it('blocks invalid geometry but leaves connect and firmware optional', () => {
+  it('blocks invalid geometry on every editing step while free jumps stay open', () => {
     let state = deviceSetupReducer(open(), { kind: 'edit', patch: { bedWidth: 0 } });
     expect(canAdvanceDeviceSetup(state)).toBe(false);
+    // The connect page now hosts the bed fields (ADR-239), so the same
+    // validation gate applies there; the stepper's free 'go' jump remains.
     state = deviceSetupReducer(state, { kind: 'go', step: 'connect' });
-    expect(canAdvanceDeviceSetup(state)).toBe(true);
-    state = deviceSetupReducer(state, { kind: 'go', step: 'firmware' });
+    expect(state.step).toBe('connect');
+    expect(canAdvanceDeviceSetup(state)).toBe(false);
+    state = deviceSetupReducer(state, { kind: 'edit', patch: { bedWidth: 400 } });
     expect(canAdvanceDeviceSetup(state)).toBe(true);
   });
 

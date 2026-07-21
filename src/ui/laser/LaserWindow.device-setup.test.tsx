@@ -89,12 +89,12 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       await act(async () => button(host, 'Machine Setup').click());
-      expect(host.textContent).toContain('Step 1 of 7');
-      expect(host.textContent).toContain('Machine & controller');
-      const profileCatalog = [...host.querySelectorAll('details')].find((candidate) =>
-        candidate.textContent?.includes('Start from a reviewed machine profile'),
-      );
-      expect(profileCatalog?.open).toBe(true);
+      expect(host.textContent).toContain('Step 1 of 4');
+      expect(host.textContent).toContain('Choose your machine');
+      // The catalog is a plain always-visible section now — never collapsed
+      // behind a <details> (ADR-239).
+      const profileCatalog = host.querySelector('section[aria-label="Reviewed machine profiles"]');
+      expect(profileCatalog?.closest('details')).toBeNull();
       expect(profileCatalog?.textContent).toContain('Neotronics 4040 Max');
       expect(host.textContent).not.toContain('Run guided setup');
     } finally {
@@ -110,7 +110,7 @@ describe('LaserWindow device-setup nudge', () => {
 
       await act(async () => setup.click());
 
-      expect(host.textContent).toContain('Step 5 of 7');
+      expect(host.textContent).toContain('Step 3 of 4');
       expect(host.textContent).toContain('Auto-focus setup');
       expect(host.textContent).toContain('Not configured');
       const field = host.querySelector<HTMLTextAreaElement>('#autofocus-cmd');

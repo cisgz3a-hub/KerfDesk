@@ -49,7 +49,8 @@ describe('DeviceSetupWizard detected values', () => {
       });
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
-      await act(async () => button(view.host, 'Next').click());
+      // The bed fields share the connect page now, so the accepted value is
+      // visible without further navigation (ADR-239).
       expect(input(view.host, 'Bed width (mm)').value).toBe('363');
     } finally {
       await view.unmount();

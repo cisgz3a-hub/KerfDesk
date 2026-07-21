@@ -23,7 +23,7 @@ describe('MachineSetupDialog compatibility entry', () => {
   it('renders the single guided Machine Setup flow instead of competing tabs', async () => {
     const view = await renderDialog();
     try {
-      expect(view.host.textContent).toContain('Step 1 of 7 — Machine & controller');
+      expect(view.host.textContent).toContain('Step 1 of 4 — Choose your machine');
       expect(view.host.textContent).not.toContain('Profile CatalogController Settings');
       expect(view.host.textContent).not.toContain('Run guided setup');
     } finally {

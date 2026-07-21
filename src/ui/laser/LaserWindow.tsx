@@ -91,7 +91,7 @@ export function LaserWindow(): JSX.Element {
       <ProbePanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
-        onConfigureAutofocus={() => setMachineSetupRequest({ initialStep: 'safety' })}
+        onConfigureAutofocus={() => setMachineSetupRequest({ initialStep: 'options' })}
         onStartJob={() => void runStartJobFlow()}
       />
       <MachineConsoleSection />
