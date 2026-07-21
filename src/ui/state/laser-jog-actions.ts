@@ -21,6 +21,7 @@ import { type LaserSafetyAction } from './laser-safety-notice';
 import { settleOwnedMotionPhase } from './laser-owned-motion-settlement';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
+import { useToastStore } from './toast-store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
@@ -307,10 +308,12 @@ function assertJogFrameReady(set: SetFn, get: GetFn): void {
 // bounds and keep-out zones evaluate the same physical segment. A jog with no
 // known machine position cannot be resolved and keeps the legacy controller-
 // guarded behavior; board-point moves always require a live position upstream.
+// Configured bounds are warn-only (rule 7 / ADR-232); only the ADR-129 no-go
+// zone check may refuse the move.
 function assertJogMotionSafe(set: SetFn, get: GetFn, params: JogParams): void {
   const path = resolveJogXyPath(get, params);
   if (path === null) return;
-  assertJogTargetWithinConfiguredBounds(set, get, path.target);
+  warnJogTargetOutsideConfiguredBounds(set, get, path.target);
   assertJogClearsNoGoZones(set, get, path);
 }
 
@@ -327,7 +330,10 @@ function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
   return { start, target };
 }
 
-function assertJogTargetWithinConfiguredBounds(
+// Warn-only by mandate (rule 7 / ADR-232): configured bed bounds are policy,
+// not a guard. The move is still sent — the controller's soft-limits remain
+// the real bounds authority — so this surfaces a toast and never throws.
+function warnJogTargetOutsideConfiguredBounds(
   set: SetFn,
   get: GetFn,
   target: JogXyPath['target'],
@@ -346,11 +352,11 @@ function assertJogTargetWithinConfiguredBounds(
     return;
   }
   const message =
-    `Jog blocked: target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
+    `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
     `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
-    `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}.`;
-  set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
-  throw new Error(message);
+    `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
+  useToastStore.getState().pushToast(message, 'warning');
+  set({ log: pushLog(get(), `[lf2] ${message}`) });
 }
 
 // DEV-04: refuse a direct manual jog whose straight path would drive the head
