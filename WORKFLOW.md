@@ -1364,25 +1364,29 @@ Machine capability is an enforced physical-output contract (ADR-210), not descri
 - The final atomic setup action independently refuses a profile/machine mismatch, so another caller
   cannot persist a single-output capability beside the opposite active mode.
 
-The four steps are always visible and always ordered (ADR-239; supersedes the seven-step
+The six steps are always visible and always ordered (ADR-239; supersedes the seven-step
 enumeration of ADR-186/ADR-205):
 
-1. **Choose your machine** — the reviewed-profile catalog renders always-open at the top with a
+1. **Machine type** — Laser only / CNC only / Laser + CNC, and for hybrids the active mode after
+   Save. Nothing else competes with this choice.
+2. **Choose your machine** — the reviewed-profile catalog renders always-open at the top with a
    text filter; a detected-firmware match sorts its cards first and shows the match reasons
    (generic `$$` values never claim hardware identity, so "Possible match" is the ceiling).
-   Below it: Laser/CNC capability, CNC preset, controller family, baud, output dialect, advanced
-   streaming, and import/export. Controller selection precedes serial connection; picking a card
-   applies the whole profile to the draft and nothing else.
-2. **Connect & confirm** — connect with the reviewed driver/baud, run that controller family's
+   Below it: CNC preset, controller family, baud, output dialect, advanced streaming, and
+   import/export. Controller selection precedes serial connection; picking a card applies the
+   whole profile to the draft and nothing else.
+3. **Connect & detect** — connect with the reviewed driver/baud, run that controller family's
    read-only identity/settings commands, and optionally **Use detected values** (Ruida correctly
-   presents file-only behavior). Then, on the same page: name, usable bed, max/frame feed, origin,
-   homing policy, and the machine-output contract (laser S range/air/Fire or CNC safe
-   Z/spindle/dwell/coolant/park). Stock, material, and bit remain job-specific in Material & Bit.
-3. **Options & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, raster scan
+   presents file-only behavior). This page only observes and copies; it edits no field directly.
+4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the
+   machine-output contract (laser S range/air/Fire or CNC safe Z/spindle/dwell/coolant/park) on
+   one flat page. Stock, material, and bit remain job-specific in Material & Bit.
+5. **Options & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, raster scan
    offset + optional controlled laser-off seek feed, auto-focus, rotary, and camera status. Every
-   group's summary row shows its live one-line state (zone counts, configured/not-configured,
-   calibration pending) without opening it, and no group nests another collapsible.
-4. **Review & save** — firmware comparison first (controller-specific configuration location and
+   group is collapsed by default and its summary row shows its live one-line state (zone counts,
+   configured/not-configured, calibration pending) without opening it; no group nests another
+   collapsible. The auto-focus deep-link opens its section explicitly.
+6. **Review & save** — firmware comparison first (controller-specific configuration location and
    write policy; GRBL/grblHAL can queue common per-setting writes only after read + backup
    acknowledgement; FluidNC, Marlin, Smoothieware, and Ruida never receive numeric GRBL setup
    writes; queuing is draft-only and Cancel sends nothing), then the software-consistency cards and

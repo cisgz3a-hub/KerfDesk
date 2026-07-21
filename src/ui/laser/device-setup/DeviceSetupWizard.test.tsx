@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../../core/controllers/grbl';
-import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
@@ -71,55 +70,18 @@ afterEach(() => {
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
+// The six-step shell and searchable-catalog behavior are pinned in
+// DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
-  it('opens profile-first and shows one four-step setup sequence', async () => {
-    const view = await renderWizard();
-    try {
-      expect(view.host.textContent).toContain('Step 1 of 4 — Choose your machine');
-      expect(view.host.textContent).toContain('Start here before connecting.');
-      expect(view.host.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
-      expect(
-        view.host.querySelectorAll('nav[aria-label="Machine Setup steps"] button'),
-      ).toHaveLength(4);
-      // The catalog is always visible — no collapsed section hides it (ADR-239).
-      expect(view.host.textContent).toContain('Use Creality Falcon A1 Pro (grblHAL)');
-      expect(view.host.querySelector('input[aria-label="Search machine profiles"]')).toBeInstanceOf(
-        HTMLInputElement,
-      );
-      expect(view.host.textContent).not.toContain('ready to cut');
-    } finally {
-      await view.unmount();
-    }
-  });
-
-  it('filters the profile catalog by search text', async () => {
-    const view = await renderWizard();
-    try {
-      const search = input(view.host, 'Search machine profiles');
-      await act(async () => {
-        search.value = 'sculpfun';
-        Simulate.change(search);
-      });
-      expect(view.host.textContent).toContain('Use Sculpfun S30');
-      expect(view.host.textContent).not.toContain('Use Ortur Laser Master 3');
-      await act(async () => {
-        search.value = 'no such machine';
-        Simulate.change(search);
-      });
-      expect(view.host.textContent).toContain('No profile matches');
-    } finally {
-      await view.unmount();
-    }
-  });
-
   it('connects only after using the selected controller and baud', async () => {
     const originalConnect = useLaserStore.getState().connect;
     const connect = vi.fn(async () => undefined);
     useLaserStore.setState({ connect });
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
-      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
       await act(async () => {
         button(view.host, 'Connect…').click();
         await Promise.resolve();
@@ -143,8 +105,9 @@ describe('DeviceSetupWizard', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
-      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
       expect(view.host.textContent).toContain('Connection does not match the setup draft');
       await act(async () => button(view.host, 'Use detected grblHAL in draft').click());
       await act(async () => button(view.host, 'Back').click());
@@ -158,6 +121,7 @@ describe('DeviceSetupWizard', () => {
     const view = await renderWizard(undefined, mockPlatform(false));
     try {
       await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(button(view.host, 'Connect…').disabled).toBe(true);
       expect(view.host.textContent).toContain('Web Serial is unavailable');
     } finally {
@@ -169,6 +133,7 @@ describe('DeviceSetupWizard', () => {
     const onClose = vi.fn();
     const view = await renderWizard(onClose);
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await act(async () => button(view.host, 'Cancel without saving').click());
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -182,7 +147,9 @@ describe('DeviceSetupWizard', () => {
   it('atomically saves a laser profile and workspace at the end', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // connect & confirm
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       await changeInput(view.host, 'Device name', 'Beginner laser');
       await changeInput(view.host, 'Bed width (mm)', '510');
       await advanceToReview(view.host);
@@ -200,25 +167,6 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
-  it('keeps a selected catalog profile exact instead of overlaying controller observations', async () => {
-    useLaserStore.setState({
-      connection: { kind: 'connected' },
-      detectedControllerKind: 'grblhal',
-      detectedSettings: { bedWidth: 363, bedHeight: 273 },
-      lastSettingsReadAt: 1,
-    } as Partial<ReturnType<typeof useLaserStore.getState>>);
-    const view = await renderWizard();
-    try {
-      await act(async () => button(view.host, 'Use Creality Falcon A1 Pro').click());
-      expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
-      await act(async () => button(view.host, 'Next').click());
-      expect(input(view.host, 'Bed width (mm)').value).toBe('400');
-      expect(useStore.getState().project.device).toEqual(DEFAULT_DEVICE_PROFILE);
-    } finally {
-      await view.unmount();
-    }
-  });
-
   it('shows CNC-only machine settings and commits them with the profile', async () => {
     const view = await renderWizard();
     try {
@@ -226,9 +174,11 @@ describe('DeviceSetupWizard', () => {
       const cncRadio = radios.item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Built-in CNC machine', 'genmitsu-3018');
       await act(async () => button(view.host, 'Load into draft').click());
-      await act(async () => button(view.host, 'Next').click()); // connect & confirm
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(view.host.textContent).toContain('CNC clearance and spindle contract');
       expect(view.host.textContent).not.toContain('Laser output and accessories');
       expect(input(view.host, 'Spindle maximum').value).toBe('10000');
@@ -259,7 +209,9 @@ describe('DeviceSetupWizard', () => {
       expect(view.host.textContent).toContain('Active mode after Save');
       expect(view.host.textContent).toContain('interchangeable laser and spindle toolheads');
 
-      await act(async () => button(view.host, 'Next').click()); // connect & confirm
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(view.host.textContent).toContain('Laser output and accessories');
       expect(view.host.textContent).toContain('CNC clearance and spindle contract');
       await changeInput(view.host, 'Safe Z', '10');
@@ -284,6 +236,7 @@ describe('DeviceSetupWizard', () => {
       const cncRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
       expect(button(view.host, 'Next').disabled).toBe(true);
@@ -295,6 +248,7 @@ describe('DeviceSetupWizard', () => {
   it('uses external configuration guidance for Marlin instead of firmware writes', async () => {
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await advanceToReview(view.host);
       expect(view.host.textContent).toContain('Marlin configuration is not written from KerfDesk');
@@ -308,6 +262,7 @@ describe('DeviceSetupWizard', () => {
   it('hides serial streaming and G-code controls for file-only Ruida setup', async () => {
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'ruida');
       expect(view.host.textContent).toContain('File export');
       expect(view.host.querySelector('[aria-label="Serial baud rate"]')).toBeNull();
@@ -380,7 +335,7 @@ describe('DeviceSetupWizard', () => {
 });
 
 async function advanceToReview(host: HTMLElement): Promise<void> {
-  while (!host.textContent?.includes('Step 4 of 4 — Review & save')) {
+  while (!host.textContent?.includes('Step 6 of 6 — Review & save')) {
     await act(async () => button(host, 'Next').click());
   }
 }

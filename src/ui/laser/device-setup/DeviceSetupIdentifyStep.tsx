@@ -1,7 +1,7 @@
-// Step 1: choose what the machine is and how KerfDesk must communicate with
-// it. The reviewed-profile catalog leads (one click fills the draft, ADR-239);
-// connection deliberately comes on the next step so the first serial open
-// uses the reviewed driver and baud rate.
+// Step 2: choose which machine this is and how KerfDesk must communicate
+// with it. The reviewed-profile catalog leads (one click fills the draft,
+// ADR-239); connection deliberately comes on the next step so the first
+// serial open uses the reviewed driver and baud rate.
 
 import {
   GRBL_GCODE_DIALECTS,
@@ -19,7 +19,6 @@ import {
   type DeviceSetupStepProps,
 } from './device-setup-flow';
 import { DeviceSetupCncPreset } from './DeviceSetupCncPreset';
-import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
 import { DeviceSetupProfilePicker } from './DeviceSetupProfilePicker';
 import {
   machineSetupControllerGuide,
@@ -37,7 +36,6 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
       {deviceSetupSupportsMachineKind(state, 'laser') ? (
         <DeviceSetupProfilePicker state={state} dispatch={dispatch} />
       ) : null}
-      <DeviceSetupMachineCapability state={state} dispatch={dispatch} />
       <DeviceSetupCncPreset state={state} dispatch={dispatch} />
       <ControllerContract
         state={state}
@@ -62,11 +60,10 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
 function SetupIntroduction(): JSX.Element {
   return (
     <div style={introStyle}>
-      <strong>Start here before connecting.</strong>
+      <strong>Pick your machine before connecting.</strong>
       <span>
-        Pick your machine from the reviewed profiles — one click fills the whole setup — or
-        configure the identity manually below. The active mode alone controls commands, output, and
-        safety gates after Save.
+        One click on a reviewed profile fills the whole setup — or configure the controller identity
+        manually below. Connection comes on the next step, using exactly what you choose here.
       </span>
     </div>
   );

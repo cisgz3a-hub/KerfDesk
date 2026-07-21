@@ -26,8 +26,8 @@ export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps)
         firmwareWrites={queuedFirmwareWrites}
         onEdit={() => dispatch({ kind: 'go', step: 'identify' })}
       />
-      <WorkspaceReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'connect' })} />
-      <OutputReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'connect' })} />
+      <WorkspaceReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
+      <OutputReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
       <SafetyReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'options' })} />
       <HardwareHandoff machineKinds={state.machineKinds} />
     </section>

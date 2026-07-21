@@ -343,11 +343,12 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await page.getByRole('button', { name: 'Expand Laser panel' }).click();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
-  await expect(setup).toContainText('Step 1 of 4');
+  await expect(setup).toContainText('Step 1 of 6');
+  await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
-  // The reviewed-profile catalog is always visible on step 1 (ADR-239).
+  // The reviewed-profile catalog is always visible on the profile step (ADR-239).
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
-  for (let step = 0; step < 3; step += 1) {
+  for (let step = 0; step < 4; step += 1) {
     await page.getByRole('button', { name: 'Next', exact: true }).click();
   }
   await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();
@@ -378,6 +379,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
 
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
+  await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(setup.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
 
   // A firmware mismatch informs on the card but never disables it — the
@@ -390,7 +392,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
 
   const xToolCard = page.locator('article').filter({ hasText: 'xTool D1 Pro' });
   await xToolCard.getByRole('button', { name: 'Use xTool D1 Pro' }).click();
-  for (let step = 0; step < 3; step += 1) {
+  for (let step = 0; step < 4; step += 1) {
     await setup.getByRole('button', { name: 'Next', exact: true }).click();
   }
   await setup.getByRole('button', { name: 'Save machine setup' }).click();

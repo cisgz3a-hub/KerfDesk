@@ -20,10 +20,17 @@ function open(detected: Partial<DeviceProfile> | null = null): DeviceSetupState 
 }
 
 describe('unified machine setup flow', () => {
-  it('starts with machine/controller selection before connection', () => {
+  it('starts with the machine-type choice before profile, connection, and confirmation', () => {
     const state = open();
-    expect(state.step).toBe('identify');
-    expect(DEVICE_SETUP_STEP_ORDER).toEqual(['identify', 'connect', 'options', 'review']);
+    expect(state.step).toBe('capability');
+    expect(DEVICE_SETUP_STEP_ORDER).toEqual([
+      'capability',
+      'identify',
+      'connect',
+      'confirm',
+      'options',
+      'review',
+    ]);
   });
 
   it('walks the same beginner sequence for laser and CNC without running a probe', () => {
@@ -87,6 +94,7 @@ describe('unified machine setup flow', () => {
       kind: 'set-machine-kinds',
       machineKinds: ['cnc'],
     });
+    state = deviceSetupReducer(state, { kind: 'go', step: 'identify' });
     state = deviceSetupReducer(state, { kind: 'select-controller', controllerKind: 'marlin' });
     expect(machineSetupValidationIssues(state).join(' ')).toMatch(/cannot run KerfDesk CNC jobs/);
     expect(canAdvanceDeviceSetup(state)).toBe(false);
@@ -210,13 +218,17 @@ describe('unified machine setup flow', () => {
     expect(state.detectedApplied).toBe(false);
   });
 
-  it('blocks invalid geometry on every editing step while free jumps stay open', () => {
+  it('blocks invalid geometry on editing steps while capability and connect stay passable', () => {
     let state = deviceSetupReducer(open(), { kind: 'edit', patch: { bedWidth: 0 } });
+    // Capability and connect hold no fixable field, so Next never strands the
+    // operator there; the pages that host fields gate on the same issues.
+    expect(state.step).toBe('capability');
+    expect(canAdvanceDeviceSetup(state)).toBe(true);
+    state = deviceSetupReducer(state, { kind: 'go', step: 'identify' });
     expect(canAdvanceDeviceSetup(state)).toBe(false);
-    // The connect page now hosts the bed fields (ADR-239), so the same
-    // validation gate applies there; the stepper's free 'go' jump remains.
     state = deviceSetupReducer(state, { kind: 'go', step: 'connect' });
-    expect(state.step).toBe('connect');
+    expect(canAdvanceDeviceSetup(state)).toBe(true);
+    state = deviceSetupReducer(state, { kind: 'go', step: 'confirm' });
     expect(canAdvanceDeviceSetup(state)).toBe(false);
     state = deviceSetupReducer(state, { kind: 'edit', patch: { bedWidth: 400 } });
     expect(canAdvanceDeviceSetup(state)).toBe(true);

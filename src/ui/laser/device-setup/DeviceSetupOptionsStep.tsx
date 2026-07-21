@@ -23,7 +23,11 @@ import {
 import { DeviceSetupRotaryFields } from './DeviceSetupRotaryFields';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
-export function DeviceSetupOptionsStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
+export function DeviceSetupOptionsStep({
+  state,
+  dispatch,
+  openAutofocus,
+}: DeviceSetupStepProps & { readonly openAutofocus?: boolean }): JSX.Element {
   const draft = state.draft;
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
   return (
@@ -36,7 +40,7 @@ export function DeviceSetupOptionsStep({ state, dispatch }: DeviceSetupStepProps
           stay off or uncalibrated until configured.
         </span>
       </div>
-      <OptionSection title="No-go zones" status={noGoZoneStatus(draft)} open>
+      <OptionSection title="No-go zones" status={noGoZoneStatus(draft)}>
         <SafetyZonesPanel zones={draft.noGoZones} onChange={(noGoZones) => update({ noGoZones })} />
       </OptionSection>
       <OptionSection title="Z axis and probe" status={zAxisStatus(draft)}>
@@ -59,7 +63,11 @@ export function DeviceSetupOptionsStep({ state, dispatch }: DeviceSetupStepProps
         />
       </OptionSection>
       {deviceSetupSupportsMachineKind(state, 'laser') ? (
-        <LaserCalibrationSections draft={draft} update={update} />
+        <LaserCalibrationSections
+          draft={draft}
+          update={update}
+          openAutofocus={openAutofocus === true}
+        />
       ) : null}
     </section>
   );
@@ -68,6 +76,7 @@ export function DeviceSetupOptionsStep({ state, dispatch }: DeviceSetupStepProps
 function LaserCalibrationSections(props: {
   readonly draft: DeviceProfile;
   readonly update: (patch: Partial<DeviceProfile>) => void;
+  readonly openAutofocus: boolean;
 }): JSX.Element {
   const { draft, update } = props;
   return (
@@ -95,7 +104,11 @@ function LaserCalibrationSections(props: {
           substantial return time, especially for one-way engraving.
         </p>
       </OptionSection>
-      <OptionSection title="Auto-focus setup" status={autofocusStatus(draft)} open>
+      <OptionSection
+        title="Auto-focus setup"
+        status={autofocusStatus(draft)}
+        open={props.openAutofocus}
+      >
         <AutofocusEditor
           value={draft.autofocusCommand}
           onChange={(autofocusCommand) => update({ autofocusCommand })}

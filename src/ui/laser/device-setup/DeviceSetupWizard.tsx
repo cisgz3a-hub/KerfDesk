@@ -27,22 +27,28 @@ import {
   type DeviceSetupState,
   type DeviceSetupStep,
 } from './device-setup-flow';
+import { DeviceSetupCapabilityStep } from './DeviceSetupCapabilityStep';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupMachineStep } from './DeviceSetupMachineStep';
 import { DeviceSetupOptionsStep } from './DeviceSetupOptionsStep';
 import { DeviceSetupReviewStep } from './DeviceSetupReviewStep';
 
 const STEP_TITLES: Record<DeviceSetupStep, string> = {
+  capability: 'Machine type',
   identify: 'Choose your machine',
-  connect: 'Connect & confirm',
+  connect: 'Connect & detect',
+  confirm: 'Confirm settings',
   options: 'Options & calibration',
   review: 'Review & save',
 };
+
+export type DeviceSetupHighlight = 'autofocus';
 
 type DeviceSetupWizardProps = {
   readonly onClose: () => void;
   readonly onConfigured?: (profile: DeviceProfile) => void;
   readonly initialStep?: DeviceSetupStep;
+  readonly highlight?: DeviceSetupHighlight | undefined;
 };
 
 export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
@@ -69,7 +75,7 @@ export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
   const save = useMachineSetupSave(state, props, replaceMachineSetup);
   return (
     <Dialog title="Machine Setup" size="xl" onClose={save.saving ? () => undefined : props.onClose}>
-      <SetupLayout state={state} dispatch={dispatch} />
+      <SetupLayout state={state} dispatch={dispatch} highlight={props.highlight} />
       <SetupActions
         state={state}
         dispatch={dispatch}
@@ -164,6 +170,7 @@ function errorMessage(error: unknown): string {
 function SetupLayout(props: {
   readonly state: DeviceSetupState;
   readonly dispatch: React.Dispatch<DeviceSetupAction>;
+  readonly highlight?: DeviceSetupHighlight | undefined;
 }): JSX.Element {
   const stepOrder = deviceSetupStepOrder(props.state.machineKind);
   const stepNumber = stepOrder.indexOf(props.state.step) + 1;
@@ -174,7 +181,7 @@ function SetupLayout(props: {
         <p style={stepHintStyle}>
           Step {stepNumber} of {stepOrder.length} — {STEP_TITLES[props.state.step]}
         </p>
-        <div style={bodyStyle}>{renderStep(props.state, props.dispatch)}</div>
+        <div style={bodyStyle}>{renderStep(props.state, props.dispatch, props.highlight)}</div>
       </div>
     </div>
   );
@@ -263,27 +270,37 @@ function saveButtonLabel(saving: boolean, firmwareWriteCount: number): string {
   return `Save setup and write ${firmwareWriteCount} setting${firmwareWriteCount === 1 ? '' : 's'}`;
 }
 
-// The connect and review pages stack the previously separate step
-// components on one flat scrollable page (ADR-239): connect/read, then the
-// coordinate model, then machine output; firmware comparison sits above the
-// review cards so Save follows the queued-write summary it executes.
+// The confirm page stacks the coordinate model and machine output on one
+// flat scrollable page, and the review page puts firmware comparison above
+// the review cards so Save follows the queued-write summary it executes
+// (ADR-239).
 function renderStep(
   state: DeviceSetupState,
   dispatch: React.Dispatch<DeviceSetupAction>,
+  highlight?: DeviceSetupHighlight | undefined,
 ): JSX.Element {
   switch (state.step) {
+    case 'capability':
+      return <DeviceSetupCapabilityStep state={state} dispatch={dispatch} />;
     case 'identify':
       return <DeviceSetupIdentifyStep state={state} dispatch={dispatch} />;
     case 'connect':
+      return <DeviceSetupConnectStep state={state} dispatch={dispatch} />;
+    case 'confirm':
       return (
         <div style={stackedStepStyle}>
-          <DeviceSetupConnectStep state={state} dispatch={dispatch} />
           <DeviceSetupConfirmStep state={state} dispatch={dispatch} />
           <DeviceSetupMachineStep state={state} dispatch={dispatch} />
         </div>
       );
     case 'options':
-      return <DeviceSetupOptionsStep state={state} dispatch={dispatch} />;
+      return (
+        <DeviceSetupOptionsStep
+          state={state}
+          dispatch={dispatch}
+          openAutofocus={highlight === 'autofocus'}
+        />
+      );
     case 'review':
       return (
         <div style={stackedStepStyle}>

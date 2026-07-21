@@ -36,14 +36,15 @@ describe('DeviceSetupWizard step navigation', () => {
     });
 
     try {
+      await act(async () => stepButton(host, 2, 'Choose your machine').click());
       await changeSelect(host, 'Controller firmware', 'marlin');
-      await act(async () => stepButton(host, 4, 'Review & save').click());
-      expect(host.textContent).toContain('Step 4 of 4 — Review & save');
-      expect(stepButton(host, 4, 'Review & save').getAttribute('aria-current')).toBe('step');
-      expect(stepButton(host, 4, 'Review & save').title).toBe('Open Review & save');
+      await act(async () => stepButton(host, 6, 'Review & save').click());
+      expect(host.textContent).toContain('Step 6 of 6 — Review & save');
+      expect(stepButton(host, 6, 'Review & save').getAttribute('aria-current')).toBe('step');
+      expect(stepButton(host, 6, 'Review & save').title).toBe('Open Review & save');
 
-      await act(async () => stepButton(host, 1, 'Choose your machine').click());
-      expect(host.textContent).toContain('Step 1 of 4 — Choose your machine');
+      await act(async () => stepButton(host, 2, 'Choose your machine').click());
+      expect(host.textContent).toContain('Step 2 of 6 — Choose your machine');
       expect(select(host, 'Controller firmware').value).toBe('marlin');
     } finally {
       await act(async () => root.unmount());

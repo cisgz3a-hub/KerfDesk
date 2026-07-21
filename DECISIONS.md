@@ -10501,9 +10501,9 @@ The maintainer directed this default on 2026-07-21.
 - No compiler, emitter, or G-code change: the diff is dialog state, option labels/order, the
   select parser fallback, and these tests.
 
-## ADR-239 - Machine Setup: profile-first step 1 and a four-step wizard
+## ADR-239 - Machine Setup: capability-first six-step wizard with a searchable catalog
 
-**Date:** 2026-07-21
+**Date:** 2026-07-21 (amended same day after the maintainer reviewed the built wizard in chat)
 **Status:** Accepted (amends ADR-205's step composition and ADR-186's step enumeration; ADR-092's
 guided-steps and draft-commit decisions, ADR-210's capability contract, and the firmware write
 policy are unchanged)
@@ -10530,37 +10530,48 @@ The audit of the current surface found the structural causes:
 
 ### Decision
 
-1. **Profile-first step 1.** The reviewed-profile catalog renders always-open at the top of step 1
-   with a text filter (name, controller, bed size). Manual identity — capability radios, CNC
-   preset, controller/baud/dialect, advanced streaming, import/export — stays on step 1 below the
-   catalog. Picking a card still applies the whole profile verbatim through `apply-preset`.
+1. **Capability first, profile second** (maintainer-ordered, 2026-07-21 review). Step 1 asks only
+   what the machine is — Laser / CNC / Laser + CNC and, for hybrids, the active mode. Step 2 holds
+   the reviewed-profile catalog, always-open at the top with a text filter (name, controller, bed
+   size), followed by the CNC preset, controller/baud/dialect, advanced streaming, and
+   import/export. Picking a card still applies the whole profile verbatim through `apply-preset`.
 2. **Visible suggestions.** Cards render the suggester's `reasons` and `warnings` (previously
    computed and dropped), so a detection match says why it matches, and detection-matched profiles
    keep sorting first. The `suggested` tier stays unreachable **by design**: generic `$$` values
    must not claim hardware identity (pinned by `profile-suggestions.test.ts`); the tier remains
    reserved for future distinctive evidence. Detection still never applies anything by itself
    (ADR-205 unchanged).
-3. **Four steps.** `identify` (Choose your machine) → `connect` (Connect & confirm: the existing
-   connect/read/use-detected surface, then name/bed/feeds/origin/homing, then laser and/or CNC
-   output, stacked flat on one scrollable page) → `options` (Options & calibration) → `review`
-   (firmware compare/queue followed by the review cards and hardware handoff). The step components
+3. **Six steps.** `capability` (Machine type) → `identify` (Choose your machine) → `connect`
+   (Connect & detect — the connect/read/use-detected surface on its own page, per the maintainer)
+   → `confirm` (Confirm settings: name/bed/feeds/origin/homing plus laser and/or CNC output,
+   stacked flat on one scrollable page) → `options` (Options & calibration) → `review` (firmware
+   compare/queue followed by the review cards and hardware handoff). The step components
    themselves are reused; the wizard stacks them.
-4. **Options as status rows.** Every optional group — no-go zones, Z axis and probe, planner/ETA,
-   raster scan offset + controlled seek, auto-focus, rotary, camera — shows a live one-line status
-   in its always-visible summary row (the pattern the auto-focus section already used), and no
-   group nests another collapsible. The operator can read the whole machine state without opening
-   anything.
-5. **Gates move, none widen.** Next on steps 1-3 gates on the same `machineSetupValidationIssues`;
-   firmware queueing keeps its read + backup + per-setting confirm + transport preconditions; Save
-   remains the single atomic commit followed by verified queued writes. No new confirmation,
-   block, or refusal is introduced (rule 7 / ADR-228 untouched).
-6. The auto-focus deep-link from Job Controls targets the `options` step.
+4. **Options as closed status rows.** Every optional group — no-go zones, Z axis and probe,
+   planner/ETA, raster scan offset + controlled seek, auto-focus, rotary, camera — is **collapsed
+   by default** (maintainer direction) and shows a live one-line status in its always-visible
+   summary row, and no group nests another collapsible. The operator reads the whole machine state
+   without opening anything.
+5. **Gates move, none widen.** Next gates on the same `machineSetupValidationIssues` only on the
+   pages that host fields (`identify`, `confirm`, `options`); `capability` and `connect` always
+   advance so Next never strands the operator away from a fix. Firmware queueing keeps its read +
+   backup + per-setting confirm + transport preconditions; Save remains the single atomic commit
+   followed by verified queued writes. No new confirmation, block, or refusal is introduced
+   (rule 7 / ADR-228 untouched).
+6. The auto-focus deep-link from Job Controls targets the `options` step and explicitly opens the
+   auto-focus section (an `highlight` open-request field), since no section opens by default.
+7. **The connected-4040 fill-policy rail banner is removed** (maintainer direction, 2026-07-21).
+   The rail keeps only the neutral "This machine isn't set up yet" nudge; 4040 fill-policy
+   selection remains available through the catalog, and the Job Review warning path is untouched.
 
 ### Consequences
 
-- Step ids `confirm`, `machine`, `safety`, and `firmware` disappear from `DeviceSetupStep`;
-  `options` is added. The only production deep-link (`safety`, auto-focus) moves to `options`.
-- WORKFLOW.md F-C7 is rewritten to the four-step enumeration; ADR-186's laser/CNC visible-step
+- Step ids `machine`, `safety`, and `firmware` disappear from `DeviceSetupStep`; `capability`,
+  `options` are added and `confirm` is the merged coordinates+output page. The only production
+  deep-link (auto-focus) moves to `options` + `highlight`.
+- The Machine Setup rail button loses its 4040-advisory primary emphasis; only the unconfigured
+  nudge still promotes it.
+- WORKFLOW.md F-C7 is rewritten to the six-step enumeration; ADR-186's laser/CNC visible-step
   variance was already dead in code (fixed seven-step order) and is superseded by this shape.
 - e2e and component tests pinning the seven-step layout, the collapsed-catalog summary text, and
   step-title strings are updated in the same change; the stale

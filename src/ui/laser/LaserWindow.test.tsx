@@ -104,8 +104,8 @@ describe('LaserWindow autofocus busy controls', () => {
         button(host, 'Machine Setup').click();
       });
 
-      expect(host.textContent).toContain('Step 1 of 4');
-      expect(host.textContent).toContain('Import or export a machine profile');
+      expect(host.textContent).toContain('Step 1 of 6');
+      expect(host.textContent).toContain('Machine capability');
     } finally {
       await unmountRoot(root);
       host.remove();
