@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import type { PaintColor, PaintPoint } from '../../core/image-edit';
 import {
   combineMasks,
+  featherMask,
   isMaskEmpty,
   wandSelection,
   type SelectionCombineMode,
@@ -61,6 +62,8 @@ type ImageEditorState = {
   readonly wandContiguous: boolean;
   /** Sticky selection boolean mode (the four options-bar buttons). */
   readonly selectionMode: SelectionCombineMode;
+  /** Feather (px) applied to every NEW selection (Photoshop options-bar Feather). */
+  readonly selectionFeather: number;
   readonly isApplying: boolean;
   /** Viewport transform; null = fit-to-window on next canvas layout. */
   readonly view: EditorView | null;
@@ -72,6 +75,7 @@ type ImageEditorState = {
   readonly setTool: (tool: EditorTool) => void;
   readonly setBrush: (brush: Partial<BrushSettings>) => void;
   readonly setForeground: (color: PaintColor) => void;
+  readonly setBackground: (color: PaintColor) => void;
   readonly swapColors: () => void;
   readonly resetColors: () => void;
   readonly setView: (view: EditorView | null) => void;
@@ -87,6 +91,7 @@ type ImageEditorState = {
   /** Combine a new selection with the current one (sticky mode unless overridden). */
   readonly combineSelection: (incoming: SelectionMask, override?: SelectionCombineMode) => void;
   readonly setSelectionMode: (mode: SelectionCombineMode) => void;
+  readonly setSelectionFeather: (px: number) => void;
   readonly modifySelection: (kind: SelectionModifyKind, radiusPx: number) => void;
   readonly nudgeSelection: (dx: number, dy: number, movePixels: boolean) => void;
   readonly wandAt: (x: number, y: number, override?: SelectionCombineMode) => void;
@@ -110,6 +115,7 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   wandTolerance: DEFAULT_WAND_TOLERANCE,
   wandContiguous: true,
   selectionMode: 'replace',
+  selectionFeather: 0,
   isApplying: false,
   view: null,
   viewportSize: { width: 0, height: 0 },
@@ -122,6 +128,7 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   setTool: (tool) => set({ tool }),
   setBrush: (brush) => set((s) => ({ brush: { ...s.brush, ...brush } })),
   setForeground: (color) => set({ foreground: color }),
+  setBackground: (color) => set({ background: color }),
   swapColors: () => set((s) => ({ foreground: s.background, background: s.foreground })),
   resetColors: () => set({ foreground: BLACK, background: WHITE }),
   setView: (view) => set({ view }),
@@ -148,10 +155,13 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   select: (mask) => withSession(set, get, (session) => withSelection(session, mask)),
   combineSelection: (incoming, override) =>
     withSession(set, get, (session, s) => {
-      const combined = combineMasks(session.selection, incoming, override ?? s.selectionMode);
+      const feathered =
+        s.selectionFeather > 0 ? featherMask(incoming, s.selectionFeather) : incoming;
+      const combined = combineMasks(session.selection, feathered, override ?? s.selectionMode);
       return withSelection(session, isMaskEmpty(combined) ? null : combined);
     }),
   setSelectionMode: (selectionMode) => set({ selectionMode }),
+  setSelectionFeather: (px) => set({ selectionFeather: Math.min(250, Math.max(0, px)) }),
   modifySelection: (kind, radiusPx) =>
     withSession(set, get, (session) =>
       session.selection === null

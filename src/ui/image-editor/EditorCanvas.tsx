@@ -3,10 +3,12 @@
 // (use-brush-cursor.ts), and fit/zoom/pan through the store view.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { docToCanvas, drawEditorScene, fitView } from './editor-canvas-draw';
+import { docToCanvas, drawEditorScene } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
 import { BRUSH_CURSOR_STYLE, useBrushCursor } from './use-brush-cursor';
+import { useCanvasFit } from './use-canvas-fit';
 import { useEditorPointer } from './use-editor-pointer';
+import { MODE_BADGE_STYLE, useModeBadge } from './use-mode-badge';
 
 const ANTS_TICK_MS = 120;
 
@@ -17,7 +19,6 @@ export function EditorCanvas(): JSX.Element {
   const tool = useImageEditorStore((s) => s.tool);
   const view = useImageEditorStore((s) => s.view);
   const setView = useImageEditorStore((s) => s.setView);
-  const setViewportSize = useImageEditorStore((s) => s.setViewportSize);
   const isSpacePanning = useImageEditorStore((s) => s.isSpacePanning);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -25,30 +26,10 @@ export function EditorCanvas(): JSX.Element {
 
   const revision = session?.revision ?? -1;
   const doc = session?.doc;
-  const needsFit = view === null;
   // The doc canvas rebuilds only when pixels changed (revision bump).
   // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal
   const docCanvas = useMemo(() => (doc === undefined ? null : docToCanvas(doc)), [doc, revision]);
-
-  // Size the canvas to its container; fit the document when no view exists
-  // yet (open / Ctrl+0 re-fit).
-  useEffect(() => {
-    const host = hostRef.current;
-    const canvas = canvasRef.current;
-    if (host === null || canvas === null || doc === undefined) return;
-    const resize = (): void => {
-      canvas.width = host.clientWidth;
-      canvas.height = host.clientHeight;
-      setViewportSize(canvas.width, canvas.height);
-      if (useImageEditorStore.getState().view === null) {
-        setView(fitView(doc.width, doc.height, canvas.width, canvas.height));
-      }
-    };
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [doc, needsFit, setView, setViewportSize]);
+  useCanvasFit(hostRef, canvasRef, doc, view === null);
 
   // Ants animation ticks only while a selection exists (F-L2).
   const hasSelection = (session?.selection ?? null) !== null;
@@ -61,6 +42,7 @@ export function EditorCanvas(): JSX.Element {
   const activeView = view ?? { scale: 1, panX: 0, panY: 0 };
   const pointer = useEditorPointer(activeView, setView);
   const cursor = useBrushCursor(tool, brush, activeView, isSpacePanning);
+  const badge = useModeBadge();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -88,15 +70,20 @@ export function EditorCanvas(): JSX.Element {
         onPointerDown={pointer.onPointerDown}
         onPointerMove={(e) => {
           cursor.moveCursor(e, hostRef.current);
+          badge.updateBadge(e, hostRef.current);
           pointer.onPointerMove(e);
         }}
         onPointerUp={pointer.onPointerUp}
         onPointerCancel={pointer.cancelDrag}
-        onPointerLeave={cursor.hideCursor}
+        onPointerLeave={() => {
+          cursor.hideCursor();
+          badge.hideBadge();
+        }}
         onWheel={pointer.onWheel}
         aria-label="Image Studio document canvas"
       />
       <div ref={cursor.cursorRef} style={BRUSH_CURSOR_STYLE} aria-hidden="true" />
+      <div ref={badge.badgeRef} style={MODE_BADGE_STYLE} aria-hidden="true" />
     </div>
   );
 }
