@@ -10,7 +10,14 @@
 // that resize the document must clear or re-seed the history.
 
 import type { RgbaBuffer } from './rgba-buffer';
-import { copyTilePixels, TILE_SIZE_PX, type TileCoord, writeTilePixelsInPlace } from './tiles';
+import {
+  copyTilePixels,
+  type PixelRect,
+  TILE_SIZE_PX,
+  type TileCoord,
+  tilesForPixelRect,
+  writeTilePixelsInPlace,
+} from './tiles';
 
 export const EDITOR_HISTORY_BYTE_BUDGET = 256 * 1024 * 1024;
 
@@ -54,6 +61,19 @@ export function captureTiles(
   }));
   const byteSize = tiles.reduce((sum, tile) => sum + tile.pixels.byteLength, 0);
   return { label, tiles, byteSize };
+}
+
+/**
+ * Snapshot every tile a dirty rect touches — the one-call form of
+ * captureTiles for ops that report a PixelRect (strokeDirtyRect etc.).
+ */
+export function captureRect(
+  buffer: RgbaBuffer,
+  rect: PixelRect,
+  label: string,
+  tileSizePx: number = TILE_SIZE_PX,
+): HistoryEntry {
+  return captureTiles(buffer, tilesForPixelRect(buffer, rect, tileSizePx), label, tileSizePx);
 }
 
 function stackByteSize(stack: readonly HistoryEntry[]): number {
