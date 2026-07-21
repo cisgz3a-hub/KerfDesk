@@ -1,4 +1,5 @@
 import type { RasterImage } from '../../core/scene';
+import { useImageEditorStore } from '../image-editor/image-editor-store';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -17,6 +18,7 @@ export function SelectedImageAdjustments(): JSX.Element | null {
   return (
     <section aria-label="Selected image adjustments" style={sectionStyle}>
       <h3 style={headingStyle}>Image Adjust</h3>
+      <EditImageButton image={image} />
       <AdjustmentInput
         image={image}
         field="brightness"
@@ -45,6 +47,23 @@ export function SelectedImageAdjustments(): JSX.Element | null {
         fallback={1}
       />
     </section>
+  );
+}
+
+// Opens the Image Studio (ADR-242) on the selected raster. These numeric
+// adjustments stay the live engrave-stage scalars; the Studio bakes pixels.
+function EditImageButton(props: { readonly image: RasterImage }): JSX.Element {
+  const openEditor = useImageEditorStore((s) => s.openEditor);
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--primary"
+      style={{ width: '100%', marginBottom: 8 }}
+      onClick={() => openEditor(props.image)}
+      title="Open the Image Studio: paint, erase, and edit selected areas of this image."
+    >
+      Edit Image…
+    </button>
   );
 }
 

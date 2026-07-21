@@ -83,6 +83,7 @@ import { materialPresetActions, type MaterialPresetActions } from './material-pr
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { operationActions, type OperationActions } from './operation-actions';
 import { artworkOrderActions, type ArtworkOrderActions } from './artwork-order-actions';
+import { imageEditActions, type ImageEditActions } from './image-edit-actions';
 import { imageMaskActions, type ImageMaskActions } from './image-mask-actions';
 import {
   sceneClipboardActions,
@@ -156,6 +157,7 @@ export type AppState = ObjectPropertiesActions &
   NestActions &
   PrintCutProjectActions &
   VariableDataActions &
+  ImageEditActions &
   ImageMaskActions &
   ProjectOptimizationActions &
   ProjectNotesActions &
@@ -435,6 +437,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...operationActions(set),
   ...artworkOrderActions(set),
   ...cncTabActions(set),
+  ...imageEditActions(set),
   ...imageMaskActions(set),
   ...sceneClipboardActions(set),
   ...sceneGroupActions(set),
