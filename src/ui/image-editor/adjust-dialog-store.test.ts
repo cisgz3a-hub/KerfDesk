@@ -78,4 +78,29 @@ describe('useAdjustDialogStore', () => {
     useAdjustDialogStore.getState().open('levels');
     expect(useAdjustDialogStore.getState().dialog).toBeNull();
   });
+
+  it('curves opens its point editor instead of committing instantly', () => {
+    seedSession();
+    useAdjustDialogStore.getState().open('curves');
+    const dialog = useAdjustDialogStore.getState().dialog;
+    expect(dialog?.id).toBe('curves');
+    expect(dialog?.curvePoints).toEqual([
+      { x: 0, y: 0 },
+      { x: 255, y: 255 },
+    ]);
+    expect(useImageEditorStore.getState().session?.history.undoStack.length).toBe(0);
+  });
+
+  it('commits the edited curve as one history entry', () => {
+    seedSession();
+    useAdjustDialogStore.getState().open('curves');
+    useAdjustDialogStore.getState().setCurvePoints([
+      { x: 0, y: 0 },
+      { x: 255, y: 128 },
+    ]);
+    useAdjustDialogStore.getState().commit();
+    const session = useImageEditorStore.getState().session;
+    expect(session?.doc.data[0]).toBe(128); // white pulled down to the new ceiling
+    expect(session?.history.undoStack.length).toBe(1);
+  });
 });

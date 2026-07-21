@@ -9,6 +9,7 @@ import {
   applyLumaLutInPlace,
   applyLutInPlace,
   brightnessContrastLut,
+  curveLut,
   gaussianBlurInPlace,
   grayscaleLut,
   highPassInPlace,
@@ -18,11 +19,13 @@ import {
   posterizeLut,
   thresholdLut,
   unsharpMaskInPlace,
+  type CurvePoint,
 } from '../../core/image-adjust';
 
 export type AdjustmentId =
   | 'brightness-contrast'
   | 'levels'
+  | 'curves'
   | 'threshold'
   | 'posterize'
   | 'invert'
@@ -31,6 +34,12 @@ export type AdjustmentId =
   | 'unsharp-mask'
   | 'high-pass'
   | 'median';
+
+/** The identity diagonal Curves opens with. */
+export const DEFAULT_CURVE_POINTS: readonly CurvePoint[] = [
+  { x: 0, y: 0 },
+  { x: 255, y: 255 },
+];
 
 export type AdjustParamSpec = {
   readonly key: string;
@@ -80,6 +89,15 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
       { key: 'outBlack', label: 'Output black', ...FULL_RANGE, defaultValue: 0 },
       { key: 'outWhite', label: 'Output white', ...FULL_RANGE, defaultValue: 255 },
     ],
+  },
+  curves: {
+    id: 'curves',
+    label: 'Curves',
+    menu: 'adjust',
+    shortcutHint: 'Ctrl+M',
+    // The point editor draws its own histogram backdrop.
+    hasHistogram: false,
+    params: [],
   },
   threshold: {
     id: 'threshold',
@@ -189,6 +207,11 @@ export function runAdjustment(
       return;
     case 'levels':
       applyLutInPlace(doc, levelsLut(levelsFrom(spec, params)), rect, mask);
+      return;
+    case 'curves':
+      // Custom point lists route through the session bridge; the catalog
+      // runner stays total with the identity diagonal.
+      applyLutInPlace(doc, curveLut(DEFAULT_CURVE_POINTS), rect, mask);
       return;
     case 'threshold':
       applyLumaLutInPlace(doc, thresholdLut(p(spec, params, 'level')), rect, mask);

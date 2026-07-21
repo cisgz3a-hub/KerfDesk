@@ -2,9 +2,10 @@
 // either a committed session edit (ONE history entry, selection-clamped) or
 // a non-destructive preview buffer the canvas draws instead of the document.
 
+import { applyLutInPlace, curveLut, type CurvePoint } from '../../core/image-adjust';
 import { captureRect, cloneRgbaBuffer, pushHistoryEntry } from '../../core/image-edit';
 import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
-import { maskBounds } from '../../core/image-select';
+import { maskBounds, type SelectionMask } from '../../core/image-select';
 import { adjustmentById, runAdjustment, type AdjustmentId } from './editor-adjustments';
 import type { EditorSession } from './editor-session';
 
@@ -12,16 +13,34 @@ function selectionRect(session: EditorSession): PixelRect | null {
   return session.selection === null ? null : maskBounds(session.selection);
 }
 
+// Curves carries its point list outside the numeric-params record; every
+// other id dispatches through the catalog runner.
+function runOp(
+  id: AdjustmentId,
+  params: Readonly<Record<string, number>>,
+  curvePoints: readonly CurvePoint[] | undefined,
+  doc: RgbaBuffer,
+  rect: PixelRect | null,
+  mask: SelectionMask | null,
+): void {
+  if (id === 'curves' && curvePoints !== undefined) {
+    applyLutInPlace(doc, curveLut(curvePoints), rect, mask);
+    return;
+  }
+  runAdjustment(id, params, doc, rect, mask);
+}
+
 /** Apply the adjustment to the working document as one undoable step. */
 export function commitAdjustment(
   session: EditorSession,
   id: AdjustmentId,
   params: Readonly<Record<string, number>>,
+  curvePoints?: readonly CurvePoint[],
 ): EditorSession {
   const bounds = selectionRect(session);
   const captured = bounds ?? { x: 0, y: 0, width: session.doc.width, height: session.doc.height };
   const entry = captureRect(session.doc, captured, adjustmentById(id).label);
-  runAdjustment(id, params, session.doc, bounds, session.selection);
+  runOp(id, params, curvePoints, session.doc, bounds, session.selection);
   return {
     ...session,
     history: pushHistoryEntry(session.history, entry),
@@ -35,8 +54,9 @@ export function computeAdjustPreview(
   session: EditorSession,
   id: AdjustmentId,
   params: Readonly<Record<string, number>>,
+  curvePoints?: readonly CurvePoint[],
 ): RgbaBuffer {
   const clone = cloneRgbaBuffer(session.doc);
-  runAdjustment(id, params, clone, selectionRect(session), session.selection);
+  runOp(id, params, curvePoints, clone, selectionRect(session), session.selection);
   return clone;
 }

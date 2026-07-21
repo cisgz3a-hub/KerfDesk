@@ -11,7 +11,8 @@ import {
   useAdjustDialogStore,
   type AdjustDialog,
 } from './adjust-dialog-store';
-import { adjustmentById, type AdjustParamSpec } from './editor-adjustments';
+import { CurvesEditor } from './CurvesEditor';
+import { adjustmentById, DEFAULT_CURVE_POINTS, type AdjustParamSpec } from './editor-adjustments';
 import type { EditorSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 
@@ -35,7 +36,7 @@ function PanelBody(props: {
     if (!dialog.previewEnabled) return;
     const frame = requestAnimationFrame(refreshAdjustPreview);
     return () => cancelAnimationFrame(frame);
-  }, [dialog.id, dialog.params, dialog.previewEnabled]);
+  }, [dialog.id, dialog.params, dialog.curvePoints, dialog.previewEnabled]);
 
   return (
     <div
@@ -50,6 +51,9 @@ function PanelBody(props: {
     >
       <strong style={{ fontSize: 13 }}>{spec.label}</strong>
       {spec.hasHistogram ? <Histogram session={session} /> : null}
+      {dialog.id === 'curves' ? (
+        <CurvesEditor points={dialog.curvePoints ?? DEFAULT_CURVE_POINTS} session={session} />
+      ) : null}
       {spec.params.map((param) => (
         <ParamSlider
           key={param.key}

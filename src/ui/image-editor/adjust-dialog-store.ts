@@ -4,14 +4,22 @@
 // Desaturate) skip the dialog and commit through the session immediately.
 
 import { create } from 'zustand';
+import type { CurvePoint } from '../../core/image-adjust';
 import type { RgbaBuffer } from '../../core/image-edit';
 import { commitAdjustment, computeAdjustPreview } from './editor-adjust-session';
-import { adjustmentById, defaultParams, type AdjustmentId } from './editor-adjustments';
+import {
+  adjustmentById,
+  DEFAULT_CURVE_POINTS,
+  defaultParams,
+  type AdjustmentId,
+} from './editor-adjustments';
 import { useImageEditorStore } from './image-editor-store';
 
 export type AdjustDialog = {
   readonly id: AdjustmentId;
   readonly params: Readonly<Record<string, number>>;
+  /** Curves control points; null for every other adjustment. */
+  readonly curvePoints: readonly CurvePoint[] | null;
   /** Preview ✓ (Photoshop): off shows the untouched document. */
   readonly previewEnabled: boolean;
   /** Latest computed preview buffer; null until the first compute lands. */
@@ -22,6 +30,7 @@ type AdjustDialogState = {
   readonly dialog: AdjustDialog | null;
   readonly open: (id: AdjustmentId) => void;
   readonly setParams: (params: Readonly<Record<string, number>>) => void;
+  readonly setCurvePoints: (points: readonly CurvePoint[]) => void;
   readonly setPreviewEnabled: (enabled: boolean) => void;
   readonly setPreviewDoc: (doc: RgbaBuffer) => void;
   /** Reset every slider to its default (the Photoshop Alt-Reset behavior). */
@@ -30,6 +39,17 @@ type AdjustDialogState = {
   readonly cancel: () => void;
 };
 
+const EMPTY_DIALOG = { previewEnabled: true, previewDoc: null } as const;
+
+function freshDialog(id: AdjustmentId): AdjustDialog {
+  return {
+    id,
+    params: defaultParams(adjustmentById(id)),
+    curvePoints: id === 'curves' ? DEFAULT_CURVE_POINTS : null,
+    ...EMPTY_DIALOG,
+  };
+}
+
 export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
   dialog: null,
 
@@ -37,11 +57,12 @@ export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
     const editor = useImageEditorStore.getState();
     if (editor.session === null || editor.transform !== null) return;
     const spec = adjustmentById(id);
-    if (spec.params.length === 0) {
+    // Curves has no sliders but is never instant — it opens its point editor.
+    if (spec.params.length === 0 && id !== 'curves') {
       useImageEditorStore.setState({ session: commitAdjustment(editor.session, id, {}) });
       return;
     }
-    set({ dialog: { id, params: defaultParams(spec), previewEnabled: true, previewDoc: null } });
+    set({ dialog: freshDialog(id) });
   },
 
   setParams: (params) =>
@@ -51,24 +72,16 @@ export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
         : { dialog: { ...s.dialog, params: { ...s.dialog.params, ...params } } },
     ),
 
+  setCurvePoints: (curvePoints) =>
+    set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, curvePoints } })),
+
   setPreviewEnabled: (previewEnabled) =>
     set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, previewEnabled } })),
 
   setPreviewDoc: (previewDoc) =>
     set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, previewDoc } })),
 
-  reset: () =>
-    set((s) =>
-      s.dialog === null
-        ? s
-        : {
-            dialog: {
-              ...s.dialog,
-              params: defaultParams(adjustmentById(s.dialog.id)),
-              previewDoc: null,
-            },
-          },
-    ),
+  reset: () => set((s) => (s.dialog === null ? s : { dialog: freshDialog(s.dialog.id) })),
 
   commit: () => {
     const { dialog } = get();
@@ -76,7 +89,12 @@ export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
     if (dialog === null || editor.session === null) return;
     set({ dialog: null });
     useImageEditorStore.setState({
-      session: commitAdjustment(editor.session, dialog.id, dialog.params),
+      session: commitAdjustment(
+        editor.session,
+        dialog.id,
+        dialog.params,
+        dialog.curvePoints ?? undefined,
+      ),
     });
   },
 
@@ -95,7 +113,9 @@ export function refreshAdjustPreview(): void {
   const { dialog, setPreviewDoc } = useAdjustDialogStore.getState();
   const { session } = useImageEditorStore.getState();
   if (dialog === null || session === null || !dialog.previewEnabled) return;
-  setPreviewDoc(computeAdjustPreview(session, dialog.id, dialog.params));
+  setPreviewDoc(
+    computeAdjustPreview(session, dialog.id, dialog.params, dialog.curvePoints ?? undefined),
+  );
 }
 
 // A closed or different session invalidates the dialog and its preview
