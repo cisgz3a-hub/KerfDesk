@@ -1,11 +1,11 @@
 // The Image Studio document canvas (ADR-242): on-change redraw of the
-// working buffer + selection ants + drag preview, sized to its container,
-// cursor-anchored wheel zoom, middle-drag pan.
+// working buffer + selection ants + drag preview, the live brush cursor
+// (use-brush-cursor.ts), and fit/zoom/pan through the store view.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { docToCanvas, drawEditorScene, fitView } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
-import type { EditorView } from './image-editor-types';
+import { BRUSH_CURSOR_STYLE, useBrushCursor } from './use-brush-cursor';
 import { useEditorPointer } from './use-editor-pointer';
 
 const ANTS_TICK_MS = 120;
@@ -13,19 +13,25 @@ const ANTS_TICK_MS = 120;
 export function EditorCanvas(): JSX.Element {
   const session = useImageEditorStore((s) => s.session);
   const brush = useImageEditorStore((s) => s.brush);
-  const color = useImageEditorStore((s) => s.color);
+  const foreground = useImageEditorStore((s) => s.foreground);
+  const tool = useImageEditorStore((s) => s.tool);
+  const view = useImageEditorStore((s) => s.view);
+  const setView = useImageEditorStore((s) => s.setView);
+  const setViewportSize = useImageEditorStore((s) => s.setViewportSize);
+  const isSpacePanning = useImageEditorStore((s) => s.isSpacePanning);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const [view, setView] = useState<EditorView | null>(null);
   const [antsPhase, setAntsPhase] = useState(0);
 
   const revision = session?.revision ?? -1;
   const doc = session?.doc;
+  const needsFit = view === null;
   // The doc canvas rebuilds only when pixels changed (revision bump).
   // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal
   const docCanvas = useMemo(() => (doc === undefined ? null : docToCanvas(doc)), [doc, revision]);
 
-  // Fit once per session (and on container resize before any user zoom).
+  // Size the canvas to its container; fit the document when no view exists
+  // yet (open / Ctrl+0 re-fit).
   useEffect(() => {
     const host = hostRef.current;
     const canvas = canvasRef.current;
@@ -33,29 +39,28 @@ export function EditorCanvas(): JSX.Element {
     const resize = (): void => {
       canvas.width = host.clientWidth;
       canvas.height = host.clientHeight;
-      setView((current) =>
-        current === null ? fitView(doc.width, doc.height, canvas.width, canvas.height) : current,
-      );
+      setViewportSize(canvas.width, canvas.height);
+      if (useImageEditorStore.getState().view === null) {
+        setView(fitView(doc.width, doc.height, canvas.width, canvas.height));
+      }
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(host);
     return () => observer.disconnect();
-  }, [doc]);
+  }, [doc, needsFit, setView, setViewportSize]);
 
   // Ants animation ticks only while a selection exists (F-L2).
   const hasSelection = (session?.selection ?? null) !== null;
   useEffect(() => {
     if (!hasSelection) return;
-    const timer = window.setInterval(
-      () => setAntsPhase((phase) => (phase + 1) % 1000),
-      ANTS_TICK_MS,
-    );
+    const timer = window.setInterval(() => setAntsPhase((p) => (p + 1) % 1000), ANTS_TICK_MS);
     return () => window.clearInterval(timer);
   }, [hasSelection]);
 
   const activeView = view ?? { scale: 1, panX: 0, panY: 0 };
   const pointer = useEditorPointer(activeView, setView);
+  const cursor = useBrushCursor(tool, brush, activeView, isSpacePanning);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,7 +74,7 @@ export function EditorCanvas(): JSX.Element {
       pointer.drag,
       antsPhase,
       {
-        color: `rgb(${color.r}, ${color.g}, ${color.b})`,
+        color: `rgb(${foreground.r}, ${foreground.g}, ${foreground.b})`,
         widthPx: brush.diameterPx,
       },
     );
@@ -79,14 +84,19 @@ export function EditorCanvas(): JSX.Element {
     <div ref={hostRef} style={hostStyle}>
       <canvas
         ref={canvasRef}
-        style={canvasStyle}
+        style={{ ...canvasStyle, cursor: cursor.canvasCursor }}
         onPointerDown={pointer.onPointerDown}
-        onPointerMove={pointer.onPointerMove}
+        onPointerMove={(e) => {
+          cursor.moveCursor(e, hostRef.current);
+          pointer.onPointerMove(e);
+        }}
         onPointerUp={pointer.onPointerUp}
         onPointerCancel={pointer.cancelDrag}
+        onPointerLeave={cursor.hideCursor}
         onWheel={pointer.onWheel}
         aria-label="Image Studio document canvas"
       />
+      <div ref={cursor.cursorRef} style={BRUSH_CURSOR_STYLE} aria-hidden="true" />
     </div>
   );
 }
@@ -96,6 +106,7 @@ const hostStyle: React.CSSProperties = {
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
+  position: 'relative',
   background: 'var(--lf-bg-2)',
 };
 
@@ -104,5 +115,4 @@ const canvasStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
   touchAction: 'none',
-  cursor: 'crosshair',
 };

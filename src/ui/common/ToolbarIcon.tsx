@@ -1,4 +1,5 @@
 import box from 'lucide-static/icons/box.svg?raw';
+import brush from 'lucide-static/icons/brush.svg?raw';
 import camera from 'lucide-static/icons/camera.svg?raw';
 import eye from 'lucide-static/icons/eye.svg?raw';
 import fileCode from 'lucide-static/icons/file-code-2.svg?raw';
@@ -31,6 +32,7 @@ const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'tools.place-board': squareDashedPointer,
   'tools.box-generator': box,
   'tools.trace-image': wandSparkles,
+  'tools.edit-image': brush,
   'tools.convert-to-bitmap': imageDown,
   'file.save-gcode': fileDown,
   'window.toggle-preview': eye,

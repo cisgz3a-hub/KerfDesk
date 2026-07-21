@@ -36,8 +36,8 @@ export function EditorOptionsBar(): JSX.Element {
 function PaintOptions(props: { readonly showColor: boolean }): JSX.Element {
   const brush = useImageEditorStore((s) => s.brush);
   const setBrush = useImageEditorStore((s) => s.setBrush);
-  const color = useImageEditorStore((s) => s.color);
-  const setColor = useImageEditorStore((s) => s.setColor);
+  const color = useImageEditorStore((s) => s.foreground);
+  const setForeground = useImageEditorStore((s) => s.setForeground);
   return (
     <>
       <Slider
@@ -72,7 +72,7 @@ function PaintOptions(props: { readonly showColor: boolean }): JSX.Element {
               <button
                 key={`${swatch.r}-${swatch.g}-${swatch.b}`}
                 type="button"
-                onClick={() => setColor(swatch)}
+                onClick={() => setForeground(swatch)}
                 aria-pressed={isActive}
                 title={`Paint ${swatch.r === 0 ? 'black' : swatch.r === 255 ? 'white' : 'gray'}`}
                 style={{

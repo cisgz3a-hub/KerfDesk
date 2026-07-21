@@ -158,7 +158,7 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
     'tools.place-board',
     'tools.box-generator',
   ],
-  ['tools.trace-image', 'tools.convert-to-bitmap'],
+  ['tools.trace-image', 'tools.edit-image', 'tools.convert-to-bitmap'],
   ['file.save-gcode'],
   // M27: Preview is the operator's primary pre-burn verification surface —
   // it gets a visible toggle, not just the P shortcut.

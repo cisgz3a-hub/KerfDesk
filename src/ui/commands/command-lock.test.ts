@@ -86,6 +86,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     rotarySetup: vi.fn(),
     labsSettings: vi.fn(),
     adjustImage: vi.fn(),
+    editImage: vi.fn(),
     saveProcessedBitmap: vi.fn(),
     traceImage: vi.fn(),
     retraceOriginal: vi.fn(),

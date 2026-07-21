@@ -29,6 +29,7 @@ import {
   type EditorTool,
 } from './editor-session';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
+import type { EditorView } from './image-editor-types';
 
 const DEFAULT_BRUSH: BrushSettings = { diameterPx: 12, hardness: 0.8, opacity: 1 };
 const DEFAULT_WAND_TOLERANCE = 32;
@@ -44,15 +45,29 @@ type ImageEditorState = {
   readonly loadState: LoadState;
   readonly tool: EditorTool;
   readonly brush: BrushSettings;
-  readonly color: PaintColor;
+  /** Photoshop color pair: foreground paints, eraser erases TO background. */
+  readonly foreground: PaintColor;
+  readonly background: PaintColor;
   readonly wandTolerance: number;
   readonly wandContiguous: boolean;
   readonly isApplying: boolean;
+  /** Viewport transform; null = fit-to-window on next canvas layout. */
+  readonly view: EditorView | null;
+  readonly viewportSize: { readonly width: number; readonly height: number };
+  /** Held-Spacebar temporary Hand tool (Photoshop pan convention). */
+  readonly isSpacePanning: boolean;
   readonly openEditor: (image: RasterImage) => void;
   readonly closeEditor: () => void;
   readonly setTool: (tool: EditorTool) => void;
   readonly setBrush: (brush: Partial<BrushSettings>) => void;
-  readonly setColor: (color: PaintColor) => void;
+  readonly setForeground: (color: PaintColor) => void;
+  readonly swapColors: () => void;
+  readonly resetColors: () => void;
+  readonly setView: (view: EditorView | null) => void;
+  readonly setViewportSize: (width: number, height: number) => void;
+  readonly zoomBy: (factor: number) => void;
+  readonly zoomTo100: () => void;
+  readonly setSpacePanning: (isPanning: boolean) => void;
   readonly setWandTolerance: (tolerance: number) => void;
   readonly setWandContiguous: (contiguous: boolean) => void;
   readonly stroke: (points: readonly PaintPoint[]) => void;
@@ -74,10 +89,14 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   loadState: { kind: 'idle' },
   tool: { kind: 'brush' },
   brush: DEFAULT_BRUSH,
-  color: BLACK,
+  foreground: BLACK,
+  background: WHITE,
   wandTolerance: DEFAULT_WAND_TOLERANCE,
   wandContiguous: true,
   isApplying: false,
+  view: null,
+  viewportSize: { width: 0, height: 0 },
+  isSpacePanning: false,
 
   openEditor: (image) => openEditorAction(set, get, image),
 
@@ -86,13 +105,22 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
     set((s) => ({
       session: null,
       loadState: { kind: 'idle' },
+      view: null,
+      isSpacePanning: false,
       stash: session === null ? s.stash : { ...s.stash, [session.objectId]: session },
     }));
   },
 
   setTool: (tool) => set({ tool }),
   setBrush: (brush) => set((s) => ({ brush: { ...s.brush, ...brush } })),
-  setColor: (color) => set({ color }),
+  setForeground: (color) => set({ foreground: color }),
+  swapColors: () => set((s) => ({ foreground: s.background, background: s.foreground })),
+  resetColors: () => set({ foreground: BLACK, background: WHITE }),
+  setView: (view) => set({ view }),
+  setViewportSize: (width, height) => set({ viewportSize: { width, height } }),
+  zoomBy: (factor) => zoomByAction(set, get, factor),
+  zoomTo100: () => zoomToScaleAction(set, get, 1),
+  setSpacePanning: (isSpacePanning) => set({ isSpacePanning }),
   setWandTolerance: (wandTolerance) => set({ wandTolerance }),
   setWandContiguous: (wandContiguous) => set({ wandContiguous }),
 
@@ -100,11 +128,13 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
     withSession(set, get, (session, s) => {
       const label =
         s.tool.kind === 'eraser' ? 'Eraser' : s.tool.kind === 'pencil' ? 'Pencil' : 'Brush';
-      return commitStroke(session, s.tool, s.brush, s.color, points, label);
+      // Photoshop semantics: the eraser paints the BACKGROUND color.
+      const color = s.tool.kind === 'eraser' ? s.background : s.foreground;
+      return commitStroke(session, s.tool, s.brush, color, points, label);
     }),
   line: (from, to, constrain45) =>
     withSession(set, get, (session, s) =>
-      commitLine(session, s.brush, s.color, from, to, constrain45),
+      commitLine(session, s.brush, s.foreground, from, to, constrain45),
     ),
 
   select: (mask) => withSession(set, get, (session) => withSelection(session, mask)),
@@ -121,7 +151,9 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   deleteSelection: () =>
     withSession(set, get, (session) => commitFillSelection(session, WHITE, 'Delete selection')),
   fillSelection: () =>
-    withSession(set, get, (session, s) => commitFillSelection(session, s.color, 'Fill selection')),
+    withSession(set, get, (session, s) =>
+      commitFillSelection(session, s.foreground, 'Fill selection'),
+    ),
   moveSelection: (dx, dy) =>
     withSession(set, get, (session) => commitMoveSelection(session, dx, dy)),
 
@@ -192,4 +224,37 @@ function withSession(
   const state = get();
   if (state.session === null) return;
   set({ session: update(state.session, state) });
+}
+
+// Zoom about the viewport centre (keyboard zoom; wheel zoom stays
+// cursor-anchored in the pointer hook).
+function zoomByAction(set: Setter, get: () => ImageEditorState, factor: number): void {
+  const { view, viewportSize } = get();
+  if (view === null) return;
+  const scale = Math.min(64, Math.max(0.05, view.scale * factor));
+  applyCentredScale(set, view, viewportSize, scale);
+}
+
+function zoomToScaleAction(set: Setter, get: () => ImageEditorState, scale: number): void {
+  const { view, viewportSize } = get();
+  if (view === null) return;
+  applyCentredScale(set, view, viewportSize, scale);
+}
+
+function applyCentredScale(
+  set: Setter,
+  view: EditorView,
+  viewport: { readonly width: number; readonly height: number },
+  scale: number,
+): void {
+  const cx = viewport.width / 2;
+  const cy = viewport.height / 2;
+  const ratio = scale / view.scale;
+  set({
+    view: {
+      scale,
+      panX: cx - (cx - view.panX) * ratio,
+      panY: cy - (cy - view.panY) * ratio,
+    },
+  });
 }

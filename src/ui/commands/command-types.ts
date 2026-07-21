@@ -57,6 +57,7 @@ export type CommandId =
   | 'tools.print-and-cut'
   | 'tools.labs'
   | 'tools.adjust-image'
+  | 'tools.edit-image'
   | 'tools.apply-image-mask'
   | 'tools.crop-image'
   | 'tools.remove-image-mask'
@@ -202,6 +203,7 @@ export type AppCommandContext = {
   readonly printAndCut: () => void;
   readonly labsSettings: () => void;
   readonly adjustImage: () => void;
+  readonly editImage: () => void;
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;
   readonly retraceOriginal: () => void;
