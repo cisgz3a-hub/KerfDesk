@@ -49,13 +49,13 @@ function seedRaster(): RasterImage {
 }
 
 describe('Trace Image workflow controls', () => {
-  it('defaults laser traces to the Raster/Image scan pipeline with explicit binary copy', async () => {
+  it('defaults laser traces to editable vectors with the raster scan escape', async () => {
     await withTraceDialog(async (host) => {
       const output = outputSelect(host);
-      expect(output?.value).toBe('raster');
+      expect(output?.value).toBe('vector');
       expect(Array.from(output?.options ?? []).map((option) => option.textContent)).toEqual([
-        'Raster scan (recommended)',
         'Editable vectors',
+        'Raster scan',
       ]);
       expect(host.textContent ?? '').toContain(
         'Raster scan uses the same Raster/Image scan motion as a photo.',
@@ -82,6 +82,10 @@ describe('Trace Image workflow controls', () => {
 
   it('shows Fill Style only for filled-contour presets', async () => {
     await withTraceDialog(async (host) => {
+      // The vector default (ADR-238) shows Fill Style immediately for the
+      // filled-contour Line Art preset; the raster escape hides it.
+      expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
+      await changeSelect(outputSelect(host), 'raster');
       expect(fillStyleSelect(host)).toBeNull();
       await changeSelect(outputSelect(host), 'vector');
       const select = presetSelect(host);
@@ -115,7 +119,9 @@ describe('Trace Image workflow controls', () => {
         expect(outputSelect(host)).toBeNull();
         expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
         expect(host.textContent ?? '').toContain('Cutting on CNC');
-        expect(host.textContent ?? '').not.toContain('Raster scan (recommended)');
+        expect(host.textContent ?? '').not.toContain(
+          'Raster scan uses the same Raster/Image scan motion',
+        );
       });
     } finally {
       useStore.setState({ project: prior });
