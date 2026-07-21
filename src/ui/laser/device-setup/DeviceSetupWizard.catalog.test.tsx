@@ -1,5 +1,5 @@
 // Catalog-facing wizard behavior: the six-step shell, the always-visible
-// searchable profile catalog, and verbatim profile application (ADR-239).
+// searchable profile catalog, and verbatim profile application (ADR-240).
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -42,7 +42,7 @@ describe('DeviceSetupWizard catalog', () => {
       ).toHaveLength(6);
       await act(async () => button(view.host, 'Next').click());
       expect(view.host.textContent).toContain('Step 2 of 6 — Choose your machine');
-      // The catalog is always visible — no collapsed section hides it (ADR-239).
+      // The catalog is always visible — no collapsed section hides it (ADR-240).
       expect(view.host.textContent).toContain('Use Creality Falcon A1 Pro (grblHAL)');
       expect(view.host.querySelector('input[aria-label="Search machine profiles"]')).toBeInstanceOf(
         HTMLInputElement,

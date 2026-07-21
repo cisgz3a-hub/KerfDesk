@@ -27,7 +27,7 @@ import { mergeDetectedSetupFacts } from './device-setup-detected-facts';
 
 export { deviceSetupSupportsMachineKind } from './device-setup-capability';
 
-// Six steps (ADR-239, maintainer-ordered): machine type first, then the
+// Six steps (ADR-240, maintainer-ordered): machine type first, then the
 // profile catalog, then a dedicated connect-and-detect page, then one flat
 // confirm page (coordinates + machine output), optional calibrations as
 // closed status rows, and firmware comparison + review before the single

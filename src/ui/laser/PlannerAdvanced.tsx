@@ -42,7 +42,7 @@ export function PlannerAdvanced(props: PlannerFieldsProps): JSX.Element {
 
 // The bare estimator fields, without a collapsible wrapper. Machine Setup's
 // Options step renders these flat so no field hides two collapse levels deep
-// (ADR-239); PlannerAdvanced keeps the legacy <details> shell.
+// (ADR-240); PlannerAdvanced keeps the legacy <details> shell.
 export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
   return (
     <>

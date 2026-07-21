@@ -203,6 +203,7 @@
 | ADR-236 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
 | ADR-237 | 2026-07-21 | Accepted | Job Review runs at Start; plain Frame is dialog-free |
 | ADR-238 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
+| ADR-239 | 2026-07-21 | Accepted, hardware verification pending | Tangential feed-matched contour entries for the 4040-safe profile |
 
 ---
 
@@ -10501,7 +10502,85 @@ The maintainer directed this default on 2026-07-21.
 - No compiler, emitter, or G-code change: the diff is dialog state, option labels/order, the
   select parser fallback, and these tests.
 
-## ADR-239 - Machine Setup: capability-first six-step wizard with a searchable catalog
+---
+
+## ADR-239 - Tangential feed-matched contour entries for the 4040-safe profile
+
+**Date:** 2026-07-21
+**Status:** Accepted, hardware verification pending
+
+### Context
+
+ADR-234 closed the 4040's uneven-burn mechanism for scanline fill: every sweep now enters ink
+through a bounded laser-off `G1 S0` runway at burn feed. Two contour paths kept the original
+powered-start-from-the-junction motion on every profile, including the 4040-safe one:
+
+- **Line mode** (`emitSegment`): the seek arrives at the contour's first vertex — `G1 F800 S0`
+  on the 4040 — and the very next command is the powered first edge. The seek direction is
+  generally not collinear with that edge, so GRBL's junction planner drops to near zero before
+  the burn begins.
+- **Follow Shape (offset) fill** (`emitOffsetFillGroup`): each concentric loop starts the same
+  way, and a 0.1 mm loop pitch means hundreds of such powered starts clustered at the same
+  angular position — a visible seam. `compileJob` deliberately set `fillRunwayPolicy` to
+  undefined for the offset style, so ADR-234 never covered it.
+
+The maintainer directed closing this gap (2026-07-21) after the PR-305 audit ranked it the
+highest-value remaining motion fix now that Editable vectors is the default trace output
+(ADR-238).
+
+### Decision
+
+1. A new planner module `core/job/contour-entry.ts` computes, per contour, a **tangential
+   entry point**: the first vertex moved back along the first non-degenerate edge's direction
+   by `min(max(0, layer overscan), 5) mm` — the ADR-234 length formula, further bounded by
+   the room available before the bed boundary so the entry never commands off-bed motion
+   (zero room falls back to the legacy approach). Collinearity with the first burn edge lets
+   the junction planner carry the entry feed into the ink.
+2. `compileJob` bakes `entryRunwayMm` onto Line-mode `CutGroup`s and Follow Shape
+   `FillGroup`s only when the device rides the same policy switch as ADR-234
+   (`fillRunwayPolicyForDevice` — the 4040-safe dialect). Every other profile compiles
+   byte-identical legacy groups. Overscan 0 disables the entry — the same explicit operator
+   choice ADR-236 reports for scanline fill.
+3. The emitter seeks to the entry point with the device's laser-off travel policy, then emits
+   one `G1 X.. Y.. F<burn feed> S0` ramp (tagged `kerfdesk:laser-off-motion`) into the first
+   vertex, then the unchanged burn chain. Contours whose geometry defines no tangent (single
+   point, collapsed at 3 dp) keep their legacy approach.
+4. Planner timing, toolpath preview, and the Frame motion envelope consume the same
+   `contourEntryPoint` so estimates, preview, and `computeJobMotionBounds` stay in parity with
+   the emitted geometry; the artwork AABB (`computeJobBounds`) excludes entry motion.
+
+### Consequences
+
+- On the 4040-safe profile, Line cuts and Follow Shape loops now enter ink moving at burn
+  feed with the laser off, matching the scanline-fill and raster entry treatment. Scanline and
+  island fill are untouched (they keep their ADR-234/236 sweep plans), as are generic and
+  Falcon profiles (byte-identical output, pinned by tests).
+- The entry adds up to 5 mm of laser-off motion before each contour, tangentially outside the
+  artwork; the Frame envelope includes it. LightBurn does not add automatic lead-ins to Line
+  cuts — this is a deliberate 4040-scoped divergence in the ADR-234 tradition.
+- Job Review's runway-coverage summary still counts scanline sweeps only; extending the
+  ADR-236 coverage report (and the #309 overscan-0 advisory) to contour entries is deferred
+  follow-up work.
+- Like ADR-234/235/236, software output is structurally verified only: a 4040 scrap coupon
+  comparing Line/Follow-Shape burns before and after remains required.
+
+### Verification
+
+- `contour-entry.test.ts` pins the length formula, the 5 mm cap, the overscan-0 disable, the
+  tangent math, degenerate-edge skipping, and null cases.
+- `grbl-strategy-4040-contour-entry.test.ts` pins the emitted byte sequence (controlled seek →
+  `F<feed> S0` ramp → powered burn) for Line and multi-loop Follow Shape, one entry per
+  contour per pass, the legacy no-entry sequence, and generic-profile byte stability.
+- `compile-job-contour-entry.test.ts` pins the device scoping, the scanline exclusion, and the
+  overscan clamp; `job-bounds-contour-entry.test.ts`, `toolpath-contour-entry.test.ts`, and
+  `planner-contour-entry.test.ts` pin envelope, preview, and timing parity. The G-code
+  snapshot corpus is unchanged (generic profiles only).
+
+---
+
+## ADR-240 - Machine Setup: capability-first six-step wizard with a searchable catalog
+
+*(Numbered ADR-240 because ADR-239 was claimed by the contour-entry decision above while this branch was in review; earlier commits on this branch refer to it as ADR-239.)*
 
 **Date:** 2026-07-21 (amended same day after the maintainer reviewed the built wizard in chat)
 **Status:** Accepted (amends ADR-205's step composition and ADR-186's step enumeration; ADR-092's

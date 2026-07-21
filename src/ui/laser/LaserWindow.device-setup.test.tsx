@@ -92,7 +92,7 @@ describe('LaserWindow device-setup nudge', () => {
       await act(async () => button(host, 'Next').click());
       expect(host.textContent).toContain('Step 2 of 6');
       // The catalog is a plain always-visible section now — never collapsed
-      // behind a <details> (ADR-239).
+      // behind a <details> (ADR-240).
       const profileCatalog = host.querySelector('section[aria-label="Reviewed machine profiles"]');
       expect(profileCatalog?.closest('details')).toBeNull();
       expect(profileCatalog?.textContent).toContain('Neotronics 4040 Max');
@@ -139,7 +139,7 @@ describe('LaserWindow device-setup nudge', () => {
       await act(async () => button(host, 'Save machine setup').click());
       expect(host.textContent).not.toContain('set up yet');
       // The 4040 fill-policy rail banner was removed at the maintainer's
-      // direction (ADR-239 amendment), so a configured machine shows a calm
+      // direction (ADR-240 amendment), so a configured machine shows a calm
       // default button again.
       expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
       // The configured signature is persisted, so a reload re-hydrates it.

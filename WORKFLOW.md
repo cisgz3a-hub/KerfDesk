@@ -1364,7 +1364,7 @@ Machine capability is an enforced physical-output contract (ADR-210), not descri
 - The final atomic setup action independently refuses a profile/machine mismatch, so another caller
   cannot persist a single-output capability beside the opposite active mode.
 
-The six steps are always visible and always ordered (ADR-239; supersedes the seven-step
+The six steps are always visible and always ordered (ADR-240; supersedes the seven-step
 enumeration of ADR-186/ADR-205):
 
 1. **Machine type** — Laser only / CNC only / Laser + CNC, and for hybrids the active mode after

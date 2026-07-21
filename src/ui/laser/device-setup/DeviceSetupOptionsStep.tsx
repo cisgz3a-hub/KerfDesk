@@ -1,6 +1,6 @@
 // Step 5: optional boundaries and calibrations, every group closed by
 // default and headed by a live one-line status so the whole machine state
-// reads without opening anything (ADR-239). Editors stay draft-bound; no
+// reads without opening anything (ADR-240). Editors stay draft-bound; no
 // live project state or hardware command changes when a field is edited.
 
 import { DEFAULT_ROTARY_SETUP, type DeviceProfile } from '../../../core/devices';

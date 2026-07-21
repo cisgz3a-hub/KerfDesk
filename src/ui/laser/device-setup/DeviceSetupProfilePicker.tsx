@@ -1,7 +1,7 @@
 // Always-visible, searchable catalog of reviewed machine profiles — the
 // first thing the operator sees in Machine Setup. One click fills the whole
 // draft; the manual identity fields below it remain the fallback for
-// machines that are not listed. (ADR-239)
+// machines that are not listed. (ADR-240)
 
 import { useState } from 'react';
 import {

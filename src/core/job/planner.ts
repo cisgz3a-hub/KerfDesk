@@ -35,6 +35,7 @@
 
 import { resolveGrblDialect, type DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
+import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Job, RasterGroup } from './job';
@@ -159,7 +160,7 @@ function buildBlocks(
     cursor =
       group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
         ? appendFillGroupBlocks(out, cursor, group, cutV, travelV, device)
-        : appendCutGroupBlocks(out, cursor, group, cutV, travelV);
+        : appendCutGroupBlocks(out, cursor, group, cutV, travelV, device);
   }
   if (finishPosition !== null) appendTravel(out, cursor, finishPosition, travelV);
   return out;
@@ -281,13 +282,24 @@ function appendCutGroupBlocks(
   group: CutGroup | FillGroup,
   cutV: number,
   travelV: number,
+  device: DeviceProfile,
 ): Vec2 {
   let cursor = initialCursor;
+  const entryRunwayMm = group.entryRunwayMm ?? 0;
+  const bed = { widthMm: device.bedWidth, heightMm: device.bedHeight };
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const seg of group.segments) {
       const first = seg.polyline[0];
       if (first === undefined) continue;
-      appendTravel(out, cursor, first, travelV);
+      // ADR-239: the tangential entry is laser-off feed motion, timed like
+      // the emitted `G1 F<feed> S0` ramp rather than a rapid.
+      const entry = entryRunwayMm > 0 ? contourEntryPoint(seg.polyline, entryRunwayMm, bed) : null;
+      if (entry === null) {
+        appendTravel(out, cursor, first, travelV);
+      } else {
+        appendTravel(out, cursor, entry, travelV);
+        appendFeedTravel(out, entry, first, cutV);
+      }
       appendCutPolylineBlocks(out, seg.polyline, cutV);
       const last = seg.polyline[seg.polyline.length - 1];
       if (last !== undefined) cursor = last;

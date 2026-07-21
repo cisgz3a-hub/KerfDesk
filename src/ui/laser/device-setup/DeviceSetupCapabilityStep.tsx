@@ -1,5 +1,5 @@
 // Step 1: declare what the physical machine is before anything else. The
-// capability contract decides which later pages and settings apply (ADR-239,
+// capability contract decides which later pages and settings apply (ADR-240,
 // maintainer-ordered step sequence).
 
 import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';

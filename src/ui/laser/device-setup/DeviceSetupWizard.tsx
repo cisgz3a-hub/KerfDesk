@@ -273,7 +273,7 @@ function saveButtonLabel(saving: boolean, firmwareWriteCount: number): string {
 // The confirm page stacks the coordinate model and machine output on one
 // flat scrollable page, and the review page puts firmware comparison above
 // the review cards so Save follows the queued-write summary it executes
-// (ADR-239).
+// (ADR-240).
 function renderStep(
   state: DeviceSetupState,
   dispatch: React.Dispatch<DeviceSetupAction>,

@@ -1,6 +1,6 @@
 // Step 2: choose which machine this is and how KerfDesk must communicate
 // with it. The reviewed-profile catalog leads (one click fills the draft,
-// ADR-239); connection deliberately comes on the next step so the first
+// ADR-240); connection deliberately comes on the next step so the first
 // serial open uses the reviewed driver and baud rate.
 
 import {

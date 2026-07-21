@@ -1,6 +1,6 @@
 // Pure one-line status summaries for the Options & calibration step. Each
 // summary makes a group's state readable from its always-visible header row
-// without opening the section (ADR-239).
+// without opening the section (ADR-240).
 
 import { profileSupportsCapability, type DeviceProfile } from '../../../core/devices';
 

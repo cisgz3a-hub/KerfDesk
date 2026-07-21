@@ -347,7 +347,7 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
   // The reviewed-profile catalog is always visible on the profile step for
-  // laser-capable machines (ADR-239).
+  // laser-capable machines (ADR-240).
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
   for (let step = 0; step < 4; step += 1) {
     await page.getByRole('button', { name: 'Next', exact: true }).click();

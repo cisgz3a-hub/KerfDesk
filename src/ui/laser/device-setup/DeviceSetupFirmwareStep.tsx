@@ -1,4 +1,4 @@
-// Firmware section of the final Review & save page (ADR-239): compare and,
+// Firmware section of the final Review & save page (ADR-240): compare and,
 // only for supported GRBL-dollar controllers, offer individually confirmed
 // writes queued for final Save. Machine-critical travel settings never get a
 // batch-write shortcut, and Cancel sends no command.
