@@ -24,3 +24,9 @@ export type { CurvePoint } from './curves';
 export { curveLut } from './curves';
 
 export { lumaHistogram } from './histogram';
+
+export { gaussianBlurInPlace } from './gaussian-blur';
+export type { UnsharpParams } from './unsharp-mask';
+export { unsharpMaskInPlace } from './unsharp-mask';
+export { highPassInPlace } from './high-pass';
+export { medianInPlace } from './median';
