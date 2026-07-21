@@ -20,8 +20,10 @@ export {
   undoInPlace,
 } from './history';
 
-export type { BrushParams, BrushTip } from './brush-stamp';
-export { MAX_BRUSH_DIAMETER_PX, MIN_BRUSH_DIAMETER_PX } from './brush-stamp';
+export type { BrushParams } from './brush-stamp';
 
-export type { PaintColor, PaintPoint, PaintStroke } from './stroke';
+export type { PaintColor, PaintPoint } from './stroke';
 export { paintStrokeInPlace, snapLineEnd45, strokeDirtyRect } from './stroke';
+
+export type { AffineTransform } from './transform-blit';
+export { blitTransformedInPlace, IDENTITY_AFFINE, transformedBounds } from './transform-blit';

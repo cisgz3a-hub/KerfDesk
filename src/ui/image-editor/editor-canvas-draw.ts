@@ -3,11 +3,19 @@
 // in-progress tool preview. On-change redraw (no free-running rAF); only the
 // ants dash phase ticks while a selection exists.
 
-import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
+import type { AffineTransform, PixelRect, RgbaBuffer } from '../../core/image-edit';
 import { maskOutline, type SelectionMask } from '../../core/image-select';
 import type { EditorDrag } from './editor-drag';
 import { dragRect, marqueeRect } from './editor-drag';
+import { handlePositions, transformCentre } from './editor-transform';
 import type { EditorView } from './image-editor-types';
+
+export type TransformPreview = {
+  readonly rect: PixelRect;
+  readonly pixels: Uint8ClampedArray;
+  readonly alpha: Uint8Array;
+  readonly affine: AffineTransform;
+};
 
 export const ANTS_DASH_PX = 4;
 
@@ -74,6 +82,56 @@ export function drawEditorScene(
   ctx.restore();
 }
 
+/** Ctrl+T live preview: the floating pixels through the affine + the box. */
+export function drawTransformPreview(
+  ctx: CanvasRenderingContext2D,
+  view: EditorView,
+  preview: TransformPreview,
+): void {
+  const { rect, affine } = preview;
+  const floatCanvas = document.createElement('canvas');
+  floatCanvas.width = rect.width;
+  floatCanvas.height = rect.height;
+  const fctx = floatCanvas.getContext('2d');
+  if (fctx === null) return;
+  const image = new ImageData(new Uint8ClampedArray(preview.pixels), rect.width, rect.height);
+  // Weight visibility by the selection alpha so soft masks preview honestly.
+  for (let i = 0; i < preview.alpha.length; i += 1) {
+    image.data[i * 4 + 3] = preview.alpha[i] ?? 0;
+  }
+  fctx.putImageData(image, 0, 0);
+
+  ctx.save();
+  ctx.translate(view.panX, view.panY);
+  ctx.scale(view.scale, view.scale);
+  const c = transformCentre(rect, affine);
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate((affine.rotateDeg * Math.PI) / 180);
+  ctx.scale(affine.scaleX, affine.scaleY);
+  ctx.drawImage(floatCanvas, -rect.width / 2, -rect.height / 2);
+  ctx.restore();
+
+  // The box + handles.
+  const handles = handlePositions(rect, affine);
+  ctx.strokeStyle = PREVIEW_ACCENT;
+  ctx.lineWidth = 1 / view.scale;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(handles.nw.x, handles.nw.y);
+  for (const corner of [handles.ne, handles.se, handles.sw, handles.nw]) {
+    ctx.lineTo(corner.x, corner.y);
+  }
+  ctx.stroke();
+  const size = 6 / view.scale;
+  for (const pos of Object.values(handles)) {
+    ctx.fillStyle = ANTS_LIGHT;
+    ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);
+    ctx.strokeRect(pos.x - size / 2, pos.y - size / 2, size, size);
+  }
+  ctx.restore();
+}
+
 // Darken everything outside the crop box and draw the thirds grid inside it
 // (Photoshop's crop shield + rule-of-thirds overlay).
 function drawPendingCrop(
@@ -119,6 +177,7 @@ function drawDragPreview(
     case 'pan':
     case 'move-selection':
     case 'move-outline':
+    case 'transform-drag':
       break;
     case 'crop-drag':
       drawDashedRect(ctx, dragRect(drag), view);

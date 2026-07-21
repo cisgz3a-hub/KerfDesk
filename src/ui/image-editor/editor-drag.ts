@@ -8,9 +8,10 @@
 // pixels with Ctrl). Completion side effects are dispatched by the pointer
 // hook on pointer-up.
 
-import type { PaintPoint, PixelRect } from '../../core/image-edit';
+import type { AffineTransform, PaintPoint, PixelRect } from '../../core/image-edit';
 import type { SelectionCombineMode } from '../../core/image-select';
 import type { EditorTool } from './editor-session';
+import type { TransformHandle } from './editor-transform';
 
 export type DragModifiers = {
   readonly shift: boolean;
@@ -42,6 +43,12 @@ export type EditorDrag =
       readonly booleanOverride: SelectionCombineMode | null;
     }
   | { readonly kind: 'crop-drag'; readonly from: PaintPoint; readonly to: PaintPoint }
+  | {
+      readonly kind: 'transform-drag';
+      readonly handle: TransformHandle;
+      readonly startAffine: AffineTransform;
+      readonly from: PaintPoint;
+    }
   | { readonly kind: 'move-outline'; readonly from: PaintPoint; readonly to: PaintPoint }
   | { readonly kind: 'move-selection'; readonly from: PaintPoint; readonly to: PaintPoint }
   | { readonly kind: 'pan'; readonly lastClientX: number; readonly lastClientY: number };
@@ -141,6 +148,9 @@ export function advanceDrag(
     case 'move-outline':
     case 'move-selection':
       return { ...drag, to: point };
+    case 'transform-drag':
+      // The pointer hook applies dragTransform live; the drag itself is static.
+      return drag;
   }
 }
 
