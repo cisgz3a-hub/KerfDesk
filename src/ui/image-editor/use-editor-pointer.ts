@@ -33,9 +33,29 @@ type PointerApi = {
   readonly onPointerDown: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerMove: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerUp: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  readonly onDoubleClick: () => void;
   readonly onWheel: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   readonly cancelDrag: () => void;
 };
+
+/**
+ * Canvas double-click: commit the active modal state (transform, then crop —
+ * the Photoshop grammar), otherwise return to the default Brush tool (the
+ * maintainer's "unclick the tool" convention, same step Esc takes).
+ */
+export function canvasDoubleClickAction(): void {
+  const store = useImageEditorStore.getState();
+  if (useAdjustDialogStore.getState().dialog !== null) return;
+  if (store.transform !== null) {
+    store.commitTransform();
+    return;
+  }
+  if (store.pendingCrop !== null) {
+    store.commitPendingCrop();
+    return;
+  }
+  if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
+}
 
 export function useEditorPointer(
   view: EditorView,
@@ -57,31 +77,7 @@ export function useEditorPointer(
   );
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        // A detached canvas or an already-dead pointer id must not kill the
-        // gesture — capture is an optimization, not a requirement.
-      }
-      const state = useImageEditorStore.getState();
-      // Middle button or held Spacebar = Hand pan (Photoshop convention).
-      if (e.button === 1 || state.isSpacePanning) {
-        update({ kind: 'pan', lastClientX: e.clientX, lastClientY: e.clientY });
-        return;
-      }
-      if (e.button !== 0) return;
-      // An open adjustment dialog parks the tools: its preview buffer must
-      // track a stable document (pan/zoom/wheel stay live above).
-      if (useAdjustDialogStore.getState().dialog !== null) return;
-      const point = docPoint(e);
-      const transformDrag = beginTransformDrag(state, point, view.scale);
-      if (transformDrag !== null) {
-        update(transformDrag);
-        return;
-      }
-      startToolDrag(e, point, update);
-    },
+    (e: React.PointerEvent<HTMLCanvasElement>) => pointerDown(e, view.scale, update, docPoint(e)),
     [docPoint, update, view.scale],
   );
 
@@ -127,7 +123,45 @@ export function useEditorPointer(
 
   const cancelDrag = useCallback(() => update(IDLE_DRAG), [update]);
 
-  return { drag, onPointerDown, onPointerMove, onPointerUp, onWheel, cancelDrag };
+  return {
+    drag,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onDoubleClick: canvasDoubleClickAction,
+    onWheel,
+    cancelDrag,
+  };
+}
+
+function pointerDown(
+  e: React.PointerEvent<HTMLCanvasElement>,
+  viewScale: number,
+  update: (drag: EditorDrag) => void,
+  point: { x: number; y: number },
+): void {
+  try {
+    e.currentTarget.setPointerCapture(e.pointerId);
+  } catch {
+    // A detached canvas or an already-dead pointer id must not kill the
+    // gesture — capture is an optimization, not a requirement.
+  }
+  const state = useImageEditorStore.getState();
+  // Middle button or held Spacebar = Hand pan (Photoshop convention).
+  if (e.button === 1 || state.isSpacePanning) {
+    update({ kind: 'pan', lastClientX: e.clientX, lastClientY: e.clientY });
+    return;
+  }
+  if (e.button !== 0) return;
+  // An open adjustment dialog parks the tools: its preview buffer must
+  // track a stable document (pan/zoom/wheel stay live above).
+  if (useAdjustDialogStore.getState().dialog !== null) return;
+  const transformDrag = beginTransformDrag(state, point, viewScale);
+  if (transformDrag !== null) {
+    update(transformDrag);
+    return;
+  }
+  startToolDrag(e, point, update);
 }
 
 // Wheel zooms about the pointer (matches the workspace canvas; Alt+wheel is
