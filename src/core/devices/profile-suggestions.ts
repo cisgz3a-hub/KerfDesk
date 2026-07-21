@@ -52,6 +52,26 @@ function suggestionFor(
   return { profileId, profile, entry, confidence: 'manual-only', reasons, warnings };
 }
 
+// Case-insensitive text filter for the setup catalog. Matches the profile
+// name, controller kind (raw and display label), and "WxH" bed size so
+// operators can type "falcon", "grblhal", or "400x400".
+export function filterMachineProfileSuggestions(
+  suggestions: ReadonlyArray<MachineProfileSuggestion>,
+  query: string,
+): ReadonlyArray<MachineProfileSuggestion> {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return suggestions;
+  return suggestions.filter((suggestion) => suggestionSearchText(suggestion).includes(needle));
+}
+
+function suggestionSearchText(suggestion: MachineProfileSuggestion): string {
+  const profile = suggestion.profile;
+  const kind = normalizedControllerKind(profile.controllerKind);
+  return [profile.name, kind, controllerKindLabel(kind), `${profile.bedWidth}x${profile.bedHeight}`]
+    .join(' ')
+    .toLowerCase();
+}
+
 function profileReasons(
   detectedControllerKind: ControllerKind | null,
   facts: Partial<DeviceProfile>,
