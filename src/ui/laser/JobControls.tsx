@@ -320,7 +320,7 @@ function startJobTitle(estimate: LiveJobEstimate, timeNoun: string): string {
     return `Estimated ${timeNoun} time: ${estimate.label}`;
   }
   if (estimate.kind === 'too-large') {
-    return 'Large job: Start will block until you reduce the artwork size or lower the raster settings.';
+    return 'Large job: the live estimate is paused to keep the canvas responsive.';
   }
   return 'Enable Output on at least one layer to start a job';
 }

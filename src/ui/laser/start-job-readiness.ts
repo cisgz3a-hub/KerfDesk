@@ -49,7 +49,11 @@ import {
   withControllerReportUnits,
 } from './start-job-preparation';
 import { collectStartWarnings } from './start-job-warnings';
-import { demotedPolicyWarnings, partitionEmitPreflight } from './start-job-readiness-policy';
+import {
+  demotedPolicyWarnings,
+  largeJobPreparationWarning,
+  partitionEmitPreflight,
+} from './start-job-readiness-policy';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 import { startControllerPolicy } from './start-job-controller-policy';
 
@@ -292,10 +296,14 @@ function finalizeStartPreparation({
 
   const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
   const controllerPolicy = startControllerPolicy(controller, gcode, machine);
+  // Scoped scene, so a small selected-output slice of a huge design does not
+  // warn as a large job (ADR-241).
+  const largeJobWarning = largeJobPreparationWarning(prepared.project.scene);
   const warnings = collectStartWarnings(
     project,
     controllerSettings,
     [
+      ...(largeJobWarning === null ? [] : [largeJobWarning]),
       ...demotedPolicyWarnings(project, machine),
       ...advisoryWarnings,
       ...emitSplit.warnings,
