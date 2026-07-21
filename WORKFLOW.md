@@ -3835,6 +3835,122 @@ F-CNC19 tiling.
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
 
+## Phase L flows (Image Studio — ADR-242)
+
+### F-L1. Open, edit, apply
+
+#### Success
+1. The operator selects a `raster-image` object and opens **Edit Image…**
+   (properties-panel button, Tools menu command, or canvas double-click). The
+   Image Studio overlay opens full-screen with the image fitted, tool strip
+   left, tool options on top, Adjustments/Histogram/History right, status row
+   bottom.
+2. Painting with Brush/Pencil (black/white/gray + eyedropper), erasing
+   (to white — white is "no burn / no trace"), and drawing straight lines
+   (drag; Shift constrains to 45°) update the canvas live at source
+   resolution.
+3. **Apply** bakes the working pixels back into the scene object (new
+   `dataUrl` + re-derived luma) as exactly ONE project undo step; the overlay
+   stays open for further work. Physical mm size never changes from painting.
+4. Closing the editor (Esc from Select, or the close button) simply returns
+   to the workspace; the session is kept in memory and reopening the same
+   image resumes it. No confirmation dialog exists anywhere in the editor.
+
+#### Error — decode failure
+1. If the image's `dataUrl` cannot be decoded, a typed toast reports it and
+   the editor does not open; the scene is untouched.
+
+#### Empty — no raster selected
+1. The command is disabled without a `raster-image` selection. For
+   vector-only artwork the path is **Convert to Bitmap** (F-F4) first; the
+   menu tooltip says so.
+
+#### Edge — trace-source image
+1. Editing a kept trace source (ADR-026 tinted backing) changes future
+   re-traces only after Apply; the existing committed vectors are untouched
+   until the operator re-traces (F-L3).
+
+#### Edge — job streaming
+1. While a job is active the overlay shows the streaming state with the
+   software Abort control inside the editor chrome (non-negotiable #9); the
+   editor never blocks it.
+
+### F-L2. Select and change an area
+
+#### Success
+1. Rectangle/ellipse marquee, freehand/polygonal lasso, and magic wand
+   (tolerance + contiguous toggle) create a selection rendered as marching
+   ants; Ctrl+D deselects, Ctrl+Shift+I inverts, feather is a tool option.
+2. **Delete** clears the selected area to white; **Fill** floods it with the
+   active black/white/gray; painting is clipped to the selection while one is
+   active.
+3. Dragging inside the selection moves its pixel contents (source area fills
+   white); arrow keys nudge by 1 px (Shift = 10 px).
+4. Selection-scoped operation applies to every later adjustment/filter
+   (IE-2+).
+
+#### Error
+1. (None specific — selection tools cannot fail; a wand click on a
+   uniform image selects the whole connected region.)
+
+#### Empty — no selection
+1. With no active selection, area operations act on the whole image
+   (the familiar convention); the status row shows "No selection".
+
+#### Edge — selection at image bounds
+1. Selections clamp to the document rectangle; moving contents past the edge
+   discards only what leaves the canvas, matching every raster editor.
+
+### F-L3. Edit → re-trace loop
+
+#### Success
+1. After Apply, **Re-trace** (the existing `tools.retrace-original` path)
+   regenerates vectors from the edited source through the normal Trace
+   dialog; geometry lands at the same mm placement (registration is
+   invariant — the working grid and mm bounds are unchanged by painting).
+2. Painted-in line work appears in the new trace; erased specks and
+   wand-deleted regions drop out of it.
+3. The **view toggle** switches Natural ⇄ Engrave preview (the real
+   compile-path dither at current layer settings) so the operator sees what
+   the laser will burn while editing.
+
+#### Error — trace worker failure
+1. Existing F-E1 handling applies unchanged (bounded timeout, worker
+   retirement, recoverable typed error).
+
+#### Empty — never traced
+1. An image with no prior trace simply opens the Trace dialog fresh; the
+   loop is identical from there.
+
+#### Edge — crop/resize
+1. Crop (and IE-2 resize) are the only operations that change mm bounds, and
+   they do so at the same DPI so physical scale stays honest; the status row
+   shows the resulting mm size before commit.
+
+### F-L4. Editor history and sessions
+
+#### Success
+1. Every committed operation is one editor-local undo step (Ctrl+Z /
+   Ctrl+Shift+Z inside the editor); the History panel lists ops newest-first
+   and clicking one restores that state.
+2. **Revert session** (explicit button) returns to the as-opened pixels.
+3. Apply commits to the project store; the workspace's own undo then treats
+   the whole edit as one step.
+
+#### Error — history budget exceeded
+1. When the tile-history byte budget fills, the oldest entries are evicted
+   silently and the History panel notes "older steps trimmed"; nothing
+   blocks.
+
+#### Empty — no edits yet
+1. **Apply** is disabled until the first operation exists (there is nothing
+   to apply); every tool remains available.
+
+#### Edge — app reload
+1. Sessions are in-memory (IE-1..3): reloading the app drops unapplied
+   editor sessions. Applied work is in the project and its undo history.
+   Session persistence is an IE-4 schema decision (ADR-242).
+
 ## Camera Mode flows
 
 ### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)

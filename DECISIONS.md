@@ -10713,3 +10713,80 @@ exact check; LightBurn compiles arbitrarily complex fills without a size refusal
 - `pre-emit.test.ts` pins that an over-budget scene passes pre-emit;
   `start-job-readiness-policy.test.ts` pins the advisory text and its silence on modest
   scenes.
+
+---
+
+## ADR-242 - Image Studio: in-app raster editing of RasterImage sources
+
+**Date:** 2026-07-21
+**Status:** Accepted (maintainer directed build start, 2026-07-21); staged IE-1..IE-4
+
+### Context
+
+Traced images need pixel repair — adding, deleting, and changing line work and editing selected
+areas — and raster engraves need tonal preparation. LightBurn (2.1.03) has no pixel tools at all:
+no painting, no eraser, no selections, no levels/curves, no background removal; its staff route
+users to external editors (remove.bg, GIMP). The full research record and phased roadmap live in
+`docs/audits/2026-07-21-image-editor-research-and-roadmap.md` with cited external evidence in
+`docs/audits/2026-07-21-image-editor-web-research.md`. In-repo enablers already exist: the kept
+trace source (ADR-026), `tools.retrace-original`, the pure `core/raster` pixel primitives, the
+worker patterns (trace, convert-bitmap), and the fixed-inset overlay + ephemeral-store precedents.
+ADR-030 §3 (Proposed) already called for a dedicated Adjust-Image surface out of the Trace dialog.
+
+### Decision
+
+1. **Image Studio**: a full-screen overlay workspace that edits the pixels of a selected
+   `raster-image` object. Entry via a `tools.edit-image` command, a button beside the selected
+   image's properties, and canvas double-click. The editor is a lazy-loaded chunk (ADR-102
+   precedent) so bundle and cold-start budgets are untouched for non-users.
+2. **In-house pure-TS engine, zero new runtime dependencies through IE-3.** The library survey
+   (RESEARCH_LOG 2026-07-21) found every candidate license-hostile (wasm-vips LGPL; RMBG weights
+   non-commercial), bundle-hostile (OpenCV.js multi-MB), dead, or architecturally incompatible
+   (miniPaint). New pure module `src/core/image-edit/` (RGBA buffers, 256 px copy-on-write tiles,
+   byte-budgeted history, brush/line/selection/fill/adjust ops); UI in `src/ui/image-editor/`.
+3. **RGBA working buffer at source resolution; bake on Apply.** Apply re-encodes `dataUrl`
+   (async worker encode) and re-derives `lumaBase64`, preserving physical mm scale (crop/resize
+   change mm only through the same DPI). Exactly one project-undo entry per Apply. Compile,
+   preview, and emit pipelines are untouched; preview budgets never reduce baked resolution
+   (ADR-202 principle).
+4. **Editor-local undo/redo** over tile snapshots; the project store's whole-Project snapshot
+   history is never engaged per-op. The overlay registers as a modal and owns its keymap
+   (global shortcuts, including Ctrl+Z, are suppressed while a modal is open).
+5. **Sessions are resumable; nothing confirms.** Closing the editor keeps the in-memory session
+   keyed by object id; reopening resumes it; Revert is an explicit action. There is no
+   "discard changes?" dialog or any other confirmation surface (CLAUDE.md #7 / ADR-228).
+   Sessions are in-memory only until an IE-4 schema decision.
+6. **Abort stays reachable (non-negotiable #9):** while a job is active, the overlay shows the
+   streaming state with the software Abort control inside the editor chrome; the editor never
+   blocks it.
+7. **Staging:** IE-1 line work & selections (brush/pencil/eraser/line; marquee/lasso/wand;
+   delete/fill/paint-clipped/move; crop; Apply→re-trace) → IE-2 adjust & filters (levels,
+   curves, histogram, Enhance unsharp parity, blur/median, selection-scoped adjustments,
+   bilinear resize, Halftone/Newsprint/Sketch modes, live trace overlay) → IE-3 retouch
+   (clone, dodge/burn, classical background removal, text stamp, gradients, non-PatchMatch
+   spot-heal) → IE-4 (layers/blend modes/masks, session persistence, acceleration — each its
+   own ADR). This absorbs ADR-030 §3. Cloud/ML/generative features are permanently out
+   (non-negotiable #8; RMBG-class weights are license-unsafe regardless).
+8. **The engrave-path nearest-neighbor resample fix is NOT part of Studio work** — it changes
+   emitted S-values and ships separately with an acknowledged G-code snapshot change.
+
+### Consequences
+
+- Deliberate capability divergence beyond LightBurn, recorded here per the reference-product
+  rule: we keep LightBurn's UX shape (Adjust Image semantics, mask/crop model, dither
+  vocabulary) and exceed its pixel-editing surface intentionally.
+- `AdjustImageDialog` remains the live engrave-stage control (brightness/contrast/gamma scalars
+  consumed at compile); Studio adjustments bake pixels at Apply. Both surfaces state this; no
+  duplicated source of truth.
+- Applying is destructive to `dataUrl` pixels with project undo as the safety net; re-editing
+  resumes from the applied state.
+- Every increment carries perceptual evidence (ADR-025 harness fixtures for the edit→trace
+  loop + rendered before/after PNGs), property tests (determinism, bounds, tile/history
+  invariants), and the Playwright smoke path once UI lands. Green structural suites alone are
+  not acceptance.
+
+### Verification
+
+- Roadmap §8 defines the per-increment gates; WORKFLOW.md F-L1..F-L4 define the operator
+  flows. IE-1 acceptance = all F-L flows demonstrable + perceptual fixtures green + zero new
+  dependencies in `package.json`.
