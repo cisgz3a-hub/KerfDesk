@@ -16,6 +16,7 @@ import {
   type DragModifiers,
   type EditorDrag,
 } from './editor-drag';
+import { useAdjustDialogStore } from './adjust-dialog-store';
 import { useImageEditorStore } from './image-editor-store';
 import type { EditorView } from './image-editor-types';
 import { canvasToDoc } from './editor-canvas-draw';
@@ -68,6 +69,9 @@ export function useEditorPointer(
         return;
       }
       if (e.button !== 0) return;
+      // An open adjustment dialog parks the tools: its preview buffer must
+      // track a stable document (pan/zoom/wheel stay live above).
+      if (useAdjustDialogStore.getState().dialog !== null) return;
       const point = docPoint(e);
       const transformDrag = beginTransformDrag(state, point, view.scale);
       if (transformDrag !== null) {

@@ -5,7 +5,9 @@
 
 import { useEffect, useRef } from 'react';
 import { useRegisterModal } from '../common/use-register-modal';
+import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
+import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
@@ -54,6 +56,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
         <div style={mainColumnStyle}>
           <EditorOptionsBar />
           <EditorCanvas />
+          <AdjustDialogPanel />
           <footer style={statusStyle}>
             <span>
               {session.selection === null ? 'No selection' : 'Selection active'}
@@ -88,6 +91,7 @@ function TopBar(props: {
       <strong style={titleStyle}>
         Image Studio — {session.sourceName} ({session.doc.width}×{session.doc.height} px)
       </strong>
+      <EditorAdjustMenus />
       <span style={topActionsStyle}>
         <button
           type="button"
@@ -167,6 +171,8 @@ const mainColumnStyle: React.CSSProperties = {
   flexDirection: 'column',
   flex: 1,
   minWidth: 0,
+  // Anchors the floating adjustment dialog to the canvas column.
+  position: 'relative',
 };
 const statusStyle: React.CSSProperties = {
   display: 'flex',
