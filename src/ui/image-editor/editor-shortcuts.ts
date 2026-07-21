@@ -4,6 +4,7 @@
 // selection commands, and Esc (cancel → close with the session kept, F-L1).
 
 import { invertMask, selectAllMask } from '../../core/image-select';
+import { useAdjustDialogStore } from './adjust-dialog-store';
 import { useImageEditorStore } from './image-editor-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
@@ -14,6 +15,7 @@ export function handleEditorKeyDown(e: React.KeyboardEvent): void {
     e.preventDefault();
     return;
   }
+  if (handleAdjustDialogKey(e, key)) return;
   if (e.ctrlKey || e.metaKey) {
     if (handleControlKey(key, e.shiftKey)) e.preventDefault();
     return;
@@ -21,6 +23,21 @@ export function handleEditorKeyDown(e: React.KeyboardEvent): void {
   if (handleArrowKey(key, e.shiftKey) || handlePlainKey(key) || handleToolKey(key)) {
     e.preventDefault();
   }
+}
+
+// An open adjustment dialog owns the keys: Enter commits, Esc cancels,
+// everything else is parked (the dialog's own inputs stop propagation).
+function handleAdjustDialogKey(e: React.KeyboardEvent, key: string): boolean {
+  const store = useAdjustDialogStore.getState();
+  if (store.dialog === null) return false;
+  if (key === 'enter') {
+    store.commit();
+    e.preventDefault();
+  } else if (key === 'escape') {
+    store.cancel();
+    e.preventDefault();
+  }
+  return true;
 }
 
 // Arrows nudge the selection outline 1 px (Shift = 10 px); with the Move
@@ -162,6 +179,17 @@ function handleControlKey(key: string, shift: boolean): boolean {
     case 't':
       // Ctrl+T free transform of the selection (or the whole image).
       store.startTransform();
+      return true;
+    case 'i':
+      // Plain Ctrl+I only — Ctrl+Shift+I is Select Inverse above.
+      useAdjustDialogStore.getState().open('invert');
+      return true;
+    case 'l':
+      useAdjustDialogStore.getState().open('levels');
+      return true;
+    case 'u':
+      if (!shift) return false;
+      useAdjustDialogStore.getState().open('desaturate');
       return true;
     default:
       return false;

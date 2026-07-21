@@ -3,6 +3,7 @@
 // (use-brush-cursor.ts), and fit/zoom/pan through the store view.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAdjustPreviewDoc } from './adjust-dialog-store';
 import { docToCanvas, drawEditorScene, drawTransformPreview } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
 import { BRUSH_CURSOR_STYLE, useBrushCursor } from './use-brush-cursor';
@@ -27,8 +28,10 @@ export function EditorCanvas(): JSX.Element {
   const [antsPhase, setAntsPhase] = useState(0);
 
   const revision = session?.revision ?? -1;
-  const doc = session?.doc;
-  // The doc canvas rebuilds only when pixels changed (revision bump).
+  // An enabled adjustment preview substitutes for the working document.
+  const doc = useAdjustPreviewDoc() ?? session?.doc;
+  // The doc canvas rebuilds only when pixels changed (revision bump or a
+  // fresh preview buffer identity).
   // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal
   const docCanvas = useMemo(() => (doc === undefined ? null : docToCanvas(doc)), [doc, revision]);
   useCanvasFit(hostRef, canvasRef, doc, view === null);
