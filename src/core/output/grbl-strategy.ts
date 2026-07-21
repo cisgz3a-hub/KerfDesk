@@ -28,6 +28,7 @@ import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { fillRunwayCommentText } from './fill-runway-comment';
+import { laserParkTarget } from './job-park-target';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 
 const DECIMAL_PLACES = 3;
@@ -106,7 +107,9 @@ function postamble(
   // redundant one; the park move still carries S0, so the laser-off invariant
   // holds either way.
   const lines = laserAlreadyOff ? [] : ['M5'];
-  const park = finishPosition ?? (dialect.parkAtOriginAfterJob ? { x: 0, y: 0 } : null);
+  // Park precedence lives in laserParkTarget (shared with the Job Review
+  // park-outside-frame disclosure) so review and emission cannot diverge.
+  const park = laserParkTarget(dialect, finishPosition);
   if (park !== null) lines.push(laserOffSeekLine(park.x, park.y, device, dialect));
   return lines.join(LINE_END) + LINE_END;
 }
