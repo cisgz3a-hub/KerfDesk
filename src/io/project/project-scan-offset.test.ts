@@ -151,8 +151,20 @@ describe('project scan-offset IO', () => {
     }
   });
 
-  it('rejects physically impossible scan offsets and status without a table', () => {
+  // Rule 7 / ADR-228: the magnitude cap is a heuristic policy, not validity —
+  // a legacy project saved with an over-cap offset must still OPEN. The Start
+  // path surfaces the same finding as a Job Review warning instead.
+  it('opens a project whose saved device scan offsets exceed the magnitude cap', () => {
     const project = createProject();
+    const overCap = deserializeProject(
+      JSON.stringify({
+        ...project,
+        device: {
+          ...project.device,
+          scanningOffsets: [{ speedMmPerMin: 3000, offsetMm: 6 }],
+        },
+      }),
+    );
     const huge = deserializeProject(
       JSON.stringify({
         ...project,
@@ -162,6 +174,18 @@ describe('project scan-offset IO', () => {
         },
       }),
     );
+
+    expect(overCap.kind).toBe('ok');
+    if (overCap.kind === 'ok') {
+      expect(overCap.project.device.scanningOffsets).toEqual([
+        { speedMmPerMin: 3000, offsetMm: 6 },
+      ]);
+    }
+    expect(huge.kind).toBe('ok');
+  });
+
+  it('rejects a calibration status without a table', () => {
+    const project = createProject();
     const orphanStatus = deserializeProject(
       JSON.stringify({
         ...project,
@@ -173,8 +197,6 @@ describe('project scan-offset IO', () => {
       }),
     );
 
-    expect(huge.kind).toBe('invalid');
-    if (huge.kind === 'invalid') expect(huge.reason).toMatch(/device\.scanningOffsets/);
     expect(orphanStatus.kind).toBe('invalid');
     if (orphanStatus.kind === 'invalid') {
       expect(orphanStatus.reason).toMatch(/device\.scanOffsetCalibrationStatus/);

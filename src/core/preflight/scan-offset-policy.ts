@@ -55,8 +55,11 @@ function scanOffsetIssue(
     return null;
   }
   const limit = scanOffsetMagnitudeLimitMm(project.device);
+  // Distinct advisory code (rule 7): a finite over-cap magnitude is a
+  // heuristic finding — it must warn (Job Review, post-save toast), never
+  // block. Only the non-finite case above is a hard validity failure.
   return {
-    code: 'scan-offset-out-of-range',
+    code: 'scan-offset-above-cap',
     message: `${owner} bidirectional scan offset ${String(offset)} mm exceeds the device limit of ±${limit} mm.`,
   };
 }

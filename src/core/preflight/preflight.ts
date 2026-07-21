@@ -45,6 +45,10 @@ export type PreflightCode =
   | 'power-out-of-range'
   | 'speed-out-of-range'
   | 'scan-offset-out-of-range'
+  // Advisory-only (rule 7 / ADR-228): the scan-offset MAGNITUDE cap is a
+  // heuristic, not integrity — consumers must warn on it, never block (Start
+  // via partitionEmitPreflight, Save via partitionSavePreflight).
+  | 'scan-offset-above-cap'
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'offset-fill-open-contour'
