@@ -35,6 +35,8 @@ import {
   layerWithObjectOverride,
   sharedObjectPowerScalePercent,
 } from './compile-job-object-policy';
+import { contourEntryRunwayMm } from './contour-entry';
+import { buildFillGroup } from './fill-group-build';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
@@ -167,29 +169,21 @@ function vectorGroupsForLayer(
         : { ...layer, fillBidirectional: scanDirection.bidirectional };
     const segments = collectFillSegmentsForLayer(objects, hatchingLayer, device);
     if (segments.length === 0) return [];
-    const scanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
     const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
-    const fillRunwayPolicy =
-      layer.fillStyle === 'offset' ? undefined : fillRunwayPolicyForDevice(device);
-    return [
-      {
-        ...common,
-        kind: 'fill' as const,
-        fillStyle: layer.fillStyle,
-        ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
-        ...(layer.fillStyle === 'offset' ? {} : { scanDirection }),
-        ...(layer.fillStyle === 'offset' || scanOffsetMm === undefined
-          ? {}
-          : { bidirectionalScanOffsetMm: scanOffsetMm }),
-        overscanMm: Math.max(0, layer.fillOverscanMm),
-        segments,
-      },
-    ];
+    return [buildFillGroup({ layer, device, common, scanDirection, segments })];
   }
   const segments = collectLineSegmentsForLayer(objects, layer, device);
   if (segments.length === 0) return [];
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
-  return [{ ...common, kind: 'cut' as const, segments }];
+  const entryRunwayMm = contourEntryRunwayMm(device, layer.fillOverscanMm);
+  return [
+    {
+      ...common,
+      kind: 'cut' as const,
+      ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
+      segments,
+    },
+  ];
 }
 
 function islandFillGroupsForLayer(

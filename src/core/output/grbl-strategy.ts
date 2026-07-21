@@ -19,6 +19,7 @@ import {
   type GrblGcodeDialect,
   type GrblPowerMode,
 } from '../devices';
+import { contourEntryPoint } from '../job/contour-entry';
 import { expandFillHatchWithRunways } from '../job/fill-runway';
 import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
 import type { FillSpan, FillSweep } from '../job/fill-sweeps';
@@ -114,13 +115,19 @@ function postamble(
   return lines.join(LINE_END) + LINE_END;
 }
 
-function emitSegment(
-  seg: CutSegment,
-  s: number,
-  feed: number,
-  device: DeviceProfile,
-  dialect: GrblGcodeDialect,
-): string {
+// Shared emission context for contour segments (Line mode and offset fill).
+// entryRunwayMm carries the group's ADR-239 tangential entry; undefined keeps
+// legacy byte-identical approach motion.
+type SegmentEmissionContext = {
+  readonly s: number;
+  readonly feed: number;
+  readonly device: DeviceProfile;
+  readonly dialect: GrblGcodeDialect;
+  readonly entryRunwayMm?: number | undefined;
+};
+
+function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
+  const { s, feed, dialect } = context;
   const first = seg.polyline[0];
   // A one-point polyline has nothing to cut — emitting its rapid alone would
   // be a pointless stray G0 (defense in depth; producers filter these).
@@ -150,8 +157,33 @@ function emitSegment(
   // If the entire segment collapses at emit precision, omit its laser-off seek
   // as well; it has no executable burn motion to position for.
   if (!burnEmitted) return '';
-  const lines = [laserOffSeekLine(first.x, first.y, device, dialect), ...burnLines];
-  return lines.join(LINE_END) + LINE_END;
+  return [...segmentApproachLines(seg, first, context), ...burnLines].join(LINE_END) + LINE_END;
+}
+
+// ADR-239: with an entry runway, seek to the tangential entry point instead of
+// the ink edge, then ramp to the first vertex laser-off at burn feed. The ramp
+// is collinear with the first burn edge, so the junction carries the entry
+// feed into the ink. Without one (or when no tangent exists), keep the legacy
+// direct seek byte-identically.
+function segmentApproachLines(
+  seg: CutSegment,
+  first: { readonly x: number; readonly y: number },
+  context: SegmentEmissionContext,
+): string[] {
+  const entry =
+    context.entryRunwayMm === undefined
+      ? null
+      : contourEntryPoint(seg.polyline, context.entryRunwayMm, {
+          widthMm: context.device.bedWidth,
+          heightMm: context.device.bedHeight,
+        });
+  if (entry === null) {
+    return [laserOffSeekLine(first.x, first.y, context.device, context.dialect)];
+  }
+  return [
+    laserOffSeekLine(entry.x, entry.y, context.device, context.dialect),
+    laserOffRunwayLine(first.x, first.y, context.feed),
+  ];
 }
 
 function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDialect): string {
@@ -169,7 +201,13 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
     // here silently flipped later groups to constant power (audit P2-1).
     if (p > 0) chunks.push(`${vectorPowerWord(group, dialect)} S0`);
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, s, feed, device, dialect);
+      const segText = emitSegment(seg, {
+        s,
+        feed,
+        device,
+        dialect,
+        entryRunwayMm: group.entryRunwayMm,
+      });
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }
@@ -218,7 +256,13 @@ function emitOffsetFillGroup(
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, s, feed, device, dialect);
+      const segText = emitSegment(seg, {
+        s,
+        feed,
+        device,
+        dialect,
+        entryRunwayMm: group.entryRunwayMm,
+      });
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }

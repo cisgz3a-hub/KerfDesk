@@ -203,6 +203,7 @@ function previewFromPrepared(
       startPoint,
       ...(parkPoint === undefined ? {} : { parkPoint }),
       scanningOffsets: project.device.scanningOffsets,
+      bedSizeMm: { widthMm: project.device.bedWidth, heightMm: project.device.bedHeight },
     }),
     prepared.jobOriginOffset,
     project.device,

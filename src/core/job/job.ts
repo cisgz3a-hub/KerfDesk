@@ -43,6 +43,12 @@ export type CutGroup = {
   readonly speed: number; // mm/min; already capped to device.maxFeed
   readonly passes: number; // integer ≥ 1
   readonly airAssist: boolean;
+  // ADR-239: length (mm) of the tangential laser-off G1 entry each contour
+  // start receives at burn feed on the 4040-safe profile. Absent on profiles
+  // that keep legacy contour emission, so their bytes stay identical. Also
+  // carried by Follow Shape (offset) FillGroups via the Omit below; scanline
+  // and island fill use fillRunwayPolicy sweep plans instead and never set it.
+  readonly entryRunwayMm?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
