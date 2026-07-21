@@ -12,6 +12,7 @@ import {
   commitMoveSelection,
   commitStroke,
   createSession,
+  nudgeOutline,
   redoSession,
   revertSession,
   undoSession,
@@ -96,6 +97,17 @@ describe('editor session ops', () => {
     // The mask travelled: deleting now clears the moved block.
     session = commitFillSelection(session, WHITE, 'Delete selection');
     expect(channelAt(session, 7, 2)).toBe(255);
+  });
+
+  it('nudgeOutline moves only the selection, never the pixels', () => {
+    let session = newSession();
+    session = commitStroke(session, { kind: 'pencil' }, PENCIL, BLACK, [{ x: 3, y: 3 }], 'Pencil');
+    session = withSelection(session, rectSelection(24, 24, { x: 2, y: 2, width: 3, height: 3 }));
+    const before = channelAt(session, 3, 3);
+    session = nudgeOutline(session, 4, 0);
+    expect(channelAt(session, 3, 3)).toBe(before);
+    expect(session.selection?.alpha[3 * 24 + 7]).toBeGreaterThan(0);
+    expect(session.selection?.alpha[3 * 24 + 3]).toBe(0);
   });
 
   it('revert returns to the as-opened pixels and clears history', () => {

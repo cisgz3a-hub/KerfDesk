@@ -100,11 +100,26 @@ function stampCentres(stroke: PaintStroke): readonly PaintPoint[] {
 }
 
 /**
+ * A selection clip for paint ops: one alpha byte per document pixel.
+ * Structural (not the image-select SelectionMask type) so the two core
+ * modules stay acyclic; any mask with a matching alpha buffer satisfies it.
+ */
+export type PaintClip = {
+  readonly alpha: Uint8Array;
+};
+
+/**
  * Rasterize the stroke into the buffer (mutates pixels in place) and return
  * the dirty rect it wrote inside. Alpha stays opaque — the document has no
- * transparency; "erasing" paints white.
+ * transparency; "erasing" paints white. With a clip, every pixel's paint
+ * alpha is weighted by the selection alpha (Photoshop: strokes clamp to the
+ * active selection).
  */
-export function paintStrokeInPlace(buffer: RgbaBuffer, stroke: PaintStroke): PixelRect {
+export function paintStrokeInPlace(
+  buffer: RgbaBuffer,
+  stroke: PaintStroke,
+  clip?: PaintClip,
+): PixelRect {
   const rect = strokeDirtyRect(stroke, buffer);
   if (rect.width === 0 || rect.height === 0) return rect;
   const window = createCoverageWindow(rect.x, rect.y, rect.width, rect.height);
@@ -114,9 +129,11 @@ export function paintStrokeInPlace(buffer: RgbaBuffer, stroke: PaintStroke): Pix
   const opacity = Math.min(1, Math.max(0, stroke.brush.opacity));
   for (let row = 0; row < rect.height; row += 1) {
     for (let col = 0; col < rect.width; col += 1) {
-      const alpha = (window.alpha[row * rect.width + col] ?? 0) * opacity;
+      const docIndex = (rect.y + row) * buffer.width + rect.x + col;
+      const clipAlpha = clip === undefined ? 1 : (clip.alpha[docIndex] ?? 0) / 255;
+      const alpha = (window.alpha[row * rect.width + col] ?? 0) * opacity * clipAlpha;
       if (alpha <= 0) continue;
-      const base = ((rect.y + row) * buffer.width + rect.x + col) * RGBA_CHANNELS;
+      const base = docIndex * RGBA_CHANNELS;
       blendChannel(buffer, base, stroke.color.r, alpha);
       blendChannel(buffer, base + 1, stroke.color.g, alpha);
       blendChannel(buffer, base + 2, stroke.color.b, alpha);

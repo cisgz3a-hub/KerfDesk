@@ -8,9 +8,11 @@ import { ellipseSelection, polygonSelection, rectSelection } from '../../core/im
 import {
   advanceDrag,
   beginDrag,
+  booleanFromModifiers,
   CLICK_TOLERANCE_PX,
   IDLE_DRAG,
   marqueeRect,
+  type DragModifiers,
   type EditorDrag,
 } from './editor-drag';
 import { useImageEditorStore } from './image-editor-store';
@@ -59,22 +61,7 @@ export function useEditorPointer(
         return;
       }
       if (e.button !== 0) return;
-      const point = docPoint(e);
-      const isPaintTool =
-        state.tool.kind === 'brush' ||
-        state.tool.kind === 'pencil' ||
-        state.tool.kind === 'eraser' ||
-        state.tool.kind === 'line';
-      // Alt-click inside a paint tool = temporary eyedropper.
-      if (isPaintTool && e.altKey) {
-        sampleForeground(point.x, point.y);
-        return;
-      }
-      if (state.tool.kind === 'wand') {
-        state.wandAt(point.x, point.y);
-        return;
-      }
-      update(beginDrag(state.tool, point, e.shiftKey, (state.session?.selection ?? null) !== null));
+      startToolDrag(e, docPoint(e), update);
     },
     [docPoint, update],
   );
@@ -92,7 +79,14 @@ export function useEditorPointer(
         update({ kind: 'pan', lastClientX: e.clientX, lastClientY: e.clientY });
         return;
       }
-      update(advanceDrag(current, docPoint(e), e.shiftKey));
+      update(
+        advanceDrag(
+          current,
+          docPoint(e),
+          { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey },
+          useImageEditorStore.getState().isSpacePanning,
+        ),
+      );
     },
     [docPoint, setView, update, view],
   );
@@ -133,6 +127,39 @@ function zoomAtPointer(
   });
 }
 
+// Left-button tool dispatch: Alt-click eyedropper inside paint tools, wand
+// click with boolean modifiers, otherwise begin the pure drag state.
+function startToolDrag(
+  e: React.PointerEvent<HTMLCanvasElement>,
+  point: { x: number; y: number },
+  update: (drag: EditorDrag) => void,
+): void {
+  const state = useImageEditorStore.getState();
+  const isPaintTool =
+    state.tool.kind === 'brush' ||
+    state.tool.kind === 'pencil' ||
+    state.tool.kind === 'eraser' ||
+    state.tool.kind === 'line';
+  if (isPaintTool && e.altKey) {
+    sampleForeground(point.x, point.y);
+    return;
+  }
+  const modifiers: DragModifiers = { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey };
+  const selection = state.session?.selection ?? null;
+  if (state.tool.kind === 'wand') {
+    state.wandAt(
+      point.x,
+      point.y,
+      booleanFromModifiers(modifiers, selection !== null) ?? undefined,
+    );
+    return;
+  }
+  const insideSelection =
+    selection !== null &&
+    (selection.alpha[Math.floor(point.y) * selection.width + Math.floor(point.x)] ?? 0) > 0;
+  update(beginDrag(state.tool, point, modifiers, selection !== null, insideSelection));
+}
+
 // Alt-click eyedropper: sample the document pixel under the cursor into the
 // foreground color.
 function sampleForeground(x: number, y: number): void {
@@ -168,7 +195,13 @@ function completeDrag(drag: EditorDrag): void {
       completeMarquee(drag, doc.width, doc.height);
       return;
     case 'lasso':
-      store.select(polygonSelection(doc.width, doc.height, drag.points));
+      store.combineSelection(
+        polygonSelection(doc.width, doc.height, drag.points),
+        drag.booleanOverride ?? undefined,
+      );
+      return;
+    case 'move-outline':
+      store.nudgeSelection(drag.to.x - drag.from.x, drag.to.y - drag.from.y, false);
       return;
     case 'move-selection':
       store.moveSelection(drag.to.x - drag.from.x, drag.to.y - drag.from.y);
@@ -183,15 +216,15 @@ function completeMarquee(
 ): void {
   const store = useImageEditorStore.getState();
   const rect = marqueeRect(drag);
-  // A sub-tolerance drag is a click: clear the selection instead of
-  // selecting a sliver.
+  // A sub-tolerance replace-mode drag is a click: clear the selection.
   if (rect.width < CLICK_TOLERANCE_PX && rect.height < CLICK_TOLERANCE_PX) {
-    store.select(null);
+    if (drag.booleanOverride === null && store.selectionMode === 'replace') store.select(null);
     return;
   }
-  store.select(
-    drag.ellipse
+  store.combineSelection(
+    drag.shape === 'ellipse'
       ? ellipseSelection(docWidth, docHeight, rect)
       : rectSelection(docWidth, docHeight, rect),
+    drag.booleanOverride ?? undefined,
   );
 }

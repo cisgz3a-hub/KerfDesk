@@ -85,6 +85,7 @@ function drawDragPreview(
     case 'idle':
     case 'pan':
     case 'move-selection':
+    case 'move-outline':
       break;
     case 'paint':
     case 'lasso': {
@@ -100,32 +101,39 @@ function drawDragPreview(
       strokePolyline(ctx, [drag.from, drag.to]);
       break;
     }
-    case 'marquee': {
-      const rect = marqueeRect(drag);
-      ctx.strokeStyle = PREVIEW_ACCENT;
-      ctx.lineWidth = 1 / view.scale;
-      ctx.setLineDash([4 / view.scale, 3 / view.scale]);
-      if (drag.ellipse) {
-        ctx.beginPath();
-        ctx.ellipse(
-          rect.x + rect.width / 2,
-          rect.y + rect.height / 2,
-          rect.width / 2,
-          rect.height / 2,
-          0,
-          0,
-          Math.PI * 2,
-        );
-        ctx.stroke();
-      } else {
-        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-      }
+    case 'marquee':
+      drawMarqueePreview(ctx, drag, view);
       break;
-    }
     default:
       break;
   }
   ctx.restore();
+}
+
+function drawMarqueePreview(
+  ctx: CanvasRenderingContext2D,
+  drag: Extract<EditorDrag, { kind: 'marquee' }>,
+  view: EditorView,
+): void {
+  const rect = marqueeRect(drag);
+  ctx.strokeStyle = PREVIEW_ACCENT;
+  ctx.lineWidth = 1 / view.scale;
+  ctx.setLineDash([4 / view.scale, 3 / view.scale]);
+  if (drag.shape === 'ellipse') {
+    ctx.beginPath();
+    ctx.ellipse(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+      rect.width / 2,
+      rect.height / 2,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+  } else {
+    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  }
 }
 
 function strokePolyline(

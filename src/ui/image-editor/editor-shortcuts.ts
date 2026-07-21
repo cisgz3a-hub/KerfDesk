@@ -18,7 +18,27 @@ export function handleEditorKeyDown(e: React.KeyboardEvent): void {
     if (handleControlKey(key, e.shiftKey)) e.preventDefault();
     return;
   }
-  if (handlePlainKey(key) || handleToolKey(key)) e.preventDefault();
+  if (handleArrowKey(key, e.shiftKey) || handlePlainKey(key) || handleToolKey(key)) {
+    e.preventDefault();
+  }
+}
+
+// Arrows nudge the selection outline 1 px (Shift = 10 px); with the Move
+// tool active they move the selected pixels instead (Photoshop).
+function handleArrowKey(key: string, shift: boolean): boolean {
+  const store = useImageEditorStore.getState();
+  if (store.session?.selection == null) return false;
+  const step = shift ? 10 : 1;
+  const deltas: Readonly<Record<string, readonly [number, number]>> = {
+    arrowleft: [-step, 0],
+    arrowright: [step, 0],
+    arrowup: [0, -step],
+    arrowdown: [0, step],
+  };
+  const delta = deltas[key];
+  if (delta === undefined) return false;
+  store.nudgeSelection(delta[0], delta[1], store.tool.kind === 'move');
+  return true;
 }
 
 // [ / ] resize, Shift+[ / Shift+] harden (Photoshop conventions).
@@ -153,7 +173,13 @@ function handleToolKey(key: string): boolean {
       store.setTool({ kind: 'line' });
       return true;
     case 'm':
-      store.setTool({ kind: 'marquee' });
+      // M activates the marquee; pressing it again cycles rect ⇄ ellipse
+      // (the Photoshop flyout-cycle reduction).
+      store.setTool(
+        store.tool.kind === 'marquee'
+          ? { kind: 'marquee', shape: store.tool.shape === 'rect' ? 'ellipse' : 'rect' }
+          : { kind: 'marquee', shape: 'rect' },
+      );
       return true;
     case 's':
       store.setTool({ kind: 'lasso' });

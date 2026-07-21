@@ -8,7 +8,13 @@
 
 import { create } from 'zustand';
 import type { PaintColor, PaintPoint } from '../../core/image-edit';
-import { wandSelection, type SelectionMask } from '../../core/image-select';
+import {
+  combineMasks,
+  isMaskEmpty,
+  wandSelection,
+  type SelectionCombineMode,
+  type SelectionMask,
+} from '../../core/image-select';
 import type { RasterImage } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -19,6 +25,8 @@ import {
   commitMoveSelection,
   commitStroke,
   createSession,
+  modifySelectionMask,
+  nudgeOutline,
   redoSession,
   revertSession,
   undoSession,
@@ -27,6 +35,7 @@ import {
   type BrushSettings,
   type EditorSession,
   type EditorTool,
+  type SelectionModifyKind,
 } from './editor-session';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 import type { EditorView } from './image-editor-types';
@@ -50,6 +59,8 @@ type ImageEditorState = {
   readonly background: PaintColor;
   readonly wandTolerance: number;
   readonly wandContiguous: boolean;
+  /** Sticky selection boolean mode (the four options-bar buttons). */
+  readonly selectionMode: SelectionCombineMode;
   readonly isApplying: boolean;
   /** Viewport transform; null = fit-to-window on next canvas layout. */
   readonly view: EditorView | null;
@@ -73,7 +84,12 @@ type ImageEditorState = {
   readonly stroke: (points: readonly PaintPoint[]) => void;
   readonly line: (from: PaintPoint, to: PaintPoint, constrain45: boolean) => void;
   readonly select: (mask: SelectionMask | null) => void;
-  readonly wandAt: (x: number, y: number) => void;
+  /** Combine a new selection with the current one (sticky mode unless overridden). */
+  readonly combineSelection: (incoming: SelectionMask, override?: SelectionCombineMode) => void;
+  readonly setSelectionMode: (mode: SelectionCombineMode) => void;
+  readonly modifySelection: (kind: SelectionModifyKind, radiusPx: number) => void;
+  readonly nudgeSelection: (dx: number, dy: number, movePixels: boolean) => void;
+  readonly wandAt: (x: number, y: number, override?: SelectionCombineMode) => void;
   readonly deleteSelection: () => void;
   readonly fillSelection: () => void;
   readonly moveSelection: (dx: number, dy: number) => void;
@@ -93,6 +109,7 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   background: WHITE,
   wandTolerance: DEFAULT_WAND_TOLERANCE,
   wandContiguous: true,
+  selectionMode: 'replace',
   isApplying: false,
   view: null,
   viewportSize: { width: 0, height: 0 },
@@ -100,16 +117,7 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
 
   openEditor: (image) => openEditorAction(set, get, image),
 
-  closeEditor: () => {
-    const { session } = get();
-    set((s) => ({
-      session: null,
-      loadState: { kind: 'idle' },
-      view: null,
-      isSpacePanning: false,
-      stash: session === null ? s.stash : { ...s.stash, [session.objectId]: session },
-    }));
-  },
+  closeEditor: () => closeEditorAction(set, get),
 
   setTool: (tool) => set({ tool }),
   setBrush: (brush) => set((s) => ({ brush: { ...s.brush, ...brush } })),
@@ -138,16 +146,23 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
     ),
 
   select: (mask) => withSession(set, get, (session) => withSelection(session, mask)),
-  wandAt: (x, y) =>
-    withSession(set, get, (session, s) =>
-      withSelection(
-        session,
-        wandSelection(session.doc, x, y, {
-          tolerance: s.wandTolerance,
-          contiguous: s.wandContiguous,
-        }),
-      ),
+  combineSelection: (incoming, override) =>
+    withSession(set, get, (session, s) => {
+      const combined = combineMasks(session.selection, incoming, override ?? s.selectionMode);
+      return withSelection(session, isMaskEmpty(combined) ? null : combined);
+    }),
+  setSelectionMode: (selectionMode) => set({ selectionMode }),
+  modifySelection: (kind, radiusPx) =>
+    withSession(set, get, (session) =>
+      session.selection === null
+        ? session
+        : withSelection(session, modifySelectionMask(session.selection, kind, radiusPx)),
     ),
+  nudgeSelection: (dx, dy, movePixels) =>
+    withSession(set, get, (session) =>
+      movePixels ? commitMoveSelection(session, dx, dy) : nudgeOutline(session, dx, dy),
+    ),
+  wandAt: (x, y, override) => wandAtAction(get, x, y, override),
   deleteSelection: () =>
     withSession(set, get, (session) => commitFillSelection(session, WHITE, 'Delete selection')),
   fillSelection: () =>
@@ -167,6 +182,31 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
 type Setter = (
   partial: Partial<ImageEditorState> | ((state: ImageEditorState) => Partial<ImageEditorState>),
 ) => void;
+
+function closeEditorAction(set: Setter, get: () => ImageEditorState): void {
+  const { session } = get();
+  set((s) => ({
+    session: null,
+    loadState: { kind: 'idle' },
+    view: null,
+    isSpacePanning: false,
+    stash: session === null ? s.stash : { ...s.stash, [session.objectId]: session },
+  }));
+}
+
+function wandAtAction(
+  get: () => ImageEditorState,
+  x: number,
+  y: number,
+  override?: SelectionCombineMode,
+): void {
+  const { session, wandTolerance, wandContiguous, combineSelection } = get();
+  if (session === null) return;
+  combineSelection(
+    wandSelection(session.doc, x, y, { tolerance: wandTolerance, contiguous: wandContiguous }),
+    override,
+  );
+}
 
 function openEditorAction(set: Setter, get: () => ImageEditorState, image: RasterImage): void {
   const { stash, session } = get();
