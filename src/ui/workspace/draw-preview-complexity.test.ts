@@ -4,6 +4,7 @@ import {
   createProject,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
+  type RasterImage,
   type TracedImage,
 } from '../../core/scene';
 import { PREPARATION_RAW_VECTOR_SEGMENT_BUDGET } from '../../core/job';
@@ -86,6 +87,42 @@ describe('buildPreviewToolpath complexity guard', () => {
 
     expect(gcodeMocks.prepareOutput).not.toHaveBeenCalled();
     expect(toolpath.totalLength).toBe(0);
+    expect((toolpath as { readonly previewIssue?: { kind: string } }).previewIssue).toEqual({
+      kind: 'too-complex',
+    });
+  });
+
+  it('pauses the preview for a raster above the work-unit budget (ADR-243)', () => {
+    gcodeMocks.prepareOutput.mockImplementationOnce(() => {
+      throw new Error('prepareOutput should not run for a preview-paused huge raster');
+    });
+    const base = createProject();
+    const color = '#808080';
+    const raster: RasterImage = {
+      kind: 'raster-image',
+      id: 'R1',
+      color,
+      source: 'x.png',
+      dataUrl: 'data:image/png;base64,unused',
+      pixelWidth: 4,
+      pixelHeight: 4,
+      dither: 'floyd-steinberg',
+      linesPerMm: 25,
+      bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      transform: IDENTITY_TRANSFORM,
+    };
+    const project = {
+      ...base,
+      scene: {
+        ...EMPTY_SCENE,
+        layers: [{ ...createLayer({ id: color, color, mode: 'image' as const }), linesPerMm: 25 }],
+        objects: [raster],
+      },
+    };
+
+    const toolpath = buildPreviewToolpath(project);
+
+    expect(gcodeMocks.prepareOutput).not.toHaveBeenCalled();
     expect((toolpath as { readonly previewIssue?: { kind: string } }).previewIssue).toEqual({
       kind: 'too-complex',
     });

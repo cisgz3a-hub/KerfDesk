@@ -29,17 +29,12 @@ describe('preview preparation failures', () => {
     });
   });
 
-  it('preserves raster budget failures beside the blank preview', () => {
+  it('previews a formerly refused raster — 3000x3000 px streams (ADR-243)', () => {
+    // Before ADR-243 this raster was refused for its ~78 MB materialized
+    // working set. It now compiles as a streamed group and previews normally.
     const toolpath = buildPreviewToolpath(hugeRasterProject());
 
-    expect(previewIssueFor(toolpath)).toMatchObject({
-      kind: 'preparation-failed',
-      messages: [
-        expect.stringMatching(
-          /3000x3000 px \(~78 MB materialized working set exceeds the 64 MB budget\)/,
-        ),
-      ],
-    });
+    expect(previewIssueFor(toolpath)).toBeNull();
   });
 });
 

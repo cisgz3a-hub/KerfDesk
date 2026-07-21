@@ -56,7 +56,9 @@ export type PreflightCode =
   | 'laser-on-travel'
   | 'long-blank-feed'
   | 'no-go-zone-collision'
-  | 'raster-too-large'
+  // Compile integrity (rule 7 category b): the JS engine factually failed to
+  // materialize the program string (RangeError). Not a predictive size cap.
+  | 'program-materialization-failed'
   | 'compiled-output-budget-exceeded'
   | 'selected-output-empty'
   | 'variable-evaluation-failed'

@@ -91,10 +91,6 @@ export function evaluateRasterBudget(
   return { kind: 'ok', budget };
 }
 
-export function supportsStreamedRasterRows(algorithm: DitherAlgorithm): boolean {
-  return algorithm === 'threshold' || algorithm === 'ordered' || algorithm === 'grayscale';
-}
-
 function finiteExtent(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }

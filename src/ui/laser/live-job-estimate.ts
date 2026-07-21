@@ -8,6 +8,7 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
+import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -47,16 +48,21 @@ export function estimateLiveJob(
   const outputProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
 
-  // Cheap vector pre-counts gate compile so huge traces/fills cannot freeze ETA.
+  // Cheap pre-counts gate compile so huge traces/fills/rasters cannot freeze
+  // the ETA. These pause the estimate only — Start/Save/Frame still prepare
+  // (ADR-241/ADR-243).
   if (countOutputVectorSegments(outputProject.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
   if (countEstimatedFillSegments(outputProject.scene) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
+  if (rasterPreparationTooComplex(outputProject)) {
+    return { kind: 'too-large' };
+  }
 
   // Same prepared job as Save / Start / Preview, so ETA times the path the
-  // machine runs. Over-budget raster preparation reports too-large instead.
+  // machine runs.
   const prepared = prepareOutput(project, {
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
@@ -82,6 +88,9 @@ export async function estimateLiveJobSnapshot(
   if (countEstimatedFillSegments(outputProject.scene) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
+  if (rasterPreparationTooComplex(outputProject)) {
+    return { kind: 'too-large' };
+  }
   const prepared = await prepareOutputSnapshot(project, {
     outputScope,
     clock,
@@ -92,13 +101,36 @@ export async function estimateLiveJobSnapshot(
   return estimatePrepared(prepared, jobOrigin);
 }
 
+/**
+ * estimateLiveJob without the responsiveness gates: prepares and times the
+ * job no matter its size. Only call this off the main thread (the ADR-244
+ * preparation worker) or in tests.
+ */
+export function estimateLiveJobUnbounded(
+  project: Project,
+  outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
+  jobOrigin?: JobOriginPlacement,
+): LiveJobEstimate {
+  const scoped = validateOutputScope(project.scene, outputScope);
+  if (!scoped.ok) return { kind: 'empty' };
+  const prepared = prepareOutput(project, {
+    outputScope,
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+  });
+  return estimatePrepared(prepared, jobOrigin, { unbounded: true });
+}
+
 function estimatePrepared(
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
+  options: { readonly unbounded?: boolean } = {},
 ): LiveJobEstimate {
   if (!prepared.ok) return { kind: 'too-large' };
   if (prepared.job.groups.length === 0) return { kind: 'empty' };
-  if (countCompiledCutSegments(prepared.job) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
+  if (
+    options.unbounded !== true &&
+    countCompiledCutSegments(prepared.job) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET
+  ) {
     return { kind: 'too-large' };
   }
 

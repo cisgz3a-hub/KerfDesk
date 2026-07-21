@@ -20,22 +20,37 @@ export type ImageMaskInput = {
 };
 
 export function applyImageMaskToLuma(input: ImageMaskInput): Uint8Array {
-  if (input.image.imageMaskId === undefined) return input.luma;
-  if (input.maskObject?.id !== input.image.imageMaskId) return input.luma;
-  const contours = closedMaskContours(input.maskObject);
-  if (contours.length === 0) return input.luma;
   const width = Math.max(1, Math.floor(input.width));
   const height = Math.max(1, Math.floor(input.height));
+  const insideMask = createImageMaskPixelTest(input.image, input.maskObject, width, height);
+  if (insideMask === null) return input.luma;
   const out = new Uint8Array(input.luma);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const idx = y * width + x;
-      if (!pointInEvenOdd(pixelCenterInScene(input.image, x, y, width, height), contours)) {
-        out[idx] = WHITE_LUMA_BYTE;
-      }
+      if (!insideMask(x, y)) out[y * width + x] = WHITE_LUMA_BYTE;
     }
   }
   return out;
+}
+
+/**
+ * Per-pixel mask membership test on the image's target pixel grid, or null
+ * when no mask applies. Row-streaming raster compiles use this to whiten
+ * masked-out pixels one row at a time instead of materializing the full
+ * masked luma buffer (ADR-243). Coordinates are the PRE-orientation target
+ * grid — the same grid applyImageMaskToLuma masks.
+ */
+export function createImageMaskPixelTest(
+  image: RasterImage,
+  maskObject: SceneObject | null | undefined,
+  width: number,
+  height: number,
+): ((x: number, y: number) => boolean) | null {
+  if (image.imageMaskId === undefined) return null;
+  if (maskObject?.id !== image.imageMaskId) return null;
+  const contours = closedMaskContours(maskObject);
+  if (contours.length === 0) return null;
+  return (x, y) => pointInEvenOdd(pixelCenterInScene(image, x, y, width, height), contours);
 }
 
 export function hasClosedImageMaskGeometry(object: SceneObject): boolean {

@@ -10790,3 +10790,150 @@ ADR-030 §3 (Proposed) already called for a dedicated Adjust-Image surface out o
 - Roadmap §8 defines the per-increment gates; WORKFLOW.md F-L1..F-L4 define the operator
   flows. IE-1 acceptance = all F-L flows demonstrable + perceptual fixtures green + zero new
   dependencies in `package.json`.
+
+## ADR-243 - Rasters of any size stream row-by-row; the raster budget becomes advisories
+
+**Date:** 2026-07-21
+**Status:** Accepted
+
+### Context
+
+After ADR-241 removed the vector/fill segment-budget refusal, two size refusals still made
+image jobs impossible above fixed caps, both surviving from the Laser 9 program's P1-A
+"app froze after an image job" mitigation:
+
+1. `runPreEmitPreflight` refused any image operation whose pixel grid exceeded 50M pixel-pass
+   work units or whose estimated dither working set exceeded 64 MB (`raster-too-large`).
+   Row-streaming existed but only for the row-independent dithers (threshold / ordered /
+   grayscale) on unmasked images; error diffusion "requires full-image state" and always
+   materialized width×height Float32+Uint16 buffers.
+2. `prepareOutput` refused any compiled job measuring over 250,000 motion segments or ~96 MB
+   of estimated program text (`compiled-output-budget-exceeded`), killing Start, Save, Frame,
+   preview, and estimate alike.
+
+Both are policy caps, not integrity facts (rule 7 / ADR-228): the maintainer's direction is
+that the software runs any job of any size. The "full-image state" premise is false — every
+shipped diffusion kernel (Floyd-Steinberg, Jarvis, Stucki, Atkinson, Burkes, Sierra) reaches
+at most TWO rows ahead, so a rolling three-row window reproduces the materialized dither
+bit-for-bit while holding O(width) state. Image masks are per-pixel point-in-polygon tests
+and stream just as easily.
+
+### Decision
+
+1. **Streamed error diffusion** (`core/raster/dither-rows.ts`): a sequential row ditherer
+   holding three Float32 rows reproduces `dither()` exactly (property-tested bit-for-bit
+   across all eight kernels). Rewind replays deterministically from row 0 — correct for any
+   access pattern; the rotary row-reverse wrapper degrades to O(h²) rather than misbehaving.
+2. **Universal streaming** (`core/job/compile-job-raster-stream.ts`): above the existing
+   4M-pixel threshold every raster streams — any dither algorithm, masked or not, any origin
+   orientation, rotated or not. Unrotated images keep the resample → mask (pre-orientation
+   grid) → orient → dither pipeline; rotated images use the ADR-track #321 inverse-transform
+   sampler with the mask applied at source resolution (matching rotatedMaskedRasterLuma).
+   Both are pinned byte-identical to the materialized pipeline by parity tests.
+3. **Refusals become advisories.** `raster-too-large` is deleted. The pre-emit raster check
+   is gone; `prepareOutput` no longer runs the compiled-work refusal. Job Review now carries:
+   a "very large image" advisory (over 50M work units — the live preview/estimate pause
+   threshold), and the compiled-work measurements ("large program: N motion segments / ~M MB
+   of G-code") as advisories via `start-job-readiness-policy`. The live preview and estimate
+   gain a cheap raster work-unit gate (`core/job/raster-preparation-complexity.ts`) mirroring
+   the ADR-241 vector gates: they pause above budget, they refuse nothing.
+4. **One genuine size boundary remains — compile integrity.** `materializeProgram`
+   (io/gcode) converts an actual engine string-overflow (RangeError, ~512 MB single-string
+   limit) into `program-materialization-failed`, blocking with the remedy in the message
+   (lower lines/mm, reduce passes, split the job). It fires only on the real engine failure,
+   never on a predictive estimate. This amends ADR-230 point 7's premise: a raster over the
+   old budget CAN now produce its exact artifact and earn a Frame permit; only a program the
+   engine factually cannot materialize still cannot be framed (no artifact, no permit).
+
+### Consequences
+
+- Any image engrave the operator can configure now compiles, frames, previews its motion
+  envelope, and streams — 50M+ pixel photo engraves included. Preparation cost is time, not
+  a refusal, and the operator is told in Job Review.
+- Start-time preparation of a very large raster re-runs the row pipeline for each consumer
+  scan (bounds, duration, toolpath, emit × passes) instead of dithering once — the O(width)
+  memory / repeated-compute tradeoff. Moving preparation off the main thread (ADR-244)
+  absorbs the wait for the live surfaces.
+- The rotary image path (Labs-gated, ADR-127) on a streamed error-diffusion raster pays the
+  O(h²) reverse-replay cost; acceptable for the Labs corner it lives in.
+- `save-processed-bitmap` still uses `evaluateRasterBudget` for its canvas PNG export — a
+  genuinely materializing UI feature, unchanged here and worth its own review later.
+
+### Verification
+
+- `dither-rows.test.ts` — property test pins streamed ≡ materialized bit-for-bit for all 8
+  kernels plus rewind/descending/cached-row determinism.
+- `compile-job-raster-stream.test.ts` — 16-way parity matrix (4 dithers × 2 origins ×
+  mask on/off) against the materialized resample→mask→orient→dither reference.
+- `emit-gcode.test.ts` — a 2500×2500 pass-through Floyd-Steinberg raster (refused before
+  this ADR for its 75 MB working set) emits real G-code with a passing preflight;
+  `materializeProgram` unit tests pin the RangeError conversion and rethrow.
+- `pre-emit.test.ts`, `prepare-output.test.ts` — oversized rasters pass pre-emit and prepare
+  as streamed groups; `raster-preparation-complexity.test.ts` pins the advisory gate;
+  `draw-preview-complexity.test.ts` pins the preview pause. The #321 rotation suite
+  (`compile-job-raster-rotation.test.ts`) still passes over the relocated streamed provider.
+- G-code snapshots unchanged (fixture corpus is below the streaming threshold).
+- NOT verified on hardware: no physical burn of a streamed error-diffusion engrave yet; the
+  bit-for-bit equivalence proof is the software argument that output is unchanged.
+
+## ADR-244 - Large-job preview and estimate prepare off the main thread
+
+**Date:** 2026-07-21
+**Status:** Accepted
+
+### Context
+
+ADR-241/ADR-243 removed every size refusal from Start/Save/Frame, but the live canvas
+preview and ETA badge still PAUSE above the responsiveness budgets (100k vector segments /
+20k estimated fill segments / 50M raster work units): preparing such a scene synchronously
+would freeze the canvas for seconds to minutes. The operator of a large job therefore
+confirmed it from the Job Review warnings alone, with no rendered toolpath and no ETA —
+informative, but blind.
+
+### Decision
+
+1. A dedicated module Worker (`ui/workspace/preparation-worker.ts`, bundled by Vite the
+   same way as the existing Convert-to-Bitmap worker) runs the UNBOUNDED preparation —
+   `buildPreviewToolpathUnbounded` + `estimateLiveJobUnbounded`, new gate-free variants of
+   the same single-pipeline builders — and returns both the preview toolpath and the
+   estimate from ONE compile. All message types live in `preparation-worker-protocol.ts`.
+2. The client (`preparation-worker-client.ts`) single-flights per (project identity,
+   options) via a WeakMap, so the preview and the estimate share one expensive prepare.
+   Requests for the same project queue on the worker; a request for a DIFFERENT project
+   terminates the worker (computes cannot be interrupted cooperatively) and rejects stale
+   promises, which callers treat as "ignore".
+3. `usePreviewToolpath` shows a new `preparing-large-job` banner ("preparing the route
+   preview in the background… Start and Save do not wait for it") while the worker runs,
+   then fills the canvas in with the real toolpath. `useJobEstimate` keeps the "large job"
+   badge until the worker's estimate replaces it; its follow-up is generation-guarded
+   because settling the synchronous estimate re-runs the effect and would otherwise cancel
+   the in-flight worker result. Environments without Worker (vitest/jsdom) keep the
+   ADR-241/243 paused behavior — the sync path is unchanged.
+4. Variable-text and print-cut-registration projects stay on the snapshot pipeline and do
+   not use the worker: their clock/renderer callbacks cannot cross the worker boundary.
+   Over-budget scenes in that combination keep the paused banner (rare; documented).
+
+### Consequences
+
+- A huge fill or photo engrave now shows its true toolpath and ETA a few seconds-to-minutes
+  after the edit settles, with zero main-thread jank; the operator confirms Job Review with
+  a rendered route again.
+- Start/Save/Frame still prepare on the main thread when invoked (one-shot operator
+  actions); moving THOSE onto the worker (and reusing its result for Start via the
+  handoff-consistency fingerprints) is possible follow-up work but touches the evidence
+  epochs, so it is deliberately out of scope here.
+- The worker bundle pulls the core+io pipeline plus `canvasTheme` constants; all pure —
+  no DOM access at import time (verified by the worker building in vite build).
+
+### Verification
+
+- `preparation-worker-client.test.ts` — stub-Worker tests: null without Worker support,
+  single-flight sharing, same-project queuing, different-project supersede + terminate,
+  error propagation, retry-after-rejection.
+- `use-preview-toolpath.test.tsx` — over-budget preview shows `preparing-large-job`, fills
+  in with the worker toolpath, and keeps the paused banner when workers are unavailable.
+  `use-job-estimate.test.tsx` — a too-large estimate is replaced by the worker result.
+- The worker glue file itself (`self.onmessage` plumbing) is not unit-tested; its logic is
+  two already-tested pure functions. NOT verified: a live-browser end-to-end run of the
+  worker on a real over-budget scene (vitest has no Worker runtime; needs a dev-server
+  session or the e2e suite).

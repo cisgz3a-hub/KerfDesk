@@ -20,6 +20,14 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
       </div>
     );
   }
+  if (props.issue?.kind === 'preparing-large-job') {
+    return (
+      <div className="lf-banner" style={bannerStyle} role="status">
+        Large job: preparing the route preview in the background. It will appear here when ready —
+        Start and Save do not wait for it.
+      </div>
+    );
+  }
   if (props.issue?.kind === 'placement-unavailable') {
     return (
       <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">

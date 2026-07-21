@@ -14,6 +14,10 @@ import { useStore } from '../state';
 import type { LiveJobEstimate } from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
 
+const workerMocks = vi.hoisted(() => ({ prepareLargeJobOffThread: vi.fn() }));
+
+vi.mock('../workspace/preparation-worker-client', () => workerMocks);
+
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -68,9 +72,36 @@ async function renderProbe(): Promise<() => Promise<void>> {
   };
 }
 
+function overBudgetRasterProject(): Project {
+  const color = '#808080';
+  const raster: SceneObject = {
+    kind: 'raster-image',
+    id: 'R1',
+    color,
+    source: 'x.png',
+    dataUrl: 'data:image/png;base64,unused',
+    pixelWidth: 4,
+    pixelHeight: 4,
+    dither: 'floyd-steinberg',
+    linesPerMm: 25,
+    bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+    transform: IDENTITY_TRANSFORM,
+  };
+  const base = createProject();
+  return {
+    ...base,
+    scene: addLayer(addObject(base.scene, raster), {
+      ...createLayer({ id: color, color, mode: 'image' }),
+      linesPerMm: 25,
+    }),
+  };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   probe.current = null;
+  workerMocks.prepareLargeJobOffThread.mockReset();
+  workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -124,6 +155,40 @@ describe('useJobEstimate debounce (H16)', () => {
       vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
     });
 
+    expect(probe.current?.kind).toBe('estimated');
+
+    await unmount();
+  });
+
+  it('replaces a too-large estimate with the worker result (ADR-244)', async () => {
+    let resolveWorker: (value: { toolpath: unknown; estimate: LiveJobEstimate }) => void = () =>
+      undefined;
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(
+      new Promise((resolve) => {
+        resolveWorker = resolve;
+      }),
+    );
+    const unmount = await renderProbe();
+
+    await act(async () => {
+      useStore.setState({ project: overBudgetRasterProject() });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+    expect(probe.current?.kind).toBe('too-large');
+
+    await act(async () => {
+      resolveWorker({
+        toolpath: { steps: [], totalLength: 0 },
+        estimate: {
+          kind: 'estimated',
+          label: '12m 0s',
+          totalSeconds: 720,
+          breakdown: { cutSeconds: 700, travelSeconds: 20 },
+        },
+      });
+    });
     expect(probe.current?.kind).toBe('estimated');
 
     await unmount();
