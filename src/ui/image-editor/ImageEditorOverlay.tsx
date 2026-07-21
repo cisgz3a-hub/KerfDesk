@@ -11,6 +11,7 @@ import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
+import { ResizeDialogPanel } from './ResizeDialog';
 import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
 
@@ -57,6 +58,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
           <EditorOptionsBar />
           <EditorCanvas />
           <AdjustDialogPanel />
+          <ResizeDialogPanel />
           <footer style={statusStyle}>
             <span>
               {session.selection === null ? 'No selection' : 'Selection active'}

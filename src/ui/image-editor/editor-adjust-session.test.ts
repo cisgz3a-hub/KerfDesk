@@ -38,4 +38,14 @@ describe('computeAdjustPreview', () => {
     expect(preview.data[0]).toBe(0);
     expect(session.doc.data[0]).toBe(255);
   });
+
+  it('routes curve points through the curve LUT', () => {
+    const session = newSession();
+    const preview = computeAdjustPreview(session, 'curves', {}, [
+      { x: 0, y: 40 },
+      { x: 255, y: 40 },
+    ]);
+    expect(preview.data[0]).toBe(40); // flat curve maps everything to 40
+    expect(session.doc.data[0]).toBe(255);
+  });
 });

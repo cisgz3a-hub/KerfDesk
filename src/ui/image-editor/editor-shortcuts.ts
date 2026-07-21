@@ -187,6 +187,9 @@ function handleControlKey(key: string, shift: boolean): boolean {
     case 'l':
       useAdjustDialogStore.getState().open('levels');
       return true;
+    case 'm':
+      useAdjustDialogStore.getState().open('curves');
+      return true;
     case 'u':
       if (!shift) return false;
       useAdjustDialogStore.getState().open('desaturate');
