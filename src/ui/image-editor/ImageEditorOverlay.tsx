@@ -88,10 +88,22 @@ function TopBar(props: {
         Image Studio — {session.sourceName} ({session.doc.width}×{session.doc.height} px)
       </strong>
       <span style={topActionsStyle}>
-        <button type="button" className="lf-btn" onClick={actions.undo} disabled={!canUndo}>
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={actions.undo}
+          disabled={!canUndo}
+          title="Undo the last editor step (Ctrl+Z)"
+        >
           Undo
         </button>
-        <button type="button" className="lf-btn" onClick={actions.redo} disabled={!canRedo}>
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={actions.redo}
+          disabled={!canRedo}
+          title="Redo the last undone editor step (Ctrl+Shift+Z)"
+        >
           Redo
         </button>
         <button
@@ -99,6 +111,7 @@ function TopBar(props: {
           className="lf-btn"
           onClick={actions.revert}
           disabled={!canUndo && !session.dirtySinceApply}
+          title="Discard every session edit and return to the as-opened image"
         >
           Revert
         </button>

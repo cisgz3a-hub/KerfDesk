@@ -109,6 +109,7 @@ function WandOptions(): JSX.Element {
           type="checkbox"
           checked={contiguous}
           onChange={(e) => setContiguous(e.target.checked)}
+          title="Select only the connected region under the click; off selects every matching pixel"
         />
         Contiguous
       </label>
@@ -127,16 +128,37 @@ function SelectionActions(): JSX.Element {
   };
   return (
     <span style={groupStyle}>
-      <ActionButton label="Delete" onClick={deleteSelection} enabled={hasSelection} />
-      <ActionButton label="Fill" onClick={fillSelection} enabled={hasSelection} />
-      <ActionButton label="Invert" onClick={invert} enabled={hasSelection} />
-      <ActionButton label="Deselect" onClick={() => select(null)} enabled={hasSelection} />
+      <ActionButton
+        label="Delete"
+        title="Clear the selected area to white (Delete)"
+        onClick={deleteSelection}
+        enabled={hasSelection}
+      />
+      <ActionButton
+        label="Fill"
+        title="Fill the selected area with the active paint colour"
+        onClick={fillSelection}
+        enabled={hasSelection}
+      />
+      <ActionButton
+        label="Invert"
+        title="Invert the selection (Ctrl+Shift+I)"
+        onClick={invert}
+        enabled={hasSelection}
+      />
+      <ActionButton
+        label="Deselect"
+        title="Clear the selection (Ctrl+D)"
+        onClick={() => select(null)}
+        enabled={hasSelection}
+      />
     </span>
   );
 }
 
 function ActionButton(props: {
   readonly label: string;
+  readonly title: string;
   readonly onClick: () => void;
   readonly enabled: boolean;
 }): JSX.Element {
@@ -146,6 +168,7 @@ function ActionButton(props: {
       className="lf-btn"
       onClick={props.onClick}
       disabled={!props.enabled}
+      title={props.title}
       style={{ padding: '2px 10px' }}
     >
       {props.label}
@@ -172,6 +195,7 @@ function Slider(props: {
         value={props.value}
         onChange={(e) => props.onChange(Number(e.target.value))}
         aria-label={props.label}
+        title={`Adjust the ${props.label.toLowerCase()} for the active tool`}
       />
       <span style={sliderValueStyle}>{props.value}</span>
     </label>
