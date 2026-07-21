@@ -7,7 +7,9 @@
 // surface; intra-module code and tests import the leaf files directly.
 
 export type { RgbaBuffer } from './rgba-buffer';
-export { cloneRgbaBuffer, createRgbaBuffer } from './rgba-buffer';
+export { cloneRgbaBuffer, RGBA_CHANNELS } from './rgba-buffer';
+
+export type { PixelRect } from './tiles';
 
 export type { EditHistory } from './history';
 export {
