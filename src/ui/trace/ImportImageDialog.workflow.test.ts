@@ -82,7 +82,7 @@ describe('Trace Image workflow controls', () => {
 
   it('shows Fill Style only for filled-contour presets', async () => {
     await withTraceDialog(async (host) => {
-      // The vector default (ADR-237) shows Fill Style immediately for the
+      // The vector default (ADR-238) shows Fill Style immediately for the
       // filled-contour Line Art preset; the raster escape hides it.
       expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
       await changeSelect(outputSelect(host), 'raster');

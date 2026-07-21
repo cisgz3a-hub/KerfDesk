@@ -201,7 +201,7 @@
 | ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
 | ADR-235 | 2026-07-19 | Accepted, hardware verification pending | New laser traces default to materialized Raster/Image output |
 | ADR-236 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
-| ADR-237 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
+| ADR-238 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
 
 ---
 
@@ -10401,7 +10401,7 @@ software improvement from focus, optics, mechanics, power delivery, firmware, an
 
 ---
 
-## ADR-237 - Laser trace output defaults to editable vectors; raster scan remains selectable
+## ADR-238 - Laser trace output defaults to editable vectors; raster scan remains selectable
 
 **Date:** 2026-07-21
 **Status:** Accepted

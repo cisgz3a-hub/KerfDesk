@@ -1,6 +1,6 @@
 // Trace runs on the selected RasterImage (ADR-027), preserving the existing
 // File-keyed preview and worker trace pipeline. Laser projects default to
-// editable vector output (LightBurn's Trace model, ADR-237); materializing the
+// editable vector output (LightBurn's Trace model, ADR-238); materializing the
 // trace through the Raster/Image pipeline (ADR-235) remains selectable, and
 // CNC stays vector-only. Both outputs retain source provenance for Re-trace
 // Original. Pure UI pieces live in dialog-parts.tsx.
