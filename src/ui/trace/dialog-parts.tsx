@@ -62,8 +62,8 @@ export function TraceOutputPicker(props: {
         aria-label="Trace output"
         title="Choose whether the traced result engraves as a raster scan or stays as editable vectors."
       >
-        <option value="raster">Raster scan (recommended)</option>
         <option value="vector">Editable vectors</option>
+        <option value="raster">Raster scan</option>
       </select>
       <span style={fillStyleHintStyle}>
         Raster scan uses the same Raster/Image scan motion as a photo. The trace is binary artwork,
@@ -75,7 +75,7 @@ export function TraceOutputPicker(props: {
 }
 
 function parseTraceOutput(value: string): TraceOutput {
-  return value === 'vector' ? 'vector' : 'raster';
+  return value === 'raster' ? 'raster' : 'vector';
 }
 
 export function PresetPicker(props: {

@@ -201,6 +201,7 @@
 | ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
 | ADR-235 | 2026-07-19 | Accepted, hardware verification pending | New laser traces default to materialized Raster/Image output |
 | ADR-236 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
+| ADR-237 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
 
 ---
 
@@ -10397,3 +10398,62 @@ This change establishes code-level output semantics and regression coverage only
 the cause of an existing bad burn, certify 4040 hardware, or establish that the resulting physical
 mark is acceptable. Material coupons and controlled A/B burns are still required to distinguish
 software improvement from focus, optics, mechanics, power delivery, firmware, and material effects.
+
+---
+
+## ADR-237 - Laser trace output defaults to editable vectors; raster scan remains selectable
+
+**Date:** 2026-07-21
+**Status:** Accepted
+
+### Context
+
+ADR-235 made **Raster scan** the default laser trace output because the 4040's traced-lettering
+burn was uneven through the vector Fill pipeline while direct photo engraving was clean. A full
+code audit of that incident (2026-07-21) confirmed the mechanism at the byte level: the pre-#299
+fill emitter gave 75.6% of the bad job's sweeps no runway at all (ADR-033 skips overscan on burns
+shorter than 2x the setting), so hundreds of powered sweeps started from rest after a `G0`, while
+every raster ink entry always received an unconditional 5 mm feed-matched `S0` runway.
+
+That vector-side hole has since been closed for the machine that exhibited it: ADR-234's
+`feed-matched-entry` policy gives every 4040-safe fill sweep a bounded `G1 F<feed> S0` entry
+runway with no short-run skip on that path, and ADR-236 adds controlled laser-off seeks and the
+uncalibrated one-way scan fallback. With the motion defect addressed at its source, the default
+can return to the reference behavior: LightBurn's Trace Image produces editable vector paths.
+Editable vectors are also the more capable result (node editing, fill-style choice, resolution
+independence at any later density).
+
+The maintainer directed this default on 2026-07-21.
+
+### Decision
+
+1. The laser Trace dialog defaults to **Editable vectors**. **Raster scan** remains selectable
+   and unchanged; the option list orders the default first and drops the "(recommended)" tag.
+2. This supersedes only ADR-235 decision 1's choice of default. Everything else in ADR-235
+   remains governing: the raster materialization machinery, registration through the trace
+   working grid, Image-operation binding and revalidation, Pass Through handling, provenance,
+   atomic commit, and CNC remaining vector-only.
+3. The defensive select parser falls back to `vector`, matching the commit layer's existing
+   `traceOutput ?? 'vector'` fallback, so an omitted or unrecognized value now degrades to the
+   default rather than to the opposite pipeline.
+
+### Consequences
+
+- New laser traces commit as editable Fill/Line vectors by default, matching LightBurn. On the
+  4040-safe dialect they engrave through ADR-234's feed-matched entry runways; that geometry is
+  structurally pinned by tests but its physical burn quality remains hardware-verification
+  pending, exactly as ADR-234 states.
+- Profiles that are not on the 4040-safe dialect keep ADR-234's deliberately-preserved legacy
+  fill motion (including the ADR-033 short-run overscan skip). The existing conditional
+  advisories for a suspected 4040 on a generic profile are the sanctioned mitigation; this ADR
+  does not widen any policy or add any guard.
+- Operators who prefer the photo-parity scan motion — the pipeline the maintainer physically
+  verified as clean — pick Raster scan in the dialog; nothing about that path changes.
+
+### Verification
+
+- Workflow tests updated: laser default is `vector` with the raster escape present; Fill Style
+  appears immediately for filled-contour presets under the vector default and hides under
+  Raster scan; CNC tracing remains vector-only with no output picker.
+- No compiler, emitter, or G-code change: the diff is dialog state, option labels/order, the
+  select parser fallback, and these tests.
