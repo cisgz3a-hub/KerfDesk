@@ -52,13 +52,24 @@ export function useEditorPointer(
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       e.currentTarget.setPointerCapture(e.pointerId);
-      if (e.button === 1) {
+      const state = useImageEditorStore.getState();
+      // Middle button or held Spacebar = Hand pan (Photoshop convention).
+      if (e.button === 1 || state.isSpacePanning) {
         update({ kind: 'pan', lastClientX: e.clientX, lastClientY: e.clientY });
         return;
       }
       if (e.button !== 0) return;
-      const state = useImageEditorStore.getState();
       const point = docPoint(e);
+      const isPaintTool =
+        state.tool.kind === 'brush' ||
+        state.tool.kind === 'pencil' ||
+        state.tool.kind === 'eraser' ||
+        state.tool.kind === 'line';
+      // Alt-click inside a paint tool = temporary eyedropper.
+      if (isPaintTool && e.altKey) {
+        sampleForeground(point.x, point.y);
+        return;
+      }
       if (state.tool.kind === 'wand') {
         state.wandAt(point.x, point.y);
         return;
@@ -93,25 +104,50 @@ export function useEditorPointer(
   }, [update]);
 
   const onWheel = useCallback(
-    (e: React.WheelEvent<HTMLCanvasElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * factor));
-      const ratio = scale / view.scale;
-      setView({
-        scale,
-        panX: cx - (cx - view.panX) * ratio,
-        panY: cy - (cy - view.panY) * ratio,
-      });
-    },
+    (e: React.WheelEvent<HTMLCanvasElement>) => zoomAtPointer(view, setView, e),
     [setView, view],
   );
 
   const cancelDrag = useCallback(() => update(IDLE_DRAG), [update]);
 
   return { drag, onPointerDown, onPointerMove, onPointerUp, onWheel, cancelDrag };
+}
+
+// Wheel zooms about the pointer (matches the workspace canvas; Alt+wheel is
+// identical — both zoom, per the maintainer's app convention).
+function zoomAtPointer(
+  view: EditorView,
+  setView: (view: EditorView) => void,
+  e: React.WheelEvent<HTMLCanvasElement>,
+): void {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+  const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * factor));
+  const ratio = scale / view.scale;
+  setView({
+    scale,
+    panX: cx - (cx - view.panX) * ratio,
+    panY: cy - (cy - view.panY) * ratio,
+  });
+}
+
+// Alt-click eyedropper: sample the document pixel under the cursor into the
+// foreground color.
+function sampleForeground(x: number, y: number): void {
+  const store = useImageEditorStore.getState();
+  const doc = store.session?.doc;
+  if (doc === undefined) return;
+  const px = Math.floor(x);
+  const py = Math.floor(y);
+  if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) return;
+  const base = (py * doc.width + px) * 4;
+  store.setForeground({
+    r: doc.data[base] ?? 0,
+    g: doc.data[base + 1] ?? 0,
+    b: doc.data[base + 2] ?? 0,
+  });
 }
 
 function completeDrag(drag: EditorDrag): void {

@@ -43,7 +43,38 @@ export function EditorToolStrip(): JSX.Element {
           </button>
         );
       })}
+      <ColorChips />
     </aside>
+  );
+}
+
+// Photoshop foreground/background chips: X swaps, D resets to black/white.
+function ColorChips(): JSX.Element {
+  const foreground = useImageEditorStore((s) => s.foreground);
+  const background = useImageEditorStore((s) => s.background);
+  const swapColors = useImageEditorStore((s) => s.swapColors);
+  const resetColors = useImageEditorStore((s) => s.resetColors);
+  const css = (c: { r: number; g: number; b: number }): string => `rgb(${c.r}, ${c.g}, ${c.b})`;
+  return (
+    <div style={chipsHostStyle} aria-label="Foreground and background colors">
+      <button
+        type="button"
+        onClick={swapColors}
+        title="Swap foreground and background colors (X)"
+        style={chipsButtonStyle}
+      >
+        <span style={{ ...chipStyle, background: css(background), top: 10, left: 10 }} />
+        <span style={{ ...chipStyle, background: css(foreground), top: 2, left: 2, zIndex: 1 }} />
+      </button>
+      <button
+        type="button"
+        onClick={resetColors}
+        title="Reset to black foreground / white background (D)"
+        style={resetStyle}
+      >
+        <span aria-hidden="true">▨</span>
+      </button>
+    </div>
   );
 }
 
@@ -72,4 +103,44 @@ const buttonStyle: React.CSSProperties = {
 const activeStyle: React.CSSProperties = {
   border: '1px solid var(--lf-accent)',
   background: 'var(--lf-bg-input)',
+};
+
+const chipsHostStyle: React.CSSProperties = {
+  marginTop: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 2,
+  paddingTop: 8,
+};
+
+const chipsButtonStyle: React.CSSProperties = {
+  position: 'relative',
+  width: 30,
+  height: 30,
+  border: 'none',
+  background: 'transparent',
+  cursor: 'pointer',
+  padding: 0,
+};
+
+const chipStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: 16,
+  height: 16,
+  border: '1px solid var(--lf-border-strong)',
+  borderRadius: 2,
+};
+
+const resetStyle: React.CSSProperties = {
+  width: 22,
+  height: 18,
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 11,
+  border: '1px solid transparent',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'var(--lf-text-muted)',
+  cursor: 'pointer',
 };

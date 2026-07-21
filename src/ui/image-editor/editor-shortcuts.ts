@@ -7,45 +7,103 @@ import { invertMask, selectAllMask } from '../../core/image-select';
 import { useImageEditorStore } from './image-editor-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
-  const store = useImageEditorStore.getState();
   const key = e.key.toLowerCase();
+  if (key === ' ') {
+    // Held Spacebar = temporary Hand pan (Photoshop convention).
+    useImageEditorStore.getState().setSpacePanning(true);
+    e.preventDefault();
+    return;
+  }
   if (e.ctrlKey || e.metaKey) {
     if (handleControlKey(key, e.shiftKey)) e.preventDefault();
     return;
   }
-  if (key === 'escape') {
-    // Esc steps outward: non-default tool → Brush; Brush → close (session
-    // kept — closing never asks anything, F-L1).
-    if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
-    else store.closeEditor();
-    e.preventDefault();
-    return;
-  }
-  if (key === 'delete' || key === 'backspace') {
-    store.deleteSelection();
-    e.preventDefault();
-    return;
-  }
-  if (key === '[' || key === ']') {
-    const delta = key === '[' ? -2 : 2;
-    store.setBrush({ diameterPx: Math.min(256, Math.max(1, store.brush.diameterPx + delta)) });
-    e.preventDefault();
-    return;
-  }
-  if (handleToolKey(key)) e.preventDefault();
+  if (handlePlainKey(key) || handleToolKey(key)) e.preventDefault();
 }
 
-function handleControlKey(key: string, shift: boolean): boolean {
+// [ / ] resize, Shift+[ / Shift+] harden (Photoshop conventions).
+function handleBrushSizeKey(key: string): boolean {
+  const store = useImageEditorStore.getState();
+  switch (key) {
+    case '{':
+    case '}': {
+      const delta = key === '{' ? -0.05 : 0.05;
+      store.setBrush({ hardness: Math.min(1, Math.max(0, store.brush.hardness + delta)) });
+      return true;
+    }
+    case '[':
+    case ']': {
+      const delta = key === '[' ? -2 : 2;
+      store.setBrush({ diameterPx: Math.min(256, Math.max(1, store.brush.diameterPx + delta)) });
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+function handlePlainKey(key: string): boolean {
+  const store = useImageEditorStore.getState();
+  if (handleBrushSizeKey(key)) return true;
+  switch (key) {
+    case 'x':
+      store.swapColors();
+      return true;
+    case 'd':
+      store.resetColors();
+      return true;
+    case 'escape':
+      // Esc steps outward: non-default tool → Brush; Brush → close (session
+      // kept — closing never asks anything, F-L1).
+      if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
+      else store.closeEditor();
+      return true;
+    case 'delete':
+    case 'backspace':
+      store.deleteSelection();
+      return true;
+    default:
+      return false;
+  }
+}
+
+export function handleEditorKeyUp(e: React.KeyboardEvent): void {
+  if (e.key === ' ') {
+    useImageEditorStore.getState().setSpacePanning(false);
+    e.preventDefault();
+  }
+}
+
+const ZOOM_KEY_STEP = 1.25;
+
+// Ctrl+0 fit / Ctrl+1 100% / Ctrl± steps (Photoshop zoom conventions).
+function handleZoomKey(key: string): boolean {
+  const store = useImageEditorStore.getState();
+  switch (key) {
+    case '0':
+      // Clearing the view makes the canvas re-fit on next layout.
+      store.setView(null);
+      return true;
+    case '1':
+      store.zoomTo100();
+      return true;
+    case '=':
+    case '+':
+      store.zoomBy(ZOOM_KEY_STEP);
+      return true;
+    case '-':
+      store.zoomBy(1 / ZOOM_KEY_STEP);
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Ctrl+A all / Ctrl+D deselect / Ctrl+Shift+I inverse (Photoshop trio).
+function handleSelectionKey(key: string, shift: boolean): boolean {
   const store = useImageEditorStore.getState();
   const doc = store.session?.doc;
   switch (key) {
-    case 'z':
-      if (shift) store.redo();
-      else store.undo();
-      return true;
-    case 'y':
-      store.redo();
-      return true;
     case 'a':
       if (doc !== undefined) store.select(selectAllMask(doc.width, doc.height));
       return true;
@@ -58,6 +116,22 @@ function handleControlKey(key: string, shift: boolean): boolean {
         return true;
       }
       return false;
+    default:
+      return false;
+  }
+}
+
+function handleControlKey(key: string, shift: boolean): boolean {
+  const store = useImageEditorStore.getState();
+  if (handleZoomKey(key) || handleSelectionKey(key, shift)) return true;
+  switch (key) {
+    case 'z':
+      if (shift) store.redo();
+      else store.undo();
+      return true;
+    case 'y':
+      store.redo();
+      return true;
     default:
       return false;
   }

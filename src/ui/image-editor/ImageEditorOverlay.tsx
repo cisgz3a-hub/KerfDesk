@@ -9,7 +9,7 @@ import type { EditorSession } from './editor-session';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
-import { handleEditorKeyDown } from './editor-shortcuts';
+import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
 
 export function ImageEditorOverlay(): JSX.Element | null {
@@ -42,6 +42,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
       tabIndex={-1}
       style={overlayStyle}
       onKeyDown={handleEditorKeyDown}
+      onKeyUp={handleEditorKeyUp}
     >
       <TopBar
         session={session}
