@@ -18,8 +18,13 @@ import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { layerWithObjectOverride } from './compile-job-object-policy';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
-import { rasterBoundsInMachineCoords } from './raster-bounds';
+import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
+import {
+  isRotatedRaster,
+  rotatedMaskedRasterLuma,
+  rotatedRasterRow,
+} from './raster-rotated-sample';
 import { resolveImageScanDirection } from './scan-direction-policy';
 import { validatedScanOffsetMm } from './scan-offset';
 
@@ -81,6 +86,7 @@ function compileRasterGroup(
           pixelHeight,
           obj,
           device,
+          bounds,
           algorithm: layer.ditherAlgorithm,
           sMax,
           sMin,
@@ -92,6 +98,7 @@ function compileRasterGroup(
           obj,
           layer,
           device,
+          bounds,
           maskObject,
           pixelWidth,
           pixelHeight,
@@ -126,6 +133,7 @@ type MaterializedRasterInput = {
   readonly obj: RasterImage;
   readonly layer: Layer;
   readonly device: DeviceProfile;
+  readonly bounds: RasterMachineBounds;
   readonly maskObject: SceneObject | null;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
@@ -134,6 +142,25 @@ type MaterializedRasterInput = {
 };
 
 function materializedRasterValues(input: MaterializedRasterInput): Uint16Array {
+  // Rotated images bypass the axis-aligned resample + flip pipeline: the
+  // machine scan grid samples the rotated content directly.
+  if (isRotatedRaster(input.obj)) {
+    const rotatedLuma = rotatedMaskedRasterLuma(
+      {
+        sourceLuma: input.preparedLuma,
+        obj: input.obj,
+        device: input.device,
+        bounds: input.bounds,
+        pixelWidth: input.pixelWidth,
+        pixelHeight: input.pixelHeight,
+      },
+      input.maskObject,
+    );
+    return dither(
+      { luma: rotatedLuma, width: input.pixelWidth, height: input.pixelHeight },
+      { algorithm: input.layer.ditherAlgorithm, sMax: input.sMax, sMin: input.sMin },
+    );
+  }
   const luma = input.layer.passThrough
     ? input.preparedLuma
     : resampleLumaNearest(
@@ -173,23 +200,25 @@ type StreamedRasterInput = {
   readonly pixelHeight: number;
   readonly obj: RasterImage;
   readonly device: DeviceProfile;
+  readonly bounds: RasterMachineBounds;
   readonly algorithm: Layer['ditherAlgorithm'];
   readonly sMax: number;
   readonly sMin: number;
 };
 
 function streamedRasterRowProvider(input: StreamedRasterInput): (y: number) => Uint16Array {
+  const ditherOptions = { algorithm: input.algorithm, sMax: input.sMax, sMin: input.sMin };
+  if (isRotatedRaster(input.obj)) {
+    return (y: number): Uint16Array =>
+      ditherIndependentRow(rotatedRasterRow(input, y), y, ditherOptions);
+  }
   const objFlipX = input.obj.transform.mirrorX !== input.obj.transform.scaleX < 0;
   const objFlipY = input.obj.transform.mirrorY !== input.obj.transform.scaleY < 0;
   const flipX = originFlipsRasterX(input.device) !== objFlipX;
   const flipY = originFlipsRasterY(input.device) !== objFlipY;
   return (y: number): Uint16Array => {
     const luma = resampledOrientedRow(input, y, flipX, flipY);
-    return ditherIndependentRow(luma, y, {
-      algorithm: input.algorithm,
-      sMax: input.sMax,
-      sMin: input.sMin,
-    });
+    return ditherIndependentRow(luma, y, ditherOptions);
   };
 }
 
