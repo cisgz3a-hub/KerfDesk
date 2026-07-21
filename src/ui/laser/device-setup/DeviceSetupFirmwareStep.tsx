@@ -1,6 +1,7 @@
-// Step 6: compare and, only for supported GRBL-dollar controllers, offer
-// individually confirmed writes queued for final Save. Machine-critical travel
-// settings never get a batch-write shortcut, and Cancel sends no command.
+// Firmware section of the final Review & save page (ADR-239): compare and,
+// only for supported GRBL-dollar controllers, offer individually confirmed
+// writes queued for final Save. Machine-critical travel settings never get a
+// batch-write shortcut, and Cancel sends no command.
 
 import { useState } from 'react';
 import { Button } from '../../kit';
@@ -31,7 +32,7 @@ export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProp
     return (
       <section style={sectionStyle}>
         <p style={hintStyle}>
-          Connect the controller to compare firmware. This step is optional — saving the software
+          Connect the controller to compare firmware. This section is optional — saving the software
           profile never requires a firmware write.
         </p>
       </section>
@@ -42,7 +43,8 @@ export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProp
       <section style={sectionStyle}>
         <p role="alert" style={warningStyle}>
           Firmware writes are blocked because the active connection uses {activeControllerKind},
-          while this draft uses {controllerKind}. Reconnect correctly on step 2 first.
+          while this draft uses {controllerKind}. Reconnect from the Connect &amp; detect step
+          first.
         </p>
       </section>
     );
@@ -51,8 +53,8 @@ export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProp
     return (
       <section style={sectionStyle}>
         <p style={hintStyle}>
-          Read and export a controller backup before any write. You can skip this step and save the
-          software profile without changing firmware.
+          Read and export a controller backup before any write. You can skip this section and save
+          the software profile without changing firmware.
         </p>
         <MachineSettingsPanel defaultOpen context={settingsContext} />
       </section>

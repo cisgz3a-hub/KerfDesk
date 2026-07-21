@@ -10532,8 +10532,9 @@ The audit of the current surface found the structural causes:
 
 1. **Capability first, profile second** (maintainer-ordered, 2026-07-21 review). Step 1 asks only
    what the machine is — Laser / CNC / Laser + CNC and, for hybrids, the active mode. Step 2 holds
-   the reviewed-profile catalog, always-open at the top with a text filter (name, controller, bed
-   size), followed by the CNC preset, controller/baud/dialect, advanced streaming, and
+   the reviewed-profile catalog for laser-capable machines, always-open at the top with a text
+   filter (name, controller, bed size) — a CNC-only capability sees the built-in CNC preset
+   instead — followed by the CNC preset, controller/baud/dialect, advanced streaming, and
    import/export. Picking a card still applies the whole profile verbatim through `apply-preset`.
 2. **Visible suggestions.** Cards render the suggester's `reasons` and `warnings` (previously
    computed and dropped), so a detection match says why it matches, and detection-matched profiles
@@ -10548,10 +10549,10 @@ The audit of the current surface found the structural causes:
    compare/queue followed by the review cards and hardware handoff). The step components
    themselves are reused; the wizard stacks them.
 4. **Options as closed status rows.** Every optional group — no-go zones, Z axis and probe,
-   planner/ETA, raster scan offset + controlled seek, auto-focus, rotary, camera — is **collapsed
-   by default** (maintainer direction) and shows a live one-line status in its always-visible
-   summary row, and no group nests another collapsible. The operator reads the whole machine state
-   without opening anything.
+   planner/ETA, plus the laser-only scan offset + controlled seek, auto-focus, rotary, and camera
+   groups (hidden for CNC-only machines, as before) — is **collapsed by default** (maintainer
+   direction) and shows a live one-line status in its always-visible summary row, and no group
+   nests another collapsible. The operator reads the whole machine state without opening anything.
 5. **Gates move, none widen.** Next gates on the same `machineSetupValidationIssues` only on the
    pages that host fields (`identify`, `confirm`, `options`); `capability` and `connect` always
    advance so Next never strands the operator away from a fix. Firmware queueing keeps its read +

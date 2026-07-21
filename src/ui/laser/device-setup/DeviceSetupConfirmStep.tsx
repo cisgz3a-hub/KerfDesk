@@ -1,5 +1,6 @@
-// Step 3: establish the software coordinate model used by the workspace,
-// bounds checks, framing, jogging, and output transforms.
+// Step 4 (Confirm settings, first section): establish the software
+// coordinate model used by the workspace, bounds checks, framing, jogging,
+// and output transforms.
 
 import type { DeviceProfile, Origin } from '../../../core/devices';
 import { BedRows, FeedRows, NameRow, OriginCornerRow, OriginSelect } from '../DeviceProfileFields';

@@ -237,7 +237,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-setup.launch': {
     label: 'Machine Setup',
     tooltip:
-      'Open the single step-by-step setup for machine type, profile, controller, workspace, output, safety, guarded firmware review, and hardware handoff.',
+      'Open the single step-by-step setup: machine type, profile and controller, connect and detect, confirm settings, options and calibration, then review and save.',
   },
   'laser.machine-setup.tab.overview': {
     label: 'Machine overview',
@@ -276,7 +276,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.device-setup.launch': {
     label: 'Machine Setup',
     tooltip:
-      'Configure machine type, controller, coordinates, output, safety, firmware policy, and hardware handoff in one draft-based flow.',
+      'Configure machine type, profile, controller, coordinates, output, optional calibrations, and the guarded firmware review in one draft-based flow.',
   },
   'laser.device-setup.next': {
     label: 'Next step',
@@ -298,7 +298,8 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   },
   'laser.device-setup.connect': {
     label: 'Connect controller',
-    tooltip: 'Open the serial port with the controller family and baud selected on step 1.',
+    tooltip:
+      'Open the serial port with the controller family and baud chosen on the Choose your machine step.',
   },
   'laser.device-setup.reread': {
     label: 'Run read-only checks',

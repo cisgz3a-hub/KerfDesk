@@ -1,6 +1,6 @@
-// Draft-only CNC machine presets. This belongs on step 1 because a preset
-// supplies both the work area reviewed on step 3 and the spindle ceiling
-// reviewed on step 4.
+// Draft-only CNC machine presets. This belongs on the Choose your machine
+// step because a preset supplies both the work area and the spindle ceiling
+// reviewed later on the Confirm settings step.
 
 import { useState } from 'react';
 import { CNC_MACHINE_CATALOG } from '../../../core/cnc';
