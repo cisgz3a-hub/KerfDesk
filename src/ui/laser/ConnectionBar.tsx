@@ -114,28 +114,33 @@ function QualificationNotice(props: {
     );
   }
   return (
-    <div role="alert" style={qualificationErrorStyle}>
-      <strong>Controller qualification failed.</strong> {qualification.message}{' '}
-      {props.onRetry !== undefined && (
-        <button
-          type="button"
-          onClick={props.onRetry}
-          disabled={props.disabled}
-          title="Retry the owned controller settings read for this connection."
-        >
-          Retry reading controller settings
-        </button>
-      )}
-      {props.onReconnect !== undefined && (
-        <button
-          type="button"
-          onClick={props.onReconnect}
-          disabled={props.disabled}
-          title="Close this controller connection and reconnect for fresh qualification."
-        >
-          Reconnect controller
-        </button>
-      )}
+    <div role="alert" className="lf-banner lf-banner--warning" style={qualificationErrorStyle}>
+      <strong style={qualificationTitleStyle}>Controller qualification failed</strong>
+      <p style={qualificationMessageStyle}>{qualification.message}</p>
+      <div style={qualificationActionsStyle}>
+        {props.onRetry !== undefined && (
+          <button
+            type="button"
+            className="lf-btn"
+            onClick={props.onRetry}
+            disabled={props.disabled}
+            title="Retry the owned controller settings read for this connection."
+          >
+            Retry reading controller settings
+          </button>
+        )}
+        {props.onReconnect !== undefined && (
+          <button
+            type="button"
+            className="lf-btn"
+            onClick={props.onReconnect}
+            disabled={props.disabled}
+            title="Close this controller connection and reconnect for fresh qualification."
+          >
+            Reconnect controller
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -193,7 +198,17 @@ const qualificationStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   fontSize: 11,
 };
+// A failed qualification is recoverable in place, so it wears the shared
+// warning banner rather than raw red text with bare inline buttons.
 const qualificationErrorStyle: React.CSSProperties = {
-  color: 'var(--lf-danger-fg)',
+  display: 'grid',
+  gap: 6,
   fontSize: 11,
+};
+const qualificationTitleStyle: React.CSSProperties = { fontSize: 12 };
+const qualificationMessageStyle: React.CSSProperties = { margin: 0, lineHeight: 1.45 };
+const qualificationActionsStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 6,
+  flexWrap: 'wrap',
 };

@@ -41,14 +41,25 @@ import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 type Props = {
   readonly disabled: boolean;
   readonly onConfigureAutofocus?: () => void;
+  readonly onConfigureHoming?: () => void;
   readonly onStartJob: () => void;
 };
 
-export function JobControls({
-  disabled,
-  onConfigureAutofocus = doNothing,
-  onStartJob,
-}: Props): JSX.Element {
+// Both setup entries are optional so bare <JobControls> renders standalone;
+// resolving them here keeps the branches out of the component body.
+function configureCallbacks(props: Props): {
+  readonly autofocus: () => void;
+  readonly homing: () => void;
+} {
+  return {
+    autofocus: props.onConfigureAutofocus ?? doNothing,
+    homing: props.onConfigureHoming ?? doNothing,
+  };
+}
+
+export function JobControls(props: Props): JSX.Element {
+  const { disabled, onStartJob } = props;
+  const configure = configureCallbacks(props);
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const streamer = useLaserStore((s) => s.streamer);
   const status = streamer?.status;
@@ -86,7 +97,8 @@ export function JobControls({
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}
-        onConfigureAutofocus={onConfigureAutofocus}
+        onConfigureAutofocus={configure.autofocus}
+        onConfigureHoming={configure.homing}
         onStartJob={onStartJob}
       />
       <StartBlockerNotice />
@@ -137,12 +149,7 @@ function shouldShowIdleOverrideReset(
   return !controlsBusy && hasOverrides && overrides !== null && hasNonDefaultOverrides(overrides);
 }
 
-function SetupRow(props: {
-  readonly disabled: boolean;
-  readonly streaming: boolean;
-  readonly onConfigureAutofocus: () => void;
-  readonly onStartJob: () => void;
-}): JSX.Element {
+function useSetupRowModel(props: { readonly disabled: boolean; readonly streaming: boolean }) {
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
   // A permit can become stale from an artwork, scope, placement, controller,
@@ -158,29 +165,65 @@ function SetupRow(props: {
   // ADR-101 §5 (provisional): auto-focus is a laser focus routine; it hides
   // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
-  const isCncMachine = machineKind === 'cnc';
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  const statusReport = laser.statusReport;
-  const framedRun = laser.framedRun;
-  const frameOperationActive = laser.motionOperation?.kind === 'frame';
   const home = useLaserStore((s) => s.home);
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
-  const frameControl = frameControlProps(busy, statusReport?.state);
-  const framedRunIssue = framedRunReadinessIssue(framedRun, app, laser, camera);
+  const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser, camera);
   const framedReady = framedRunIssue === null;
-  const startLabel = framedReady ? 'Start framed job' : 'Set up & Frame';
-  const frameLabel = framedReady ? 'Frame again' : 'Frame job';
-  const startControl = startControlProps(
+  return {
+    onFrame,
+    onAutofocus,
+    home,
     busy,
-    framedReady
-      ? startJobTitle(estimate, jobTimeNoun(machineKind))
-      : 'Prepare and review the exact job, then trace its full motion envelope with the tool off.',
-  );
-  // No portable autofocus G-code exists, so an empty command becomes a direct
-  // setup entry instead of a disabled control that leaves users hunting for
-  // the vendor-specific command field.
-  const noAutofocus = autofocusCommand.trim() === '';
+    homingEnabled,
+    isCncMachine: machineKind === 'cnc',
+    frameOperationActive: laser.motionOperation?.kind === 'frame',
+    hasFramedRun: laser.framedRun !== null,
+    framedRunIssue,
+    framedReady,
+    frameControl: frameControlProps(busy, laser.statusReport?.state),
+    startLabel: framedReady ? 'Start framed job' : 'Set up & Frame',
+    frameLabel: framedReady ? 'Frame again' : 'Frame job',
+    startControl: startControlProps(
+      busy,
+      framedReady
+        ? startJobTitle(estimate, jobTimeNoun(machineKind))
+        : 'Prepare and review the exact job, then trace its full motion envelope with the tool off.',
+    ),
+    // No portable autofocus G-code exists, so an empty command becomes a
+    // direct setup entry instead of a disabled control that leaves users
+    // hunting for the vendor-specific command field.
+    noAutofocus: autofocusCommand.trim() === '',
+    estimate,
+  };
+}
+
+function SetupRow(props: {
+  readonly disabled: boolean;
+  readonly streaming: boolean;
+  readonly onConfigureAutofocus: () => void;
+  readonly onConfigureHoming: () => void;
+  readonly onStartJob: () => void;
+}): JSX.Element {
+  const {
+    onFrame,
+    onAutofocus,
+    home,
+    busy,
+    homingEnabled,
+    isCncMachine,
+    frameOperationActive,
+    hasFramedRun,
+    framedRunIssue,
+    framedReady,
+    frameControl,
+    startLabel,
+    frameLabel,
+    startControl,
+    noAutofocus,
+    estimate,
+  } = useSetupRowModel(props);
   // Start leads the grid full-width; Frame pairs beside Home under it. Both
   // run-the-machine actions wear the light-green go look (maintainer request,
   // matching LightBurn's green Start), so "moves the head" reads at a glance.
@@ -206,7 +249,13 @@ function SetupRow(props: {
         >
           {frameLabel}
         </button>
-        <HomeButton onHome={() => void home()} busy={busy} homingEnabled={homingEnabled} />
+        <HomeButton
+          onHome={() => void home()}
+          onConfigureHoming={props.onConfigureHoming}
+          busy={busy}
+          streaming={props.streaming}
+          homingEnabled={homingEnabled}
+        />
         {!isCncMachine && (
           <AutofocusButton
             needsSetup={noAutofocus}
@@ -218,7 +267,7 @@ function SetupRow(props: {
         )}
       </div>
       <span role="status" style={framedRunStatusStyle} title={framedRunIssue ?? undefined}>
-        {framedRunStatusText(frameOperationActive, framedReady, framedRun !== null, framedRunIssue)}
+        {framedRunStatusText(frameOperationActive, framedReady, hasFramedRun, framedRunIssue)}
       </span>
       <EstimateBadge estimate={estimate} />
     </>
@@ -237,22 +286,37 @@ function framedRunStatusText(
   return `Frame expired — ${framedRunIssue}`;
 }
 
+// A machine whose homing switches were never declared otherwise leaves a dead
+// grey Home button with no way forward, so an unconfigured profile turns the
+// button into its own setup entry — the same offer-the-fix shape auto-focus
+// uses below.
 function HomeButton(props: {
   readonly onHome: () => void;
+  readonly onConfigureHoming: () => void;
   readonly busy: boolean;
+  readonly streaming: boolean;
   readonly homingEnabled: boolean;
 }): JSX.Element {
+  if (!props.homingEnabled) {
+    return (
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={props.onConfigureHoming}
+        disabled={props.streaming}
+        title="Homing is off for this machine. Open Machine Setup to turn on $H homing."
+      >
+        Set up homing
+      </button>
+    );
+  }
   return (
     <button
       type="button"
       className="lf-btn"
       onClick={props.onHome}
-      disabled={props.busy || !props.homingEnabled}
-      title={
-        props.homingEnabled
-          ? 'Send $H — home all axes'
-          : 'Homing is disabled in Device settings. Enable "$H supported" first.'
-      }
+      disabled={props.busy}
+      title="Send $H — home all axes"
     >
       Home
     </button>

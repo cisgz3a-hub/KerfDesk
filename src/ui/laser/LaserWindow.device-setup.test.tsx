@@ -121,6 +121,26 @@ describe('LaserWindow device-setup nudge', () => {
     }
   });
 
+  it('offers homing setup in place instead of a dead grey Home button', async () => {
+    const { host, unmount } = await renderLaserWindow();
+    try {
+      // The default profile has homing off, so the rail's home slot must be a
+      // live way into Machine Setup rather than an unclickable control.
+      expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Home');
+      const setupHoming = button(host, 'Set up homing');
+      expect(setupHoming.disabled).toBe(false);
+
+      await act(async () => setupHoming.click());
+
+      expect(host.textContent).toContain('Step 4 of 6 — Confirm settings');
+      expect(host.querySelector('input[aria-label="Homing enabled"]')).toBeInstanceOf(
+        HTMLInputElement,
+      );
+    } finally {
+      await unmount();
+    }
+  });
+
   it('clears the nudge after the machine is set up through the wizard', async () => {
     useLaserStore.setState({ connection: { kind: 'connected' } } as Partial<
       ReturnType<typeof useLaserStore.getState>

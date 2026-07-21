@@ -84,6 +84,11 @@ describe('ConnectionBar device permission actions', () => {
 
     expect(host.textContent).toContain('Controller qualification failed');
     expect(host.textContent).toContain('The settings response timed out');
+    // A recoverable failure wears the shared warning banner instead of bare
+    // red text, and its actions use the standard button chrome.
+    const banner = host.querySelector('[role="alert"]');
+    expect(banner?.className).toContain('lf-banner--warning');
+    expect(banner?.querySelector('button')?.className).toContain('lf-btn');
     const retry = [...host.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('Retry reading controller settings'),
     );

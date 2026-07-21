@@ -47,6 +47,9 @@ export function LaserWindow(): JSX.Element {
   const jogBlocked = useJogBlocked();
   const controllerDisplay = controllerDisplayState(statusReport, alarmCode);
   const connected = connection.kind === 'connected';
+  // Homing lives on the Confirm settings step, which is not collapsed, so the
+  // deep-link needs no section highlight.
+  const openHomingSetup = (): void => setMachineSetupRequest({ initialStep: 'confirm' });
   if (!machinePanel.isExpanded) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -73,6 +76,7 @@ export function LaserWindow(): JSX.Element {
           homingEnabled={homingEnabled}
           canUnlock={control.canUnlock}
           onHome={() => void control.home().catch(() => undefined)}
+          onConfigureHoming={openHomingSetup}
           onUnlock={() => void control.unlockAlarm().catch(() => undefined)}
         />
       )}
@@ -94,6 +98,7 @@ export function LaserWindow(): JSX.Element {
         onConfigureAutofocus={() =>
           setMachineSetupRequest({ initialStep: 'options', highlight: 'autofocus' })
         }
+        onConfigureHoming={openHomingSetup}
         onStartJob={() => void runStartJobFlow()}
       />
       <MachineConsoleSection />
@@ -247,12 +252,14 @@ function AlarmBanner({
   homingEnabled,
   canUnlock,
   onHome,
+  onConfigureHoming,
   onUnlock,
 }: {
   readonly code: number | null;
   readonly homingEnabled: boolean;
   readonly canUnlock: boolean;
   readonly onHome: () => void;
+  readonly onConfigureHoming: () => void;
   readonly onUnlock: () => void;
 }): JSX.Element {
   const alarm = code === null ? null : describeAlarm(code);
@@ -271,6 +278,7 @@ function AlarmBanner({
         homingEnabled={homingEnabled}
         canUnlock={canUnlock}
         onHome={onHome}
+        onConfigureHoming={onConfigureHoming}
         onUnlock={onUnlock}
       />
     </div>
@@ -281,25 +289,31 @@ function AlarmRecoveryActions(props: {
   readonly homingEnabled: boolean;
   readonly canUnlock: boolean;
   readonly onHome: () => void;
+  readonly onConfigureHoming: () => void;
   readonly onUnlock: () => void;
 }): JSX.Element {
   return (
     <>
-      <button
-        type="button"
-        onClick={props.onHome}
-        disabled={!props.homingEnabled}
-        title={
-          props.homingEnabled
-            ? 'Send $H. Use this only when the machine has working homing switches.'
-            : 'Homing is disabled in Device settings. Enable "$H supported" first.'
-        }
-      >
-        Home ($H)
-      </button>
+      {props.homingEnabled ? (
+        <button
+          type="button"
+          onClick={props.onHome}
+          title="Send $H. Use this only when the machine has working homing switches."
+        >
+          Home ($H)
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={props.onConfigureHoming}
+          title="Homing is off for this machine. Open Machine Setup to turn on $H homing."
+        >
+          Set up homing
+        </button>
+      )}
       {!props.homingEnabled && (
         <span style={alarmHintStyle}>
-          Enable &quot;$H supported&quot; in Device settings if this machine has homing switches.
+          Turn on homing in Machine Setup if this machine has homing switches.
         </span>
       )}
       {props.canUnlock && (
