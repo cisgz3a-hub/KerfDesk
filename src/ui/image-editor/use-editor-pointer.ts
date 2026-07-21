@@ -10,6 +10,7 @@ import {
   beginDrag,
   booleanFromModifiers,
   CLICK_TOLERANCE_PX,
+  dragRect,
   IDLE_DRAG,
   marqueeRect,
   type DragModifiers,
@@ -194,11 +195,11 @@ function completeDrag(drag: EditorDrag): void {
     case 'marquee':
       completeMarquee(drag, doc.width, doc.height);
       return;
+    case 'crop-drag':
+      completeCropDrag(store, drag);
+      return;
     case 'lasso':
-      store.combineSelection(
-        polygonSelection(doc.width, doc.height, drag.points),
-        drag.booleanOverride ?? undefined,
-      );
+      completeLasso(store, drag, doc.width, doc.height);
       return;
     case 'move-outline':
       store.nudgeSelection(drag.to.x - drag.from.x, drag.to.y - drag.from.y, false);
@@ -206,6 +207,29 @@ function completeDrag(drag: EditorDrag): void {
     case 'move-selection':
       store.moveSelection(drag.to.x - drag.from.x, drag.to.y - drag.from.y);
       return;
+  }
+}
+
+function completeLasso(
+  store: ReturnType<typeof useImageEditorStore.getState>,
+  drag: Extract<EditorDrag, { kind: 'lasso' }>,
+  docWidth: number,
+  docHeight: number,
+): void {
+  store.combineSelection(
+    polygonSelection(docWidth, docHeight, drag.points),
+    drag.booleanOverride ?? undefined,
+  );
+}
+
+function completeCropDrag(
+  store: ReturnType<typeof useImageEditorStore.getState>,
+  drag: Extract<EditorDrag, { kind: 'crop-drag' }>,
+): void {
+  const rect = dragRect(drag);
+  // A tiny drag is a click: keep any existing pending crop untouched.
+  if (rect.width >= CLICK_TOLERANCE_PX && rect.height >= CLICK_TOLERANCE_PX) {
+    store.setPendingCrop(rect);
   }
 }
 

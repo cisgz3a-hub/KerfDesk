@@ -72,10 +72,15 @@ function handlePlainKey(key: string): boolean {
     case 'd':
       store.resetColors();
       return true;
+    case 'enter':
+      // Enter commits the pending crop (the ✓ in the options bar).
+      store.commitPendingCrop();
+      return true;
     case 'escape':
-      // Esc steps outward: non-default tool → Brush; Brush → close (session
-      // kept — closing never asks anything, F-L1).
-      if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
+      // Esc steps outward: pending crop → discard; non-default tool → Brush;
+      // Brush → close (session kept — closing never asks anything, F-L1).
+      if (store.pendingCrop !== null) store.setPendingCrop(null);
+      else if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
       else store.closeEditor();
       return true;
     case 'delete':
@@ -186,6 +191,9 @@ function handleToolKey(key: string): boolean {
       return true;
     case 'w':
       store.setTool({ kind: 'wand' });
+      return true;
+    case 'c':
+      store.setTool({ kind: 'crop' });
       return true;
     case 'v':
       store.setTool({ kind: 'move' });

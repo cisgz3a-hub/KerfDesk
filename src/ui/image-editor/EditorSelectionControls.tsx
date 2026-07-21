@@ -30,6 +30,8 @@ const MODIFY_KINDS: readonly { readonly kind: SelectionModifyKind; readonly labe
 export function SelectionModeButtons(): JSX.Element {
   const selectionMode = useImageEditorStore((s) => s.selectionMode);
   const setSelectionMode = useImageEditorStore((s) => s.setSelectionMode);
+  const feather = useImageEditorStore((s) => s.selectionFeather);
+  const setSelectionFeather = useImageEditorStore((s) => s.setSelectionFeather);
   return (
     <span style={groupStyle} aria-label="Selection mode">
       {MODES.map((entry) => (
@@ -47,6 +49,19 @@ export function SelectionModeButtons(): JSX.Element {
           <span aria-hidden="true">{entry.glyph}</span>
         </button>
       ))}
+      <label style={radiusLabelStyle}>
+        Feather
+        <input
+          type="number"
+          min={0}
+          max={250}
+          value={feather}
+          onChange={(e) => setSelectionFeather(Number(e.target.value) || 0)}
+          style={radiusInputStyle}
+          title="Soft-edge every new selection by this many pixels"
+          aria-label="Selection feather in pixels"
+        />
+      </label>
     </span>
   );
 }

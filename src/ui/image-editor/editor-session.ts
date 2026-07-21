@@ -57,6 +57,8 @@ export function modifySelectionMask(
   }
 }
 
+import type { Bounds } from '../../core/scene';
+
 export const WHITE: PaintColor = { r: 255, g: 255, b: 255 };
 export const BLACK: PaintColor = { r: 0, g: 0, b: 0 };
 
@@ -69,6 +71,7 @@ export type EditorTool =
   | { readonly kind: 'marquee'; readonly shape: 'rect' | 'ellipse' }
   | { readonly kind: 'lasso' }
   | { readonly kind: 'wand' }
+  | { readonly kind: 'crop' }
   | { readonly kind: 'move' };
 
 export type BrushSettings = {
@@ -86,6 +89,10 @@ export type EditorSession = {
   readonly doc: RgbaBuffer;
   /** As-opened pixels, for the explicit Revert action (F-L4). */
   readonly base: RgbaBuffer;
+  /** Where the doc sits inside the as-opened image (crop accumulates). */
+  readonly cropOffset: { readonly x: number; readonly y: number };
+  /** The object's mm bounds at open — Apply maps crops through these. */
+  readonly sourceBounds: Bounds;
   readonly history: EditHistory;
   readonly selection: SelectionMask | null;
   /** Bumped on every visible document/selection change to trigger redraws. */
@@ -98,12 +105,15 @@ export function createSession(
   objectId: string,
   sourceName: string,
   doc: RgbaBuffer,
+  sourceBounds: Bounds,
 ): EditorSession {
   return {
     objectId,
     sourceName,
     doc,
     base: cloneRgbaBuffer(doc),
+    cropOffset: { x: 0, y: 0 },
+    sourceBounds,
     history: createEditHistory(),
     selection: null,
     revision: 0,
@@ -111,11 +121,65 @@ export function createSession(
   };
 }
 
-/** Explicit Revert: back to the as-opened pixels, history cleared. */
+/** Explicit Revert: back to the as-opened pixels (un-crops too). */
 export function revertSession(session: EditorSession): EditorSession {
-  session.doc.data.set(session.base.data);
   return {
     ...session,
+    doc: cloneRgbaBuffer(session.base),
+    cropOffset: { x: 0, y: 0 },
+    history: createEditHistory(),
+    selection: null,
+    revision: session.revision + 1,
+    dirtySinceApply: true,
+  };
+}
+
+/**
+ * The mm bounds Apply should write for a cropped document, mapped through
+ * the accumulated offset at the same DPI (the shipped cropLocalBounds
+ * convention) — null when the document is uncropped.
+ */
+export function appliedBounds(session: EditorSession): Bounds | null {
+  const { sourceBounds } = session;
+  const uncropped =
+    session.cropOffset.x === 0 &&
+    session.cropOffset.y === 0 &&
+    session.doc.width === session.base.width &&
+    session.doc.height === session.base.height;
+  if (uncropped) return null;
+  const widthMm = sourceBounds.maxX - sourceBounds.minX;
+  const heightMm = sourceBounds.maxY - sourceBounds.minY;
+  const sx = widthMm / session.base.width;
+  const sy = heightMm / session.base.height;
+  return {
+    minX: sourceBounds.minX + session.cropOffset.x * sx,
+    minY: sourceBounds.minY + session.cropOffset.y * sy,
+    maxX: sourceBounds.minX + (session.cropOffset.x + session.doc.width) * sx,
+    maxY: sourceBounds.minY + (session.cropOffset.y + session.doc.height) * sy,
+  };
+}
+
+/**
+ * Crop the working document to the rect. Tile history cannot span a resize,
+ * so the editor history clears (surfaced in the status row); Revert still
+ * restores the full as-opened image, and Apply maps the mm bounds through
+ * the accumulated offset so physical scale stays honest.
+ */
+export function commitCrop(session: EditorSession, rect: PixelRect): EditorSession {
+  const x = Math.max(0, Math.floor(rect.x));
+  const y = Math.max(0, Math.floor(rect.y));
+  const width = Math.max(1, Math.min(session.doc.width - x, Math.round(rect.width)));
+  const height = Math.max(1, Math.min(session.doc.height - y, Math.round(rect.height)));
+  if (width <= 0 || height <= 0) return session;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const src = ((y + row) * session.doc.width + x) * 4;
+    data.set(session.doc.data.subarray(src, src + width * 4), row * width * 4);
+  }
+  return {
+    ...session,
+    doc: { width, height, data },
+    cropOffset: { x: session.cropOffset.x + x, y: session.cropOffset.y + y },
     history: createEditHistory(),
     selection: null,
     revision: session.revision + 1,

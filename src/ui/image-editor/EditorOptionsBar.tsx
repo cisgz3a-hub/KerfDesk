@@ -34,9 +34,47 @@ export function EditorOptionsBar(): JSX.Element {
       {showModes ? <SelectionModeButtons /> : null}
       {isPaintTool ? <PaintOptions showColor={tool.kind !== 'eraser'} /> : null}
       {tool.kind === 'wand' ? <WandOptions /> : null}
+      {tool.kind === 'crop' ? <CropActions /> : null}
       {isSelectTool ? <SelectionActions /> : null}
       {isSelectTool ? <SelectionModifyRow /> : null}
     </div>
+  );
+}
+
+// The crop commit/cancel pair (Photoshop puts ✓/✕ in the options bar).
+function CropActions(): JSX.Element {
+  const pendingCrop = useImageEditorStore((s) => s.pendingCrop);
+  const commitPendingCrop = useImageEditorStore((s) => s.commitPendingCrop);
+  const setPendingCrop = useImageEditorStore((s) => s.setPendingCrop);
+  const hasPending = pendingCrop !== null;
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+      <span style={{ fontSize: 12, color: 'var(--lf-text-muted)' }}>
+        {hasPending
+          ? `${Math.round(pendingCrop.width)}×${Math.round(pendingCrop.height)} px`
+          : 'Drag a crop box'}
+      </span>
+      <button
+        type="button"
+        className="lf-btn lf-btn--primary"
+        style={{ padding: '2px 10px' }}
+        onClick={commitPendingCrop}
+        disabled={!hasPending}
+        title="Commit the crop (Enter) — history clears; mm size follows the same DPI"
+      >
+        ✓ Crop
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        style={{ padding: '2px 10px' }}
+        onClick={() => setPendingCrop(null)}
+        disabled={!hasPending}
+        title="Discard the crop box (Esc)"
+      >
+        ✕
+      </button>
+    </span>
   );
 }
 
