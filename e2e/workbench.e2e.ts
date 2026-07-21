@@ -323,11 +323,11 @@ kerfDeskTest(
     await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
     await connectAndHome(page, kerfdesk);
 
-    // ADR-228: Start is available only after the exact compiled job has completed a Frame.
+    // ADR-228/ADR-237: Start is available only after the exact compiled job has
+    // completed a Frame, and that Frame runs dialog-free.
     const frameButton = page.getByRole('button', { name: 'Frame job', exact: true });
     const writesBeforeFrame = serialWrites(await kerfdesk.events()).length;
     await frameButton.click();
-    await confirmFrameReview(page);
     await expect
       .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
       .toContain('$J=G90 G21');
@@ -338,6 +338,7 @@ kerfDeskTest(
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
     const writesBefore = serialWrites(await kerfdesk.events()).length;
     await startButton.click();
+    await confirmStartReview(page);
     await expect(probe).toHaveAttribute('data-lifecycle', 'running');
     const pixelsBeforeStatus = await canvasPixels(page);
     const initial = Number(await probe.getAttribute('data-confirmed-route-mm'));
@@ -450,12 +451,12 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   await expect(page.getByRole('button', { name: 'Review recovery' })).toBeVisible();
 });
 
-// ADR-228: Frame review owns the policy acknowledgement. A completed physical
-// trace mints the one-use permit; the later Start streams that exact artifact.
-async function confirmFrameReview(page: Page): Promise<void> {
+// ADR-237: Frame runs dialog-free and mints a review-pending permit; the
+// single Job Review opens at Start and streams that exact artifact on confirm.
+async function confirmStartReview(page: Page): Promise<void> {
   await page
-    .getByRole('dialog', { name: 'Review job before framing' })
-    .getByRole('button', { name: 'Accept & Frame' })
+    .getByRole('dialog', { name: 'Review job before starting' })
+    .getByRole('button', { name: 'Start job', exact: true })
     .click();
 }
 
