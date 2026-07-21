@@ -101,6 +101,7 @@ export function EditorCanvas(): JSX.Element {
           pointer.onPointerMove(e);
         }}
         onPointerUp={pointer.onPointerUp}
+        onDoubleClick={pointer.onDoubleClick}
         onPointerCancel={pointer.cancelDrag}
         onPointerLeave={hover.onHoverLeave}
         onWheel={pointer.onWheel}
