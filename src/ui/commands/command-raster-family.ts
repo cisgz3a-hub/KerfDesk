@@ -2,6 +2,7 @@ import { disabled, enabled, type AppCommand, type AppCommandContext } from './co
 
 type RasterToolCommandId =
   | 'tools.adjust-image'
+  | 'tools.edit-image'
   | 'tools.save-processed-bitmap'
   | 'tools.trace-image';
 
@@ -9,8 +10,18 @@ export function adjustImageCommand(ctx: AppCommandContext): AppCommand {
   return rasterToolCommand(ctx, 'tools.adjust-image', 'Adjust Image...', 'Adjust selected image');
 }
 
+export function editImageCommand(ctx: AppCommandContext): AppCommand {
+  return rasterToolCommand(
+    ctx,
+    'tools.edit-image',
+    'Image Studio...',
+    'Paint, erase, and edit selected areas of the selected image',
+  );
+}
+
 export function processedRasterToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    editImageCommand(ctx),
     rasterToolCommand(
       ctx,
       'tools.save-processed-bitmap',
@@ -56,6 +67,8 @@ function rasterToolInvoke(ctx: AppCommandContext, id: RasterToolCommandId): () =
   switch (id) {
     case 'tools.adjust-image':
       return ctx.adjustImage;
+    case 'tools.edit-image':
+      return ctx.editImage;
     case 'tools.save-processed-bitmap':
       return ctx.saveProcessedBitmap;
     case 'tools.trace-image':

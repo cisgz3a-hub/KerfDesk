@@ -161,6 +161,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Tune brightness, contrast, gamma, and dithering for the selected image.',
   },
+  'tools.edit-image': {
+    family: 'tools',
+    tooltip: 'Open the Image Studio to paint, erase, and edit selected areas of the image.',
+  },
   'tools.apply-image-mask': {
     family: 'tools',
     tooltip:
