@@ -54,20 +54,27 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
 
+// Hardware-realistic settlement: GRBL acks $J= at parse time (ok first, while
+// status still reports Jog); the G4 settlement marker may only follow a fresh
+// Idle report, and one final Idle confirmation releases the XY traverse.
 async function settleCncRetract(
   connection: FakeConnection,
   writes: ReadonlyArray<string>,
 ): Promise<void> {
-  connection.emitLine('<Jog|MPos:50.000,30.000,3.810|FS:1000,0>');
-  connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
-  expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
-
   connection.emitLine('ok');
+  await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+  expect(writes).not.toContain('G4 P0.01\n');
+
+  connection.emitLine('<Jog|MPos:50.000,30.000,3.810|FS:1000,0>');
+  await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
+  expect(writes).not.toContain('G4 P0.01\n');
+
+  connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
   await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
   expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
 
   connection.emitLine('ok');
-  await vi.waitFor(() => expect(writes.at(-1)).toBe('?'));
+  await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(3));
   expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
   connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
   await flush();
@@ -270,10 +277,15 @@ describe('jogToMachinePosition', () => {
     });
 
     releaseRetract();
+    // The stale pre-release Idle is not fresh proof: the fence must probe
+    // status and observe a new Idle before crossing the settlement marker.
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
+    expect(writes).not.toContain('G4 P0.01\n');
+    connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
     await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes.at(-1)).toBe('?'));
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(2));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
     await move;
@@ -307,12 +319,12 @@ describe('jogToMachinePosition', () => {
       );
     await flush();
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
-    connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes.at(-1)).toBe('?'));
+    // The pre-marker Idle fence is probing status when the pendant takes over.
+    await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
     connection.emitLine('<Idle|MPos:55.000,35.000,1.000|FS:0,0|MPG:1>');
 
     expect(await outcome).toBeInstanceOf(Error);
+    expect(writes).not.toContain('G4 P0.01\n');
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     expect(useLaserStore.getState().motionOperation).toMatchObject({
       kind: 'jog',
@@ -344,8 +356,7 @@ describe('jogToMachinePosition', () => {
       );
     await flush();
     connection.emitLine('ok');
-    await vi.waitFor(() => expect(writes).toContain('G4 P0.01\n'));
-    connection.emitLine('ok');
+    // The retract's pre-marker Idle fence has its first status probe in flight.
     await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(1));
 
     const cancel = useLaserStore.getState().cancelJog();
@@ -361,7 +372,7 @@ describe('jogToMachinePosition', () => {
     // Only a fresh Idle may put the cancellation marker behind the stopped
     // motion queue. The marker ack is then followed by one final Idle proof.
     connection.emitLine('<Idle|MPos:50.000,30.000,3.810|FS:0,0>');
-    await vi.waitFor(() => expect(writes.filter((line) => line === 'G4 P0.01\n')).toHaveLength(2));
+    await vi.waitFor(() => expect(writes.filter((line) => line === 'G4 P0.01\n')).toHaveLength(1));
     expect(writes.some((line) => line.includes('X70.000'))).toBe(false);
     connection.emitLine('ok');
     await vi.waitFor(() => expect(writes.filter((line) => line === '?')).toHaveLength(4));
