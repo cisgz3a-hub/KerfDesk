@@ -5,10 +5,15 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
+import { useToastStore } from './toast-store';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
-describe('jog configured-machine-bounds guard', () => {
+// ADR-232 / CLAUDE.md rule 7: configured machine bounds are warn-only policy.
+// A jog whose target lies outside the configured bounds must still be sent to
+// the controller (soft-limits remain the real bounds authority) with a
+// non-blocking warning toast naming the bounds.
+describe('jog configured-machine-bounds warning', () => {
   afterEach(async () => {
     await useLaserStore.getState().disconnect();
     useStore.setState({ project: createProject(DEFAULT_DEVICE_PROFILE) });
@@ -18,77 +23,90 @@ describe('jog configured-machine-bounds guard', () => {
       lastWriteError: null,
       motionOperation: null,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    dismissAllToasts();
     vi.restoreAllMocks();
   });
 
-  it('rejects an absolute board-point destination beyond configured travel', async () => {
+  it('sends an absolute board-point destination beyond configured travel and warns', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => void writes.push(data));
     configureDevice('rear-left');
     await connectIdleAt(connection, 50, 50);
     writes.length = 0;
 
-    await expect(useLaserStore.getState().jogToMachinePosition(401, 50, 1000)).rejects.toThrow(
-      /outside the configured machine bounds/i,
-    );
+    await useLaserStore.getState().jogToMachinePosition(401, 50, 1000);
 
-    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([]);
-    expect(useLaserStore.getState().lastWriteError).toMatch(/X0\.000\.\.400\.000/);
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G91 G21 X351.000 F1000\n',
+    ]);
+    const warning = useToastStore.getState().toasts.at(-1);
+    expect(warning?.variant).toBe('warning');
+    expect(warning?.message).toMatch(/outside the configured machine bounds/i);
+    expect(warning?.message).toMatch(/X0\.000\.\.400\.000/);
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
   });
 
-  it('rejects a relative fine step past the edge but allows the exact edge', async () => {
-    const rejectedWrites: string[] = [];
-    const rejectedConnection = makeConnection(async (data) => void rejectedWrites.push(data));
+  it('sends a relative fine step past the edge with a warning, and the edge silently', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => void writes.push(data));
     configureDevice('rear-left');
-    await connectIdleAt(rejectedConnection, 399.5, 50);
-    rejectedWrites.length = 0;
+    await connectIdleAt(connection, 399.5, 50);
+    writes.length = 0;
 
-    await expect(useLaserStore.getState().jog({ dx: 1, feed: 1000 })).rejects.toThrow(
+    await useLaserStore.getState().jog({ dx: 1, feed: 1000 });
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual(['$J=G91 G21 X1.000 F1000\n']);
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(
       /outside the configured machine bounds/i,
     );
-    expect(rejectedWrites.filter((line) => line.startsWith('$J='))).toEqual([]);
 
     await useLaserStore.getState().disconnect();
-    const allowedWrites: string[] = [];
-    const allowedConnection = makeConnection(async (data) => void allowedWrites.push(data));
-    await connectIdleAt(allowedConnection, 399.5, 50);
-    allowedWrites.length = 0;
+    dismissAllToasts();
+    const edgeWrites: string[] = [];
+    const edgeConnection = makeConnection(async (data) => void edgeWrites.push(data));
+    await connectIdleAt(edgeConnection, 399.5, 50);
+    edgeWrites.length = 0;
     await useLaserStore.getState().jog({ dx: 0.5, feed: 1000 });
-    expect(allowedWrites.filter((line) => line.startsWith('$J='))).toEqual([
+    expect(edgeWrites.filter((line) => line.startsWith('$J='))).toEqual([
       '$J=G91 G21 X0.500 F1000\n',
     ]);
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 
-  it('uses signed travel limits for a center-origin device', async () => {
+  it('warns with signed travel limits for a center-origin device', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => void writes.push(data));
     configureDevice('center');
     await connectIdleAt(connection, 0, 0);
     writes.length = 0;
 
-    await expect(useLaserStore.getState().jogToMachinePosition(201, 0, 1000)).rejects.toThrow(
-      /outside the configured machine bounds/i,
-    );
-    await useLaserStore.getState().jogToMachinePosition(-200, 0, 1000);
+    await useLaserStore.getState().jogToMachinePosition(201, 0, 1000);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/X-200\.000\.\.200\.000/);
 
     expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
-      '$J=G91 G21 X-200.000 F1000\n',
+      '$J=G91 G21 X201.000 F1000\n',
     ]);
   });
 
-  it('treats relative:false axes as the absolute destination', async () => {
+  it('treats relative:false axes as the absolute destination and still proceeds', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => void writes.push(data));
     configureDevice('rear-left');
     await connectIdleAt(connection, 50, 50);
     writes.length = 0;
 
-    await expect(
-      useLaserStore.getState().jog({ dx: 401, dy: 50, feed: 1000, relative: false }),
-    ).rejects.toThrow(/outside the configured machine bounds/i);
-    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([]);
+    await useLaserStore.getState().jog({ dx: 401, dy: 50, feed: 1000, relative: false });
+
+    expect(writes.filter((line) => line.startsWith('$J=')).length).toBe(1);
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
   });
 });
+
+function dismissAllToasts(): void {
+  for (const toast of useToastStore.getState().toasts) {
+    useToastStore.getState().dismissToast(toast.id);
+  }
+}
 
 function configureDevice(origin: 'rear-left' | 'center'): void {
   const project = useStore.getState().project;
