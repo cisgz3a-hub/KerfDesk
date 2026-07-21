@@ -73,13 +73,15 @@ function handlePlainKey(key: string): boolean {
       store.resetColors();
       return true;
     case 'enter':
-      // Enter commits the pending crop (the ✓ in the options bar).
-      store.commitPendingCrop();
+      // Enter commits the active modal canvas state: transform, then crop.
+      if (store.transform !== null) store.commitTransform();
+      else store.commitPendingCrop();
       return true;
     case 'escape':
-      // Esc steps outward: pending crop → discard; non-default tool → Brush;
-      // Brush → close (session kept — closing never asks anything, F-L1).
-      if (store.pendingCrop !== null) store.setPendingCrop(null);
+      // Esc steps outward: transform → cancel; pending crop → discard;
+      // non-default tool → Brush; Brush → close (session kept, F-L1).
+      if (store.transform !== null) store.cancelTransform();
+      else if (store.pendingCrop !== null) store.setPendingCrop(null);
       else if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
       else store.closeEditor();
       return true;
@@ -156,6 +158,10 @@ function handleControlKey(key: string, shift: boolean): boolean {
       return true;
     case 'y':
       store.redo();
+      return true;
+    case 't':
+      // Ctrl+T free transform of the selection (or the whole image).
+      store.startTransform();
       return true;
     default:
       return false;

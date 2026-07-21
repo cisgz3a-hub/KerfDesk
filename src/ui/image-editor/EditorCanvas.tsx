@@ -3,7 +3,7 @@
 // (use-brush-cursor.ts), and fit/zoom/pan through the store view.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { docToCanvas, drawEditorScene } from './editor-canvas-draw';
+import { docToCanvas, drawEditorScene, drawTransformPreview } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
 import { BRUSH_CURSOR_STYLE, useBrushCursor } from './use-brush-cursor';
 import { useCanvasFit } from './use-canvas-fit';
@@ -21,6 +21,7 @@ export function EditorCanvas(): JSX.Element {
   const setView = useImageEditorStore((s) => s.setView);
   const isSpacePanning = useImageEditorStore((s) => s.isSpacePanning);
   const pendingCrop = useImageEditorStore((s) => s.pendingCrop);
+  const transform = useImageEditorStore((s) => s.transform);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [antsPhase, setAntsPhase] = useState(0);
@@ -62,6 +63,14 @@ export function EditorCanvas(): JSX.Element {
       },
       pendingCrop,
     );
+    if (transform !== null) {
+      drawTransformPreview(ctx, activeView, {
+        rect: transform.floating.rect,
+        pixels: transform.floating.pixels,
+        alpha: transform.floating.alpha,
+        affine: transform.affine,
+      });
+    }
   });
 
   return (

@@ -19,6 +19,7 @@ import {
 import { useImageEditorStore } from './image-editor-store';
 import type { EditorView } from './image-editor-types';
 import { canvasToDoc } from './editor-canvas-draw';
+import { dragTransform, hitTransformHandle } from './editor-transform';
 
 const ZOOM_STEP = 1.1;
 const MIN_SCALE = 0.05;
@@ -67,9 +68,15 @@ export function useEditorPointer(
         return;
       }
       if (e.button !== 0) return;
-      startToolDrag(e, docPoint(e), update);
+      const point = docPoint(e);
+      const transformDrag = beginTransformDrag(state, point, view.scale);
+      if (transformDrag !== null) {
+        update(transformDrag);
+        return;
+      }
+      startToolDrag(e, point, update);
     },
-    [docPoint, update],
+    [docPoint, update, view.scale],
   );
 
   const onPointerMove = useCallback(
@@ -83,6 +90,10 @@ export function useEditorPointer(
           panY: view.panY + e.clientY - current.lastClientY,
         });
         update({ kind: 'pan', lastClientX: e.clientX, lastClientY: e.clientY });
+        return;
+      }
+      if (current.kind === 'transform-drag') {
+        moveTransformDrag(current, docPoint(e), e.shiftKey);
         return;
       }
       update(
@@ -131,6 +142,37 @@ function zoomAtPointer(
     panX: cx - (cx - view.panX) * ratio,
     panY: cy - (cy - view.panY) * ratio,
   });
+}
+
+// An active Ctrl+T session grabs every left drag until Enter/Esc.
+function beginTransformDrag(
+  state: ReturnType<typeof useImageEditorStore.getState>,
+  point: { x: number; y: number },
+  viewScale: number,
+): EditorDrag | null {
+  const transform = state.transform;
+  if (transform === null) return null;
+  const handle = hitTransformHandle(transform.floating.rect, transform.affine, point, viewScale);
+  return { kind: 'transform-drag', handle, startAffine: transform.affine, from: point };
+}
+
+function moveTransformDrag(
+  current: Extract<EditorDrag, { kind: 'transform-drag' }>,
+  point: { x: number; y: number },
+  shift: boolean,
+): void {
+  const store = useImageEditorStore.getState();
+  if (store.transform === null) return;
+  store.updateTransformAffine(
+    dragTransform(
+      current.startAffine,
+      store.transform.floating.rect,
+      current.handle,
+      current.from,
+      point,
+      shift,
+    ),
+  );
 }
 
 // Left-button tool dispatch: Alt-click eyedropper inside paint tools, wand
@@ -187,15 +229,25 @@ function completeDrag(drag: EditorDrag): void {
   const store = useImageEditorStore.getState();
   const doc = store.session?.doc;
   if (doc === undefined) return;
+  // idle/pan finish nothing; a transform drag already updated the affine
+  // live and its session stays active until Enter/Esc.
+  if (drag.kind === 'idle' || drag.kind === 'pan' || drag.kind === 'transform-drag') return;
+  completeActionDrag(store, doc, drag);
+}
+
+type ActionDrag = Exclude<EditorDrag, { kind: 'idle' | 'pan' | 'transform-drag' }>;
+
+function completeActionDrag(
+  store: ReturnType<typeof useImageEditorStore.getState>,
+  doc: NonNullable<ReturnType<typeof useImageEditorStore.getState>['session']>['doc'],
+  drag: ActionDrag,
+): void {
   switch (drag.kind) {
-    case 'idle':
-    case 'pan':
-      return;
     case 'paint':
       store.stroke(drag.points);
       return;
     case 'line':
-      store.line(drag.from, drag.to, drag.shift);
+      completeLine(store, drag);
       return;
     case 'marquee':
       completeMarquee(drag, doc.width, doc.height);
@@ -213,6 +265,13 @@ function completeDrag(drag: EditorDrag): void {
       store.moveSelection(drag.to.x - drag.from.x, drag.to.y - drag.from.y);
       return;
   }
+}
+
+function completeLine(
+  store: ReturnType<typeof useImageEditorStore.getState>,
+  drag: Extract<EditorDrag, { kind: 'line' }>,
+): void {
+  store.line(drag.from, drag.to, drag.shift);
 }
 
 function completeLasso(
