@@ -10,6 +10,7 @@ import {
   drawQuickMaskOverlay,
   drawTransformPreview,
 } from './editor-canvas-draw';
+import { useCompositeDoc } from './use-composite-doc';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
 import { BRUSH_CURSOR_STYLE } from './use-brush-cursor';
@@ -38,8 +39,11 @@ export function EditorCanvas(): JSX.Element {
   const [antsPhase, setAntsPhase] = useState(0);
 
   const revision = session?.revision ?? -1;
-  // An enabled adjustment preview substitutes for the working document.
-  const doc = useAdjustPreviewDoc() ?? session?.doc;
+  // The canvas shows the layer composite (identity for single-layer
+  // sessions); an enabled adjustment preview substitutes for it.
+  const adjustPreview = useAdjustPreviewDoc();
+  const composite = useCompositeDoc(session, revision);
+  const doc = adjustPreview ?? composite;
   // The doc canvas rebuilds only when pixels changed (revision bump or a
   // fresh preview buffer identity).
   // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal

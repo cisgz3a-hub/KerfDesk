@@ -51,6 +51,7 @@ import {
   type EditorTool,
   type SelectionModifyKind,
 } from './editor-session';
+import { compositeSession } from './editor-session-layers';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 import type { EditorView } from './image-editor-types';
 
@@ -317,8 +318,13 @@ function wandAtAction(
 ): void {
   const { session, wandTolerance, wandContiguous, combineSelection } = get();
   if (session === null) return;
+  // The wand matches what the operator SEES — the layer composite — never
+  // the active layer alone (a transparent layer would select everything).
   combineSelection(
-    wandSelection(session.doc, x, y, { tolerance: wandTolerance, contiguous: wandContiguous }),
+    wandSelection(compositeSession(session), x, y, {
+      tolerance: wandTolerance,
+      contiguous: wandContiguous,
+    }),
     override,
   );
 }
@@ -357,7 +363,9 @@ function applyAction(set: Setter, get: () => ImageEditorState): void {
   // needs applying (found by the 2026-07-21 interactive self-test).
   if (session === null || isApplying || !session.dirtySinceApply) return;
   set({ isApplying: true });
-  bakeBufferToBitmapFields(session.doc)
+  // ADR-245: Apply always bakes the layer composite (fast-path identity for
+  // a single-layer session), never the active layer alone.
+  bakeBufferToBitmapFields(compositeSession(session))
     .then((fields) => {
       const bounds = appliedBounds(session);
       useStore.getState().applyEditedImage(session.objectId, {
