@@ -57,8 +57,12 @@ import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import { type StartOfferPolicy } from './start-blocked-repair';
 import { runJobReviewGate } from './job-review';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
-import type { FramedRunPermit } from '../state/framed-run';
+import type { FramedRunPermit, FramedRunReviewEvidence } from '../state/framed-run';
 import { framedRunReadinessIssue } from './framed-run-readiness';
+import {
+  FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE,
+  reviewFramedRunForStart,
+} from './framed-run-start-review';
 import { runFrameNow } from './use-frame-action';
 import {
   claimCurrentFramedRunStart,
@@ -82,12 +86,20 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
       useToastStore.getState().pushToast(issue, 'warning');
     }
     // Start is the primary action: with no current permit it launches the same
-    // prepare/review/Frame flow as the Frame button. A successful trace arms
-    // the exact job; the operator then deliberately presses Start to burn/cut.
+    // dialog-free prepare/Frame flow as the Frame button. A successful trace
+    // arms the exact job; pressing Start again opens the one Job Review.
     await runFrameNow();
     return;
   }
   if (permit === null) return;
+  // ADR-237: the single Job Review runs here at Start. Transient camera
+  // permits were reviewed before their Frame and carry evidence from birth.
+  const review = permit.candidate.review ?? (await reviewFramedRunForStart(permit));
+  if (review === null) return;
+  if (useLaserStore.getState().framedRun !== permit) {
+    useToastStore.getState().pushToast(FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE, 'warning');
+    return;
+  }
   const claim = claimCurrentFramedRunStart(permit);
   if (claim === null) {
     useToastStore
@@ -96,7 +108,7 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
     return;
   }
   try {
-    await streamFramedRun(permit, claim, repository);
+    await streamFramedRun(permit, review, claim, repository);
   } finally {
     releaseFramedRunStartClaim(claim);
   }
@@ -104,6 +116,7 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
 
 async function streamFramedRun(
   permit: FramedRunPermit,
+  review: FramedRunReviewEvidence,
   claim: FramedRunStartClaim,
   repository: RecoveryRepository,
 ): Promise<void> {
@@ -124,10 +137,10 @@ async function streamFramedRun(
     laser: currentLaser,
     prepared: permit.candidate.preparedStart,
     machineKind: machineKindOf(permit.candidate.project.machine),
-    reviewedAtIso: permit.candidate.reviewedAtIso,
-    reviewModel: permit.candidate.reviewModel,
-    laserModeStartEvidence: permit.candidate.laserModeStartEvidence,
-    cncSetupAttestation: permit.candidate.cncSetupAttestation,
+    reviewedAtIso: review.reviewedAtIso,
+    reviewModel: review.reviewModel,
+    laserModeStartEvidence: review.laserModeStartEvidence,
+    cncSetupAttestation: review.cncSetupAttestation,
     checkpointToReplace: null,
     completedReceipt: null,
     externalEnvironment: permit.candidate.externalEnvironment,

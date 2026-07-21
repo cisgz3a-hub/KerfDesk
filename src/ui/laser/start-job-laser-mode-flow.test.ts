@@ -213,15 +213,20 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
 
   it('sends no ordinary job when the unknown-$32 review is cancelled', async () => {
     await makeLaserModeUnknown();
+    installCompletingFrameMock();
     useLaserStore.setState({ framedRun: null, frameVerification: null });
     reviewChoice = 'cancel';
     const review = captureJobReviewModels();
 
+    // ADR-237: the first press Frames dialog-free; the second opens the
+    // Start review carrying the unknown-$32 acknowledgement, then cancels.
+    await runStartJobFlow(recoveryHarness());
     await runStartJobFlow(recoveryHarness());
 
     review.stop();
     expect(review.models.at(-1)?.acknowledgement).toMatchObject({ kind: 'laser-unverified' });
     expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().framedRun).not.toBeNull();
     expect(readJobCheckpoint()).toBeNull();
   });
 

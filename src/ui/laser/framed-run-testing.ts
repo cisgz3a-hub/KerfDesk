@@ -31,11 +31,36 @@ export function idleControllerStatusForFrameTest(): StatusReport {
 }
 
 /**
- * Test-only equivalent of a cleanly completed Frame for the stores' current
- * exact job. Production permits are minted exclusively by the final physical
- * Frame Idle in laser-status-line.ts.
+ * Test-only equivalent of a cleanly completed ordinary Frame: review-pending,
+ * exactly as `runFrameNow` mints candidates (ADR-237 — Start owns the review).
+ * Production permits are minted exclusively by the final physical Frame Idle
+ * in laser-status-line.ts.
+ */
+export async function reviewPendingFramedRunPermitForCurrentState(): Promise<FramedRunPermit> {
+  return buildFramedRunPermitForCurrentState('review-pending');
+}
+
+export async function installReviewPendingFramedRunPermitForCurrentState(): Promise<FramedRunPermit> {
+  const permit = await reviewPendingFramedRunPermitForCurrentState();
+  useLaserStore.setState({
+    framedRun: permit,
+    frameVerification: permit.candidate.frameVerification,
+  });
+  return permit;
+}
+
+/**
+ * Test-only equivalent of a cleanly completed Frame whose candidate already
+ * carries confirmed review evidence (the transient-camera shape) so Start
+ * streams without opening Job Review.
  */
 export async function framedRunPermitForCurrentState(): Promise<FramedRunPermit> {
+  return buildFramedRunPermitForCurrentState('reviewed');
+}
+
+async function buildFramedRunPermitForCurrentState(
+  reviewState: 'reviewed' | 'review-pending',
+): Promise<FramedRunPermit> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
@@ -73,27 +98,33 @@ export async function framedRunPermitForCurrentState(): Promise<FramedRunPermit>
     executionSignature: prepared.canvasPlan.retentionKey,
     controllerBeforeFrame: framedRunControllerSnapshot(laser),
     returnToWorkPosition: { x: position.x, y: position.y },
-    reviewedAtIso: new Date().toISOString(),
-    reviewModel,
     frameVerification: {
       boundsSignature: frameBoundsSignature(bounds),
       wco: laser.wcoCache,
       workOriginActive: laser.workOriginActive,
     },
     externalEnvironment,
-    ...(machineKind === 'laser'
-      ? {
-          laserModeStartEvidence: requiredLaserModeEvidence(
-            app.project,
-            laserSnapshot,
-            prepared.gcode,
-          ),
-        }
+    ...(reviewState === 'review-pending'
+      ? {}
       : {
-          cncSetupAttestation: createCncSetupAttestation(
-            prepared.gcode,
-            cncControllerEpochOf(laser),
-          ),
+          review: {
+            reviewedAtIso: new Date().toISOString(),
+            reviewModel,
+            ...(machineKind === 'laser'
+              ? {
+                  laserModeStartEvidence: requiredLaserModeEvidence(
+                    app.project,
+                    laserSnapshot,
+                    prepared.gcode,
+                  ),
+                }
+              : {
+                  cncSetupAttestation: createCncSetupAttestation(
+                    prepared.gcode,
+                    cncControllerEpochOf(laser),
+                  ),
+                }),
+          },
         }),
   };
   return createFramedRunPermit(candidate, laser);

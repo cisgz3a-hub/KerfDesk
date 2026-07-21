@@ -161,10 +161,13 @@ describe('Frame source-of-truth contract', () => {
 
       await expect(runFrameNow()).resolves.toBe(true);
 
-      expect(reviewHarness.runJobReviewGate).toHaveBeenCalledOnce();
+      // ADR-237: Frame is dialog-free; the finding rides the permit into
+      // the Start-time Job Review instead of a pre-Frame dialog.
+      expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
       expect(frame).toHaveBeenCalledOnce();
-      expect(useLaserStore.getState().framedRun).not.toBeNull();
-      expect(JSON.stringify(reviewHarness.runJobReviewGate.mock.calls[0])).toContain(label);
+      const permit = useLaserStore.getState().framedRun;
+      expect(permit).not.toBeNull();
+      expect(JSON.stringify(permit?.candidate.preparedStart.warnings)).toContain(label);
     },
   );
 
@@ -222,9 +225,11 @@ describe('Frame source-of-truth contract', () => {
 
     await expect(runFrameNow()).resolves.toBe(true);
 
+    // A zone touching only the frame outline never refuses Frame; the
+    // interior test below pins the warning content for crossed job motion.
     expect(frame).toHaveBeenCalledOnce();
     expect(useLaserStore.getState().framedRun).not.toBeNull();
-    expect(JSON.stringify(reviewHarness.runJobReviewGate.mock.calls[0])).toContain('Clamp');
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('success');
   });
 
   it('keeps an interior no-go finding advisory and lets the completed Frame authorize', async () => {
@@ -242,7 +247,8 @@ describe('Frame source-of-truth contract', () => {
     await expect(runFrameNow()).resolves.toBe(true);
 
     expect(frame).toHaveBeenCalledOnce();
-    expect(useLaserStore.getState().framedRun).not.toBeNull();
-    expect(JSON.stringify(reviewHarness.runJobReviewGate.mock.calls[0])).toContain('Clamp');
+    const permit = useLaserStore.getState().framedRun;
+    expect(permit).not.toBeNull();
+    expect(JSON.stringify(permit?.candidate.preparedStart.warnings)).toContain('Clamp');
   });
 });

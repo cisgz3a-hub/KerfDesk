@@ -16,6 +16,15 @@
 > consistency. Authoritative per-gate disposition:
 > `docs/audits/2026-07-18-guard-inventory-frame-first.md`. Flow F-A10 reflects the current
 > model; passages that predate it are stamped inline.
+>
+> **Review location — Job Review runs at Start (ADR-237, 2026-07-21).** A plain Frame runs
+> dialog-free: prepare → physical trace → review-pending permit. The single Job Review dialog
+> opens when the operator presses **Start** on a review-pending permit; its confirm button is
+> **Start job**, and confirming claims the permit and streams. Warnings, the G54 normalization
+> disclosure, and the acknowledgement/attestation prompts all surface in that Start-time review.
+> Passages below that describe a pre-Frame Job Review or an **Accept & Frame** confirm predate
+> ADR-237 — read "Job Review before Frame" as "Job Review at Start". Transient camera-marker
+> Frames remain reviewed before dispatch and stream without reopening the dialog.
 
 ---
 
@@ -740,10 +749,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
    Unstreamable/empty output refuses; homing, camera, accessory, override, dialect, tool, and other
    non-Frame-validity policy findings remain warnings.
-5. **Job Review** shows those warnings and the exact artifact. When preparation changed G55-G59 to
-   G54, a durable warning names the original WCS and states that the active selection changed, the
-   stored offsets were not erased, and cancelling leaves G54 selected. The operator accepts with
-   **Accept & Frame**; an edit inside review re-prepares before acceptance.
+5. **Job Review runs at Start (ADR-237).** Frame dispatches dialog-free; the warnings, exact
+   artifact, and — when preparation changed G55-G59 to G54 — the durable WCS disclosure ride the
+   review-pending permit. Pressing Start opens the one Job Review; the operator confirms with
+   **Start job**. An edit inside the review re-prepares, and a re-prepared artifact that no longer
+   matches the framed one voids the permit (Frame again).
 6. Calculated motion-envelope, travel, and no-go findings remain visible in Job Review but do not
    pre-empt the governing physical test. Frame establishes driver-produced tool-off state and runs
    the watched exact envelope; controller rejection, cancel, or interrupted motion issues no permit.
@@ -837,7 +847,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    G54 from G55-G59, the durable warning names the original WCS and says that the active selection
    changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is **not**
    editable in the review (it stays on the machine rail); the sticky footer echoes the resolved
-   origin ("Runs from …") beside Cancel and **Accept & Frame**. Pressing Accept & Frame records the
+   origin ("Runs from …") beside Cancel and **Start job** (ADR-237: the review opens at Start for
+   the framed permit). Pressing Start job records the
    same evidence objects the previous native confirms produced. For scan output, the review also
    names each operation's effective direction/reason, exact pass-weighted runway coverage, requested
    runway values, and any controlled laser-off seek policy warning.
