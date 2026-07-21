@@ -257,6 +257,18 @@ describe('buildJobReviewModel', () => {
     expect(model.warnings).toContainEqual(expect.stringContaining('manual air pump'));
   });
 
+  it('discloses the park rapid that exits the framed outline (laser)', async () => {
+    // The line object spans X/Y 1..9 while the default GRBL dialect parks at
+    // work 0,0 — the job's final rapid leaves the framed motion envelope.
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.warnings).toContainEqual(expect.stringContaining('outside the framed outline'));
+    expect(model.warnings).toContainEqual(expect.stringContaining('X 0'));
+    expect(model.warnings).toContainEqual(expect.stringContaining('Y 0'));
+    // rule 7 / ADR-228: disclosure only — it never forces acknowledgement.
+    expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
+  });
+
   it('summarizes a CNC job with the tool plan and the exact attestation prompt', async () => {
     useStore.setState((state) => ({
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },

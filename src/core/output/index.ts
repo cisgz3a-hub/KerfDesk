@@ -4,6 +4,7 @@ export {
   type OutputStrategy,
 } from './output-strategy';
 export { grblStrategy } from './grbl-strategy';
+export { resolveJobParkTarget } from './job-park-target';
 export { cncGrblStrategy, emitCncJobWithPassSpans } from './cnc-grbl-strategy';
 export type { CncPassSpan, CncPassSpanEmission } from './cnc-pass-spans';
 export { extractToolChangeLabels, TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';

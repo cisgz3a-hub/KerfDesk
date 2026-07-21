@@ -14,6 +14,7 @@ import {
   type Job,
 } from '../../../core/job';
 import type { DeviceProfile } from '../../../core/devices';
+import { finishOptionsForJobOrigin } from '../../../core/output';
 import { machineKindOf, type MachineKind, type Project } from '../../../core/scene';
 import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
@@ -36,6 +37,7 @@ import {
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
+import { detectParkOutsideFrameWarnings } from './park-outside-frame-warnings';
 
 export type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -88,6 +90,14 @@ export function buildJobReviewModel(args: {
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
+      // The park point is resolved with the emitters' own precedence and the
+      // same finish-position seam emission uses (finishOptionsForJobOrigin).
+      ...detectParkOutsideFrameWarnings(
+        args.prepared.prepared.job,
+        args.project.device,
+        machineKind,
+        finishOptionsForJobOrigin(args.prepared.jobOrigin).finishPosition,
+      ),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
     toolPlanLabels: toolPlanLabels(args.prepared.cncToolPlan),
