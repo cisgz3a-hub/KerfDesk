@@ -93,7 +93,35 @@ function streamableRasterProject(): Project {
   };
 }
 
+function overBudgetVectorProject(): Project {
+  // 100,001 segments — above the former PREPARATION_RAW_VECTOR_SEGMENT_BUDGET
+  // that used to refuse all output (ADR-241 removed that refusal).
+  const points = Array.from({ length: 100_002 }, (_, index) => ({
+    x: index % 100,
+    y: Math.floor(index / 100) / 100,
+  }));
+  const obj: SceneObject = {
+    kind: 'imported-svg',
+    id: 'huge-vector',
+    source: 'huge.svg',
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 11 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#ff0000', polylines: [{ points, closed: false }] }],
+  };
+  const base = createProject();
+  return {
+    ...base,
+    scene: addLayer(addObject(base.scene, obj), createLayer({ id: 'L1', color: '#ff0000' })),
+  };
+}
+
 describe('prepareOutput', () => {
+  it('prepares a vector scene above the former segment budget (ADR-241)', () => {
+    const prepared = prepareOutput(overBudgetVectorProject());
+    expect(prepared.ok).toBe(true);
+    if (prepared.ok) expect(prepared.job.groups.length).toBeGreaterThan(0);
+  });
+
   it('returns an optimized job for a well-formed project', () => {
     const prepared = prepareOutput(vectorProject());
     expect(prepared.ok).toBe(true);

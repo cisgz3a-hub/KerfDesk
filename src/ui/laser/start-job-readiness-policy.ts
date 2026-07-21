@@ -3,8 +3,9 @@
 // the small set of emit failures that cannot produce an executable program.
 
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
+import { scenePreparationTooComplex } from '../../core/job';
 import type { PreflightIssue } from '../../core/preflight';
-import { machineKindOf, type Project } from '../../core/scene';
+import { machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
 import type { MachineStartSnapshot } from './start-job-readiness';
@@ -28,6 +29,15 @@ export function demotedPolicyWarnings(project: Project, machine: MachineStartSna
   );
   if (workZeroIssue !== null) warnings.push(workZeroIssue);
   return warnings;
+}
+
+export const LARGE_JOB_PREPARATION_WARNING =
+  'Large job: this design is over the live preview and estimate budget, so those stay paused. Preparing and streaming the program may take longer than usual.';
+
+// The former pre-emit curve/fill segment budget refusal, demoted to a Job
+// Review advisory (rule 7 / ADR-241): the operator is informed, never blocked.
+export function largeJobPreparationWarning(scene: Scene): string | null {
+  return scenePreparationTooComplex(scene) ? LARGE_JOB_PREPARATION_WARNING : null;
 }
 
 const EMIT_BLOCKING_PREFLIGHT_CODES: ReadonlySet<string> = new Set([

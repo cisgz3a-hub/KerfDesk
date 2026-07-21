@@ -16,7 +16,6 @@ import {
   STREAMED_RASTER_PIXEL_THRESHOLD,
   supportsStreamedRasterRows,
 } from '../raster/raster-budget';
-import { scenePreparationTooComplex } from '../job/preparation-complexity';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
 import { outputOperationLayers, sceneObjectUsesOperation } from '../scene';
@@ -35,13 +34,10 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
   ) {
     issues.push({ code: 'speed-out-of-range', message: controlledTravelIssue });
   }
-  if (scenePreparationTooComplex(project.scene)) {
-    issues.push({
-      code: 'vector-segment-budget-exceeded',
-      message:
-        'This design exceeds the safe curve or fill segment budget. Simplify the artwork or split it into smaller jobs.',
-    });
-  }
+  // Vector/fill complexity never refuses here (rule 7 / ADR-241): compile
+  // handles any segment count, so over-budget scenes flow through and surface
+  // as a Job Review "large job" advisory instead. Preview and the live
+  // estimate keep their own cheap upstream gates for canvas responsiveness.
   issues.push(...rasterBudgetIssues(project));
   issues.push(...operationScanOffsetIssues(project, { nonFiniteOnly: true }));
   return { ok: issues.length === 0, issues };

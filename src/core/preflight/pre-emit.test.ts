@@ -17,7 +17,7 @@ import { createRectangle } from '../shapes/primitives';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { runPreEmitPreflight } from './pre-emit';
 
-it('rejects canonical curve geometry above the bounded machine segment budget', () => {
+it('does not refuse curve geometry above the preparation segment budget (ADR-241)', () => {
   const base = createProject();
   const color = '#ff0000';
   const segments = Array.from({ length: 100_001 }, (_, index) => ({
@@ -39,9 +39,7 @@ it('rejects canonical curve geometry above the bounded machine segment budget', 
     ],
   };
   const scene = addLayer(addObject(base.scene, object), createLayer({ id: 'curve', color }));
-  expect(runPreEmitPreflight({ ...base, scene }).issues).toContainEqual(
-    expect.objectContaining({ code: 'vector-segment-budget-exceeded' }),
-  );
+  expect(runPreEmitPreflight({ ...base, scene })).toEqual({ ok: true, issues: [] });
 });
 
 function projectWithJig(opts: {

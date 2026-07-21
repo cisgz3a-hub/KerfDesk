@@ -10660,3 +10660,56 @@ The audit of the current surface found the structural causes:
 - The CNC rail's live duplicates (Material & Bit machine params, detected-settings Apply) and the
   dead standalone editors (`DeviceSettings.tsx` and siblings) are out of scope here; folding or
   deleting them stays a separate refactor decision.
+
+## ADR-241 - The curve/fill segment budget no longer refuses output; it advises in Job Review
+
+**Date:** 2026-07-21
+**Status:** Accepted
+
+### Context
+
+`runPreEmitPreflight` refused to produce ANY output — Start, Save, Frame, RD export, the
+tiled save — whenever `scenePreparationTooComplex` held (over 100,000 flattened vector
+segments or over 20,000 estimated fill hatch segments): "This design exceeds the safe curve
+or fill segment budget. Simplify the artwork or split it into smaller jobs." A detailed
+fill-mode portrait hit the fill budget and the operator could not run the job at all.
+
+The refusal predates the frame-first mandate (it arrived with the Laser 9 program, PR #58)
+and is exactly the class rule 7 / ADR-228 forbids: a policy cap re-labelled as preflight.
+It is not one of the three permitted refusal categories — the program CAN be produced
+(compile handles any segment count; `compilationPolylines` falls back to the canonical
+compatibility polylines if a single path's machine-tolerance flatten exceeds its internal
+budget), nothing is unstreamable, and no handoff evidence is involved. The 2026-07-10
+implementation plan already said "Do not hard-block Start/Save (LightBurn parity)" for this
+exact check; LightBurn compiles arbitrarily complex fills without a size refusal.
+
+### Decision
+
+1. `runPreEmitPreflight` no longer checks `scenePreparationTooComplex`. The
+   `vector-segment-budget-exceeded` issue code is deleted. Over-budget vector/fill scenes
+   compile, emit, Frame, and Start like any other job.
+2. The budget becomes a Job Review advisory (`largeJobPreparationWarning`,
+   start-job-readiness-policy.ts): "Large job: this design is over the live preview and
+   estimate budget, so those stay paused. Preparing and streaming the program may take
+   longer than usual." It is computed from the SCOPED output scene, so a small
+   selected-output slice of a huge design does not warn.
+3. The preview and live-estimate complexity gates are UNCHANGED: `buildPreviewToolpath` and
+   `estimateLiveJob` still return `too-complex` / `too-large` before synchronous compile.
+   Those are canvas-responsiveness fallbacks on informational surfaces, not refusals of any
+   machine action. The JobControls tooltip no longer claims "Start will block".
+4. The raster budget (`raster-too-large`, P1-A) is untouched by this ADR: past the streamed-
+   row threshold a raster's dither/emit buffers genuinely exhaust tab memory, which is a
+   compile-integrity fact, not a policy cap. Revisiting that boundary is separate work.
+
+### Consequences
+
+- Any vector/fill design the operator can draw now produces a program. A very large fill can
+  take seconds of synchronous preparation at Start/Save; the operator is told so in Job
+  Review instead of being refused.
+- The canvas preview and ETA remain paused above the budget, so the operator confirms a
+  large job from the Job Review dialog (its warnings list now names the condition) rather
+  than from a rendered toolpath. Raising the preview budgets or moving preparation off the
+  main thread would restore those surfaces for large jobs — deferred follow-up.
+- `pre-emit.test.ts` pins that an over-budget scene passes pre-emit;
+  `start-job-readiness-policy.test.ts` pins the advisory text and its silence on modest
+  scenes.
