@@ -10937,3 +10937,46 @@ informative, but blind.
   two already-tested pure functions. NOT verified: a live-browser end-to-end run of the
   worker on a real over-budget scene (vitest has no Worker runtime; needs a dev-server
   session or the e2e suite).
+
+## ADR-245 - Image Studio layers: active-layer document with a composite bake
+
+**Status:** Accepted 2026-07-21 (Phase L, parity plan PP-F; extends ADR-242).
+
+**Context.** The Image Studio edits one flat RGBA document. Photoshop-grade
+retouching wants layers: paint kept separate from the source photo, marks
+movable until commit, non-destructive assembly. The laser pipeline, however,
+consumes exactly one bitmap - whatever the editor shows must be what burns.
+
+**Decision - the small-layers reduction:**
+
+1. **A session holds an ordered list of doc-sized RGBA layers** (id, name,
+   visible, opacity 0..1, blend) plus an active-layer id. Layer count is
+   operator-bounded, not guarded; memory pressure surfaces in the History
+   trim note as today.
+2. **`session.doc` IS the active layer's buffer** (pointer-shared). Every
+   existing op - paint, adjustments, filters, Quick Mask, tile history -
+   keeps targeting `session.doc` unchanged and therefore edits the active
+   layer. Switching the active layer swaps the pointer and clears the tile
+   history (entries are buffer-relative, same rule as crop). Cross-layer
+   history is v2.
+3. **Blend modes are `normal` and `multiply` only.** Multiply is the one
+   mode with clear engrave semantics (ink accumulates); the other 25
+   Photoshop modes are out of scope until a real workflow demands one.
+4. **Upper layers start transparent** (alpha 0); the paint core gains an
+   `erase` stroke flag that writes transparency instead of color. The
+   Background layer keeps the white-is-empty convention (ADR-242).
+5. **One composite path.** A pure `core/image-layers` module composites
+   bottom-up (source-over / multiply, x opacity). The SAME function feeds
+   the canvas preview and the Apply bake, so preview-vs-burn divergence is
+   structurally impossible (Karpathy's law). Apply flattens; the scene
+   object stays a flat RasterImage - project files and G-code are
+   untouched by this ADR.
+6. **Crop / Image Size / Canvas Size apply to every layer** so dimensions
+   stay uniform; Revert restores the as-opened single-Background state.
+
+**Consequences.** Editing stays exactly as fast as today (ops touch one
+buffer); rendering pays one full-doc composite per committed op. The
+editor session grows a layers array that stashes/resumes as before. The
+Layers panel (visibility, opacity, blend, add/duplicate/delete/merge-down,
+reorder) docks beside History. Undo does not cross layer switches in v1 -
+stated in the panel, not blocked.
