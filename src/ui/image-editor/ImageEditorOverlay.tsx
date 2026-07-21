@@ -120,7 +120,7 @@ function TopBar(props: {
           type="button"
           className="lf-btn lf-btn--primary"
           onClick={actions.apply}
-          disabled={!canUndo || isApplying}
+          disabled={!session.dirtySinceApply || isApplying}
           title="Bake the edits into the project image (one undo step)"
         >
           {isApplying ? 'Applying…' : 'Apply'}

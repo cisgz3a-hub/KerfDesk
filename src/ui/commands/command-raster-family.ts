@@ -11,11 +11,16 @@ export function adjustImageCommand(ctx: AppCommandContext): AppCommand {
 }
 
 export function editImageCommand(ctx: AppCommandContext): AppCommand {
-  return rasterToolCommand(
-    ctx,
+  // Always enabled: with a raster selected it opens that image; without one
+  // it imports an image and opens the Studio on it (one-click Photoshop).
+  return enabled(
     'tools.edit-image',
+    'tools',
     'Image Studio...',
-    'Paint, erase, and edit selected areas of the selected image',
+    ctx.hasRasterSelection
+      ? 'Paint, erase, and edit selected areas of the selected image'
+      : 'Import an image and edit it in the Image Studio',
+    ctx.editImage,
   );
 }
 

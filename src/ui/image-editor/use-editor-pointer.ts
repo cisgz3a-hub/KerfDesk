@@ -54,7 +54,12 @@ export function useEditorPointer(
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      e.currentTarget.setPointerCapture(e.pointerId);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // A detached canvas or an already-dead pointer id must not kill the
+        // gesture — capture is an optimization, not a requirement.
+      }
       const state = useImageEditorStore.getState();
       // Middle button or held Spacebar = Hand pan (Photoshop convention).
       if (e.button === 1 || state.isSpacePanning) {
