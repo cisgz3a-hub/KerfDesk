@@ -183,15 +183,15 @@ async function startTransientFramedRun(permit: FramedRunPermit): Promise<boolean
         const issue = framedRunReadinessIssue(permit);
         if (issue !== null) throw new Error(issue);
       },
-      ...(candidate.laserModeStartEvidence === undefined
+      ...(candidate.review?.laserModeStartEvidence === undefined
         ? {}
-        : { laserModeStartEvidence: candidate.laserModeStartEvidence }),
+        : { laserModeStartEvidence: candidate.review.laserModeStartEvidence }),
       ...(candidate.preparedStart.cncToolPlan === undefined
         ? {}
         : { cncToolPlan: candidate.preparedStart.cncToolPlan }),
-      ...(candidate.cncSetupAttestation === undefined
+      ...(candidate.review?.cncSetupAttestation === undefined
         ? {}
-        : { cncSetupAttestation: candidate.cncSetupAttestation }),
+        : { cncSetupAttestation: candidate.review.cncSetupAttestation }),
       canvasPlan: candidate.preparedStart.canvasPlan,
     });
     return true;

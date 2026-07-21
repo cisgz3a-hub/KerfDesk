@@ -280,7 +280,7 @@ describe('ordinary framed Start permit claim', () => {
   it('keeps the permit live through the final assertion and consumes it before streaming', async () => {
     const permit = useLaserStore.getState().framedRun;
     if (permit === null) throw new Error('Expected a framed-run permit.');
-    const laserModeStartEvidence = permit.candidate.laserModeStartEvidence;
+    const laserModeStartEvidence = permit.candidate.review?.laserModeStartEvidence;
     if (laserModeStartEvidence === undefined) {
       throw new Error('Expected the laser fixture to retain reviewed Start evidence.');
     }

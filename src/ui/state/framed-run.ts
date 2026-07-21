@@ -33,7 +33,18 @@ export type FramedRunExternalEnvironment = {
   readonly rotaryRasterAllowed: boolean;
 };
 
-/** Immutable reviewed input carried by the Frame motion until physical completion. */
+/** Review evidence confirmed in the Job Review dialog. An ordinary Frame
+ * issues a review-pending permit and Start opens the single Job Review
+ * (ADR-237); a transient camera Frame is reviewed before dispatch and
+ * carries its evidence from birth. */
+export type FramedRunReviewEvidence = {
+  readonly reviewedAtIso: string;
+  readonly reviewModel: JobReviewModel;
+  readonly laserModeStartEvidence?: LaserModeStartEvidence;
+  readonly cncSetupAttestation?: CncSetupAttestation;
+};
+
+/** Immutable exact prepared input carried by the Frame motion until physical completion. */
 export type FramedRunCandidate = {
   readonly preparedStart: PreparedStartProgram;
   readonly project: Project;
@@ -48,11 +59,12 @@ export type FramedRunCandidate = {
   /** Work-coordinate point occupied while this exact program was prepared.
    * Frame appends a tool-off return leg so Start begins from that same point. */
   readonly returnToWorkPosition: { readonly x: number; readonly y: number };
-  /** Immutable Job Review evidence that authorized the exact candidate before Frame. */
-  readonly reviewedAtIso: string;
-  readonly reviewModel: JobReviewModel;
-  readonly laserModeStartEvidence?: LaserModeStartEvidence;
-  readonly cncSetupAttestation?: CncSetupAttestation;
+  /** Present only when Job Review preceded Frame (transient camera). Absent
+   * on ordinary permits: Start owns the one review before claiming them. */
+  readonly review?: FramedRunReviewEvidence;
+  /** Durable disclosure for the owned pre-Frame G54 selection, surfaced in
+   * Start's Job Review for a review-pending permit. */
+  readonly frameWcsNormalizationWarning?: string;
   /** Transient calibration jobs own immutable prepared bytes outside the open
    * canvas. Their permit must follow that project rather than the unrelated
    * live-project execution signature. */

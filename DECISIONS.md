@@ -201,6 +201,7 @@
 | ADR-234 | 2026-07-19 | Accepted, hardware verification pending | Bounded feed-matched fill entries for the 4040-safe profile |
 | ADR-235 | 2026-07-19 | Accepted, hardware verification pending | New laser traces default to materialized Raster/Image output |
 | ADR-236 | 2026-07-19 | Accepted, hardware verification pending | Profile-scoped 4040 scan quality hardening |
+| ADR-237 | 2026-07-21 | Accepted | Job Review runs at Start; plain Frame is dialog-free |
 
 ---
 
@@ -10397,3 +10398,45 @@ This change establishes code-level output semantics and regression coverage only
 the cause of an existing bad burn, certify 4040 hardware, or establish that the resulting physical
 mark is acceptable. Material coupons and controlled A/B burns are still required to distinguish
 software improvement from focus, optics, mechanics, power delivery, firmware, and material effects.
+
+## ADR-237 - Job Review runs at Start; plain Frame is dialog-free
+
+**Date:** 2026-07-21
+**Status:** Accepted (amends ADR-230's review sequencing; the frame-first contract of ADR-228/ADR-232 is unchanged)
+
+### Context
+
+ADR-230 placed the single Job Review before the physical Frame: Frame prepared the exact artifact,
+opened the review dialog ("Accept & Frame"), traced only after confirmation, and Start later
+claimed the permit without any dialog. In practice the operator frequently frames just to see the
+physical envelope — and the maintainer directed (2026-07-21, in chat) that the full pre-check
+dialog must not interrupt an ordinary Frame: "It should only be at the main button."
+
+### Decision
+
+- A plain Frame (Frame button, or Start pressed with no live permit) runs dialog-free:
+  prepare → owned G54 selection → physical trace → **review-pending permit**. The candidate
+  carries the exact prepared artifact, the preparation warnings, and the durable G54
+  normalization disclosure, but no review evidence.
+- Pressing **Start** on a review-pending permit opens the one Job Review (purpose `start`,
+  confirm button **Start job**) built from the permit's exact artifact plus live controller
+  state. Confirming produces the same review evidence and acknowledgement/attestation objects
+  as before, then claims the permit and streams. Cancelling streams nothing and keeps the
+  permit armed.
+- Exact-artifact backstops: if the permit dies while the review is open (any ADR-230/232
+  invalidation), Start streams nothing and says so; if an in-review edit re-prepares to a
+  different execution signature, the permit is voided and the operator Frames again.
+- Transient camera-marker Frames keep their review-before-dispatch shape: their candidates are
+  born with review evidence and stream without reopening the dialog.
+
+### Consequences
+
+- The operator sees exactly one dialog per burn, at the moment of commitment (Start), matching
+  the maintainer's model of Frame as a lightweight physical check.
+- Policy findings (bed bounds, no-go zones, controller settings) surface at Start instead of
+  before the trace. The tool-off Frame trace itself therefore runs without a prior warning
+  surface — the physical trace is the disclosure, per ADR-232's source-of-truth ruling.
+- Evidence binding is tighter, not looser: acknowledgements and attestations are produced
+  seconds before streaming instead of before the trace.
+- The Job Review `frame` purpose ("Accept & Frame" copy) has no production caller after this
+  change; it is retained for now and may be removed in a follow-up.

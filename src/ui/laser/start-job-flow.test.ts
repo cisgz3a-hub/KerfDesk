@@ -250,6 +250,8 @@ describe('runStartJobFlow', () => {
 
   // CNC attestation display/binding and review-cancel behavior live in
   // src/ui/laser/job-review/job-review-gate.test.ts beside the gate.
+  // ADR-237 Start-time review behavior (review-pending permits) lives in
+  // src/ui/laser/start-job-flow.review-at-start.test.ts.
 
   it('forces ping-pong for a legacy Marlin profile with char-counted streaming', async () => {
     const { repository } = recoveryHarness();

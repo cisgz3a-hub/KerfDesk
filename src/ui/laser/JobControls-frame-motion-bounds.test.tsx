@@ -96,23 +96,11 @@ describe('JobControls laser motion Frame', () => {
         frameButton.click();
       });
       await act(async () => {
-        await vi.waitFor(() => {
-          expect(useJobReviewStore.getState().state.kind).toBe('open');
-        });
-      });
-      expect(host.textContent).toContain('Review job before framing');
-      expect(frame).not.toHaveBeenCalled();
-
-      const acceptFrame = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent?.trim() === 'Accept & Frame',
-      );
-      if (acceptFrame === undefined) throw new Error('Review confirmation button not rendered');
-      await act(async () => {
-        acceptFrame.click();
-      });
-      await act(async () => {
         await vi.waitFor(() => expect(frame).toHaveBeenCalledTimes(1));
       });
+      // ADR-237: a plain Frame runs dialog-free; the single Job Review
+      // opens later, at Start.
+      expect(useJobReviewStore.getState().state.kind).toBe('idle');
 
       expect(frame).toHaveBeenCalledTimes(1);
       const framedBounds = frame.mock.calls[0]?.[0];

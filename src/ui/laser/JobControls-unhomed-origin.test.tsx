@@ -141,7 +141,7 @@ describe('JobControls unhomed custom-origin Frame action', () => {
       await vi.waitFor(() => {
         expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
           variant: 'success',
-          message: 'Frame complete — this exact job is ready to start.',
+          message: 'Frame complete — press Start to review and run this exact job.',
         });
       });
       expect(frame).toHaveBeenCalledOnce();

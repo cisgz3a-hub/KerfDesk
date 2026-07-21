@@ -29,7 +29,6 @@ type ReviewGateArgs = {
 const originalFrame = useLaserStore.getState().frame;
 const originalSelectPrimaryWcsForFrame = useLaserStore.getState().selectPrimaryWcsForFrame;
 const originalCapabilities = useLaserStore.getState().capabilities;
-let reviewArgs: ReviewGateArgs | null;
 
 function expectedWcsNormalizationWarning(wcs: 'G55' | 'G56' | 'G57' | 'G58' | 'G59'): string {
   return (
@@ -142,9 +141,7 @@ beforeEach(() => {
   });
   useToastStore.setState({ toasts: [] });
   useStartBlockerStore.getState().clear();
-  reviewArgs = null;
   reviewHarness.runJobReviewGate.mockReset().mockImplementation(async (args: ReviewGateArgs) => {
-    reviewArgs = args;
     return {
       bundle: args.initial,
       laserModeStartEvidence: undefined,
@@ -178,7 +175,7 @@ afterEach(() => {
 
 describe('Frame WCS disclosure and completion reporting', () => {
   it.each(['G55', 'G56', 'G57', 'G58', 'G59'] as const)(
-    'discloses the owned normalization from %s through Job Review',
+    'retains the owned normalization from %s on the permit for the Start review',
     async (originalWcs) => {
       const selectPrimaryWcsForFrame = selectG54WithFreshIdle();
       useLaserStore.setState({
@@ -190,7 +187,10 @@ describe('Frame WCS disclosure and completion reporting', () => {
       await expect(runFrameNow()).resolves.toBe(true);
 
       expect(selectPrimaryWcsForFrame).toHaveBeenCalledTimes(1);
-      expect(reviewArgs?.initial.frameWcsNormalizationWarning).toBe(
+      // ADR-237: Frame runs dialog-free; the disclosure rides the permit
+      // into the Job Review that Start opens.
+      expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
+      expect(useLaserStore.getState().framedRun?.candidate.frameWcsNormalizationWarning).toBe(
         expectedWcsNormalizationWarning(originalWcs),
       );
     },
@@ -207,7 +207,9 @@ describe('Frame WCS disclosure and completion reporting', () => {
     await expect(runFrameNow()).resolves.toBe(true);
 
     expect(selectPrimaryWcsForFrame).not.toHaveBeenCalled();
-    expect(reviewArgs?.initial.frameWcsNormalizationWarning).toBeUndefined();
+    expect(
+      useLaserStore.getState().framedRun?.candidate.frameWcsNormalizationWarning,
+    ).toBeUndefined();
   });
 
   it('normalizes an unknown WCS without inventing a named-offset warning', async () => {
@@ -221,25 +223,9 @@ describe('Frame WCS disclosure and completion reporting', () => {
     await expect(runFrameNow()).resolves.toBe(true);
 
     expect(selectPrimaryWcsForFrame).toHaveBeenCalledTimes(1);
-    expect(reviewArgs?.initial.frameWcsNormalizationWarning).toBeUndefined();
-  });
-
-  it('leaves G54 selected when the operator cancels review after normalization', async () => {
-    reviewHarness.runJobReviewGate.mockImplementation(async (args: ReviewGateArgs) => {
-      reviewArgs = args;
-      return null;
-    });
-    const selectPrimaryWcsForFrame = selectG54WithFreshIdle();
-    const frame = vi.fn(async () => undefined);
-    useLaserStore.setState({ activeWcs: 'G55', selectPrimaryWcsForFrame, frame });
-
-    await expect(runFrameNow()).resolves.toBe(false);
-
-    expect(reviewArgs?.initial.frameWcsNormalizationWarning).toBe(
-      expectedWcsNormalizationWarning('G55'),
-    );
-    expect(useLaserStore.getState().activeWcs).toBe('G54');
-    expect(frame).not.toHaveBeenCalled();
+    expect(
+      useLaserStore.getState().framedRun?.candidate.frameWcsNormalizationWarning,
+    ).toBeUndefined();
   });
 
   it('retains the G54 disclosure when later placement preparation fails', async () => {
