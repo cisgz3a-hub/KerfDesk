@@ -32,7 +32,8 @@ describe('DeviceSetupWizard detected values', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
       await act(async () => button(view.host, 'Use detected values').click());
@@ -49,7 +50,7 @@ describe('DeviceSetupWizard detected values', () => {
       });
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
-      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(input(view.host, 'Bed width (mm)').value).toBe('363');
     } finally {
       await view.unmount();

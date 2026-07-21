@@ -1364,23 +1364,36 @@ Machine capability is an enforced physical-output contract (ADR-210), not descri
 - The final atomic setup action independently refuses a profile/machine mismatch, so another caller
   cannot persist a single-output capability beside the opposite active mode.
 
-The seven steps are always visible and always ordered:
+The six steps are always visible and always ordered (ADR-240; supersedes the seven-step
+enumeration of ADR-186/ADR-205):
 
-1. **Machine & controller** — choose Laser/CNC, controller family, baud, output dialect, streaming,
-   optional catalog profile, and import/export. Controller selection precedes serial connection.
-2. **Connect & read** — connect with the reviewed driver/baud and run that controller family's
-   read-only identity/settings commands. Ruida correctly presents file-only behavior.
-3. **Work area & coordinates** — name, usable bed, max/frame feed, origin, and homing policy.
-4. **Machine output** — laser S range/air/Fire or CNC safe Z/spindle/dwell/coolant/park. Stock,
-   material, and bit remain job-specific and stay in Material & Bit.
-5. **Safety & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, optional
-   controlled laser-off seek feed, and the relevant laser-only scan/autofocus/rotary/camera status.
-6. **Firmware review** — controller-specific configuration location and write policy. GRBL/grblHAL
-   can queue common per-setting writes only after read + backup acknowledgement; FluidNC, Marlin,
-   Smoothieware, and Ruida never receive numeric GRBL setup writes. Queuing is draft-only: Cancel
-   sends nothing.
-7. **Review & hardware handoff** — summarize every software consumer and list the separate physical
-   commissioning checklist. The flow says software is internally consistent, never "ready to cut."
+1. **Machine type** — Laser only / CNC only / Laser + CNC, and for hybrids the active mode after
+   Save. Nothing else competes with this choice.
+2. **Choose your machine** — for laser-capable machines the reviewed-profile catalog renders
+   always-open at the top with a text filter (a CNC-only capability sees the built-in CNC preset
+   instead); a detected-firmware match sorts its cards first and shows the match reasons
+   (generic `$$` values never claim hardware identity, so "Possible match" is the ceiling).
+   Below it: CNC preset, controller family, baud, output dialect, advanced streaming, and
+   import/export. Controller selection precedes serial connection; picking a card applies the
+   whole profile to the draft and nothing else.
+3. **Connect & detect** — connect with the reviewed driver/baud, run that controller family's
+   read-only identity/settings commands, and optionally **Use detected values** (Ruida correctly
+   presents file-only behavior). This page only observes and copies; it edits no field directly.
+4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the
+   machine-output contract (laser S range/air/Fire or CNC safe Z/spindle/dwell/coolant/park) on
+   one flat page. Stock, material, and bit remain job-specific in Material & Bit.
+5. **Options & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, and the
+   laser-only scan-offset + optional controlled laser-off seek feed, auto-focus, rotary, and
+   camera-status groups (hidden for CNC-only machines). Every group is collapsed by default and
+   its summary row shows its live one-line state (zone counts, configured/not-configured,
+   calibration pending) without opening it; no group nests another collapsible. The auto-focus
+   deep-link opens its section explicitly.
+6. **Review & save** — firmware comparison first (controller-specific configuration location and
+   write policy; GRBL/grblHAL can queue common per-setting writes only after read + backup
+   acknowledgement; FluidNC, Marlin, Smoothieware, and Ruida never receive numeric GRBL setup
+   writes; queuing is draft-only and Cancel sends nothing), then the software-consistency cards and
+   the separate physical commissioning checklist. The flow says software is internally consistent,
+   never "ready to cut."
 
 #### Success — connected controller answers its read commands
 

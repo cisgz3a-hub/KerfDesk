@@ -15,7 +15,7 @@ import { inlineCodeStyle, numInputStyle, Row, unitStyle } from './device-setting
 const MAX_ACCEL = 100000;
 const MAX_JD_MM = 100;
 
-export function PlannerAdvanced(props: {
+type PlannerFieldsProps = {
   readonly accel: number;
   readonly jd: number;
   readonly cutTimeScale: number;
@@ -24,7 +24,9 @@ export function PlannerAdvanced(props: {
   readonly onJdChange: (next: number) => void;
   readonly onCutTimeScaleChange: (next: number) => void;
   readonly onTravelTimeScaleChange: (next: number) => void;
-}): JSX.Element {
+};
+
+export function PlannerAdvanced(props: PlannerFieldsProps): JSX.Element {
   return (
     <details style={advancedDetailsStyle}>
       <summary
@@ -33,6 +35,17 @@ export function PlannerAdvanced(props: {
       >
         Advanced: estimator tuning
       </summary>
+      <PlannerFields {...props} />
+    </details>
+  );
+}
+
+// The bare estimator fields, without a collapsible wrapper. Machine Setup's
+// Options step renders these flat so no field hides two collapse levels deep
+// (ADR-240); PlannerAdvanced keeps the legacy <details> shell.
+export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
+  return (
+    <>
       <div style={advancedBodyStyle}>
         <Row label="$120 accel">
           <ClearableNumberField
@@ -92,7 +105,7 @@ export function PlannerAdvanced(props: {
           a measured job. A value of 1.00 leaves the planner estimate unchanged.
         </p>
       </div>
-    </details>
+    </>
   );
 }
 

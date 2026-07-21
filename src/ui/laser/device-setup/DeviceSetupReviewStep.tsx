@@ -1,5 +1,6 @@
-// Step 7: software configuration review plus an explicit hardware handoff.
-// Save never claims the physical machine is ready to move or energize output.
+// Final step: software configuration review plus an explicit hardware
+// handoff. Save never claims the physical machine is ready to move or
+// energize output.
 
 import { Button } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
@@ -26,8 +27,8 @@ export function DeviceSetupReviewStep({ state, dispatch }: DeviceSetupStepProps)
         onEdit={() => dispatch({ kind: 'go', step: 'identify' })}
       />
       <WorkspaceReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
-      <OutputReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'machine' })} />
-      <SafetyReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'safety' })} />
+      <OutputReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
+      <SafetyReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'options' })} />
       <HardwareHandoff machineKinds={state.machineKinds} />
     </section>
   );

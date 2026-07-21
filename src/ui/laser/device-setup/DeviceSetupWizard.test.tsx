@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../../core/controllers/grbl';
-import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
@@ -71,30 +70,18 @@ afterEach(() => {
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
+// The six-step shell and searchable-catalog behavior are pinned in
+// DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
-  it('opens controller-first and shows one seven-step setup sequence', async () => {
-    const view = await renderWizard();
-    try {
-      expect(view.host.textContent).toContain('Step 1 of 7 — Machine & controller');
-      expect(view.host.textContent).toContain('Start here before connecting.');
-      expect(view.host.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
-      expect(
-        view.host.querySelectorAll('nav[aria-label="Machine Setup steps"] button'),
-      ).toHaveLength(7);
-      expect(view.host.textContent).not.toContain('ready to cut');
-    } finally {
-      await view.unmount();
-    }
-  });
-
   it('connects only after using the selected controller and baud', async () => {
     const originalConnect = useLaserStore.getState().connect;
     const connect = vi.fn(async () => undefined);
     useLaserStore.setState({ connect });
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
-      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
       await act(async () => {
         button(view.host, 'Connect…').click();
         await Promise.resolve();
@@ -118,8 +105,9 @@ describe('DeviceSetupWizard', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
-      await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
       expect(view.host.textContent).toContain('Connection does not match the setup draft');
       await act(async () => button(view.host, 'Use detected grblHAL in draft').click());
       await act(async () => button(view.host, 'Back').click());
@@ -133,6 +121,7 @@ describe('DeviceSetupWizard', () => {
     const view = await renderWizard(undefined, mockPlatform(false));
     try {
       await act(async () => button(view.host, 'Next').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(button(view.host, 'Connect…').disabled).toBe(true);
       expect(view.host.textContent).toContain('Web Serial is unavailable');
     } finally {
@@ -144,6 +133,7 @@ describe('DeviceSetupWizard', () => {
     const onClose = vi.fn();
     const view = await renderWizard(onClose);
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await act(async () => button(view.host, 'Cancel without saving').click());
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -157,8 +147,9 @@ describe('DeviceSetupWizard', () => {
   it('atomically saves a laser profile and workspace at the end', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // connect
-      await act(async () => button(view.host, 'Next').click()); // workspace
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       await changeInput(view.host, 'Device name', 'Beginner laser');
       await changeInput(view.host, 'Bed width (mm)', '510');
       await advanceToReview(view.host);
@@ -176,26 +167,6 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
-  it('keeps a selected catalog profile exact instead of overlaying controller observations', async () => {
-    useLaserStore.setState({
-      connection: { kind: 'connected' },
-      detectedControllerKind: 'grblhal',
-      detectedSettings: { bedWidth: 363, bedHeight: 273 },
-      lastSettingsReadAt: 1,
-    } as Partial<ReturnType<typeof useLaserStore.getState>>);
-    const view = await renderWizard();
-    try {
-      await act(async () => button(view.host, 'Use Creality Falcon A1 Pro').click());
-      expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
-      await act(async () => button(view.host, 'Next').click());
-      await act(async () => button(view.host, 'Next').click());
-      expect(input(view.host, 'Bed width (mm)').value).toBe('400');
-      expect(useStore.getState().project.device).toEqual(DEFAULT_DEVICE_PROFILE);
-    } finally {
-      await view.unmount();
-    }
-  });
-
   it('shows CNC-only machine settings and commits them with the profile', async () => {
     const view = await renderWizard();
     try {
@@ -203,11 +174,11 @@ describe('DeviceSetupWizard', () => {
       const cncRadio = radios.item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Built-in CNC machine', 'genmitsu-3018');
       await act(async () => button(view.host, 'Load into draft').click());
-      await act(async () => button(view.host, 'Next').click()); // connect
-      await act(async () => button(view.host, 'Next').click()); // workspace
-      await act(async () => button(view.host, 'Next').click()); // machine output
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(view.host.textContent).toContain('CNC clearance and spindle contract');
       expect(view.host.textContent).not.toContain('Laser output and accessories');
       expect(input(view.host, 'Spindle maximum').value).toBe('10000');
@@ -238,9 +209,9 @@ describe('DeviceSetupWizard', () => {
       expect(view.host.textContent).toContain('Active mode after Save');
       expect(view.host.textContent).toContain('interchangeable laser and spindle toolheads');
 
-      await act(async () => button(view.host, 'Next').click()); // connect
-      await act(async () => button(view.host, 'Next').click()); // workspace
-      await act(async () => button(view.host, 'Next').click()); // machine output
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(view.host.textContent).toContain('Laser output and accessories');
       expect(view.host.textContent).toContain('CNC clearance and spindle contract');
       await changeInput(view.host, 'Safe Z', '10');
@@ -265,6 +236,7 @@ describe('DeviceSetupWizard', () => {
       const cncRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
       expect(button(view.host, 'Next').disabled).toBe(true);
@@ -276,8 +248,9 @@ describe('DeviceSetupWizard', () => {
   it('uses external configuration guidance for Marlin instead of firmware writes', async () => {
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'marlin');
-      await advanceToFirmware(view.host);
+      await advanceToReview(view.host);
       expect(view.host.textContent).toContain('Marlin configuration is not written from KerfDesk');
       expect(view.host.textContent).toContain('M503, M114, M400');
       expect(view.host.textContent).not.toContain('Write and verify');
@@ -289,6 +262,7 @@ describe('DeviceSetupWizard', () => {
   it('hides serial streaming and G-code controls for file-only Ruida setup', async () => {
     const view = await renderWizard();
     try {
+      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Controller firmware', 'ruida');
       expect(view.host.textContent).toContain('File export');
       expect(view.host.querySelector('[aria-label="Serial baud rate"]')).toBeNull();
@@ -319,7 +293,7 @@ describe('DeviceSetupWizard', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      await advanceToFirmware(view.host);
+      await advanceToReview(view.host);
       expect(view.host.textContent).toContain('Queue $30 for Save');
       expect(view.host.textContent).toContain('$130');
       expect(view.host.textContent).toContain('never batch-written');
@@ -343,7 +317,8 @@ describe('DeviceSetupWizard', () => {
       });
       expect(writeGrblSetting).not.toHaveBeenCalled();
       expect(view.host.textContent).toContain('Remove queued $30');
-      await act(async () => button(view.host, 'Next').click());
+      // The review cards share this final page, so the queued write summary
+      // sits beside the Save button that will execute it.
       expect(view.host.textContent).toContain('Firmware after save');
       expect(view.host.textContent).toContain('$30=1000; exact re-read required');
       await act(async () => {
@@ -359,14 +334,8 @@ describe('DeviceSetupWizard', () => {
   });
 });
 
-async function advanceToFirmware(host: HTMLElement): Promise<void> {
-  while (!host.textContent?.includes('Step 6 of 7 — Firmware review')) {
-    await act(async () => button(host, 'Next').click());
-  }
-}
-
 async function advanceToReview(host: HTMLElement): Promise<void> {
-  while (!host.textContent?.includes('Step 7 of 7 — Review & hardware handoff')) {
+  while (!host.textContent?.includes('Step 6 of 6 — Review & save')) {
     await act(async () => button(host, 'Next').click());
   }
 }

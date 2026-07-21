@@ -27,22 +27,25 @@ import { mergeDetectedSetupFacts } from './device-setup-detected-facts';
 
 export { deviceSetupSupportsMachineKind } from './device-setup-capability';
 
+// Six steps (ADR-240, maintainer-ordered): machine type first, then the
+// profile catalog, then a dedicated connect-and-detect page, then one flat
+// confirm page (coordinates + machine output), optional calibrations as
+// closed status rows, and firmware comparison + review before the single
+// atomic Save.
 export type DeviceSetupStep =
+  | 'capability'
   | 'identify'
   | 'connect'
   | 'confirm'
-  | 'machine'
-  | 'safety'
-  | 'firmware'
+  | 'options'
   | 'review';
 
 export const DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
+  'capability',
   'identify',
   'connect',
   'confirm',
-  'machine',
-  'safety',
-  'firmware',
+  'options',
   'review',
 ];
 
@@ -125,7 +128,7 @@ export function initDeviceSetup(
   const machineKinds = initialMachineKinds(profile, baselineKind);
   const machineKind = initialActiveMachineKind(machineKinds, baselineKind);
   return {
-    step: 'identify',
+    step: 'capability',
     machineKinds,
     machineKind,
     baseline: profile,
@@ -399,14 +402,16 @@ export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyA
 
 export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
   switch (state.step) {
+    // Capability and connect always advance: their pages hold no field that
+    // could resolve a validation issue, so blocking Next there would strand
+    // the operator away from the fix.
+    case 'capability':
+    case 'connect':
+      return true;
     case 'identify':
     case 'confirm':
-    case 'machine':
-    case 'safety':
+    case 'options':
       return machineSetupValidationIssues(state).length === 0;
-    case 'connect':
-    case 'firmware':
-      return true;
     case 'review':
       return false;
     default:

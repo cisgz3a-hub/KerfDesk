@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
-import { shouldAdvise4040FillPolicySelection } from '../../../core/job/fill-runway-policy';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -17,17 +16,19 @@ import {
 import { useLaserStore } from '../../state/laser-store';
 import { deviceProfileSignature, shouldPromptDeviceSetup } from './device-setup-nudge';
 import type { DeviceSetupStep } from './device-setup-flow';
-import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { DeviceSetupWizard, type DeviceSetupHighlight } from './DeviceSetupWizard';
 
 export type DeviceSetupOpenRequest = {
   readonly initialStep: DeviceSetupStep;
+  readonly highlight?: DeviceSetupHighlight;
 };
 
 export function DeviceSetupControls(props: {
   readonly openRequest?: DeviceSetupOpenRequest | undefined;
 }): JSX.Element {
   const [machineSetupOpen, setMachineSetupOpen] = useState(false);
-  const [initialStep, setInitialStep] = useState<DeviceSetupStep>('identify');
+  const [initialStep, setInitialStep] = useState<DeviceSetupStep>('capability');
+  const [highlight, setHighlight] = useState<DeviceSetupHighlight | undefined>(undefined);
   const [configured, setConfigured] = useState<ReadonlySet<string>>(() => {
     const storage = browserLocalStorage();
     return storage === null ? new Set() : loadConfiguredSignatures(storage);
@@ -35,14 +36,15 @@ export function DeviceSetupControls(props: {
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const device = useStore((s) => s.project.device);
   const needsSetup = shouldPromptDeviceSetup({ connected, device, configured });
-  const needs4040ProfileReview = connected && shouldAdvise4040FillPolicySelection(device);
   useEffect(() => {
     if (props.openRequest === undefined) return;
     setInitialStep(props.openRequest.initialStep);
+    setHighlight(props.openRequest.highlight);
     setMachineSetupOpen(true);
   }, [props.openRequest]);
   const openSetup = (step: DeviceSetupStep): void => {
     setInitialStep(step);
+    setHighlight(undefined);
     setMachineSetupOpen(true);
   };
   const markConfigured = (profile: DeviceProfile): void => {
@@ -55,8 +57,8 @@ export function DeviceSetupControls(props: {
   return (
     <>
       <Button
-        variant={needsSetup || needs4040ProfileReview ? 'primary' : 'default'}
-        onClick={() => openSetup('identify')}
+        variant={needsSetup ? 'primary' : 'default'}
+        onClick={() => openSetup('capability')}
         {...helpProps('control:laser.machine-setup.launch')}
       >
         Machine Setup
@@ -66,17 +68,10 @@ export function DeviceSetupControls(props: {
           This machine isn&apos;t set up yet.
         </p>
       )}
-      {needs4040ProfileReview && (
-        <p style={warningNoteStyle} role="note">
-          4040 fill-quality policy is inactive because {device.name} is selected. KerfDesk cannot
-          identify a Neotronics 4040 from its work area or controller settings. If this is that
-          machine, open Machine Setup, choose the Neotronics 4040 profile, review it, and Save
-          before the next Scanline Fill.
-        </p>
-      )}
       {machineSetupOpen && (
         <DeviceSetupWizard
           initialStep={initialStep}
+          highlight={highlight}
           onClose={() => setMachineSetupOpen(false)}
           onConfigured={markConfigured}
         />
@@ -89,10 +84,4 @@ const mutedNoteStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 11,
   color: 'var(--lf-text-muted)',
-};
-const warningNoteStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 11,
-  lineHeight: 1.4,
-  color: 'var(--lf-warning-fg)',
 };

@@ -23,7 +23,7 @@ describe('MachineSetupDialog compatibility entry', () => {
   it('renders the single guided Machine Setup flow instead of competing tabs', async () => {
     const view = await renderDialog();
     try {
-      expect(view.host.textContent).toContain('Step 1 of 7 — Machine & controller');
+      expect(view.host.textContent).toContain('Step 1 of 6 — Machine type');
       expect(view.host.textContent).not.toContain('Profile CatalogController Settings');
       expect(view.host.textContent).not.toContain('Run guided setup');
     } finally {
@@ -36,6 +36,11 @@ describe('MachineSetupDialog compatibility entry', () => {
     try {
       expect(view.host.querySelector('button')?.textContent).not.toBeNull();
       expect(view.host.textContent).toContain('Cancel without saving');
+      const next = [...view.host.querySelectorAll('button')].find(
+        (candidate) => candidate.textContent === 'Next',
+      );
+      if (next === undefined) throw new Error('Next not rendered');
+      await act(async () => next.click());
       expect(view.host.textContent).toContain('Import or export a machine profile');
     } finally {
       await view.unmount();

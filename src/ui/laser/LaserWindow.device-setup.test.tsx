@@ -46,7 +46,6 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       expect(host.textContent).toContain('set up yet');
-      expect(host.textContent).toContain('4040 fill-quality policy is inactive');
     } finally {
       await unmount();
     }
@@ -59,7 +58,6 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       expect(host.textContent).not.toContain('set up yet');
-      expect(host.textContent).not.toContain('4040 fill-quality policy is inactive');
       expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
       expect(buttons(host, 'Machine Setup')).toHaveLength(1);
       expect(host.textContent).not.toContain('Set up device');
@@ -89,12 +87,14 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       await act(async () => button(host, 'Machine Setup').click());
-      expect(host.textContent).toContain('Step 1 of 7');
-      expect(host.textContent).toContain('Machine & controller');
-      const profileCatalog = [...host.querySelectorAll('details')].find((candidate) =>
-        candidate.textContent?.includes('Start from a reviewed machine profile'),
-      );
-      expect(profileCatalog?.open).toBe(true);
+      expect(host.textContent).toContain('Step 1 of 6');
+      expect(host.textContent).toContain('Machine type');
+      await act(async () => button(host, 'Next').click());
+      expect(host.textContent).toContain('Step 2 of 6');
+      // The catalog is a plain always-visible section now — never collapsed
+      // behind a <details> (ADR-240).
+      const profileCatalog = host.querySelector('section[aria-label="Reviewed machine profiles"]');
+      expect(profileCatalog?.closest('details')).toBeNull();
       expect(profileCatalog?.textContent).toContain('Neotronics 4040 Max');
       expect(host.textContent).not.toContain('Run guided setup');
     } finally {
@@ -110,7 +110,7 @@ describe('LaserWindow device-setup nudge', () => {
 
       await act(async () => setup.click());
 
-      expect(host.textContent).toContain('Step 5 of 7');
+      expect(host.textContent).toContain('Step 5 of 6');
       expect(host.textContent).toContain('Auto-focus setup');
       expect(host.textContent).toContain('Not configured');
       const field = host.querySelector<HTMLTextAreaElement>('#autofocus-cmd');
@@ -138,10 +138,10 @@ describe('LaserWindow device-setup nudge', () => {
       }
       await act(async () => button(host, 'Save machine setup').click());
       expect(host.textContent).not.toContain('set up yet');
-      // Setup is recorded, but the deliberately separate quality guard remains
-      // until the operator chooses the machine-specific profile.
-      expect(host.textContent).toContain('4040 fill-quality policy is inactive');
-      expect(button(host, 'Machine Setup').className).toContain('lf-btn--primary');
+      // The 4040 fill-policy rail banner was removed at the maintainer's
+      // direction (ADR-240 amendment), so a configured machine shows a calm
+      // default button again.
+      expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
       // The configured signature is persisted, so a reload re-hydrates it.
       expect(localStorage.getItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY)).toContain(
         'generic-grbl-400x400',
@@ -151,7 +151,7 @@ describe('LaserWindow device-setup nudge', () => {
     }
   });
 
-  it('does not show the conditional 4040 warning for Neotronics or Falcon profiles', async () => {
+  it('never shows the removed 4040 fill-policy rail banner', async () => {
     useLaserStore.setState({ connection: { kind: 'connected' } } as Partial<
       ReturnType<typeof useLaserStore.getState>
     >);
@@ -176,8 +176,8 @@ describe('LaserWindow device-setup nudge', () => {
     >);
     const { host, unmount } = await renderLaserWindow();
     try {
-      expect(host.textContent).toContain('4040 fill-quality policy is inactive');
       await act(async () => button(host, 'Machine Setup').click());
+      await act(async () => button(host, 'Next').click());
       const restore = button(host, 'Use Neotronics 4040 Max / LT-4LDS-V2 20W');
       expect(restore.disabled).toBe(false);
       await act(async () => restore.click());
@@ -195,7 +195,6 @@ describe('LaserWindow device-setup nudge', () => {
       expect(useStore.getState().project.device.gcodeDialect.dialectId).toBe(
         'neotronics-4040-safe',
       );
-      expect(host.textContent).not.toContain('4040 fill-quality policy is inactive');
     } finally {
       await unmount();
     }

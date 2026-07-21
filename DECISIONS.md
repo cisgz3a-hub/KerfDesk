@@ -10575,3 +10575,88 @@ highest-value remaining motion fix now that Editable vectors is the default trac
   overscan clamp; `job-bounds-contour-entry.test.ts`, `toolpath-contour-entry.test.ts`, and
   `planner-contour-entry.test.ts` pin envelope, preview, and timing parity. The G-code
   snapshot corpus is unchanged (generic profiles only).
+
+---
+
+## ADR-240 - Machine Setup: capability-first six-step wizard with a searchable catalog
+
+*(Numbered ADR-240 because ADR-239 was claimed by the contour-entry decision above while this branch was in review; earlier commits on this branch refer to it as ADR-239.)*
+
+**Date:** 2026-07-21 (amended same day after the maintainer reviewed the built wizard in chat)
+**Status:** Accepted (amends ADR-205's step composition and ADR-186's step enumeration; ADR-092's
+guided-steps and draft-commit decisions, ADR-210's capability contract, and the firmware write
+policy are unchanged)
+
+### Context
+
+Maintainer direction (2026-07-21, in chat, with screenshots): Machine Setup is still too
+complicated — finding the machine profile is hard, and the settings are scattered across steps and
+collapsible menus. Redesign it so all necessary settings are chosen without hunting, and lose no
+settings.
+
+The audit of the current surface found the structural causes:
+
+- Seven steps, but only about ten of the ~70 controls are required to save; the rest are optional
+  calibrations spread across four steps.
+- The profile catalog — which fills nearly every later field in one click — is a **collapsed**
+  `<details>` on step 1, rendered *below* controller/baud/dialect fields, with no search.
+- The suggester's computed `reasons`/`warnings` strings are never rendered, so even a
+  detection-matched card explains nothing; on a first run (no prior connection) every card shows
+  "Manual choice" with no way to tell the profiles apart beyond their names.
+- Optional calibrations are nested `<details>` (planner estimator tuning sits two collapse levels
+  deep) with no visible state, so the operator must open each one to learn whether it needs
+  attention.
+
+### Decision
+
+1. **Capability first, profile second** (maintainer-ordered, 2026-07-21 review). Step 1 asks only
+   what the machine is — Laser / CNC / Laser + CNC and, for hybrids, the active mode. Step 2 holds
+   the reviewed-profile catalog for laser-capable machines, always-open at the top with a text
+   filter (name, controller, bed size) — a CNC-only capability sees the built-in CNC preset
+   instead — followed by the CNC preset, controller/baud/dialect, advanced streaming, and
+   import/export. Picking a card still applies the whole profile verbatim through `apply-preset`.
+2. **Visible suggestions.** Cards render the suggester's `reasons` and `warnings` (previously
+   computed and dropped), so a detection match says why it matches, and detection-matched profiles
+   keep sorting first. The `suggested` tier stays unreachable **by design**: generic `$$` values
+   must not claim hardware identity (pinned by `profile-suggestions.test.ts`); the tier remains
+   reserved for future distinctive evidence. Detection still never applies anything by itself
+   (ADR-205 unchanged).
+3. **Six steps.** `capability` (Machine type) → `identify` (Choose your machine) → `connect`
+   (Connect & detect — the connect/read/use-detected surface on its own page, per the maintainer)
+   → `confirm` (Confirm settings: name/bed/feeds/origin/homing plus laser and/or CNC output,
+   stacked flat on one scrollable page) → `options` (Options & calibration) → `review` (firmware
+   compare/queue followed by the review cards and hardware handoff). The step components
+   themselves are reused; the wizard stacks them.
+4. **Options as closed status rows.** Every optional group — no-go zones, Z axis and probe,
+   planner/ETA, plus the laser-only scan offset + controlled seek, auto-focus, rotary, and camera
+   groups (hidden for CNC-only machines, as before) — is **collapsed by default** (maintainer
+   direction) and shows a live one-line status in its always-visible summary row, and no group
+   nests another collapsible. The operator reads the whole machine state without opening anything.
+5. **Gates move, none widen.** Next gates on the same `machineSetupValidationIssues` only on the
+   pages that host fields (`identify`, `confirm`, `options`); `capability` and `connect` always
+   advance so Next never strands the operator away from a fix. Firmware queueing keeps its read +
+   backup + per-setting confirm + transport preconditions; Save remains the single atomic commit
+   followed by verified queued writes. No new confirmation, block, or refusal is introduced
+   (rule 7 / ADR-228 untouched).
+6. The auto-focus deep-link from Job Controls targets the `options` step and explicitly opens the
+   auto-focus section (an `highlight` open-request field), since no section opens by default.
+7. **The connected-4040 fill-policy rail banner is removed** (maintainer direction, 2026-07-21).
+   The rail keeps only the neutral "This machine isn't set up yet" nudge; 4040 fill-policy
+   selection remains available through the catalog, and the Job Review warning path is untouched.
+
+### Consequences
+
+- Step ids `machine`, `safety`, and `firmware` disappear from `DeviceSetupStep`; `capability`,
+  `options` are added and `confirm` is the merged coordinates+output page. The only production
+  deep-link (auto-focus) moves to `options` + `highlight`.
+- The Machine Setup rail button loses its 4040-advisory primary emphasis; only the unconfigured
+  nudge still promotes it.
+- WORKFLOW.md F-C7 is rewritten to the six-step enumeration; ADR-186's laser/CNC visible-step
+  variance was already dead in code (fixed seven-step order) and is superseded by this shape.
+- e2e and component tests pinning the seven-step layout, the collapsed-catalog summary text, and
+  step-title strings are updated in the same change; the stale
+  `production-workflows.spec.ts` locators ("Optional: start from a tested machine profile", the
+  removed "Firmware mismatch" card state) are corrected as part of this work.
+- The CNC rail's live duplicates (Material & Bit machine params, detected-settings Apply) and the
+  dead standalone editors (`DeviceSettings.tsx` and siblings) are out of scope here; folding or
+  deleting them stays a separate refactor decision.

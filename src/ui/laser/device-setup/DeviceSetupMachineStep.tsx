@@ -1,6 +1,7 @@
-// Step 4: machine-process settings. Laser and CNC deliberately render
-// different controls; job-specific stock/material/bit settings stay in the
-// project rail and are not confused with persistent machine configuration.
+// Step 4 (Confirm settings, output section): machine-process settings.
+// Laser and CNC deliberately render different controls; job-specific
+// stock/material/bit settings stay in the project rail and are not confused
+// with persistent machine configuration.
 
 import { selectControllerDriver } from '../../../core/controllers';
 import {

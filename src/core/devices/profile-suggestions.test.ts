@@ -4,7 +4,7 @@ import {
   settingsMapToProfilePatch,
   settingsMapToRows,
 } from '../controllers/grbl';
-import { suggestMachineProfiles } from './profile-suggestions';
+import { filterMachineProfileSuggestions, suggestMachineProfiles } from './profile-suggestions';
 
 const FALCON_SETTINGS = new Map<number, string>([
   [30, '1000'],
@@ -58,6 +58,37 @@ describe('suggestMachineProfiles', () => {
     ).toMatchObject({
       confidence: 'possible',
     });
+  });
+
+  it('filters by name, controller kind, and bed size, and an empty query returns everything', () => {
+    const suggestions = suggestMachineProfiles({
+      detectedControllerKind: null,
+      detectedProfilePatch: null,
+      controllerSettings: null,
+      settingsRows: [],
+    });
+
+    expect(filterMachineProfileSuggestions(suggestions, '')).toEqual(suggestions);
+    expect(filterMachineProfileSuggestions(suggestions, '   ')).toEqual(suggestions);
+
+    const byName = filterMachineProfileSuggestions(suggestions, 'FALCON');
+    expect(byName.length).toBeGreaterThan(0);
+    expect(
+      byName.every((suggestion) => suggestion.profile.name.toLowerCase().includes('falcon')),
+    ).toBe(true);
+
+    const byKind = filterMachineProfileSuggestions(suggestions, 'grblhal');
+    expect(byKind.length).toBeGreaterThan(0);
+    expect(
+      byKind.every(
+        (suggestion) => (suggestion.profile.controllerKind ?? 'grbl-v1.1') === 'grblhal',
+      ),
+    ).toBe(true);
+
+    const byBed = filterMachineProfileSuggestions(suggestions, '430x390');
+    expect(byBed.map((suggestion) => suggestion.profileId)).toEqual(['xtool-d1-pro']);
+
+    expect(filterMachineProfileSuggestions(suggestions, 'no-such-machine')).toEqual([]);
   });
 
   it('marks mismatched controller profiles manual-only with warnings', () => {
