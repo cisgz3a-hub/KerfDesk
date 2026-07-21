@@ -30,7 +30,6 @@ type ReviewGateArgs = {
 const originalFrame = useLaserStore.getState().frame;
 const originalSelectPrimaryWcsForFrame = useLaserStore.getState().selectPrimaryWcsForFrame;
 const originalCapabilities = useLaserStore.getState().capabilities;
-let reviewArgs: ReviewGateArgs | null;
 let events: string[];
 
 function installVectorProject(): void {
@@ -117,10 +116,8 @@ beforeEach(() => {
     frameVerification: null,
   });
   useToastStore.setState({ toasts: [] });
-  reviewArgs = null;
   events = [];
   reviewHarness.runJobReviewGate.mockReset().mockImplementation(async (args: ReviewGateArgs) => {
-    reviewArgs = args;
     events.push('job-review');
     return {
       bundle: args.initial,
@@ -158,7 +155,7 @@ afterEach(() => {
 
 describe('runFrameNow framed-run authorization', () => {
   it.each(['g92-and-g10', 'g92-only'] as const)(
-    'selects G54 for %s controllers and waits for its fresh position before review and Frame',
+    'selects G54 for %s controllers and waits for its fresh position before Frame',
     async (wcs) => {
       const selectPrimaryWcsForFrame = vi.fn(async () => {
         events.push('select-g54');
@@ -188,67 +185,37 @@ describe('runFrameNow framed-run authorization', () => {
       await expect(runFrameNow()).resolves.toBe(true);
 
       expect(selectPrimaryWcsForFrame).toHaveBeenCalledTimes(1);
-      expect(events).toEqual(['select-g54', 'job-review', 'physical-frame']);
+      expect(events).toEqual(['select-g54', 'physical-frame']);
       expect(useLaserStore.getState().activeWcs).toBe('G54');
     },
   );
 
-  it('reviews first, then dispatches the exact reviewed prepared artifact and motion envelope', async () => {
-    let markReviewOpen: (() => void) | undefined;
-    const reviewOpened = new Promise<void>((resolve) => {
-      markReviewOpen = resolve;
-    });
-    let confirmReview: (() => void) | undefined;
-    reviewHarness.runJobReviewGate.mockImplementation((args: ReviewGateArgs) => {
-      reviewArgs = args;
-      events.push('job-review');
-      markReviewOpen?.();
-      return new Promise((resolve) => {
-        confirmReview = () =>
-          resolve({
-            bundle: args.initial,
-            laserModeStartEvidence: undefined,
-            cncSetupAttestation: undefined,
-          });
-      });
-    });
+  it('dispatches the exact prepared artifact and motion envelope without opening Job Review', async () => {
     const frame = vi.fn(async (bounds: JobBounds, feed: number, candidate?: FramedRunCandidate) => {
       events.push('physical-frame');
       if (candidate === undefined) throw new Error('Frame candidate was not supplied');
-      const reviewed = reviewArgs?.initial;
-      if (reviewed === undefined) throw new Error('Frame ran before Job Review');
 
-      expect(candidate.preparedStart).toBe(reviewed.prepared);
-      expect(candidate.project).toBe(reviewed.project);
-      expect(candidate.executionSignature).toBe(reviewed.prepared.canvasPlan.retentionKey);
+      const project = useStore.getState().project;
+      expect(candidate.project).toBe(project);
+      expect(candidate.executionSignature).toBe(candidate.preparedStart.canvasPlan.retentionKey);
+      expect(candidate.review).toBeUndefined();
       expect(bounds).toEqual(
-        computeJobMotionBounds(reviewed.prepared.prepared.job, reviewed.project.device),
+        computeJobMotionBounds(candidate.preparedStart.prepared.job, project.device),
       );
-      expect(feed).toBe(reviewed.project.device.framingFeedMmPerMin);
+      expect(feed).toBe(project.device.framingFeedMmPerMin);
 
       dispatchedFrame(candidate);
       completeFrame(candidate);
     });
     useLaserStore.setState({ frame });
 
-    const outcome = runFrameNow();
-    await reviewOpened;
-    expect(frame).not.toHaveBeenCalled();
-    expect(useLaserStore.getState().motionOperation).toBeNull();
+    await expect(runFrameNow()).resolves.toBe(true);
 
-    confirmReview?.();
-    await expect(outcome).resolves.toBe(true);
-
-    expect(events).toEqual(['job-review', 'physical-frame']);
-    expect(reviewArgs).toMatchObject({
-      checkpointToReplace: null,
-      completedReceipt: null,
-      purpose: 'frame',
-    });
+    // ADR-237: the single Job Review runs at Start, never at plain Frame.
+    expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
+    expect(events).toEqual(['physical-frame']);
     expect(frame).toHaveBeenCalledTimes(1);
-    expect(useLaserStore.getState().framedRun?.candidate.preparedStart).toBe(
-      reviewArgs?.initial.prepared,
-    );
+    expect(useLaserStore.getState().framedRun?.candidate.review).toBeUndefined();
   });
 
   it('stays pending after dispatch and resolves true only when completion publishes its permit', async () => {

@@ -120,14 +120,16 @@ function installTransientPermit(review: ConfirmedJobReview): FramedRunPermit {
     controllerBeforeFrame: framedRunControllerSnapshot(laser),
     externalEnvironment: review.bundle.externalEnvironment,
     returnToWorkPosition: { x: 0, y: 0 },
-    reviewedAtIso: review.reviewedAtIso,
-    reviewModel: review.reviewModel,
-    ...(review.laserModeStartEvidence === undefined
-      ? {}
-      : { laserModeStartEvidence: review.laserModeStartEvidence }),
-    ...(review.cncSetupAttestation === undefined
-      ? {}
-      : { cncSetupAttestation: review.cncSetupAttestation }),
+    review: {
+      reviewedAtIso: review.reviewedAtIso,
+      reviewModel: review.reviewModel,
+      ...(review.laserModeStartEvidence === undefined
+        ? {}
+        : { laserModeStartEvidence: review.laserModeStartEvidence }),
+      ...(review.cncSetupAttestation === undefined
+        ? {}
+        : { cncSetupAttestation: review.cncSetupAttestation }),
+    },
     authorizationContext: 'transient-camera',
   };
   const permit = createFramedRunPermit(candidate, laser);

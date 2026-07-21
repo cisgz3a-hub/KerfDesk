@@ -5,6 +5,7 @@ import {
   framedRunControllerSnapshot,
   type FramedRunCandidate,
   type FramedRunPermit,
+  type FramedRunReviewEvidence,
 } from '../state/framed-run';
 import { useCameraStore } from '../state/camera-store';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
@@ -29,7 +30,7 @@ import {
   startExternalEnvironmentMatches,
 } from './start-job-external-environment';
 import { prepareCurrentStartJob } from './start-job-source';
-import { runJobReviewGate, type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
+import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import { resolveFrameCandidate } from './frame-candidate';
 
@@ -40,23 +41,18 @@ export function useFrameAction(): () => void {
 }
 
 /**
- * Prepare, review, and physically Frame one exact executable artifact. The
- * controller store promotes the candidate to `framedRun` only after the final
- * clean Idle; dispatch, cancel, Alarm, reset, or write failure earns no permit.
+ * Prepare and physically Frame one exact executable artifact, dialog-free
+ * (ADR-237: the single Job Review runs at Start, which claims the permit).
+ * The controller store promotes the candidate to `framedRun` only after the
+ * final clean Idle; dispatch, cancel, Alarm, reset, or write failure earns
+ * no permit.
  */
 export async function runFrameNow(): Promise<boolean> {
   ensureFramedRunInvalidationSubscriptions();
   useStartBlockerStore.getState().clear();
   const initial = await prepareFrameReviewBundle();
   if (initial === null) return false;
-  const review = await runJobReviewGate({
-    initial,
-    checkpointToReplace: null,
-    completedReceipt: null,
-    purpose: 'frame',
-  });
-  if (review === null) return false;
-  return dispatchReviewedFrame(review);
+  return dispatchPreparedFrame(initial);
 }
 
 export type TransientFrameControllerPreparation = {
@@ -98,7 +94,8 @@ export async function dispatchTransientReviewedFrame(
   review: ConfirmedJobReview,
   outputScope: OutputScope,
 ): Promise<FramedRunPermit | null> {
-  const accepted = await dispatchReviewedFrame(review, {
+  const accepted = await dispatchPreparedFrame(review.bundle, {
+    review: reviewEvidenceOf(review),
     authorizationContext: 'transient-camera',
     outputScope,
   });
@@ -163,21 +160,34 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
   };
 }
 
-type ReviewedFrameDispatchOptions = {
+type PreparedFrameDispatchOptions = {
+  readonly review?: FramedRunReviewEvidence;
   readonly authorizationContext?: 'transient-camera';
   readonly outputScope?: OutputScope;
 };
 
-async function dispatchReviewedFrame(
-  review: ConfirmedJobReview,
-  options: ReviewedFrameDispatchOptions = {},
+function reviewEvidenceOf(review: ConfirmedJobReview): FramedRunReviewEvidence {
+  return {
+    reviewedAtIso: review.reviewedAtIso,
+    reviewModel: review.reviewModel,
+    ...(review.laserModeStartEvidence === undefined
+      ? {}
+      : { laserModeStartEvidence: review.laserModeStartEvidence }),
+    ...(review.cncSetupAttestation === undefined
+      ? {}
+      : { cncSetupAttestation: review.cncSetupAttestation }),
+  };
+}
+
+async function dispatchPreparedFrame(
+  bundle: ReviewedStartBundle,
+  options: PreparedFrameDispatchOptions = {},
 ): Promise<boolean> {
-  const { bundle } = review;
   if (!(await requireFrameControllerQueue())) return false;
   const currentLaser = useLaserStore.getState();
   if (!reviewedFrameIsCurrent(bundle, currentLaser, options.authorizationContext)) {
     reportFrameRefusal([
-      'The job or machine setup changed during review. Review the current job and Frame again.',
+      'The job or machine setup changed before Frame could run. Frame the current job again.',
     ]);
     return false;
   }
@@ -213,14 +223,10 @@ async function dispatchReviewedFrame(
       workOriginActive: currentLaser.workOriginActive,
     },
     returnToWorkPosition,
-    reviewedAtIso: review.reviewedAtIso,
-    reviewModel: review.reviewModel,
-    ...(review.laserModeStartEvidence === undefined
+    ...(options.review === undefined ? {} : { review: options.review }),
+    ...(bundle.frameWcsNormalizationWarning === undefined
       ? {}
-      : { laserModeStartEvidence: review.laserModeStartEvidence }),
-    ...(review.cncSetupAttestation === undefined
-      ? {}
-      : { cncSetupAttestation: review.cncSetupAttestation }),
+      : { frameWcsNormalizationWarning: bundle.frameWcsNormalizationWarning }),
   };
 
   const completion = waitForFrameOutcome(candidate);
@@ -242,7 +248,7 @@ async function dispatchReviewedFrame(
 
 function reviewedFrameCandidateOptions(
   bundle: ReviewedStartBundle,
-  options: ReviewedFrameDispatchOptions,
+  options: PreparedFrameDispatchOptions,
 ): Pick<FramedRunCandidate, 'outputScope' | 'authorizationContext'> {
   const outputScope =
     options.outputScope === undefined ? currentOutputScope(bundle.app) : options.outputScope;
@@ -272,7 +278,7 @@ function reportFrameCompletion(candidate: FramedRunCandidate, accepted: boolean)
   }
   useToastStore
     .getState()
-    .pushToast('Frame complete — this exact job is ready to start.', 'success');
+    .pushToast('Frame complete — press Start to review and run this exact job.', 'success');
   return true;
 }
 

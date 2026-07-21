@@ -11,6 +11,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
+import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
@@ -26,10 +27,6 @@ const reviewHarness = vi.hoisted(() => ({
 vi.mock('./job-review', () => ({
   runJobReviewGate: reviewHarness.runJobReviewGate,
 }));
-
-type ReviewGateArgs = {
-  readonly initial: ReviewedStartBundle;
-};
 
 const originalFrame = useLaserStore.getState().frame;
 const originalSelectPrimaryWcsForFrame = useLaserStore.getState().selectPrimaryWcsForFrame;
@@ -139,13 +136,26 @@ afterEach(() => {
 
 describe('transient reviewed Frame dispatch', () => {
   it('physically Frames the immutable project and returns its exact completion permit', async () => {
-    let transientBundle: ReviewedStartBundle | undefined;
-    reviewHarness.runJobReviewGate.mockImplementationOnce(async (args: ReviewGateArgs) => {
-      transientBundle = args.initial;
-      return null;
-    });
+    // ADR-237: plain Frame no longer opens Job Review, so capture the exact
+    // prepared artifact from a dispatch-only Frame attempt instead.
+    let captured: FramedRunCandidate | undefined;
+    const captureOnlyFrame = vi.fn(
+      async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {
+        captured = candidate;
+      },
+    );
+    useLaserStore.setState({ frame: captureOnlyFrame });
     await expect(runFrameNow()).resolves.toBe(false);
-    if (transientBundle === undefined) throw new Error('Transient review bundle was not captured');
+    expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
+    if (captured === undefined) throw new Error('Transient prepared artifact was not captured');
+    const transientBundle: ReviewedStartBundle = {
+      app: useStore.getState(),
+      project: captured.project,
+      laser: useLaserStore.getState(),
+      prepared: captured.preparedStart,
+      laserModeStartSnapshot: captureLaserModeStartSnapshot(useLaserStore.getState()),
+      externalEnvironment: captured.externalEnvironment,
+    };
 
     const review: ConfirmedJobReview = {
       bundle: transientBundle,

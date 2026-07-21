@@ -17,6 +17,12 @@ import {
 } from '../../core/scene';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
+// ADR-234's feed-matched entry runway derives its length from the layer's
+// fill overscan, so overscan 0 silently reproduces the burn-from-rapid entry
+// scorch the runway exists to prevent. Advisory only — never a gate (rule 7).
+const OVERSCAN_ZERO_DISABLES_4040_FILL_RUNWAY_WARNING =
+  'Fill overscan is 0, which disables the 4040-safe burn-entry runway: split fill fragments will start burning straight out of a rapid and can scorch where each fragment begins. Restore fill overscan (KerfDesk uses up to 5 mm of it as feed-matched runway).';
+
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
   const job = compileJob(project.scene, project.device);
   const warnings = [...detectUncalibratedJobWarnings(job, project.scene.layers)];
@@ -68,6 +74,12 @@ function append4040FillPolicyWarning(
 
 function appendFillHeatWarnings(job: ReturnType<typeof compileJob>, warnings: string[]): void {
   const heat = analyzeFillHeatRisk(job);
+  if (
+    heat.fillDisabledRunwaySweepCount > 0 &&
+    job.groups.some(isRunwayDisabledFeedMatchedFillGroup)
+  ) {
+    warnings.push(OVERSCAN_ZERO_DISABLES_4040_FILL_RUNWAY_WARNING);
+  }
   if (job.groups.some(isSensitiveIslandFillGroup) && heat.sensitiveIslandShortSweepCount > 0) {
     warnings.push(
       `4040-safe Island Fill has ${heat.sensitiveIslandShortSweepCount} short sweep(s) that can overburn or darken small details even with full laser-off runway. Use Scanline Fill for final 4040 burns until Island Fill is calibrated for this machine.`,
@@ -88,6 +100,16 @@ function appendFillHeatWarnings(job: ReturnType<typeof compileJob>, warnings: st
       `Island Fill has ${heat.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`,
     );
   }
+}
+
+function isRunwayDisabledFeedMatchedFillGroup(
+  group: ReturnType<typeof compileJob>['groups'][number],
+): boolean {
+  return (
+    group.kind === 'fill' &&
+    group.fillRunwayPolicy === 'feed-matched-entry' &&
+    group.overscanMm <= 0
+  );
 }
 
 function isSensitiveIslandFillGroup(

@@ -6,7 +6,7 @@
 
 import { selectControllerDriver } from '../../core/controllers';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { ControllerSettingsSnapshot, PreflightIssue } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { emitGcodeSnapshot } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
@@ -36,6 +36,7 @@ import {
 } from './import-toasts';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
+import { partitionSavePreflight } from './save-preflight-policy';
 import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
@@ -176,8 +177,12 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     return;
   }
   const { gcode, preflight } = await emitSaveGcode(ctx, placement);
-  if (!preflight.ok) {
-    const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
+  // Rule 7 / ADR-228: advisory preflight findings (the scan-offset magnitude
+  // cap) warn after the save instead of refusing it — mirrors the Start
+  // path's partitionEmitPreflight split.
+  const { blocking, advisories } = partitionSavePreflight(preflight.issues);
+  if (blocking.length > 0) {
+    const lines = blocking.map((i) => `• ${i.message}`).join('\n');
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
@@ -197,7 +202,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await target.write(gcode);
     advanceExportVariables(ctx);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
-    pushPostSaveAdvisories(ctx);
+    pushPostSaveAdvisories(ctx, advisories);
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
@@ -213,7 +218,13 @@ function advanceExportVariables(ctx: SaveGcodeCtx): void {
 // upsample softer than preview, uncalibrated defaults, trace-vector cut
 // risk) — non-blocking, since the export itself succeeded. CNC mode has
 // its own advisory set (stock footprint, H.2) via the machine-aware selector.
-function pushPostSaveAdvisories(ctx: SaveGcodeCtx): void {
+function pushPostSaveAdvisories(
+  ctx: SaveGcodeCtx,
+  preflightAdvisories: ReadonlyArray<PreflightIssue>,
+): void {
+  for (const advisory of preflightAdvisories) {
+    ctx.pushToast(advisory.message, 'warning');
+  }
   for (const warning of detectMachineJobWarnings(
     ctx.project,
     ctx.controllerSettings,
