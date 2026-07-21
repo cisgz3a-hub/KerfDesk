@@ -142,7 +142,8 @@ describe('controlled laser-off motion preflight', () => {
           message: 'Controlled laser-off seek feed 1001 is outside 1..1000 mm/min.',
         },
         {
-          code: 'scan-offset-out-of-range',
+          // Advisory code (rule 7): the magnitude cap warns, non-finite blocks.
+          code: 'scan-offset-above-cap',
           message: 'Layer L1 bidirectional scan offset 4.01 mm exceeds the device limit of ±4 mm.',
         },
       ]),
