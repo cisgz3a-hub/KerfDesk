@@ -12,6 +12,7 @@ import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
+import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
@@ -79,6 +80,7 @@ export function App(): JSX.Element {
       <ImportImageDialog />
       <ConfirmSaveDialog />
       <JobReviewDialog />
+      <ImageEditorHost />
     </div>
   );
 }
