@@ -3,10 +3,10 @@
 // in-progress tool preview. On-change redraw (no free-running rAF); only the
 // ants dash phase ticks while a selection exists.
 
-import type { RgbaBuffer } from '../../core/image-edit';
+import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
 import { maskOutline, type SelectionMask } from '../../core/image-select';
 import type { EditorDrag } from './editor-drag';
-import { marqueeRect } from './editor-drag';
+import { dragRect, marqueeRect } from './editor-drag';
 import type { EditorView } from './image-editor-types';
 
 export const ANTS_DASH_PX = 4;
@@ -59,6 +59,7 @@ export function drawEditorScene(
   drag: EditorDrag,
   antsPhase: number,
   previewStyle: { readonly color: string; readonly widthPx: number },
+  pendingCrop: PixelRect | null = null,
 ): void {
   ctx.save();
   ctx.fillStyle = EDITOR_BACKDROP;
@@ -67,8 +68,40 @@ export function drawEditorScene(
   ctx.scale(view.scale, view.scale);
   ctx.imageSmoothingEnabled = view.scale < 1;
   ctx.drawImage(docCanvas, 0, 0);
+  if (pendingCrop !== null) drawPendingCrop(ctx, pendingCrop, docCanvas, view);
   drawDragPreview(ctx, drag, view, previewStyle);
   if (selection !== null) drawAnts(ctx, selection, view, antsPhase);
+  ctx.restore();
+}
+
+// Darken everything outside the crop box and draw the thirds grid inside it
+// (Photoshop's crop shield + rule-of-thirds overlay).
+function drawPendingCrop(
+  ctx: CanvasRenderingContext2D,
+  crop: PixelRect,
+  docCanvas: HTMLCanvasElement,
+  view: EditorView,
+): void {
+  ctx.save();
+  /* eslint-disable-next-line no-restricted-syntax -- crop shield is canvas paint, not chrome */
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.beginPath();
+  ctx.rect(0, 0, docCanvas.width, docCanvas.height);
+  ctx.rect(crop.x, crop.y, crop.width, crop.height);
+  ctx.fill('evenodd');
+  ctx.strokeStyle = PREVIEW_ACCENT;
+  ctx.lineWidth = 1.5 / view.scale;
+  ctx.setLineDash([]);
+  ctx.strokeRect(crop.x, crop.y, crop.width, crop.height);
+  ctx.lineWidth = 0.5 / view.scale;
+  ctx.beginPath();
+  for (const t of [1 / 3, 2 / 3]) {
+    ctx.moveTo(crop.x + crop.width * t, crop.y);
+    ctx.lineTo(crop.x + crop.width * t, crop.y + crop.height);
+    ctx.moveTo(crop.x, crop.y + crop.height * t);
+    ctx.lineTo(crop.x + crop.width, crop.y + crop.height * t);
+  }
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -87,27 +120,37 @@ function drawDragPreview(
     case 'move-selection':
     case 'move-outline':
       break;
+    case 'crop-drag':
+      drawDashedRect(ctx, dragRect(drag), view);
+      break;
     case 'paint':
-    case 'lasso': {
-      ctx.strokeStyle = drag.kind === 'lasso' ? PREVIEW_ACCENT : style.color;
-      ctx.lineWidth = drag.kind === 'lasso' ? 1 / view.scale : style.widthPx;
-      if (drag.kind === 'lasso') ctx.setLineDash([4 / view.scale, 3 / view.scale]);
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = style.widthPx;
       strokePolyline(ctx, drag.points);
       break;
-    }
-    case 'line': {
+    case 'lasso':
+      ctx.strokeStyle = PREVIEW_ACCENT;
+      ctx.lineWidth = 1 / view.scale;
+      ctx.setLineDash([4 / view.scale, 3 / view.scale]);
+      strokePolyline(ctx, drag.points);
+      break;
+    case 'line':
       ctx.strokeStyle = style.color;
       ctx.lineWidth = style.widthPx;
       strokePolyline(ctx, [drag.from, drag.to]);
       break;
-    }
     case 'marquee':
       drawMarqueePreview(ctx, drag, view);
       break;
-    default:
-      break;
   }
   ctx.restore();
+}
+
+function drawDashedRect(ctx: CanvasRenderingContext2D, rect: PixelRect, view: EditorView): void {
+  ctx.strokeStyle = PREVIEW_ACCENT;
+  ctx.lineWidth = 1 / view.scale;
+  ctx.setLineDash([4 / view.scale, 3 / view.scale]);
+  ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
 }
 
 function drawMarqueePreview(

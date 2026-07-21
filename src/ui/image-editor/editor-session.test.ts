@@ -6,7 +6,9 @@ import {
 } from '../../core/image-edit/rgba-buffer';
 import { rectSelection } from '../../core/image-select';
 import {
+  appliedBounds,
   BLACK,
+  commitCrop,
   commitFillSelection,
   commitLine,
   commitMoveSelection,
@@ -24,7 +26,12 @@ import {
 const PENCIL: BrushSettings = { diameterPx: 3, hardness: 1, opacity: 1 };
 
 function newSession() {
-  return createSession('obj-1', 'test.png', createRgbaBuffer(24, 24));
+  return createSession('obj-1', 'test.png', createRgbaBuffer(24, 24), {
+    minX: 0,
+    minY: 0,
+    maxX: 24,
+    maxY: 24,
+  });
 }
 
 function channelAt(session: ReturnType<typeof newSession>, x: number, y: number): number {
@@ -116,5 +123,22 @@ describe('editor session ops', () => {
     session = revertSession(session);
     expect(rgbaBuffersEqual(session.doc, session.base)).toBe(true);
     expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  it('crop shrinks the doc, maps mm bounds at the same DPI, and revert un-crops', () => {
+    let session = newSession();
+    session = commitStroke(session, { kind: 'pencil' }, PENCIL, BLACK, [{ x: 7, y: 7 }], 'Pencil');
+    session = commitCrop(session, { x: 6, y: 6, width: 12, height: 6 });
+    expect(session.doc.width).toBe(12);
+    expect(session.doc.height).toBe(6);
+    // The painted pixel travelled into crop space.
+    expect(channelAt(session, 1, 1)).toBe(0);
+    expect(session.history.undoStack).toHaveLength(0);
+    // 24 px ↔ 24 mm source: 1 px = 1 mm (cropLocalBounds convention).
+    expect(appliedBounds(session)).toEqual({ minX: 6, minY: 6, maxX: 18, maxY: 12 });
+
+    session = revertSession(session);
+    expect(session.doc.width).toBe(24);
+    expect(appliedBounds(session)).toBeNull();
   });
 });

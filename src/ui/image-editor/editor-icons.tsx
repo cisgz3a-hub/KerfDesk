@@ -2,6 +2,7 @@
 // pinned lucide-static assets the main toolbar uses, keyed by editor tool.
 
 import brush from 'lucide-static/icons/brush.svg?raw';
+import crop from 'lucide-static/icons/crop.svg?raw';
 import eraser from 'lucide-static/icons/eraser.svg?raw';
 import lasso from 'lucide-static/icons/lasso.svg?raw';
 import move from 'lucide-static/icons/move.svg?raw';
@@ -19,6 +20,7 @@ const ICONS: Readonly<Record<EditorTool['kind'], string>> = {
   marquee: squareDashed,
   lasso,
   wand,
+  crop,
   move,
 };
 

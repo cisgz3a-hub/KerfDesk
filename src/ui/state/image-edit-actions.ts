@@ -5,13 +5,17 @@
 // dimensions and mm bounds are untouched — Studio painting never changes
 // physical scale (crop/resize are separate ops with their own contracts).
 
-import { replaceObject, type SceneObject } from '../../core/scene';
+import { replaceObject, type Bounds, type SceneObject } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
 export type EditedImageFields = {
   readonly dataUrl: string;
   readonly lumaBase64: string;
+  /** Present only when the edit cropped/resized (mm follows the same DPI). */
+  readonly pixelWidth?: number;
+  readonly pixelHeight?: number;
+  readonly bounds?: Bounds;
 };
 
 export type ImageEditActions = {
@@ -33,7 +37,14 @@ function applyEdit(
 ): AppState | Partial<AppState> {
   const image = sceneObjectById(state.project.scene.objects, imageId);
   if (image?.kind !== 'raster-image') return state;
-  const edited = { ...image, dataUrl: fields.dataUrl, lumaBase64: fields.lumaBase64 };
+  const edited = {
+    ...image,
+    dataUrl: fields.dataUrl,
+    lumaBase64: fields.lumaBase64,
+    ...(fields.pixelWidth === undefined ? {} : { pixelWidth: fields.pixelWidth }),
+    ...(fields.pixelHeight === undefined ? {} : { pixelHeight: fields.pixelHeight }),
+    ...(fields.bounds === undefined ? {} : { bounds: fields.bounds }),
+  };
   return {
     project: {
       ...state.project,

@@ -41,6 +41,7 @@ export type EditorDrag =
       readonly points: readonly PaintPoint[];
       readonly booleanOverride: SelectionCombineMode | null;
     }
+  | { readonly kind: 'crop-drag'; readonly from: PaintPoint; readonly to: PaintPoint }
   | { readonly kind: 'move-outline'; readonly from: PaintPoint; readonly to: PaintPoint }
   | { readonly kind: 'move-selection'; readonly from: PaintPoint; readonly to: PaintPoint }
   | { readonly kind: 'pan'; readonly lastClientX: number; readonly lastClientY: number };
@@ -111,6 +112,8 @@ export function beginDrag(
     case 'wand':
       // Wand is a click tool; the hook commits immediately on down.
       return IDLE_DRAG;
+    case 'crop':
+      return { kind: 'crop-drag', from: point, to: point };
     case 'move':
       return hasSelection ? { kind: 'move-selection', from: point, to: point } : IDLE_DRAG;
   }
@@ -130,27 +133,46 @@ export function advanceDrag(
       return { kind: 'paint', points: [...drag.points, point] };
     case 'line':
       return { ...drag, to: point, shift: modifiers.shift };
-    case 'marquee': {
-      if (spaceHeld) {
-        // Spacebar repositions the in-progress marquee without dropping it.
-        const dx = point.x - drag.to.x;
-        const dy = point.y - drag.to.y;
-        return { ...drag, from: { x: drag.from.x + dx, y: drag.from.y + dy }, to: point };
-      }
-      const free = drag.booleanOverride === null;
-      return {
-        ...drag,
-        to: point,
-        constrain: free && modifiers.shift,
-        fromCenter: free && modifiers.alt,
-      };
-    }
+    case 'marquee':
+      return advanceMarquee(drag, point, modifiers, spaceHeld);
     case 'lasso':
       return { ...drag, points: [...drag.points, point] };
+    case 'crop-drag':
     case 'move-outline':
     case 'move-selection':
       return { ...drag, to: point };
   }
+}
+
+/** Normalized rect of a two-point drag (crop). */
+export function dragRect(drag: { readonly from: PaintPoint; readonly to: PaintPoint }): PixelRect {
+  return {
+    x: Math.min(drag.from.x, drag.to.x),
+    y: Math.min(drag.from.y, drag.to.y),
+    width: Math.abs(drag.to.x - drag.from.x),
+    height: Math.abs(drag.to.y - drag.from.y),
+  };
+}
+
+function advanceMarquee(
+  drag: Extract<EditorDrag, { kind: 'marquee' }>,
+  point: PaintPoint,
+  modifiers: DragModifiers,
+  spaceHeld: boolean,
+): EditorDrag {
+  if (spaceHeld) {
+    // Spacebar repositions the in-progress marquee without dropping it.
+    const dx = point.x - drag.to.x;
+    const dy = point.y - drag.to.y;
+    return { ...drag, from: { x: drag.from.x + dx, y: drag.from.y + dy }, to: point };
+  }
+  const free = drag.booleanOverride === null;
+  return {
+    ...drag,
+    to: point,
+    constrain: free && modifiers.shift,
+    fromCenter: free && modifiers.alt,
+  };
 }
 
 /** The marquee's document rect honouring constrain (square) + from-centre. */

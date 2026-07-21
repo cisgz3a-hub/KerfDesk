@@ -7,7 +7,7 @@
 // store as exactly one undo entry.
 
 import { create } from 'zustand';
-import type { PaintColor, PaintPoint } from '../../core/image-edit';
+import type { PaintColor, PaintPoint, PixelRect } from '../../core/image-edit';
 import {
   combineMasks,
   featherMask,
@@ -20,7 +20,9 @@ import type { RasterImage } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import {
+  appliedBounds,
   BLACK,
+  commitCrop,
   commitFillSelection,
   commitLine,
   commitMoveSelection,
@@ -70,6 +72,8 @@ type ImageEditorState = {
   readonly viewportSize: { readonly width: number; readonly height: number };
   /** Held-Spacebar temporary Hand tool (Photoshop pan convention). */
   readonly isSpacePanning: boolean;
+  /** Crop-tool rect awaiting Enter/✓ (Esc/✕ discards). */
+  readonly pendingCrop: PixelRect | null;
   readonly openEditor: (image: RasterImage) => void;
   readonly closeEditor: () => void;
   readonly setTool: (tool: EditorTool) => void;
@@ -83,6 +87,8 @@ type ImageEditorState = {
   readonly zoomBy: (factor: number) => void;
   readonly zoomTo100: () => void;
   readonly setSpacePanning: (isPanning: boolean) => void;
+  readonly setPendingCrop: (rect: PixelRect | null) => void;
+  readonly commitPendingCrop: () => void;
   readonly setWandTolerance: (tolerance: number) => void;
   readonly setWandContiguous: (contiguous: boolean) => void;
   readonly stroke: (points: readonly PaintPoint[]) => void;
@@ -120,12 +126,14 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   view: null,
   viewportSize: { width: 0, height: 0 },
   isSpacePanning: false,
+  pendingCrop: null,
 
   openEditor: (image) => openEditorAction(set, get, image),
 
   closeEditor: () => closeEditorAction(set, get),
 
-  setTool: (tool) => set({ tool }),
+  // Switching tools discards any pending crop box (never the session).
+  setTool: (tool) => set({ tool, pendingCrop: null }),
   setBrush: (brush) => set((s) => ({ brush: { ...s.brush, ...brush } })),
   setForeground: (color) => set({ foreground: color }),
   setBackground: (color) => set({ background: color }),
@@ -136,6 +144,8 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   zoomBy: (factor) => zoomByAction(set, get, factor),
   zoomTo100: () => zoomToScaleAction(set, get, 1),
   setSpacePanning: (isSpacePanning) => set({ isSpacePanning }),
+  setPendingCrop: (pendingCrop) => set({ pendingCrop }),
+  commitPendingCrop: () => commitPendingCropAction(set, get),
   setWandTolerance: (wandTolerance) => set({ wandTolerance }),
   setWandContiguous: (wandContiguous) => set({ wandContiguous }),
 
@@ -193,6 +203,13 @@ type Setter = (
   partial: Partial<ImageEditorState> | ((state: ImageEditorState) => Partial<ImageEditorState>),
 ) => void;
 
+function commitPendingCropAction(set: Setter, get: () => ImageEditorState): void {
+  const { pendingCrop } = get();
+  if (pendingCrop === null) return;
+  set({ pendingCrop: null });
+  withSession(set, get, (session) => commitCrop(session, pendingCrop));
+}
+
 function closeEditorAction(set: Setter, get: () => ImageEditorState): void {
   const { session } = get();
   set((s) => ({
@@ -235,7 +252,7 @@ function openEditorAction(set: Setter, get: () => ImageEditorState, image: Raste
       // The open may have been superseded (closed / another image opened).
       if (get().loadState.kind !== 'loading') return;
       set({
-        session: createSession(image.id, image.source, doc),
+        session: createSession(image.id, image.source, doc, image.bounds),
         loadState: { kind: 'idle' },
       });
     })
@@ -252,7 +269,13 @@ function applyAction(set: Setter, get: () => ImageEditorState): void {
   set({ isApplying: true });
   bakeBufferToBitmapFields(session.doc)
     .then((fields) => {
-      useStore.getState().applyEditedImage(session.objectId, fields);
+      const bounds = appliedBounds(session);
+      useStore.getState().applyEditedImage(session.objectId, {
+        ...fields,
+        ...(bounds === null
+          ? {}
+          : { pixelWidth: session.doc.width, pixelHeight: session.doc.height, bounds }),
+      });
       set((s) => ({
         isApplying: false,
         session: s.session === null ? null : { ...s.session, dirtySinceApply: false },

@@ -20,6 +20,7 @@ export function EditorCanvas(): JSX.Element {
   const view = useImageEditorStore((s) => s.view);
   const setView = useImageEditorStore((s) => s.setView);
   const isSpacePanning = useImageEditorStore((s) => s.isSpacePanning);
+  const pendingCrop = useImageEditorStore((s) => s.pendingCrop);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [antsPhase, setAntsPhase] = useState(0);
@@ -59,6 +60,7 @@ export function EditorCanvas(): JSX.Element {
         color: `rgb(${foreground.r}, ${foreground.g}, ${foreground.b})`,
         widthPx: brush.diameterPx,
       },
+      pendingCrop,
     );
   });
 

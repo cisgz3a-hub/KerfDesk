@@ -28,6 +28,7 @@ const TOOLS: readonly ToolEntry[] = [
   },
   { tool: { kind: 'lasso' }, label: 'Lasso — Shift adds, Alt subtracts', shortcut: 'S' },
   { tool: { kind: 'wand' }, label: 'Magic wand — Shift adds, Alt subtracts', shortcut: 'W' },
+  { tool: { kind: 'crop' }, label: 'Crop — drag a box, Enter commits, Esc cancels', shortcut: 'C' },
   { tool: { kind: 'move' }, label: 'Move selected pixels', shortcut: 'V' },
 ];
 
