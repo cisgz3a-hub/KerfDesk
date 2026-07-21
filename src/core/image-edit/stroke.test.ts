@@ -101,6 +101,26 @@ describe('paintStrokeInPlace', () => {
     expect(rgbaBuffersEqual(buffer, original)).toBe(true);
   });
 
+  it('clamps painting to a clip mask (active-selection semantics)', () => {
+    const buffer = createRgbaBuffer(10, 10);
+    // Clip: only the left half of the document is selected.
+    const alpha = new Uint8Array(100);
+    for (let y = 0; y < 10; y += 1) alpha.fill(255, y * 10, y * 10 + 5);
+    paintStrokeInPlace(
+      buffer,
+      pencilStroke(
+        [
+          { x: 1, y: 5.5 },
+          { x: 9, y: 5.5 },
+        ],
+        3,
+      ),
+      { alpha },
+    );
+    expect(channelAt(buffer, 3, 5)).toBe(0);
+    expect(channelAt(buffer, 7, 5)).toBe(255);
+  });
+
   it('is deterministic: the same stroke paints byte-identical buffers', () => {
     const pointArb = fc.record({
       x: fc.double({ min: -5, max: 30, noNaN: true }),

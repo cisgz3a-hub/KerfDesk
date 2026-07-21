@@ -24,11 +24,38 @@ import {
 import { paintStrokeInPlace, snapLineEnd45, strokeDirtyRect } from '../../core/image-edit';
 import {
   blitFloatingInPlace,
+  borderMask,
+  contractMask,
+  expandMask,
   extractFloatingRegion,
+  featherMask,
   fillMaskedInPlace,
   maskBounds,
+  smoothMask,
   type SelectionMask,
 } from '../../core/image-select';
+
+export type SelectionModifyKind = 'expand' | 'contract' | 'border' | 'smooth' | 'feather';
+
+/** Select ▸ Modify (Photoshop): reshape the current selection by a px amount. */
+export function modifySelectionMask(
+  selection: SelectionMask,
+  kind: SelectionModifyKind,
+  radiusPx: number,
+): SelectionMask {
+  switch (kind) {
+    case 'expand':
+      return expandMask(selection, radiusPx);
+    case 'contract':
+      return contractMask(selection, radiusPx);
+    case 'border':
+      return borderMask(selection, radiusPx);
+    case 'smooth':
+      return smoothMask(selection, radiusPx);
+    case 'feather':
+      return featherMask(selection, radiusPx);
+  }
+}
 
 export const WHITE: PaintColor = { r: 255, g: 255, b: 255 };
 export const BLACK: PaintColor = { r: 0, g: 0, b: 0 };
@@ -38,7 +65,8 @@ export type EditorTool =
   | { readonly kind: 'pencil' }
   | { readonly kind: 'eraser' }
   | { readonly kind: 'line' }
-  | { readonly kind: 'marquee' }
+  // Rect/ellipse share the marquee slot (Photoshop's M flyout; M cycles).
+  | { readonly kind: 'marquee'; readonly shape: 'rect' | 'ellipse' }
   | { readonly kind: 'lasso' }
   | { readonly kind: 'wand' }
   | { readonly kind: 'move' };
@@ -129,7 +157,8 @@ export function commitStroke(
   const rect = strokeDirtyRect(stroke, session.doc);
   if (rect.width === 0 || rect.height === 0) return session;
   const entry = captureRect(session.doc, rect, label);
-  paintStrokeInPlace(session.doc, stroke);
+  // Photoshop: an active selection clamps every stroke.
+  paintStrokeInPlace(session.doc, stroke, session.selection ?? undefined);
   return committed(session, pushHistoryEntry(session.history, entry));
 }
 
@@ -151,6 +180,12 @@ export function withSelection(
   selection: SelectionMask | null,
 ): EditorSession {
   return { ...session, selection, revision: session.revision + 1 };
+}
+
+/** Move the selection OUTLINE only (selection-tool drag / arrow nudge). */
+export function nudgeOutline(session: EditorSession, dx: number, dy: number): EditorSession {
+  if (session.selection === null) return session;
+  return withSelection(session, shiftMask(session.selection, Math.round(dx), Math.round(dy)));
 }
 
 /** Delete (fill white) or Fill (fill colour) the selected area. */

@@ -17,7 +17,12 @@ const TOOLS: readonly ToolEntry[] = [
   { tool: { kind: 'pencil' }, glyph: '✏', label: 'Pencil', shortcut: 'P' },
   { tool: { kind: 'eraser' }, glyph: '⌫', label: 'Eraser', shortcut: 'E' },
   { tool: { kind: 'line' }, glyph: '╱', label: 'Line (Shift = 45°)', shortcut: 'L' },
-  { tool: { kind: 'marquee' }, glyph: '▭', label: 'Marquee (Shift = ellipse)', shortcut: 'M' },
+  {
+    tool: { kind: 'marquee', shape: 'rect' },
+    glyph: '▭',
+    label: 'Marquee — M cycles rect/ellipse; Shift adds, Alt subtracts',
+    shortcut: 'M',
+  },
   { tool: { kind: 'lasso' }, glyph: '◌', label: 'Lasso', shortcut: 'S' },
   { tool: { kind: 'wand' }, glyph: '✦', label: 'Magic wand', shortcut: 'W' },
   { tool: { kind: 'move' }, glyph: '✥', label: 'Move selection', shortcut: 'V' },

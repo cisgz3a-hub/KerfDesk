@@ -4,16 +4,15 @@
 // the UI composes into delete, fill, and move.
 
 export type { SelectionMask } from './selection-mask';
-export { invertMask, isMaskEmpty, MASK_SOLID, maskBounds, selectAllMask } from './selection-mask';
+export { invertMask, isMaskEmpty, maskBounds, selectAllMask } from './selection-mask';
 
 export { ellipseSelection, rectSelection } from './marquee';
 export { polygonSelection } from './lasso';
 
-export type { WandOptions } from './wand';
+export type { SelectionCombineMode } from './combine-masks';
+export { combineMasks } from './combine-masks';
+export { borderMask, contractMask, expandMask, featherMask, smoothMask } from './mask-morphology';
+
 export { wandSelection } from './wand';
-
-export type { OutlinePoint } from './mask-outline';
 export { maskOutline } from './mask-outline';
-
-export type { FloatingRegion } from './region-ops';
 export { blitFloatingInPlace, extractFloatingRegion, fillMaskedInPlace } from './region-ops';

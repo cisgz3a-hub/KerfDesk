@@ -3,7 +3,11 @@
 // (Delete / Fill / Deselect / Invert). Contextual per active tool.
 
 import type { PaintColor } from '../../core/image-edit';
-import { invertMask } from '../../core/image-select';
+import {
+  SelectionActions,
+  SelectionModeButtons,
+  SelectionModifyRow,
+} from './EditorSelectionControls';
 import { useImageEditorStore } from './image-editor-store';
 
 const SWATCHES: readonly PaintColor[] = [
@@ -12,23 +16,26 @@ const SWATCHES: readonly PaintColor[] = [
   { r: 255, g: 255, b: 255 },
 ];
 
+function isPaintToolKind(kind: string): boolean {
+  return kind === 'brush' || kind === 'pencil' || kind === 'eraser' || kind === 'line';
+}
+
+function isSelectionToolKind(kind: string): boolean {
+  return kind === 'marquee' || kind === 'lasso' || kind === 'wand' || kind === 'move';
+}
+
 export function EditorOptionsBar(): JSX.Element {
   const tool = useImageEditorStore((s) => s.tool);
-  const isPaintTool =
-    tool.kind === 'brush' ||
-    tool.kind === 'pencil' ||
-    tool.kind === 'eraser' ||
-    tool.kind === 'line';
-  const isSelectTool =
-    tool.kind === 'marquee' ||
-    tool.kind === 'lasso' ||
-    tool.kind === 'wand' ||
-    tool.kind === 'move';
+  const isPaintTool = isPaintToolKind(tool.kind);
+  const isSelectTool = isSelectionToolKind(tool.kind);
+  const showModes = isSelectTool && tool.kind !== 'move';
   return (
     <div style={barStyle} aria-label="Tool options">
+      {showModes ? <SelectionModeButtons /> : null}
       {isPaintTool ? <PaintOptions showColor={tool.kind !== 'eraser'} /> : null}
       {tool.kind === 'wand' ? <WandOptions /> : null}
       {isSelectTool ? <SelectionActions /> : null}
+      {isSelectTool ? <SelectionModifyRow /> : null}
     </div>
   );
 }
@@ -114,65 +121,6 @@ function WandOptions(): JSX.Element {
         Contiguous
       </label>
     </>
-  );
-}
-
-function SelectionActions(): JSX.Element {
-  const session = useImageEditorStore((s) => s.session);
-  const deleteSelection = useImageEditorStore((s) => s.deleteSelection);
-  const fillSelection = useImageEditorStore((s) => s.fillSelection);
-  const select = useImageEditorStore((s) => s.select);
-  const hasSelection = session !== null && session.selection !== null;
-  const invert = (): void => {
-    if (session?.selection != null) select(invertMask(session.selection));
-  };
-  return (
-    <span style={groupStyle}>
-      <ActionButton
-        label="Delete"
-        title="Clear the selected area to white (Delete)"
-        onClick={deleteSelection}
-        enabled={hasSelection}
-      />
-      <ActionButton
-        label="Fill"
-        title="Fill the selected area with the active paint colour"
-        onClick={fillSelection}
-        enabled={hasSelection}
-      />
-      <ActionButton
-        label="Invert"
-        title="Invert the selection (Ctrl+Shift+I)"
-        onClick={invert}
-        enabled={hasSelection}
-      />
-      <ActionButton
-        label="Deselect"
-        title="Clear the selection (Ctrl+D)"
-        onClick={() => select(null)}
-        enabled={hasSelection}
-      />
-    </span>
-  );
-}
-
-function ActionButton(props: {
-  readonly label: string;
-  readonly title: string;
-  readonly onClick: () => void;
-  readonly enabled: boolean;
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      className="lf-btn"
-      onClick={props.onClick}
-      disabled={!props.enabled}
-      title={props.title}
-      style={{ padding: '2px 10px' }}
-    >
-      {props.label}
-    </button>
   );
 }
 
