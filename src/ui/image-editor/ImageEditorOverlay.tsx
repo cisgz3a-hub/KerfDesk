@@ -3,11 +3,12 @@
 // closing (Esc / ×) keeps the session and never asks anything. Apply bakes
 // the working pixels into the scene object as one project undo entry.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRegisterModal } from '../common/use-register-modal';
 import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
+import { HistoryPanel } from './HistoryPanel';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
@@ -23,6 +24,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
   const redo = useImageEditorStore((s) => s.redo);
   const revert = useImageEditorStore((s) => s.revert);
   const apply = useImageEditorStore((s) => s.apply);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   useRegisterModal();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -50,6 +52,8 @@ export function ImageEditorOverlay(): JSX.Element | null {
       <TopBar
         session={session}
         isApplying={isApplying}
+        isHistoryOpen={isHistoryOpen}
+        onToggleHistory={() => setIsHistoryOpen((open) => !open)}
         actions={{ undo, redo, revert, apply, close: closeEditor }}
       />
       <div style={bodyStyle}>
@@ -67,6 +71,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
             <span>Esc closes — session is kept · Apply commits one undo step</span>
           </footer>
         </div>
+        {isHistoryOpen ? <HistoryPanel /> : null}
       </div>
     </div>
   );
@@ -83,6 +88,8 @@ type TopBarActions = {
 function TopBar(props: {
   readonly session: EditorSession;
   readonly isApplying: boolean;
+  readonly isHistoryOpen: boolean;
+  readonly onToggleHistory: () => void;
   readonly actions: TopBarActions;
 }): JSX.Element {
   const { session, isApplying, actions } = props;
@@ -95,6 +102,15 @@ function TopBar(props: {
       </strong>
       <EditorAdjustMenus />
       <span style={topActionsStyle}>
+        <button
+          type="button"
+          className={props.isHistoryOpen ? 'lf-btn' : 'lf-btn lf-btn--ghost'}
+          onClick={props.onToggleHistory}
+          aria-pressed={props.isHistoryOpen}
+          title="Show or hide the History panel (click any step to jump there)"
+        >
+          History
+        </button>
         <button
           type="button"
           className="lf-btn"
