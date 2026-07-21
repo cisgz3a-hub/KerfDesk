@@ -265,7 +265,9 @@ function openEditorAction(set: Setter, get: () => ImageEditorState, image: Raste
 
 function applyAction(set: Setter, get: () => ImageEditorState): void {
   const { session, isApplying } = get();
-  if (session === null || isApplying || session.history.undoStack.length === 0) return;
+  // dirtySinceApply, not undo depth: crop clears the tile history but still
+  // needs applying (found by the 2026-07-21 interactive self-test).
+  if (session === null || isApplying || !session.dirtySinceApply) return;
   set({ isApplying: true });
   bakeBufferToBitmapFields(session.doc)
     .then((fields) => {

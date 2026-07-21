@@ -11,14 +11,16 @@ import { readImageDensity } from '../common/image-density';
 import { describeImportedImageSize, rasterImportGeometry } from '../common/image-import';
 import { confirmOversizeImport } from '../app/import-size-guard';
 
+/** Imports the file into the scene; resolves with the created object (null
+ * when skipped or failed) so callers like Image Studio can chain onto it. */
 export async function importImageFile(
   file: File,
   importRasterImage: (object: SceneObject) => void,
   pushToast: (message: string, variant?: ToastVariant) => void,
-): Promise<void> {
+): Promise<SceneObject | null> {
   // F-A3: confirm before importing a very large file (both the toolbar picker
   // and drag-drop route through here).
-  if (!confirmOversizeImport(file.name, file.size)) return;
+  if (!confirmOversizeImport(file.name, file.size)) return null;
   try {
     const natural = await readImageNaturalSize(file);
     const image = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));
@@ -30,7 +32,7 @@ export async function importImageFile(
       sampledHeight: image.height,
       ...(density !== null ? { dpi: density } : {}),
     });
-    importRasterImage({
+    const object: SceneObject = {
       kind: 'raster-image',
       id: crypto.randomUUID(),
       source: file.name,
@@ -43,13 +45,16 @@ export async function importImageFile(
       dither: 'floyd-steinberg',
       linesPerMm: 10,
       lumaBase64: extractLumaBase64(image),
-    });
+    };
+    importRasterImage(object);
     pushToast(
       `Added image: ${file.name} (${describeImportedImageSize(natural, image)})`,
       'success',
     );
+    return object;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not load image: ${message}`, 'error');
+    return null;
   }
 }

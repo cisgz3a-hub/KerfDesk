@@ -3,7 +3,7 @@ import { machineKindOf } from '../../core/scene';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
-import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { editImageAction } from './edit-image-action';
 import {
   handleImportDxf,
   handleImportSvg,
@@ -125,11 +125,7 @@ function appCommandContext(
     toggleCameraPanel: dialogs.toggleCameraPanel,
     ...railPanelCommandContext(dialogs, activeStreamer),
     hasRasterSelection: selected?.kind === 'raster-image',
-    editImage: () => {
-      if (selected?.kind === 'raster-image') {
-        useImageEditorStore.getState().openEditor(selected);
-      }
-    },
+    editImage: editImageAction(platform, selected, app.importRasterImage, pushToast),
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
