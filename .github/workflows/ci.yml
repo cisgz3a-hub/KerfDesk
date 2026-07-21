@@ -5,10 +5,17 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel in-progress runs on the same PR / branch when a new commit lands.
+# Cancel in-progress runs on the same PR branch when a new commit lands —
+# but NOT on main. Rapid merge trains (2026-07-21) cancelled every main run
+# before it finished, so main never got a completed verdict and deploy.yml,
+# which fires only on a successful CI completion, starved: production sat
+# hours stale while PRs kept landing. With cancellation off, the in-flight
+# main run always finishes and triggers a deploy of its validated SHA;
+# GitHub still keeps only one PENDING run per group, so intermediate queued
+# pushes are superseded (shown as cancelled) and the tip always runs.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
