@@ -28,7 +28,10 @@ export const EDITOR_BACKDROP = '#333333';
 const PREVIEW_ACCENT = '#44aaff';
 const ANTS_LIGHT = '#ffffff';
 const ANTS_DARK = '#000000';
+// Quick Mask rubylith: the print-industry red overlay marking selected ink.
+const QUICK_MASK_RED = 220;
 /* eslint-enable no-restricted-syntax */
+const QUICK_MASK_MAX_ALPHA = 0.55;
 
 export function docToCanvas(doc: RgbaBuffer): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -79,6 +82,36 @@ export function drawEditorScene(
   if (pendingCrop !== null) drawPendingCrop(ctx, pendingCrop, docCanvas, view);
   drawDragPreview(ctx, drag, view, previewStyle);
   if (selection !== null) drawAnts(ctx, selection, view, antsPhase);
+  ctx.restore();
+}
+
+/**
+ * Quick Mask rubylith overlay: translucent red wherever ink was painted
+ * (dark rubylith pixels), drawn over the document at the view transform.
+ */
+export function drawQuickMaskOverlay(
+  ctx: CanvasRenderingContext2D,
+  view: EditorView,
+  rubylith: RgbaBuffer,
+): void {
+  const overlay = document.createElement('canvas');
+  overlay.width = rubylith.width;
+  overlay.height = rubylith.height;
+  const octx = overlay.getContext('2d');
+  if (octx === null) return;
+  const image = octx.createImageData(rubylith.width, rubylith.height);
+  for (let i = 0; i < rubylith.width * rubylith.height; i += 1) {
+    // Luma is enough here: the rubylith is painted in greys.
+    const ink = 255 - (rubylith.data[i * 4] ?? 0);
+    image.data[i * 4] = QUICK_MASK_RED;
+    image.data[i * 4 + 3] = Math.round(ink * QUICK_MASK_MAX_ALPHA);
+  }
+  octx.putImageData(image, 0, 0);
+  ctx.save();
+  ctx.translate(view.panX, view.panY);
+  ctx.scale(view.scale, view.scale);
+  ctx.imageSmoothingEnabled = view.scale < 1;
+  ctx.drawImage(overlay, 0, 0);
   ctx.restore();
 }
 

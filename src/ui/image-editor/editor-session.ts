@@ -187,7 +187,8 @@ export function commitCrop(session: EditorSession, rect: PixelRect): EditorSessi
   };
 }
 
-function brushFor(tool: EditorTool, settings: BrushSettings): BrushParams {
+/** BrushParams for a paint tool (pencil = pixel tip, others = soft tip). */
+export function brushFor(tool: EditorTool, settings: BrushSettings): BrushParams {
   const tip =
     tool.kind === 'pencil'
       ? ({ kind: 'pixel' } as const)

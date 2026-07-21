@@ -5,7 +5,9 @@
 
 import { invertMask, selectAllMask } from '../../core/image-select';
 import { useAdjustDialogStore } from './adjust-dialog-store';
+import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
+import { useQuickMaskStore } from './quick-mask-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
   const key = e.key.toLowerCase();
@@ -199,6 +201,13 @@ function handleControlKey(key: string, shift: boolean): boolean {
   }
 }
 
+// M activates the marquee; pressing it again cycles rect ⇄ ellipse (the
+// Photoshop flyout-cycle reduction).
+function cycledMarquee(tool: EditorTool): EditorTool {
+  if (tool.kind !== 'marquee') return { kind: 'marquee', shape: 'rect' };
+  return { kind: 'marquee', shape: tool.shape === 'rect' ? 'ellipse' : 'rect' };
+}
+
 function handleToolKey(key: string): boolean {
   const store = useImageEditorStore.getState();
   switch (key) {
@@ -215,13 +224,11 @@ function handleToolKey(key: string): boolean {
       store.setTool({ kind: 'line' });
       return true;
     case 'm':
-      // M activates the marquee; pressing it again cycles rect ⇄ ellipse
-      // (the Photoshop flyout-cycle reduction).
-      store.setTool(
-        store.tool.kind === 'marquee'
-          ? { kind: 'marquee', shape: store.tool.shape === 'rect' ? 'ellipse' : 'rect' }
-          : { kind: 'marquee', shape: 'rect' },
-      );
+      store.setTool(cycledMarquee(store.tool));
+      return true;
+    case 'q':
+      // Quick Mask: paint the selection as a red rubylith (Photoshop Q).
+      useQuickMaskStore.getState().toggle();
       return true;
     case 's':
       store.setTool({ kind: 'lasso' });
