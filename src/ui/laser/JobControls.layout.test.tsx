@@ -44,7 +44,11 @@ describe('JobControls action hierarchy', () => {
       expect(precedes(button(view.host, 'Set up & Frame'), button(view.host, 'Frame job'))).toBe(
         true,
       );
-      expect(precedes(button(view.host, 'Frame job'), button(view.host, 'Home'))).toBe(true);
+      // The default profile has homing off, so the home slot renders its
+      // "Set up homing" entry; only the slot order is under test here.
+      expect(precedes(button(view.host, 'Frame job'), button(view.host, 'Set up homing'))).toBe(
+        true,
+      );
     } finally {
       await view.unmount();
     }

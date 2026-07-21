@@ -15,10 +15,15 @@ import { CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE } from './start-job-readiness';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Homing is declared on, so the rail renders the real $H Home control rather
+// than its "Set up homing" entry — otherwise the mid-job disabled assertions
+// below would pass vacuously.
 function installProject(): void {
+  const base = createProject();
   useStore.setState({
     project: {
-      ...createProject(),
+      ...base,
+      device: { ...base.device, homing: { ...base.device.homing, enabled: true } },
       scene: {
         ...EMPTY_SCENE,
         layers: [createLayer({ id: 'L1', color: '#ff0000' })],

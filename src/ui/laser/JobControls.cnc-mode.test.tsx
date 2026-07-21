@@ -65,7 +65,9 @@ describe('JobControls machine gating (ADR-101 §5)', () => {
     try {
       const labels = buttonLabels(host);
       expect(labels).not.toContain('Auto-focus');
-      expect(labels).toContain('Home');
+      // Homing is off in the default profile, so the home control shows its
+      // setup entry — the point is that it survives the CNC switch at all.
+      expect(labels).toContain('Set up homing');
       expect(labels).toContain('Frame job');
       expect(labels).toContain('Set up & Frame');
       expect(labels).not.toContain('Resume from line');

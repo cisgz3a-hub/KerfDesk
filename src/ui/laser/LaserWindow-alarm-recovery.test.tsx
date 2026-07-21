@@ -70,18 +70,26 @@ describe('LaserWindow alarm recovery homing capability', () => {
         );
       });
 
-      const homeButton = button(host, 'Home ($H)');
-      expect(homeButton.disabled).toBe(true);
+      // A profile without $H offers the fix instead of a dead grey control:
+      // no Home button exists, and its replacement opens Machine Setup rather
+      // than sending anything to the controller.
+      expect(
+        [...host.querySelectorAll('button')].map((candidate) => candidate.textContent),
+      ).not.toContain('Home ($H)');
+      const setupHoming = button(host, 'Set up homing');
+      expect(setupHoming.disabled).toBe(false);
       expect(host.textContent).toContain(
-        'Enable "$H supported" in Device settings if this machine has homing switches.',
+        'Turn on homing in Machine Setup if this machine has homing switches.',
       );
 
       await act(async () => {
-        homeButton.click();
+        setupHoming.click();
         await Promise.resolve();
       });
 
       expect(home).not.toHaveBeenCalled();
+      expect(host.textContent).toContain('Machine Setup');
+      expect(host.textContent).toContain('Homing');
     } finally {
       await act(async () => {
         useLaserStore.setState({ home: originalHome });
