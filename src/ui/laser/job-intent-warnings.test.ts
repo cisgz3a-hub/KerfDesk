@@ -115,6 +115,41 @@ const tinyIsland: SceneObject = {
   ],
 };
 
+// Two filled rectangles separated by a gap wider than the split-rapid
+// threshold, so each scanline splits into two fragments with a rapid between.
+const splitFillRects: SceneObject = {
+  kind: 'imported-svg',
+  id: 'split-rects',
+  source: 'split-rects.svg',
+  bounds: { minX: 0, minY: 0, maxX: 50, maxY: 10 },
+  transform: IDENTITY_TRANSFORM,
+  paths: [
+    {
+      color: '#ff0000',
+      polylines: [
+        {
+          points: [
+            { x: 0, y: 0 },
+            { x: 20, y: 0 },
+            { x: 20, y: 10 },
+            { x: 0, y: 10 },
+          ],
+          closed: true,
+        },
+        {
+          points: [
+            { x: 30, y: 0 },
+            { x: 50, y: 0 },
+            { x: 50, y: 10 },
+            { x: 30, y: 10 },
+          ],
+          closed: true,
+        },
+      ],
+    },
+  ],
+};
+
 const largeIsland: SceneObject = {
   ...tinyIsland,
   id: 'large-island',
@@ -308,6 +343,50 @@ describe('detectJobIntentWarnings', () => {
     expect(detectJobIntentWarnings(islandProject)).not.toContain(
       '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
     );
+  });
+
+  it('warns when fill overscan 0 disables the 4040-safe split-fill entry runway', () => {
+    const project = projectWith(splitFillRects, 'fill');
+    const layer = project.scene.layers[0];
+    const overscanZeroProject: Project = {
+      ...project,
+      device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      scene: {
+        ...project.scene,
+        layers: layer === undefined ? project.scene.layers : [{ ...layer, fillOverscanMm: 0 }],
+      },
+    };
+
+    expect(detectJobIntentWarnings(overscanZeroProject)).toContain(
+      'Fill overscan is 0, which disables the 4040-safe burn-entry runway: split fill fragments will start burning straight out of a rapid and can scorch where each fragment begins. Restore fill overscan (KerfDesk uses up to 5 mm of it as feed-matched runway).',
+    );
+  });
+
+  it('does not emit the overscan-runway advisory when overscan is positive or the 4040 policy is inactive', () => {
+    const active4040WithOverscan: Project = {
+      ...projectWith(splitFillRects, 'fill'),
+      device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+    };
+    const genericProfileZeroOverscan = projectWith(splitFillRects, 'fill');
+    const genericLayer = genericProfileZeroOverscan.scene.layers[0];
+    const genericZero: Project = {
+      ...genericProfileZeroOverscan,
+      scene: {
+        ...genericProfileZeroOverscan.scene,
+        layers:
+          genericLayer === undefined
+            ? genericProfileZeroOverscan.scene.layers
+            : [{ ...genericLayer, fillOverscanMm: 0 }],
+      },
+    };
+
+    for (const project of [active4040WithOverscan, genericZero]) {
+      expect(
+        detectJobIntentWarnings(project).some((item) =>
+          item.includes('disables the 4040-safe burn-entry runway'),
+        ),
+      ).toBe(false);
+    }
   });
 
   it('does not emit a vector-trace warning for image-mode layers', () => {
