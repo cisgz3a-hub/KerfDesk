@@ -31,11 +31,13 @@ function PanelBody(props: {
   const spec = adjustmentById(dialog.id);
   const store = useAdjustDialogStore.getState();
 
-  // Live preview: recompute on a frame boundary so slider drags coalesce.
+  // Live preview: recompute on a short timer so slider drags coalesce.
+  // A timer, not requestAnimationFrame: rAF is queued (not run) while the
+  // window is occluded, which left the preview stale until the next paint.
   useEffect(() => {
     if (!dialog.previewEnabled) return;
-    const frame = requestAnimationFrame(refreshAdjustPreview);
-    return () => cancelAnimationFrame(frame);
+    const timer = window.setTimeout(refreshAdjustPreview, PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
   }, [dialog.id, dialog.params, dialog.curvePoints, dialog.previewEnabled]);
 
   return (
@@ -139,6 +141,8 @@ function ParamSlider(props: {
     </label>
   );
 }
+
+const PREVIEW_DEBOUNCE_MS = 16;
 
 const HISTOGRAM_WIDTH = 256;
 const HISTOGRAM_HEIGHT = 56;

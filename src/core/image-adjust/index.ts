@@ -25,6 +25,9 @@ export { curveLut } from './curves';
 
 export { lumaHistogram } from './histogram';
 
+export type { HalftoneParams } from './halftone';
+export { halftoneScreenInPlace } from './halftone';
+
 export { gaussianBlurInPlace } from './gaussian-blur';
 export type { UnsharpParams } from './unsharp-mask';
 export { unsharpMaskInPlace } from './unsharp-mask';

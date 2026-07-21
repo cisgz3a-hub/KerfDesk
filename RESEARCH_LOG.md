@@ -1147,3 +1147,7 @@ evidence: `docs/audits/2026-07-21-image-editor-web-research.md`; roadmap:
 - **Re-evaluate if:** IE-4 profiling demands GPU/wasm acceleration, or ML
   matting becomes a committed feature (then MODNet/U-2-Net only, explicit
   opt-in download, never RMBG).
+
+## 2026-07-21 - Image Size resampling: pica evaluated, in-house chosen
+
+PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worker, but ADR-242 holds Image Studio to zero new dependencies through IE-3, and the editor's need is engrave-resolution conversion, not print-grade interpolation. Shipped src/core/image-resample: a 2x2 box-halving chain while the source exceeds 2x the target (anti-aliases heavy downscales - the failure mode that matters for 20 MP photos), bilinear tail for the remainder. Pinned by an alternating-columns test naive bilinear fails. A Lanczos upgrade (pica or in-house) can slot behind the same resampleBuffer signature if fidelity work later demands it.
