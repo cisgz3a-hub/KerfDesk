@@ -18,14 +18,13 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
-import { resampleBuffer } from '../image-resample';
 import {
   type RawImageData,
   type TraceOptions,
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths, scaleTracedPathsUniform, upscaleBy } from './auto-upscale';
+import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { traceCenterlineStrokePaths } from './centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
 import { traceImageToEdgePaths } from './edge-trace';
@@ -138,26 +137,14 @@ export async function traceImageToColoredPaths(
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
   // Sparse small/thin sources trace poorly at native resolution, so their
-  // scale plan supersamples them. Dense color pictures instead stay native or
-  // trace on a bounded working grid so photo texture cannot multiply the
-  // contour workload. Every non-native route restores SOURCE coordinates.
+  // scale plan supersamples them. Dense color pictures stay native so trace
+  // performance policy never silently lowers source resolution. Every
+  // non-native route restores SOURCE coordinates.
   // The inner dispatch is called directly so this never re-enters itself.
   // pixelScale rides along on the upscale route so cleanup caps (despeckle,
   // pinhole fill, min-area, simplify ε, sharpener regime bounds) keep their
   // SOURCE-pixel semantics on the supersampled raster.
   const scalePlan = traceScalePlan(image, options);
-  if (scalePlan.kind === 'downscale') {
-    const workingImage = resampleBuffer(image, scalePlan.width, scalePlan.height);
-    const workingOptions: TraceOptions = {
-      ...options,
-      supersampleContour: false,
-      autoUpscaleSmallSources: false,
-      upscaleSmallSmoothSources: false,
-      pixelScale: 1,
-    };
-    const traced = withCanonicalTraceCurves(await dispatchTrace(workingImage, workingOptions));
-    return scaleTracedPathsUniform(traced, scalePlan.coordinateScale);
-  }
   const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;
   if (factor > 1) {
     const scaledOptions: TraceOptions = { ...options, pixelScale: factor };

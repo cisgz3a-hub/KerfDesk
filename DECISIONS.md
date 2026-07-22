@@ -6611,14 +6611,14 @@ the native route with the former forced-2x route.
 
 Dense color pictures are a separate profile: frequent mask transitions plus
 auto-sketch routing distinguish photo-like inputs from sparse colored logos.
-They never take the optional 2x contour route; above 1.5 MP they trace on a
-roughly 1.25 MP working grid, then both polylines and canonical curves scale
-back into source coordinates. This bounds texture-driven contour work while
-leaving Edge Detection, Sharp, monochrome hatching, and the Arch House sparse
-color fixture on their existing paths. The repo color-photo fixture measured
-about 6.9s before and 2.8s after at 2048px on the same host. Rendered comparison
-preserved the primary shapes and lettering while simplifying high-frequency
-wood grain and speckle; physical laser output remains unqualified.
+They never take the optional 2x contour route, but they stay at native
+resolution at every source size. A former above-1.5 MP downscale was removed
+after audit because its performance policy silently discarded high-frequency
+source detail without an operator choice. Avoiding the optional 2x route still
+provides the material performance win relative to the former forced-2x path;
+Edge Detection, Sharp, monochrome hatching, and the Arch House sparse color
+fixture remain on their existing paths. Physical laser output remains
+unqualified.
 
 ## ADR-129 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
 
@@ -11019,7 +11019,8 @@ docs/audits/2026-07-22-image-studio-v2-plan.md; extends ADR-242/245).
    dimension change (crop, resize) still CLEAR, because those replace
    buffer identities the tiles were captured against. Quick Mask gets its
    own small EditHistory over the rubylith (same core primitives); Ctrl+Z
-   inside the mode pops rubylith strokes and never leaks into session undo.
+   inside the mode pops rubylith strokes when present, then falls through to
+   session undo when the rubylith history is empty.
 2. **The composite is cached and patched by dirty window.** Sessions record
    `lastDirtyRect` per revision (precise for paint/fill/move/adjust, empty
    for selection-only changes, null = full for structure ops). The canvas
@@ -11032,8 +11033,11 @@ docs/audits/2026-07-22-image-studio-v2-plan.md; extends ADR-242/245).
    barrels sit at the 20-export cap. Bucket fill composes existing wand +
    masked-fill primitives and adds no core surface.
 4. **Laser advisories stay advisories** (rule 7 / ADR-228): ink coverage and
-   engrave-time readouts inform; kerf thin-stroke detection warns with an
-   overlay and offers a one-click undoable Thicken - nothing refuses.
+   engrave-time readouts inform; the raster diagnostic uses the emitter's
+   horizontal-run rule and the effective Image-mode dot-width correction to
+   identify runs that software would fully remove. It offers one-click,
+   undoable Thicken; line-mode kerf is excluded and nothing refuses.
 5. **Apply & Trace** closes the tracer loop through the existing
-   `openImageDialog` seam: bake first (one project-undo entry), then open
-   the trace dialog on the updated raster. No new trace machinery.
+   `openImageDialog` seam: bake pending edits first (one project-undo entry),
+   or proceed immediately when the session is already clean, then open the
+   trace dialog on the scene raster. No new trace machinery.

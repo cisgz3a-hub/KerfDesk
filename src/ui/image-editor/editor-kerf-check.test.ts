@@ -31,13 +31,24 @@ function raster(): RasterImage {
   };
 }
 
-function projectWithKerf(kerfOffsetMm: number): Project {
+function projectWithDotWidth(
+  dotWidthCorrectionMm: number,
+  kerfOffsetMm = 0,
+  linesPerMm = 0.1,
+): Project {
   const base = createProject();
   return {
     ...base,
     scene: {
       objects: [raster()],
-      layers: [{ ...createLayer({ id: 'L1', color: '#808080', mode: 'image' }), kerfOffsetMm }],
+      layers: [
+        {
+          ...createLayer({ id: 'L1', color: '#808080', mode: 'image' }),
+          dotWidthCorrectionMm,
+          kerfOffsetMm,
+          linesPerMm,
+        },
+      ],
     },
   };
 }
@@ -61,31 +72,49 @@ beforeEach(() => {
 });
 
 describe('computeKerfCheck', () => {
-  it('flags the hairline but not the solid block', () => {
-    const check = computeKerfCheck(strokesSession(), projectWithKerf(3));
+  it('flags a horizontal raster run that dot-width correction fully removes', () => {
+    const check = computeKerfCheck(strokesSession(), projectWithDotWidth(3));
     expect(check).not.toBeNull();
     if (check === null) return;
     expect(check.thresholdMm).toBe(3);
-    // The 1-px hairline dies under a 3 mm opening; the 10 px block survives.
-    expect(check.thinMask.alpha[(30 * 60 + 10) & 0x7fffffff]).toBeDefined();
-    expect(check.thinPixels).toBeGreaterThan(0);
-    expect(check.thinMask.alpha[35 * 60 + 35]).toBe(0); // block centre not thin
+    // Each row of the 1-px vertical hairline is a 1 mm run and is removed;
+    // the 10 mm block remains wider than 2 × the 3 mm correction.
+    expect(check.removedMask.alpha[30 * 60 + 10]).toBe(255);
+    expect(check.removedPixels).toBeGreaterThan(0);
+    expect(check.removedMask.alpha[35 * 60 + 35]).toBe(0);
   });
 
-  it('returns null when the layer declares no kerf or dot width', () => {
-    expect(computeKerfCheck(strokesSession(), projectWithKerf(0))).toBeNull();
+  it('ignores line-mode kerf offset and returns null without dot-width correction', () => {
+    expect(computeKerfCheck(strokesSession(), projectWithDotWidth(0, 3))).toBeNull();
+  });
+
+  it('uses the same line-interval clamp as raster compilation', () => {
+    const check = computeKerfCheck(strokesSession(), projectWithDotWidth(3, 0, 1));
+    expect(check?.thresholdMm).toBe(1);
+  });
+
+  it('does not call a long horizontal hairline removed merely because it is one pixel tall', () => {
+    const session = strokesSession();
+    for (let x = 5; x < 55; x += 1) {
+      const base = (2 * 60 + x) * 4;
+      session.doc.data[base] = 0;
+      session.doc.data[base + 1] = 0;
+      session.doc.data[base + 2] = 0;
+    }
+    const check = computeKerfCheck(session, projectWithDotWidth(3));
+    expect(check?.removedMask.alpha[2 * 60 + 30]).toBe(0);
   });
 
   it('applyThicken repairs the thin strokes as one undoable entry', () => {
     const session = strokesSession();
     useImageEditorStore.setState({ session });
-    const check = computeKerfCheck(session, projectWithKerf(3));
+    const check = computeKerfCheck(session, projectWithDotWidth(3));
     if (check === null) throw new Error('expected a check');
     applyThicken(check);
     const next = useImageEditorStore.getState().session;
-    expect(next?.history.undoStack.at(-1)?.label).toBe('Thicken thin strokes');
+    expect(next?.history.undoStack.at(-1)?.label).toBe('Thicken dot-width runs');
     // Re-checking the thickened document finds no thin strokes left.
-    const recheck = computeKerfCheck(next ?? session, projectWithKerf(3));
-    expect(recheck?.thinPixels).toBe(0);
+    const recheck = computeKerfCheck(next ?? session, projectWithDotWidth(3));
+    expect(recheck?.removedPixels).toBe(0);
   });
 });

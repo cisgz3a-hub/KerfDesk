@@ -89,8 +89,8 @@ export type TraceOptions = {
   readonly fillPinholeCracks?: boolean;
   // supersampleContour: opt into feature-aware quality supersampling for the
   // binary contour presets. Cleaned masks with coherent 1-3px detail trace at
-  // 2x and scale back down; broad solid art stays at native resolution, while
-  // large dense color pictures use a bounded working grid. Sharp opts out
+  // 2x and scale back down; broad solid art and dense color pictures stay at
+  // native resolution. Sharp opts out
   // because bilinear supersampling anti-aliases the pixel notches it exists to
   // preserve.
   readonly supersampleContour?: boolean;

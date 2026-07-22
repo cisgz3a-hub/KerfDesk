@@ -109,7 +109,9 @@ layers, every brush dab pays a full-frame composite.
 
 - TopBar/tool "T" opens a small dialog (editor chrome, not the app's text
   artwork dialog): text, font picker fed by the SAME font list the text
-  artwork feature uses, size in px, fill black/white.
+  artwork feature uses, positive finite size in px (fractional and uncapped),
+  fill black/white. Opening commits an active Free Transform instead of
+  silently ignoring the command.
 - Rasterization reuses the app's opentype parsing: glyph outlines →
   `Path2D` → offscreen canvas fill → `RgbaBuffer` (transparent background) →
   stamped into a NEW transparent layer named after the text, centred; the
@@ -149,21 +151,20 @@ layers, every brush dab pays a full-frame composite.
   If the object has no engraveable layer assignment, the readout says so
   instead of guessing.
 
-### E2. Kerf/thin-stroke warnings (warnings, never blocks — rule 7 / ADR-228)
+### E2. Dot-width run warnings (warnings, never blocks — rule 7 / ADR-228)
 
-- Analysis composed ENTIRELY from existing core: ink mask from the
-  composite (luma < 128) → `contractMask(kerfPx)` → `expandMask(kerfPx)` →
-  pixels lost by that opening = strokes thinner than the kerf. `kerfPx`
-  derives from the object's layer kerf (mm) through the session's mm↔px
-  mapping.
-- Surfaces: a status-footer badge ("⚠ N px of strokes thinner than the
-  kerf"), a toggleable orange overlay (the Quick Mask rendering pattern),
-  and a one-click **Thicken** that paints ink where
-  `expandMask(thinRegions, kerfPx)` says — one undoable history entry.
+- Analysis follows raster output semantics: make an ink mask from the
+  composite (luma < 128), scan horizontal runs, and apply the same
+  positive-run survival rule as the raster emitter. The threshold is the
+  effective Image-mode dot-width correction, including its line-interval
+  clamp; line-mode kerf offset is irrelevant.
+- Surfaces: a status-footer badge for pixels in runs that correction would
+  fully remove and a one-click **Thicken** that grows those runs enough to
+  survive — one undoable history entry.
   Nothing refuses anything; Job Review remains the only warning surface for
   the machine side.
-- Tests: a 1 px line at kerf 3 px flags and thickens; a thick block does
-  not; mm→px derivation.
+- Tests: a 1 px vertical hairline flags and thickens; a long horizontal
+  hairline and a thick block survive; stale line-mode kerf does not warn.
 
 ## V2-F — The loop-closer: Apply & Trace (1 PR)
 
@@ -171,10 +172,10 @@ Verified integration seam: the whole trace flow enters through
 `openImageDialog(rasterImage)` (`tool-command-context.ts`), which opens the
 existing trace dialog — live preview and parameters included.
 
-- TopBar button **"Apply & Trace"**: runs the existing `apply()` (bakes the
-  composite into the scene raster as one project-undo entry), and on the
-  apply promise resolving, closes the editor (session kept, as always) and
-  calls `openImageDialog` with the freshly-updated scene image.
+- TopBar button **"Apply & Trace"**: when dirty, runs the existing `apply()`
+  (bakes the composite into the scene raster as one project-undo entry); when
+  clean, it skips the redundant bake. It then closes the editor (session kept,
+  as always) and calls `openImageDialog` with the scene image.
 - Store plumbing: the editor store cannot import ui/commands (cycle);
   instead `ImageEditorHost` (already app-level) wires the dialog opener in,
   the same seam `use-app-commands` uses.

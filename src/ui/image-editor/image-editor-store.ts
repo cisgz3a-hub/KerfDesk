@@ -373,7 +373,8 @@ function runApply(set: Setter, get: () => ImageEditorState): Promise<string | nu
   const { session, isApplying } = get();
   // dirtySinceApply, not undo depth: crop clears the tile history but still
   // needs applying (found by the 2026-07-21 interactive self-test).
-  if (session === null || isApplying || !session.dirtySinceApply) return Promise.resolve(null);
+  if (session === null || isApplying) return Promise.resolve(null);
+  if (!session.dirtySinceApply) return Promise.resolve(session.objectId);
   set({ isApplying: true });
   const objectId = session.objectId;
   // ADR-245: Apply always bakes the layer composite (fast-path identity for
@@ -402,9 +403,9 @@ function runApply(set: Setter, get: () => ImageEditorState): Promise<string | nu
     });
 }
 
-// Apply & Trace (V2 plan F): bake first, then close the editor (session
-// stashed as always) and hand the freshly-updated scene raster to the
-// existing trace dialog. A clean session that failed to apply opens nothing.
+// Apply & Trace (V2 plan F): bake pending edits, then close the editor
+// (session stashed as always) and hand the scene raster to the existing trace
+// dialog. A clean session can be re-traced immediately without a fake edit.
 function applyAndTraceAction(
   set: Setter,
   get: () => ImageEditorState,

@@ -11,18 +11,10 @@ import type { RawImageData, TraceOptions } from './trace-image';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 
 const DENSE_COLOR_TRANSITION_DENSITY = 0.025;
-const DENSE_COLOR_DOWNSCALE_TRIGGER_PIXELS = 1_500_000;
-const DENSE_COLOR_TARGET_PIXELS = 1_250_000;
 
 export type TraceScalePlan =
   | { readonly kind: 'native' }
-  | { readonly kind: 'upscale'; readonly factor: number }
-  | {
-      readonly kind: 'downscale';
-      readonly width: number;
-      readonly height: number;
-      readonly coordinateScale: number;
-    };
+  | { readonly kind: 'upscale'; readonly factor: number };
 
 /**
  * Returns the supersample factor selected for a trace, or 1 for native size.
@@ -38,9 +30,8 @@ export function traceUpscaleFactor(image: RawImageData, options: TraceOptions): 
 
 /**
  * Select the raster resolution used by the tracer. Sparse thin details retain
- * the feature-aware quality supersample. Dense color pictures stay native at
- * ordinary sizes and use a bounded working grid above 1.5 MP; their vectors
- * are restored to source coordinates after tracing.
+ * the feature-aware quality supersample. Dense color pictures stay at their
+ * native resolution so tracing never silently discards source detail.
  */
 export function traceScalePlan(image: RawImageData, options: TraceOptions): TraceScalePlan {
   const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
@@ -49,10 +40,6 @@ export function traceScalePlan(image: RawImageData, options: TraceOptions): Trac
   const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
   const profile = contourQualityProfile(image, options);
   const denseColor = isDenseColorProfile(image, options, profile);
-  if (denseColor) {
-    const downscale = denseColorDownscalePlan(image);
-    if (downscale !== null) return downscale;
-  }
   const detailFactor = shouldUseContourQualityScale(image, options, profile, denseColor)
     ? THIN_STROKE_UPSCALE_FACTOR
     : 1;
@@ -93,18 +80,4 @@ function isDenseColorProfile(
     isBinaryContourPreset(options) &&
     shouldUseSketchTrace(image, options)
   );
-}
-
-function denseColorDownscalePlan(image: RawImageData): TraceScalePlan | null {
-  const sourcePixels = image.width * image.height;
-  if (sourcePixels <= DENSE_COLOR_DOWNSCALE_TRIGGER_PIXELS) return null;
-  const requestedScale = Math.sqrt(sourcePixels / DENSE_COLOR_TARGET_PIXELS);
-  const width = Math.max(1, Math.round(image.width / requestedScale));
-  const coordinateScale = image.width / width;
-  return {
-    kind: 'downscale',
-    width,
-    height: Math.max(1, Math.round(image.height / coordinateScale)),
-    coordinateScale,
-  };
 }

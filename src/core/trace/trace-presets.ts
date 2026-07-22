@@ -45,8 +45,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // slivers) so they don't trace as spurious inner contours.
     fillPinholeCracks: true,
     // Feature-aware quality path: coherent thin details (hooked apex tips,
-    // pale subtitle strokes) supersample; broad art stays native and large
-    // dense color pictures use a bounded working grid.
+    // pale subtitle strokes) supersample; broad art and dense color pictures
+    // stay native.
     supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,

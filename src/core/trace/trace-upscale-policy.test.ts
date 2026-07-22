@@ -94,12 +94,8 @@ describe('traceUpscaleFactor', () => {
     expect(traceScalePlan(colorfulPicture(800, 600), LINE_ART)).toEqual({ kind: 'native' });
   });
 
-  it('downscales a large dense color picture to a bounded working grid', () => {
-    const plan = traceScalePlan(colorfulPicture(1600, 1000), LINE_ART);
-    expect(plan.kind).toBe('downscale');
-    if (plan.kind !== 'downscale') return;
-    expect(plan.width * plan.height).toBeLessThanOrEqual(1_260_000);
-    expect(plan.coordinateScale).toBeGreaterThan(1);
+  it('keeps a large dense color picture at native resolution', () => {
+    expect(traceScalePlan(colorfulPicture(1600, 1000), LINE_ART)).toEqual({ kind: 'native' });
   });
 });
 

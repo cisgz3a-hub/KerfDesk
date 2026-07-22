@@ -161,20 +161,20 @@ function InkTimeStatus(): JSX.Element | null {
 // never a block (rule 7).
 function KerfStatus(): JSX.Element | null {
   const check = useKerfCheck();
-  if (check === null || check.thinPixels === 0) return null;
+  if (check === null || check.removedPixels === 0) return null;
   return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
       <span
-        title={`Ink strokes thinner than the layer's ${check.thresholdMm} mm kerf/dot width may not survive the burn`}
+        title={`These Image-mode raster pixels are in horizontal runs that the current ${check.thresholdMm} mm dot-width correction would remove`}
       >
-        ⚠ {check.thinPixels} px thinner than {check.thresholdMm} mm
+        ⚠ {check.removedPixels} px removed by {check.thresholdMm} mm dot correction
       </span>
       <button
         type="button"
         className="lf-btn"
         style={{ padding: '0 8px', fontSize: 11 }}
         onClick={() => applyThicken(check)}
-        title="Thicken every thin stroke out to the kerf width (one undo step)"
+        title="Thicken affected runs enough to survive dot-width correction (one undo step)"
       >
         Thicken
       </button>
@@ -280,8 +280,8 @@ function TopBarActionButtons(props: {
         type="button"
         className="lf-btn"
         onClick={actions.applyAndTrace}
-        disabled={applyDisabled}
-        title="Bake the edits, then open the tracer on the updated image"
+        disabled={isApplying}
+        title="Apply pending edits if needed, then open the tracer"
       >
         Apply &amp; Trace
       </button>
