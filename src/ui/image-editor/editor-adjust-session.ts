@@ -3,11 +3,11 @@
 // a non-destructive preview buffer the canvas draws instead of the document.
 
 import { applyLutInPlace, curveLut, type CurvePoint } from '../../core/image-adjust';
-import { captureRect, cloneRgbaBuffer, pushHistoryEntry } from '../../core/image-edit';
+import { cloneRgbaBuffer, pushHistoryEntry } from '../../core/image-edit';
 import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
 import { maskBounds, type SelectionMask } from '../../core/image-select';
 import { adjustmentById, runAdjustment, type AdjustmentId } from './editor-adjustments';
-import type { EditorSession } from './editor-session';
+import { captureScoped, type EditorSession } from './editor-session';
 import { compositeSession } from './editor-session-layers';
 
 function selectionRect(session: EditorSession): PixelRect | null {
@@ -40,7 +40,7 @@ export function commitAdjustment(
 ): EditorSession {
   const bounds = selectionRect(session);
   const captured = bounds ?? { x: 0, y: 0, width: session.doc.width, height: session.doc.height };
-  const entry = captureRect(session.doc, captured, adjustmentById(id).label);
+  const entry = captureScoped(session, captured, adjustmentById(id).label);
   runOp(id, params, curvePoints, session.doc, bounds, session.selection);
   return {
     ...session,

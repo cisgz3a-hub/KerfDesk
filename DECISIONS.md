@@ -10980,3 +10980,38 @@ editor session grows a layers array that stashes/resumes as before. The
 Layers panel (visibility, opacity, blend, add/duplicate/delete/merge-down,
 reorder) docks beside History. Undo does not cross layer switches in v1 -
 stated in the panel, not blocked.
+
+## ADR-246 - Image Studio v2: scoped history, dirty-window compositing, retouch module
+
+**Status:** Accepted 2026-07-22 (the maintainer-selected v2 arc; plan in
+docs/audits/2026-07-22-image-studio-v2-plan.md; extends ADR-242/245).
+
+**Decisions:**
+
+1. **History entries carry a scope** (`HistoryEntry.scope` = the layer id
+   they were recorded against; '' = untagged). Undo/redo peek the next
+   entry's scope and follow it - swapping the active-layer pointer WITHOUT
+   touching the history - so Ctrl+Z walks strokes across layer switches.
+   Layer ops adopt per-op history policies: switch/add/duplicate/move KEEP,
+   remove PURGES exactly the removed layer's entries, merge-down and every
+   dimension change (crop, resize) still CLEAR, because those replace
+   buffer identities the tiles were captured against. Quick Mask gets its
+   own small EditHistory over the rubylith (same core primitives); Ctrl+Z
+   inside the mode pops rubylith strokes and never leaks into session undo.
+2. **The composite is cached and patched by dirty window.** Sessions record
+   `lastDirtyRect` per revision (precise for paint/fill/move/adjust, empty
+   for selection-only changes, null = full for structure ops). The canvas
+   cache recomposites only that window; any missed revision falls back to a
+   full rebuild. Correctness is pinned by a byte-equivalence property test
+   against the uncached composite.
+3. **New core module `core/image-retouch`** hosts the v2 paint surface
+   (gradient fill, clone stroke, masked-median spot heal - the patent-safe
+   variant; PatchMatch stays excluded) because all three original Studio
+   barrels sit at the 20-export cap. Bucket fill composes existing wand +
+   masked-fill primitives and adds no core surface.
+4. **Laser advisories stay advisories** (rule 7 / ADR-228): ink coverage and
+   engrave-time readouts inform; kerf thin-stroke detection warns with an
+   overlay and offers a one-click undoable Thicken - nothing refuses.
+5. **Apply & Trace** closes the tracer loop through the existing
+   `openImageDialog` seam: bake first (one project-undo entry), then open
+   the trace dialog on the updated raster. No new trace machinery.

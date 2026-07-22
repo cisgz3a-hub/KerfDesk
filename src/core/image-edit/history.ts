@@ -29,6 +29,12 @@ export type TileSnapshot = {
 export type HistoryEntry = {
   /** Operator-facing label for the History panel ("Brush stroke", "Fill"). */
   readonly label: string;
+  /**
+   * Which buffer the tiles belong to — the session tags entries with the
+   * active layer id so undo can follow strokes across layer switches
+   * (V2 plan A2). '' = untagged (single-buffer callers).
+   */
+  readonly scope: string;
   readonly tiles: readonly TileSnapshot[];
   readonly byteSize: number;
 };
@@ -54,13 +60,14 @@ export function captureTiles(
   coords: readonly TileCoord[],
   label: string,
   tileSizePx: number = TILE_SIZE_PX,
+  scope = '',
 ): HistoryEntry {
   const tiles = coords.map((coord) => ({
     coord,
     pixels: copyTilePixels(buffer, coord, tileSizePx),
   }));
   const byteSize = tiles.reduce((sum, tile) => sum + tile.pixels.byteLength, 0);
-  return { label, tiles, byteSize };
+  return { label, scope, tiles, byteSize };
 }
 
 /**
@@ -72,8 +79,15 @@ export function captureRect(
   rect: PixelRect,
   label: string,
   tileSizePx: number = TILE_SIZE_PX,
+  scope = '',
 ): HistoryEntry {
-  return captureTiles(buffer, tilesForPixelRect(buffer, rect, tileSizePx), label, tileSizePx);
+  return captureTiles(
+    buffer,
+    tilesForPixelRect(buffer, rect, tileSizePx),
+    label,
+    tileSizePx,
+    scope,
+  );
 }
 
 function stackByteSize(stack: readonly HistoryEntry[]): number {
@@ -117,12 +131,14 @@ function moveEntry(
   const entry = source[source.length - 1];
   if (entry === undefined) return { history, applied: null };
   // Capture the buffer's current pixels for the opposite stack BEFORE
-  // restoring, so the step is exactly reversible.
+  // restoring, so the step is exactly reversible. The counterpart keeps the
+  // entry's scope — it targets the same buffer.
   const counterpart = captureTiles(
     working,
     entry.tiles.map((tile) => tile.coord),
     entry.label,
     tileSizePx,
+    entry.scope,
   );
   for (const tile of entry.tiles) {
     writeTilePixelsInPlace(working, tile.coord, tile.pixels, tileSizePx);

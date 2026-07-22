@@ -244,6 +244,15 @@ export function brushFor(tool: EditorTool, settings: BrushSettings): BrushParams
   return { diameterPx: settings.diameterPx, opacity: settings.opacity, tip };
 }
 
+/** History capture tagged with the active layer (V2 plan A2). */
+export function captureScoped(
+  session: EditorSession,
+  rect: PixelRect,
+  label: string,
+): ReturnType<typeof captureRect> {
+  return captureRect(session.doc, rect, label, undefined, session.activeLayerId);
+}
+
 function committed(
   session: EditorSession,
   history: EditHistory,
@@ -274,7 +283,7 @@ export function commitStroke(
   };
   const rect = strokeDirtyRect(stroke, session.doc);
   if (rect.width === 0 || rect.height === 0) return session;
-  const entry = captureRect(session.doc, rect, label);
+  const entry = captureScoped(session, rect, label);
   // Photoshop: an active selection clamps every stroke.
   paintStrokeInPlace(session.doc, stroke, session.selection ?? undefined);
   return committed(session, pushHistoryEntry(session.history, entry), rect);
@@ -316,7 +325,7 @@ export function commitFillSelection(
   if (session.selection === null) return session;
   const bounds = maskBounds(session.selection);
   if (bounds === null) return session;
-  const entry = captureRect(session.doc, bounds, label);
+  const entry = captureScoped(session, bounds, label);
   fillMaskedInPlace(session.doc, session.selection, color);
   return committed(session, pushHistoryEntry(session.history, entry), bounds);
 }
@@ -333,7 +342,7 @@ export function commitMoveSelection(session: EditorSession, dx: number, dy: numb
     height: floating.rect.height,
   };
   const touched = unionRects(floating.rect, target);
-  const entry = captureRect(session.doc, touched, 'Move selection');
+  const entry = captureScoped(session, touched, 'Move selection');
   fillMaskedInPlace(session.doc, session.selection, WHITE);
   blitFloatingInPlace(session.doc, floating, dx, dy);
   // The selection travels with its contents; a shifted mask keeps later ops

@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
+import { rectSelection } from '../../core/image-select/marquee';
 import { commitAdjustment } from './editor-adjust-session';
-import { commitCrop, createSession } from './editor-session';
+import {
+  commitCrop,
+  commitFillSelection,
+  createSession,
+  withSelection,
+  BLACK,
+} from './editor-session';
 import {
   addLayerAboveActive,
   compositeSession,
   duplicateActiveLayer,
   mergeActiveLayerDown,
+  redoScoped,
   removeActiveLayer,
   setActiveLayer,
   setActiveLayerProps,
+  undoScoped,
 } from './editor-session-layers';
 import { commitImageSize } from './editor-session-resize';
 
@@ -44,13 +53,14 @@ describe('layer session ops', () => {
     expect(session.doc).toBe(session.layers[1]?.buffer);
   });
 
-  it('switching layers swaps the pointer and clears editor undo', () => {
+  it('switching layers swaps the pointer and KEEPS editor undo (A2)', () => {
     let session = commitAdjustment(newSession(), 'invert', {});
     expect(session.history.undoStack.length).toBe(1);
     session = addLayerAboveActive(session, 'l1');
     session = setActiveLayer(session, 'background');
     expect(session.doc).toBe(session.layers[0]?.buffer);
-    expect(session.history.undoStack.length).toBe(0);
+    expect(session.history.undoStack.length).toBe(1);
+    expect(session.history.undoStack[0]?.scope).toBe('background');
   });
 
   it('remove falls back to the layer below; the last layer is immovable', () => {
@@ -100,6 +110,70 @@ describe('layer session ops', () => {
     expect(session.activeLayerId).toBe('l1-copy');
     expect(session.doc.data[0]).toBe(9);
     expect(session.doc).not.toBe(session.layers[1]?.buffer);
+  });
+
+  it('undo follows strokes across layer switches and redo walks back (A2)', () => {
+    // Ink on the Background, then on a new upper layer.
+    let session = commitFillSelection(
+      withSelection(newSession(), rectSelection(8, 8, { x: 0, y: 0, width: 2, height: 2 })),
+      BLACK,
+      'Fill selection',
+    );
+    session = addLayerAboveActive(session, 'l1');
+    session = commitFillSelection(
+      withSelection(session, rectSelection(8, 8, { x: 4, y: 4, width: 2, height: 2 })),
+      BLACK,
+      'Fill selection',
+    );
+    expect(session.history.undoStack.length).toBe(2); // switch KEPT history
+
+    // First undo reverts the upper-layer fill (active already l1).
+    session = undoScoped(session);
+    expect(session.activeLayerId).toBe('l1');
+    expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(0); // transparent again
+
+    // Second undo follows the scope back to the Background.
+    session = undoScoped(session);
+    expect(session.activeLayerId).toBe('background');
+    expect(session.doc.data[0]).toBe(255); // background fill reverted
+
+    // Redo replays forward, following layers again.
+    session = redoScoped(session);
+    expect(session.activeLayerId).toBe('background');
+    expect(session.doc.data[0]).toBe(0);
+    session = redoScoped(session);
+    expect(session.activeLayerId).toBe('l1');
+    expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(255);
+  });
+
+  it('removing a layer purges exactly its history entries', () => {
+    let session = commitFillSelection(
+      withSelection(newSession(), rectSelection(8, 8, { x: 0, y: 0, width: 2, height: 2 })),
+      BLACK,
+      'Fill selection',
+    );
+    session = addLayerAboveActive(session, 'l1');
+    session = commitFillSelection(
+      withSelection(session, rectSelection(8, 8, { x: 4, y: 4, width: 2, height: 2 })),
+      BLACK,
+      'Fill selection',
+    );
+    session = removeActiveLayer(session);
+    expect(session.history.undoStack.length).toBe(1);
+    expect(session.history.undoStack[0]?.scope).toBe('background');
+    session = undoScoped(session);
+    expect(session.doc.data[0]).toBe(255);
+  });
+
+  it('merge-down still clears history (buffer identities replaced)', () => {
+    let session = commitFillSelection(
+      withSelection(newSession(), rectSelection(8, 8, { x: 0, y: 0, width: 2, height: 2 })),
+      BLACK,
+      'Fill selection',
+    );
+    session = addLayerAboveActive(session, 'l1');
+    session = mergeActiveLayerDown(session);
+    expect(session.history.undoStack.length).toBe(0);
   });
 
   it('crop and image size keep every layer at uniform dimensions', () => {
