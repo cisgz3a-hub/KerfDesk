@@ -6598,6 +6598,28 @@ Consequences.
   letters, serifs, arch bands, waves and roof lines; NOT verified on physical
   laser output (this changes trace geometry only, no G-code semantics).
 
+### 2026-07-22 performance amendment
+
+The 2x quality path is feature-aware rather than unconditional. The cleaned
+source-resolution contour mask is scanned for coherent 1-3px runs; qualifying
+thin details retain 2x supersampling, while broad solid artwork traces at native
+resolution. The existing small-source and thin-source policies still apply,
+and the working-pixel budget remains the final cap. This removes the routine
+4x working-pixel cost from thick logos without weakening the Arch House
+thin-detail acceptance fixture. A relative wall-clock regression test compares
+the native route with the former forced-2x route.
+
+Dense color pictures are a separate profile: frequent mask transitions plus
+auto-sketch routing distinguish photo-like inputs from sparse colored logos.
+They never take the optional 2x contour route; above 1.5 MP they trace on a
+roughly 1.25 MP working grid, then both polylines and canonical curves scale
+back into source coordinates. This bounds texture-driven contour work while
+leaving Edge Detection, Sharp, monochrome hatching, and the Arch House sparse
+color fixture on their existing paths. The repo color-photo fixture measured
+about 6.9s before and 2.8s after at 2048px on the same host. Rendered comparison
+preserved the primary shapes and lettering while simplifying high-frequency
+wood grain and speckle; physical laser output remains unqualified.
+
 ## ADR-129 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
 
 **Status:** accepted (audit DEV-04: no-go zones gated Start/Frame/export/resume, but jog was zone-blind end to end).
