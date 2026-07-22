@@ -89,8 +89,8 @@ test('renders deterministic notices for every production package and artwork ass
   );
   assert.equal(countMatches(first, /^--- Package:/gm), packages.length + 1);
   assert.equal(countMatches(first, /^--- Artwork:/gm), 8);
-  assert.match(first, /LICENSE\.electron\.txt on Windows; LICENSE on macOS/);
-  assert.match(first, /LICENSES\.chromium\.html/);
+  assert.match(first, /Electron package license is reproduced below/);
+  assert.match(first, /artifact-level license bundles emitted by the platform packager/);
   assert.match(first, new RegExp(`Package: electron@${electronPackage.version}`));
   for (const dependency of packages) {
     assert.match(first, new RegExp(`Package: ${dependency.name.replace('/', '\\/')}@`));

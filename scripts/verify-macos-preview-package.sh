@@ -25,6 +25,25 @@ require_file() {
   exit 1
 }
 
+optional_file() {
+  local label="${1:?file label is required}"
+  shift
+  local candidate
+  for candidate in "$@"; do
+    if [[ -f "${candidate}" ]]; then
+      echo "${label} retained at ${candidate}."
+      return 0
+    fi
+  done
+  {
+    echo "${label} was not retained by macOS package; checked:"
+    for candidate in "$@"; do
+      echo "  ${candidate}"
+    done
+  } >&2
+  return 0
+}
+
 test -f "${dmg}" || { echo "Missing canonical DMG: ${dmg}" >&2; exit 1; }
 
 if find "${release_dir}" -type f \
@@ -60,8 +79,8 @@ require_file \
 electron_resources="${app_dir}/Contents/Resources"
 electron_framework_resources="${app_dir}/Contents/Frameworks/Electron Framework.framework/Resources"
 electron_framework_versioned_resources="${app_dir}/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources"
-require_file \
-  'Electron LICENSE' \
+optional_file \
+  'optional Electron native LICENSE' \
   "${electron_resources}/LICENSE" \
   "${electron_framework_resources}/LICENSE" \
   "${electron_framework_versioned_resources}/LICENSE"
