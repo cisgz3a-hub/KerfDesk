@@ -39,6 +39,8 @@ function withLayers(
     history: pointerChanged ? createEditHistory() : session.history,
     revision: session.revision + 1,
     dirtySinceApply: session.dirtySinceApply || pointerChanged,
+    // Layer-structure changes can move ink anywhere — full recomposite.
+    lastDirtyRect: null,
   };
 }
 
