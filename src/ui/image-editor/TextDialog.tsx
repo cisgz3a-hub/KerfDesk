@@ -85,8 +85,7 @@ function TextControls(props: { readonly state: TextDialogState }): JSX.Element {
         Size (px)
         <input
           type="number"
-          min={4}
-          max={512}
+          step="any"
           value={state.sizePx}
           onChange={(e) => state.setSizePx(Number(e.target.value))}
           style={inputStyle}

@@ -4137,9 +4137,11 @@ behavior or create a second product implementation.
 1. In the web app, the operator opens the Camera panel and clicks **Download
    desktop app** to open the public KerfDesk GitHub Releases page directly. The
    explanatory `https://kerfdesk.com/download` page remains available manually.
-2. The download page offers exact-version assets from the matching prerelease in
-   the same public **cisgz3a-hub/KerfDesk** source repository. It does not
-   send Preview users through a `latest` alias or the stable R2 update feed:
+2. The download page is static, scriptless, and opens the public
+   **cisgz3a-hub/KerfDesk** Releases list for each platform. It names the exact
+   asset pattern the operator must choose from the newest immutable prerelease.
+   It does not send Preview users through a `latest` alias, a dynamic resolver,
+   or the stable R2 update feed:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
    - **macOS 12+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
@@ -4407,9 +4409,11 @@ real hardware:
       `vX.Y.Z`; a running older correctly signed install downloads it, notifies,
       and on natural quit installs and relaunches. Confirm no install occurs while
       a job streams and a wrong-publisher update is refused.
-- [ ] **Download surface:** `/download` links each Preview platform choice to the
-      exact matching GitHub prerelease asset. Inside Electron, desktop Download
-      and PWA Install affordances are hidden.
+- [ ] **Download surface:** `/download` is static/scriptless, sends each Preview
+      platform choice to the public KerfDesk GitHub Releases list, names the
+      exact matching prerelease asset pattern to choose, and never uses a
+      mutable `latest` alias or stable R2 update feed. Inside Electron, desktop
+      Download and PWA Install affordances are hidden.
 - [ ] **Web/PWA regression:** the hosted web app still loads the same `dist/web`
       product, its PWA Install/Update affordances remain available in web context,
       WebSerial and File System Access flows retain their documented behavior,

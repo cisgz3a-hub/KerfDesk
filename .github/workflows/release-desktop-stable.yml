@@ -132,7 +132,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          $installer = "release/$env:VERSION/LaserForge-2.0-$env:VERSION-x64-setup.exe"
+          $installer = "release/$env:VERSION/KerfDesk-$env:VERSION-windows-x64-setup.exe"
           $signature = Get-AuthenticodeSignature -LiteralPath $installer
           if ($signature.Status -ne 'Valid') {
             throw "Installer Authenticode signature is not valid: $($signature.StatusMessage)"
@@ -170,7 +170,7 @@ jobs:
         run: |
           bucket="kerfdesk-downloads"
           dir="release/${VERSION}"
-          exe="LaserForge-2.0-${VERSION}-x64-setup.exe"
+          exe="KerfDesk-${VERSION}-windows-x64-setup.exe"
           immutable="public, max-age=31536000, immutable"
 
           # Versioned installer + blockmap are content-addressed → cache forever.

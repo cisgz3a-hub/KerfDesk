@@ -86,6 +86,18 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(workflow).toContain('--publish never');
   });
 
+  it('uses public KerfDesk names for the stable installer and shortcuts', () => {
+    const builder = repoFile('electron-builder.yml');
+
+    expect(builder).toMatch(/^productName: KerfDesk$/m);
+    expect(builder).toContain('artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}');
+    expect(builder).toContain('shortcutName: KerfDesk');
+    expect(builder).toContain('appId: dev.laserforge.app');
+    expect(workflow).toContain('KerfDesk-$env:VERSION-windows-x64-setup.exe');
+    expect(workflow).toContain('KerfDesk-${VERSION}-windows-x64-setup.exe');
+    expect(workflow).not.toContain('LaserForge-2.0-${VERSION}-x64-setup.exe');
+  });
+
   it('fails tag releases closed unless signing credentials and a valid signature exist', () => {
     const requireStart = workflow.indexOf('Require tag-release signing credentials');
     const signedStart = workflow.indexOf('Build signed Windows installer + update feed');

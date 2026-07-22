@@ -24,6 +24,19 @@ export type RasterSweepRun = {
   readonly s: number;
 };
 
+/** True when dot-width correction leaves a positive-width burn segment. */
+export function rasterRunSurvivesDotWidthCorrection(
+  startXWorldMm: number,
+  endXWorldMm: number,
+  reverse: boolean,
+  dotWidthCorrectionMm: number,
+): boolean {
+  if (dotWidthCorrectionMm <= 0) return true;
+  const burnStartX = startXWorldMm + (reverse ? -dotWidthCorrectionMm : dotWidthCorrectionMm);
+  const burnEndX = endXWorldMm + (reverse ? dotWidthCorrectionMm : -dotWidthCorrectionMm);
+  return reverse ? burnStartX > burnEndX : burnStartX < burnEndX;
+}
+
 type RasterActiveSpanInput = {
   readonly row: Uint16Array;
   readonly pixelWidthMm: number;
@@ -153,7 +166,12 @@ function rasterSweepRunsForPixelRun(
 
   const burnStartX = startX + (reverse ? -dotWidthCorrectionMm : dotWidthCorrectionMm);
   const burnEndX = endX + (reverse ? dotWidthCorrectionMm : -dotWidthCorrectionMm);
-  const correctedRunExists = reverse ? burnStartX > burnEndX : burnStartX < burnEndX;
+  const correctedRunExists = rasterRunSurvivesDotWidthCorrection(
+    startX,
+    endX,
+    reverse,
+    dotWidthCorrectionMm,
+  );
   if (!correctedRunExists) {
     return [{ startXWorldMm: startX, endXWorldMm: endX, s: 0 }];
   }
