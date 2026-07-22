@@ -90,6 +90,11 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSE.electron.txt');
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSES.chromium.html');
     expect(macVerifier).toContain('Contents/Resources');
+    expect(macVerifier).toContain('Contents/Frameworks/Electron Framework.framework/Resources');
+    expect(macVerifier).toContain(
+      'Contents/Frameworks/Electron Framework.framework/Versions/A/Resources',
+    );
+    expect(macVerifier).toMatch(/require_file\s+\\\s+'Electron LICENSE'/);
     expect(macVerifier).toContain('${electron_resources}/LICENSE');
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
