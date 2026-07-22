@@ -8,6 +8,7 @@ import {
   duplicateLayer,
   mergeDown,
   moveLayer,
+  moveLayerTo,
   removeLayer,
   setLayerProps,
   type EditorLayer,
@@ -123,6 +124,17 @@ export function removeActiveLayer(session: EditorSession): EditorSession {
 
 export function moveActiveLayer(session: EditorSession, direction: 1 | -1): EditorSession {
   const layers = moveLayer(session.layers, session.activeLayerId, direction);
+  if (layers === session.layers) return session;
+  return withLayers(session, layers, session.activeLayerId, session.history, true);
+}
+
+/** Drag reorder: move ANY layer to an exact stack index (history kept). */
+export function moveLayerToIndex(
+  session: EditorSession,
+  id: string,
+  stackIndex: number,
+): EditorSession {
+  const layers = moveLayerTo(session.layers, id, stackIndex);
   if (layers === session.layers) return session;
   return withLayers(session, layers, session.activeLayerId, session.history, true);
 }
