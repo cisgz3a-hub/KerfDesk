@@ -21,6 +21,7 @@ import { EditorCanvas } from './EditorCanvas';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
 import { ResizeDialogPanel } from './ResizeDialog';
+import { TextDialog } from './TextDialog';
 import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
@@ -84,19 +85,8 @@ export function ImageEditorOverlay(): JSX.Element | null {
           <EditorCanvas />
           <AdjustDialogPanel />
           <ResizeDialogPanel />
-          <footer style={statusStyle}>
-            <span>
-              {isQuickMask
-                ? 'Quick Mask — paint the selection, Q to finish'
-                : session.selection === null
-                  ? 'No selection'
-                  : 'Selection active'}
-              {trimmed > 0 ? ` · ${trimmed} older history steps trimmed` : ''}
-              <InkTimeStatus />
-            </span>
-            <KerfStatus />
-            <span>Esc closes — session is kept · Apply commits one undo step</span>
-          </footer>
+          <TextDialog />
+          <StatusFooter session={session} isQuickMask={isQuickMask} trimmed={trimmed} />
         </div>
         {isHistoryOpen ? (
           <div style={dockStyle}>
@@ -127,6 +117,29 @@ const dockStyle: React.CSSProperties = {
   background: 'var(--lf-bg-1)',
   overflow: 'hidden',
 };
+
+function StatusFooter(props: {
+  readonly session: EditorSession;
+  readonly isQuickMask: boolean;
+  readonly trimmed: number;
+}): JSX.Element {
+  const { session, isQuickMask, trimmed } = props;
+  return (
+    <footer style={statusStyle}>
+      <span>
+        {isQuickMask
+          ? 'Quick Mask — paint the selection, Q to finish'
+          : session.selection === null
+            ? 'No selection'
+            : 'Selection active'}
+        {trimmed > 0 ? ` · ${trimmed} older history steps trimmed` : ''}
+        <InkTimeStatus />
+      </span>
+      <KerfStatus />
+      <span>Esc closes — session is kept · Apply commits one undo step</span>
+    </footer>
+  );
+}
 
 // Ink coverage + rough engrave time (V2 plan E1) — advisory only; the Job
 // Review estimate stays the authority.

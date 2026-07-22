@@ -6,6 +6,7 @@ import {
   addLayerAbove,
   compositeLayersInPlace,
   duplicateLayer,
+  layerFromBuffer,
   mergeDown,
   moveLayer,
   moveLayerTo,
@@ -126,6 +127,25 @@ export function moveActiveLayer(session: EditorSession, direction: 1 | -1): Edit
   const layers = moveLayer(session.layers, session.activeLayerId, direction);
   if (layers === session.layers) return session;
   return withLayers(session, layers, session.activeLayerId, session.history, true);
+}
+
+/**
+ * Insert a pre-rendered doc-sized buffer (rasterized text, V2 plan C) as a
+ * new layer above the active one, and activate it. The buffer must match the
+ * document dimensions (ADR-245 uniform-dimension invariant).
+ */
+export function addTextLayer(
+  session: EditorSession,
+  newId: string,
+  name: string,
+  buffer: RgbaBuffer,
+): EditorSession {
+  if (buffer.width !== session.doc.width || buffer.height !== session.doc.height) return session;
+  const layer = layerFromBuffer(newId, name, buffer);
+  const at = session.layers.findIndex((candidate) => candidate.id === session.activeLayerId);
+  const insertAt = at < 0 ? session.layers.length : at + 1;
+  const layers = [...session.layers.slice(0, insertAt), layer, ...session.layers.slice(insertAt)];
+  return withLayers(session, layers, newId, session.history, true);
 }
 
 /** Drag reorder: move ANY layer to an exact stack index (history kept). */
