@@ -57,6 +57,23 @@ describe('useQuickMaskStore', () => {
     expect(useQuickMaskStore.getState().strokeInto([{ x: 1, y: 1 }])).toBe(false);
   });
 
+  it('Ctrl+Z inside the mode undoes rubylith strokes (A2)', () => {
+    seedSession();
+    useQuickMaskStore.getState().toggle();
+    useQuickMaskStore.getState().strokeInto([{ x: 8, y: 8 }]);
+    const inked = useQuickMaskStore.getState().rubylith?.data[(8 * 16 + 8) * 4] ?? 255;
+    expect(inked).toBeLessThan(255);
+    expect(useQuickMaskStore.getState().undoStroke()).toBe(true);
+    expect(useQuickMaskStore.getState().rubylith?.data[(8 * 16 + 8) * 4]).toBe(255);
+    expect(useQuickMaskStore.getState().redoStroke()).toBe(true);
+    expect(useQuickMaskStore.getState().rubylith?.data[(8 * 16 + 8) * 4]).toBe(inked);
+  });
+
+  it('undoStroke passes through (false) when the mode is off', () => {
+    seedSession();
+    expect(useQuickMaskStore.getState().undoStroke()).toBe(false);
+  });
+
   it('a session change drops the mode', () => {
     seedSession('obj-1');
     useQuickMaskStore.getState().toggle();

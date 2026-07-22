@@ -167,17 +167,25 @@ function handleSelectionKey(key: string, shift: boolean): boolean {
   }
 }
 
+// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y — an active Quick Mask consumes them for
+// its own stroke history (V2 plan A2); otherwise the scoped session undo.
+function handleUndoRedoKey(key: string, shift: boolean): boolean {
+  if (key !== 'z' && key !== 'y') return false;
+  const store = useImageEditorStore.getState();
+  const quickMask = useQuickMaskStore.getState();
+  const isRedo = key === 'y' || shift;
+  if (isRedo ? quickMask.redoStroke() : quickMask.undoStroke()) return true;
+  if (isRedo) store.redo();
+  else store.undo();
+  return true;
+}
+
 function handleControlKey(key: string, shift: boolean): boolean {
   const store = useImageEditorStore.getState();
-  if (handleZoomKey(key) || handleSelectionKey(key, shift)) return true;
+  if (handleZoomKey(key) || handleSelectionKey(key, shift) || handleUndoRedoKey(key, shift)) {
+    return true;
+  }
   switch (key) {
-    case 'z':
-      if (shift) store.redo();
-      else store.undo();
-      return true;
-    case 'y':
-      store.redo();
-      return true;
     case 't':
       // Ctrl+T free transform of the selection (or the whole image).
       store.startTransform();

@@ -9,7 +9,6 @@
 import { create } from 'zustand';
 import {
   blitTransformedInPlace,
-  captureRect,
   IDENTITY_AFFINE,
   pushHistoryEntry,
   transformedBounds,
@@ -33,6 +32,7 @@ import { useToastStore } from '../state/toast-store';
 import {
   appliedBounds,
   BLACK,
+  captureScoped,
   commitCrop,
   commitFillSelection,
   commitLine,
@@ -41,9 +41,7 @@ import {
   createSession,
   modifySelectionMask,
   nudgeOutline,
-  redoSession,
   revertSession,
-  undoSession,
   WHITE,
   withSelection,
   type BrushSettings,
@@ -51,7 +49,7 @@ import {
   type EditorTool,
   type SelectionModifyKind,
 } from './editor-session';
-import { compositeSession } from './editor-session-layers';
+import { compositeSession, redoScoped, undoScoped } from './editor-session-layers';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 import type { EditorView } from './image-editor-types';
 
@@ -209,8 +207,9 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   moveSelection: (dx, dy) =>
     withSession(set, get, (session) => commitMoveSelection(session, dx, dy)),
 
-  undo: () => withSession(set, get, (session) => undoSession(session)),
-  redo: () => withSession(set, get, (session) => redoSession(session)),
+  // Scoped: undo/redo follow the entry's layer across switches (A2).
+  undo: () => withSession(set, get, (session) => undoScoped(session)),
+  redo: () => withSession(set, get, (session) => redoScoped(session)),
   revert: () => withSession(set, get, (session) => revertSession(session)),
 
   apply: () => applyAction(set, get),
@@ -279,7 +278,7 @@ function commitTransformAction(set: Setter, get: () => ImageEditorState): void {
           target.y + target.height,
         ) - Math.min(transform.floating.rect.y, target.y),
     };
-    const entry = captureRect(s.doc, union, 'Free transform');
+    const entry = captureScoped(s, union, 'Free transform');
     fillMaskedInPlace(s.doc, transform.mask, WHITE);
     blitTransformedInPlace(s.doc, transform.floating, transform.affine);
     return {

@@ -1,7 +1,7 @@
 // The Image Studio Layers panel (ADR-245): top-down stack with visibility
 // eyes, the active row highlighted, and the active layer's opacity/blend
-// plus the six list actions. Switching the active layer clears editor undo
-// (buffer-relative tiles — the crop rule), stated in the row tooltip.
+// plus the six list actions. History entries carry a layer scope (ADR-246),
+// so switching layers keeps undo — Ctrl+Z follows strokes across layers.
 
 import {
   addLayerAboveActive,
@@ -62,7 +62,7 @@ export function LayersPanel(): JSX.Element | null {
               }}
               onClick={() => updateSession((s) => setActiveLayer(s, layer.id))}
               aria-current={layer.id === session.activeLayerId ? 'true' : undefined}
-              title="Make this the active paint layer (switching clears editor undo)"
+              title="Make this the active paint layer (undo follows your strokes across layers)"
             >
               {layer.name}
             </button>
