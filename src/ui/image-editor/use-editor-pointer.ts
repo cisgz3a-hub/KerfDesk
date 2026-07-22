@@ -55,6 +55,10 @@ export function canvasDoubleClickAction(): void {
     store.commitPendingCrop();
     return;
   }
+  // Otherwise "release" to a clean state: drop any selection (the marching
+  // ants a wand/marquee left) AND return to the Brush. One gesture clears
+  // both what a tool did and the tool itself (maintainer's convention).
+  if (store.session?.selection != null) store.select(null);
   if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
 }
 
