@@ -124,6 +124,8 @@ type ImageEditorState = {
   readonly redo: () => void;
   readonly revert: () => void;
   readonly apply: () => void;
+  /** Apply, close, then open the trace dialog on the updated scene raster. */
+  readonly applyAndTrace: (onApplied: (objectId: string) => void) => void;
 };
 
 export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
@@ -213,6 +215,7 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   revert: () => withSession(set, get, (session) => revertSession(session)),
 
   apply: () => applyAction(set, get),
+  applyAndTrace: (onApplied) => applyAndTraceAction(set, get, onApplied),
 }));
 
 type Setter = (
@@ -358,17 +361,27 @@ function openEditorAction(set: Setter, get: () => ImageEditorState, image: Raste
 }
 
 function applyAction(set: Setter, get: () => ImageEditorState): void {
+  void runApply(set, get);
+}
+
+/**
+ * Bake the composite into the scene raster as one project-undo entry.
+ * Resolves the applied objectId on success, or null when nothing applied
+ * (no session, already applying, clean, or a bake error).
+ */
+function runApply(set: Setter, get: () => ImageEditorState): Promise<string | null> {
   const { session, isApplying } = get();
   // dirtySinceApply, not undo depth: crop clears the tile history but still
   // needs applying (found by the 2026-07-21 interactive self-test).
-  if (session === null || isApplying || !session.dirtySinceApply) return;
+  if (session === null || isApplying || !session.dirtySinceApply) return Promise.resolve(null);
   set({ isApplying: true });
+  const objectId = session.objectId;
   // ADR-245: Apply always bakes the layer composite (fast-path identity for
   // a single-layer session), never the active layer alone.
-  bakeBufferToBitmapFields(compositeSession(session))
+  return bakeBufferToBitmapFields(compositeSession(session))
     .then((fields) => {
       const bounds = appliedBounds(session);
-      useStore.getState().applyEditedImage(session.objectId, {
+      useStore.getState().applyEditedImage(objectId, {
         ...fields,
         ...(bounds === null
           ? {}
@@ -379,12 +392,29 @@ function applyAction(set: Setter, get: () => ImageEditorState): void {
         session: s.session === null ? null : { ...s.session, dirtySinceApply: false },
       }));
       useToastStore.getState().pushToast('Image edits applied.', 'success');
+      return objectId;
     })
     .catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       set({ isApplying: false });
       useToastStore.getState().pushToast(`Could not apply image edits: ${message}`, 'error');
+      return null;
     });
+}
+
+// Apply & Trace (V2 plan F): bake first, then close the editor (session
+// stashed as always) and hand the freshly-updated scene raster to the
+// existing trace dialog. A clean session that failed to apply opens nothing.
+function applyAndTraceAction(
+  set: Setter,
+  get: () => ImageEditorState,
+  onApplied: (objectId: string) => void,
+): void {
+  void runApply(set, get).then((objectId) => {
+    if (objectId === null) return;
+    closeEditorAction(set, get);
+    onApplied(objectId);
+  });
 }
 
 function withSession(
