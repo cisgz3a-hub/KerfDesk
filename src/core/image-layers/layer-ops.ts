@@ -56,6 +56,22 @@ export function removeLayer(layers: readonly EditorLayer[], id: string): readonl
   return [...layers.slice(0, at), ...layers.slice(at + 1)];
 }
 
+/** Move a layer to an exact stack index (drag reorder); clamped to range. */
+export function moveLayerTo(
+  layers: readonly EditorLayer[],
+  id: string,
+  toIndex: number,
+): readonly EditorLayer[] {
+  const at = indexOfLayer(layers, id);
+  if (at < 0) return layers;
+  const to = Math.max(0, Math.min(layers.length - 1, Math.floor(toIndex)));
+  if (to === at) return layers;
+  const moved = layers[at];
+  if (moved === undefined) return layers;
+  const without = [...layers.slice(0, at), ...layers.slice(at + 1)];
+  return [...without.slice(0, to), moved, ...without.slice(to)];
+}
+
 /** Move a layer one step up (+1, toward the top) or down (-1). */
 export function moveLayer(
   layers: readonly EditorLayer[],

@@ -4,9 +4,10 @@
 // burns (Karpathy's law made structural).
 
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
-import type { EditorLayer } from './layer';
+import type { EditorLayer, LayerBlend } from './layer';
 
 const MAX_BYTE = 255;
+const MID_BYTE = 128;
 
 /**
  * Composite every visible layer (bottom-up, index 0 = Background) into
@@ -49,11 +50,29 @@ function blendLayerInPlace(target: RgbaBuffer, layer: EditorLayer, window: Pixel
       for (let c = 0; c < 3; c += 1) {
         const dst = target.data[base + c] ?? 0;
         const src = layer.buffer.data[base + c] ?? 0;
-        const blended = layer.blend === 'multiply' ? (dst * src) / MAX_BYTE : src;
+        const blended = blendChannel(dst, src, layer.blend);
         target.data[base + c] = Math.round(dst + (blended - dst) * srcAlpha);
       }
       // The editor's composite stays opaque: it sits over the white target.
       target.data[base + 3] = MAX_BYTE;
     }
+  }
+}
+
+// The standard separable blend formulas (W3C compositing spec), byte-domain.
+function blendChannel(dst: number, src: number, blend: LayerBlend): number {
+  switch (blend) {
+    case 'normal':
+      return src;
+    case 'multiply':
+      return (dst * src) / MAX_BYTE;
+    case 'screen':
+      return MAX_BYTE - ((MAX_BYTE - dst) * (MAX_BYTE - src)) / MAX_BYTE;
+    case 'overlay':
+      return dst < MID_BYTE
+        ? (2 * dst * src) / MAX_BYTE
+        : MAX_BYTE - (2 * (MAX_BYTE - dst) * (MAX_BYTE - src)) / MAX_BYTE;
+    case 'difference':
+      return Math.abs(dst - src);
   }
 }

@@ -98,6 +98,36 @@ describe('compositeLayersInPlace', () => {
     expect(grey(windowed, 0, 0)).toBe(255);
   });
 
+  it('screen lightens, overlay splits at mid-grey, difference is |d - s|', () => {
+    const cases: readonly {
+      blend: 'screen' | 'overlay' | 'difference';
+      dst: number;
+      src: number;
+      expected: number;
+    }[] = [
+      { blend: 'screen', dst: 128, src: 128, expected: 192 }, // 255-(127*127)/255
+      { blend: 'screen', dst: 0, src: 0, expected: 0 },
+      { blend: 'overlay', dst: 64, src: 128, expected: 64 }, // 2*64*128/255
+      { blend: 'overlay', dst: 192, src: 128, expected: 192 }, // 255-2*63*127/255
+      { blend: 'difference', dst: 200, src: 60, expected: 140 },
+      { blend: 'difference', dst: 60, src: 200, expected: 140 },
+    ];
+    for (const { blend, dst, src, expected } of cases) {
+      const bg = createRgbaBuffer(1, 1);
+      bg.data[0] = dst;
+      bg.data[1] = dst;
+      bg.data[2] = dst;
+      const background = layerFromBuffer('bg', 'Background', bg);
+      let upper = createLayer('l1', 'Layer 1', 1, 1, 'transparent');
+      paint(upper, 0, 0, src);
+      upper = { ...upper, blend };
+      const target = createRgbaBuffer(1, 1);
+      compositeLayersInPlace(target, [background, upper]);
+      expect(grey(target, 0, 0), `${blend} ${dst}/${src}`).toBeGreaterThanOrEqual(expected - 1);
+      expect(grey(target, 0, 0), `${blend} ${dst}/${src}`).toBeLessThanOrEqual(expected + 1);
+    }
+  });
+
   it('a window fully outside the target is a no-op', () => {
     const target = createRgbaBuffer(8, 8);
     const layer = createLayer('l1', 'Layer 1', 8, 8, 'transparent');

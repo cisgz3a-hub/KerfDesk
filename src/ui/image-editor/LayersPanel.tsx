@@ -3,11 +3,14 @@
 // plus the six list actions. History entries carry a layer scope (ADR-246),
 // so switching layers keeps undo — Ctrl+Z follows strokes across layers.
 
+import { useState } from 'react';
+import { resampleBuffer } from '../../core/image-resample';
 import {
   addLayerAboveActive,
   duplicateActiveLayer,
   mergeActiveLayerDown,
   moveActiveLayer,
+  moveLayerToIndex,
   removeActiveLayer,
   setActiveLayer,
   setActiveLayerProps,
@@ -23,18 +26,35 @@ function updateSession(update: (session: EditorSession) => EditorSession): void 
 
 export function LayersPanel(): JSX.Element | null {
   const session = useImageEditorStore((s) => s.session);
+  const [dragId, setDragId] = useState<string | null>(null);
   if (session === null) return null;
   const active = session.layers.find((layer) => layer.id === session.activeLayerId);
   // Top of the stack renders first (Photoshop reading order).
   const rows = [...session.layers].reverse();
+  const stackIndexOfRow = (rowIndex: number): number => session.layers.length - 1 - rowIndex;
   return (
     <section style={panelStyle} aria-label="Layers panel">
       <strong style={headerStyle}>Layers</strong>
       <LayerActions canMerge={session.layers.length > 1} />
       {active === undefined ? null : <ActiveLayerControls active={active} />}
       <div style={listStyle}>
-        {rows.map((layer) => (
-          <div key={layer.id} style={rowStyle}>
+        {rows.map((layer, rowIndex) => (
+          <div
+            key={layer.id}
+            style={rowStyle}
+            draggable
+            onDragStart={() => setDragId(layer.id)}
+            onDragEnd={() => setDragId(null)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragId !== null && dragId !== layer.id) {
+                updateSession((s) => moveLayerToIndex(s, dragId, stackIndexOfRow(rowIndex)));
+              }
+              setDragId(null);
+            }}
+          >
+            <LayerThumbnail layer={layer} revision={session.revision} />
             <button
               type="button"
               className="lf-btn lf-btn--ghost"
@@ -62,7 +82,7 @@ export function LayersPanel(): JSX.Element | null {
               }}
               onClick={() => updateSession((s) => setActiveLayer(s, layer.id))}
               aria-current={layer.id === session.activeLayerId ? 'true' : undefined}
-              title="Make this the active paint layer (undo follows your strokes across layers)"
+              title="Make this the active paint layer (undo follows your strokes across layers); drag rows to reorder"
             >
               {layer.name}
             </button>
@@ -70,6 +90,44 @@ export function LayersPanel(): JSX.Element | null {
         ))}
       </div>
     </section>
+  );
+}
+
+const BLEND_VALUES = ['normal', 'multiply', 'screen', 'overlay', 'difference'] as const;
+
+function parseBlend(value: string): (typeof BLEND_VALUES)[number] {
+  const match = BLEND_VALUES.find((blend) => blend === value);
+  return match ?? 'normal';
+}
+
+const THUMB_WIDTH = 28;
+const THUMB_HEIGHT = 21;
+
+// A mipmap-downsampled preview of the layer's own pixels (not the
+// composite); redrawn when the revision bumps.
+function LayerThumbnail(props: {
+  readonly layer: EditorSession['layers'][number];
+  readonly revision: number;
+}): JSX.Element {
+  const { layer } = props;
+  return (
+    <canvas
+      width={THUMB_WIDTH}
+      height={THUMB_HEIGHT}
+      style={thumbStyle}
+      aria-hidden="true"
+      ref={(canvas) => {
+        const ctx = canvas?.getContext('2d') ?? null;
+        if (ctx === null) return;
+        const small = resampleBuffer(layer.buffer, THUMB_WIDTH, THUMB_HEIGHT);
+        ctx.clearRect(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+        ctx.putImageData(
+          new ImageData(new Uint8ClampedArray(small.data), small.width, small.height),
+          0,
+          0,
+        );
+      }}
+    />
   );
 }
 
@@ -158,23 +216,25 @@ function ActiveLayerControls(props: {
           title="Opacity of the active layer"
         />
       </label>
-      <label style={controlLabelStyle} title="Blend mode: multiply accumulates ink">
+      <label
+        style={controlLabelStyle}
+        title="Blend mode: how this layer's ink meets the layers below"
+      >
         Blend
         <select
           value={active.blend}
           onChange={(e) =>
-            updateSession((s) =>
-              setActiveLayerProps(s, {
-                blend: e.target.value === 'multiply' ? 'multiply' : 'normal',
-              }),
-            )
+            updateSession((s) => setActiveLayerProps(s, { blend: parseBlend(e.target.value) }))
           }
           style={selectStyle}
           aria-label="Active layer blend mode"
-          title="Blend mode: multiply accumulates ink"
+          title="Blend mode: how this layer's ink meets the layers below"
         >
           <option value="normal">Normal</option>
           <option value="multiply">Multiply</option>
+          <option value="screen">Screen</option>
+          <option value="overlay">Overlay</option>
+          <option value="difference">Difference</option>
         </select>
       </label>
     </div>
@@ -245,6 +305,16 @@ const rowStyle: React.CSSProperties = {
   display: 'flex',
   gap: 2,
   alignItems: 'stretch',
+};
+
+const thumbStyle: React.CSSProperties = {
+  width: THUMB_WIDTH,
+  height: THUMB_HEIGHT,
+  flexShrink: 0,
+  alignSelf: 'center',
+  borderRadius: 2,
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-2)',
 };
 
 const eyeStyle: React.CSSProperties = {

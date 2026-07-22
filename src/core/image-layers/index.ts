@@ -13,6 +13,7 @@ export {
   duplicateLayer,
   mergeDown,
   moveLayer,
+  moveLayerTo,
   removeLayer,
   setLayerProps,
 } from './layer-ops';
