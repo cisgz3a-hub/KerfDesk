@@ -163,25 +163,22 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
 function* inputRowsInProviderOrder(
   input: EmitRasterInput,
 ): Generator<{ readonly rowIndex: number; readonly row: Uint16Array }> {
-  if (input.rowProvider !== undefined) {
-    for (let providerY = 0; providerY < input.height; providerY += 1) {
-      const row = input.rowProvider(providerY);
+  for (let sourceY = 0; sourceY < input.height; sourceY += 1) {
+    const row =
+      input.rowProvider === undefined
+        ? input.sValues.subarray(sourceY * input.width, (sourceY + 1) * input.width)
+        : input.rowProvider(sourceY);
+    if (input.rowProvider !== undefined) {
       if (row.length !== input.width) {
         throw new Error(
           `emitRasterGroup: row provider returned ${row.length} values; expected ${input.width}`,
         );
       }
-      yield {
-        rowIndex:
-          input.rowProviderOrder === 'descending-y' ? input.height - 1 - providerY : providerY,
-        row,
-      };
     }
-    return;
-  }
-  for (let rowIndex = 0; rowIndex < input.height; rowIndex += 1) {
-    const start = rowIndex * input.width;
-    yield { rowIndex, row: input.sValues.subarray(start, start + input.width) };
+    yield {
+      rowIndex: input.rowProviderOrder === 'descending-y' ? input.height - 1 - sourceY : sourceY,
+      row,
+    };
   }
 }
 

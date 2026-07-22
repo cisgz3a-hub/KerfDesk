@@ -1,5 +1,5 @@
 import type { EmitGcodeResult } from '../../io/gcode';
-import { scenePreparationTooComplex } from '../../core/job';
+import { outputVectorPreparationTooComplex } from '../../core/job/preparation-complexity';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
 import type { StartJobPreparation } from './start-job-readiness';
@@ -18,7 +18,9 @@ export function outputPreparationShouldRunOffThread(
   if (scoped !== null && !scoped.ok) return false;
   const scene = scoped === null ? project.scene : scoped.scene;
   const scopedProject = scene === project.scene ? project : { ...project, scene };
-  return scenePreparationTooComplex(scene) || rasterPreparationTooComplex(scopedProject);
+  return (
+    outputVectorPreparationTooComplex(scopedProject) || rasterPreparationTooComplex(scopedProject)
+  );
 }
 
 export function prepareStartOutputOffThread(

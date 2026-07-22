@@ -5,6 +5,7 @@
 
 import {
   applyTransform,
+  DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   flattenColoredPathCurves,
   isClosedEnough,
@@ -12,6 +13,7 @@ import {
   pathUsesOperation,
   type ColoredPath,
   type Layer,
+  type Project,
   type Scene,
   type SceneObject,
   type Transform,
@@ -27,6 +29,21 @@ export function scenePreparationTooComplex(scene: Scene): boolean {
   return (
     countOutputVectorSegments(scene) > PREPARATION_RAW_VECTOR_SEGMENT_BUDGET ||
     countEstimatedFillSegments(scene) > PREPARATION_COMPILED_SEGMENT_BUDGET
+  );
+}
+
+/**
+ * Selects background output preparation when compile/emission amplification
+ * would make a geometrically small project expensive. This is routing only:
+ * projects over the budget still compile and emit in full.
+ */
+export function outputVectorPreparationTooComplex(project: Project): boolean {
+  if (project.machine?.kind === 'cnc') {
+    return cncVectorPreparationWorkUnits(project.scene) >= PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
+  }
+  return (
+    laserVectorPreparationWorkUnits(project.scene) >= PREPARATION_RAW_VECTOR_SEGMENT_BUDGET ||
+    laserFillPreparationWorkUnits(project.scene) >= PREPARATION_COMPILED_SEGMENT_BUDGET
   );
 }
 
@@ -59,6 +76,71 @@ export function countEstimatedFillSegments(scene: Scene): number {
     }
   }
   return count;
+}
+
+function laserVectorPreparationWorkUnits(scene: Scene): number {
+  let count = 0;
+  for (const layer of scene.layers.flatMap(outputOperationLayers)) {
+    for (const obj of scene.objects) {
+      const operation = effectiveLayer(layer, obj);
+      if (operation.mode === 'image') continue;
+      const passes = laserPassCount(operation.passes);
+      for (const path of vectorPaths(obj)) {
+        if (!pathUsesOperation(obj, path, layer)) continue;
+        count += countPathSegments(path) * passes;
+        if (count >= PREPARATION_RAW_VECTOR_SEGMENT_BUDGET) return count;
+      }
+    }
+  }
+  return count;
+}
+
+function laserFillPreparationWorkUnits(scene: Scene): number {
+  let count = 0;
+  for (const layer of scene.layers.flatMap(outputOperationLayers)) {
+    for (const obj of scene.objects) {
+      const transform = vectorTransform(obj);
+      const operation = effectiveLayer(layer, obj);
+      if (transform === null || operation.mode !== 'fill') continue;
+      const passes = laserPassCount(operation.passes);
+      for (const path of vectorPaths(obj)) {
+        if (!pathUsesOperation(obj, path, layer)) continue;
+        count += countPathEstimatedHatches(path, transform, operation) * passes;
+        if (count >= PREPARATION_COMPILED_SEGMENT_BUDGET) return count;
+      }
+    }
+  }
+  return count;
+}
+
+function cncVectorPreparationWorkUnits(scene: Scene): number {
+  let count = 0;
+  for (const layer of scene.layers) {
+    if (!layer.output) continue;
+    const depthPasses = cncDepthPassCount(layer);
+    for (const obj of scene.objects) {
+      for (const path of vectorPaths(obj)) {
+        if (!pathUsesOperation(obj, path, layer)) continue;
+        count += countPathSegments(path) * depthPasses;
+        if (count >= PREPARATION_RAW_VECTOR_SEGMENT_BUDGET) return count;
+      }
+    }
+  }
+  return count;
+}
+
+function laserPassCount(passes: number): number {
+  return Number.isFinite(passes) ? Math.max(1, Math.floor(passes)) : Number.POSITIVE_INFINITY;
+}
+
+function cncDepthPassCount(layer: Layer): number {
+  const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  if (!Number.isFinite(settings.depthMm) || settings.depthMm <= 0) return 0;
+  const depthPerPassMm =
+    Number.isFinite(settings.depthPerPassMm) && settings.depthPerPassMm > 0
+      ? Math.min(settings.depthPerPassMm, settings.depthMm)
+      : settings.depthMm;
+  return Math.max(1, Math.ceil(settings.depthMm / depthPerPassMm - 1e-9));
 }
 
 function effectiveLayer(layer: Layer, object: SceneObject): Layer {

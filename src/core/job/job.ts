@@ -81,9 +81,10 @@ export type RasterGroup = {
   // S-values per pixel, already scaled by power %. Row-major.
   readonly sValues: Uint16Array;
   readonly rowProvider?: (y: number) => Uint16Array;
-  // Streamed error-diffusion providers must be consumed from source row 0
-  // upward. A descending physical order maps those forward-only source rows
-  // onto the job from maxY to minY without asking the provider to rewind.
+  // Raster storage and streamed error-diffusion providers are consumed from
+  // source row 0 upward. A descending physical order maps those source rows
+  // onto the job from maxY to minY without reversing storage or rewinding a
+  // provider.
   readonly rowProviderOrder?: RasterRowProviderOrder;
   // Execution archives cannot structured-clone a function-valued provider.
   // This marker records that the provider must be deterministically rebuilt

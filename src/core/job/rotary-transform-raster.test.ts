@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { emitRasterGroup } from '../raster/emit-raster';
 import type { Job, RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
 import { applyRotaryYScale } from './rotary-transform';
@@ -31,13 +32,15 @@ describe('applyRotaryYScale raster', () => {
     expect(Array.from(group.sValues)).toEqual([1, 2, 3, 4]);
   });
 
-  it('reverses raster rows when the rotary axis is reversed', () => {
+  it('maps raster rows onto descending Y when the rotary axis is reversed', () => {
     const result: Job = applyRotaryYScale({ groups: [rasterGroup()] }, 2, true);
     const group = result.groups[0];
     expect(group?.kind).toBe('raster');
     if (group?.kind !== 'raster') throw new Error('raster missing');
     expect(group.bounds).toEqual({ minX: 5, minY: 0, maxX: 15, maxY: 20 });
-    expect(Array.from(group.sValues)).toEqual([3, 4, 1, 2]);
+    expect(Array.from(group.sValues)).toEqual([1, 2, 3, 4]);
+    expect(group.rowProviderOrder).toBe('descending-y');
+    expect([...rasterRowsInProviderOrder(group)].map(({ rowIndex }) => rowIndex)).toEqual([1, 0]);
   });
 
   it('keeps a streamed provider forward-only while mapping rows onto descending Y', () => {
@@ -66,4 +69,49 @@ describe('applyRotaryYScale raster', () => {
       [5, 6],
     ]);
   });
+
+  it('maps equivalent materialized and streamed rows onto the same reversed coordinates', () => {
+    const rows = [Uint16Array.from([1, 2]), Uint16Array.from([3, 4])];
+    const materialized = applyRotaryYScale({ groups: [rasterGroup()] }, 1, true).groups[0];
+    const streamed = applyRotaryYScale(
+      {
+        groups: [
+          {
+            ...rasterGroup(),
+            sValues: new Uint16Array(0),
+            rowProvider: (row) => rows[row] ?? new Uint16Array(0),
+          },
+        ],
+      },
+      1,
+      true,
+    ).groups[0];
+    if (materialized?.kind !== 'raster' || streamed?.kind !== 'raster') {
+      throw new Error('raster missing');
+    }
+
+    const entries = (group: RasterGroup) =>
+      [...rasterRowsInProviderOrder(group)].map(({ rowIndex, row }) => ({
+        rowIndex,
+        row: Array.from(row),
+      }));
+
+    expect(entries(materialized)).toEqual(entries(streamed));
+    expect(emittedGcode(materialized)).toBe(emittedGcode(streamed));
+  });
 });
+
+function emittedGcode(group: RasterGroup): string {
+  return emitRasterGroup({
+    sValues: group.sValues,
+    ...(group.rowProvider === undefined ? {} : { rowProvider: group.rowProvider }),
+    ...(group.rowProviderOrder === undefined ? {} : { rowProviderOrder: group.rowProviderOrder }),
+    width: group.pixelWidth,
+    height: group.pixelHeight,
+    bounds: group.bounds,
+    feedMmPerMin: group.speed,
+    passes: group.passes,
+    overscanMm: group.overscanMm,
+    dotWidthCorrectionMm: group.dotWidthCorrectionMm,
+  });
+}

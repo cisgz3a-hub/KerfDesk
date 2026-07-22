@@ -9,33 +9,26 @@ export function rasterRow(group: RasterGroup, y: number): Uint16Array {
   if (!Number.isInteger(y) || y < 0 || y >= group.pixelHeight) {
     throw new Error(`Raster row ${y} is outside 0..${group.pixelHeight - 1}.`);
   }
-  if (group.rowProvider !== undefined) {
-    const providerY = group.rowProviderOrder === 'descending-y' ? group.pixelHeight - 1 - y : y;
-    return providedRasterRow(group, providerY);
-  }
-  const start = y * group.pixelWidth;
+  const sourceY = group.rowProviderOrder === 'descending-y' ? group.pixelHeight - 1 - y : y;
+  if (group.rowProvider !== undefined) return providedRasterRow(group, sourceY);
+  const start = sourceY * group.pixelWidth;
   // Consumers treat compiled Job data as immutable. A view avoids copying the
   // complete raster once per preflight/preview/estimate scan.
   return group.sValues.subarray(start, start + group.pixelWidth);
 }
 
 /**
- * Iterate a streamed provider in its required forward order while carrying
- * the physical row index used for world-Y placement. Materialized rasters
- * retain their conventional ascending physical order.
+ * Iterate raster storage in source order while carrying the physical row
+ * index used for world-Y placement. This keeps materialized and streamed
+ * rasters representation-independent, including descending rotary output.
  */
 export function* rasterRowsInProviderOrder(group: RasterGroup): Generator<RasterRowEntry> {
-  if (group.rowProvider === undefined) {
-    for (let rowIndex = 0; rowIndex < group.pixelHeight; rowIndex += 1) {
-      yield { rowIndex, row: rasterRow(group, rowIndex) };
-    }
-    return;
-  }
-  for (let providerY = 0; providerY < group.pixelHeight; providerY += 1) {
+  for (let sourceY = 0; sourceY < group.pixelHeight; sourceY += 1) {
+    const rowIndex =
+      group.rowProviderOrder === 'descending-y' ? group.pixelHeight - 1 - sourceY : sourceY;
     yield {
-      rowIndex:
-        group.rowProviderOrder === 'descending-y' ? group.pixelHeight - 1 - providerY : providerY,
-      row: providedRasterRow(group, providerY),
+      rowIndex,
+      row: rasterRow(group, rowIndex),
     };
   }
 }

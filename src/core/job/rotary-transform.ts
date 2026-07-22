@@ -5,7 +5,7 @@
 // meaningless on a rotary, only its extent matters. Runs at the LAST moment
 // (inside emitGcode, after prepareOutput), so previews/estimates keep
 // showing surface-true geometry. Raster groups map their bounds through the
-// same transform; reverse mode also reverses pixel rows so artwork mirrors.
+// same transform; reverse mode maps source-row traversal onto descending Y.
 
 import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
 
@@ -77,20 +77,11 @@ function mapRasterGroup(
 function reverseRasterValues(
   group: RasterGroup,
 ): Pick<RasterGroup, 'sValues' | 'rowProvider' | 'rowProviderOrder'> {
-  if (group.rowProvider !== undefined) {
-    return {
-      sValues: new Uint16Array(0),
-      rowProvider: group.rowProvider,
-      rowProviderOrder: group.rowProviderOrder === 'descending-y' ? 'ascending-y' : 'descending-y',
-    };
-  }
-  const reversed = new Uint16Array(group.sValues.length);
-  for (let row = 0; row < group.pixelHeight; row += 1) {
-    const sourceStart = row * group.pixelWidth;
-    const targetStart = (group.pixelHeight - 1 - row) * group.pixelWidth;
-    reversed.set(group.sValues.subarray(sourceStart, sourceStart + group.pixelWidth), targetStart);
-  }
-  return { sValues: reversed };
+  return {
+    sValues: group.sValues,
+    ...(group.rowProvider === undefined ? {} : { rowProvider: group.rowProvider }),
+    rowProviderOrder: group.rowProviderOrder === 'descending-y' ? 'ascending-y' : 'descending-y',
+  };
 }
 
 function mapSegment<T extends CutSegment>(
