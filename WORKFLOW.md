@@ -4076,8 +4076,9 @@ F-CNC19 tiling.
   do not overload embedded camera servers.
 - **Edge / Mac Preview RTSP qualification.** Mac Preview supports USB and
   private-network JPEG cameras. RTSP remains unqualified and follows the
-  existing bridge-unavailable error path when a Finder launch cannot discover
-  `ffmpeg`; the Preview does not bundle FFmpeg or add a platform-specific gate.
+  existing explicit FFmpeg-missing error path when a Finder launch cannot
+  discover `ffmpeg`; the Preview does not bundle FFmpeg or add a
+  platform-specific gate.
 
 ### F-CAM7. Click-to-position the laser head (ADR-122)
 
@@ -4133,10 +4134,11 @@ behavior or create a second product implementation.
 
 ### F-DESK1. Download and install an unsigned Preview (ADR-248)
 
-1. In the web app, the operator clicks **Download desktop app** (Toolbar) or
-   opens `https://kerfdesk.com/download`.
+1. In the web app, the operator opens the Camera panel and clicks its existing
+   **Download for Windows** link (planned Preview copy may become **Download
+   desktop app**), or opens `https://kerfdesk.com/download` directly.
 2. The download page offers exact-version assets from the matching prerelease in
-   the designated public **KerfDesk-Downloads** GitHub repository. It does not
+   the same public **cisgz3a-hub/KerfDesk** source repository. It does not
    send Preview users through a `latest` alias or the stable R2 update feed:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
@@ -4176,9 +4178,10 @@ behavior or create a second product implementation.
    remains out of scope for ADR-248.
 
 #### Edge — inside the desktop app the download/install affordances vanish
-1. When running under Electron (`adapter.id === 'electron'`), the Toolbar hides
-   both **Download desktop app** and the PWA **Install app** button — an installed
-   desktop app does not download or PWA-install itself.
+1. When running under Electron (`adapter.id === 'electron'`), the Camera panel's
+   `DownloadDesktopLink` returns `null`. The Toolbar's PWA **Install app** button
+   also remains absent because packaged Chromium offers no PWA install prompt—an
+   installed desktop app does not download or PWA-install itself.
 
 #### Edge — Preview is free to launch without an account or gate
 1. Preview shows no account, sign-in, activation, license-key, trial-renewal,
@@ -4219,28 +4222,64 @@ behavior or create a second product implementation.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 
-A Preview tag is created as an annotated tag, for example
+**Transition prohibition:** the commands below are future release procedure. No
+Preview tag may be created or pushed until the Preview workflow and its
+stable-tag rejection are merged. After that implementation exists, a Preview
+tag is created as an annotated tag, for example
 `git tag -a vX.Y.Z-preview.N -m "KerfDesk vX.Y.Z Preview N"`, then pushed with
 `git push origin vX.Y.Z-preview.N`. After source CI succeeds, the Preview
-workflow builds all three exact-version assets and publishes them together as a
-GitHub **prerelease** in the designated public **KerfDesk-Downloads** repository.
-The prerelease records the exact source commit SHA and includes a SHA-256 manifest,
-dependency/SBOM inventory, and build/provenance attestations for the published
-assets. Both release workflows invoke one checked-in Node tag validator and
-verify the ref is an annotated Git tag object. Preview accepts only the strict
-ECMAScript pattern
+workflow builds all three exact-version assets in the same public
+**cisgz3a-hub/KerfDesk** source repository. It uses the exact existing source
+tag with `--verify-tag`; it never generates another tag. The workflow first
+creates a private draft, uploads and validates the complete asset set, then
+publishes it as an immutable GitHub **prerelease** with `latest=false`. A failed
+build exposes no partial release. The prerelease records the exact source commit
+SHA and includes a SHA-256 manifest, dependency/SBOM inventory, and
+build/provenance attestations for the published assets. Preview tag events invoke
+the checked-in Node validator and verify the ref is an annotated Git tag object.
+Preview accepts only the strict ECMAScript pattern
 `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.(?:0|[1-9][0-9]*)$`;
 stable, leading-zero, lightweight, and malformed tags fail closed. Preview
 publishing never mutates the stable R2 feed or its metadata.
 
-The stable path is unchanged: create an annotated tag with
+**Workflow cutover and later stable activation (state updated 2026-07-22):** historical
+workflow ID `308419274` is now `disabled_manually`, the `desktop-production`
+environment does not yet exist, and the repository currently has only the legacy
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secret names and no CSC secrets.
+This PR is not merge-safe until the remaining unchecked pre-merge step is
+completed and recorded:
+
+1. [ ] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
+   `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Do not delete the
+   legacy names yet because current main still consumes them.
+2. [x] `gh workflow disable 308419274` completed and the historical workflow is
+   verified `disabled_manually`; this deliberately pauses the old stable/manual
+   lane during cutover and is reversible.
+3. [ ] Merge only after exact-head CI passes. Wait for the first main Pages deploy to
+   succeed through the new names, then delete legacy `CLOUDFLARE_API_TOKEN`,
+   `CLOUDFLARE_ACCOUNT_ID`, `CSC_LINK`, and `CSC_KEY_PASSWORD` repo names if
+   present.
+4. [ ] Only when a future signed stable release is deliberately authorized, create
+   the protected `desktop-production` environment and add
+   `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
+   `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
+5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or
+   Preview tag—to prove rejection precedes the protected-environment job.
+
+Only after the later stable setup is recorded do stable tag semantics resume:
+create an annotated tag with
 `git tag -a vX.Y.Z -m "KerfDesk vX.Y.Z"`, then push only that tag with
-`git push origin vX.Y.Z`. This runs `release-desktop.yml` (signed stable Windows
-build → R2 publish). The shared validator accepts only
-`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` for stable and
-rejects Preview, leading-zero, lightweight, or malformed tags. Only its signing,
-trust, updater, and R2 transport stay unchanged; stable visible product,
-shortcut, artifact, and release names also become KerfDesk. **Green CI does
+`git push origin vX.Y.Z`. The new `release-desktop-stable.yml` path performs the
+signed stable Windows build and R2 publish. Its shared validator accepts only
+`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` and rejects Preview,
+leading-zero, lightweight, or malformed tags before the protected-environment
+job. Credential-free manual packaging uses the separate
+`release-desktop-dry-run.yml` workflow, which has no signing or R2 secret
+references, uses a throwaway dispatch version, remains unsigned and trust-false
+at every selected ref, and uploads only a workflow artifact—never a GitHub
+Release, R2 object, or updater feed. Stable signing, trust, updater, and R2
+transport otherwise remain unchanged; visible product, shortcut, artifact, and
+release names become KerfDesk. **Green CI does
 not prove an installer or disk image runs** (CLAUDE.md). Before either lane is
 called done, humans complete the applicable checks on real operating systems and
 real hardware:
@@ -4248,13 +4287,31 @@ real hardware:
 - [ ] **Release identity:** the public prerelease names the exact source SHA; its
       SHA-256 manifest verifies all three KerfDesk assets; the dependency/SBOM
       inventory and attestations are present and correspond to that release. The
-      manifest records `sourceRepository` (initially `cisgz3a-hub/KerfDesk`), and
-      release notes prove each downloaded asset with
-      `gh attestation verify <asset> --repo <sourceRepository>` or a shipped
-      portable attestation bundle.
+      manifest records `sourceRepository` (initially `cisgz3a-hub/KerfDesk`),
+      `sourceSha`, `sourceRef` (the exact `refs/tags/...` ref), and
+      `signerWorkflow`; that last field equals
+      `<sourceRepository>/.github/workflows/release-desktop-preview.yml`. Each
+      downloaded asset passes
+      `gh attestation verify <asset> --repo <sourceRepository> --source-digest
+      <sourceSha> --source-ref <sourceRef> --signer-workflow <signerWorkflow>
+      --deny-self-hosted-runners`.
+- [ ] **Atomic immutable publication:** release immutability is enabled; the
+      workflow uses the already-pushed source tag with `--verify-tag`, creates a
+      private draft, and validates all binaries, checksums, manifest, SBOM,
+      notices, and attestations before publication. The published result reports
+      both immutable and prerelease, never latest.
 - [ ] **Tag-lane isolation:** structural tests prove the stable workflow rejects
       Preview/malformed tags and the Preview workflow rejects stable/malformed
       tags before either lane can sign, publish R2 metadata, or create a release.
+      The stable production workflow has a new path and no manual trigger. Its
+      credential-free prerequisite rejects invalid tags before the
+      `desktop-production` environment is reached. That environment contains only
+      new `STABLE_*` secret names. New Pages-only `PAGES_CLOUDFLARE_*` names exist
+      and the historical workflow ID is disabled before merge; the first
+      post-merge Pages deploy succeeds before legacy `CLOUDFLARE_*`/`CSC_*` names
+      are deleted. The separate dry-run is credential-free, unsigned,
+      trust-false, and workflow-artifact-only at every selected ref; it never
+      publishes a GitHub Release, R2 object, or updater feed.
 - [ ] **Shipped legal notices:** every web/desktop distribution carries the
       current `LICENSE`, `THIRD_PARTY_NOTICES.md`, generated third-party notice,
       and every dependency/font/asset notice or license text required for that
@@ -4283,13 +4340,20 @@ real hardware:
       architecture, and private-network JPEG capture works on both Mac
       architectures. Windows RTSP/IP previews when the optional `ffmpeg` binary
       is on `PATH`, and its absence fails clearly. Mac RTSP remains unqualified
-      and follows the same clear bridge-unavailable path; no FFmpeg binary or
-      unreliable Homebrew-path assumption is bundled into the release.
+      and follows the explicit FFmpeg-missing path; no FFmpeg binary or unreliable
+      Homebrew-path assumption is bundled into the release.
 - [ ] **Mac permission metadata:** both DMGs contain accurate
       `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
       `CFBundleIdentifier=com.kerfdesk.app`, and
       `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
-      private-network JPEG discovery/capture workflows.
+      private-network JPEG discovery/capture workflows. The bundle identifier
+      names the app but is not represented as durable TCC identity for unsigned
+      builds.
+- [ ] **Mac permission behavior:** at the macOS 12 floor, test launch, USB-camera
+      allow, deny, recovery in System Settings, retry, and private-network JPEG
+      capture. On macOS 15+ and on both architectures, additionally test camera
+      and local-network allow/deny/Settings recovery/retry plus Preview upgrade
+      and any re-prompt; local-network privacy begins on macOS 15.
 - [ ] **Data continuity:** first install the current **LaserForge 2.0** desktop
       build and create identifiable projects, device settings, libraries,
       preferences, and IndexedDB recovery/archive state. Before renaming, a
@@ -4302,9 +4366,12 @@ real hardware:
       stale data.
 - [ ] **Mac signature state:** CI sets `mac.identity:null`,
       `mac.hardenedRuntime:false`, `mac.notarize:false`, and
-      `CSC_IDENTITY_AUTO_DISCOVERY=false`; packaged checks confirm no Developer ID
-      identity or stapled notarization ticket, and fresh Intel/Apple Silicon Macs
-      launch only through the documented manual trust path.
+      `CSC_IDENTITY_AUTO_DISCOVERY=false`; packaged checks recursively inventory
+      the outer app and every nested executable/bundle, permit only unsigned or
+      ad-hoc state, and fail any Developer ID/distribution authority or trusted
+      Team ID. They also confirm no stapled notarization ticket. Fresh Intel/Apple
+      Silicon Macs launch only through the documented manual trust path;
+      tooling-created nested ad-hoc signatures are not treated as bundle trust.
 - [ ] **Unsigned update gate:** on Windows, Intel Mac, and Apple Silicon, an
       unsigned Preview performs no update metadata request, check, download, or
       install, including no request to `latest.yml`, a `latest` alias, or R2.

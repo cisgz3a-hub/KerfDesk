@@ -29,11 +29,12 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: LaserForge 2.0
-  # The installer shows the EULA and requires acceptance before install —
-  # the sold desktop build must surface the use grant + safety terms.
+  # NSIS displays the MIT License & Safety Notice before installation; this
+  # adds no restriction and does not authorize future commercial terms.
   license: public/eula.txt
 
-# macOS / Linux targets remain commented; ADR-007 keeps them out of MVP.
+# This stable Windows config keeps macOS / Linux targets absent. ADR-248 governs
+# the future Mac Preview config/workflow; Linux remains out of scope.
 # mac:
 #   target: dmg
 # linux:

@@ -3,8 +3,9 @@ Third-Party Notices
 
 This application bundles the open-source components listed below. Each
 remains under its own license, reproduced here as those licenses require.
-The application's own source code is MIT-licensed (see LICENSE); this file
-covers the bundled third-party components.
+The application's first-party software and documentation, in source and
+compiled/bundled form, are MIT-licensed (see LICENSE). This file covers the
+direct dependencies and fonts below; it is not complete artifact closure.
 
 == Bundled fonts ==
 

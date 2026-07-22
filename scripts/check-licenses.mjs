@@ -12,6 +12,10 @@
 // source is structurally outside any package-license scan and requires
 // separate provenance review — a green run here must not be cited as
 // clearing it.
+//
+// Every new allowlist entry requires an ADR-017 and RESEARCH_LOG review. Font
+// and Creative Commons asset licenses are reviewed outside this npm-package
+// gate and must not be added here merely because a bundled asset uses them.
 
 import { execSync } from 'node:child_process';
 
@@ -31,14 +35,7 @@ const ALLOWED_LICENSES = new Set([
   // no copyleft). Pulled transitively by electron-updater → builder-util-runtime →
   // sax@1.6.0 (ADR-024). Maintainer-approved 2026-07-04.
   'BlueOak-1.0.0',
-  // OFL-1.1 (SIL Open Font License) covers the bundled fonts. Those are vendored
-  // .ttf assets, not npm packages, so `pnpm licenses list` never surfaces them —
-  // this keeps the allow-list consistent with the documented font policy
-  // (ADR-017) and would accept an OFL-licensed npm package if one were ever added.
-  'OFL-1.1',
   '(MPL-2.0 OR Apache-2.0)',
-  'CC-BY-4.0',
-  'CC0-1.0',
   'Python-2.0',
 ]);
 

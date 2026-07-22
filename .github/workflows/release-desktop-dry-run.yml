@@ -1,0 +1,75 @@
+name: Desktop Packaging Dry Run
+
+# Credential-free packaging exercise. This is deliberately a separate workflow
+# from release-desktop-stable.yml: the new production workflow path has no
+# workflow_dispatch trigger and uses environment-scoped STABLE_* credentials.
+# This workflow never references those credentials or the legacy secret names.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-desktop-dry-run-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build unsigned Windows installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Derive dry-run version
+        id: version
+        shell: bash
+        run: |
+          VERSION="0.0.0-dispatch.${GITHUB_RUN_NUMBER}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Dry-run version: ${VERSION}"
+
+      - name: Verify canonical release repository
+        run: pnpm guard:repo
+
+      - name: Release verification gate
+        run: pnpm release:check
+
+      - name: Build unsigned installer
+        shell: bash
+        run: |
+          pnpm exec electron-builder --win --x64 \
+            --config.extraMetadata.version="${{ steps.version.outputs.version }}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.forceCodeSigning=false \
+            --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload unsigned dry-run artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: kerfdesk-windows-dry-run-${{ steps.version.outputs.version }}
+          path: |
+            release/${{ steps.version.outputs.version }}/*.exe
+            release/${{ steps.version.outputs.version }}/*.exe.blockmap
+            release/${{ steps.version.outputs.version }}/latest.yml
+          if-no-files-found: error

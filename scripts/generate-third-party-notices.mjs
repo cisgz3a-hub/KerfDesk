@@ -1,9 +1,10 @@
 // generate-third-party-notices.mjs — builds public/third-party-notices.txt
-// from the real license sources: each production dependency's LICENSE file in
-// node_modules, plus bundled font copyright records with the canonical
+// from the real license sources: each direct package.json dependency's LICENSE
+// file in node_modules, plus bundled font copyright records with the canonical
 // Apache-2.0 / OFL-1.1 texts (scripts/license-texts/). The output
 // ships inside dist/web (vite publicDir), which electron-builder also packs,
-// so both distributions carry the notices their licenses require.
+// so both distributions carry this direct-dependency/font notice input. ADR-248
+// separately requires transitive/Electron/Chromium/asset closure per artifact.
 //
 // Deterministic: sorted dependency order, no timestamps. Fails loudly when a
 // license source is missing so a new dependency cannot ship un-attributed.
@@ -158,8 +159,9 @@ const header = [
   '',
   'This application bundles the open-source components listed below. Each',
   'remains under its own license, reproduced here as those licenses require.',
-  "The application's own source code is MIT-licensed (see LICENSE); this file",
-  'covers the bundled third-party components.',
+  "The application's first-party software and documentation, in source and",
+  'compiled/bundled form, are MIT-licensed (see LICENSE). This file covers the',
+  'direct dependencies and fonts below; it is not complete artifact closure.',
 ].join('\n');
 
 const standardTexts = Object.entries(LICENSE_TEXTS)

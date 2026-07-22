@@ -94,7 +94,7 @@
 | ADR-111 | — | accepted (maintainer directive after a real 4040 cut wand... | CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04) |
 | ADR-112 | — | accepted (maintainer follow-up to ADR-111: on the live ap... | Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04) |
 | ADR-113 | — | accepted (maintainer-directed follow-up to the trace-fide... | Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05) |
-| ADR-114 | — | Accepted | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
+| ADR-114 | — | Amended by ADR-120 (restrictive EULA terms superseded); notice scope amended by ADR-248 | Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05) |
 | ADR-115 | — | accepted (maintainer-directed after rejecting ADR-059's l... | Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05) |
 | ADR-116 | — | accepted (maintainer directive: "I need my box designer t... | Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07) |
 | ADR-117 | — | accepted | Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07) |
@@ -122,7 +122,7 @@
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
 | ADR-141 | 2026-07-12 | Accepted; macOS Preview RTSP qualification amended by ADR-248 | Network-camera bridge is desktop and local-development only |
-| ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
+| ADR-142 | 2026-07-12 | Accepted; manual-dispatch topology amended by ADR-248 | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted (narrowed by ADR-215) | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
 | ADR-150 | 2026-07-13 | Accepted | Adopt bounded variable-data production as a Phase D extension |
@@ -330,7 +330,8 @@ Phase A: Windows `.exe` opens and runs on Windows 10 and 11.
 - License: **MIT**.
 - Repo public from first commit.
 - Permitted dependency licenses: MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD.
-- Rejected: GPL family (GPL-2, GPL-3, AGPL, LGPL), proprietary, source-available (BSL, Elastic).
+- Rejected: GPL family (GPL-2, GPL-3, AGPL, LGPL), proprietary,
+  source-available Business Source License (BUSL), Elastic License.
 - Enforcement: `pnpm license-check` (`scripts/check-licenses.mjs`) runs in CI;
   disallowed production-tree licenses fail the build.
 
@@ -511,7 +512,15 @@ This ADR defines the policy that lets us adopt third-party code safely.
 
 1. **It serves a use case in the current phase or an earlier phase's debt.** Not "it might be useful later." Speculative dependencies are rejected. Future-phase libraries are *evaluated* at the start of their phase, not adopted preemptively.
 
-2. **Its license is in the permitted list** (ADR-008): MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD. The license is verified against the package's actual `LICENSE` file, not just the npm metadata.
+2. **Its package license is in the reviewed set:** MIT, MIT-0,
+   BSD-2-Clause, BSD-3-Clause, 0BSD, BSL-1.0 (the permissive Boost Software
+   License), Apache-2.0, MPL-2.0, ISC, Unlicense, BlueOak-1.0.0, or
+   Python-2.0. A compound SPDX expression is permitted only when every
+   constituent license is approved. The license is verified against the
+   package's actual `LICENSE` file, not just npm metadata. OFL-1.1 and Creative
+   Commons terms require separate asset/content review and are not blanket
+   approvals for npm runtime packages. `scripts/check-licenses.mjs` is the
+   enforced production-package allowlist.
 
 3. **It is actively maintained.** Last release within 12 months, no unresolved security advisories in the version we'd pin, issue response time visible in the repo.
 
@@ -631,7 +640,8 @@ monetization plan would be premature.
   private repos, so this costs nothing.
 - **Dependency policy preserved from ADR-008.** Permitted licenses:
   MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD. Rejected:
-  GPL family, source-available (BSL, Elastic), proprietary.
+  GPL family, source-available Business Source License (BUSL), Elastic
+  License, proprietary.
   Rationale: deps are about what we consume, not how we publish; an
   MIT-compatible dep tree keeps every future license option open
   (commercial, dual, OSS, hybrid).
@@ -664,7 +674,8 @@ monetization plan would be premature.
 
 ### Reversal triggers
 Promote to a permissive license (MIT, Apache-2.0) or source-available
-(BSL, Elastic) when *any* of the following becomes true:
+(Business Source License (BUSL), Elastic License) when *any* of the following
+becomes true:
 1. Monetization model is decided and an OSS release supports it
    (e.g., open-core, hosted-paid, support-paid).
 2. External contributors materially help and need a contributor
@@ -5443,6 +5454,9 @@ perceptual pass (CLAUDE.md §2); green tests are not fidelity proof.
 (ADR-113 is reserved by the trace-fidelity track on its own branch; this entry
 deliberately skips it to avoid a repeat of the ADR-094/ADR-106 collisions.)
 
+**Status:** Amended by ADR-120 (restrictive EULA terms superseded); notice
+scope amended by ADR-248
+
 **Context.** The 2026-07-05 release audit found the product legally unsellable:
 the repo LICENSE (ADR-018) affirmatively denies everyone the right to *use* the
 software and no EULA, terms surface, or machine-safety disclaimer existed
@@ -5475,6 +5489,17 @@ by a lawyer before the first sale (jurisdiction/governing-law clause is
 deliberately absent). First-run in-app acceptance (web) remains open — the
 web bundle surfaces the EULA via About, not a blocking dialog; revisit when
 the storefront exists.
+
+### Current amendment
+
+ADR-120 supersedes Decision 1 and its proprietary-binary consequences. The
+current `public/eula.txt` is an MIT License & Safety Notice, not a restrictive
+EULA; displaying it in NSIS adds no restriction to the MIT grant or applicable
+third-party rights. ADR-248 also replaces any completeness assumption about the
+direct-dependency generator with an artifact-scoped closure requirement for
+shipped transitive packages, Electron/Chromium runtime notices, fonts, and
+assets. A first sale or future restrictive term requires a new lawyer-reviewed
+commercial ADR. This historical ADR cannot authorize either one by itself.
 
 ## ADR-115 — Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05)
 
@@ -6016,10 +6041,11 @@ from public-facing copy per the standing neutrality policy.
   Johann Stolk. `package.json` declares `"license": "MIT"`.
 - **Repo visibility: public** (the flip itself is a maintainer action on
   GitHub, executed after the release-blocking item below is resolved).
-- **Dependency policy unchanged** (ADR-017): MIT-compatible licenses only;
-  GPL-family dependencies remain rejected now because the combined MIT
-  work must stay redistributable under MIT, not merely by policy.
-- **EULA (ADR-114) reduced to a distribution notice.** With an MIT source
+- **Dependency policy unchanged** (ADR-017): only the reviewed permissive and
+  weak-copyleft package licenses enforced by `scripts/check-licenses.mjs` are
+  allowed; GPL-family dependencies remain rejected.
+- **ADR-114's proprietary Decision 1 and consequences are superseded; its EULA
+  is reduced to a distribution notice.** With an MIT source
   license the restrictive use-grant/no-redistribution clauses are void;
   `public/eula.txt` becomes a License & Safety Notice (MIT grant reference,
   machine-safety warning, warranty disclaimer, third-party pointer). The
@@ -6047,7 +6073,9 @@ presets through the in-house contour backend. This blocker is closed.**
   existing dependency ecosystem and the ADR-008 posture being restored.
 - **AGPL-3.0:** protects against closed hosted forks but deters the
   hobbyist audience and contradicts the MIT-compatible dependency story.
-- **Source-available (BSL):** not open source; fails the adoption goal.
+- **Source-available Business Source License (BUSL):** not open source; fails
+  the adoption goal. This is distinct from the permissive Boost `BSL-1.0` SPDX
+  identifier allowed by ADR-017.
 
 ### Verification
 
@@ -7021,7 +7049,7 @@ network camera oracle. Desktop is the supported network-camera workflow.
 
 ## ADR-142 - Production desktop tags require a valid Windows signature
 
-**Status:** Accepted | **Date:** 2026-07-12
+**Status:** Accepted; manual-dispatch topology amended by ADR-248 | **Date:** 2026-07-12
 
 > **Numbering note.** ADR-141 records the network-camera bridge restriction; **ADR-142** is the next allocated decision number.
 
@@ -7034,7 +7062,9 @@ secrets were absent.
 
 Tag builds fail before packaging unless `CSC_LINK` and `CSC_KEY_PASSWORD`
 exist. After packaging, `Get-AuthenticodeSignature` must report `Valid` before
-publication. Manual dispatch remains an unsigned, non-publishing dry run.
+publication. ADR-248 removes manual dispatch from the production workflow;
+credential-free unsigned packaging uses a separate workflow-artifact-only dry
+run that never publishes a GitHub Release, R2 object, or updater feed.
 
 ### Consequences
 
@@ -11100,19 +11130,39 @@ rather than OSI open source.
    may also use GitHub artifact attestations and the public Sigstore transparency
    log for downloadable binaries and manifests.
 
+### Alternatives considered
+
+- **Make the repository private or restrictive now:** rejected for this phase;
+  it would lose the intended public-CI/community posture and could not retract
+  MIT rights already granted.
+- **Add a renewable 30-day trial now:** rejected. It creates an entitlement
+  service, offline/failure/support obligations, and a new launch guard before a
+  commercial model has been authorized.
+- **Keep the MIT app public and later charge for official binaries, support, or
+  services:** legally compatible with MIT and potentially viable, but it is a
+  future business decision and does not make the MIT version exclusive.
+
 ### Consequences
 
 - No licensing, account, or entitlement implementation starts under this ADR.
 - This ADR does not authorize a sale or paid distribution. A first sale requires
-  a separate commercial decision and the ADR-114 lawyer review. If later
-  authorized, charging for official binaries, support, or services would not
-  create exclusivity over an MIT version: recipients and forks retain its MIT
-  rights.
+  a new lawyer-reviewed commercial decision satisfying this ADR's cutoff,
+  contributor-rights, notice, and release requirements. ADR-114 cannot authorize
+  a sale by itself. If later authorized, charging for official binaries, support,
+  or services would not create exclusivity over an MIT version: recipients and
+  forks retain its MIT rights.
 - A future restrictive cutoff can govern only later material for which the
   project has the necessary rights; it cannot retroactively close the MIT
   history.
 - GitHub service pricing is an external dependency and must be rechecked if its
   published policy changes.
+
+### Verification
+
+- Root `LICENSE` and `package.json` remain MIT and the repository remains public.
+- `pnpm license-check` enforces ADR-017's reviewed production-package set.
+- This ADR introduces no account, trial, activation, paywall, entitlement
+  storage, or license-network implementation.
 
 ### References
 
@@ -11163,41 +11213,70 @@ update source.
    `com.kerfdesk.app`.
 3. **Preview matrix.** Publish Windows 10/11 x64 as NSIS and macOS 12+ as two
    separate DMGs, one `x64` and one `arm64`; do not publish a Linux artifact.
-   Windows Preview artifacts are unsigned. Mac packaging must set
-   `mac.identity: null`, `mac.hardenedRuntime: false`, `mac.notarize: false`, and
-   `CSC_IDENTITY_AUTO_DISCOVERY=false`; it must not use an ad-hoc identity.
-   Post-build checks prove the outer app has no Developer ID identity and no
-   stapled notarization ticket. Release notes and download instructions must
-   prominently explain SmartScreen/Gatekeeper warnings and the manual
-   trust/override steps.
+   Windows Preview artifacts are unsigned. On Mac, `mac.identity: null` disables
+   electron-builder bundle signing; packaging also sets
+   `mac.hardenedRuntime: false`, `mac.notarize: false`, and
+   `CSC_IDENTITY_AUTO_DISCOVERY=false`. No Developer ID/distribution identity or
+   notarization ticket is permitted. Tooling-created ad-hoc signatures on nested
+   Apple Silicon executables may remain, but they are not a trusted app identity
+   and must not be represented as one. Post-build checks recursively inventory
+   the outer app and every nested executable/bundle, permit only unsigned/ad-hoc
+   state, and fail any Developer ID/distribution authority or trusted Team ID;
+   they also prove there is no stapled notarization ticket. Release notes and
+   download instructions prominently explain SmartScreen/Gatekeeper warnings and
+   the manual trust/override steps.
 4. **No trusted update channel.** Preview builds keep updater trust false and
    perform no updater check. They publish no `latest*` updater metadata, do not
-   publish to R2, and do not alter the stable feed. Both workflows call one
-   checked-in Node validator that also proves the ref is an annotated Git tag.
-   Its strict ECMAScript patterns are
+   publish to R2, and do not alter the stable feed. Stable tag events and future
+   Preview tag events call one checked-in Node validator that also proves the ref
+   is an annotated Git tag. Stable production moves to the new
+   `release-desktop-stable.yml` path, exposes no manual trigger, and references
+   only new `STABLE_*` secrets in the protected `desktop-production` environment.
+   A separate credential-free job validates the tag before GitHub can request
+   approval for, or expose secrets to, that environment. The workflow migration
+   has two explicit cutover boundaries: before merge, create the new Pages-only
+   `PAGES_CLOUDFLARE_*` repo secrets alongside the legacy names and disable the
+   historical `release-desktop.yml` workflow ID; after merge, require a successful
+   main Pages deploy through the new names before deleting legacy
+   `CLOUDFLARE_*`/`CSC_*` repo names. The `desktop-production` environment and its
+   signing/R2 secrets are not a merge prerequisite and need not be purchased now;
+   they are required only before a deliberate future stable tag, which remains
+   prohibited until that setup is recorded. A separate credential-free desktop
+   packaging dry-run remains unsigned and trust-false at every selected ref. It
+   uploads only a workflow artifact and never publishes a GitHub Release, R2
+   object, or updater feed. The validator's strict
+   ECMAScript patterns are
    `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` for stable and
    `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.(?:0|[1-9][0-9]*)$`
    for Preview. Both fail closed for every other name, leading-zero numeric
    identifier, or lightweight tag; structural tests pin the mutual exclusion
-   before the first Preview tag. Preview users update by explicitly downloading
-   a later prerelease.
+   before the first Preview tag. **No Preview tag may be created or pushed until
+   the Preview workflow and its stable-tag rejection are merged.** Preview users
+   update by explicitly downloading a later prerelease.
 5. **Public prerelease destination.** Assets may be published only as
-   prereleases in the designated public `KerfDesk-Downloads` GitHub repository,
-   and only after that repository and a least-privilege cross-repository token
-   or GitHub App are configured. A Preview is never marked latest. Every
-   individual release asset must remain below GitHub's 2 GiB limit. Artifact
-   `<version>` is the tag without its leading `v`; canonical binary, checksum,
-   manifest, and CycloneDX SBOM names are fixed in WORKFLOW F-DESK1/F-DESK3.
+   prereleases in the same public source repository, initially
+   `cisgz3a-hub/KerfDesk`. The release uses the exact existing source tag and
+   equivalent `--verify-tag` enforcement; the workflow must not generate another
+   tag or require cross-repository credentials. Repository release immutability
+   must be enabled. The workflow creates a private draft, uploads and validates
+   the complete canonical asset set, and only then publishes the draft as an
+   immutable prerelease with `latest=false`. A failed build never exposes a
+   partial release. Every individual release asset remains below GitHub's 2 GiB
+   limit. Artifact `<version>` is the tag without its leading `v`; canonical
+   binary, checksum, manifest, and CycloneDX SBOM names are fixed in WORKFLOW
+   F-DESK1/F-DESK3.
 6. **Integrity and provenance travel with the binaries.** Each prerelease
    records the exact source commit SHA and includes a SHA-256 manifest,
    dependency inventory/SBOM, and GitHub artifact provenance attestations for
    the downloadable artifacts. These identify what CI built; they do not
-   convert an unsigned binary into a trusted or signed binary. Because assets
-   publish in a separate repository, the manifest and release notes record the
-   attesting source repository (initially `cisgz3a-hub/KerfDesk`) and the exact
-   verification form `gh attestation verify <asset> --repo <sourceRepository>`;
-   if that cross-repository lookup cannot be made durable, portable attestation
-   bundles ship beside the assets. Before any Preview release, an
+   convert an unsigned binary into a trusted or signed binary. The manifest and
+   release notes record `sourceRepository`, `sourceSha`, `sourceRef` (the exact
+   `refs/tags/...` ref), and `signerWorkflow`; the last field must equal
+   `<sourceRepository>/.github/workflows/release-desktop-preview.yml`.
+   Verification binds all four recorded values:
+   `gh attestation verify <asset> --repo <sourceRepository> --source-digest
+   <sourceSha> --source-ref <sourceRef> --signer-workflow <signerWorkflow>
+   --deny-self-hosted-runners`. Before any Preview release, an
    artifact-scoped closure gate must enumerate the shipped transitive production
    packages, Electron/Chromium runtime notices, fonts, and assets; it fails on
    missing required license/notice material. The current direct-dependency
@@ -11207,11 +11286,18 @@ update source.
    must contain accurate `NSCameraUsageDescription` and
    `NSLocalNetworkUsageDescription` strings for the existing camera and
    network-camera workflows. USB and private-network JPEG cameras remain in
-   scope. Mac RTSP input remains unqualified and follows the existing
-   bridge-unavailable error path when `ffmpeg` cannot be found: Finder-launched
+   scope. Mac RTSP input remains unqualified and follows the existing explicit
+   FFmpeg-missing error path when `ffmpeg` cannot be found: Finder-launched
    apps do not reliably inherit Homebrew's path, no FFmpeg binary is bundled,
    and a Finder-safe discovery/configuration flow requires a separate reviewed
-   design.
+   design. `CFBundleIdentifier` identifies the bundle but an unsigned build has
+   no durable signed-code identity for TCC permission continuity; camera or
+   local-network permission may prompt again after a Preview upgrade. macOS 15+
+   qualification therefore covers camera and local-network allow, deny, recovery
+   in System Settings, retry, and upgrade/re-prompt behavior. The macOS 12 floor
+   separately covers launch, USB-camera allow/deny/Settings recovery/retry, and
+   private-network JPEG capture; local-network privacy itself starts with macOS
+   15.
 8. **Qualification remains honest.** CI/package success does not verify
    installation, serial access, camera permission, or machine behavior. Real
    Windows 10/11, Intel Mac, and Apple Silicon Mac installation and workflow
@@ -11219,14 +11305,43 @@ update source.
    signed/notarized production macOS release, Mac auto-update trust, or Mac App
    Store release requires a separate ADR.
 
+### Alternatives considered
+
+- **Remain Windows-only:** rejected because the Preview is meant to qualify both
+  current Mac architectures without forking the product.
+- **Buy Developer ID signing and notarization now:** deferred until a production
+  Mac channel and its recurring operational cost are approved.
+- **Publish one universal DMG:** rejected for Preview qualification; separate
+  x64 and arm64 artifacts make architecture failures and evidence explicit.
+- **Reuse stable R2/updater publication:** rejected because it would mix
+  deliberately unsigned Preview artifacts into a trusted production channel.
+
 ### Consequences
 
 - Preview artifacts can be downloaded publicly without weakening the stable
   signed/R2 release contract or adding a licensing service.
 - Users accept explicit unsigned-software friction; the project does not
   represent these builds as production-trusted.
-- Preserving identifiers avoids a Windows storage migration, while the new Mac
-  bundle ID establishes the Mac identity before any signed production decision.
+- Preserving identifiers avoids a Windows storage migration. The new Mac bundle
+  ID names the app consistently, but it does not give an unsigned Preview durable
+  TCC identity; permission prompts may recur across upgrades.
+
+### Verification
+
+- WORKFLOW F-DESK3 is the load-bearing release and real-OS/hardware checklist.
+- Shared tag-policy tests prove stable/Preview mutual exclusion and annotated-tag
+  enforcement before any Preview tag is permitted.
+- Publication remains blocked until the Preview workflow, artifact/legal closure
+  gate, same-repository draft-to-immutable release path, and exact attestation
+  checks exist.
+- Merge remains blocked until the new Pages-only secret names exist and the
+  historical workflow is disabled; legacy names are removed only after the first
+  successful post-merge Pages deploy.
+- Stable publication remains blocked until the protected environment and its new
+  signing/R2 secrets are deliberately configured later.
+- Identity migration, absence of updater traffic, macOS 15 permission behavior,
+  and installation/serial/files/camera behavior require recorded real-system
+  evidence; green CI alone does not satisfy them.
 
 ### References
 
@@ -11237,8 +11352,10 @@ update source.
 - Electron macOS 12 support boundary: https://www.electronjs.org/docs/latest/breaking-changes#removed-macos-12-support
 - GitHub release assets and limits: https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
 - GitHub prerelease publishing: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
+- GitHub immutable releases: https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases
 - GitHub artifact attestations: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations
 - Apple camera usage description: https://developer.apple.com/documentation/bundleresources/information-property-list/nscamerausagedescription
 - Apple local-network usage description: https://developer.apple.com/documentation/bundleresources/information-property-list/nslocalnetworkusagedescription
+- Apple local-network privacy on macOS: https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy
 - Electron application data paths: https://www.electronjs.org/docs/latest/api/app
 - electron-builder NSIS upgrade identity: https://www.electron.build/nsis/
