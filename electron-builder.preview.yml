@@ -44,10 +44,7 @@ nsis:
 mac:
   appId: com.kerfdesk.app
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
+    - dmg
   artifactName: KerfDesk-${version}-macos-${arch}.${ext}
   identity: null
   hardenedRuntime: false
@@ -60,3 +57,4 @@ mac:
 dmg:
   title: KerfDesk ${version}
   sign: false
+  writeUpdateInfo: false

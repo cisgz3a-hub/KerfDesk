@@ -235,3 +235,10 @@ test('requires exact fail-closed metadata inside every packaged Preview', () => 
     /channel marker is missing/,
   );
 });
+
+test('keeps the Preview desktop builder config manual-update only', () => {
+  const config = fs.readFileSync(path.join(REPO_ROOT, 'electron-builder.preview.yml'), 'utf8');
+  assert.match(config, /\bdmg:\s*\n(?: {2}.+\n)* {2}writeUpdateInfo: false\b/);
+  assert.doesNotMatch(config, /\bmac:\s*\n(?: {2}.+\n)* {6}arch:\s*\n/);
+  assert.doesNotMatch(config, /\bmac:\s*\n(?: {2}.+\n)* {8}- x64\s*\n(?: {2}.+\n)* {8}- arm64\b/);
+});

@@ -38,7 +38,8 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('electron-builder --mac --arm64');
     expect(workflow).toContain('needs: [build-windows, build-macos-x64, build-macos-arm64]');
     expect(builder).toMatch(/win:\s[\s\S]*target: nsis[\s\S]*- x64/);
-    expect(builder).toMatch(/mac:\s[\s\S]*target: dmg[\s\S]*- x64[\s\S]*- arm64/);
+    expect(builder).toMatch(/mac:\s[\s\S]*target:\s*\n\s*- dmg/);
+    expect(builder).not.toMatch(/mac:\s[\s\S]*arch:\s*\n\s*- x64[\s\S]*- arm64/);
     expect(builder).not.toMatch(/^linux:/m);
   });
 
@@ -94,6 +95,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
     expect(builder).not.toMatch(/^publish:/m);
     expect(workflow).toContain('--publish never');
+    expect(builder).toContain('writeUpdateInfo: false');
     expect(`${workflow}\n${macVerifier}`).toContain("-name 'latest*.yml'");
     expect(`${workflow}\n${macVerifier}`).toContain("-name '*.blockmap'");
     expect(workflow).not.toContain('wrangler r2');
