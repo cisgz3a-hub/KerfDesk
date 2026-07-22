@@ -65,3 +65,6 @@ while IFS= read -r -d '' candidate; do
 done < <(find "${app_dir}" \
   \( -type d \( -name '*.app' -o -name '*.framework' -o -name '*.xpc' \) \
   -o -type f -perm -111 \) -print0)
+
+echo "macOS ${arch} Preview package contract verified for ${version}"
+exit 0
