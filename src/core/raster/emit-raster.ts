@@ -35,6 +35,7 @@ import {
   rasterControllerCoordinateMm,
   type RasterRowSweepPlan,
 } from './raster-sweep-plan';
+import type { RasterRowProviderOrder } from '../job/job';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -49,6 +50,7 @@ export type EmitRasterInput = {
   // dither module) has already applied the power scale.
   readonly sValues: Uint16Array;
   readonly rowProvider?: (y: number) => Uint16Array;
+  readonly rowProviderOrder?: RasterRowProviderOrder;
   readonly width: number;
   readonly height: number;
   // World bounds of the image in mm. The image is rendered with its
@@ -119,8 +121,7 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
     if (passes > 1) yield `; raster pass ${pass + 1} of ${passes}${LINE_END}`;
     let emittedRowCount = 0;
     let feedEmitted = false;
-    for (let y = 0; y < input.height; y += 1) {
-      const row = inputRow(input, y);
+    for (const { rowIndex, row } of inputRowsInProviderOrder(input)) {
       // Snake direction alternates per emitted ROW; within a reverse row the
       // ink islands sweep right-to-left too.
       const reverse = (input.bidirectional ?? true) && emittedRowCount % 2 === 1;
@@ -133,7 +134,7 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
         minXWorldMm: input.bounds.minX,
       });
       if (sweepPlans.length === 0) continue;
-      const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
+      const worldY = input.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
       for (const sweepPlan of sweepPlans) {
         // Each island is its own sweep. Internal exits stop at the burn edge;
         // the next bounded lead-in crosses the remainder with the laser off —
@@ -159,18 +160,29 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
   yield `M5${LINE_END}`;
 }
 
-function inputRow(input: EmitRasterInput, y: number): Uint16Array {
+function* inputRowsInProviderOrder(
+  input: EmitRasterInput,
+): Generator<{ readonly rowIndex: number; readonly row: Uint16Array }> {
   if (input.rowProvider !== undefined) {
-    const row = input.rowProvider(y);
-    if (row.length !== input.width) {
-      throw new Error(
-        `emitRasterGroup: row provider returned ${row.length} values; expected ${input.width}`,
-      );
+    for (let providerY = 0; providerY < input.height; providerY += 1) {
+      const row = input.rowProvider(providerY);
+      if (row.length !== input.width) {
+        throw new Error(
+          `emitRasterGroup: row provider returned ${row.length} values; expected ${input.width}`,
+        );
+      }
+      yield {
+        rowIndex:
+          input.rowProviderOrder === 'descending-y' ? input.height - 1 - providerY : providerY,
+        row,
+      };
     }
-    return row;
+    return;
   }
-  const start = y * input.width;
-  return input.sValues.subarray(start, start + input.width);
+  for (let rowIndex = 0; rowIndex < input.height; rowIndex += 1) {
+    const start = rowIndex * input.width;
+    yield { rowIndex, row: input.sValues.subarray(start, start + input.width) };
+  }
 }
 
 function emitSpanSweep(

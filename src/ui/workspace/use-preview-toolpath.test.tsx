@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { usePreviewToolpath, type PreviewBuildScheduler } from './use-preview-toolpath';
+import type { PreviewIssue } from './preview-status';
 
 function idleReport(x: number, y: number): StatusReport {
   return {
@@ -208,6 +209,34 @@ describe('usePreviewToolpath', () => {
     await act(async () => scheduled?.());
 
     expect(probe.current).toBe(pausedToolpath);
+  });
+
+  it('surfaces a worker rejection and retry guidance instead of spinning forever', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    const pausedToolpath = {
+      totalLength: 0,
+      steps: [],
+      previewIssue: { kind: 'too-complex' as const },
+    };
+    previewMocks.buildPreviewToolpath.mockReturnValue(pausedToolpath);
+    workerMocks.prepareLargeJobOffThread.mockRejectedValue(new Error('worker crashed'));
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+    await act(async () => Promise.resolve());
+
+    expect(
+      (probe.current as { readonly previewIssue?: PreviewIssue } | null)?.previewIssue,
+    ).toEqual({
+      kind: 'preparation-failed',
+      messages: [
+        'Background preparation failed: worker crashed. Edit the job or reopen Preview to retry.',
+      ],
+    });
   });
 });
 

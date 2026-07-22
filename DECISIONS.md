@@ -10960,6 +10960,41 @@ informative, but blind.
   worker on a real over-budget scene (vitest has no Worker runtime; needs a dev-server
   session or the e2e suite).
 
+### 2026-07-22 implementation amendment
+
+The PR #329 audit found that the accepted design still left several real gaps. The
+implementation now makes the following refinements without introducing a size, policy,
+or predictive refusal:
+
+1. Preview and ETA derive from one `prepareOutput` result in the worker. A worker failure
+   settles both consumers into an explicit retryable unavailable state instead of leaving
+   either UI permanently in "preparing".
+2. Large plain-project Start, Save, and Frame requests use a dedicated output-preparation
+   worker. Start and Frame receive exact precomputed duration/bounds/park metrics and a
+   clone-safe prepared-output recipe; Save receives the emitted program. Projects whose
+   variable-text or registration callbacks cannot cross the worker boundary retain the
+   synchronous path. Missing or failed Worker support also falls back synchronously, so
+   this responsiveness mechanism cannot stop machine operation.
+3. Streamed raster recovery archives a deterministic `prepared-project` row-provider
+   recipe rather than expanding the raster into the former 32 MiB grid. Recovery hydrates
+   the provider from the sealed project, re-emits the program, and accepts it only when
+   exact G-code and fingerprint comparison still pass. The overall artifact storage-size
+   envelope remains unchanged.
+4. Reverse rotary output records descending physical row order while consuming each
+   provider sequentially. This removes the quadratic restart pattern for streamed
+   error-diffusion rows without changing emitted coordinates.
+5. Only recognizable allocation/string-capacity failures become
+   `program-materialization-failed`; unrelated `RangeError`s propagate with their original
+   meaning. Extreme but valid serialized raster dimensions therefore return a controlled
+   compile-integrity result instead of leaking a typed-array exception.
+
+Verification now includes a production Vite build of the output worker, unit/integration
+coverage for the clone/hydrate/re-emit/fingerprint recovery path, and a live in-app-browser
+run of a 4.04-million-pixel Save. The worker returned a 136,892-character program in
+2,159 ms while a 10 ms main-thread heartbeat advanced 159 times, with no browser warnings
+or errors. Physical burn behavior remains hardware verification, not a claim established
+by this software audit.
+
 ## ADR-245 - Image Studio layers: active-layer document with a composite bake
 
 **Status:** Accepted 2026-07-21 (Phase L, parity plan PP-F; extends ADR-242).

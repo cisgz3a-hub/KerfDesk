@@ -8,7 +8,6 @@
 // same transform; reverse mode also reverses pixel rows so artwork mirrors.
 
 import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
-import { rasterRow } from './raster-rows';
 
 // reverse (ADR-127): the rotary can spin the opposite way (chuck mounted
 // backwards, or roller/gearing that inverts direction), which mirrors the
@@ -75,11 +74,14 @@ function mapRasterGroup(
   };
 }
 
-function reverseRasterValues(group: RasterGroup): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
+function reverseRasterValues(
+  group: RasterGroup,
+): Pick<RasterGroup, 'sValues' | 'rowProvider' | 'rowProviderOrder'> {
   if (group.rowProvider !== undefined) {
     return {
       sValues: new Uint16Array(0),
-      rowProvider: (y) => rasterRow(group, group.pixelHeight - 1 - y),
+      rowProvider: group.rowProvider,
+      rowProviderOrder: group.rowProviderOrder === 'descending-y' ? 'ascending-y' : 'descending-y',
     };
   }
   const reversed = new Uint16Array(group.sValues.length);

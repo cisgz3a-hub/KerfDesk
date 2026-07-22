@@ -8,8 +8,6 @@ import { selectControllerDriver } from '../../core/controllers';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerSettingsSnapshot, PreflightIssue } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
-import { emitGcodeSnapshot } from '../../io/gcode';
-import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
 import { importLightBurnProject } from '../../io/lightburn';
 import { parseSvg } from '../../io/svg';
@@ -24,10 +22,8 @@ import { repairedMachineCapabilityMessage } from '../machine/machine-capability-
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveExportJobPlacement,
-  trustedMotionOffsetForPreflight,
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
-  type ResolvedJobPlacement,
 } from '../job-placement';
 import {
   describeImportError,
@@ -40,9 +36,8 @@ import { partitionSavePreflight } from './save-preflight-policy';
 import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
-import { renderVariableText } from '../text/render-variable-text';
-import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { importSourceSizeIssue } from './import-source-limits';
+import { emitSaveGcode } from './save-gcode-emission';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -238,24 +233,6 @@ function pushPostSaveAdvisories(
       'info',
     );
   }
-}
-
-async function emitSaveGcode(
-  ctx: SaveGcodeCtx,
-  placement: Extract<ResolvedJobPlacement, { ok: true }>,
-): ReturnType<typeof emitGcodeSnapshot> {
-  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
-  const registration = currentPrintCutOutputRegistration(ctx.project);
-  return emitGcodeSnapshot(ctx.project, {
-    clock: () => new Date(),
-    renderVariableText,
-    ...(registration === undefined ? {} : { registration }),
-    metadata: buildGcodeMetadata(),
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
-    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
-    ...(ctx.allowRotaryRaster === true ? { allowRotaryRaster: true } : {}),
-  });
 }
 
 export type SaveProjectCtx = {

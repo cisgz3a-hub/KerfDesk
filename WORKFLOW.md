@@ -3841,7 +3841,7 @@ F-CNC19 tiling.
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
 
-## Phase L flows (Image Studio — ADR-243)
+## Phase L flows (Image Studio — ADR-242)
 
 ### F-L1. Open, edit, apply
 
@@ -3955,7 +3955,7 @@ F-CNC19 tiling.
 #### Edge — app reload
 1. Sessions are in-memory (IE-1..3): reloading the app drops unapplied
    editor sessions. Applied work is in the project and its undo history.
-   Session persistence is an IE-4 schema decision (ADR-243).
+   Session persistence is an IE-4 schema decision (ADR-242).
 
 ## Camera Mode flows
 

@@ -38,7 +38,7 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
   if (props.issue?.kind === 'preparation-failed') {
     return (
       <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
-        Preview blocked: {props.issue.messages.join(' ')}
+        Preview unavailable: {props.issue.messages.join(' ')}
       </div>
     );
   }
@@ -415,5 +415,6 @@ function formatMm(value: number): string {
 function formatEstimate(estimate: LiveJobEstimate): string {
   if (estimate.kind === 'estimated') return estimate.label;
   if (estimate.kind === 'too-large') return 'ETA skipped';
+  if (estimate.kind === 'preparation-failed') return 'ETA unavailable';
   return '-';
 }
