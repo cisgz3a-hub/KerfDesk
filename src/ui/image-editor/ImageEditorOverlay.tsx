@@ -6,7 +6,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatDuration } from '../../core/job';
 import { useRegisterModal } from '../common/use-register-modal';
+import { applyThicken } from './editor-kerf-check';
 import { useInkTimeReadout } from './use-ink-time-readout';
+import { useKerfCheck } from './use-kerf-check';
 import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
@@ -78,6 +80,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
               {trimmed > 0 ? ` · ${trimmed} older history steps trimmed` : ''}
               <InkTimeStatus />
             </span>
+            <KerfStatus />
             <span>Esc closes — session is kept · Apply commits one undo step</span>
           </footer>
         </div>
@@ -114,6 +117,31 @@ function InkTimeStatus(): JSX.Element | null {
   return (
     <span title="Ink coverage of the visible image, and a rough engrave time from the assigned Image-mode layer">
       {` · ink ${readout.inkPercent}%${time}`}
+    </span>
+  );
+}
+
+// Kerf thin-stroke advisory (V2 plan E2) — a warning with its fix in place,
+// never a block (rule 7).
+function KerfStatus(): JSX.Element | null {
+  const check = useKerfCheck();
+  if (check === null || check.thinPixels === 0) return null;
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+      <span
+        title={`Ink strokes thinner than the layer's ${check.thresholdMm} mm kerf/dot width may not survive the burn`}
+      >
+        ⚠ {check.thinPixels} px thinner than {check.thresholdMm} mm
+      </span>
+      <button
+        type="button"
+        className="lf-btn"
+        style={{ padding: '0 8px', fontSize: 11 }}
+        onClick={() => applyThicken(check)}
+        title="Thicken every thin stroke out to the kerf width (one undo step)"
+      >
+        Thicken
+      </button>
     </span>
   );
 }
