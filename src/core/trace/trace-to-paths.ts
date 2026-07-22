@@ -18,25 +18,19 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
+import { resampleBuffer } from '../image-resample';
 import {
   type RawImageData,
   type TraceOptions,
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
-import {
-  THIN_STROKE_UPSCALE_FACTOR,
-  computeUpscaleFactor,
-  downscaleTracedPaths,
-  shouldAutoUpscale,
-  shouldUpscaleSmallSource,
-  upscaleBy,
-} from './auto-upscale';
+import { downscaleTracedPaths, scaleTracedPathsUniform, upscaleBy } from './auto-upscale';
 import { traceCenterlineStrokePaths } from './centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
 import { traceImageToEdgePaths } from './edge-trace';
 import { withCanonicalTraceCurves } from './trace-curves';
-import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
+import { traceScalePlan } from './trace-upscale-policy';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -143,13 +137,28 @@ export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
-  // Small sources trace poorly at native resolution; supersample, trace, then
-  // scale the vectors back down by the SAME factor. The inner dispatch is
-  // called directly so this never re-enters itself and double-upscales.
-  // pixelScale rides along so pixel-denominated cleanup caps (despeckle,
+  // Sparse small/thin sources trace poorly at native resolution, so their
+  // scale plan supersamples them. Dense color pictures instead stay native or
+  // trace on a bounded working grid so photo texture cannot multiply the
+  // contour workload. Every non-native route restores SOURCE coordinates.
+  // The inner dispatch is called directly so this never re-enters itself.
+  // pixelScale rides along on the upscale route so cleanup caps (despeckle,
   // pinhole fill, min-area, simplify ε, sharpener regime bounds) keep their
   // SOURCE-pixel semantics on the supersampled raster.
-  const factor = upscaleFactorFor(image, options);
+  const scalePlan = traceScalePlan(image, options);
+  if (scalePlan.kind === 'downscale') {
+    const workingImage = resampleBuffer(image, scalePlan.width, scalePlan.height);
+    const workingOptions: TraceOptions = {
+      ...options,
+      supersampleContour: false,
+      autoUpscaleSmallSources: false,
+      upscaleSmallSmoothSources: false,
+      pixelScale: 1,
+    };
+    const traced = withCanonicalTraceCurves(await dispatchTrace(workingImage, workingOptions));
+    return scaleTracedPathsUniform(traced, scalePlan.coordinateScale);
+  }
+  const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;
   if (factor > 1) {
     const scaledOptions: TraceOptions = { ...options, pixelScale: factor };
     const upscaled = withCanonicalTraceCurves(
@@ -158,55 +167,6 @@ export async function traceImageToColoredPaths(
     return downscaleTracedPaths(upscaled, factor);
   }
   return withCanonicalTraceCurves(await dispatchTrace(image, options));
-}
-
-// The supersample factor to apply, or 1 (no upscale). Two independent triggers,
-// deliberately with DIFFERENT factors:
-//   * autoUpscaleSmallSources — thin strokes (<~3px), the original mkbitmap
-//     policy; fires on any preset that opts in, at the fixed historical 2x that
-//     its fixtures/tests were tuned to.
-//   * upscaleSmallSmoothSources — small overall size regardless of stroke
-//     thickness; set only on the smooth-wanting presets (Sharp opts out so its
-//     pixel-art notches are never anti-aliased away). Uses the ADAPTIVE factor
-//     so the smallest letters reach a smooth working size instead of a fixed 2x
-//     that still facets a 40px letter.
-// If both fire, take the larger factor.
-//
-// Interpolation is BILINEAR for both — two higher-order kernels were measured on
-// the small-smooth path against the facet harness and BOTH rejected:
-//   * Bicubic (Catmull-Rom / Mitchell-Netravali, 2026-07-04): smooths the
-//     CURVE-dominated glyphs but REGRESSES the corner/straight-dominated E (E@40
-//     2.07%->5.10%/4.64%) via overshoot/ringing at E's dense step edges.
-//   * Monotone cubic (PCHIP / Fritsch-Carlson, 2026-07-04): chosen because it is
-//     provably overshoot-free, so E "could not" ring. It regressed E just as
-//     hard anyway — E@40 2.07%->5.10%, E@60 3.04%->3.38% — while B@40 (3.06%) and
-//     S@40 (4.52%) still missed their improvement targets. The overshoot-free
-//     unit tests passed, which proves the E faceting is NOT interpolation
-//     ringing: it comes from the downstream Canny/DP fit reacting to any smoother
-//     (higher-point-count) upscaled raster, so no interpolation kernel can fix it
-//     from here. Bilinear is the balanced optimum; keep it.
-function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
-  const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
-  const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
-  const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
-  const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
-  // Quality supersample for the contour-finished presets (mkbitmap's
-  // recipe): mid-size art carries MIXED stroke widths — thick letters that
-  // defeat the thin-stroke detector alongside 1-2px features (hooked apex
-  // tips, pale subtitle strokes) that binarization physically misshapes at
-  // 1x. Neither legacy trigger fires there, so the presets opt in
-  // explicitly; the pixel budget cap keeps the 4x cost off photos and huge
-  // scans. Edge Detection is contour-finished too (local-contrast mask →
-  // shared finisher), so its opt-in rides the same flag.
-  const contourQuality =
-    options.supersampleContour === true &&
-    (isBinaryContourPreset(options) || options.traceMode === 'edge');
-  const contourFactor = contourQuality ? THIN_STROKE_UPSCALE_FACTOR : 1;
-  let factor = Math.max(thinFactor, smallFactor, contourFactor);
-  while (factor > 1 && !fitsTraceWorkingPixelBudget(image, factor, options)) {
-    factor -= 1;
-  }
-  return factor;
 }
 
 // The backend selection shared by both the direct and the upscaled paths.
