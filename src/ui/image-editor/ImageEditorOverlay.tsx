@@ -5,7 +5,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { formatDuration } from '../../core/job';
+import type { RasterImage } from '../../core/scene';
 import { useRegisterModal } from '../common/use-register-modal';
+import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { applyThicken } from './editor-kerf-check';
 import { useInkTimeReadout } from './use-ink-time-readout';
 import { useKerfCheck } from './use-kerf-check';
@@ -30,6 +33,8 @@ export function ImageEditorOverlay(): JSX.Element | null {
   const redo = useImageEditorStore((s) => s.redo);
   const revert = useImageEditorStore((s) => s.revert);
   const apply = useImageEditorStore((s) => s.apply);
+  const applyAndTrace = useImageEditorStore((s) => s.applyAndTrace);
+  const openImageDialog = useUiStore((s) => s.openImageDialog);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const isQuickMask = useQuickMaskStore((s) => s.rubylith !== null);
   useRegisterModal();
@@ -61,7 +66,16 @@ export function ImageEditorOverlay(): JSX.Element | null {
         isApplying={isApplying}
         isHistoryOpen={isHistoryOpen}
         onToggleHistory={() => setIsHistoryOpen((open) => !open)}
-        actions={{ undo, redo, revert, apply, close: closeEditor }}
+        actions={{
+          undo,
+          redo,
+          revert,
+          apply,
+          // Apply & Trace hands the updated scene raster to the existing
+          // trace dialog (V2 plan F) via the toolbar's openImageDialog seam.
+          applyAndTrace: () => applyAndTrace((id) => traceUpdatedImage(id, openImageDialog)),
+          close: closeEditor,
+        }}
       />
       <div style={bodyStyle}>
         <EditorToolStrip />
@@ -93,6 +107,15 @@ export function ImageEditorOverlay(): JSX.Element | null {
       </div>
     </div>
   );
+}
+
+// Look the freshly-applied scene raster back up by id and hand it to the
+// tracer (V2 plan F). apply() has already committed it, so the object exists.
+function traceUpdatedImage(objectId: string, openImageDialog: (source: RasterImage) => void): void {
+  const object = useStore
+    .getState()
+    .project.scene.objects.find((candidate) => candidate.id === objectId);
+  if (object?.kind === 'raster-image') openImageDialog(object);
 }
 
 const dockStyle: React.CSSProperties = {
@@ -151,6 +174,7 @@ type TopBarActions = {
   readonly redo: () => void;
   readonly revert: () => void;
   readonly apply: () => void;
+  readonly applyAndTrace: () => void;
   readonly close: () => void;
 };
 
@@ -180,52 +204,83 @@ function TopBar(props: {
         >
           Panels
         </button>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={actions.undo}
-          disabled={!canUndo}
-          title="Undo the last editor step (Ctrl+Z)"
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={actions.redo}
-          disabled={!canRedo}
-          title="Redo the last undone editor step (Ctrl+Shift+Z)"
-        >
-          Redo
-        </button>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={actions.revert}
-          disabled={!canUndo && !session.dirtySinceApply}
-          title="Discard every session edit and return to the as-opened image"
-        >
-          Revert
-        </button>
-        <button
-          type="button"
-          className="lf-btn lf-btn--primary"
-          onClick={actions.apply}
-          disabled={!session.dirtySinceApply || isApplying}
-          title="Bake the edits into the project image (one undo step)"
-        >
-          {isApplying ? 'Applying…' : 'Apply'}
-        </button>
-        <button
-          type="button"
-          className="lf-btn lf-btn--ghost"
-          onClick={actions.close}
-          title="Close — the editing session is kept and resumes on reopen"
-        >
-          ✕
-        </button>
+        <TopBarActionButtons
+          session={session}
+          isApplying={isApplying}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          actions={actions}
+        />
       </span>
     </header>
+  );
+}
+
+function TopBarActionButtons(props: {
+  readonly session: EditorSession;
+  readonly isApplying: boolean;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  readonly actions: TopBarActions;
+}): JSX.Element {
+  const { session, isApplying, canUndo, canRedo, actions } = props;
+  const applyDisabled = !session.dirtySinceApply || isApplying;
+  return (
+    <>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={actions.undo}
+        disabled={!canUndo}
+        title="Undo the last editor step (Ctrl+Z)"
+      >
+        Undo
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={actions.redo}
+        disabled={!canRedo}
+        title="Redo the last undone editor step (Ctrl+Shift+Z)"
+      >
+        Redo
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={actions.revert}
+        disabled={!canUndo && !session.dirtySinceApply}
+        title="Discard every session edit and return to the as-opened image"
+      >
+        Revert
+      </button>
+      <button
+        type="button"
+        className="lf-btn lf-btn--primary"
+        onClick={actions.apply}
+        disabled={applyDisabled}
+        title="Bake the edits into the project image (one undo step)"
+      >
+        {isApplying ? 'Applying…' : 'Apply'}
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={actions.applyAndTrace}
+        disabled={applyDisabled}
+        title="Bake the edits, then open the tracer on the updated image"
+      >
+        Apply &amp; Trace
+      </button>
+      <button
+        type="button"
+        className="lf-btn lf-btn--ghost"
+        onClick={actions.close}
+        title="Close — the editing session is kept and resumes on reopen"
+      >
+        ✕
+      </button>
+    </>
   );
 }
 
