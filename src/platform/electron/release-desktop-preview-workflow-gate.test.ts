@@ -76,6 +76,8 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
       'node scripts/verify-packaged-preview-metadata.mjs',
     );
     expect(macVerifier).toContain('xcrun stapler validate');
+    expect(macVerifier).toContain('Preview package contract verified');
+    expect(macVerifier).toMatch(/\nexit 0\s*$/);
   });
 
   it('ships legal material and pins required macOS permission metadata', () => {
