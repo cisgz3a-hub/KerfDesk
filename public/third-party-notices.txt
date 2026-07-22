@@ -9,8 +9,8 @@ reported by `pnpm licenses list --prod`, the Electron package license,
 bundled fonts, and the eight pinned OpenClipart CC0 assets.
 
 Desktop artifacts also embed the Electron/Chromium runtime. Its upstream
-Electron LICENSE (LICENSE.electron.txt on Windows; LICENSE on macOS) and
-LICENSES.chromium.html files are artifact-level requirements and must be
+Electron package license is reproduced below; Electron/Chromium
+artifact-level license bundles emitted by the platform packager are
 retained and verified by desktop packaging.
 
 == Bundled fonts ==
@@ -1825,9 +1825,9 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Electron embeds Chromium and other upstream runtime components. Desktop
-packaging must also retain its platform-native Electron LICENSE (named
-LICENSE.electron.txt on Windows and LICENSE on macOS) plus
-LICENSES.chromium.html.
+packaging must retain the Electron package license in these generated
+notices and the packaged Chromium license bundle when electron-builder
+emits it for the target platform.
 
 === Apache-2.0 full license text ===
 
