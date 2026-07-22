@@ -18,7 +18,7 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
 
   it('production listens only to version-tag pushes on Windows', () => {
     expect(existsSync(join(process.cwd(), '.github/workflows/release-desktop.yml'))).toBe(false);
-    expect(workflow).toContain("tags: ['v*']");
+    expect(workflow).toContain("tags: ['v*', '!v*-*']");
     expect(workflow).not.toMatch(/^\s{2}workflow_dispatch:/m);
     expect(workflow).toContain('runs-on: windows-latest');
     expect(workflow).toContain('environment: desktop-production');

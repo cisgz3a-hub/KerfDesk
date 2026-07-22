@@ -11359,3 +11359,113 @@ update source.
 - Apple local-network privacy on macOS: https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy
 - Electron application data paths: https://www.electronjs.org/docs/latest/api/app
 - electron-builder NSIS upgrade identity: https://www.electron.build/nsis/
+
+## ADR-249 - Notify-only update discovery for unsigned Desktop Preview
+
+**Date:** 2026-07-22
+**Status:** Accepted
+
+### Context
+
+ADR-248 deliberately gave unsigned Preview builds no update request because the
+only updater already in the app, `electron-updater`, downloads and installs from
+a trusted production feed. The maintainer subsequently selected the Rayforge
+business/distribution pattern: keep the core public, free, and MIT-licensed;
+publish unsigned Previews; tell users when a newer Preview exists; and require a
+manual browser download and installation until signed stable releases exist.
+Rayforge informed the behavioral choice only; no Rayforge code is copied.
+
+An unsigned Mac application cannot rely on OS-native notification identity and
+permission as the sole cross-platform surface. Adding a general preload or IPC
+bridge merely to show a version would also expand the deliberately absent
+privilege surface. The existing custom `app://` protocol and status bar can
+provide a narrower path.
+
+### Decision
+
+1. **Specific supersession.** This ADR supersedes only ADR-248 item 2's limit on
+   renderer-visible Preview changes, item 4's prohibition on a Preview metadata
+   request, and corresponding "absence of updater traffic" verification text.
+   Preview updater trust remains false. Every prohibition on unsigned download,
+   execution, installation, R2, `latest*` metadata, and stable-feed mutation
+   remains in force. Web/PWA behavior remains unchanged.
+2. **One metadata check per launch.** Only a packaged app whose embedded
+   `kerfdeskDesktopReleaseChannel` is exactly `preview` and whose current version
+   is strict `X.Y.Z-preview.N` may query
+   `https://api.github.com/repos/cisgz3a-hub/KerfDesk/releases?per_page=20`.
+   The memoized main-process request is GET-only, rejects redirects, omits
+   credentials/referrer, uses no token, times out, and bounds the response body.
+   Dev, stable, web, malformed metadata, and unsupported targets are inert.
+3. **Untrusted response, strict result.** Main treats release JSON as untrusted.
+   It accepts only `draft:false`, `prerelease:true`, `immutable:true`, a strict
+   `vX.Y.Z-preview.N` newer than `app.getVersion()`, and the canonical asset for
+   the running platform and architecture. Numeric identifiers compare as
+   arbitrary-size integers. The release must contain exactly the three canonical
+   binaries plus checksums, manifest, and SBOM. API-provided URLs are ignored. The
+   renderer receives only `{ kind:'none' }` or `{ kind:'available', version }`.
+4. **No preload or IPC.** The renderer calls the exact same-origin GET route
+   `app://app/api/desktop-preview-update`. The existing main-process protocol
+   handler performs the pinned external request; renderer CSP remains
+   `connect-src 'self'`. The route rejects a different scheme, host, path,
+   method, query, fragment, credentials, or port. There is still no preload and
+   no `ipcMain` surface.
+5. **Passive status-bar notification.** A newer Preview adds a compact
+   **Download update** link to the existing status bar plus a polite screen-reader
+   live region. It never pops up, steals focus, auto-opens, or changes machine
+   state. It remains visible during a job: opening an informational browser page
+   is not a machine action, and hiding it would create a new guard contrary to
+   the FRAME-only guard policy. The PWA Update button remains separate because
+   that action reloads the app.
+6. **One derived external destination.** A user click may open only
+   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` for the strict
+   version already accepted by main. Electron canonicalizes that exact repository
+   URL and always denies creation of a child window; no API-provided URL chooses
+   it. The exact tag page prevents version/date drift and a legacy service worker
+   from substituting an older cached download page. Release notes retain the
+   manual SmartScreen/Gatekeeper steps.
+7. **Privacy and failure.** No account, project, design, machine, controller,
+   job, device identifier, token, cookie, or telemetry is sent. GitHub still
+   receives unavoidable connection metadata such as IP address, time, and the
+   generic `KerfDesk-Desktop-Preview` user agent. Offline, rate-limit, HTTP,
+   timeout, oversized, malformed, mutable, wrong-asset, and downgrade cases are
+   silent and non-fatal.
+8. **Release prerequisite.** The repository's immutable-release setting and the
+   ADR-248 Preview publication gates must be enabled before the first Preview
+   tag. The checker intentionally stays silent for mutable releases. No Preview
+   tag is created by this implementation.
+
+### Consequences
+
+- Preview users can learn about a newer version without granting unsigned code
+  an automatic update path.
+- The desktop app gains one narrow third-party metadata request, recorded as a
+  specific exception to PROJECT non-negotiable 8; web and machining remain
+  offline.
+- Signed stable Windows updates remain the separate `electron-updater` path and
+  retain background download plus install-on-natural-quit behavior.
+- Automated tests can prove request, parsing, UI, and external-link policy, but
+  real packaged Windows/Intel Mac/Apple Silicon behavior remains CLAIMED until
+  an older Preview is tested against a newer published immutable Preview.
+
+### Verification
+
+- Unit tests cover channel metadata, exact route/method, request headers,
+  timeout/error containment, response bounds, strict tags, large numeric version
+  ordering, immutable/draft/prerelease state, platform asset presence, and
+  one-check memoization.
+- Renderer tests cover fail-closed response parsing, request coalescing, passive
+  status-bar rendering, accessibility announcement, fixed link destination, and
+  availability during a job.
+- Navigation tests pin exact URL allowlisting, external browser opening, and
+  child-window denial; existing auto-updater tests continue proving unsigned
+  channels never touch `electron-updater`.
+- WORKFLOW F-DESK3 remains the load-bearing real-OS and network-observation gate.
+
+### References
+
+- GitHub Releases REST API: https://docs.github.com/en/rest/releases/releases
+- GitHub immutable releases: https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases
+- Electron custom protocols: https://www.electronjs.org/docs/latest/api/protocol
+- Electron security guidance: https://www.electronjs.org/docs/latest/tutorial/security
+- Electron notifications: https://www.electronjs.org/docs/latest/api/notification
+- Electron shell external opening: https://www.electronjs.org/docs/latest/api/shell

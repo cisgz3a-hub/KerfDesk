@@ -16,7 +16,9 @@ name: Release Desktop Stable
 # Tag releases are fail-closed signed builds (ADR-135/142).
 on:
   push:
-    tags: ['v*']
+    # Keep prerelease tags out of the signed stable lane. The negative pattern
+    # must follow the positive pattern for GitHub's ordered tag filters.
+    tags: ['v*', '!v*-*']
 
 concurrency:
   group: release-desktop-${{ github.ref }}

@@ -4134,9 +4134,9 @@ behavior or create a second product implementation.
 
 ### F-DESK1. Download and install an unsigned Preview (ADR-248)
 
-1. In the web app, the operator opens the Camera panel and clicks its existing
-   **Download for Windows** link (planned Preview copy may become **Download
-   desktop app**), or opens `https://kerfdesk.com/download` directly.
+1. In the web app, the operator opens the Camera panel and clicks **Download
+   desktop app** to open the public KerfDesk GitHub Releases page directly. The
+   explanatory `https://kerfdesk.com/download` page remains available manually.
 2. The download page offers exact-version assets from the matching prerelease in
    the same public **cisgz3a-hub/KerfDesk** source repository. It does not
    send Preview users through a `latest` alias or the stable R2 update feed:
@@ -4193,32 +4193,47 @@ behavior or create a second product implementation.
 
 ### F-DESK2. Desktop updates (trust-gated, burn-safe)
 
-1. An unsigned Preview performs no automatic update check, download, or install
-   (ADR-135, ADR-248). It does not fetch or consume `latest.yml`, a `latest`
-   redirect, or any R2 update metadata. The operator chooses a newer exact
-   version on the pinned KerfDesk download page and installs it manually after
-   ending the current session.
-2. The signed stable Windows path remains governed by ADR-024, ADR-135, and
+1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
+   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Releases
+   API (ADR-249). Main accepts only a non-draft, immutable prerelease with a
+   strict newer `vX.Y.Z-preview.N` tag and the canonical asset for the current
+   OS/architecture. Dev, web, stable-version, unsupported-platform, malformed,
+   mutable, missing-asset, downgrade, offline, rate-limited, and failed requests
+   produce no visible control and never block startup.
+2. When a newer Preview exists, a passive **Download update** control appears at
+   the right edge of the status bar and a polite live region announces its exact
+   version. There is no popup and the control receives no automatic focus. It
+   remains available during a job because it cannot reload, download, execute,
+   install, restart, or change machine state.
+3. Clicking **Download update** opens only the fixed public
+   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page for the
+   exact announced version in the system browser. This bypasses any legacy
+   service-worker copy of the first-party landing page and cannot drift to a
+   newer-by-date but lower semantic version.
+   The Electron child window is denied. API-provided URLs are ignored, Preview
+   updater trust stays false, and the app never consumes
+   `latest.yml`, a `latest` redirect, R2 update metadata, or installer bytes.
+   The operator selects an exact GitHub prerelease asset and installs it manually.
+4. The signed stable Windows path remains governed by ADR-024, ADR-135, and
    ADR-142. Once production signing is enabled and verified, each signed stable
    packaged launch checks the R2 feed's `latest.yml` (`electron/auto-update.ts`).
-3. A newer correctly signed stable Windows version downloads in the background;
+5. A newer correctly signed stable Windows version downloads in the background;
    the OS shows a native "update ready" notification. The current session is
-   never interrupted.
-4. The signed stable update installs only on the next **natural quit**
-   (`autoInstallOnAppQuit`) and then relaunches. KerfDesk never calls
-   `quitAndInstall`. A signed/notarized macOS stable updater is out of scope until
-   its own trust and release contract is approved.
+   never interrupted. It installs only on the next **natural quit**
+   (`autoInstallOnAppQuit`). KerfDesk never calls `quitAndInstall`. A signed and
+   notarized macOS stable updater remains out of scope.
 
 #### Error — offline or feed unreachable
-1. Preview has no updater request to fail. For a signed stable Windows build, an
-   R2 check failure is silent (logged via `onError`, never fatal); the installed
-   version continues to run normally.
+1. Preview GitHub metadata failures are silent and non-fatal; the status control
+   remains absent and the installed version continues normally. Signed stable R2
+   failures are also logged only through `onError` and never block startup.
 
 #### Edge — a job is streaming
-1. Updates NEVER install mid-burn. Preview has no updater, and signed stable waits
-   for a natural quit; a quit cannot happen during a running job without the
-   operator stopping it (`use-unload-stop.ts` soft-resets the machine on unload).
-   Non-negotiable #9 holds.
+1. Updates NEVER install mid-burn. Preview only opens a manual download page and
+   does not mutate the running app; signed stable waits for a natural quit, and a
+   quit cannot happen during a running job without the operator stopping it
+   (`use-unload-stop.ts` soft-resets the machine on unload). Non-negotiable #9
+   holds.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 
@@ -4265,6 +4280,16 @@ completed and recorded:
    `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
 5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or
    Preview tag—to prove rejection precedes the protected-environment job.
+
+6. [x] Repository release immutability was enabled on 2026-07-22. The workflow's
+   token cannot read repository Administration settings, so the maintainer must
+   re-check this setting before each tag; publication then verifies the release
+   attestation and `immutable:true` result.
+7. [ ] Before the first Preview tag, enable repository rules that prevent direct
+   or forced changes to `main` and restrict `v*` tag creation/update/deletion to
+   the release maintainer. The workflow independently requires the tagged commit
+   to be in current `main` history and re-resolves the remote annotated tag
+   immediately before draft creation and publication.
 
 Only after the later stable setup is recorded do stable tag semantics resume:
 create an annotated tag with
@@ -4372,9 +4397,12 @@ real hardware:
       Team ID. They also confirm no stapled notarization ticket. Fresh Intel/Apple
       Silicon Macs launch only through the documented manual trust path;
       tooling-created nested ad-hoc signatures are not treated as bundle trust.
-- [ ] **Unsigned update gate:** on Windows, Intel Mac, and Apple Silicon, an
-      unsigned Preview performs no update metadata request, check, download, or
-      install, including no request to `latest.yml`, a `latest` alias, or R2.
+- [ ] **Unsigned notify-only update gate:** on Windows, Intel Mac, and Apple
+      Silicon, an older packaged Preview makes one anonymous GitHub metadata
+      request and surfaces a newer immutable Preview in the status bar. Clicking
+      opens only the fixed KerfDesk download page. Confirm zero installer,
+      `latest.yml`, mutable alias, R2, download, execution, or install traffic;
+      repeat offline, malformed-response, and active-job cases.
 - [ ] **Signed stable Windows update (after signing lands):** publish a higher
       `vX.Y.Z`; a running older correctly signed install downloads it, notifies,
       and on natural quit installs and relaunches. Confirm no install occurs while

@@ -7,6 +7,7 @@ import { transformedBBox, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
+import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
 
 export function StatusBar(): JSX.Element {
@@ -41,6 +42,7 @@ export function StatusBar(): JSX.Element {
         Bed: {project.device.bedWidth} × {project.device.bedHeight} mm
       </Segment>
       <Segment>Zoom: {Math.round(zoomFactor * 100)}%</Segment>
+      <DesktopPreviewUpdateButton />
       <PwaUpdateButton />
     </footer>
   );

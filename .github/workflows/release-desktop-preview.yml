@@ -1,0 +1,559 @@
+name: Release Desktop Preview
+
+# Unsigned public Preview lane (ADR-248/249). Preview releases are exact-version
+# GitHub prereleases; they never publish updater metadata or touch stable R2.
+on:
+  push:
+    tags: ['v*-preview.*']
+
+concurrency:
+  group: release-desktop-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-preview-tag:
+    name: Validate Preview release tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Reject non-Preview or lightweight tags
+        run: node scripts/validate-release-tag.mjs preview "${GITHUB_REF_NAME}"
+
+      - name: Require the tagged commit to belong to current main history
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$(git rev-parse HEAD)" refs/remotes/origin/main
+
+  build-windows:
+    name: Build unsigned Windows x64 Preview
+    needs: validate-preview-tag
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Derive Preview version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify canonical release repository
+        run: pnpm guard:repo
+
+      - name: Release verification and legal-closure gate
+        run: pnpm release:check
+
+      - name: Build unsigned Windows Preview
+        shell: bash
+        run: |
+          pnpm exec electron-builder --win --x64 \
+            --config electron-builder.preview.yml \
+            --config.extraMetadata.version="${{ steps.version.outputs.version }}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verify Windows Preview package contract
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $releaseDir = "release/$env:VERSION"
+          $installer = "$releaseDir/KerfDesk-$env:VERSION-windows-x64-setup.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Missing canonical Windows Preview installer: $installer"
+          }
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          if ($signature.Status -ne 'NotSigned') {
+            throw "Preview installer must be unsigned; found $($signature.Status)."
+          }
+
+          $unexpectedMetadata = Get-ChildItem -LiteralPath $releaseDir -Recurse -File |
+            Where-Object { $_.Name -match '^latest.*\.(yml|yaml|json)$' -or $_.Extension -eq '.blockmap' }
+          if ($unexpectedMetadata) {
+            throw "Preview emitted updater metadata: $($unexpectedMetadata.FullName -join ', ')"
+          }
+
+          $unpacked = Join-Path $releaseDir 'win-unpacked'
+          $executable = Join-Path $unpacked 'KerfDesk.exe'
+          $bytes = [IO.File]::ReadAllBytes($executable)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          if ($machine -ne 0x8664) {
+            throw "Preview executable must be x64 PE32+; machine field was 0x$($machine.ToString('x4'))."
+          }
+
+          $required = @(
+            (Join-Path $unpacked 'LICENSE.electron.txt'),
+            (Join-Path $unpacked 'LICENSES.chromium.html'),
+            (Join-Path $unpacked 'resources/legal/LICENSE'),
+            (Join-Path $unpacked 'resources/legal/THIRD_PARTY_NOTICES.md'),
+            (Join-Path $unpacked 'resources/legal/third-party-notices.txt')
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Packaged legal material is missing: $path"
+            }
+          }
+
+          $archive = Join-Path $unpacked 'resources/app.asar'
+          node scripts/verify-packaged-preview-metadata.mjs $archive $env:VERSION
+
+      - name: Attest Windows binary on its native builder
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-windows-x64-setup.exe
+
+      - name: Upload Windows Preview binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kerfdesk-preview-windows-${{ steps.version.outputs.version }}
+          path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-windows-x64-setup.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos-x64:
+    name: Build unsigned macOS Intel x64 Preview
+    needs: validate-preview-tag
+    runs-on: macos-15-intel
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Derive Preview version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify canonical release repository
+        run: pnpm guard:repo
+
+      - name: Release verification and legal-closure gate
+        run: pnpm release:check
+
+      - name: Build unsigned and unnotarized macOS x64 Preview
+        run: |
+          pnpm exec electron-builder --mac --x64 \
+            --config electron-builder.preview.yml \
+            --config.extraMetadata.version="${{ steps.version.outputs.version }}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verify macOS x64 Preview package contract
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/verify-macos-preview-package.sh "${VERSION}" x64
+
+      - name: Attest macOS x64 binary on its native builder
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-macos-x64.dmg
+
+      - name: Upload macOS x64 Preview binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kerfdesk-preview-macos-x64-${{ steps.version.outputs.version }}
+          path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-macos-x64.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos-arm64:
+    name: Build unsigned macOS Apple Silicon arm64 Preview
+    needs: validate-preview-tag
+    runs-on: macos-15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Derive Preview version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify canonical release repository
+        run: pnpm guard:repo
+
+      - name: Release verification and legal-closure gate
+        run: pnpm release:check
+
+      - name: Build unsigned and unnotarized macOS arm64 Preview
+        run: |
+          pnpm exec electron-builder --mac --arm64 \
+            --config electron-builder.preview.yml \
+            --config.extraMetadata.version="${{ steps.version.outputs.version }}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verify macOS arm64 Preview package contract
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/verify-macos-preview-package.sh "${VERSION}" arm64
+
+      - name: Attest macOS arm64 binary on its native builder
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-macos-arm64.dmg
+
+      - name: Upload macOS arm64 Preview binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kerfdesk-preview-macos-arm64-${{ steps.version.outputs.version }}
+          path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-macos-arm64.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-preview:
+    name: Publish immutable GitHub prerelease
+    needs: [build-windows, build-macos-x64, build-macos-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download all Preview binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: kerfdesk-preview-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Derive Preview release values
+        id: release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          PEELED_SHA="$(git rev-list -n 1 "${GITHUB_REF_NAME}")"
+          test "${SOURCE_SHA}" = "${PEELED_SHA}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "source_sha=${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "signer_workflow=${GITHUB_REPOSITORY}/.github/workflows/release-desktop-preview.yml" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate checksums, manifest, and CycloneDX SBOM
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
+        run: |
+          WIN_EXE="release-assets/KerfDesk-${VERSION}-windows-x64-setup.exe"
+          MAC_X64_DMG="release-assets/KerfDesk-${VERSION}-macos-x64.dmg"
+          MAC_ARM64_DMG="release-assets/KerfDesk-${VERSION}-macos-arm64.dmg"
+          node scripts/generate-release-integrity.mjs \
+            --version "${VERSION}" \
+            --source-repository "${GITHUB_REPOSITORY}" \
+            --source-sha "${SOURCE_SHA}" \
+            --source-ref "${GITHUB_REF}" \
+            --signer-workflow "${SIGNER_WORKFLOW}" \
+            --out-dir release-assets \
+            --artifact "${WIN_EXE}" \
+            --artifact "${MAC_X64_DMG}" \
+            --artifact "${MAC_ARM64_DMG}"
+          (cd release-assets && sha256sum --check "KerfDesk-${VERSION}-SHA256SUMS.txt")
+
+      - name: Write exact-source Preview release notes
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
+        run: |
+          cat > release-notes.md <<EOF
+          # KerfDesk ${VERSION} Preview
+
+          This is a free, unsigned, non-production Preview. Windows may show a
+          SmartScreen warning. macOS may require Control-click > Open and the
+          Privacy & Security "Open Anyway" path. Updates remain manual: KerfDesk
+          only notifies and opens the public KerfDesk GitHub Releases page.
+
+          - sourceRepository: ${GITHUB_REPOSITORY}
+          - sourceSha: ${SOURCE_SHA}
+          - sourceRef: ${GITHUB_REF}
+          - signerWorkflow: ${SIGNER_WORKFLOW}
+          EOF
+
+      - name: Attest release companions
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: |
+            release-assets/KerfDesk-*-SHA256SUMS.txt
+            release-assets/KerfDesk-*-release-manifest.json
+            release-assets/KerfDesk-*-sbom.cdx.json
+
+      - name: Verify exact provenance before creating a release
+        env:
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          find release-assets -maxdepth 1 -type f -name 'KerfDesk-*' -print0 |
+            while IFS= read -r -d '' asset; do
+              gh attestation verify "${asset}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --source-digest "${SOURCE_SHA}" \
+                --source-ref "${GITHUB_REF}" \
+                --signer-workflow "${SIGNER_WORKFLOW}" \
+                --deny-self-hosted-runners
+            done
+
+      # GITHUB_TOKEN cannot read repository Administration settings. Release
+      # immutability is an externally verified tag prerequisite (ADR-248), then
+      # is cryptographically verified after publication below.
+      - name: Re-resolve the remote tag and prepare a private draft
+        id: draft
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IFS=$'\t' read -r tag_type tag_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          test "${tag_type}" = tag
+          IFS=$'\t' read -r target_type target_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          test "${target_type}" = commit
+          test "${target_sha}" = "${SOURCE_SHA}"
+
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            test "$(gh release view "${GITHUB_REF_NAME}" --json tagName --jq '.tagName')" = "${GITHUB_REF_NAME}"
+            test "$(gh release view "${GITHUB_REF_NAME}" --json isPrerelease --jq '.isPrerelease')" = true
+            if test "$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq '.isDraft')" = true; then
+              # A prior failed run may leave only its private draft. Reset that
+              # workflow-owned draft so upload retries always start clean.
+              test "$(gh release view "${GITHUB_REF_NAME}" --json name --jq '.name')" = "KerfDesk ${VERSION} Preview"
+              gh release delete "${GITHUB_REF_NAME}" --yes
+            else
+              echo 'already_published=true' >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --draft \
+            --prerelease \
+            --latest=false \
+            --title "KerfDesk ${VERSION} Preview" \
+            --notes-file release-notes.md
+          echo 'already_published=false' >> "${GITHUB_OUTPUT}"
+
+      - name: Upload and validate the complete draft asset set
+        if: steps.draft.outputs.already_published != 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          expected=(
+            "KerfDesk-${VERSION}-windows-x64-setup.exe"
+            "KerfDesk-${VERSION}-macos-x64.dmg"
+            "KerfDesk-${VERSION}-macos-arm64.dmg"
+            "KerfDesk-${VERSION}-SHA256SUMS.txt"
+            "KerfDesk-${VERSION}-release-manifest.json"
+            "KerfDesk-${VERSION}-sbom.cdx.json"
+          )
+          assets=()
+          for name in "${expected[@]}"; do
+            test -f "release-assets/${name}"
+            test "$(stat -c '%s' "release-assets/${name}")" -lt 2147483648
+            assets+=("release-assets/${name}")
+          done
+
+          gh release upload "${GITHUB_REF_NAME}" "${assets[@]}"
+          test "$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq '.isDraft')" = true
+          test "$(gh release view "${GITHUB_REF_NAME}" --json isPrerelease --jq '.isPrerelease')" = true
+          test "$(gh release view "${GITHUB_REF_NAME}" --json tagName --jq '.tagName')" = "${GITHUB_REF_NAME}"
+          printf '%s\n' "${expected[@]}" | sort > expected-assets.txt
+          gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name' | sort > actual-assets.txt
+          diff -u expected-assets.txt actual-assets.txt
+
+      - name: Publish as immutable prerelease, never latest
+        if: steps.draft.outputs.already_published != 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IFS=$'\t' read -r tag_type tag_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          test "${tag_type}" = tag
+          IFS=$'\t' read -r target_type target_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          test "${target_type}" = commit
+          test "${target_sha}" = "${SOURCE_SHA}"
+          gh release edit "${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --draft=false \
+            --prerelease \
+            --latest=false
+
+      - name: Verify the published immutable release and exact source
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_source_sha="$(
+            gh release verify "${GITHUB_REF_NAME}" --format json \
+              --jq '.verificationResult.statement.subject[0].digest | to_entries[0].value'
+          )"
+          test "${release_source_sha}" = "${SOURCE_SHA}"
+          release_api="repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}"
+          api_header='X-GitHub-Api-Version: 2026-03-10'
+          test "$(gh api -H "${api_header}" "${release_api}" --jq '.draft')" = false
+          test "$(gh api -H "${api_header}" "${release_api}" --jq '.prerelease')" = true
+          test "$(gh api -H "${api_header}" "${release_api}" --jq '.immutable')" = true
+          expected=(
+            "KerfDesk-${VERSION}-windows-x64-setup.exe"
+            "KerfDesk-${VERSION}-macos-x64.dmg"
+            "KerfDesk-${VERSION}-macos-arm64.dmg"
+            "KerfDesk-${VERSION}-SHA256SUMS.txt"
+            "KerfDesk-${VERSION}-release-manifest.json"
+            "KerfDesk-${VERSION}-sbom.cdx.json"
+          )
+          printf '%s\n' "${expected[@]}" | sort > expected-published-assets.txt
+          gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name' | sort > actual-published-assets.txt
+          diff -u expected-published-assets.txt actual-published-assets.txt
+          mkdir published-release-assets
+          gh release download "${GITHUB_REF_NAME}" \
+            --dir published-release-assets \
+            --pattern 'KerfDesk-*'
+          find published-release-assets -maxdepth 1 -type f -printf '%f\n' | sort > downloaded-assets.txt
+          diff -u expected-published-assets.txt downloaded-assets.txt
+          (cd published-release-assets && sha256sum --check "KerfDesk-${VERSION}-SHA256SUMS.txt")
+          manifest="published-release-assets/KerfDesk-${VERSION}-release-manifest.json"
+          test "$(jq -r '.sourceRepository' "${manifest}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.sourceSha' "${manifest}")" = "${SOURCE_SHA}"
+          test "$(jq -r '.sourceRef' "${manifest}")" = "${GITHUB_REF}"
+          test "$(jq -r '.signerWorkflow' "${manifest}")" = "${SIGNER_WORKFLOW}"
+          for name in "${expected[@]}"; do
+            gh release verify-asset "${GITHUB_REF_NAME}" "published-release-assets/${name}"
+          done

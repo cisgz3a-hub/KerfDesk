@@ -5,12 +5,14 @@ their respective licenses and notices. KerfDesk's first-party software and
 associated documentation, in source and compiled/bundled form, are MIT-licensed
 — see `LICENSE`.
 
-The tables below are a non-exhaustive summary of selected direct libraries and
-bundled fonts. The generated `public/third-party-notices.txt` enumerates every
-direct `package.json` dependency plus those fonts, but neither document is the
-artifact-scoped transitive/Electron/Chromium closure required by ADR-248. The
-`pnpm licenses list --prod` output inventories production packages, and JS
-license banners remain in the shipped `dist/web/assets/*.js`.
+The tables below are a readable summary of selected libraries and bundled
+fonts. The generated `public/third-party-notices.txt` is the release input: it
+enumerates the complete installed `pnpm licenses list --prod` closure, the
+Electron npm package license, bundled outline/CNC fonts, and all eight pinned
+OpenClipart CC0 assets. Desktop packaging separately fails closed unless the
+artifact retains Electron's platform-native `LICENSE.electron.txt` (Windows) or
+`LICENSE` (macOS) and `LICENSES.chromium.html`; JS license banners also remain
+in shipped assets.
 
 ---
 
