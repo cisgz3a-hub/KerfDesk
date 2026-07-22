@@ -4,7 +4,9 @@
 // the working pixels into the scene object as one project undo entry.
 
 import { useEffect, useRef, useState } from 'react';
+import { formatDuration } from '../../core/job';
 import { useRegisterModal } from '../common/use-register-modal';
+import { useInkTimeReadout } from './use-ink-time-readout';
 import { AdjustDialogPanel } from './AdjustDialog';
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
@@ -74,6 +76,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
                   ? 'No selection'
                   : 'Selection active'}
               {trimmed > 0 ? ` · ${trimmed} older history steps trimmed` : ''}
+              <InkTimeStatus />
             </span>
             <span>Esc closes — session is kept · Apply commits one undo step</span>
           </footer>
@@ -98,6 +101,22 @@ const dockStyle: React.CSSProperties = {
   background: 'var(--lf-bg-1)',
   overflow: 'hidden',
 };
+
+// Ink coverage + rough engrave time (V2 plan E1) — advisory only; the Job
+// Review estimate stays the authority.
+function InkTimeStatus(): JSX.Element | null {
+  const readout = useInkTimeReadout();
+  if (readout === null) return null;
+  const time =
+    readout.estimate.kind === 'estimated'
+      ? ` · ≈ ${formatDuration(readout.estimate.seconds)} @ "${readout.estimate.layerName}"`
+      : '';
+  return (
+    <span title="Ink coverage of the visible image, and a rough engrave time from the assigned Image-mode layer">
+      {` · ink ${readout.inkPercent}%${time}`}
+    </span>
+  );
+}
 
 type TopBarActions = {
   readonly undo: () => void;
