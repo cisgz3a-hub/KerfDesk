@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { formatDuration } from '../../core/job';
+import type { RasterImage } from '../../core/scene';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -38,16 +39,6 @@ export function ImageEditorOverlay(): JSX.Element | null {
   const isQuickMask = useQuickMaskStore((s) => s.rubylith !== null);
   useRegisterModal();
 
-  // Apply & Trace hands the updated scene raster to the existing trace
-  // dialog (V2 plan F): the same openImageDialog seam the toolbar uses.
-  const handleApplyAndTrace = (): void =>
-    applyAndTrace((objectId) => {
-      const object = useStore
-        .getState()
-        .project.scene.objects.find((candidate) => candidate.id === objectId);
-      if (object?.kind === 'raster-image') openImageDialog(object);
-    });
-
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     // rAF focus override (kit-dialog convention): win the initial-focus race
@@ -80,7 +71,9 @@ export function ImageEditorOverlay(): JSX.Element | null {
           redo,
           revert,
           apply,
-          applyAndTrace: handleApplyAndTrace,
+          // Apply & Trace hands the updated scene raster to the existing
+          // trace dialog (V2 plan F) via the toolbar's openImageDialog seam.
+          applyAndTrace: () => applyAndTrace((id) => traceUpdatedImage(id, openImageDialog)),
           close: closeEditor,
         }}
       />
@@ -114,6 +107,15 @@ export function ImageEditorOverlay(): JSX.Element | null {
       </div>
     </div>
   );
+}
+
+// Look the freshly-applied scene raster back up by id and hand it to the
+// tracer (V2 plan F). apply() has already committed it, so the object exists.
+function traceUpdatedImage(objectId: string, openImageDialog: (source: RasterImage) => void): void {
+  const object = useStore
+    .getState()
+    .project.scene.objects.find((candidate) => candidate.id === objectId);
+  if (object?.kind === 'raster-image') openImageDialog(object);
 }
 
 const dockStyle: React.CSSProperties = {
