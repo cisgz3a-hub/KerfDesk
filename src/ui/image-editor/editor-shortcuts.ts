@@ -8,6 +8,7 @@ import { useAdjustDialogStore } from './adjust-dialog-store';
 import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
+import { useTextDialogStore } from './text-dialog-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
   const key = e.key.toLowerCase();
@@ -83,7 +84,7 @@ function handleBrushSizeKey(key: string): boolean {
 
 function handlePlainKey(key: string): boolean {
   const store = useImageEditorStore.getState();
-  if (handleBrushSizeKey(key)) return true;
+  if (handleBrushSizeKey(key) || handleModalCanvasKey(key, store)) return true;
   switch (key) {
     case 'x':
       store.swapColors();
@@ -91,18 +92,9 @@ function handlePlainKey(key: string): boolean {
     case 'd':
       store.resetColors();
       return true;
-    case 'enter':
-      // Enter commits the active modal canvas state: transform, then crop.
-      if (store.transform !== null) store.commitTransform();
-      else store.commitPendingCrop();
-      return true;
-    case 'escape':
-      // Esc steps outward: transform → cancel; pending crop → discard;
-      // non-default tool → Brush; Brush → close (session kept, F-L1).
-      if (store.transform !== null) store.cancelTransform();
-      else if (store.pendingCrop !== null) store.setPendingCrop(null);
-      else if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
-      else store.closeEditor();
+    case 't':
+      // Add text to a new layer (Photoshop's T; plain — Ctrl+T is transform).
+      useTextDialogStore.getState().open();
       return true;
     case 'delete':
     case 'backspace':
@@ -111,6 +103,27 @@ function handlePlainKey(key: string): boolean {
     default:
       return false;
   }
+}
+
+// Enter / Esc drive the active modal canvas state (transform, then crop);
+// Esc otherwise steps outward to Brush, then closes (session kept, F-L1).
+function handleModalCanvasKey(
+  key: string,
+  store: ReturnType<typeof useImageEditorStore.getState>,
+): boolean {
+  if (key === 'enter') {
+    if (store.transform !== null) store.commitTransform();
+    else store.commitPendingCrop();
+    return true;
+  }
+  if (key === 'escape') {
+    if (store.transform !== null) store.cancelTransform();
+    else if (store.pendingCrop !== null) store.setPendingCrop(null);
+    else if (store.tool.kind !== 'brush') store.setTool({ kind: 'brush' });
+    else store.closeEditor();
+    return true;
+  }
+  return false;
 }
 
 export function handleEditorKeyUp(e: React.KeyboardEvent): void {

@@ -11,6 +11,7 @@ import {
 } from './editor-session';
 import {
   addLayerAboveActive,
+  addTextLayer,
   compositeSession,
   duplicateActiveLayer,
   mergeActiveLayerDown,
@@ -174,6 +175,28 @@ describe('layer session ops', () => {
     session = addLayerAboveActive(session, 'l1');
     session = mergeActiveLayerDown(session);
     expect(session.history.undoStack.length).toBe(0);
+  });
+
+  it('addTextLayer inserts a doc-sized buffer as the new active layer', () => {
+    const session = newSession(); // 8×8 Background
+    const textBuffer = createRgbaBuffer(8, 8);
+    // Fake "ink" pixel so we can prove the buffer became the layer.
+    textBuffer.data[(4 * 8 + 4) * 4] = 0;
+    textBuffer.data[(4 * 8 + 4) * 4 + 3] = 255;
+    const next = addTextLayer(session, 'text-1', 'Hello', textBuffer);
+    expect(next.layers.map((l) => l.id)).toEqual(['background', 'text-1']);
+    expect(next.activeLayerId).toBe('text-1');
+    expect(next.layers[1]?.name).toBe('Hello');
+    expect(next.doc).toBe(textBuffer);
+    expect(next.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(255);
+    // Composite shows the text ink over the white Background.
+    expect(compositeSession(next).data[(4 * 8 + 4) * 4]).toBe(0);
+  });
+
+  it('addTextLayer rejects a mismatched buffer (dimension invariant)', () => {
+    const session = newSession();
+    const wrong = createRgbaBuffer(4, 4);
+    expect(addTextLayer(session, 'text-1', 'x', wrong)).toBe(session);
   });
 
   it('crop and image size keep every layer at uniform dimensions', () => {
