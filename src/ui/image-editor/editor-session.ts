@@ -74,6 +74,9 @@ export type EditorTool =
   | { readonly kind: 'marquee'; readonly shape: 'rect' | 'ellipse' }
   | { readonly kind: 'lasso' }
   | { readonly kind: 'wand' }
+  // Bucket/gradient share the fill slot (G cycles, like M for marquee).
+  | { readonly kind: 'bucket' }
+  | { readonly kind: 'gradient'; readonly shape: 'linear' | 'radial' }
   | { readonly kind: 'crop' }
   | { readonly kind: 'move' };
 
