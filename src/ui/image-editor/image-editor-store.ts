@@ -288,6 +288,7 @@ function commitTransformAction(set: Setter, get: () => ImageEditorState): void {
       selection: null,
       revision: s.revision + 1,
       dirtySinceApply: true,
+      lastDirtyRect: union,
     };
   });
 }

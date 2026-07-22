@@ -73,4 +73,36 @@ describe('compositeLayersInPlace', () => {
     compositeLayersInPlace(target, [createLayer('bg', 'Background', 2, 2, 'white')]);
     expect(target.data[3]).toBe(255);
   });
+
+  it('a windowed composite matches the full composite inside the window', () => {
+    const background = createLayer('bg', 'Background', 16, 16, 'white');
+    const upper = createLayer('l1', 'Layer 1', 16, 16, 'transparent');
+    for (const [x, y, g] of [
+      [3, 3, 0],
+      [8, 5, 90],
+      [12, 12, 200],
+    ] as const) {
+      paint(upper, x, y, g);
+    }
+    const layers = [background, { ...upper, opacity: 0.7, blend: 'multiply' as const }];
+    const full = createRgbaBuffer(16, 16);
+    compositeLayersInPlace(full, layers);
+    const windowed = createRgbaBuffer(16, 16);
+    compositeLayersInPlace(windowed, layers, { x: 2, y: 2, width: 12, height: 12 });
+    for (let y = 2; y < 14; y += 1) {
+      for (let x = 2; x < 14; x += 1) {
+        expect(grey(windowed, x, y)).toBe(grey(full, x, y));
+      }
+    }
+    // Outside the window the target is untouched (still white).
+    expect(grey(windowed, 0, 0)).toBe(255);
+  });
+
+  it('a window fully outside the target is a no-op', () => {
+    const target = createRgbaBuffer(8, 8);
+    const layer = createLayer('l1', 'Layer 1', 8, 8, 'transparent');
+    paint(layer, 1, 1, 0);
+    compositeLayersInPlace(target, [layer], { x: 20, y: 20, width: 5, height: 5 });
+    expect(grey(target, 1, 1)).toBe(255);
+  });
 });

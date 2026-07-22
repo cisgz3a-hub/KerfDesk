@@ -109,7 +109,17 @@ export type EditorSession = {
   readonly revision: number;
   /** True once any op landed after open or the last Apply. */
   readonly dirtySinceApply: boolean;
+  /**
+   * Pixels changed by the op that produced this revision: a rect for the
+   * hot ops (stroke/fill/move/adjust), EMPTY_DIRTY_RECT for selection-only
+   * changes, null = everything (layer/structure ops, crop, undo). Drives
+   * the dirty-window composite cache (V2 plan A1).
+   */
+  readonly lastDirtyRect: PixelRect | null;
 };
+
+/** Zero-area marker: the revision changed nothing the composite can see. */
+export const EMPTY_DIRTY_RECT: PixelRect = { x: 0, y: 0, width: 0, height: 0 };
 
 export function createSession(
   objectId: string,
@@ -130,6 +140,7 @@ export function createSession(
     selection: null,
     revision: 0,
     dirtySinceApply: false,
+    lastDirtyRect: null,
   };
 }
 
@@ -146,6 +157,7 @@ export function revertSession(session: EditorSession): EditorSession {
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: null,
   };
 }
 
@@ -204,6 +216,7 @@ export function commitCrop(session: EditorSession, rect: PixelRect): EditorSessi
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: null,
   };
 }
 
@@ -231,12 +244,17 @@ export function brushFor(tool: EditorTool, settings: BrushSettings): BrushParams
   return { diameterPx: settings.diameterPx, opacity: settings.opacity, tip };
 }
 
-function committed(session: EditorSession, history: EditHistory): EditorSession {
+function committed(
+  session: EditorSession,
+  history: EditHistory,
+  dirtyRect: PixelRect,
+): EditorSession {
   return {
     ...session,
     history,
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: dirtyRect,
   };
 }
 
@@ -259,7 +277,7 @@ export function commitStroke(
   const entry = captureRect(session.doc, rect, label);
   // Photoshop: an active selection clamps every stroke.
   paintStrokeInPlace(session.doc, stroke, session.selection ?? undefined);
-  return committed(session, pushHistoryEntry(session.history, entry));
+  return committed(session, pushHistoryEntry(session.history, entry), rect);
 }
 
 /** Line tool: a two-point stroke; Shift constrains to 45°. */
@@ -279,7 +297,8 @@ export function withSelection(
   session: EditorSession,
   selection: SelectionMask | null,
 ): EditorSession {
-  return { ...session, selection, revision: session.revision + 1 };
+  // Selection changes never move pixels — the composite cache stays valid.
+  return { ...session, selection, revision: session.revision + 1, lastDirtyRect: EMPTY_DIRTY_RECT };
 }
 
 /** Move the selection OUTLINE only (selection-tool drag / arrow nudge). */
@@ -299,7 +318,7 @@ export function commitFillSelection(
   if (bounds === null) return session;
   const entry = captureRect(session.doc, bounds, label);
   fillMaskedInPlace(session.doc, session.selection, color);
-  return committed(session, pushHistoryEntry(session.history, entry));
+  return committed(session, pushHistoryEntry(session.history, entry), bounds);
 }
 
 /** Move the selected pixels by (dx, dy): extract → white-fill → blit. */
@@ -320,7 +339,7 @@ export function commitMoveSelection(session: EditorSession, dx: number, dy: numb
   // The selection travels with its contents; a shifted mask keeps later ops
   // (delete/fill/second move) anchored on the moved pixels.
   return {
-    ...committed(session, pushHistoryEntry(session.history, entry)),
+    ...committed(session, pushHistoryEntry(session.history, entry), touched),
     selection: shiftMask(session.selection, Math.round(dx), Math.round(dy)),
   };
 }
@@ -328,13 +347,23 @@ export function commitMoveSelection(session: EditorSession, dx: number, dy: numb
 export function undoSession(session: EditorSession): EditorSession {
   const result = undoInPlace(session.history, session.doc);
   if (result.applied === null) return session;
-  return { ...session, history: result.history, revision: session.revision + 1 };
+  return {
+    ...session,
+    history: result.history,
+    revision: session.revision + 1,
+    lastDirtyRect: null,
+  };
 }
 
 export function redoSession(session: EditorSession): EditorSession {
   const result = redoInPlace(session.history, session.doc);
   if (result.applied === null) return session;
-  return { ...session, history: result.history, revision: session.revision + 1 };
+  return {
+    ...session,
+    history: result.history,
+    revision: session.revision + 1,
+    lastDirtyRect: null,
+  };
 }
 
 function unionRects(a: PixelRect, b: PixelRect): PixelRect {

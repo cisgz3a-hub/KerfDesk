@@ -47,6 +47,7 @@ export function commitAdjustment(
     history: pushHistoryEntry(session.history, entry),
     revision: session.revision + 1,
     dirtySinceApply: true,
+    lastDirtyRect: captured,
   };
 }
 
