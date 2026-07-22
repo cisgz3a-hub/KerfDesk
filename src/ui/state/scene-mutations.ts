@@ -28,6 +28,7 @@ import {
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateArtworkWithOperations } from './duplicate-artwork';
 import { positionTraceOverRasterSource } from './trace-placement';
+import { releaseTraceSourcePalette } from './trace-source-palette';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -278,6 +279,15 @@ export function applyTraceToExisting(
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
   const prepared = prepareTraceSource(s.project.scene, existing, options);
   let scene = prepared.scene;
+  // Free the source's palette slot BEFORE the trace allocates, so the artwork
+  // being cut takes OPERATION_PALETTE[0] instead of the runner-up. A deleted
+  // source leaves its operation orphaned (pruning it below would come too late
+  // to matter); a retained one stays as a no-output backing and steps aside.
+  if (prepared.source !== undefined) {
+    scene = prepared.shouldPruneLayers
+      ? pruneOrphanLayers(scene)
+      : releaseTraceSourcePalette(scene, prepared.source);
+  }
   const positionedTrace =
     prepared.source === undefined ? traced : positionTraceOverRasterSource(prepared.source, traced);
   if (options.replaceTraceId !== undefined && options.replaceTraceId !== positionedTrace.id) {
