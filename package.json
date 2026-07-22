@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "clipper2-ts": "2.0.1-17",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.12",
     "electron-updater": "^6.8.9",
     "imagetracerjs": "^1.2.6",
     "lucide-static": "^1.23.0",
