@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -10,16 +10,64 @@ function repoFile(path: string): string {
 // prove the installer runs, but it CAN pin the invariants that keep the release
 // correct: tag-gated, verified before packaging, version-pinned, signed before
 // publishing, and targeting the exact origin electron-updater reads from.
-describe('Desktop release workflow gate (ADR-024/152)', () => {
-  const workflow = repoFile('.github/workflows/release-desktop.yml');
+describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
+  const workflow = repoFile('.github/workflows/release-desktop-stable.yml');
+  const dryRunWorkflow = repoFile('.github/workflows/release-desktop-dry-run.yml');
+  const deployWorkflow = repoFile('.github/workflows/deploy.yml');
+  const tagPushPredicate = "if: github.event_name == 'push' && github.ref_type == 'tag'";
 
-  it('builds only on version tags, on a Windows runner', () => {
-    expect(workflow).toContain("tags: ['v*']");
+  it('production listens only to version-tag pushes on Windows', () => {
+    expect(existsSync(join(process.cwd(), '.github/workflows/release-desktop.yml'))).toBe(false);
+    expect(workflow).toContain("tags: ['v*', '!v*-*']");
+    expect(workflow).not.toMatch(/^\s{2}workflow_dispatch:/m);
     expect(workflow).toContain('runs-on: windows-latest');
+    expect(workflow).toContain('environment: desktop-production');
+  });
+
+  it('puts manual packaging in a credential-free dispatch-only workflow', () => {
+    expect(dryRunWorkflow).toMatch(/^\s{2}workflow_dispatch:/m);
+    expect(dryRunWorkflow).not.toContain('tags:');
+    expect(dryRunWorkflow).not.toContain('${{ secrets.');
+    expect(dryRunWorkflow).not.toContain('WIN_CSC_LINK');
+    expect(dryRunWorkflow).not.toContain('WIN_CSC_KEY_PASSWORD');
+    expect(dryRunWorkflow).not.toContain('wrangler r2 object put');
+    expect(dryRunWorkflow).not.toContain('gh release');
+    expect(dryRunWorkflow).toContain('actions/upload-artifact@v7');
+    expect(dryRunWorkflow).toContain('VERSION="0.0.0-dispatch.${GITHUB_RUN_NUMBER}"');
+    expect(dryRunWorkflow).toContain('--config.extraMetadata.kerfdeskUpdateChannelTrusted=false');
+    expect(dryRunWorkflow).toContain('--config.forceCodeSigning=false');
+    expect(dryRunWorkflow).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'");
+    expect(dryRunWorkflow.indexOf('run: pnpm release:check')).toBeLessThan(
+      dryRunWorkflow.indexOf('electron-builder --win --x64'),
+    );
   });
 
   it('checks text out as LF on Windows so the Prettier release gate is stable', () => {
     expect(repoFile('.gitattributes')).toContain('* text=auto eol=lf');
+  });
+
+  it('rejects the tag before requesting the production environment', () => {
+    const validationJob = workflow.indexOf('validate-stable-tag:');
+    const validator = workflow.indexOf('node scripts/validate-release-tag.mjs stable');
+    const buildJob = workflow.indexOf('build-windows:');
+    const environment = workflow.indexOf('environment: desktop-production');
+    expect(validationJob).toBeGreaterThanOrEqual(0);
+    expect(validator).toBeGreaterThan(validationJob);
+    expect(buildJob).toBeGreaterThan(validator);
+    expect(workflow.slice(buildJob, environment)).toContain('needs: validate-stable-tag');
+    expect(environment).toBeGreaterThan(buildJob);
+  });
+
+  it('rejects non-stable or lightweight tags before signing and R2 publication', () => {
+    const validatorIndex = workflow.indexOf(
+      'node scripts/validate-release-tag.mjs stable "${GITHUB_REF_NAME}"',
+    );
+    const signingIndex = workflow.indexOf('Require tag-release signing credentials');
+    const publishIndex = workflow.indexOf('Publish installer + update feed to Cloudflare R2');
+    expect(validatorIndex).toBeGreaterThanOrEqual(0);
+    expect(workflow.slice(0, validatorIndex)).toContain(tagPushPredicate);
+    expect(validatorIndex).toBeLessThan(signingIndex);
+    expect(validatorIndex).toBeLessThan(publishIndex);
   });
 
   it('runs the full release:check gate before packaging the installer', () => {
@@ -39,16 +87,29 @@ describe('Desktop release workflow gate (ADR-024/152)', () => {
   });
 
   it('fails tag releases closed unless signing credentials and a valid signature exist', () => {
-    expect(workflow).toContain('Require tag-release signing credentials');
-    expect(workflow).toContain('WIN_CSC_LINK: ${{ secrets.CSC_LINK }}');
-    expect(workflow).toContain('--config.forceCodeSigning="${force_signing}"');
-    expect(workflow).toContain('Verify signed tag installer');
+    const requireStart = workflow.indexOf('Require tag-release signing credentials');
+    const signedStart = workflow.indexOf('Build signed Windows installer + update feed');
+    const verifyStart = workflow.indexOf('Verify signed tag installer');
+    const uploadStart = workflow.indexOf('Upload installer + update feed as workflow artifact');
+    const signedBuild = workflow.slice(signedStart, verifyStart);
+    expect(workflow.slice(requireStart, signedStart)).toContain(tagPushPredicate);
+    expect(signedBuild).toContain(tagPushPredicate);
+    expect(signedBuild).toContain('WIN_CSC_LINK: ${{ secrets.STABLE_WINDOWS_CSC_LINK }}');
+    expect(signedBuild).not.toContain('secrets.CSC_LINK');
+    expect(signedBuild).toContain('--config.forceCodeSigning=true');
+    expect(workflow.slice(verifyStart, uploadStart)).toContain(tagPushPredicate);
     expect(workflow).toContain("$signature.Status -ne 'Valid'");
   });
 
-  it('embeds update trust only in signed tag builds and reads it fail-closed at runtime', () => {
-    expect(workflow).toContain('if [ "${GITHUB_REF_TYPE}" = "tag" ]');
-    expect(workflow).toContain('--config.extraMetadata.kerfdeskUpdateChannelTrusted="${trust}"');
+  it('uses the actual tag-push predicate on every production-sensitive step', () => {
+    expect(workflow.split(tagPushPredicate)).toHaveLength(6);
+  });
+
+  it('embeds update trust only in signed tag-push builds and reads it fail-closed', () => {
+    const signedStart = workflow.indexOf('Build signed Windows installer + update feed');
+    const verifyStart = workflow.indexOf('Verify signed tag installer');
+    const signedBuild = workflow.slice(signedStart, verifyStart);
+    expect(signedBuild).toContain('--config.extraMetadata.kerfdeskUpdateChannelTrusted=true');
     expect(repoFile('electron/main.ts')).toContain(
       'readDesktopUpdateChannelTrust(app.getAppPath())',
     );
@@ -56,11 +117,20 @@ describe('Desktop release workflow gate (ADR-024/152)', () => {
   });
 
   it('publishes to R2 only for tag pushes, never a manual dry run', () => {
-    expect(workflow).toContain("if: github.ref_type == 'tag'");
+    const publishIndex = workflow.indexOf('Publish installer + update feed to Cloudflare R2');
+    const publishBlock = workflow.slice(publishIndex);
+    expect(publishBlock).toContain(tagPushPredicate);
+    expect(publishBlock).toContain('secrets.STABLE_R2_API_TOKEN');
+    expect(publishBlock).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
     expect(workflow).toContain('wrangler r2 object put');
-    expect(workflow.indexOf('Verify signed tag installer')).toBeLessThan(
-      workflow.indexOf('Publish installer + update feed to Cloudflare R2'),
-    );
+    expect(workflow.indexOf('Verify signed tag installer')).toBeLessThan(publishIndex);
+  });
+
+  it('keeps web deployment on newly named Pages-only credentials', () => {
+    expect(deployWorkflow).toContain('secrets.PAGES_CLOUDFLARE_API_TOKEN');
+    expect(deployWorkflow).toContain('secrets.PAGES_CLOUDFLARE_ACCOUNT_ID');
+    expect(deployWorkflow).not.toContain('${{ secrets.CLOUDFLARE_API_TOKEN }}');
+    expect(deployWorkflow).not.toContain('${{ secrets.CLOUDFLARE_ACCOUNT_ID }}');
   });
 
   it('uploads the feed to the same origin electron-updater reads from', () => {

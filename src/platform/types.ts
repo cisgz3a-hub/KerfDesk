@@ -166,6 +166,18 @@ export type CameraBridgeAdapter = {
   readonly health: () => Promise<CameraBridgeHealth>;
 };
 
+// Unsigned desktop Preview update discovery (ADR-249). This is notification
+// only: the adapter can report a newer version and supply one fixed website
+// address, but it has no download, execute, install, or restart capability.
+export type DesktopUpdateAvailability =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'available'; readonly version: string };
+
+export type DesktopUpdateAdapter = {
+  readonly downloadPageUrl: (version: string) => string;
+  readonly checkForUpdate: () => Promise<DesktopUpdateAvailability>;
+};
+
 export type PlatformAdapter = {
   readonly id: 'web' | 'electron' | 'mock';
 
@@ -187,4 +199,8 @@ export type PlatformAdapter = {
   // Optional local camera bridge for RTSP/network cameras. Web-only runs can
   // report unavailable; Electron starts the bridge in the main process.
   readonly cameraBridge?: CameraBridgeAdapter;
+
+  // Installed only by the Electron renderer adapter. Main enables the endpoint
+  // only for a packaged Preview; stable desktop uses its signed updater path.
+  readonly desktopUpdates?: DesktopUpdateAdapter;
 };

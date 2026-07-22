@@ -71,4 +71,4 @@ safety data sheet (SDS) and your machine manufacturer's guidance.
 ---
 
 This safety information is also summarized in the app under **Help → Safety &
-liability**, and the license terms are in the accompanying EULA.
+liability**, and the MIT terms are in the accompanying License & Safety Notice.

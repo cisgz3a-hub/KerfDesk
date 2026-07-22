@@ -1,0 +1,62 @@
+appId: dev.laserforge.app
+productName: KerfDesk
+forceCodeSigning: false
+
+directories:
+  output: release/${version}
+  buildResources: build
+
+# Preview packages the same compiled application as web and stable desktop.
+# Legal material is duplicated at the package root so it remains available
+# outside the renderer bundle on every desktop target.
+files:
+  - dist-electron/**/*
+  - '!dist-electron/**/*.map'
+  - dist/web/**/*
+  - package.json
+extraResources:
+  - from: LICENSE
+    to: legal/LICENSE
+  - from: THIRD_PARTY_NOTICES.md
+    to: legal/THIRD_PARTY_NOTICES.md
+  - from: public/third-party-notices.txt
+    to: legal/third-party-notices.txt
+
+extraMetadata:
+  kerfdeskUpdateChannelTrusted: false
+  kerfdeskDesktopReleaseChannel: preview
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: KerfDesk
+  license: public/eula.txt
+  differentialPackage: false
+
+mac:
+  appId: com.kerfdesk.app
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  artifactName: KerfDesk-${version}-macos-${arch}.${ext}
+  identity: null
+  hardenedRuntime: false
+  notarize: false
+  minimumSystemVersion: '12.0'
+  extendInfo:
+    NSCameraUsageDescription: KerfDesk uses a camera to align work with material and preview the machine workspace.
+    NSLocalNetworkUsageDescription: KerfDesk connects to cameras on the local network for workspace preview.
+
+dmg:
+  title: KerfDesk ${version}
+  sign: false

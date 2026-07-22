@@ -19,6 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:release-integrity": "node --test scripts/third-party-closure.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
@@ -29,7 +30,7 @@
     "check:file-size": "node scripts/check-file-size-policy.mjs",
     "check:soft-size": "node scripts/check-soft-line-limit.mjs",
     "check:index-exports": "node scripts/check-index-exports.mjs",
-    "release:check": "pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm license-check && pnpm audit:deps && pnpm test && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
+    "release:check": "pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm license-check && pnpm audit:deps && pnpm test && pnpm test:release-integrity && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
     "guard:repo": "node scripts/assert-correct-repo.mjs",
     "dev:web": "vite",
     "build": "pnpm build:web",
@@ -57,6 +58,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@eslint/js": "^9.10.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^20.14.0",

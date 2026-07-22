@@ -35,6 +35,7 @@ import {
   net,
   protocol,
   session,
+  shell,
   type Event as ElectronEvent,
   type Session,
   type WebContents,
@@ -62,10 +63,31 @@ import {
   type RtspCameraBridgeHandle,
 } from './rtsp-camera-bridge.js';
 import { configureAutoUpdater } from './auto-update.js';
-import { readDesktopUpdateChannelTrust } from './update-channel-trust.js';
+import { DESKTOP_PRODUCT_NAME, legacyDesktopDataPath } from './desktop-identity.js';
+import {
+  canonicalOfficialDesktopDownloadUrl,
+  isOfficialDesktopDownloadUrl,
+} from './official-download-page.js';
+import {
+  createPreviewUpdateCheck,
+  isExactPreviewUpdateApiRequest,
+  PREVIEW_UPDATE_API_PATH,
+} from './preview-update.js';
+import {
+  readDesktopPreviewUpdateEnabled,
+  readDesktopUpdateChannelTrust,
+  resolveDesktopUpdateModes,
+} from './update-channel-trust.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Public rename without a data migration: pin both Chromium/application roots
+// before Electron's ready event so existing projects and recovery state remain.
+const LEGACY_DESKTOP_DATA_PATH = legacyDesktopDataPath(app.getPath('appData'));
+app.setName(DESKTOP_PRODUCT_NAME);
+app.setPath('userData', LEGACY_DESKTOP_DATA_PATH);
+app.setPath('sessionData', LEGACY_DESKTOP_DATA_PATH);
 
 // electron-updater is CommonJS; under Node16 ESM the reliable interop is a
 // default import + destructure (a named ESM import isn't statically detectable).
@@ -79,7 +101,20 @@ const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
 const CAMERA_BRIDGE_ORIGIN = `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`;
 // ADR-171: tag releases embed this flag only after forceCodeSigning succeeds.
 // Missing, malformed, and manual-build metadata all fail closed.
-const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = readDesktopUpdateChannelTrust(app.getAppPath());
+const DESKTOP_UPDATE_MODES = resolveDesktopUpdateModes(
+  readDesktopUpdateChannelTrust(app.getAppPath()),
+  app.isPackaged && readDesktopPreviewUpdateEnabled(app.getAppPath()),
+);
+const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = DESKTOP_UPDATE_MODES.trustedUpdater;
+const IS_DESKTOP_PREVIEW_UPDATE_ENABLED = DESKTOP_UPDATE_MODES.previewNotification;
+const checkForPreviewUpdate = createPreviewUpdateCheck({
+  enabled: IS_DESKTOP_PREVIEW_UPDATE_ENABLED,
+  currentVersion: app.getVersion(),
+  platform: process.platform,
+  arch: process.arch,
+  fetchReleases: (url, init) => net.fetch(url, init),
+  onError: (error: unknown) => console.warn('Preview update check failed:', error),
+});
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
@@ -125,6 +160,19 @@ protocol.registerSchemesAsPrivileged([
 function makeAppProtocolHandler(distRoot: string) {
   return async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
+    if (url.hostname === 'app' && url.pathname === PREVIEW_UPDATE_API_PATH) {
+      if (!isExactPreviewUpdateApiRequest(request)) {
+        return new Response('Not Found', { status: 404 });
+      }
+      const availability = await checkForPreviewUpdate();
+      return Response.json(availability, {
+        headers: {
+          'Cache-Control': 'no-store',
+          'Content-Type': 'application/json; charset=utf-8',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    }
     // Strip leading slash; treat empty path as index.html.
     const requested = url.pathname.replace(/^\/+/, '') || 'index.html';
     const filePath = path.normalize(path.join(distRoot, requested));
@@ -146,7 +194,7 @@ function createMainWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
-    title: 'LaserForge 2.0',
+    title: DESKTOP_PRODUCT_NAME,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -296,6 +344,14 @@ function installNavigationPolicy(window: BrowserWindow): void {
   webContents.on('will-navigate', blockUntrusted);
   webContents.on('will-redirect', blockUntrusted);
   webContents.setWindowOpenHandler((details) => {
+    if (isOfficialDesktopDownloadUrl(details.url)) {
+      const downloadUrl = canonicalOfficialDesktopDownloadUrl(details.url);
+      if (downloadUrl === null) return { action: 'deny' };
+      void shell.openExternal(downloadUrl).catch((error: unknown) => {
+        console.warn('Could not open the KerfDesk download page:', error);
+      });
+      return { action: 'deny' };
+    }
     return {
       action: shouldAllowWindowOpen(details.url, TRUSTED_RENDERER_ORIGINS) ? 'allow' : 'deny',
     };

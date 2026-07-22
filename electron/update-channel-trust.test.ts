@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  previewUpdateEnabledFromPackageMetadata,
+  readDesktopPreviewUpdateEnabled,
   readDesktopUpdateChannelTrust,
+  resolveDesktopUpdateModes,
   updateChannelTrustedFromPackageMetadata,
 } from './update-channel-trust.js';
 
@@ -34,6 +37,43 @@ describe('desktop update-channel trust', () => {
     expect(readDesktopUpdateChannelTrust(appPath)).toBe(true);
   });
 
+  it('enables notify-only checks only for an exact Preview channel marker', () => {
+    expect(
+      previewUpdateEnabledFromPackageMetadata({ kerfdeskDesktopReleaseChannel: 'preview' }),
+    ).toBe(true);
+    expect(
+      previewUpdateEnabledFromPackageMetadata({ kerfdeskDesktopReleaseChannel: 'stable' }),
+    ).toBe(false);
+    expect(previewUpdateEnabledFromPackageMetadata({ kerfdeskDesktopReleaseChannel: true })).toBe(
+      false,
+    );
+    expect(previewUpdateEnabledFromPackageMetadata(null)).toBe(false);
+  });
+
+  it('reads the Preview marker independently from signed update trust', () => {
+    const appPath = temporaryAppPath({
+      kerfdeskDesktopReleaseChannel: 'preview',
+      kerfdeskUpdateChannelTrusted: false,
+    });
+    expect(readDesktopPreviewUpdateEnabled(appPath)).toBe(true);
+    expect(readDesktopUpdateChannelTrust(appPath)).toBe(false);
+  });
+
+  it('fails fully closed when Preview and trusted-updater metadata conflict', () => {
+    expect(resolveDesktopUpdateModes(true, true)).toEqual({
+      trustedUpdater: false,
+      previewNotification: false,
+    });
+    expect(resolveDesktopUpdateModes(true, false)).toEqual({
+      trustedUpdater: true,
+      previewNotification: false,
+    });
+    expect(resolveDesktopUpdateModes(false, true)).toEqual({
+      trustedUpdater: false,
+      previewNotification: true,
+    });
+  });
+
   it('fails closed for absent or malformed package metadata', () => {
     const absent = mkdtempSync(join(tmpdir(), 'kerfdesk-update-trust-'));
     temporaryDirectories.push(absent);
@@ -43,6 +83,8 @@ describe('desktop update-channel trust', () => {
 
     expect(readDesktopUpdateChannelTrust(absent)).toBe(false);
     expect(readDesktopUpdateChannelTrust(malformed)).toBe(false);
+    expect(readDesktopPreviewUpdateEnabled(absent)).toBe(false);
+    expect(readDesktopPreviewUpdateEnabled(malformed)).toBe(false);
   });
 });
 

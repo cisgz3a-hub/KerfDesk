@@ -114,15 +114,38 @@ auditable.
 | `eslint-import-resolver-typescript` | ^3.6.3 | ISC | TS path resolution for boundaries |
 | `prettier` | ^3.3.0 | MIT | Formatter |
 | `globals` | ^15.9.0 | MIT | Predefined env globals |
-| `license-checker` | ^25.0.1 | BSD-3-Clause | CI license audit |
+| `scripts/check-licenses.mjs` | in-tree | MIT | pnpm-aware production package-license gate |
 | `@types/node`, `@types/react`, `@types/react-dom`, `@types/opentype.js` | various | MIT (DefinitelyTyped) | Type declarations |
 | `electron` | ^42.3.0 | MIT | Windows desktop shell (bumped F-2; CVE-2026-34769/34780 patched) |
 | `electron-builder` | ^26.11.1 | MIT | Desktop installer pipeline |
+| `@electron/asar` | 3.4.1 | MIT | Inspect packaged Preview metadata in release gates |
 | `wrangler` | ^4.95.0 | MIT / Apache-2.0 | Cloudflare Pages deploy CLI |
 
 All licenses verified MIT-compatible by `pnpm license-check` (production-only)
 + manual review of dev-dep tree. The CI workflow re-runs the check on every
 push.
+
+### @electron/asar — adopted for packaged Preview verification (2026-07-22)
+
+- **Version:** 3.4.1 exact; this is the version already resolved transitively by
+  electron-builder. Upstream latest at evaluation was 4.2.1 (2026-07-21).
+- **License:** MIT, verified from the installed package and official repository.
+- **Source:** https://github.com/electron/asar/releases/tag/v3.4.1
+- **Decision affected:** ADR-248/249 and
+  `scripts/verify-packaged-preview-metadata.mjs`.
+- **Role:** dev/release-only reader for `app.asar/package.json`; proves the built
+  version, Preview marker, and updater-trust false value actually landed in each
+  Windows/macOS package. It is never bundled into the application runtime.
+- **Maintenance:** official Electron project; actively maintained. The older
+  compatible major is pinned deliberately to reuse electron-builder's installed
+  copy rather than add a second ASAR implementation to the release toolchain.
+- **Evaluated:** 2026-07-22, Codex session.
+- **Confidence:** high.
+- **Re-verify by:** 2027-01-22.
+- **Alternatives considered:** leave the archive unchecked (rejected because
+  source YAML cannot prove runtime metadata); disable ASAR (rejected because it
+  changes package structure); install an unpinned CLI in CI (rejected as a
+  supply-chain and reproducibility regression).
 
 ---
 
@@ -143,7 +166,7 @@ These have been chosen in advance but are not yet in `package.json`. Re-verify a
   - `fontkit` (MIT) — heavier (~600 KB unminified); supports more font formats than we need (WOFF2, etc.). Skipped.
   - `harfbuzzjs` (MIT) — text shaping for complex scripts; overkill for Latin-script MVP-D and 10× the size.
 - **Bundle impact:** adds ~265 KB to the JS bundle (524 KB total → 161 KB gzip). Within PROJECT.md's "< 1 MB compressed" target with margin. Lazy-loading deferred — could re-evaluate if a future feature pushes the bundle past 200 KB gzip.
-- **Bundled fonts:** Roboto Regular (Apache-2.0), Inconsolata Regular (OFL-1.1), Pacifico Regular (OFL-1.1), Dancing Script Regular (OFL-1.1). All MIT-compatible per ADR-017. Loaded on-demand via UI-layer `font-loader.ts` — fonts are not in the initial JS bundle.
+- **Bundled fonts:** Roboto Regular (Apache-2.0), Inconsolata Regular (OFL-1.1), Pacifico Regular (OFL-1.1), Dancing Script Regular (OFL-1.1). Reviewed separately as permissively licensed assets with their own notices, not as blanket npm-package approvals under ADR-017. Loaded on-demand via UI-layer `font-loader.ts` — fonts are not in the initial JS bundle.
 
 ### imagetracerjs — adopted Phase E (2026-05-27)
 
@@ -830,8 +853,9 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   - Transitive `sax@1.6.0` (via `builder-util-runtime`) is **BlueOak-1.0.0** —
     a permissive, MIT-compatible license (Blue Oak Council permissive list;
     no copyleft). Added to the `scripts/check-licenses.mjs` allow-list on
-    adoption (maintainer-approved 2026-07-04), consistent with the existing
-    permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).
+    adoption (maintainer-approved 2026-07-04), consistent with the reviewed
+    permissive package entries such as Boost `BSL-1.0`. Creative Commons and
+    OFL terms are reviewed for assets/content, not blanket-approved npm packages.
 
 ## GRBL axis-specific origin semantics (2026-07-13)
 
@@ -1151,3 +1175,49 @@ evidence: `docs/audits/2026-07-21-image-editor-web-research.md`; roadmap:
 ## 2026-07-21 - Image Size resampling: pica evaluated, in-house chosen
 
 PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worker, but ADR-242 holds Image Studio to zero new dependencies through IE-3, and the editor's need is engrave-resolution conversion, not print-grade interpolation. Shipped src/core/image-resample: a 2x2 box-halving chain while the source exceeds 2x the target (anti-aliases heavy downscales - the failure mode that matters for 20 MP photos), bilinear tail for the remainder. Pinned by an alternating-columns test naive bilinear fails. A Lanczos upgrade (pica or in-house) can slot behind the same resampleBuffer signature if fidelity work later demands it.
+
+---
+
+## Unsigned Preview update discovery — 2026-07-22 (ADR-249)
+
+- **Behavioral reference:** Rayforge's public desktop distribution was studied as
+  a product pattern: notify about a newer release, then send the operator to an
+  official installation page for a manual upgrade. No Rayforge code was copied.
+- **Rejected:** `electron-updater` for Preview. It is retained only for the
+  future signed stable Windows feed because its download/install capability is
+  inappropriate for deliberately unsigned artifacts.
+- **Rejected:** OS notification as the sole Preview UI. Notification identity
+  and permission are OS-dependent, especially for unsigned Mac builds, while
+  the existing status bar is deterministic and non-modal.
+- **Rejected:** a new preload/context bridge or `ipcMain` handler. The existing
+  privileged `app://` protocol can expose one exact same-origin read-only route
+  without broadening renderer privileges or CSP.
+- **GitHub API:** `/releases/latest` excludes prereleases, so the checker uses
+  the bounded releases-list endpoint and filters locally. It requires a strict
+  Preview tag, immutable published state, and the current platform's canonical
+  asset. GitHub response URLs never control navigation.
+- **Release setting boundary:** GitHub's immutable-release settings endpoint
+  requires repository Administration-read permission, which `GITHUB_TOKEN`
+  cannot request. Immutability is therefore a maintainer-verified tag
+  prerequisite and a post-publication cryptographic/API assertion; it is not a
+  workflow preflight that would always fail. The setting was enabled on
+  2026-07-22.
+- **Workflow supply chain:** every third-party action in the new Preview lane is
+  pinned to a full commit SHA. The tag commit must belong to current `main`, and
+  the workflow re-peels the remote annotated tag before draft creation and again
+  immediately before publication.
+- **Privacy:** the one anonymous request per packaged Preview launch carries no
+  token, cookie, referrer, user, project, machine, controller, or job data.
+  Ordinary network metadata such as IP/time and a generic product user agent is
+  unavoidable and is disclosed in PROJECT/ADR-249.
+- **User action:** the status-bar link derives only the exact strict
+  `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page; the web
+  download button opens the same repository's release index. The same-origin
+  landing page was rejected for these controls because an already-installed
+  legacy service worker can keep serving its older precached download HTML. The
+  checker also requires the release's complete binary/checksum/manifest/SBOM
+  asset set. No installer bytes are fetched by the application, and Preview
+  updater trust remains false.
+- **Sources:** GitHub Releases REST API and immutable-release documentation;
+  Electron protocol, security, shell, and notification documentation. Links are
+  pinned in ADR-249.

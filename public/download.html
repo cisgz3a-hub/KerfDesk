@@ -1,110 +1,226 @@
 <!doctype html>
 <!--
-  download.html — the "Download for Windows" landing page (ADR-024). Kept fully
-  self-contained (inline styles, no bundle assets, no scripts) for the same
-  reason as 404.html: a static page that referenced hashed /assets/ chunks would
-  break after a redeploy, and the strict CSP (script-src 'self') blocks inline
-  scripts anyway. The installer + updater feed live on Cloudflare R2; this page
-  just links to the stable installer URL.
+  download.html is deliberately self-contained: no bundle assets and no scripts.
+  Preview downloads live only in the public KerfDesk GitHub prereleases. Because
+  this static page cannot safely resolve a changing version, each platform link
+  opens the same release list and names the exact asset the operator should pick.
 -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Download KerfDesk for Windows</title>
+    <title>Download KerfDesk Preview</title>
     <style>
+      * {
+        box-sizing: border-box;
+      }
       body {
-        font-family: system-ui, sans-serif;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         min-height: 100vh;
         margin: 0;
         background: #f8fafc;
         color: #111827;
+        font-family: system-ui, sans-serif;
       }
       main {
-        max-width: 34rem;
-        padding: 2rem 1.5rem;
+        width: min(64rem, 100%);
+        margin: 0 auto;
+        padding: 3rem 1.25rem;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
       }
       h1 {
-        margin: 0 0 0.25rem;
-        font-size: 1.6rem;
+        margin: 0 0 0.5rem;
+        font-size: clamp(1.8rem, 5vw, 2.5rem);
       }
-      p {
-        line-height: 1.5;
+      h2 {
+        margin: 2rem 0 0.75rem;
+        font-size: 1.35rem;
       }
-      .req {
-        color: #6b7280;
-        font-size: 0.95rem;
-        margin-top: 0.25rem;
+      h3 {
+        margin: 0;
+        font-size: 1.1rem;
       }
-      .download {
-        display: inline-block;
-        margin: 1.25rem 0 0.5rem;
-        padding: 0.7rem 1.4rem;
+      p,
+      li {
+        line-height: 1.55;
+      }
+      .intro {
+        max-width: 48rem;
+        margin: 0;
+        color: #4b5563;
         font-size: 1.05rem;
-        font-weight: 600;
-        color: #ffffff;
-        background: #1976d2;
-        border-radius: 8px;
-        text-decoration: none;
       }
-      .download:hover {
-        background: #1565c0;
-      }
-      .note {
+      .notice {
         margin-top: 1.5rem;
-        padding: 0.9rem 1rem;
+        padding: 1rem 1.1rem;
         background: #fff7ed;
         border: 1px solid #fed7aa;
-        border-radius: 8px;
-        font-size: 0.95rem;
+        border-radius: 10px;
       }
-      .note strong {
+      .notice strong {
         display: block;
         margin-bottom: 0.25rem;
       }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+        gap: 1rem;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        padding: 1.1rem;
+        background: #ffffff;
+        border: 1px solid #dbe3ec;
+        border-radius: 10px;
+      }
+      .requirements {
+        margin: 0.35rem 0 0;
+        color: #6b7280;
+        font-size: 0.92rem;
+      }
+      code {
+        overflow-wrap: anywhere;
+        padding: 0.1rem 0.25rem;
+        background: #f1f5f9;
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+      .asset-name {
+        display: block;
+        margin-top: 0.9rem;
+        padding: 0.55rem;
+        border-radius: 6px;
+      }
+      .download {
+        display: inline-block;
+        align-self: flex-start;
+        margin-top: auto;
+        padding: 0.7rem 1rem;
+        color: #ffffff;
+        background: #1976d2;
+        border-radius: 8px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+      .download:hover,
+      .download:focus-visible {
+        background: #1565c0;
+      }
+      .instructions {
+        padding-left: 1.25rem;
+      }
       a {
-        color: #1976d2;
+        color: #1565c0;
       }
       footer {
-        margin-top: 1.75rem;
-        font-size: 0.9rem;
-        color: #6b7280;
+        margin-top: 2rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid #dbe3ec;
+        color: #4b5563;
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Download KerfDesk for Windows</h1>
-      <p class="req">Windows 10 or 11, 64-bit. Free and offline-capable.</p>
-
-      <a
-        class="download"
-        href="https://dl.kerfdesk.com/desktop/kerfdesk-latest-x64-setup.exe"
-        download
-      >
-        Download the installer (.exe)
-      </a>
-
-      <p class="req">
-        The desktop app is the same KerfDesk you use in the browser, in a native window with a
-        native menu and robust offline support. It connects to your GRBL laser or CNC over USB.
-        Updates are installed manually until code signing is enabled.
+      <h1>Download KerfDesk Preview</h1>
+      <p class="intro">
+        KerfDesk Preview is free, public, and offline-capable. These early desktop builds are
+        unsigned. All three buttons below open the same public
+        <a href="https://github.com/cisgz3a-hub/KerfDesk/releases">KerfDesk GitHub releases</a>
+        page; choose the newest release marked <strong>Pre-release</strong>, then select the exact
+        asset for your computer.
       </p>
 
-      <div class="note">
-        <strong>First launch: a Windows warning is expected.</strong>
-        This early build is not yet code-signed, so Microsoft Defender SmartScreen may show “Windows
-        protected your PC.” Click <em>More info</em> → <em>Run anyway</em> to install. A signed
-        build (no warning) is coming.
+      <div class="notice">
+        <strong>Preview updates are manual.</strong>
+        KerfDesk may notify you that a newer Preview exists, but it never downloads or installs an
+        unsigned update. Finish any machine work, close KerfDesk, return to this page, and install
+        the newer exact-version asset yourself.
       </div>
 
+      <h2>Choose your computer</h2>
+      <div class="grid">
+        <section class="card">
+          <h3>Windows</h3>
+          <p class="requirements">Windows 10 or 11, 64-bit (x64)</p>
+          <code class="asset-name">KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code>
+          <p>Choose the asset whose name follows the pattern above.</p>
+          <a class="download" href="https://github.com/cisgz3a-hub/KerfDesk/releases">
+            Browse Windows Previews
+          </a>
+        </section>
+
+        <section class="card">
+          <h3>Mac with Intel</h3>
+          <p class="requirements">macOS 12 or newer, Intel x64</p>
+          <code class="asset-name">KerfDesk-&lt;version&gt;-macos-x64.dmg</code>
+          <p>Choose the asset whose name follows the pattern above.</p>
+          <a class="download" href="https://github.com/cisgz3a-hub/KerfDesk/releases">
+            Browse Intel Mac Previews
+          </a>
+        </section>
+
+        <section class="card">
+          <h3>Mac with Apple Silicon</h3>
+          <p class="requirements">macOS 12 or newer, Apple Silicon (arm64)</p>
+          <code class="asset-name">KerfDesk-&lt;version&gt;-macos-arm64.dmg</code>
+          <p>Choose the asset whose name follows the pattern above.</p>
+          <a class="download" href="https://github.com/cisgz3a-hub/KerfDesk/releases">
+            Browse Apple Silicon Previews
+          </a>
+        </section>
+      </div>
+
+      <p>
+        In each filename, <code>&lt;version&gt;</code> is the prerelease tag without its leading
+        <code>v</code> (for example, tag <code>v0.2.0-preview.1</code> uses version
+        <code>0.2.0-preview.1</code>).
+      </p>
+
+      <h2>Install an unsigned Preview</h2>
+      <h3>Windows SmartScreen</h3>
+      <ol class="instructions">
+        <li>Run the downloaded setup file.</li>
+        <li>
+          Only continue if it came from the public repository linked above and its filename matches
+          the Windows pattern.
+        </li>
+        <li>
+          If SmartScreen shows <strong>Windows protected your PC</strong>, select
+          <strong>More info</strong>.
+        </li>
+        <li>Confirm the publisher is shown as unknown, then select <strong>Run anyway</strong>.</li>
+      </ol>
+
+      <h3>macOS Gatekeeper</h3>
+      <ol class="instructions">
+        <li>Open the DMG and drag <strong>KerfDesk.app</strong> to Applications.</li>
+        <li>
+          Control-click KerfDesk.app in Applications, choose <strong>Open</strong>, then choose
+          <strong>Open</strong> again.
+        </li>
+        <li>
+          If macOS still blocks it, open
+          <strong>System Settings &gt; Privacy &amp; Security</strong> and choose
+          <strong>Open Anyway</strong>. On macOS 12 Monterey, use
+          <strong
+            >System Preferences &gt; Security &amp; Privacy &gt; General &gt; Open Anyway</strong
+          >.
+        </li>
+      </ol>
+      <p>
+        Mac Preview builds are both <strong>unsigned and unnotarized</strong>. KerfDesk does not
+        disable or silently bypass Gatekeeper.
+      </p>
+
       <footer>
-        On macOS or Linux? There's no desktop installer yet — use the web app at
-        <a href="https://kerfdesk.com">kerfdesk.com</a> in Chrome or Edge (same features,
-        installable from the browser). <a href="/">Open KerfDesk in this browser →</a>
+        <strong>Linux:</strong> there is no Linux desktop Preview yet. Use the
+        <a href="https://kerfdesk.com">KerfDesk web app</a> in Chrome or Edge; it has the same CAM
+        features and can be installed from the browser.
       </footer>
     </main>
   </body>

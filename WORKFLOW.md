@@ -4057,7 +4057,7 @@ F-CNC19 tiling.
 - **Edge / encoder failure.** A platform without 2D canvas support fails
   typed ('could not build the bed image') instead of half-completing.
 
-### F-CAM6. Machine camera via the local bridge (ADR-121)
+### F-CAM6. Machine camera via the local bridge (ADR-121, ADR-141, ADR-248)
 
 - **Success / first-class machine camera.** The operator opens the Camera
   panel, the local bridge is healthy, and **Discover machine camera** finds a
@@ -4068,12 +4068,17 @@ F-CNC19 tiling.
   machine-camera capture show an actionable message. Local-development users
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
-  USB cameras only (ADR-136).
+  USB cameras only (ADR-141).
 - **Empty / no camera found.** Discovery completes with no candidate camera;
   the panel stays usable for USB cameras and manual RTSP entry.
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera
   host are serialized and shared while in flight so preview polling and capture
   do not overload embedded camera servers.
+- **Edge / Mac Preview RTSP qualification.** Mac Preview supports USB and
+  private-network JPEG cameras. RTSP remains unqualified and follows the
+  existing explicit FFmpeg-missing error path when a Finder launch cannot
+  discover `ffmpeg`; the Preview does not bundle FFmpeg or add a
+  platform-specific gate.
 
 ### F-CAM7. Click-to-position the laser head (ADR-122)
 
@@ -4118,90 +4123,300 @@ F-CNC19 tiling.
 
 ---
 
-## Desktop app (Windows installer) flows
+## Desktop app (Windows + macOS Preview) flows
 
-The desktop app is the same web build wrapped in Electron (ADR-003, ADR-024):
-the `dist/web` bundle runs in Electron's Chromium renderer, so every laser/CNC
-flow above behaves identically. These flows cover only what is *new* on the
-desktop target — getting it, updating it, and proving it works.
+The desktop app is the same web build wrapped in Electron (ADR-003, ADR-024,
+ADR-248): the `dist/web` bundle runs in Electron's Chromium renderer, so every
+laser/CNC flow above behaves identically. These flows cover only what is *new*
+on a desktop target — getting it, updating it, and proving it works. Preview is
+an unsigned, exact-version distribution lane; it does not change machine
+behavior or create a second product implementation.
 
-### F-DESK1. Download and install (Windows 10/11, 64-bit)
+### F-DESK1. Download and install an unsigned Preview (ADR-248)
 
-1. In the web app, the operator clicks **Download for Windows** (Toolbar) or
-   opens `https://kerfdesk.com/download`.
-2. The download page links the installer on the Cloudflare R2 feed
-   (`https://dl.kerfdesk.com/desktop/kerfdesk-latest-x64-setup.exe`).
-3. Running the installer (NSIS, per-user, `oneClick:false`) lets the operator
-   choose an install directory, then installs and creates a "LaserForge 2.0"
-   shortcut.
-4. First launch opens the app over the `app://` scheme at bed dimensions — the
-   same as the web app's F-A1.
+1. In the web app, the operator opens the Camera panel and clicks **Download
+   desktop app** to open the public KerfDesk GitHub Releases page directly. The
+   explanatory `https://kerfdesk.com/download` page remains available manually.
+2. The download page offers exact-version assets from the matching prerelease in
+   the same public **cisgz3a-hub/KerfDesk** source repository. It does not
+   send Preview users through a `latest` alias or the stable R2 update feed:
+   - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
+     (NSIS, per-user, `oneClick:false`, user-selectable install directory).
+   - **macOS 12+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
+   - **macOS 12+, Apple Silicon arm64:**
+     `KerfDesk-<version>-macos-arm64.dmg`.
+   Here `<version>` is the tag text without its leading `v` (for example,
+   `0.2.0-preview.1`). The companion files are
+   `KerfDesk-<version>-SHA256SUMS.txt`,
+   `KerfDesk-<version>-release-manifest.json`, and
+   `KerfDesk-<version>-sbom.cdx.json`.
+3. Every visible app, shortcut, installer, disk-image, and artifact name is
+   **KerfDesk**. Windows installation creates a KerfDesk shortcut; macOS users
+   drag **KerfDesk.app** from the DMG to Applications.
+4. Preview installation is manual on every OS. First launch opens the same app
+   over the `app://` scheme at bed dimensions — the same as the web app's F-A1.
 
-#### Error — unsigned-build SmartScreen warning (v1, expected)
-1. Until code signing lands (ADR-024 §5), Windows Defender SmartScreen shows
-   "Windows protected your PC" on first run.
-2. The `/download` page documents the bypass: **More info → Run anyway.**
-3. Once signed, the warning disappears with no app change.
+#### Error — unsigned Windows SmartScreen warning (Preview, expected)
+1. Windows Defender SmartScreen may show "Windows protected your PC" because a
+   Preview installer is unsigned.
+2. The `/download` page labels the asset **Unsigned Preview** and documents the
+   deliberate bypass: **More info → Run anyway**.
 
-#### Empty — no desktop build on macOS / Linux
-1. The download page states the installer is Windows-only and links macOS/Linux
-   users to the web app (ADR-007).
+#### Error — unsigned and unnotarized macOS Gatekeeper warning (Preview, expected)
+1. Gatekeeper may refuse the first normal open because the Preview app is
+   unsigned and unnotarized. The `/download` page labels both Mac assets
+   **Unsigned, unnotarized Preview** before download.
+2. The page documents the deliberate manual-open path supported by macOS:
+   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS 12
+   Monterey uses **System Preferences → Security & Privacy → General → Open
+   Anyway**; newer macOS uses **System Settings → Privacy & Security → Open
+   Anyway**. Preview never claims Apple notarization or silently weakens
+   Gatekeeper.
+
+#### Empty — no desktop build on Linux
+1. The download page links Linux users to the web app. Linux desktop packaging
+   remains out of scope for ADR-248.
 
 #### Edge — inside the desktop app the download/install affordances vanish
-1. When running under Electron (`adapter.id === 'electron'`), the Toolbar hides
-   both **Download for Windows** and the PWA **Install app** button — you don't
-   download or PWA-install the app from within itself.
+1. When running under Electron (`adapter.id === 'electron'`), the Camera panel's
+   `DownloadDesktopLink` returns `null`. The Toolbar's PWA **Install app** button
+   also remains absent because packaged Chromium offers no PWA install prompt—an
+   installed desktop app does not download or PWA-install itself.
+
+#### Edge — Preview is free to launch without an account or gate
+1. Preview shows no account, sign-in, activation, license-key, trial-renewal,
+   subscription, or paywall flow. Launch continues directly to F-A1. Any future
+   commercial entitlement flow is not authorized by this workflow. It first
+   requires the maintainer's explicit prior permission and coordinated
+   supersession of the no-new-guard governance where applicable; only then may a
+   new ADR, workflow, and implementation be proposed.
 
 ### F-DESK2. Desktop updates (trust-gated, burn-safe)
 
-1. An unsigned build performs no automatic update check, download, or install
-   (ADR-135). The operator downloads a newer installer from the pinned KerfDesk
-   download page and runs it after ending the current session.
-2. Once production signing is enabled and verified, each packaged launch checks
-   the R2 feed's `latest.yml` (`electron/auto-update.ts`).
-3. A newer signed version downloads in the background; the OS shows a native
-   "update ready" notification. The current session is never interrupted.
-4. The signed update installs on the **next quit** (`autoInstallOnAppQuit`), and
-   the app relaunches on the new version.
+1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
+   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Releases
+   API (ADR-249). Main accepts only a non-draft, immutable prerelease with a
+   strict newer `vX.Y.Z-preview.N` tag and the canonical asset for the current
+   OS/architecture. Dev, web, stable-version, unsupported-platform, malformed,
+   mutable, missing-asset, downgrade, offline, rate-limited, and failed requests
+   produce no visible control and never block startup.
+2. When a newer Preview exists, a passive **Download update** control appears at
+   the right edge of the status bar and a polite live region announces its exact
+   version. There is no popup and the control receives no automatic focus. It
+   remains available during a job because it cannot reload, download, execute,
+   install, restart, or change machine state.
+3. Clicking **Download update** opens only the fixed public
+   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page for the
+   exact announced version in the system browser. This bypasses any legacy
+   service-worker copy of the first-party landing page and cannot drift to a
+   newer-by-date but lower semantic version.
+   The Electron child window is denied. API-provided URLs are ignored, Preview
+   updater trust stays false, and the app never consumes
+   `latest.yml`, a `latest` redirect, R2 update metadata, or installer bytes.
+   The operator selects an exact GitHub prerelease asset and installs it manually.
+4. The signed stable Windows path remains governed by ADR-024, ADR-135, and
+   ADR-142. Once production signing is enabled and verified, each signed stable
+   packaged launch checks the R2 feed's `latest.yml` (`electron/auto-update.ts`).
+5. A newer correctly signed stable Windows version downloads in the background;
+   the OS shows a native "update ready" notification. The current session is
+   never interrupted. It installs only on the next **natural quit**
+   (`autoInstallOnAppQuit`). KerfDesk never calls `quitAndInstall`. A signed and
+   notarized macOS stable updater remains out of scope.
 
 #### Error — offline or feed unreachable
-1. For a signed build, the check fails silently (logged via `onError`, never
-   fatal). The app runs normally on the installed version.
+1. Preview GitHub metadata failures are silent and non-fatal; the status control
+   remains absent and the installed version continues normally. Signed stable R2
+   failures are also logged only through `onError` and never block startup.
 
 #### Edge — a job is streaming
-1. Updates NEVER install mid-burn: the app never calls `quitAndInstall`, and a
-   quit can't happen during a running job without the operator stopping it
+1. Updates NEVER install mid-burn. Preview only opens a manual download page and
+   does not mutate the running app; signed stable waits for a natural quit, and a
+   quit cannot happen during a running job without the operator stopping it
    (`use-unload-stop.ts` soft-resets the machine on unload). Non-negotiable #9
    holds.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 
-Cutting a release is `git tag vX.Y.Z && git push --tags`, which runs
-`release-desktop.yml` (build → R2 publish). **Green CI does not prove the
-installer runs** (CLAUDE.md). Before a desktop release is called done, a human
-runs this on real Windows:
+**Transition prohibition:** the commands below are future release procedure. No
+Preview tag may be created or pushed until the Preview workflow and its
+stable-tag rejection are merged. After that implementation exists, a Preview
+tag is created as an annotated tag, for example
+`git tag -a vX.Y.Z-preview.N -m "KerfDesk vX.Y.Z Preview N"`, then pushed with
+`git push origin vX.Y.Z-preview.N`. After source CI succeeds, the Preview
+workflow builds all three exact-version assets in the same public
+**cisgz3a-hub/KerfDesk** source repository. It uses the exact existing source
+tag with `--verify-tag`; it never generates another tag. The workflow first
+creates a private draft, uploads and validates the complete asset set, then
+publishes it as an immutable GitHub **prerelease** with `latest=false`. A failed
+build exposes no partial release. The prerelease records the exact source commit
+SHA and includes a SHA-256 manifest, dependency/SBOM inventory, and
+build/provenance attestations for the published assets. Preview tag events invoke
+the checked-in Node validator and verify the ref is an annotated Git tag object.
+Preview accepts only the strict ECMAScript pattern
+`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.(?:0|[1-9][0-9]*)$`;
+stable, leading-zero, lightweight, and malformed tags fail closed. Preview
+publishing never mutates the stable R2 feed or its metadata.
 
-- [ ] `pnpm build:desktop` locally (or download the CI artifact) produces
-      `release/<version>/LaserForge-2.0-<version>-x64-setup.exe`.
-- [ ] Installs cleanly on **Windows 10** and **Windows 11**; the shortcut
-      launches the app over `app://app/index.html`.
-- [ ] **Serial (hardware):** a GRBL laser/CNC plugged in appears in the
-      `select-serial-port` picker; connect → jog → frame → stream a small job.
-- [ ] **Files:** a `.lf2` round-trips via the File System Access pickers; G-code
-      export saves.
-- [ ] **Camera (optional):** a USB webcam previews (getUserMedia); an RTSP/IP
-      camera previews only if `ffmpeg` is on PATH (documented optional dep).
-- [ ] **Unsigned update gate:** an unsigned packaged build performs no update
-      network request, download, or install.
-- [ ] **Signed auto-update (after signing lands):** publish a higher `vX.Y.Z`;
-      a running older signed install downloads it, notifies, and on quit installs
-      + relaunches on the new version. Confirm **no install occurs while a job
-      streams** and a wrong-publisher update is refused.
-- [ ] **Download surface:** `/download` serves the installer on the web; inside
-      the desktop app the Download/Install affordances are hidden.
+**Workflow cutover and later stable activation (state updated 2026-07-22):** historical
+workflow ID `308419274` is now `disabled_manually`, the `desktop-production`
+environment does not yet exist, and the repository currently has only the legacy
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secret names and no CSC secrets.
+This PR is not merge-safe until the remaining unchecked pre-merge step is
+completed and recorded:
 
-Until every box is checked on real hardware, the desktop installer stays
-**CLAIMED** in the hardware verification inventory.
+1. [ ] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
+   `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Do not delete the
+   legacy names yet because current main still consumes them.
+2. [x] `gh workflow disable 308419274` completed and the historical workflow is
+   verified `disabled_manually`; this deliberately pauses the old stable/manual
+   lane during cutover and is reversible.
+3. [ ] Merge only after exact-head CI passes. Wait for the first main Pages deploy to
+   succeed through the new names, then delete legacy `CLOUDFLARE_API_TOKEN`,
+   `CLOUDFLARE_ACCOUNT_ID`, `CSC_LINK`, and `CSC_KEY_PASSWORD` repo names if
+   present.
+4. [ ] Only when a future signed stable release is deliberately authorized, create
+   the protected `desktop-production` environment and add
+   `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
+   `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
+5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or
+   Preview tag—to prove rejection precedes the protected-environment job.
+
+6. [x] Repository release immutability was enabled on 2026-07-22. The workflow's
+   token cannot read repository Administration settings, so the maintainer must
+   re-check this setting before each tag; publication then verifies the release
+   attestation and `immutable:true` result.
+7. [ ] Before the first Preview tag, enable repository rules that prevent direct
+   or forced changes to `main` and restrict `v*` tag creation/update/deletion to
+   the release maintainer. The workflow independently requires the tagged commit
+   to be in current `main` history and re-resolves the remote annotated tag
+   immediately before draft creation and publication.
+
+Only after the later stable setup is recorded do stable tag semantics resume:
+create an annotated tag with
+`git tag -a vX.Y.Z -m "KerfDesk vX.Y.Z"`, then push only that tag with
+`git push origin vX.Y.Z`. The new `release-desktop-stable.yml` path performs the
+signed stable Windows build and R2 publish. Its shared validator accepts only
+`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` and rejects Preview,
+leading-zero, lightweight, or malformed tags before the protected-environment
+job. Credential-free manual packaging uses the separate
+`release-desktop-dry-run.yml` workflow, which has no signing or R2 secret
+references, uses a throwaway dispatch version, remains unsigned and trust-false
+at every selected ref, and uploads only a workflow artifact—never a GitHub
+Release, R2 object, or updater feed. Stable signing, trust, updater, and R2
+transport otherwise remain unchanged; visible product, shortcut, artifact, and
+release names become KerfDesk. **Green CI does
+not prove an installer or disk image runs** (CLAUDE.md). Before either lane is
+called done, humans complete the applicable checks on real operating systems and
+real hardware:
+
+- [ ] **Release identity:** the public prerelease names the exact source SHA; its
+      SHA-256 manifest verifies all three KerfDesk assets; the dependency/SBOM
+      inventory and attestations are present and correspond to that release. The
+      manifest records `sourceRepository` (initially `cisgz3a-hub/KerfDesk`),
+      `sourceSha`, `sourceRef` (the exact `refs/tags/...` ref), and
+      `signerWorkflow`; that last field equals
+      `<sourceRepository>/.github/workflows/release-desktop-preview.yml`. Each
+      downloaded asset passes
+      `gh attestation verify <asset> --repo <sourceRepository> --source-digest
+      <sourceSha> --source-ref <sourceRef> --signer-workflow <signerWorkflow>
+      --deny-self-hosted-runners`.
+- [ ] **Atomic immutable publication:** release immutability is enabled; the
+      workflow uses the already-pushed source tag with `--verify-tag`, creates a
+      private draft, and validates all binaries, checksums, manifest, SBOM,
+      notices, and attestations before publication. The published result reports
+      both immutable and prerelease, never latest.
+- [ ] **Tag-lane isolation:** structural tests prove the stable workflow rejects
+      Preview/malformed tags and the Preview workflow rejects stable/malformed
+      tags before either lane can sign, publish R2 metadata, or create a release.
+      The stable production workflow has a new path and no manual trigger. Its
+      credential-free prerequisite rejects invalid tags before the
+      `desktop-production` environment is reached. That environment contains only
+      new `STABLE_*` secret names. New Pages-only `PAGES_CLOUDFLARE_*` names exist
+      and the historical workflow ID is disabled before merge; the first
+      post-merge Pages deploy succeeds before legacy `CLOUDFLARE_*`/`CSC_*` names
+      are deleted. The separate dry-run is credential-free, unsigned,
+      trust-false, and workflow-artifact-only at every selected ref; it never
+      publishes a GitHub Release, R2 object, or updater feed.
+- [ ] **Shipped legal notices:** every web/desktop distribution carries the
+      current `LICENSE`, `THIRD_PARTY_NOTICES.md`, generated third-party notice,
+      and every dependency/font/asset notice or license text required for that
+      artifact. An artifact-scoped closure gate covers shipped transitive
+      production packages, Electron/Chromium runtime notices, fonts, and assets;
+      the current direct-dependency generator alone is not sufficient.
+- [ ] **Windows packaging:** the x64 NSIS installer installs cleanly on real
+      **Windows 10** and **Windows 11**, creates only KerfDesk-visible names, and
+      launches `app://app/index.html` after the documented SmartScreen path.
+- [ ] **Intel Mac packaging:** the x64 DMG installs and launches KerfDesk over
+      `app://app/index.html` on a real Intel Mac after the documented Gatekeeper
+      manual-open path. Evidence includes macOS 12.x for the claimed floor and a
+      currently supported macOS version for the architecture.
+- [ ] **Apple Silicon packaging:** the arm64 DMG installs and launches KerfDesk
+      over `app://app/index.html` natively on a real Apple Silicon Mac after the
+      documented Gatekeeper manual-open path. Evidence includes macOS 12.x for
+      the claimed floor and a currently supported macOS version for the
+      architecture.
+- [ ] **Serial (hardware, each desktop architecture):** a plugged-in GRBL
+      laser/CNC appears in the platform serial picker; connect → jog → frame →
+      stream a small job and exercise Abort.
+- [ ] **Files (each desktop architecture):** a `.lf2` project round-trips through
+      the existing File System Access pickers and G-code export saves to the
+      chosen path.
+- [ ] **Camera:** a USB webcam previews through `getUserMedia` on every desktop
+      architecture, and private-network JPEG capture works on both Mac
+      architectures. Windows RTSP/IP previews when the optional `ffmpeg` binary
+      is on `PATH`, and its absence fails clearly. Mac RTSP remains unqualified
+      and follows the explicit FFmpeg-missing path; no FFmpeg binary or unreliable
+      Homebrew-path assumption is bundled into the release.
+- [ ] **Mac permission metadata:** both DMGs contain accurate
+      `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
+      `CFBundleIdentifier=com.kerfdesk.app`, and
+      `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
+      private-network JPEG discovery/capture workflows. The bundle identifier
+      names the app but is not represented as durable TCC identity for unsigned
+      builds.
+- [ ] **Mac permission behavior:** at the macOS 12 floor, test launch, USB-camera
+      allow, deny, recovery in System Settings, retry, and private-network JPEG
+      capture. On macOS 15+ and on both architectures, additionally test camera
+      and local-network allow/deny/Settings recovery/retry plus Preview upgrade
+      and any re-prompt; local-network privacy begins on macOS 15.
+- [ ] **Data continuity:** first install the current **LaserForge 2.0** desktop
+      build and create identifiable projects, device settings, libraries,
+      preferences, and IndexedDB recovery/archive state. Before renaming, a
+      packaged identity probe records `app.getPath('userData')` and
+      `app.getPath('sessionData')` and confirms the verified legacy
+      `%APPDATA%\laserforge` root. The first KerfDesk Preview pins both paths to
+      that root before `ready`, retains app ID `dev.laserforge.app` and its NSIS
+      upgrade identity, and preserves the data. Repeat Preview → newer Preview
+      and Preview → future signed stable; machine state is never fabricated from
+      stale data.
+- [ ] **Mac signature state:** CI sets `mac.identity:null`,
+      `mac.hardenedRuntime:false`, `mac.notarize:false`, and
+      `CSC_IDENTITY_AUTO_DISCOVERY=false`; packaged checks recursively inventory
+      the outer app and every nested executable/bundle, permit only unsigned or
+      ad-hoc state, and fail any Developer ID/distribution authority or trusted
+      Team ID. They also confirm no stapled notarization ticket. Fresh Intel/Apple
+      Silicon Macs launch only through the documented manual trust path;
+      tooling-created nested ad-hoc signatures are not treated as bundle trust.
+- [ ] **Unsigned notify-only update gate:** on Windows, Intel Mac, and Apple
+      Silicon, an older packaged Preview makes one anonymous GitHub metadata
+      request and surfaces a newer immutable Preview in the status bar. Clicking
+      opens only the fixed KerfDesk download page. Confirm zero installer,
+      `latest.yml`, mutable alias, R2, download, execution, or install traffic;
+      repeat offline, malformed-response, and active-job cases.
+- [ ] **Signed stable Windows update (after signing lands):** publish a higher
+      `vX.Y.Z`; a running older correctly signed install downloads it, notifies,
+      and on natural quit installs and relaunches. Confirm no install occurs while
+      a job streams and a wrong-publisher update is refused.
+- [ ] **Download surface:** `/download` links each Preview platform choice to the
+      exact matching GitHub prerelease asset. Inside Electron, desktop Download
+      and PWA Install affordances are hidden.
+- [ ] **Web/PWA regression:** the hosted web app still loads the same `dist/web`
+      product, its PWA Install/Update affordances remain available in web context,
+      WebSerial and File System Access flows retain their documented behavior,
+      and desktop packaging introduces no target-specific laser/CNC divergence.
+
+Until every applicable box is checked on the named real OS and hardware, that
+desktop artifact stays **CLAIMED** in the hardware verification inventory.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

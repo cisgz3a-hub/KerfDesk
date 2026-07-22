@@ -1,17 +1,22 @@
 # Third-Party Notices
 
-KerfDesk (repo: LaserForge 2.0) bundles the third-party software and fonts listed
-below and reproduces their required copyright and permission notices here, as their
-licenses (MIT, ISC, Apache-2.0, MPL-2.0, BSL-1.0, OFL-1.1, Unlicense) require of a
-distribution. The first-party source is MIT-licensed — see `LICENSE`.
+KerfDesk (repo: LaserForge 2.0) bundles third-party software and fonts under
+their respective licenses and notices. KerfDesk's first-party software and
+associated documentation, in source and compiled/bundled form, are MIT-licensed
+— see `LICENSE`.
 
-The `pnpm licenses list --prod` output is the authoritative, always-current list of
-every production package and its license; the JS libraries' full license texts are
-also preserved as `@license` banners inside the shipped `dist/web/assets/*.js`.
+The tables below are a readable summary of selected libraries and bundled
+fonts. The generated `public/third-party-notices.txt` is the release input: it
+enumerates the complete installed `pnpm licenses list --prod` closure, the
+Electron npm package license, bundled outline/CNC fonts, and all eight pinned
+OpenClipart CC0 assets. Desktop packaging separately fails closed unless the
+artifact retains Electron's platform-native `LICENSE.electron.txt` (Windows) or
+`LICENSE` (macOS) and `LICENSES.chromium.html`; JS license banners also remain
+in shipped assets.
 
 ---
 
-## Bundled runtime libraries (shipped in the web/desktop bundle)
+## Selected bundled runtime libraries (shipped in the web/desktop bundle)
 
 | Library | License | Copyright / source |
 |---|---|---|
@@ -35,8 +40,8 @@ domain under the Unlicense.
 
 ## Bundled fonts and stroke-font data
 
-Per PROJECT.md / ADR-017 these are MIT-*compatible* permissive font licenses
-(Apache-2.0 + SIL Open Font License 1.1). OFL-1.1 requires its
+These permissively licensed fonts ship alongside the MIT first-party work under
+Apache-2.0 or SIL Open Font License 1.1. OFL-1.1 requires its
 copyright notice and license to accompany the font in any distribution.
 
 | Font | License | Copyright / source attribution |

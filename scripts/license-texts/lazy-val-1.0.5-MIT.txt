@@ -1,6 +1,13 @@
+lazy-val 1.0.5
+
+The published lazy-val 1.0.5 package manifest declares the package as MIT but
+does not include a license file. This reviewed fallback is intentionally valid
+only for the exact lazy-val@1.0.5 package and records its declared author as the
+copyright holder.
+
 MIT License
 
-Copyright (c) 2026 Johann Stolk
+Copyright (c) Vladimir Krivosheev
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
