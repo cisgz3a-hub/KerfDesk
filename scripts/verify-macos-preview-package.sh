@@ -7,6 +7,24 @@ arch="${2:?Mac architecture is required}"
 release_dir="release/${version}"
 dmg="${release_dir}/KerfDesk-${version}-macos-${arch}.dmg"
 
+require_file() {
+  local label="${1:?file label is required}"
+  shift
+  local candidate
+  for candidate in "$@"; do
+    if [[ -f "${candidate}" ]]; then
+      return 0
+    fi
+  done
+  {
+    echo "Missing ${label}; checked:"
+    for candidate in "$@"; do
+      echo "  ${candidate}"
+    done
+  } >&2
+  exit 1
+}
+
 test -f "${dmg}" || { echo "Missing canonical DMG: ${dmg}" >&2; exit 1; }
 
 if find "${release_dir}" -type f \
@@ -32,12 +50,26 @@ test "$(lipo -archs "${executable}")" = "${expected_macho_arch}"
 node scripts/verify-packaged-preview-metadata.mjs \
   "${app_dir}/Contents/Resources/app.asar" "${version}"
 
-test -f "${app_dir}/Contents/Resources/legal/LICENSE"
-test -f "${app_dir}/Contents/Resources/legal/THIRD_PARTY_NOTICES.md"
-test -f "${app_dir}/Contents/Resources/legal/third-party-notices.txt"
+require_file 'KerfDesk LICENSE' "${app_dir}/Contents/Resources/legal/LICENSE"
+require_file \
+  'KerfDesk third-party notices markdown' \
+  "${app_dir}/Contents/Resources/legal/THIRD_PARTY_NOTICES.md"
+require_file \
+  'KerfDesk third-party notices text' \
+  "${app_dir}/Contents/Resources/legal/third-party-notices.txt"
 electron_resources="${app_dir}/Contents/Resources"
-test -f "${electron_resources}/LICENSE"
-test -f "${electron_resources}/LICENSES.chromium.html"
+electron_framework_resources="${app_dir}/Contents/Frameworks/Electron Framework.framework/Resources"
+electron_framework_versioned_resources="${app_dir}/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources"
+require_file \
+  'Electron LICENSE' \
+  "${electron_resources}/LICENSE" \
+  "${electron_framework_resources}/LICENSE" \
+  "${electron_framework_versioned_resources}/LICENSE"
+require_file \
+  'Electron Chromium license bundle' \
+  "${electron_resources}/LICENSES.chromium.html" \
+  "${electron_framework_resources}/LICENSES.chromium.html" \
+  "${electron_framework_versioned_resources}/LICENSES.chromium.html"
 
 if xcrun stapler validate "${app_dir}"; then
   echo "Preview app unexpectedly has a notarization ticket: ${app_dir}" >&2
