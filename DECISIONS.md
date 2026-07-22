@@ -23,7 +23,7 @@
 | ADR-004 | 2026-05-26 | Accepted | Streaming to laser is in MVP; delivered in phases |
 | ADR-005 | 2026-05-26 | Accepted | Color-driven layers (multi-op); only Line mode in MVP |
 | ADR-006 | 2026-05-26 | Accepted | GRBL v1.1+ only; extensible strategy for future controllers |
-| ADR-007 | 2026-05-26 | Accepted | Windows-only desktop; web app covers macOS and Linux |
+| ADR-007 | 2026-05-26 | Amended by ADR-248 (macOS Preview only) | Windows-only desktop; web app covers macOS and Linux |
 | ADR-008 | 2026-05-26 | Superseded | MIT open source, public from first commit (see ADR-018) |
 | ADR-009 | 2026-05-26 | Accepted | TypeScript + React + Vite + Vitest stack |
 | ADR-010 | 2026-05-26 | Accepted | Architectural discipline to prevent cascading regressions |
@@ -33,8 +33,8 @@
 | ADR-014 | 2026-05-26 | Accepted | SceneObject as discriminated union, extensible from day one |
 | ADR-015 | 2026-05-26 | Accepted | File-size discipline and anti-god-file enforcement |
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
-| ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
-| ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-017 | 2026-05-26 | Accepted; macOS-target example amended by ADR-248 | Third-party library evaluation policy; DOMPurify pinned for Phase A |
+| ADR-018 | 2026-05-27 | Superseded by ADR-120 | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-019 | — | Accepted | Phase F kickoff: Fill is a geometry decision in `compileJob` |
 | ADR-020 | — | Accepted | Phase F.2 raster image engrave (kickoff) |
 | ADR-021 | 2026-05-28 | Accepted, code shipped, hardware verification pending | Phase F.3 set-work-origin via G92 (kickoff) |
@@ -79,12 +79,12 @@
 | ADR-095 | 2026-07-02 | Accepted | Marlin controller support (queued status, stream-side pause, inline/fan dialects) |
 | ADR-096 | 2026-07-02 | Accepted | Smoothieware controller support (fractional S power scale) |
 | ADR-097 | 2026-07-02 | Accepted | Ruida: experimental .rd export, file-only transport |
-| ADR-098 | 2026-07-02 | Amended by ADR-209 | CNC router mode becomes a first-class product track (Phase H "Router") |
+| ADR-098 | 2026-07-02 | Amended by ADR-209; macOS Phase-J deferral amended by ADR-248 | CNC router mode becomes a first-class product track (Phase H "Router") |
 | ADR-100 | — | Accepted | Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params |
 | ADR-101 | 2026-07-02 | Accepted | CNC/laser UI separation policy: gate-and-hide |
 | ADR-102 | 2026-07-03 | Accepted | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
 | ADR-103 | — | accepted (maintainer session directive) | Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03) |
-| ADR-104 | — | accepted (recorded at the merge of `claude/determined-dew... | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
+| ADR-104 | — | Accepted; Phase-J schedule amended by ADR-248 | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
 | ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
 | ADR-106 | — | accepted (maintainer-approved build plan, 2026-07-03) | Parametric finger-joint box generator: claim-model joinery (2026-07-03) |
 | ADR-107 | 2026-06-27 | Accepted | Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4) |
@@ -100,7 +100,7 @@
 | ADR-117 | — | accepted | Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07) |
 | ADR-118 | — | amended (repository schema v3, exact-artifact provenance, execution archive, 2026-07-19) | Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07) |
 | ADR-119 | — | accepted | Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07) |
-| ADR-120 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
+| ADR-120 | 2026-07-07 | Accepted; clarified by ADR-247 | MIT license, open-source release (supersedes ADR-018) |
 | ADR-121 | — | accepted | Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07) |
 | ADR-122 | — | accepted | Camera-driven positioning and burn-target alignment wizard (Camera, 2026-07-07) |
 | ADR-123 | 2026-07-08 | Accepted | Own-engine trace: remove the potrace-derived backend (closes the ADR-120 blocker) |
@@ -121,7 +121,7 @@
 | ADR-138 | 2026-07-13 | Accepted | Primary toolbar is icon-first and never wraps |
 | ADR-139 | 2026-07-13 | Accepted | Right workspace rails collapse independently with fail-visible machine controls |
 | ADR-140 | 2026-07-13 | Accepted | CNC profile finish allowance and finishing pass |
-| ADR-141 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
+| ADR-141 | 2026-07-12 | Accepted; macOS Preview RTSP qualification amended by ADR-248 | Network-camera bridge is desktop and local-development only |
 | ADR-142 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 | ADR-143 | 2026-07-13 | Accepted (narrowed by ADR-215) | Disable executable CNC checkpoint and start-from-line recovery |
 | ADR-144 | 2026-07-13 | Accepted | Parametric shape edits rematerialize canonical geometry |
@@ -204,6 +204,15 @@
 | ADR-237 | 2026-07-21 | Accepted | Job Review runs at Start; plain Frame is dialog-free |
 | ADR-238 | 2026-07-21 | Accepted | Laser trace output defaults to editable vectors; raster scan remains selectable |
 | ADR-239 | 2026-07-21 | Accepted, hardware verification pending | Tangential feed-matched contour entries for the 4040-safe profile |
+| ADR-240 | 2026-07-21 | Accepted | Machine Setup: capability-first six-step wizard with a searchable catalog |
+| ADR-241 | 2026-07-21 | Accepted | The curve/fill segment budget no longer refuses output; it advises in Job Review |
+| ADR-242 | 2026-07-21 | Accepted | Image Studio: in-app raster editing of RasterImage sources |
+| ADR-243 | 2026-07-21 | Accepted | Rasters of any size stream row-by-row; the raster budget becomes advisories |
+| ADR-244 | 2026-07-21 | Accepted | Large-job preview and estimate prepare off the main thread |
+| ADR-245 | 2026-07-21 | Accepted | Image Studio layers: active-layer document with a composite bake |
+| ADR-246 | 2026-07-22 | Accepted | Image Studio v2: scoped history, dirty-window compositing, retouch module |
+| ADR-247 | 2026-07-22 | Accepted | Public MIT baseline and future-license boundary |
+| ADR-248 | 2026-07-22 | Accepted | Unsigned Windows and macOS Preview distribution |
 
 ---
 
@@ -301,7 +310,7 @@ Connection handshake rejects non-GRBL. `OutputStrategy` is implementable by a st
 
 ## ADR-007 — Windows-only desktop; web app covers macOS and Linux
 
-**Status:** Accepted | **Date:** 2026-05-26
+**Status:** Amended by ADR-248 (macOS Preview only) | **Date:** 2026-05-26
 
 ### Decision
 - Desktop: Windows 10 and 11 only.
@@ -322,7 +331,8 @@ Phase A: Windows `.exe` opens and runs on Windows 10 and 11.
 - Repo public from first commit.
 - Permitted dependency licenses: MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD.
 - Rejected: GPL family (GPL-2, GPL-3, AGPL, LGPL), proprietary, source-available (BSL, Elastic).
-- Enforcement: `license-checker` runs in CI; GPL transitive deps fail the build.
+- Enforcement: `pnpm license-check` (`scripts/check-licenses.mjs`) runs in CI;
+  disallowed production-tree licenses fail the build.
 
 ### Verification
 `LICENSE` in repo root. CI dependency audit fails on GPL.
@@ -486,10 +496,10 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 
 ## ADR-017 — Third-party library evaluation policy; DOMPurify pinned for Phase A
 
-**Status:** Accepted | **Date:** 2026-05-26
+**Status:** Accepted; macOS-target example amended by ADR-248 | **Date:** 2026-05-26
 
 ### Context
-The project source code is proprietary (ADR-018) but uses MIT-compatible dependencies freely (the dep-policy half of the original ADR-008 survived into ADR-018 unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
+The project source code is MIT-licensed under ADR-120/247 and uses compatible dependencies freely (the dependency-policy half of the original ADR-008 survived ADR-018 and remains unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
 
 It is also the most common cause of project drift. "We can add X because the library is free" is the most common rationalization that leads to scope explosions, dependency bloat, and the exact cascading-bug pattern Q10 warned against. Library availability does not change product scope. The phase plan in `PROJECT.md` is what determines what ships when.
 
@@ -566,14 +576,16 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 - **No policy (treat every dep as a one-off decision):** rejected — exactly the kind of unrigorous adoption that bloats projects.
 - **Stricter policy (no new deps without a full RFC):** rejected — too heavyweight for solo development.
-- **Centralized "dependency review" step in CI:** considered. The `license-checker` plus `RESEARCH_LOG.md` discipline plus this policy provides the same protection at lower process cost.
+- **Centralized "dependency review" step in CI:** considered. The pnpm-aware
+  `scripts/check-licenses.mjs` gate plus `RESEARCH_LOG.md` discipline and this
+  policy provides the same protection at lower process cost.
 
 ### Consequences
 - Easier: justifiable adoption decisions; clean license audit; CVE tracking; bounded bundle size.
 - Harder: no quick "throw a library at it" shortcuts. Every new dep is a small ADR-shaped artifact in `RESEARCH_LOG.md`.
 
 ### Verification
-- Phase A CI includes `license-checker` step.
+- Phase A CI includes the `pnpm license-check` step.
 - `RESEARCH_LOG.md` has an entry for DOMPurify before the first PR that imports it lands.
 - Future PR that adds a runtime dependency without a `RESEARCH_LOG.md` entry is rejected by CI lint (custom rule).
 
@@ -592,7 +604,7 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 ## ADR-018 — Proprietary license, private repo (supersedes ADR-008)
 
-**Status:** Accepted | **Date:** 2026-05-27
+**Status:** Superseded by ADR-120 | **Date:** 2026-05-27
 
 ### Context
 ADR-008 committed the project to MIT and a public repo from the first
@@ -4282,7 +4294,7 @@ Setup wizard) is the first.
 
 ## ADR-098 — CNC router mode becomes a first-class product track (Phase H "Router")
 
-**Status:** Amended by ADR-209
+**Status:** Amended by ADR-209; macOS Phase-J deferral amended by ADR-248
 **Date:** 2026-07-02
 
 ### Context
@@ -4672,7 +4684,7 @@ pending hardware checks.
 
 ## ADR-104 — Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03)
 
-**Status:** accepted (recorded at the merge of `claude/determined-dewdney-7ec915` into `main`).
+**Status:** Accepted; Phase-J schedule amended by ADR-248 (original decision recorded at the merge of `claude/determined-dewdney-7ec915` into `main`).
 
 ### Context
 
@@ -5448,12 +5460,14 @@ Rayforge camera adaptation and was not bundled.
    still governs the *source*; the EULA governs the *distributed binary* —
    they are complementary, not conflicting.
 2. `scripts/generate-third-party-notices.mjs` builds
-   `public/third-party-notices.txt` from real sources — each production
-   dependency's `node_modules` LICENSE verbatim plus each font's name-table
+   `public/third-party-notices.txt` from real sources — the direct production
+   dependencies' `node_modules` LICENSE files plus each font's name-table
    copyright record — with the canonical Apache-2.0/OFL-1.1 full texts
    committed under `scripts/license-texts/` (downloaded from apache.org and
-   openfontlicense.org). `build:web` regenerates it and the generator fails
-   loudly on a missing LICENSE, so a new dependency cannot ship un-attributed.
+   openfontlicense.org). `build:web` regenerates it and fails on a missing direct
+   LICENSE. This generator is a notice input, not proof that a distributable's
+   full transitive/runtime/asset license closure is complete; ADR-248 requires
+   that artifact-scoped closure before Preview distribution.
 3. The About dialog names both files and carries a short safety notice.
 
 **Consequences.** The EULA text is an engineering draft: it must be reviewed
@@ -5979,7 +5993,7 @@ informative.
 
 ## ADR-120 - MIT license, open-source release (supersedes ADR-018)
 
-**Status:** Accepted | **Date:** 2026-07-07
+**Status:** Accepted; clarified by ADR-247 | **Date:** 2026-07-07
 
 ### Context
 
@@ -6981,7 +6995,7 @@ Consequences.
 
 ## ADR-141 - The network-camera bridge is desktop and local-development only
 
-**Status:** Accepted | **Date:** 2026-07-12
+**Status:** Accepted; macOS Preview RTSP qualification amended by ADR-248 | **Date:** 2026-07-12
 
 > **Numbering note.** ADR-140 records the CNC finish allowance; **ADR-141** is the next allocated decision number.
 
@@ -11037,3 +11051,194 @@ docs/audits/2026-07-22-image-studio-v2-plan.md; extends ADR-242/245).
 5. **Apply & Trace** closes the tracer loop through the existing
    `openImageDialog` seam: bake first (one project-undo entry), then open
    the trace dialog on the updated raster. No new trace machinery.
+
+## ADR-247 - Public MIT baseline and future-license boundary
+
+**Date:** 2026-07-22
+**Status:** Accepted
+
+### Context
+
+KerfDesk/LaserForge is currently public under the MIT License. The maintainer
+wants the source, CI, and downloadable previews to remain free and public now
+while preserving the ability to consider paid terms later. Repository
+visibility, copyright licensing, binary pricing, and runtime entitlement are
+separate decisions: a later notice cannot withdraw MIT permissions already
+granted, and publicly visible code under restrictive terms is source-available
+rather than OSI open source.
+
+### Decision
+
+1. **The current first-party baseline remains public MIT.** First-party source
+   and the first-party portions of Preview artifacts released under this ADR
+   remain governed by the existing MIT License. Bundled dependencies, fonts,
+   assets, and other third-party portions remain governed by their own licenses
+   and `THIRD_PARTY_NOTICES`. Every recipient keeps the MIT permissions attached
+   to each first-party version or copy received under MIT. This ADR approves
+   neither a license change nor a delayed license change.
+2. **Any future boundary needs a new ADR before it takes effect.** That ADR must
+   record the exact cutoff commit and date, create a final annotated MIT tag,
+   establish contributor rights through legal review, and align `LICENSE`,
+   `package.json`, `CONTRIBUTING.md`, the EULA/notices, and release copy. Only
+   rights actually controlled by the project may be relicensed. The post-cutoff
+   license must be described accurately; public restrictive source must not be
+   advertised as open source. Third-party license, notice, source, attribution,
+   and asset duties survive every cutoff.
+3. **No latent commercialization gate is authorized.** This ADR adds no account,
+   trial, rolling 30-day lease, activation, subscription, device binding,
+   paywall, dormant entitlement path, or license/entitlement network call. Any
+   reconsideration first requires the maintainer's explicit prior permission and
+   coordinated supersession of the no-new-guard rule in `AGENTS.md`,
+   `CLAUDE.md`, PROJECT non-negotiable #21, and ADR-228 where applicable. An ADR
+   or workflow edit alone cannot authorize such a gate. Only after that authority
+   exists may a new commercial-runtime ADR define offline and failure behavior,
+   privacy, security, recovery, and support.
+4. **The public CI posture is intentional.** The repository stays public and
+   uses standard GitHub-hosted runners; under GitHub's current billing policy
+   that runner usage is free for public repositories. Larger runners and
+   unrelated paid services are outside this decision. Public-repository builds
+   may also use GitHub artifact attestations and the public Sigstore transparency
+   log for downloadable binaries and manifests.
+
+### Consequences
+
+- No licensing, account, or entitlement implementation starts under this ADR.
+- This ADR does not authorize a sale or paid distribution. A first sale requires
+  a separate commercial decision and the ADR-114 lawyer review. If later
+  authorized, charging for official binaries, support, or services would not
+  create exclusivity over an MIT version: recipients and forks retain its MIT
+  rights.
+- A future restrictive cutoff can govern only later material for which the
+  project has the necessary rights; it cannot retroactively close the MIT
+  history.
+- GitHub service pricing is an external dependency and must be rechecked if its
+  published policy changes.
+
+### References
+
+- GitHub Actions billing: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+- GitHub artifact attestations: https://docs.github.com/en/actions/concepts/security/artifact-attestations
+- Using artifact attestations: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations
+- Open Source Definition: https://opensource.org/osd
+
+## ADR-248 - Unsigned Windows and macOS Preview distribution
+
+**Date:** 2026-07-22
+**Status:** Accepted
+
+### Context
+
+ADR-007/017/098 limit the downloadable desktop to Windows, while
+ADR-024/135/142 reserve publishing and update trust for signed production
+artifacts. A public, explicitly non-production Preview is needed on Windows and
+both current Mac architectures before the project commits to paid
+signing/notarization or a production macOS channel. The Preview must exercise
+the existing renderer and shell without becoming a second product or a trusted
+update source.
+
+### Decision
+
+1. **Narrow governance exception.** This ADR amends only ADR-007's Windows-only
+   scope, ADR-017's specific example rejecting a macOS electron-builder target,
+   ADR-098/104's macOS Phase-J deferral, and ADR-141's macOS RTSP qualification.
+   ADR-017's dependency policy and all other provisions remain in force. The
+   annotated `vX.Y.Z-preview.N` lane is explicitly non-production and sits
+   outside ADR-142's production-tag scope. It is consistent with ADR-024/135
+   because it emits no updater metadata and never touches R2; ADR-024/135/142
+   stable production policies remain unchanged. Stable `vX.Y.Z` releases retain
+   the existing signed Windows, R2, `dl.kerfdesk.com`, and trusted-updater
+   policy. Linux desktop remains out of scope.
+2. **One application runtime.** Every Preview packages the same `dist/web`
+   output and adds no IPC, preload API, entitlement behavior, or machine/CAM
+   runtime feature. The only renderer-facing changes authorized here are
+   visible **KerfDesk** branding and the existing desktop-download affordance's
+   copy/link destination. Existing internal LaserForge identifiers and storage
+   names remain: preserve `app://app` and Windows app ID `dev.laserforge.app`
+   (which also preserves electron-builder's NSIS upgrade GUID), and explicitly
+   pin both `userData` and `sessionData` to the verified legacy
+   `%APPDATA%\laserforge` directory before Electron's `ready` event. A
+   pre-rename packaged identity probe must assert that the current app resolves
+   that root and fail the migration if it differs. Keep all IndexedDB,
+   local-storage, and recovery keys. The new macOS bundle identifier is
+   `com.kerfdesk.app`.
+3. **Preview matrix.** Publish Windows 10/11 x64 as NSIS and macOS 12+ as two
+   separate DMGs, one `x64` and one `arm64`; do not publish a Linux artifact.
+   Windows Preview artifacts are unsigned. Mac packaging must set
+   `mac.identity: null`, `mac.hardenedRuntime: false`, `mac.notarize: false`, and
+   `CSC_IDENTITY_AUTO_DISCOVERY=false`; it must not use an ad-hoc identity.
+   Post-build checks prove the outer app has no Developer ID identity and no
+   stapled notarization ticket. Release notes and download instructions must
+   prominently explain SmartScreen/Gatekeeper warnings and the manual
+   trust/override steps.
+4. **No trusted update channel.** Preview builds keep updater trust false and
+   perform no updater check. They publish no `latest*` updater metadata, do not
+   publish to R2, and do not alter the stable feed. Both workflows call one
+   checked-in Node validator that also proves the ref is an annotated Git tag.
+   Its strict ECMAScript patterns are
+   `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$` for stable and
+   `^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.(?:0|[1-9][0-9]*)$`
+   for Preview. Both fail closed for every other name, leading-zero numeric
+   identifier, or lightweight tag; structural tests pin the mutual exclusion
+   before the first Preview tag. Preview users update by explicitly downloading
+   a later prerelease.
+5. **Public prerelease destination.** Assets may be published only as
+   prereleases in the designated public `KerfDesk-Downloads` GitHub repository,
+   and only after that repository and a least-privilege cross-repository token
+   or GitHub App are configured. A Preview is never marked latest. Every
+   individual release asset must remain below GitHub's 2 GiB limit. Artifact
+   `<version>` is the tag without its leading `v`; canonical binary, checksum,
+   manifest, and CycloneDX SBOM names are fixed in WORKFLOW F-DESK1/F-DESK3.
+6. **Integrity and provenance travel with the binaries.** Each prerelease
+   records the exact source commit SHA and includes a SHA-256 manifest,
+   dependency inventory/SBOM, and GitHub artifact provenance attestations for
+   the downloadable artifacts. These identify what CI built; they do not
+   convert an unsigned binary into a trusted or signed binary. Because assets
+   publish in a separate repository, the manifest and release notes record the
+   attesting source repository (initially `cisgz3a-hub/KerfDesk`) and the exact
+   verification form `gh attestation verify <asset> --repo <sourceRepository>`;
+   if that cross-repository lookup cannot be made durable, portable attestation
+   bundles ship beside the assets. Before any Preview release, an
+   artifact-scoped closure gate must enumerate the shipped transitive production
+   packages, Electron/Chromium runtime notices, fonts, and assets; it fails on
+   missing required license/notice material. The current direct-dependency
+   notice generator alone cannot satisfy that gate.
+7. **Web and macOS permissions.** Web/PWA deployment, caching, and update
+   behavior are unchanged. Before a Mac Preview is distributed, its Info.plist
+   must contain accurate `NSCameraUsageDescription` and
+   `NSLocalNetworkUsageDescription` strings for the existing camera and
+   network-camera workflows. USB and private-network JPEG cameras remain in
+   scope. Mac RTSP input remains unqualified and follows the existing
+   bridge-unavailable error path when `ffmpeg` cannot be found: Finder-launched
+   apps do not reliably inherit Homebrew's path, no FFmpeg binary is bundled,
+   and a Finder-safe discovery/configuration flow requires a separate reviewed
+   design.
+8. **Qualification remains honest.** CI/package success does not verify
+   installation, serial access, camera permission, or machine behavior. Real
+   Windows 10/11, Intel Mac, and Apple Silicon Mac installation and workflow
+   checks remain **CLAIMED** until their evidence is recorded. A
+   signed/notarized production macOS release, Mac auto-update trust, or Mac App
+   Store release requires a separate ADR.
+
+### Consequences
+
+- Preview artifacts can be downloaded publicly without weakening the stable
+  signed/R2 release contract or adding a licensing service.
+- Users accept explicit unsigned-software friction; the project does not
+  represent these builds as production-trusted.
+- Preserving identifiers avoids a Windows storage migration, while the new Mac
+  bundle ID establishes the Mac identity before any signed production decision.
+
+### References
+
+- electron-builder macOS targets and architecture support: https://www.electron.build/mac/
+- electron-builder multi-platform constraints: https://www.electron.build/docs/features/multi-platform-build/
+- electron-builder macOS signing behavior: https://www.electron.build/docs/features/code-signing/code-signing-mac/
+- Electron 42 release: https://releases.electronjs.org/release/v42.0.0
+- Electron macOS 12 support boundary: https://www.electronjs.org/docs/latest/breaking-changes#removed-macos-12-support
+- GitHub release assets and limits: https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
+- GitHub prerelease publishing: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
+- GitHub artifact attestations: https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations
+- Apple camera usage description: https://developer.apple.com/documentation/bundleresources/information-property-list/nscamerausagedescription
+- Apple local-network usage description: https://developer.apple.com/documentation/bundleresources/information-property-list/nslocalnetworkusagedescription
+- Electron application data paths: https://www.electronjs.org/docs/latest/api/app
+- electron-builder NSIS upgrade identity: https://www.electron.build/nsis/

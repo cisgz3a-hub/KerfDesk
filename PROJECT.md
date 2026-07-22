@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.0 — Phase L "Image Studio" adopted: in-app Photoshop-grade raster editing of `RasterImage` sources, staged IE-1..IE-4, build started 2026-07-21 (ADR-242; research + roadmap in `docs/audits/2026-07-21-image-editor-research-and-roadmap.md`). Carried from v3.9: revisioned machine-aware CNC starters (ADR-233), bounded 4040 fill entries (ADR-234), profile-scoped 4040 scan quality hardening (ADR-235), and the actual completed Frame as the spatial source of truth with calculated bounds/settings kept advisory (ADR-232). Exact-artifact pre-Frame Job Review and a completion-issued Start permit remain governed by ADR-230, with the public-spec 4040 hybrid profile in ADR-231 and the read-only Super console in ADR-229. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 242. MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance adopted (ADR-247/248): the existing web/PWA stays first-class while exact-version Windows x64 and macOS x64/arm64 Electron Preview artifacts are added without changing machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. The only visible changes are KerfDesk branding and the desktop-download surface. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 248. The conservative MIT-compatible dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -8,21 +8,21 @@
 
 ## Product goal
 
-LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered as **both a web app and a Windows desktop app from a single codebase**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns named cut, fill, image, or CNC operations to artwork; previews the toolpath; generates correct G-code; and streams it to the connected machine.
+LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered from one codebase as a **web/PWA, Windows Electron Preview, and macOS Electron Preview**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns named cut, fill, image, or CNC operations to artwork; previews the toolpath; generates correct G-code; and streams it to the connected machine.
 
-Naming contract: **KerfDesk** is the user-facing product and release URL. **LaserForge 2.0** remains the repo/package/internal architecture name. The Cloudflare Pages API project is still named `laserforge` for historical reasons.
+Naming contract: **KerfDesk** is the user-facing product and release URL. The visible app name, installer, downloadable artifacts, download surfaces, and release titles all use **KerfDesk**. **LaserForge 2.0** remains the repo/package/internal architecture name, and existing persistence identifiers may remain LaserForge where changing them would break identity or stored user data. The Cloudflare Pages API project is still named `laserforge` for historical reasons.
 
 It deliberately copies LightBurn's UX shape and workflow. It deliberately does not copy LightBurn's feature breadth or controller fan-out.
 
 The 1.0 codebase shipped a working app but had a coupling problem: fixes in one module broke others. **2.0 is a clean rewrite designed against shotgun-surgery from day one — pure-function pipeline core, strict module boundaries, enforced file-size limits, snapshot tests on G-code, property tests on invariants.** See ADR-010 and ADR-015.
 
-**The project source code is MIT-licensed (ADR-120, superseding ADR-018).** The dependency policy is unchanged: third-party libraries must be MIT-compatible (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD) per ADR-017. GPL-family licenses are rejected for dependencies — the combined MIT work must stay redistributable under MIT.
+**The current first-party project source and app code are MIT-licensed, free, and public (ADR-120, superseding ADR-018; clarified by ADR-247/248).** Bundled dependencies, fonts, assets, and other third-party portions remain under their own licenses and notices. Existing MIT grants persist and cannot be revoked retroactively. A restrictive source-visible commercial license, dual-license arrangement, or other monetization model would be a separate future decision and is not part of the Desktop Preview track. The conservative dependency policy is unchanged: third-party libraries must be approved under ADR-017 (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD); GPL-family dependencies remain rejected so current and future distribution options are not constrained by incompatible copyleft terms.
 
 ---
 
 ## Users and roles
 
-Single role: **operator**. No accounts, no auth, no multi-tenancy. The app trusts whoever launches it with full control of their local machine.
+Single role: **operator**. No accounts, auth, multi-tenancy, activation, entitlement, trial, subscription, device binding, paywall, or dormant monetization code exists in the Desktop Preview track. The app trusts whoever launches it with full control of their local machine.
 
 User profile:
 - Owns a GRBL-based diode or CO₂ laser (xTool, Sculpfun, Ortur, Atomstack, NEJE, OpenBuilds, FluidNC retrofits).
@@ -34,12 +34,25 @@ User profile:
 
 ## Delivery targets
 
-- **Web app:** Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial for machine connection. File System Access API for projects. PWA-installable, fully offline (ADR-060).
+- **Web app/PWA:** unchanged first-class delivery target on Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial provides machine connection; the File System Access API handles projects. It remains PWA-installable and fully offline (ADR-060).
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
-- **Windows desktop app:** Electron. Same UI, same core, native menus and file system, robust offline.
-- **macOS / Linux desktop:** out of scope for MVP. Those users get the web app.
+- **Windows desktop preview:** Electron on Windows 10/11 x64. Same UI and core, native shell, robust offline. Distributed as an unsigned KerfDesk NSIS preview installer.
+- **macOS desktop preview:** Electron on macOS 12+ for x64 and arm64. Same UI and core, robust offline. Distributed as separate unsigned and unnotarized KerfDesk DMG previews.
+- **Linux:** web/PWA only. A Linux desktop build remains Phase J.
 
-Both targets ship from one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011.
+All targets ship from one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011 and ADR-248.
+
+## Desktop Preview track — scope and acceptance
+
+The Desktop Preview track is additive packaging and release governance. Apart from visible KerfDesk branding and the existing desktop-download surface, it changes no application UI or workflow, core logic, project format, preview/toolpath behavior, G-code, controller behavior, machine guard, or web/PWA behavior.
+
+1. Build one Windows 10/11 x64 NSIS installer and separate macOS 12+ x64 and arm64 DMGs. Every visible product, installer, artifact, download, and release title says **KerfDesk**.
+2. Publish only exact-version assets on a GitHub prerelease. Each prerelease includes checksums, an artifact manifest, an SBOM, and build-provenance evidence bound to the exact source revision; strict tag guards keep Preview and stable/R2 workflows mutually exclusive.
+3. Preview artifacts are explicitly labeled unsigned and, on macOS, unnotarized. Mac builds disable identity auto-discovery, signing, notarization, and hardened runtime; installation is manual and the app must not present itself as production-trusted.
+4. Do not publish preview artifacts to R2, a mutable `latest` path, or an update feed. Preview builds make no update request, and updater trust remains false.
+5. Preserve Windows app ID `dev.laserforge.app`, its NSIS upgrade GUID, `app://app`, and the verified legacy `%APPDATA%\laserforge` `userData`/`sessionData` root. A packaged identity probe must prove that root before the visible rename; prove first-brand migration and later upgrades do not hide projects, recovery state, settings, or libraries.
+6. Keep the current web/PWA build, release, installability, and offline checks green. Desktop CI is additive and must not replace or weaken the web deployment path.
+7. Passing builds and automated tests prove only packaging integrity. Launch, install, file I/O, serial permissions, and representative machine behavior remain **CLAIMED** until real-OS/hardware verification; Mac Preview supports USB and private-network JPEG cameras, while RTSP remains unqualified and follows the existing bridge-unavailable behavior until Finder-safe FFmpeg discovery is separately designed.
 
 ---
 
@@ -193,7 +206,7 @@ laser and CNC router modes — the first multi-panel parametric generator
 (Material Test precedent, ADR-044). Claim-model joinery designed against
 the two classic assembly failure classes (corner conflicts; fit
 compensation applied wrong) — see ADR-106. (Phase J stays reserved for
-macOS/Linux desktop, per ADR-104's renumbering note.)
+Linux desktop; macOS Preview moved into the ADR-247/248 Desktop Preview track.)
 
 - Pure core `src/core/box/` (spec validation → per-edge finger patterns →
   panel claims → outline walk → fit/relief → sheet layout); UI dialog +
@@ -252,9 +265,9 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
   grblHAL burn; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation then the Electron UDP transport, wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
-- Phase J: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
+- Phase J: Linux desktop build. Linux remains web/PWA-only until that phase; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 
-**MIT-availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the policy.
+**Public MIT availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the dependency policy and ADR-247/248 for the current public-source and preview-distribution posture.
 
 ### Future feature notes (uncommitted; capture-only)
 
@@ -294,7 +307,7 @@ phase; tracked here so they don't get lost.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
 7. **Power scale honest** — `S` values match the device profile's max-power scale (`$30`). Property-tested.
-8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the trusted desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024/135) — it transmits no user data and no telemetry, is confined to that origin, and stays disabled until production code signing is operational. The web app and every CAM/preview/streaming path stay fully offline.
+8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the trusted production desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024/135) — it transmits no user data and no telemetry, is confined to that origin, and stays disabled until production code signing is operational. Desktop Preview builds keep updater trust false and make no update request. The web app and every CAM/preview/streaming path stay fully offline.
 9. **Abort reachable always** — the software Abort / Controller Reset control is reachable from any window state during a job. No modal can block it. This command is not a safety-rated E-stop; dangerous conditions require the machine's physical E-stop or power isolation.
 
 ### Architectural (anti-shotgun-surgery)
@@ -343,20 +356,20 @@ phase; tracked here so they don't get lost.
 - **Text (Phase D):** `opentype.js` (MIT) for outlines. Bundled permissive fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
-- **Build:** Vite → web bundle; Vite + electron-builder → Windows `.exe` (unsigned in v1 — ADR-024 §5; code signing is secret-gated and a no-op until the certs exist).
+- **Build:** Vite → unchanged web/PWA bundle; Vite + electron-builder → unsigned Windows 10/11 x64 NSIS Preview and separate unsigned/unnotarized macOS 12+ x64 and arm64 DMG Previews. Production code signing and notarization remain secret-gated and inactive until credentials and release governance exist (ADR-024/135/248).
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
-  - `license-checker` in CI (license-compliance enforcement).
+  - `pnpm license-check` / `scripts/check-licenses.mjs` in CI (pnpm-aware license-compliance enforcement).
   - Prettier.
-- **CI:** GitHub Actions on `ubuntu-latest`. The release/deploy gate runs lint, typecheck, license-check, unit, property, snapshot, web build, and Electron main-process compile. Playwright runs in a separate pull-request/manual browser-smoke workflow so browser provisioning cannot time out a production deploy (ADR-158). The Windows desktop `.exe` (`build:desktop`, electron-builder) and hardware verification remain release-manual (S02-001/003).
-- **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
+- **CI:** GitHub Actions keeps the existing `ubuntu-latest` release/deploy gate for lint, typecheck, license-check, unit, property, snapshot, web/PWA build, and Electron main-process compile. Playwright remains a separate pull-request/manual browser-smoke workflow (ADR-158). The Desktop Preview workflow adds Windows and macOS packaging jobs and publishes only exact-version GitHub prerelease assets with checksums, a manifest, an SBOM, and provenance; it does not publish R2 assets, a mutable `latest`, or updater metadata. Real-OS launch, install, serial, and hardware verification remain manual and CLAIMED until recorded (ADR-247/248; S02-001/003).
+- **Repo:** Single public Git repo under the current MIT license (ADR-120, clarified by ADR-247/248). Public CI and the free/public app continue in this track; any future restrictive source-visible license is a separate decision, and existing MIT rights persist.
 
 ---
 
 ## External services
 
-**None.** The app must work fully offline. No analytics, no error reporting service, no cloud sync.
+**No application data services.** The app must work fully offline: no analytics, error-reporting service, cloud sync, account, entitlement, activation, or trial service. The only authorized future runtime request remains the trusted production desktop updater's pinned first-party feed, which stays disabled until signing is operational. Desktop Preview builds make no update request and use GitHub prereleases only as manual download distribution; they do not use R2 or a mutable `latest` channel.
 
 ---
 
@@ -478,7 +491,7 @@ an assumption that every folder must have an `index.ts`.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
-- **No auto-update from arbitrary or unsigned channels.** The desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). No `quitAndInstall`; trusted updates apply on quit only, never mid-burn.
+- **No auto-update from arbitrary or unsigned channels.** The production desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). Desktop Preview builds keep updater trust false, make no update request, and publish no R2 or mutable `latest` metadata. No `quitAndInstall`; future trusted updates apply on quit only, never mid-burn.
 - **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. A dependency CVE blocks releases until patched. NOTE: the CI `audit:deps` gate (`pnpm audit --audit-level=low`, part of `release:check`) fails on ANY advisory (direct OR transitive) at low+ severity - stricter than "direct only", and time-dependent (a new transitive advisory can block deploys with no code change).
 
 ---
@@ -496,12 +509,12 @@ an assumption that every folder must have an `index.ts`.
 
 ## Out of scope (no phase assigned)
 
-Reject any of these mid-development without a `PROJECT.md` revision and a `DECISIONS.md` entry. **MIT availability does not change this list.**
+Reject any of these mid-development without a `PROJECT.md` revision and a `DECISIONS.md` entry. **Current public MIT availability does not change this list.**
 
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
   simulator/evidence labels; Trocen and TopWisdom remain out of scope.
-- macOS / Linux desktop builds.
+- Linux desktop build. Linux remains supported through the web/PWA; Windows and macOS Preview packaging is in scope under ADR-247/248.
 - ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.
 - ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —
@@ -515,7 +528,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   `LinkPath` synchronization. Bounded `.clb` import and refreshable native
   preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
 - Multi-machine, networked control.
-- Cloud, accounts, sharing, sync.
+- Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
 - ~~DXF~~, AI, PDF import. **DXF moved in-scope by Phase H.6 (clean-room
   parser, ADR-098)**; AI and PDF import remain out of scope.
 - Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Several
@@ -549,7 +562,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `DECISIONS.md` | Architecturally significant decisions with rationale. |
 | `CLAUDE.md` | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. |
 | `RESEARCH_LOG.md` | External claims and library adoptions, with source, version, license, date. |
-| `LICENSE` | MIT (ADR-120). |
+| `LICENSE` | Current MIT license (ADR-120, clarified by ADR-247/248). Existing grants persist; any future source-license change requires a separate decision. |
 
 External authorities:
 - **GRBL v1.1h wire protocol** — defined in the `gnea/grbl` wiki, which has been archived since Aug 2019. The 1.1h streaming protocol (simple send-response, character-counted buffer) remains the de-facto wire authority; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.
@@ -575,7 +588,7 @@ Phase A merges only when **all** of these are true. Phase B starts only after Ph
    - **SVG sanitizer (via DOMPurify):** strips `<script>`, external `xlink:href`, foreign objects, non-image data URIs on a corpus of crafted-malicious SVGs.
    - **Module boundary:** ESLint passes; no `core` file imports from `platform`, `ui`, or `io`.
    - **File-size discipline:** ESLint passes; no file > 400 lines; no component > 250 lines; no function > 80 lines.
-   - **License compliance:** `license-checker` finds zero GPL-family transitive dependencies.
+   - **License compliance:** `pnpm license-check` finds zero disallowed production-tree licenses; distributable artifacts additionally close notices over shipped transitive packages, Electron/Chromium runtime notices, fonts, and assets (ADR-248).
    - **SceneObject extensibility:** a stub `TextObject` variant added to the union compiles through `JobCompiler` without modifying existing tests.
 5. No file in the repo over 400 lines. No untested source file. CI green.
 6. `RESEARCH_LOG.md` contains an entry for every adopted runtime dependency (license, version, justification, evaluation date).
