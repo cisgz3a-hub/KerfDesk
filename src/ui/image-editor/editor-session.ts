@@ -77,6 +77,13 @@ export type EditorTool =
   // Bucket/gradient share the fill slot (G cycles, like M for marquee).
   | { readonly kind: 'bucket' }
   | { readonly kind: 'gradient'; readonly shape: 'linear' | 'radial' }
+  // Clone: Alt-click sets the source; the aligned offset fixes on first use.
+  | {
+      readonly kind: 'clone';
+      readonly source: PaintPoint | null;
+      readonly offset: PaintPoint | null;
+    }
+  | { readonly kind: 'heal' }
   | { readonly kind: 'crop' }
   | { readonly kind: 'move' };
 

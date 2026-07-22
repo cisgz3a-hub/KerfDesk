@@ -17,7 +17,14 @@ const SWATCHES: readonly PaintColor[] = [
 ];
 
 function isPaintToolKind(kind: string): boolean {
-  return kind === 'brush' || kind === 'pencil' || kind === 'eraser' || kind === 'line';
+  return (
+    kind === 'brush' ||
+    kind === 'pencil' ||
+    kind === 'eraser' ||
+    kind === 'line' ||
+    kind === 'clone' ||
+    kind === 'heal'
+  );
 }
 
 function isSelectionToolKind(kind: string): boolean {
@@ -32,13 +39,27 @@ export function EditorOptionsBar(): JSX.Element {
   return (
     <div style={barStyle} aria-label="Tool options">
       {showModes ? <SelectionModeButtons /> : null}
-      {isPaintTool ? <PaintOptions showColor={tool.kind !== 'eraser'} /> : null}
+      {isPaintTool ? <PaintOptions showColor={showsColor(tool.kind)} /> : null}
+      {tool.kind === 'clone' ? <CloneHint hasSource={tool.source !== null} /> : null}
       {tool.kind === 'wand' || tool.kind === 'bucket' ? <WandOptions /> : null}
       {tool.kind === 'gradient' ? <GradientOptions shape={tool.shape} /> : null}
       {tool.kind === 'crop' ? <CropActions /> : null}
       {isSelectTool ? <SelectionActions /> : null}
       {isSelectTool ? <SelectionModifyRow /> : null}
     </div>
+  );
+}
+
+// Swatches make sense only for tools that paint the foreground color.
+function showsColor(kind: string): boolean {
+  return kind !== 'eraser' && kind !== 'clone' && kind !== 'heal';
+}
+
+function CloneHint(props: { readonly hasSource: boolean }): JSX.Element {
+  return (
+    <span style={{ fontSize: 12, color: 'var(--lf-text-muted)' }}>
+      {props.hasSource ? 'Source set — paint to clone' : 'Alt-click to set the clone source'}
+    </span>
   );
 }
 

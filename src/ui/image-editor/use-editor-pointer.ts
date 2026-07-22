@@ -4,7 +4,12 @@
 // session ops). Wheel zooms about the cursor; middle-drag pans.
 
 import { useCallback, useRef, useState } from 'react';
-import { ellipseSelection, polygonSelection, rectSelection } from '../../core/image-select';
+import {
+  ellipseSelection,
+  polygonSelection,
+  rectSelection,
+  type SelectionMask,
+} from '../../core/image-select';
 import {
   advanceDrag,
   beginDrag,
@@ -18,6 +23,7 @@ import {
 } from './editor-drag';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import { applyBucketAt, applyGradientDrag } from './editor-session-fill';
+import { applyCloneStroke, applyHealAt } from './editor-session-retouch';
 import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
@@ -226,6 +232,28 @@ function isPaintToolKind(
   return kind === 'brush' || kind === 'pencil' || kind === 'eraser' || kind === 'line';
 }
 
+// Clone/heal pointer-down routing. Clone: Alt-click defines the source
+// (resetting the aligned offset); a click without a source is swallowed
+// until one is set. Heal: click-dab, committed immediately.
+function retouchToolDown(
+  state: ReturnType<typeof useImageEditorStore.getState>,
+  point: { x: number; y: number },
+  alt: boolean,
+): boolean {
+  if (state.tool.kind === 'clone') {
+    if (alt) {
+      state.setTool({ kind: 'clone', source: point, offset: null });
+      return true;
+    }
+    return state.tool.source === null;
+  }
+  if (state.tool.kind === 'heal') {
+    applyHealAt(point.x, point.y);
+    return true;
+  }
+  return false;
+}
+
 // Left-button tool dispatch: Alt-click eyedropper inside paint tools, wand
 // click with boolean modifiers, otherwise begin the pure drag state.
 function startToolDrag(
@@ -237,6 +265,7 @@ function startToolDrag(
   const isPaintTool = isPaintToolKind(state.tool.kind);
   // Quick Mask parks everything except painting (which routes to the mask).
   if (useQuickMaskStore.getState().rubylith !== null && !isPaintTool) return;
+  if (retouchToolDown(state, point, e.altKey)) return;
   if (isPaintTool && e.altKey) {
     sampleForeground(point.x, point.y);
     return;
@@ -255,10 +284,23 @@ function startToolDrag(
     applyBucketAt(point.x, point.y);
     return;
   }
-  const insideSelection =
-    selection !== null &&
-    (selection.alpha[Math.floor(point.y) * selection.width + Math.floor(point.x)] ?? 0) > 0;
-  update(beginDrag(state.tool, point, modifiers, selection !== null, insideSelection));
+  update(
+    beginDrag(
+      state.tool,
+      point,
+      modifiers,
+      selection !== null,
+      isInsideSelection(selection, point),
+    ),
+  );
+}
+
+function isInsideSelection(
+  selection: SelectionMask | null,
+  point: { x: number; y: number },
+): boolean {
+  if (selection === null) return false;
+  return (selection.alpha[Math.floor(point.y) * selection.width + Math.floor(point.x)] ?? 0) > 0;
 }
 
 // Alt-click eyedropper: sample the VISIBLE pixel under the cursor (the layer
@@ -298,7 +340,12 @@ function completeActionDrag(
 ): void {
   switch (drag.kind) {
     case 'paint':
-      // An active Quick Mask consumes the stroke into the rubylith.
+      // Clone completion diverts to the clone commit (source snapshot +
+      // aligned offset); an active Quick Mask consumes plain paint strokes.
+      if (store.tool.kind === 'clone') {
+        applyCloneStroke(drag.points);
+        return;
+      }
       if (useQuickMaskStore.getState().strokeInto(drag.points)) return;
       store.stroke(drag.points);
       return;

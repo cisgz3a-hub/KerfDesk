@@ -225,44 +225,32 @@ function cycledFill(tool: EditorTool): EditorTool {
   return { kind: 'bucket' };
 }
 
+// One factory per tool key — the map keeps the handler's complexity flat no
+// matter how many tools the Studio grows.
+const TOOL_KEYS: Readonly<Record<string, (current: EditorTool) => EditorTool>> = {
+  b: () => ({ kind: 'brush' }),
+  p: () => ({ kind: 'pencil' }),
+  e: () => ({ kind: 'eraser' }),
+  l: () => ({ kind: 'line' }),
+  m: cycledMarquee,
+  g: cycledFill,
+  s: () => ({ kind: 'lasso' }),
+  w: () => ({ kind: 'wand' }),
+  k: () => ({ kind: 'clone', source: null, offset: null }),
+  j: () => ({ kind: 'heal' }),
+  c: () => ({ kind: 'crop' }),
+  v: () => ({ kind: 'move' }),
+};
+
 function handleToolKey(key: string): boolean {
   const store = useImageEditorStore.getState();
-  switch (key) {
-    case 'b':
-      store.setTool({ kind: 'brush' });
-      return true;
-    case 'p':
-      store.setTool({ kind: 'pencil' });
-      return true;
-    case 'e':
-      store.setTool({ kind: 'eraser' });
-      return true;
-    case 'l':
-      store.setTool({ kind: 'line' });
-      return true;
-    case 'm':
-      store.setTool(cycledMarquee(store.tool));
-      return true;
-    case 'q':
-      // Quick Mask: paint the selection as a red rubylith (Photoshop Q).
-      useQuickMaskStore.getState().toggle();
-      return true;
-    case 'g':
-      store.setTool(cycledFill(store.tool));
-      return true;
-    case 's':
-      store.setTool({ kind: 'lasso' });
-      return true;
-    case 'w':
-      store.setTool({ kind: 'wand' });
-      return true;
-    case 'c':
-      store.setTool({ kind: 'crop' });
-      return true;
-    case 'v':
-      store.setTool({ kind: 'move' });
-      return true;
-    default:
-      return false;
+  if (key === 'q') {
+    // Quick Mask: paint the selection as a red rubylith (Photoshop Q).
+    useQuickMaskStore.getState().toggle();
+    return true;
   }
+  const factory = TOOL_KEYS[key];
+  if (factory === undefined) return false;
+  store.setTool(factory(store.tool));
+  return true;
 }

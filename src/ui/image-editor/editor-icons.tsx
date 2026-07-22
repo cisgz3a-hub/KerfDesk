@@ -1,8 +1,10 @@
 // Lucide icons for the Image Studio tool rail (ADR-242, PP-C) — the same
 // pinned lucide-static assets the main toolbar uses, keyed by editor tool.
 
+import bandage from 'lucide-static/icons/bandage.svg?raw';
 import blend from 'lucide-static/icons/blend.svg?raw';
 import brush from 'lucide-static/icons/brush.svg?raw';
+import stamp from 'lucide-static/icons/stamp.svg?raw';
 import crop from 'lucide-static/icons/crop.svg?raw';
 import eraser from 'lucide-static/icons/eraser.svg?raw';
 import lasso from 'lucide-static/icons/lasso.svg?raw';
@@ -24,6 +26,8 @@ const ICONS: Readonly<Record<EditorTool['kind'], string>> = {
   wand,
   bucket: paintBucket,
   gradient: blend,
+  clone: stamp,
+  heal: bandage,
   crop,
   move,
 };
