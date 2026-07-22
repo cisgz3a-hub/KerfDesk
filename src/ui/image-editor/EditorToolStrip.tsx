@@ -38,6 +38,16 @@ const TOOLS: readonly ToolEntry[] = [
     label: 'Gradient — drag foreground→background; G cycles bucket/linear/radial',
     shortcut: 'G',
   },
+  {
+    tool: { kind: 'clone', source: null, offset: null },
+    label: 'Clone stamp — Alt-click sets the source, then paint the copy',
+    shortcut: 'K',
+  },
+  {
+    tool: { kind: 'heal' },
+    label: 'Spot heal — click a blemish; the surround patches it',
+    shortcut: 'J',
+  },
   { tool: { kind: 'crop' }, label: 'Crop — drag a box, Enter commits, Esc cancels', shortcut: 'C' },
   { tool: { kind: 'move' }, label: 'Move selected pixels', shortcut: 'V' },
 ];

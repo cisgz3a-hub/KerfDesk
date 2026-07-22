@@ -117,36 +117,54 @@ function dragForTool(
   hasSelection: boolean,
   override: SelectionCombineMode | null,
 ): EditorDrag {
-  switch (tool.kind) {
-    case 'brush':
-    case 'pencil':
-    case 'eraser':
-      return { kind: 'paint', points: [point] };
-    case 'line':
-      return { kind: 'line', from: point, to: point, shift: modifiers.shift };
-    case 'marquee':
-      return {
-        kind: 'marquee',
-        from: point,
-        to: point,
-        shape: tool.shape,
-        constrain: false,
-        fromCenter: false,
-        booleanOverride: override,
-      };
-    case 'lasso':
-      return { kind: 'lasso', points: [point], booleanOverride: override };
-    case 'wand':
-    case 'bucket':
-      // Click tools; the hook commits immediately on down.
-      return IDLE_DRAG;
-    case 'gradient':
-      return { kind: 'gradient-drag', from: point, to: point, shape: tool.shape };
-    case 'crop':
-      return { kind: 'crop-drag', from: point, to: point };
-    case 'move':
-      return moveToolDrag(point, hasSelection);
+  return (
+    paintFamilyDrag(tool, point, modifiers) ?? selectFamilyDrag(tool, point, hasSelection, override)
+  );
+}
+
+// Brush-like tools (clone routes through the paint drag; the pointer hook
+// gates it on a set source and diverts completion to the clone commit).
+// If-chains, not switches: the exhaustiveness rule rejects union defaults.
+function paintFamilyDrag(
+  tool: EditorTool,
+  point: PaintPoint,
+  modifiers: DragModifiers,
+): EditorDrag | null {
+  const kind = tool.kind;
+  if (kind === 'brush' || kind === 'pencil' || kind === 'eraser' || kind === 'clone') {
+    return { kind: 'paint', points: [point] };
   }
+  if (tool.kind === 'line') {
+    return { kind: 'line', from: point, to: point, shift: modifiers.shift };
+  }
+  if (tool.kind === 'gradient') {
+    return { kind: 'gradient-drag', from: point, to: point, shape: tool.shape };
+  }
+  return null;
+}
+
+function selectFamilyDrag(
+  tool: EditorTool,
+  point: PaintPoint,
+  hasSelection: boolean,
+  override: SelectionCombineMode | null,
+): EditorDrag {
+  if (tool.kind === 'marquee') {
+    return {
+      kind: 'marquee',
+      from: point,
+      to: point,
+      shape: tool.shape,
+      constrain: false,
+      fromCenter: false,
+      booleanOverride: override,
+    };
+  }
+  if (tool.kind === 'lasso') return { kind: 'lasso', points: [point], booleanOverride: override };
+  if (tool.kind === 'crop') return { kind: 'crop-drag', from: point, to: point };
+  if (tool.kind === 'move') return moveToolDrag(point, hasSelection);
+  // Click tools (wand, bucket, heal) commit on pointer-down in the hook.
+  return IDLE_DRAG;
 }
 
 export function advanceDrag(
