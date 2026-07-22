@@ -216,6 +216,15 @@ function cycledMarquee(tool: EditorTool): EditorTool {
   return { kind: 'marquee', shape: tool.shape === 'rect' ? 'ellipse' : 'rect' };
 }
 
+// G cycles bucket → linear gradient → radial gradient (the fill flyout).
+function cycledFill(tool: EditorTool): EditorTool {
+  if (tool.kind === 'bucket') return { kind: 'gradient', shape: 'linear' };
+  if (tool.kind === 'gradient' && tool.shape === 'linear') {
+    return { kind: 'gradient', shape: 'radial' };
+  }
+  return { kind: 'bucket' };
+}
+
 function handleToolKey(key: string): boolean {
   const store = useImageEditorStore.getState();
   switch (key) {
@@ -237,6 +246,9 @@ function handleToolKey(key: string): boolean {
     case 'q':
       // Quick Mask: paint the selection as a red rubylith (Photoshop Q).
       useQuickMaskStore.getState().toggle();
+      return true;
+    case 'g':
+      store.setTool(cycledFill(store.tool));
       return true;
     case 's':
       store.setTool({ kind: 'lasso' });

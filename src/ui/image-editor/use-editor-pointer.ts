@@ -17,6 +17,7 @@ import {
   type EditorDrag,
 } from './editor-drag';
 import { useAdjustDialogStore } from './adjust-dialog-store';
+import { applyBucketAt, applyGradientDrag } from './editor-session-fill';
 import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
@@ -246,6 +247,10 @@ function startToolDrag(
     );
     return;
   }
+  if (state.tool.kind === 'bucket') {
+    applyBucketAt(point.x, point.y);
+    return;
+  }
   const insideSelection =
     selection !== null &&
     (selection.alpha[Math.floor(point.y) * selection.width + Math.floor(point.x)] ?? 0) > 0;
@@ -302,6 +307,9 @@ function completeActionDrag(
       return;
     case 'crop-drag':
       completeCropDrag(store, drag);
+      return;
+    case 'gradient-drag':
+      applyGradientDrag(drag.from, drag.to, drag.shape);
       return;
     case 'lasso':
       completeLasso(store, drag, doc.width, doc.height);

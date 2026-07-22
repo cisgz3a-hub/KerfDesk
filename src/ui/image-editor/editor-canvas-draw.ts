@@ -215,6 +215,19 @@ function drawDragPreview(
     case 'crop-drag':
       drawDashedRect(ctx, dragRect(drag), view);
       break;
+    case 'gradient-drag':
+      // The drag axis: from-anchor to live end, with a small origin square.
+      ctx.strokeStyle = PREVIEW_ACCENT;
+      ctx.lineWidth = 1 / view.scale;
+      ctx.setLineDash([]);
+      strokePolyline(ctx, [drag.from, drag.to]);
+      ctx.strokeRect(
+        drag.from.x - 2 / view.scale,
+        drag.from.y - 2 / view.scale,
+        4 / view.scale,
+        4 / view.scale,
+      );
+      break;
     case 'paint':
       ctx.strokeStyle = style.color;
       ctx.lineWidth = style.widthPx;

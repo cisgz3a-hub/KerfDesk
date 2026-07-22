@@ -44,6 +44,12 @@ export type EditorDrag =
     }
   | { readonly kind: 'crop-drag'; readonly from: PaintPoint; readonly to: PaintPoint }
   | {
+      readonly kind: 'gradient-drag';
+      readonly from: PaintPoint;
+      readonly to: PaintPoint;
+      readonly shape: 'linear' | 'radial';
+    }
+  | {
       readonly kind: 'transform-drag';
       readonly handle: TransformHandle;
       readonly startAffine: AffineTransform;
@@ -97,6 +103,20 @@ export function beginDrag(
   const override = booleanFromModifiers(modifiers, hasSelection);
   const insideDrag = beginInsideSelectionDrag(tool, point, modifiers, insideSelection, override);
   if (insideDrag !== null) return insideDrag;
+  return dragForTool(tool, point, modifiers, hasSelection, override);
+}
+
+function moveToolDrag(point: PaintPoint, hasSelection: boolean): EditorDrag {
+  return hasSelection ? { kind: 'move-selection', from: point, to: point } : IDLE_DRAG;
+}
+
+function dragForTool(
+  tool: EditorTool,
+  point: PaintPoint,
+  modifiers: DragModifiers,
+  hasSelection: boolean,
+  override: SelectionCombineMode | null,
+): EditorDrag {
   switch (tool.kind) {
     case 'brush':
     case 'pencil':
@@ -117,12 +137,15 @@ export function beginDrag(
     case 'lasso':
       return { kind: 'lasso', points: [point], booleanOverride: override };
     case 'wand':
-      // Wand is a click tool; the hook commits immediately on down.
+    case 'bucket':
+      // Click tools; the hook commits immediately on down.
       return IDLE_DRAG;
+    case 'gradient':
+      return { kind: 'gradient-drag', from: point, to: point, shape: tool.shape };
     case 'crop':
       return { kind: 'crop-drag', from: point, to: point };
     case 'move':
-      return hasSelection ? { kind: 'move-selection', from: point, to: point } : IDLE_DRAG;
+      return moveToolDrag(point, hasSelection);
   }
 }
 
@@ -145,6 +168,7 @@ export function advanceDrag(
     case 'lasso':
       return { ...drag, points: [...drag.points, point] };
     case 'crop-drag':
+    case 'gradient-drag':
     case 'move-outline':
     case 'move-selection':
       return { ...drag, to: point };

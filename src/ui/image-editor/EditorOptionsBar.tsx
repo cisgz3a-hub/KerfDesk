@@ -33,11 +33,38 @@ export function EditorOptionsBar(): JSX.Element {
     <div style={barStyle} aria-label="Tool options">
       {showModes ? <SelectionModeButtons /> : null}
       {isPaintTool ? <PaintOptions showColor={tool.kind !== 'eraser'} /> : null}
-      {tool.kind === 'wand' ? <WandOptions /> : null}
+      {tool.kind === 'wand' || tool.kind === 'bucket' ? <WandOptions /> : null}
+      {tool.kind === 'gradient' ? <GradientOptions shape={tool.shape} /> : null}
       {tool.kind === 'crop' ? <CropActions /> : null}
       {isSelectTool ? <SelectionActions /> : null}
       {isSelectTool ? <SelectionModifyRow /> : null}
     </div>
+  );
+}
+
+// Linear/radial pair for the gradient tool (G also cycles them).
+function GradientOptions(props: { readonly shape: 'linear' | 'radial' }): JSX.Element {
+  const setTool = useImageEditorStore((s) => s.setTool);
+  return (
+    <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+      {(['linear', 'radial'] as const).map((shape) => (
+        <button
+          key={shape}
+          type="button"
+          className={props.shape === shape ? 'lf-btn lf-btn--primary' : 'lf-btn'}
+          style={{ padding: '2px 10px' }}
+          onClick={() => setTool({ kind: 'gradient', shape })}
+          aria-pressed={props.shape === shape}
+          title={
+            shape === 'linear'
+              ? 'Linear gradient along the drag'
+              : 'Radial gradient out from the drag start'
+          }
+        >
+          {shape === 'linear' ? 'Linear' : 'Radial'}
+        </button>
+      ))}
+    </span>
   );
 }
 
