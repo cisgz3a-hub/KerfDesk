@@ -50,6 +50,11 @@ mac:
   hardenedRuntime: false
   notarize: false
   minimumSystemVersion: '12.0'
+  extraResources:
+    - from: node_modules/electron/dist/LICENSE
+      to: legal/electron/LICENSE
+    - from: node_modules/electron/dist/LICENSES.chromium.html
+      to: legal/electron/LICENSES.chromium.html
   extendInfo:
     NSCameraUsageDescription: KerfDesk uses a camera to align work with material and preview the machine workspace.
     NSLocalNetworkUsageDescription: KerfDesk connects to cameras on the local network for workspace preview.

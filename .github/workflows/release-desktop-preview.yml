@@ -536,7 +536,7 @@ jobs:
           IFS=$'\t' read -r tag_type tag_sha < <(
             gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}" \
               --jq '[.object.type, .object.sha] | @tsv'
-          )"
+          )
           test "${tag_type}" = tag
           IFS=$'\t' read -r target_type target_sha < <(
             gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" \

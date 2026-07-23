@@ -11363,7 +11363,7 @@ update source.
 ## ADR-249 - Notify-only update discovery for unsigned Desktop Preview
 
 **Date:** 2026-07-22
-**Status:** Accepted
+**Status:** Accepted; amended 2026-07-23 to require a successful release workflow
 
 ### Context
 
@@ -11391,18 +11391,23 @@ provide a narrower path.
    remains in force. Web/PWA behavior remains unchanged.
 2. **One metadata check per launch.** Only a packaged app whose embedded
    `kerfdeskDesktopReleaseChannel` is exactly `preview` and whose current version
-   is strict `X.Y.Z-preview.N` may query
-   `https://api.github.com/repos/cisgz3a-hub/KerfDesk/releases?per_page=20`.
-   The memoized main-process request is GET-only, rejects redirects, omits
-   credentials/referrer, uses no token, times out, and bounds the response body.
-   Dev, stable, web, malformed metadata, and unsupported targets are inert.
-3. **Untrusted response, strict result.** Main treats release JSON as untrusted.
-   It accepts only `draft:false`, `prerelease:true`, `immutable:true`, a strict
-   `vX.Y.Z-preview.N` newer than `app.getVersion()`, and the canonical asset for
-   the running platform and architecture. Numeric identifiers compare as
-   arbitrary-size integers. The release must contain exactly the three canonical
-   binaries plus checksums, manifest, and SBOM. API-provided URLs are ignored. The
-   renderer receives only `{ kind:'none' }` or `{ kind:'available', version }`.
+   is strict `X.Y.Z-preview.N` may query the fixed public successful-runs endpoint
+   for `.github/workflows/release-desktop-preview.yml` with `event=push`,
+   `status=success`, and `per_page=20`. The memoized main-process request is
+   GET-only, rejects redirects, omits credentials/referrer, uses no token, times
+   out, and bounds the response body. Dev, stable, web, malformed metadata, and
+   unsupported targets are inert.
+3. **Untrusted response, green-workflow result.** Main treats workflow-run JSON as
+   untrusted. It accepts only `status:completed`, `conclusion:success`,
+   `event:push`, the exact Preview workflow path, a 40-hex source SHA, and a strict
+   `vX.Y.Z-preview.N` tag newer than `app.getVersion()`. Numeric identifiers
+   compare as arbitrary-size integers. A successful run is the release
+   certificate because its final job verifies the published immutable
+   prerelease, exact three binaries plus checksum/manifest/SBOM companions,
+   downloaded checksums, source identity, and attestations. Failed, cancelled, or
+   incomplete release runs are never advertised even if they left an immutable
+   release behind. API-provided URLs are ignored. The renderer receives only
+   `{ kind:'none' }` or `{ kind:'available', version }`.
 4. **No preload or IPC.** The renderer calls the exact same-origin GET route
    `app://app/api/desktop-preview-update`. The existing main-process protocol
    handler performs the pinned external request; renderer CSP remains
@@ -11427,8 +11432,8 @@ provide a narrower path.
    job, device identifier, token, cookie, or telemetry is sent. GitHub still
    receives unavoidable connection metadata such as IP address, time, and the
    generic `KerfDesk-Desktop-Preview` user agent. Offline, rate-limit, HTTP,
-   timeout, oversized, malformed, mutable, wrong-asset, and downgrade cases are
-   silent and non-fatal.
+   timeout, oversized, malformed, failed/cancelled/in-progress workflow, and
+   downgrade cases are silent and non-fatal.
 8. **Release prerequisite.** The repository's immutable-release setting and the
    ADR-248 Preview publication gates must be enabled before the first Preview
    tag. The checker intentionally stays silent for mutable releases. No Preview
@@ -11437,7 +11442,7 @@ provide a narrower path.
 ### Consequences
 
 - Preview users can learn about a newer version without granting unsigned code
-  an automatic update path.
+  an automatic update path or being directed to a red release run.
 - The desktop app gains one narrow third-party metadata request, recorded as a
   specific exception to PROJECT non-negotiable 8; web and machining remain
   offline.
@@ -11451,8 +11456,8 @@ provide a narrower path.
 
 - Unit tests cover channel metadata, exact route/method, request headers,
   timeout/error containment, response bounds, strict tags, large numeric version
-  ordering, immutable/draft/prerelease state, platform asset presence, and
-  one-check memoization.
+  ordering, exact workflow identity, successful/completed state, failed and
+  cancelled runs, source-SHA shape, supported targets, and one-check memoization.
 - Renderer tests cover fail-closed response parsing, request coalescing, passive
   status-bar rendering, accessibility announcement, fixed link destination, and
   availability during a job.

@@ -1,17 +1,19 @@
 // Unsigned Preview update discovery (ADR-249).
 //
 // This is deliberately separate from electron-updater. Preview builds may ask
-// GitHub whether a newer immutable prerelease exists, but they never download,
-// execute, or install it. The renderer receives only a validated version string
-// through the app:// same-origin protocol and opens KerfDesk's fixed download
-// page when the operator chooses to act.
+// GitHub whether a newer Preview release workflow completed successfully, but
+// they never download, execute, or install it. A green workflow is the release
+// certificate: its final job verifies the immutable prerelease, exact assets,
+// checksums, source manifest, and attestations. The renderer receives only a
+// validated version string through the app:// same-origin protocol.
 
 export const PREVIEW_UPDATE_API_PATH = '/api/desktop-preview-update';
-export const PREVIEW_RELEASES_API_URL =
-  'https://api.github.com/repos/cisgz3a-hub/KerfDesk/releases?per_page=20';
+export const PREVIEW_WORKFLOW_RUNS_API_URL =
+  'https://api.github.com/repos/cisgz3a-hub/KerfDesk/actions/workflows/release-desktop-preview.yml/runs?event=push&status=success&per_page=20';
 
 const MAX_RESPONSE_BYTES = 512 * 1024;
 const REQUEST_TIMEOUT_MS = 8_000;
+const PREVIEW_WORKFLOW_PATH = '.github/workflows/release-desktop-preview.yml';
 const PREVIEW_TAG = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-preview\.(0|[1-9][0-9]*)$/;
 
 export type PreviewUpdateAvailability =
@@ -24,14 +26,14 @@ type PreviewVersion = {
   readonly parts: readonly [bigint, bigint, bigint, bigint];
 };
 
-type PreviewUpdateFetch = (url: string, init: RequestInit) => Promise<Response>;
+type PreviewWorkflowRunsFetch = (url: string, init: RequestInit) => Promise<Response>;
 
 export type PreviewUpdateCheckOptions = {
   readonly enabled: boolean;
   readonly currentVersion: string;
   readonly platform: NodeJS.Platform;
   readonly arch: string;
-  readonly fetchReleases: PreviewUpdateFetch;
+  readonly fetchWorkflowRuns: PreviewWorkflowRunsFetch;
   readonly onError?: (error: unknown) => void;
 };
 
@@ -73,13 +75,12 @@ export async function checkForPreviewUpdate(
   if (!options.enabled) return { kind: 'none' };
   const current = parsePreviewTag(`v${options.currentVersion}`);
   if (current === null) return { kind: 'none' };
-  const expectedAsset = previewAssetName(options.platform, options.arch);
-  if (expectedAsset === null) return { kind: 'none' };
+  if (!isSupportedPreviewTarget(options.platform, options.arch)) return { kind: 'none' };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await options.fetchReleases(PREVIEW_RELEASES_API_URL, {
+    const response = await options.fetchWorkflowRuns(PREVIEW_WORKFLOW_RUNS_API_URL, {
       method: 'GET',
       headers: {
         Accept: 'application/vnd.github+json',
@@ -92,9 +93,9 @@ export async function checkForPreviewUpdate(
       referrerPolicy: 'no-referrer',
       signal: controller.signal,
     });
-    const releases = await readReleaseList(response);
-    if (releases === null) return { kind: 'none' };
-    return newestAvailablePreview(releases, current, expectedAsset);
+    const workflowRuns = await readWorkflowRunList(response);
+    if (workflowRuns === null) return { kind: 'none' };
+    return newestAvailablePreview(workflowRuns, current);
   } catch (error) {
     options.onError?.(error);
     return { kind: 'none' };
@@ -104,52 +105,35 @@ export async function checkForPreviewUpdate(
 }
 
 function newestAvailablePreview(
-  releases: ReadonlyArray<unknown>,
+  workflowRuns: ReadonlyArray<unknown>,
   current: PreviewVersion,
-  expectedAsset: (version: string) => string,
 ): PreviewUpdateAvailability {
   let newest: PreviewVersion | null = null;
-  for (const release of releases) {
-    const candidate = validReleaseVersion(release, expectedAsset);
+  for (const workflowRun of workflowRuns) {
+    const candidate = validWorkflowRunVersion(workflowRun);
     if (candidate === null || comparePreviewVersions(candidate, current) <= 0) continue;
     if (newest === null || comparePreviewVersions(candidate, newest) > 0) newest = candidate;
   }
   return newest === null ? { kind: 'none' } : { kind: 'available', version: newest.version };
 }
 
-function validReleaseVersion(
-  value: unknown,
-  expectedAsset: (version: string) => string,
-): PreviewVersion | null {
+function validWorkflowRunVersion(value: unknown): PreviewVersion | null {
   if (!isRecord(value)) return null;
-  if (value['draft'] !== false || value['prerelease'] !== true || value['immutable'] !== true) {
+  if (
+    value['status'] !== 'completed' ||
+    value['conclusion'] !== 'success' ||
+    value['event'] !== 'push' ||
+    value['path'] !== PREVIEW_WORKFLOW_PATH
+  ) {
     return null;
   }
-  const tag = parsePreviewTag(value['tag_name']);
-  if (tag === null || !Array.isArray(value['assets'])) return null;
-  const assetNames = value['assets'].flatMap((asset) =>
-    isRecord(asset) && typeof asset['name'] === 'string' ? [asset['name']] : [],
-  );
-  const requiredNames = previewReleaseAssetNames(tag.version);
-  const exactAssetSet =
-    assetNames.length === requiredNames.length &&
-    new Set(assetNames).size === requiredNames.length &&
-    requiredNames.every((name) => assetNames.includes(name));
-  return exactAssetSet && assetNames.includes(expectedAsset(tag.version)) ? tag : null;
+  if (typeof value['head_sha'] !== 'string' || !/^[0-9a-f]{40}$/.test(value['head_sha'])) {
+    return null;
+  }
+  return parsePreviewTag(value['head_branch']);
 }
 
-function previewReleaseAssetNames(version: string): readonly string[] {
-  return [
-    `KerfDesk-${version}-windows-x64-setup.exe`,
-    `KerfDesk-${version}-macos-x64.dmg`,
-    `KerfDesk-${version}-macos-arm64.dmg`,
-    `KerfDesk-${version}-SHA256SUMS.txt`,
-    `KerfDesk-${version}-release-manifest.json`,
-    `KerfDesk-${version}-sbom.cdx.json`,
-  ];
-}
-
-async function readReleaseList(response: Response): Promise<ReadonlyArray<unknown> | null> {
+async function readWorkflowRunList(response: Response): Promise<ReadonlyArray<unknown> | null> {
   if (response.status !== 200) return null;
   const declaredLength = response.headers.get('content-length');
   if (declaredLength !== null && Number(declaredLength) > MAX_RESPONSE_BYTES) return null;
@@ -174,20 +158,15 @@ async function readReleaseList(response: Response): Promise<ReadonlyArray<unknow
     receivedBytes,
   ).toString('utf8');
   const parsed: unknown = JSON.parse(text);
-  return Array.isArray(parsed) ? parsed : null;
+  if (!isRecord(parsed) || !Array.isArray(parsed['workflow_runs'])) return null;
+  return parsed['workflow_runs'];
 }
 
-function previewAssetName(
-  platform: NodeJS.Platform,
-  arch: string,
-): ((version: string) => string) | null {
-  if (platform === 'win32' && arch === 'x64') {
-    return (version) => `KerfDesk-${version}-windows-x64-setup.exe`;
-  }
-  if (platform === 'darwin' && (arch === 'x64' || arch === 'arm64')) {
-    return (version) => `KerfDesk-${version}-macos-${arch}.dmg`;
-  }
-  return null;
+function isSupportedPreviewTarget(platform: NodeJS.Platform, arch: string): boolean {
+  return (
+    (platform === 'win32' && arch === 'x64') ||
+    (platform === 'darwin' && (arch === 'x64' || arch === 'arm64'))
+  );
 }
 
 function parsePreviewTag(value: unknown): PreviewVersion | null {

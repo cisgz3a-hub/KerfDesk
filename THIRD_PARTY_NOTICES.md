@@ -10,9 +10,10 @@ fonts. The generated `public/third-party-notices.txt` is the release input: it
 enumerates the complete installed `pnpm licenses list --prod` closure, the
 Electron npm package license, bundled outline/CNC fonts, and all eight pinned
 OpenClipart CC0 assets. Desktop packaging separately fails closed unless the
-artifact retains Electron's platform-native `LICENSE.electron.txt` (Windows) or
-`LICENSE` (macOS) and `LICENSES.chromium.html`; JS license banners also remain
-in shipped assets.
+artifact retains Electron's native Windows notices and the explicitly bundled
+`Contents/Resources/legal/electron/LICENSE` plus
+`Contents/Resources/legal/electron/LICENSES.chromium.html` runtime notices on
+macOS; JS license banners also remain in shipped assets.
 
 ---
 
