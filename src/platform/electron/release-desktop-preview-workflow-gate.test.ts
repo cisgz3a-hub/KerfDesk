@@ -11,6 +11,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   const workflow = repoFile('.github/workflows/release-desktop-preview.yml');
   const builder = repoFile('electron-builder.preview.yml');
   const macVerifier = repoFile('scripts/verify-macos-preview-package.sh');
+  const afterPack = repoFile('scripts/electron-builder-preview-after-pack.mjs');
 
   it('accepts only Preview tag pushes and validates the annotated tag first', () => {
     expect(workflow).toContain("tags: ['v*-preview.*']");
@@ -84,13 +85,14 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toContain('from: LICENSE');
     expect(builder).toContain('from: THIRD_PARTY_NOTICES.md');
     expect(builder).toContain('from: public/third-party-notices.txt');
-    expect(builder).toContain('from: node_modules/electron/dist/LICENSE');
-    expect(builder).toContain('from: node_modules/electron/dist/LICENSES.chromium.html');
-    expect(builder).toContain('to: legal/electron/LICENSE');
-    expect(builder).toContain('to: legal/electron/LICENSES.chromium.html');
-    expect(builder.indexOf('mac:')).toBeLessThan(
-      builder.indexOf('from: node_modules/electron/dist/LICENSE'),
-    );
+    expect(builder).toContain('afterPack: scripts/electron-builder-preview-after-pack.mjs');
+    expect(builder).not.toContain('node_modules/electron/dist/LICENSE');
+    expect(builder).not.toContain('node_modules/electron/dist/LICENSES.chromium.html');
+    expect(afterPack).toContain("context.electronPlatformName !== 'darwin'");
+    expect(afterPack).toContain('path.join(context.appOutDir, sourceName)');
+    expect(afterPack).toContain("'Contents', 'Resources'");
+    expect(afterPack).toContain("'legal', 'electron', 'LICENSE'");
+    expect(afterPack).toContain("'legal', 'electron', 'LICENSES.chromium.html'");
     expect(builder).toContain("minimumSystemVersion: '12.0'");
     expect(builder).toContain('NSCameraUsageDescription:');
     expect(builder).toContain('NSLocalNetworkUsageDescription:');
