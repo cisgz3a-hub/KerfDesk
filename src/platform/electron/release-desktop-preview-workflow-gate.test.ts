@@ -181,12 +181,14 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow.slice(publish)).toContain("--jq '.immutable'");
     expect(workflow.slice(publish)).toContain('X-GitHub-Api-Version: 2026-03-10');
     expect(workflow).not.toContain('/immutable-releases');
-    expect(workflow.match(/git\/ref\/tags\/\$\{GITHUB_REF_NAME\}/g)).toHaveLength(2);
+    expect(workflow.match(/git\/ref\/tags\/\$\{GITHUB_REF_NAME\}/g)).toHaveLength(3);
     expect(workflow).toContain('test "${target_sha}" = "${SOURCE_SHA}"');
     expect(workflow).toContain("steps.draft.outputs.already_published != 'true'");
     expect(workflow).toContain('gh release delete "${GITHUB_REF_NAME}" --yes');
-    expect(workflow).toContain('release_source_sha=');
-    expect(workflow).toContain('test "${release_source_sha}" = "${SOURCE_SHA}"');
+    expect(workflow).toContain('release_tag_sha=');
+    expect(workflow).toContain('Release attestation is not available yet; retrying');
+    expect(workflow).toContain("'.verificationResult.statement.subject[0].digest.sha1'");
+    expect(workflow).toContain('test "${release_tag_sha}" = "${tag_sha}"');
     expect(workflow).toContain('diff -u expected-published-assets.txt actual-published-assets.txt');
     expect(workflow).toContain('gh release download "${GITHUB_REF_NAME}"');
     expect(workflow).toContain('sha256sum --check "KerfDesk-${VERSION}-SHA256SUMS.txt"');

@@ -533,11 +533,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          release_source_sha="$(
-            gh release verify "${GITHUB_REF_NAME}" --format json \
-              --jq '.verificationResult.statement.subject[0].digest | to_entries[0].value'
+          IFS=$'\t' read -r tag_type tag_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}" \
+              --jq '[.object.type, .object.sha] | @tsv'
           )"
-          test "${release_source_sha}" = "${SOURCE_SHA}"
+          test "${tag_type}" = tag
+          IFS=$'\t' read -r target_type target_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          test "${target_type}" = commit
+          test "${target_sha}" = "${SOURCE_SHA}"
+          release_tag_sha=''
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if release_tag_sha="$(
+              gh release verify "${GITHUB_REF_NAME}" --format json \
+                --jq '.verificationResult.statement.subject[0].digest.sha1'
+            )"; then
+              break
+            fi
+            echo "Release attestation is not available yet; retrying (${attempt}/12)."
+            sleep 10
+          done
+          test "${release_tag_sha}" = "${tag_sha}"
           release_api="repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}"
           api_header='X-GitHub-Api-Version: 2026-03-10'
           test "$(gh api -H "${api_header}" "${release_api}" --jq '.draft')" = false
