@@ -89,7 +89,11 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).not.toContain('node_modules/electron/dist/LICENSE');
     expect(builder).not.toContain('node_modules/electron/dist/LICENSES.chromium.html');
     expect(afterPack).toContain("context.electronPlatformName !== 'darwin'");
-    expect(afterPack).toContain('path.join(context.appOutDir, sourceName)');
+    expect(afterPack).toContain("require.resolve('electron/package.json')");
+    expect(afterPack).toContain("path.join(electronPackageDir, 'dist', sourceName)");
+    expect(afterPack).toContain('electron-v${version}-darwin-${arch}.zip');
+    expect(afterPack).toContain('https://github.com/electron/electron/releases/download');
+    expect(afterPack).toContain("execFileSync('ditto'");
     expect(afterPack).toContain("'Contents', 'Resources'");
     expect(afterPack).toContain("'legal', 'electron', 'LICENSE'");
     expect(afterPack).toContain("'legal', 'electron', 'LICENSES.chromium.html'");
