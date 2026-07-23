@@ -58,7 +58,7 @@ describe('laserOperationDetail', () => {
 describe('cncOperationDetail', () => {
   it('summarizes the default profile cut with a computed pass count', () => {
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe(
-      '1 pass · stepover 40% · tabs off · Manual feeds',
+      '1 pass · stepover 40% · climb · tabs off · Manual feeds',
     );
   });
 

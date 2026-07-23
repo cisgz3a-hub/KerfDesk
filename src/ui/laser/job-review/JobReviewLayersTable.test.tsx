@@ -133,6 +133,6 @@ describe('JobReviewLayersTable', () => {
     seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'cnc');
     await render('cnc');
 
-    expect(host.textContent).toContain('1 pass · stepover 40% · tabs off');
+    expect(host.textContent).toContain('1 pass · stepover 40% · climb · tabs off');
   });
 });
