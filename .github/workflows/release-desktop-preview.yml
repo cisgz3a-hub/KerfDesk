@@ -94,6 +94,18 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
+      - name: Remove local Windows Preview updater metadata before verification
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $releaseDir = "release/$env:VERSION"
+          $generatedMetadata = Get-ChildItem -LiteralPath $releaseDir -Recurse -File |
+            Where-Object { $_.Name -match '^latest.*\.(yml|yaml|json)$' -or $_.Extension -eq '.blockmap' }
+          foreach ($path in $generatedMetadata) {
+            Remove-Item -LiteralPath $path.FullName -Force
+          }
+
       - name: Verify Windows Preview package contract
         shell: pwsh
         env:
