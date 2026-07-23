@@ -67,6 +67,9 @@ async function downloadFile(url, targetPath) {
     });
 
     request.on('error', reject);
+    request.setTimeout(120_000, () => {
+      request.destroy(new Error(`Timed out downloading ${url}`));
+    });
   });
 }
 
