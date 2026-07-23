@@ -1,5 +1,5 @@
 appId: dev.laserforge.app
-productName: LaserForge 2.0
+productName: KerfDesk
 
 directories:
   output: release/${version}
@@ -22,13 +22,13 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: LaserForge-2.0-${version}-${arch}-setup.${ext}
+  artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}
 
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
-  shortcutName: LaserForge 2.0
+  shortcutName: KerfDesk
   # NSIS displays the MIT License & Safety Notice before installation; this
   # adds no restriction and does not authorize future commercial terms.
   license: public/eula.txt

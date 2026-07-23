@@ -34,15 +34,21 @@ export const useTextDialogStore = create<TextDialogState>((set, get) => ({
   ink: 'black',
 
   open: () => {
-    // Only over a live session; a transform in progress owns the canvas.
     const editor = useImageEditorStore.getState();
-    if (editor.session === null || editor.transform !== null) return;
+    if (editor.session === null) return;
+    // Opening a modal tool commits the active transform, matching Enter and
+    // avoiding a visible button that silently does nothing.
+    if (editor.transform !== null) editor.commitTransform();
+    const current = useImageEditorStore.getState();
+    if (current.session === null || current.transform !== null) return;
     set({ isOpen: true, text: '' });
   },
   close: () => set({ isOpen: false }),
   setText: (text) => set({ text }),
   setFontKey: (fontKey) => set({ fontKey }),
-  setSizePx: (sizePx) => set({ sizePx: Math.max(4, Math.min(512, Math.round(sizePx))) }),
+  setSizePx: (sizePx) => {
+    if (Number.isFinite(sizePx) && sizePx > 0) set({ sizePx });
+  },
   setInk: (ink) => set({ ink }),
 
   commit: async () => {

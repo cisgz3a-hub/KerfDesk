@@ -94,7 +94,7 @@ export const useQuickMaskStore = create<QuickMaskState>((set, get) => ({
     const { rubylith, history } = get();
     if (rubylith === null) return false;
     const result = undoInPlace(history, rubylith);
-    if (result.applied === null) return true; // mode on, nothing to undo — consumed
+    if (result.applied === null) return false;
     set((s) => ({ revision: s.revision + 1, history: result.history }));
     return true;
   },
@@ -103,7 +103,7 @@ export const useQuickMaskStore = create<QuickMaskState>((set, get) => ({
     const { rubylith, history } = get();
     if (rubylith === null) return false;
     const result = redoInPlace(history, rubylith);
-    if (result.applied === null) return true;
+    if (result.applied === null) return false;
     set((s) => ({ revision: s.revision + 1, history: result.history }));
     return true;
   },

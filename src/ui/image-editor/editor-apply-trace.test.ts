@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
@@ -12,18 +12,20 @@ function cleanSession() {
 
 beforeEach(() => {
   useImageEditorStore.setState({ session: null, isApplying: false });
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(() => undefined);
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('applyAndTrace', () => {
-  it('does nothing and keeps the editor open when there are no pending edits', async () => {
+  it('opens trace and closes the editor when there are no pending edits', async () => {
     useImageEditorStore.setState({ session: cleanSession() });
     const onApplied = vi.fn();
     useImageEditorStore.getState().applyAndTrace(onApplied);
     await Promise.resolve();
-    await Promise.resolve();
-    expect(onApplied).not.toHaveBeenCalled();
-    // A clean session is never closed by Apply & Trace.
-    expect(useImageEditorStore.getState().session).not.toBeNull();
+    expect(onApplied).toHaveBeenCalledOnce();
+    expect(onApplied).toHaveBeenCalledWith('R1');
+    expect(useImageEditorStore.getState().session).toBeNull();
   });
 
   it('begins applying (guard passes) for a dirty session', () => {
@@ -39,5 +41,13 @@ describe('applyAndTrace', () => {
     useImageEditorStore.getState().applyAndTrace(onApplied);
     expect(useImageEditorStore.getState().isApplying).toBe(false);
     expect(onApplied).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op while an apply is already running', () => {
+    useImageEditorStore.setState({ session: cleanSession(), isApplying: true });
+    const onApplied = vi.fn();
+    useImageEditorStore.getState().applyAndTrace(onApplied);
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(useImageEditorStore.getState().session).not.toBeNull();
   });
 });
