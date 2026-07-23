@@ -4194,12 +4194,15 @@ behavior or create a second product implementation.
 ### F-DESK2. Desktop updates (trust-gated, burn-safe)
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
-   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Releases
-   API (ADR-249). Main accepts only a non-draft, immutable prerelease with a
-   strict newer `vX.Y.Z-preview.N` tag and the canonical asset for the current
-   OS/architecture. Dev, web, stable-version, unsupported-platform, malformed,
-   mutable, missing-asset, downgrade, offline, rate-limited, and failed requests
-   produce no visible control and never block startup.
+   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Actions
+   endpoint for successful runs of
+   `.github/workflows/release-desktop-preview.yml` (ADR-249). Main accepts only a
+   completed successful push run with a strict newer `vX.Y.Z-preview.N` tag and
+   exact workflow path. A green run means the workflow's final job verified the
+   immutable prerelease, canonical six-asset set, checksums, source manifest, and
+   attestations. Dev, web, stable-version, unsupported-platform, malformed,
+   failed/cancelled/in-progress, downgrade, offline, rate-limited, and failed
+   requests produce no visible control and never block startup.
 2. When a newer Preview exists, a passive **Download update** control appears at
    the right edge of the status bar and a polite live region announces its exact
    version. There is no popup and the control receives no automatic focus. It
@@ -4399,10 +4402,11 @@ real hardware:
       tooling-created nested ad-hoc signatures are not treated as bundle trust.
 - [ ] **Unsigned notify-only update gate:** on Windows, Intel Mac, and Apple
       Silicon, an older packaged Preview makes one anonymous GitHub metadata
-      request and surfaces a newer immutable Preview in the status bar. Clicking
-      opens only the fixed KerfDesk download page. Confirm zero installer,
-      `latest.yml`, mutable alias, R2, download, execution, or install traffic;
-      repeat offline, malformed-response, and active-job cases.
+      request and surfaces only a newer Preview whose exact release workflow
+      completed successfully. Clicking opens only the fixed KerfDesk download
+      page. Confirm failed/cancelled release runs remain invisible and confirm
+      zero installer, `latest.yml`, mutable alias, R2, download, execution, or
+      install traffic; repeat offline, malformed-response, and active-job cases.
 - [ ] **Signed stable Windows update (after signing lands):** publish a higher
       `vX.Y.Z`; a running older correctly signed install downloads it, notifies,
       and on natural quit installs and relaunches. Confirm no install occurs while

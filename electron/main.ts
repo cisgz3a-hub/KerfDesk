@@ -112,7 +112,7 @@ const checkForPreviewUpdate = createPreviewUpdateCheck({
   currentVersion: app.getVersion(),
   platform: process.platform,
   arch: process.arch,
-  fetchReleases: (url, init) => net.fetch(url, init),
+  fetchWorkflowRuns: (url, init) => net.fetch(url, init),
   onError: (error: unknown) => console.warn('Preview update check failed:', error),
 });
 const CSP_POLICY = [

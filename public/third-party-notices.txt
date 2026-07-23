@@ -10,8 +10,8 @@ bundled fonts, and the eight pinned OpenClipart CC0 assets.
 
 Desktop artifacts also embed the Electron/Chromium runtime. Its upstream
 Electron package license is reproduced below; Electron/Chromium
-artifact-level license bundles emitted by the platform packager are
-retained and reported by desktop packaging.
+artifact-level license files are explicitly bundled and required by
+desktop package verification.
 
 == Bundled fonts ==
 
@@ -1825,9 +1825,8 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Electron embeds Chromium and other upstream runtime components. Desktop
-packaging must retain the Electron package license in these generated
-notices and any packaged Chromium license bundle when electron-builder
-emits it for the target platform.
+packaging retains the Electron package license in these generated notices
+and explicitly bundles the Electron and Chromium runtime license files.
 
 === Apache-2.0 full license text ===
 

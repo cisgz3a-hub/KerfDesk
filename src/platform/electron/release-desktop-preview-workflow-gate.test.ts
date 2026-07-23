@@ -84,19 +84,25 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toContain('from: LICENSE');
     expect(builder).toContain('from: THIRD_PARTY_NOTICES.md');
     expect(builder).toContain('from: public/third-party-notices.txt');
+    expect(builder).toContain('from: node_modules/electron/dist/LICENSE');
+    expect(builder).toContain('from: node_modules/electron/dist/LICENSES.chromium.html');
+    expect(builder).toContain('to: legal/electron/LICENSE');
+    expect(builder).toContain('to: legal/electron/LICENSES.chromium.html');
+    expect(builder.indexOf('mac:')).toBeLessThan(
+      builder.indexOf('from: node_modules/electron/dist/LICENSE'),
+    );
     expect(builder).toContain("minimumSystemVersion: '12.0'");
     expect(builder).toContain('NSCameraUsageDescription:');
     expect(builder).toContain('NSLocalNetworkUsageDescription:');
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSE.electron.txt');
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSES.chromium.html');
-    expect(macVerifier).toContain('Contents/Resources');
-    expect(macVerifier).toContain('Contents/Frameworks/Electron Framework.framework/Resources');
+    expect(macVerifier).toContain('${app_dir}/Contents/Resources/legal/electron/LICENSE');
     expect(macVerifier).toContain(
-      'Contents/Frameworks/Electron Framework.framework/Versions/A/Resources',
+      '${app_dir}/Contents/Resources/legal/electron/LICENSES.chromium.html',
     );
-    expect(macVerifier).toMatch(/optional_file\s+\\\s+'optional Electron native LICENSE'/);
-    expect(macVerifier).toMatch(/optional_file\s+\\\s+'optional Electron Chromium license bundle'/);
-    expect(macVerifier).toContain('${electron_resources}/LICENSE');
+    expect(macVerifier).not.toContain('optional_file');
+    expect(macVerifier).toContain('hdiutil attach -readonly -nobrowse');
+    expect(macVerifier).toContain('app_dir="${mount_dir}/KerfDesk.app"');
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
