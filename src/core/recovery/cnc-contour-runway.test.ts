@@ -23,6 +23,33 @@ function contourJob(polyline: ReadonlyArray<Vec2>, feedMmPerMin = 600): Job {
   return { groups: [group] };
 }
 
+// A flat led profile pass (ADR-250): a path3d whose points all sit at the cut
+// depth. Runway recovery should treat its XY points as a contour.
+function flatLeadPath3dJob(polyline: ReadonlyArray<Vec2>, zMm = -2): Job {
+  const group: CncGroup = {
+    kind: 'cnc',
+    layerId: 'layer-a',
+    color: '#000000',
+    cutType: 'profile-outside',
+    toolId: 'tool-1',
+    toolDiameterMm: 3.175,
+    feedMmPerMin: 600,
+    plungeMmPerMin: 180,
+    spindleRpm: 12_000,
+    spindleSpinupSec: 3,
+    coolant: 'mist',
+    safeZMm: 5,
+    passes: [
+      {
+        kind: 'path3d',
+        points: polyline.map((point) => ({ x: point.x, y: point.y, z: zMm })),
+        closed: false,
+      },
+    ],
+  };
+  return { groups: [group] };
+}
+
 function planFor(
   job: Job,
   uncertaintyEventId: string,
@@ -84,6 +111,28 @@ describe('planCncContourRunway', () => {
       spindleRpm: 12_000,
       coolant: 'mist',
     });
+  });
+
+  it('plans a runway from a flat led path3d pass, reading its cut depth (ADR-250)', () => {
+    const job = flatLeadPath3dJob([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
+      { x: 30, y: 0 },
+    ]);
+    const plan = expectPlan(planFor(job, 'cnc-op-1/pass-1/cut-3', 12));
+    expect(plan.motion.cutZMm).toBe(-2); // read from the flat path3d's Z
+    expect(plan.runwayPolyline).toEqual([
+      { x: 8, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
+    ]);
+    expect(plan.recoveryPolyline).toEqual([
+      { x: 8, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
+      { x: 30, y: 0 },
+    ]);
   });
 
   it('refuses a runway that would depend on acceleration through a corner', () => {

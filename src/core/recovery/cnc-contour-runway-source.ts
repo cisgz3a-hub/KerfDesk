@@ -1,5 +1,5 @@
-import type { CncContourPass, CncGroup, Job } from '../job';
-import type { CncRecoveryEvent } from './cnc-recovery-manifest';
+import type { CncContourPass, CncPass, CncGroup, Job } from '../job';
+import { flatPath3dZMm, type CncRecoveryEvent } from './cnc-recovery-manifest';
 
 export type ResolvedContourSource =
   | {
@@ -19,11 +19,27 @@ export function resolveContourSource(job: Job, event: CncRecoveryEvent): Resolve
   if (pass === undefined || pass.kind !== event.source.passKind) {
     return { kind: 'error', reason: 'source-mismatch' };
   }
-  if (pass.kind !== 'contour') return { kind: 'error', reason: 'unsupported-pass' };
-  if (segmentIndex < 0 || segmentIndex >= pass.polyline.length - 1) {
+  const contour = contourViewOf(pass);
+  if (contour === null) return { kind: 'error', reason: 'unsupported-pass' };
+  if (segmentIndex < 0 || segmentIndex >= contour.polyline.length - 1) {
     return { kind: 'error', reason: 'source-mismatch' };
   }
-  return { kind: 'ok', group, pass, segmentIndex };
+  return { kind: 'ok', group, pass: contour, segmentIndex };
+}
+
+// A plain contour is used directly; a FLAT led path3d (ADR-250) is presented as
+// a contour at its single cut depth so the shared runway geometry applies. Ramp,
+// relief, arc, and helical passes are unsupported for runway recovery.
+function contourViewOf(pass: CncPass): CncContourPass | null {
+  if (pass.kind === 'contour') return pass;
+  const zMm = flatPath3dZMm(pass);
+  if (pass.kind !== 'path3d' || zMm === null) return null;
+  return {
+    kind: 'contour',
+    zMm,
+    polyline: pass.points.map((point) => ({ x: point.x, y: point.y })),
+    closed: pass.closed,
+  };
 }
 
 export function recoveryEventsEqual(left: CncRecoveryEvent, right: CncRecoveryEvent): boolean {

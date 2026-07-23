@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 249. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 250. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -148,7 +148,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
-| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry + arc leads deferred — DECISIONS.md) | Built |
+| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |
@@ -536,7 +536,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
   `kerfOffsetMm`), automatic Line-mode hard-skip tabs
   (`core/geometry/tabs-bridges.ts`), simple Cross-Hatch fill (per-layer
-  `fillCrossHatch`), and simple Offset Fill output (`core/job/offset-fill.ts`);
+  `fillCrossHatch`), simple Offset Fill output (`core/job/offset-fill.ts`), and
+  CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
+  profile-outside/inside only — laser lead-in/out stays out of scope);
   a narrow ordered sub-layer "fill then line" operation stack is partially in
   place. **These landed without dedicated ADR headings** — the build plan
   reserved ADR-054..091 for its tickets, and the earlier citations here of

@@ -66,6 +66,32 @@ describe('buildCncRecoveryEventManifest', () => {
     expect(cuts.map((event) => event.recoverySupport)).toEqual(['runway-v1', 'manual-only']);
   });
 
+  it('grants runway-v1 to a FLAT led path3d but not a varying-Z path3d (ADR-250)', () => {
+    const flatLead: CncGroup = {
+      ...group,
+      passes: [
+        {
+          kind: 'path3d',
+          points: [
+            { x: 0, y: 0, z: -1 },
+            { x: 10, y: 0, z: -1 },
+            { x: 20, y: 0, z: -1 },
+          ],
+          closed: false,
+        },
+      ],
+    };
+    const flatCuts = buildCncRecoveryEventManifest({ groups: [flatLead] }).events.filter(
+      (event) => event.intent === 'cut',
+    );
+    expect(flatCuts.every((event) => event.recoverySupport === 'runway-v1')).toBe(true);
+    // The module `group`'s second pass is a varying-Z path3d — stays manual-only.
+    const variedCuts = buildCncRecoveryEventManifest(job).events.filter(
+      (event) => event.intent === 'cut' && event.source.passKind === 'path3d',
+    );
+    expect(variedCuts.every((event) => event.recoverySupport === 'manual-only')).toBe(true);
+  });
+
   it('refuses runway-v1 support for a multi-tool job', () => {
     const secondGroup: CncGroup = { ...group, layerId: 'layer-b', toolId: 'tool-2' };
     const manifest = buildCncRecoveryEventManifest({ groups: [group, secondGroup] });

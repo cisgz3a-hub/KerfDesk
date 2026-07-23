@@ -91,6 +91,17 @@ export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'drill',
 ];
 
+// ADR-250 arc/line lead-in and lead-out for closed profile cuts. radiusMm
+// absent = the tool radius; sweepDeg absent = 90 degrees. Leads are default-on:
+// an absent profileLead field means a tool-radius arc; `shape: 'none'` opts out.
+export type CncProfileLeadSettings = {
+  // 'none' is the explicit opt-out back to the legacy straight plunge; absent
+  // settings default to a tool-radius arc (ADR-250 default-on).
+  readonly shape: 'arc' | 'line' | 'none';
+  readonly radiusMm?: number;
+  readonly sweepDeg?: number;
+};
+
 export type CncLayerSettings = {
   readonly cutType: CncCutType;
   // Multi-tool jobs (H.7): the bit this layer cuts with. Absent = the
@@ -161,6 +172,10 @@ export type CncLayerSettings = {
   // both. Absent = 'inner' (the traced-shape reading); 'both' restores the
   // cut-every-contour behavior. Outline + engrave cuts only.
   readonly lineArtContours?: 'inner' | 'outer' | 'both';
+  // ADR-250: per-layer profile lead-in/out (profile-outside / profile-inside
+  // closed cuts only). Absent = default-on tool-radius arc; `shape: 'none'`
+  // restores the legacy straight plunge.
+  readonly profileLead?: CncProfileLeadSettings;
 };
 
 // Machine-wide flood/mist coolant for the whole CNC job (a router setting,
