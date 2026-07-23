@@ -156,8 +156,11 @@ describe('compileCncJob', () => {
   });
 
   it('closes rings: every closed pass polyline ends at its start', () => {
+    // Leads off (ADR-250) so the profile stays plain contour passes; the led
+    // path3d entry is covered in profile-lead-passes.test.ts. cutType defaults
+    // to profile-outside.
     const scene = sceneWith(
-      [cncLayer('L1', '#ff0000', { cutType: 'profile-outside', depthMm: 2, depthPerPassMm: 2 })],
+      [cncLayer('L1', '#ff0000', { profileLead: { shape: 'none' } })],
       [squareObject('O1', '#ff0000', 20)],
     );
     const group = onlyGroup(scene);
@@ -332,10 +335,13 @@ describe('compileCncJob', () => {
 
   it('leaves stock on roughing and appends one full-depth finishing pass at the true contour', () => {
     const size = 40;
+    // Leads off: this isolates the finish-allowance roughing/finishing geometry
+    // from the ADR-250 led path3d entry (covered in profile-lead-passes.test.ts).
     const layerSettings = (extra: Partial<CncLayerSettings>) => ({
       cutType: 'profile-outside' as const,
       depthMm: 4,
       depthPerPassMm: 2,
+      profileLead: { shape: 'none' as const },
       ...extra,
     });
     const noAllowance = onlyGroup(

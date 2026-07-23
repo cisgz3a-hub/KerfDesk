@@ -8,7 +8,7 @@
 //
 // Pure and deterministic: no clock, random input, or I/O.
 
-import { type DeviceProfile } from '../devices';
+import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import { artworkOperationRuns } from '../artwork-order';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -44,6 +44,7 @@ import {
   selectLineArtContours,
 } from './line-art-contours';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
+import { applyProfileLeadPasses } from './profile-lead-passes';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
@@ -112,7 +113,15 @@ export function cncGroupForLayer(
 ): CncGroup | null {
   const tool = layerCncTool(config, settings);
   const passes = passesForLayer(polylines, settings, tool, config, tabSources);
-  return cncGroupForPasses(layer, settings, tool, passes, device, config);
+  // ADR-250: bake profile lead-in/out into closed profile passes (default-on
+  // for profile-outside/inside; a no-op for other cut types and shape 'none').
+  const led = applyProfileLeadPasses(
+    passes,
+    settings,
+    tool.diameterMm,
+    machineBoundsForDevice(device),
+  );
+  return cncGroupForPasses(layer, settings, tool, led, device, config);
 }
 
 function restPocketRoughingGroupForLayer(

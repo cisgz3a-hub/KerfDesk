@@ -11509,3 +11509,122 @@ provide a narrower path.
 - Electron security guidance: https://www.electronjs.org/docs/latest/tutorial/security
 - Electron notifications: https://www.electronjs.org/docs/latest/api/notification
 - Electron shell external opening: https://www.electronjs.org/docs/latest/api/shell
+
+---
+
+## ADR-250 - Arc/line lead-in and lead-out for closed CNC profile cuts
+
+**Date:** 2026-07-23
+**Status:** Accepted — default-on for closed, untabbed profile-outside/inside cuts; `shape: 'none'` opts out
+
+### Context
+
+A CNC profile pass enters the material with a straight vertical plunge (`G1 Z` at the
+plunge feed) onto the toolpath's first vertex, then cuts the contour
+(`cnc-grbl-strategy.ts` `appendContourPass`). For `profile-outside` / `profile-inside`
+the toolpath is the tool-center path, offset from the finished wall by exactly the
+cutter radius (`profile-paths.ts`), so the cutter is **tangent** to the finished wall
+along every straight span — zero radial clearance. A dead-stop, full-depth plunge at a
+tangent point marks that wall (runout, deflection, plunge dwell, acceleration from
+rest). The maintainer reproduced this on hardware as a localized bite on one edge
+exactly where the cut starts, with the rest of the outline clean and the part correctly
+sized — which rules out an undersized-tool or on-path miscompensation.
+
+Enabling climb/conventional makes it worse: `enforceCutDirection` relocates the start to
+the midpoint of the longest edge (`motion-polish.ts`), i.e. onto the tangent line at the
+most visible span. Phase H.9 recorded "arc leads deferred" (PROJECT.md) and CNC
+lead-in/lead-out sits on the out-of-scope list; there is no CNC lead geometry today. The
+`contour-entry.ts` runway is laser-only (ADR-234/239) and never touches `kind:'cnc'`
+output. LightBurn, Fusion, and Easel all default a profile cut to a lead that plunges in
+the scrap and arrives on the contour tangentially — the fidelity reference this project
+follows.
+
+### Decision
+
+1. Add a pure-core geometry module `core/cnc/profile-lead.ts`. Given a closed,
+   already-offset profile toolpath, the profile side, and a lead configuration
+   (`shape: 'arc' | 'line'`, `radiusMm`, optional `sweepDeg`), it returns the plunge
+   point and the tangent lead-in / lead-out point sequences. The plunge lands in the
+   **waste**: exterior of the loop for `profile-outside`, interior for `profile-inside`.
+   The waste side is derived from the loop's shoelace winding (`polyline-orientation.ts`;
+   Y up, positive area = CCW, interior to the left of travel) and the profile side —
+   never guessed. The arc is tangent to the first (lead-in) / last (lead-out)
+   non-degenerate edge at the contour start vertex; the `line` shape enters perpendicular
+   from the waste.
+2. `profile-on-path` returns a typed refusal — an on-path lead would need the part side,
+   which on-path cuts do not carry. Degenerate input (open path, fewer than three points,
+   zero area, no non-degenerate edge, non-positive/`NaN` radius) also returns a typed
+   refusal, never a throw or poison geometry (the core `Result`-union convention).
+3. Leads are baked at COMPILE time (`profile-lead-passes.ts`, wired in
+   `compile-cnc-job.ts` `cncGroupForLayer`): a closed profile contour pass becomes a
+   path3d pass (plunge point → tangent lead-in → contour → lead-out) at the pass depth,
+   reusing the existing path3d emitter (no emitter change). Because `cncPassXyPoints`
+   reads path3d points, the Frame motion envelope (`computeJobMotionBounds`) and the
+   G-code motion-bounds preflight cover the lead automatically. Leads are DEFAULT-ON for
+   closed profile-outside / profile-inside cuts (`resolveProfileLeadOptions`: absent
+   per-layer settings resolve to a tool-radius arc); `shape: 'none'` opts back to the
+   legacy straight plunge.
+4. This is toolpath geometry, not a guard (CLAUDE.md #7 / PROJECT.md #21). It blocks,
+   gates, caps, clamps, and refuses nothing operational; it changes only emitted motion,
+   and only once wired. Frame and Start are untouched.
+
+### Consequences
+
+- Once wired, a closed profile cut plunges into scrap and arrives on the finished wall
+  tangentially, so the entry mark lands in the offcut rather than on the part — for both
+  the default-corner start and the climb/conventional mid-edge start. This narrows the
+  PROJECT.md "lead-in / lead-out" out-of-scope entry and supersedes the H.9 "arc leads
+  deferred" note for profile cuts.
+- The lead adds motion outside the contour on the waste side; when wired, the Frame
+  motion envelope must include it (mirroring ADR-239's envelope parity) while the artwork
+  AABB excludes it.
+- The waste side is resolved PER CONTOUR, not per layer, so a hole inside a profile-outside
+  part leads into the hole slug rather than into the kept body (the original P1 gouge).
+  Outer boundaries and holes leave the kerf offset with OPPOSITE windings, and that winding
+  is invariant to concentric roughing/finishing offsets — so a loop whose winding matches
+  the job's outermost loop keeps the layer side and the opposite winding (a hole) flips to
+  the inverse. Containment depth was rejected because it mistakes a finishing loop for a
+  nested hole.
+- Three guards each drop the lead back to the legacy straight plunge, so a lead never cuts
+  kept material: a bed guard (any lead point off the bed), a self-collision guard (a lead
+  point on the part side of its own contour — catches a concave lead curling in or a lead
+  larger than the feature), and a sibling guard (a lead point inside a disjoint neighbouring
+  part — the arrayed/nested-parts case). Because a corner-entry inside-lead pokes just past
+  the wall, most holes fall back to a plunge (safe) rather than gaining a lead.
+- Recovery parity: a led profile pass is a FLAT `path3d` (every point at the cut depth), so
+  `cnc-recovery-manifest` grants it runway-v1 (via `flatPath3dZMm`) and the runway planner
+  presents its XY points as a contour view — lead-enabled profile cuts keep automatic
+  recovery instead of falling to manual-only. Ramp and relief `path3d` passes vary in Z and
+  correctly stay manual-only. A stop inside the tangent-broken lead arc yields insufficient
+  cleared runway and falls back to review, never an unsafe re-entry.
+- Tabbed profiles keep the legacy entry for now: tabs split the loop into open segments,
+  and a lead on only the surviving full loops would be inconsistent. Tab-aware leads are a
+  follow-up.
+- The default-on flip changes emitted G-code for closed untabbed profile cuts. The CNC
+  emitter tests build jobs directly and are unaffected; the compile-level tests that assert
+  contour-pass structure now set `profileLead: { shape: 'none' }` to isolate their feature.
+  No G-code snapshot file changed (the CNC corpus asserts inline, not via snapshots), so no
+  `Snapshot change acknowledged:` line is required — but the behavior change must be called
+  out in the PR body.
+- Persistence: the `profileLead` field is not yet round-tripped by the `.lf2` serializer and
+  there is no UI to set it; both are follow-ups. Default-on needs neither (absent = on).
+- Software output is structurally verified only; a 4040 scrap-coupon burn comparing a
+  square's entry edge before and after remains required before the hardware pass is
+  claimed.
+
+### Verification
+
+- `profile-lead.test.ts` pins: the plunge lands on the waste side for outside and inside
+  profiles across CCW and CW windings; the lead-in ends exactly on, and the lead-out
+  begins exactly on, the contour start vertex; the arc arrives tangent to the first edge
+  (entry heading matches the edge direction); every arc point stays on the waste side of
+  the entry tangent (no dip toward the part); the plunge lies on the lead-radius circle
+  about the entry offset; the `line` lead approaches perpendicular from the waste; and
+  on-path, open, sub-three-point, zero-area, and non-positive/`NaN`-radius inputs return
+  typed refusals.
+- `profile-lead-passes.test.ts` pins the compile-time transform: default-on applies a
+  tool-radius arc when unset, `shape: 'none'` and non-profile / ramp-configured / open
+  passes are left untouched, and the bed and self-collision guards fall back to the legacy
+  plunge. `compile-cnc-lead.test.ts` pins the end-to-end wiring (a default outside profile
+  gains a path3d lead pass; `shape: 'none'` keeps plain contours). No G-code snapshot file
+  changed — the CNC corpus asserts inline, and the emitter tests construct jobs directly.
