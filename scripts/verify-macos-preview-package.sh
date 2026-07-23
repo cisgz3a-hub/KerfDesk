@@ -25,25 +25,6 @@ require_file() {
   exit 1
 }
 
-optional_file() {
-  local label="${1:?file label is required}"
-  shift
-  local candidate
-  for candidate in "$@"; do
-    if [[ -f "${candidate}" ]]; then
-      echo "${label} retained at ${candidate}."
-      return 0
-    fi
-  done
-  {
-    echo "${label} was not retained by macOS package; checked:"
-    for candidate in "$@"; do
-      echo "  ${candidate}"
-    done
-  } >&2
-  return 0
-}
-
 test -f "${dmg}" || { echo "Missing canonical DMG: ${dmg}" >&2; exit 1; }
 
 if find "${release_dir}" -type f \
@@ -53,8 +34,19 @@ if find "${release_dir}" -type f \
   exit 1
 fi
 
-app_dir="$(find "${release_dir}" -type d -name 'KerfDesk.app' -print -quit)"
-test -n "${app_dir}" || { echo 'KerfDesk.app was not produced.' >&2; exit 1; }
+mount_dir="$(mktemp -d)"
+is_mounted=false
+cleanup() {
+  if [[ "${is_mounted}" == true ]]; then
+    hdiutil detach "${mount_dir}" >/dev/null
+  fi
+  rmdir "${mount_dir}"
+}
+trap cleanup EXIT
+hdiutil attach -readonly -nobrowse -mountpoint "${mount_dir}" "${dmg}" >/dev/null
+is_mounted=true
+app_dir="${mount_dir}/KerfDesk.app"
+test -d "${app_dir}" || { echo 'Canonical DMG does not contain KerfDesk.app.' >&2; exit 1; }
 plist="${app_dir}/Contents/Info.plist"
 executable="${app_dir}/Contents/MacOS/KerfDesk"
 
@@ -76,19 +68,12 @@ require_file \
 require_file \
   'KerfDesk third-party notices text' \
   "${app_dir}/Contents/Resources/legal/third-party-notices.txt"
-electron_resources="${app_dir}/Contents/Resources"
-electron_framework_resources="${app_dir}/Contents/Frameworks/Electron Framework.framework/Resources"
-electron_framework_versioned_resources="${app_dir}/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources"
-optional_file \
-  'optional Electron native LICENSE' \
-  "${electron_resources}/LICENSE" \
-  "${electron_framework_resources}/LICENSE" \
-  "${electron_framework_versioned_resources}/LICENSE"
+require_file \
+  'Electron runtime LICENSE' \
+  "${app_dir}/Contents/Resources/legal/electron/LICENSE"
 require_file \
   'Electron Chromium license bundle' \
-  "${electron_resources}/LICENSES.chromium.html" \
-  "${electron_framework_resources}/LICENSES.chromium.html" \
-  "${electron_framework_versioned_resources}/LICENSES.chromium.html"
+  "${app_dir}/Contents/Resources/legal/electron/LICENSES.chromium.html"
 
 if xcrun stapler validate "${app_dir}"; then
   echo "Preview app unexpectedly has a notarization ticket: ${app_dir}" >&2

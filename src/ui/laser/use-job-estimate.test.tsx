@@ -193,4 +193,24 @@ describe('useJobEstimate debounce (H16)', () => {
 
     await unmount();
   });
+
+  it('reports a worker failure instead of leaving the estimate paused forever', async () => {
+    workerMocks.prepareLargeJobOffThread.mockRejectedValue(new Error('worker crashed'));
+    const unmount = await renderProbe();
+
+    await act(async () => {
+      useStore.setState({ project: overBudgetRasterProject() });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+    await act(async () => Promise.resolve());
+
+    expect(probe.current).toEqual({
+      kind: 'preparation-failed',
+      message: 'Background estimate failed: worker crashed. Edit the job to retry.',
+    });
+
+    await unmount();
+  });
 });

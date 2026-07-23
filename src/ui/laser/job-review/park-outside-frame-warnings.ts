@@ -34,8 +34,15 @@ export function detectParkOutsideFrameWarnings(
   finishPosition: OutputEmitOptions['finishPosition'],
 ): ReadonlyArray<string> {
   const bounds = computeJobMotionBounds(job, device);
-  if (bounds === null) return [];
   const park = resolveJobParkTarget(job, device, machineKind, finishPosition);
+  return detectParkOutsideFrameWarningsFromMetrics(bounds, park);
+}
+
+export function detectParkOutsideFrameWarningsFromMetrics(
+  bounds: JobBounds | null,
+  park: Vec2 | null,
+): ReadonlyArray<string> {
+  if (bounds === null) return [];
   if (park === null || containsPoint(bounds, park)) return [];
   return [parkOutsideFrameWarning(park)];
 }

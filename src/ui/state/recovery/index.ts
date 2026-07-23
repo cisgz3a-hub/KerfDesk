@@ -2,7 +2,9 @@ export {
   createArchivedControllerObservation,
   createExecutionArtifact,
   createRunId,
+  hydratePreparedExecutionOutput,
   type ExecutionArtifactV1,
+  type PreparedExecutionOutput,
   type RunId,
 } from './execution-artifact';
 export { recoveryRepository } from './default-recovery-repository';

@@ -11,6 +11,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   const workflow = repoFile('.github/workflows/release-desktop-preview.yml');
   const builder = repoFile('electron-builder.preview.yml');
   const macVerifier = repoFile('scripts/verify-macos-preview-package.sh');
+  const afterPack = repoFile('scripts/electron-builder-preview-after-pack.mjs');
 
   it('accepts only Preview tag pushes and validates the annotated tag first', () => {
     expect(workflow).toContain("tags: ['v*-preview.*']");
@@ -84,26 +85,46 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toContain('from: LICENSE');
     expect(builder).toContain('from: THIRD_PARTY_NOTICES.md');
     expect(builder).toContain('from: public/third-party-notices.txt');
+    expect(builder).toContain('afterPack: scripts/electron-builder-preview-after-pack.mjs');
+    expect(builder).not.toContain('node_modules/electron/dist/LICENSE');
+    expect(builder).not.toContain('node_modules/electron/dist/LICENSES.chromium.html');
+    expect(afterPack).toContain("context.electronPlatformName !== 'darwin'");
+    expect(afterPack).toContain("require.resolve('electron/package.json')");
+    expect(afterPack).toContain("path.join(electronPackageDir, 'dist', sourceName)");
+    expect(afterPack).toContain('electron-v${version}-darwin-${arch}.zip');
+    expect(afterPack).toContain('https://github.com/electron/electron/releases/download');
+    expect(afterPack).toContain("execFileSync('ditto'");
+    expect(afterPack).toContain("'Contents', 'Resources'");
+    expect(afterPack).toContain("'legal', 'electron', 'LICENSE'");
+    expect(afterPack).toContain("'legal', 'electron', 'LICENSES.chromium.html'");
     expect(builder).toContain("minimumSystemVersion: '12.0'");
     expect(builder).toContain('NSCameraUsageDescription:');
     expect(builder).toContain('NSLocalNetworkUsageDescription:');
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSE.electron.txt');
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSES.chromium.html');
-    expect(macVerifier).toContain('Contents/Resources');
-    expect(macVerifier).toContain('Contents/Frameworks/Electron Framework.framework/Resources');
+    expect(macVerifier).toContain('${app_dir}/Contents/Resources/legal/electron/LICENSE');
     expect(macVerifier).toContain(
-      'Contents/Frameworks/Electron Framework.framework/Versions/A/Resources',
+      '${app_dir}/Contents/Resources/legal/electron/LICENSES.chromium.html',
     );
-    expect(macVerifier).toMatch(/optional_file\s+\\\s+'optional Electron native LICENSE'/);
-    expect(macVerifier).toMatch(/require_file\s+\\\s+'Electron Chromium license bundle'/);
-    expect(macVerifier).toContain('${electron_resources}/LICENSE');
+    expect(macVerifier).not.toContain('optional_file');
+    expect(macVerifier).toContain('hdiutil attach -readonly -nobrowse');
+    expect(macVerifier).toContain('app_dir="${mount_dir}/KerfDesk.app"');
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
   it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
+    const windowsBuild = workflow.indexOf('Build unsigned Windows Preview');
+    const windowsCleanup = workflow.indexOf(
+      'Remove local Windows Preview updater metadata before verification',
+    );
+    const windowsVerify = workflow.indexOf('Verify Windows Preview package contract');
+
     expect(builder).not.toMatch(/^publish:/m);
     expect(workflow).toContain('--publish never');
     expect(builder).toContain('writeUpdateInfo: false');
+    expect(windowsCleanup).toBeGreaterThan(windowsBuild);
+    expect(windowsCleanup).toBeLessThan(windowsVerify);
+    expect(workflow).toContain('Remove-Item -LiteralPath $path.FullName -Force');
     expect(`${workflow}\n${macVerifier}`).toContain("-name 'latest*.yml'");
     expect(`${workflow}\n${macVerifier}`).toContain("-name '*.blockmap'");
     expect(workflow).not.toContain('wrangler r2');
@@ -172,12 +193,14 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow.slice(publish)).toContain("--jq '.immutable'");
     expect(workflow.slice(publish)).toContain('X-GitHub-Api-Version: 2026-03-10');
     expect(workflow).not.toContain('/immutable-releases');
-    expect(workflow.match(/git\/ref\/tags\/\$\{GITHUB_REF_NAME\}/g)).toHaveLength(2);
+    expect(workflow.match(/git\/ref\/tags\/\$\{GITHUB_REF_NAME\}/g)).toHaveLength(3);
     expect(workflow).toContain('test "${target_sha}" = "${SOURCE_SHA}"');
     expect(workflow).toContain("steps.draft.outputs.already_published != 'true'");
     expect(workflow).toContain('gh release delete "${GITHUB_REF_NAME}" --yes');
-    expect(workflow).toContain('release_source_sha=');
-    expect(workflow).toContain('test "${release_source_sha}" = "${SOURCE_SHA}"');
+    expect(workflow).toContain('release_tag_sha=');
+    expect(workflow).toContain('Release attestation is not available yet; retrying');
+    expect(workflow).toContain("'.verificationResult.statement.subject[0].digest.sha1'");
+    expect(workflow).toContain('test "${release_tag_sha}" = "${tag_sha}"');
     expect(workflow).toContain('diff -u expected-published-assets.txt actual-published-assets.txt');
     expect(workflow).toContain('gh release download "${GITHUB_REF_NAME}"');
     expect(workflow).toContain('sha256sum --check "KerfDesk-${VERSION}-SHA256SUMS.txt"');

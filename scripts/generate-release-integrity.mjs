@@ -140,7 +140,7 @@ export function buildCycloneDx({
         {
           name: 'org.kerfdesk.electron-runtime-notices',
           value:
-            'artifact verification required: Windows LICENSE.electron.txt or macOS LICENSE, plus LICENSES.chromium.html',
+            'artifact verification required: Windows native notices and explicit macOS legal/electron runtime notices',
         },
       ],
     },
@@ -262,11 +262,14 @@ export function generateReleaseIntegrity({
       bundledFonts: OUTLINE_FONTS.length + CNC_STROKE_FONTS.length,
       openClipartAssets: OPENCLIPART_ASSETS.length,
       electronRuntime: {
-        status: 'artifact-verification-required',
+        status: 'package-notices-required',
         packageVersion: electronPackage.version,
         requiredFilesByPlatform: {
           windows: ['LICENSE.electron.txt', 'LICENSES.chromium.html'],
-          macos: ['LICENSE', 'LICENSES.chromium.html'],
+          macos: [
+            'Contents/Resources/legal/electron/LICENSE',
+            'Contents/Resources/legal/electron/LICENSES.chromium.html',
+          ],
         },
       },
     },

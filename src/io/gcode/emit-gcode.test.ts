@@ -169,6 +169,14 @@ describe('materializeProgram', () => {
       }),
     ).toThrow('emitter bug');
   });
+
+  it('rethrows unrelated RangeErrors instead of mislabeling code defects as size failures', () => {
+    expect(() =>
+      materializeProgram((): string => {
+        throw new RangeError('bad coordinate index');
+      }),
+    ).toThrow('bad coordinate index');
+  });
 });
 
 function lineObject(id: string, x: number): SceneObject {

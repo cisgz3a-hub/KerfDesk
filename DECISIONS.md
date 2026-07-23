@@ -11004,6 +11004,41 @@ informative, but blind.
   worker on a real over-budget scene (vitest has no Worker runtime; needs a dev-server
   session or the e2e suite).
 
+### 2026-07-22 implementation amendment
+
+The PR #329 audit found that the accepted design still left several real gaps. The
+implementation now makes the following refinements without introducing a size, policy,
+or predictive refusal:
+
+1. Preview and ETA derive from one `prepareOutput` result in the worker. A worker failure
+   settles both consumers into an explicit retryable unavailable state instead of leaving
+   either UI permanently in "preparing".
+2. Large plain-project Start, Save, and Frame requests use a dedicated output-preparation
+   worker. Start and Frame receive exact precomputed duration/bounds/park metrics and a
+   clone-safe prepared-output recipe; Save receives the emitted program. Projects whose
+   variable-text or registration callbacks cannot cross the worker boundary retain the
+   synchronous path. Missing or failed Worker support also falls back synchronously, so
+   this responsiveness mechanism cannot stop machine operation.
+3. Streamed raster recovery archives a deterministic `prepared-project` row-provider
+   recipe rather than expanding the raster into the former 32 MiB grid. Recovery hydrates
+   the provider from the sealed project, re-emits the program, and accepts it only when
+   exact G-code and fingerprint comparison still pass. The overall artifact storage-size
+   envelope remains unchanged.
+4. Reverse rotary output records descending physical row order while consuming each
+   provider sequentially. This removes the quadratic restart pattern for streamed
+   error-diffusion rows without changing emitted coordinates.
+5. Only recognizable allocation/string-capacity failures become
+   `program-materialization-failed`; unrelated `RangeError`s propagate with their original
+   meaning. Extreme but valid serialized raster dimensions therefore return a controlled
+   compile-integrity result instead of leaking a typed-array exception.
+
+Verification now includes a production Vite build of the output worker, unit/integration
+coverage for the clone/hydrate/re-emit/fingerprint recovery path, and a live in-app-browser
+run of a 4.04-million-pixel Save. The worker returned a 136,892-character program in
+2,159 ms while a 10 ms main-thread heartbeat advanced 159 times, with no browser warnings
+or errors. Physical burn behavior remains hardware verification, not a claim established
+by this software audit.
+
 ## ADR-245 - Image Studio layers: active-layer document with a composite bake
 
 **Status:** Accepted 2026-07-21 (Phase L, parity plan PP-F; extends ADR-242).
@@ -11363,7 +11398,7 @@ update source.
 ## ADR-249 - Notify-only update discovery for unsigned Desktop Preview
 
 **Date:** 2026-07-22
-**Status:** Accepted
+**Status:** Accepted; amended 2026-07-23 to require a successful release workflow
 
 ### Context
 
@@ -11391,18 +11426,23 @@ provide a narrower path.
    remains in force. Web/PWA behavior remains unchanged.
 2. **One metadata check per launch.** Only a packaged app whose embedded
    `kerfdeskDesktopReleaseChannel` is exactly `preview` and whose current version
-   is strict `X.Y.Z-preview.N` may query
-   `https://api.github.com/repos/cisgz3a-hub/KerfDesk/releases?per_page=20`.
-   The memoized main-process request is GET-only, rejects redirects, omits
-   credentials/referrer, uses no token, times out, and bounds the response body.
-   Dev, stable, web, malformed metadata, and unsupported targets are inert.
-3. **Untrusted response, strict result.** Main treats release JSON as untrusted.
-   It accepts only `draft:false`, `prerelease:true`, `immutable:true`, a strict
-   `vX.Y.Z-preview.N` newer than `app.getVersion()`, and the canonical asset for
-   the running platform and architecture. Numeric identifiers compare as
-   arbitrary-size integers. The release must contain exactly the three canonical
-   binaries plus checksums, manifest, and SBOM. API-provided URLs are ignored. The
-   renderer receives only `{ kind:'none' }` or `{ kind:'available', version }`.
+   is strict `X.Y.Z-preview.N` may query the fixed public successful-runs endpoint
+   for `.github/workflows/release-desktop-preview.yml` with `event=push`,
+   `status=success`, and `per_page=20`. The memoized main-process request is
+   GET-only, rejects redirects, omits credentials/referrer, uses no token, times
+   out, and bounds the response body. Dev, stable, web, malformed metadata, and
+   unsupported targets are inert.
+3. **Untrusted response, green-workflow result.** Main treats workflow-run JSON as
+   untrusted. It accepts only `status:completed`, `conclusion:success`,
+   `event:push`, the exact Preview workflow path, a 40-hex source SHA, and a strict
+   `vX.Y.Z-preview.N` tag newer than `app.getVersion()`. Numeric identifiers
+   compare as arbitrary-size integers. A successful run is the release
+   certificate because its final job verifies the published immutable
+   prerelease, exact three binaries plus checksum/manifest/SBOM companions,
+   downloaded checksums, source identity, and attestations. Failed, cancelled, or
+   incomplete release runs are never advertised even if they left an immutable
+   release behind. API-provided URLs are ignored. The renderer receives only
+   `{ kind:'none' }` or `{ kind:'available', version }`.
 4. **No preload or IPC.** The renderer calls the exact same-origin GET route
    `app://app/api/desktop-preview-update`. The existing main-process protocol
    handler performs the pinned external request; renderer CSP remains
@@ -11427,8 +11467,8 @@ provide a narrower path.
    job, device identifier, token, cookie, or telemetry is sent. GitHub still
    receives unavoidable connection metadata such as IP address, time, and the
    generic `KerfDesk-Desktop-Preview` user agent. Offline, rate-limit, HTTP,
-   timeout, oversized, malformed, mutable, wrong-asset, and downgrade cases are
-   silent and non-fatal.
+   timeout, oversized, malformed, failed/cancelled/in-progress workflow, and
+   downgrade cases are silent and non-fatal.
 8. **Release prerequisite.** The repository's immutable-release setting and the
    ADR-248 Preview publication gates must be enabled before the first Preview
    tag. The checker intentionally stays silent for mutable releases. No Preview
@@ -11437,7 +11477,7 @@ provide a narrower path.
 ### Consequences
 
 - Preview users can learn about a newer version without granting unsigned code
-  an automatic update path.
+  an automatic update path or being directed to a red release run.
 - The desktop app gains one narrow third-party metadata request, recorded as a
   specific exception to PROJECT non-negotiable 8; web and machining remain
   offline.
@@ -11451,8 +11491,8 @@ provide a narrower path.
 
 - Unit tests cover channel metadata, exact route/method, request headers,
   timeout/error containment, response bounds, strict tags, large numeric version
-  ordering, immutable/draft/prerelease state, platform asset presence, and
-  one-check memoization.
+  ordering, exact workflow identity, successful/completed state, failed and
+  cancelled runs, source-SHA shape, supported targets, and one-check memoization.
 - Renderer tests cover fail-closed response parsing, request coalescing, passive
   status-bar rendering, accessibility announcement, fixed link destination, and
   availability during a job.

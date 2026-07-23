@@ -26,6 +26,8 @@ extraMetadata:
   kerfdeskUpdateChannelTrusted: false
   kerfdeskDesktopReleaseChannel: preview
 
+afterPack: scripts/electron-builder-preview-after-pack.mjs
+
 win:
   target:
     - target: nsis

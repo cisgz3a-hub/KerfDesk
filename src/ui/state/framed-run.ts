@@ -13,6 +13,7 @@ import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { JobOriginPlacement } from '../../core/job';
 import type { FrameVerification } from './frame-verification';
 import type { JobReviewModel } from '../laser/job-review/job-review-model';
+import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 
 /** The exact executable bundle prepared and reviewed before a physical Frame. */
 export type PreparedStartProgram = {
@@ -21,6 +22,7 @@ export type PreparedStartProgram = {
   readonly warnings: ReadonlyArray<string>;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly canvasPlan: CanvasMotionPlan;
+  readonly metrics: PreparedJobMetrics;
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;

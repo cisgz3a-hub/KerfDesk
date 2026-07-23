@@ -90,7 +90,8 @@ test('renders deterministic notices for every production package and artwork ass
   assert.equal(countMatches(first, /^--- Package:/gm), packages.length + 1);
   assert.equal(countMatches(first, /^--- Artwork:/gm), 8);
   assert.match(first, /Electron package license is reproduced below/);
-  assert.match(first, /artifact-level license bundles emitted by the platform packager/);
+  assert.match(first, /artifact-level license files are explicitly bundled and required/);
+  assert.match(first, /explicitly bundles the Electron and Chromium runtime license files/);
   assert.match(first, new RegExp(`Package: electron@${electronPackage.version}`));
   for (const dependency of packages) {
     assert.match(first, new RegExp(`Package: ${dependency.name.replace('/', '\\/')}@`));
@@ -141,8 +142,12 @@ test('writes deterministic checksums, manifest, and CycloneDX SBOM', () => {
     assert.equal(manifest.legalClosure.electronRuntime.packageVersion, electronPackage.version);
     assert.deepEqual(manifest.legalClosure.electronRuntime.requiredFilesByPlatform, {
       windows: ['LICENSE.electron.txt', 'LICENSES.chromium.html'],
-      macos: ['LICENSE', 'LICENSES.chromium.html'],
+      macos: [
+        'Contents/Resources/legal/electron/LICENSE',
+        'Contents/Resources/legal/electron/LICENSES.chromium.html',
+      ],
     });
+    assert.equal(manifest.legalClosure.electronRuntime.status, 'package-notices-required');
 
     const sbom = JSON.parse(fs.readFileSync(path.join(outDir, second.names.sbom), 'utf8'));
     assert.equal(sbom.bomFormat, 'CycloneDX');

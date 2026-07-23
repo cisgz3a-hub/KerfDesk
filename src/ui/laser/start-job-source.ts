@@ -19,8 +19,12 @@ import type { ExecutionArtifactV1 } from '../state/recovery';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
-import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-binding';
+import { recoveryArtifactPreparedOutput } from './recovery-artifact-binding';
 import { resolveRotaryRasterAllowed } from './start-job-external-environment';
+import {
+  outputPreparationShouldRunOffThread,
+  prepareStartOutputOffThread,
+} from './output-preparation-worker-client';
 
 export type PreparedRecoverySource = {
   readonly project: Project;
@@ -44,10 +48,35 @@ export async function prepareCurrentStartJob(
 ) {
   const { project, jobPlacement } = app;
   const registration = currentPrintCutOutputRegistration(project);
+  const machine = machineSnapshot(project, laser, camera);
+  if (
+    registration === undefined &&
+    !hasVariableText(project) &&
+    outputPreparationShouldRunOffThread(project, currentOutputScope(app))
+  ) {
+    const background = prepareStartOutputOffThread({
+      kind: 'start',
+      project,
+      controllerSettings: laser.controllerSettings,
+      machine,
+      jobPlacement,
+      outputScope: currentOutputScope(app),
+      ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
+      allowRotaryRaster,
+      requireFrame,
+    });
+    if (background !== null) {
+      try {
+        return await background;
+      } catch (error) {
+        console.warn('Background Start preparation failed; retrying on the main thread.', error);
+      }
+    }
+  }
   return prepareStartJobSnapshot(
     project,
     laser.controllerSettings,
-    machineSnapshot(project, laser, camera),
+    machine,
     jobPlacement,
     currentOutputScope(app),
     allowRotaryRaster,
@@ -58,6 +87,12 @@ export async function prepareCurrentStartJob(
       ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
       requireFrame,
     },
+  );
+}
+
+function hasVariableText(project: Project): boolean {
+  return project.scene.objects.some(
+    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
   );
 }
 
@@ -96,7 +131,8 @@ export function prepareArchivedRecoverySource(
     artifact.jobOrigin,
   );
   if (checked === null) return null;
-  if (!recoveryArtifactPreparedProgramMatches(artifact)) {
+  const recoveredPrepared = recoveryArtifactPreparedOutput(artifact);
+  if (recoveredPrepared === null) {
     jobAwareAlert(
       'Cannot start supervised recovery:\n\nThe archived prepared job does not reproduce the saved exact G-code lineage. No controller command was sent.',
     );
@@ -106,7 +142,7 @@ export function prepareArchivedRecoverySource(
     ...checked,
     project: artifact.prepared.project,
     gcode: artifact.gcode,
-    prepared: artifact.prepared,
+    prepared: recoveredPrepared,
     canvasPlan: artifact.canvasPlan,
     laserResumeChain: artifact.laserResumeChain ?? [],
   };

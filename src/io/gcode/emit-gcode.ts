@@ -30,6 +30,12 @@ import {
 } from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
 import type { PreparedOutput } from './prepare-output';
+import {
+  isProgramMaterializationRangeError,
+  programMaterializationFailure,
+} from './program-materialization';
+
+export { PROGRAM_MATERIALIZATION_FAILED_MESSAGE } from './program-materialization';
 
 export type EmitGcodeResult = {
   readonly gcode: string;
@@ -136,9 +142,6 @@ export function emitPreparedGcodeWithCncPassSpans(
   return { gcode, preflight, spans };
 }
 
-export const PROGRAM_MATERIALIZATION_FAILED_MESSAGE =
-  'The compiled program is too large to hold as a single G-code file in this environment, so it cannot be produced. Lower the image resolution (lines/mm), reduce passes, or split the job.';
-
 type MaterializedProgram<T> =
   | { readonly kind: 'ok'; readonly value: T }
   | { readonly kind: 'too-large'; readonly preflight: PreflightResult };
@@ -153,18 +156,10 @@ export function materializeProgram<T>(build: () => T): MaterializedProgram<T> {
   try {
     return { kind: 'ok', value: build() };
   } catch (error) {
-    if (error instanceof RangeError) {
+    if (isProgramMaterializationRangeError(error)) {
       return {
         kind: 'too-large',
-        preflight: {
-          ok: false,
-          issues: [
-            {
-              code: 'program-materialization-failed',
-              message: PROGRAM_MATERIALIZATION_FAILED_MESSAGE,
-            },
-          ],
-        },
+        preflight: programMaterializationFailure(),
       };
     }
     throw error;

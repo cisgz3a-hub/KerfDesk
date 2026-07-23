@@ -11,6 +11,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { prepareOutput } from './prepare-output';
+import { deserializeProject, serializeProject } from '../project';
 
 function vectorProject(): Project {
   const obj: SceneObject = {
@@ -194,6 +195,43 @@ describe('prepareOutput', () => {
       expect(raster?.kind === 'raster' ? raster.sValues.length : -1).toBe(0);
       expect(raster?.kind === 'raster' ? raster.rowProvider : undefined).toBeTypeOf('function');
     }
+  });
+
+  it('returns a controlled integrity failure when a valid .lf2 exhausts an actual allocation', () => {
+    const source = streamableRasterProject();
+    const extreme: Project = {
+      ...source,
+      scene: {
+        ...source.scene,
+        layers: source.scene.layers.map((layer) => ({
+          ...layer,
+          ditherAlgorithm: 'floyd-steinberg' as const,
+          linesPerMm: Number.MAX_VALUE,
+        })),
+        objects: source.scene.objects.map((object) =>
+          object.kind === 'raster-image'
+            ? { ...object, dither: 'floyd-steinberg' as const }
+            : object,
+        ),
+      },
+    };
+    const loaded = deserializeProject(serializeProject(extreme));
+    expect(loaded.kind).toBe('ok');
+    if (loaded.kind !== 'ok') return;
+
+    expect(prepareOutput(loaded.project)).toEqual({
+      ok: false,
+      preflight: {
+        ok: false,
+        issues: [
+          {
+            code: 'program-materialization-failed',
+            message:
+              'The compiled program could not be materialized in this environment. Reduce image resolution, reduce passes, or split the job, then try again.',
+          },
+        ],
+      },
+    });
   });
 
   it('compiles only selected objects when Cut Selected Graphics is enabled', () => {

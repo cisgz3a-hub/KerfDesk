@@ -376,6 +376,7 @@ function emitRasterGroupHere(
   return emitRasterGroupGcode({
     sValues: group.sValues,
     ...(group.rowProvider !== undefined ? { rowProvider: group.rowProvider } : {}),
+    ...(group.rowProviderOrder !== undefined ? { rowProviderOrder: group.rowProviderOrder } : {}),
     width: group.pixelWidth,
     height: group.pixelHeight,
     bounds: group.bounds,
