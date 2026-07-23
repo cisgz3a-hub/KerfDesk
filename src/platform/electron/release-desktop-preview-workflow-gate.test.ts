@@ -101,9 +101,18 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   });
 
   it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
+    const windowsBuild = workflow.indexOf('Build unsigned Windows Preview');
+    const windowsCleanup = workflow.indexOf(
+      'Remove local Windows Preview updater metadata before verification',
+    );
+    const windowsVerify = workflow.indexOf('Verify Windows Preview package contract');
+
     expect(builder).not.toMatch(/^publish:/m);
     expect(workflow).toContain('--publish never');
     expect(builder).toContain('writeUpdateInfo: false');
+    expect(windowsCleanup).toBeGreaterThan(windowsBuild);
+    expect(windowsCleanup).toBeLessThan(windowsVerify);
+    expect(workflow).toContain('Remove-Item -LiteralPath $path.FullName -Force');
     expect(`${workflow}\n${macVerifier}`).toContain("-name 'latest*.yml'");
     expect(`${workflow}\n${macVerifier}`).toContain("-name '*.blockmap'");
     expect(workflow).not.toContain('wrangler r2');
