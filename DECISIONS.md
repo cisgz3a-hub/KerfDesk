@@ -11628,3 +11628,56 @@ follows.
   plunge. `compile-cnc-lead.test.ts` pins the end-to-end wiring (a default outside profile
   gains a path3d lead pass; `shape: 'none'` keeps plain contours). No G-code snapshot file
   changed — the CNC corpus asserts inline, and the emitter tests construct jobs directly.
+
+## ADR-251 - Profile cuts default to climb cutting
+
+**Date:** 2026-07-24
+**Status:** Accepted
+
+### Context
+
+Cut direction (climb vs conventional) shipped in H.9 as an opt-in "motion
+polish." H.9's stated intent was that every knob stays off by default so default
+G-code is byte-identical to pre-H.9 jobs. A consequence: with `cutDirection`
+unset, the compiler emitted each profile toolpath in whatever winding the kerf
+offset happened to produce — an unpredictable, per-shape mix of climb and
+conventional, the weakest possible default.
+
+For a router cutting the outside of a part, climb milling (outside-profile =
+counter-clockwise with an M3 / top-view-clockwise spindle) pushes the fibers
+into the kept material and leaves the cleaner edge, and it is the shipped default
+in Vectric, Fusion, and Easel. The one risk — climb's self-feeding force
+snapping an axis across backlash and grabbing — scales with backlash, which
+lead-screw machines have little of. The maintainer runs a lead-screw 4040 and
+chose climb as the shipped default; conventional stays one dropdown click away
+for backlash-prone (e.g. belt-driven) machines.
+
+### Decision
+
+`DEFAULT_CNC_LAYER_SETTINGS.cutDirection` is `'climb'`. New layers start in
+climb: profile-outside toolpaths are emitted counter-clockwise, profile-inside
+and pockets clockwise, with the entry point rotated to the mid-point of the
+longest segment (unchanged `enforceCutDirection` behaviour). The "Default
+direction" dropdown option (unset `cutDirection`) still restores the compiler's
+natural winding per layer, and conventional is directly selectable.
+
+This reverses H.9's "default output byte-identical" stance for cut direction
+only. Ramp entry, helix entry, and park remain opt-in and off by default.
+
+### Consequences
+
+- The G-code snapshot corpus for profile/pocket cuts changes to climb winding
+  and mid-segment entry. Snapshot change acknowledged in the PR.
+- Climb only sets the cut direction. The straight-down entry plunge that
+  motivated the operator's "circle loses its path" report is handled separately
+  by ADR-250's default-on leads (each closed profile pass becomes a led path3d
+  that plunges in the waste and arrives tangentially, retracting between passes).
+- Determinism is preserved (climb is deterministic), so release-integrity
+  fuzz-seed byte-identity still holds.
+
+### Verification
+
+- A compile unit test asserts a default-settings profile-outside contour — with
+  leads off (`shape: 'none'`) to isolate the winding — is emitted
+  counter-clockwise (climb).
+- The existing CNC G-code snapshot suite pins the new default output.

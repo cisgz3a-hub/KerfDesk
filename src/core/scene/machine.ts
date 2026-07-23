@@ -304,6 +304,10 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   tabHeightMm: 2,
   tabWidthMm: 6,
   tabsPerShape: 4,
+  // ADR-251: profile/pocket cuts default to CLIMB — it leaves the clean edge on
+  // the kept part and matches Vectric/Fusion/Easel. Overridable per layer; the
+  // "Default direction" option (unset) restores the compiler's natural winding.
+  cutDirection: 'climb',
 };
 
 export const DEFAULT_CNC_MACHINE_CONFIG: CncMachineConfig = {

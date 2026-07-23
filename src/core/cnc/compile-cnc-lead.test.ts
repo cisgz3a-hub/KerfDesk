@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -11,6 +11,7 @@ import {
   type Scene,
 } from '../scene';
 import { cncPassXyPoints } from '../job';
+import { pointInPolygon } from '../geometry';
 import { compileCncJob } from './compile-cnc-job';
 
 const dev = DEFAULT_DEVICE_PROFILE;
@@ -89,6 +90,12 @@ describe('compileCncJob — ADR-250 profile leads', () => {
   });
 
   it('does not lead an interior hole into the kept part (P1 regression)', () => {
+    const hole = [
+      { x: 85, y: 85 },
+      { x: 115, y: 85 },
+      { x: 115, y: 115 },
+      { x: 85, y: 115 },
+    ];
     const holed: ImportedSvg = {
       kind: 'imported-svg',
       id: 'holed',
@@ -108,15 +115,7 @@ describe('compileCncJob — ADR-250 profile leads', () => {
                 { x: 50, y: 150 },
               ],
             },
-            {
-              closed: true,
-              points: [
-                { x: 85, y: 85 },
-                { x: 115, y: 85 },
-                { x: 115, y: 115 },
-                { x: 85, y: 115 },
-              ],
-            },
+            { closed: true, points: hole },
           ],
         },
       ],
@@ -137,9 +136,17 @@ describe('compileCncJob — ADR-250 profile leads', () => {
       return Math.max(...xs) - Math.min(...xs);
     };
     const bySpan = [...group.passes].sort((a, b) => spanX(a) - spanX(b));
-    // Smallest span = the hole. It must NOT become a lead into the part — the
-    // inside-side lead pokes out at the corner and falls back to a plunge.
-    expect(bySpan[0]?.kind).toBe('contour');
+    // Smallest span = the hole. Under the climb default (ADR-251) its start
+    // rotates to a mid-edge, so the inside-side lead fits and bakes a path3d
+    // instead of falling back to a plunge — but the P1 invariant holds either
+    // way: every hole-pass point stays inside the hole (the waste slug), never
+    // the kept ring. (leadClearsPart in profile-lead-passes enforces this.)
+    const holeMachine = hole.map((point) => toMachineCoords(point, dev));
+    const holePass = bySpan[0];
+    if (holePass === undefined) throw new Error('expected a hole pass');
+    for (const point of cncPassXyPoints(holePass)) {
+      expect(pointInPolygon(point, holeMachine)).toBe(true);
+    }
     // Largest span = the outer boundary with its exterior waste-side lead.
     expect(bySpan[bySpan.length - 1]?.kind).toBe('path3d');
   });

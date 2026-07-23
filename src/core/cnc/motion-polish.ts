@@ -1,5 +1,8 @@
-// Motion polish (Phase H.9, F-CNC18) — all OPT-IN so default output stays
-// byte-identical to pre-H.9 jobs (the snapshot corpus pins it):
+// Motion polish (Phase H.9, F-CNC18). These transforms run only when a layer's
+// settings opt in. Ramp entry and park stay off by default; cut direction is
+// opted in by DEFAULT_CNC_LAYER_SETTINGS (ADR-251), which defaults profile and
+// pocket cuts to CLIMB — so default output is climb-oriented, no longer
+// byte-identical to pre-H.9 jobs:
 //
 // * Cut direction. With an M3 (top-view clockwise) spindle, CLIMB cutting
 //   keeps the material on the LEFT of travel. Circling a part's exterior
