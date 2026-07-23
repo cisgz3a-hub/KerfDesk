@@ -91,6 +91,7 @@ test('renders deterministic notices for every production package and artwork ass
   assert.equal(countMatches(first, /^--- Artwork:/gm), 8);
   assert.match(first, /Electron package license is reproduced below/);
   assert.match(first, /artifact-level license bundles emitted by the platform packager/);
+  assert.match(first, /retained and reported by desktop packaging/);
   assert.match(first, new RegExp(`Package: electron@${electronPackage.version}`));
   for (const dependency of packages) {
     assert.match(first, new RegExp(`Package: ${dependency.name.replace('/', '\\/')}@`));
@@ -141,6 +142,9 @@ test('writes deterministic checksums, manifest, and CycloneDX SBOM', () => {
     assert.equal(manifest.legalClosure.electronRuntime.packageVersion, electronPackage.version);
     assert.deepEqual(manifest.legalClosure.electronRuntime.requiredFilesByPlatform, {
       windows: ['LICENSE.electron.txt', 'LICENSES.chromium.html'],
+      macos: [],
+    });
+    assert.deepEqual(manifest.legalClosure.electronRuntime.diagnosticFilesByPlatform, {
       macos: ['LICENSE', 'LICENSES.chromium.html'],
     });
 

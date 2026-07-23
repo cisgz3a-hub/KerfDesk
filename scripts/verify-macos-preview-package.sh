@@ -84,8 +84,8 @@ optional_file \
   "${electron_resources}/LICENSE" \
   "${electron_framework_resources}/LICENSE" \
   "${electron_framework_versioned_resources}/LICENSE"
-require_file \
-  'Electron Chromium license bundle' \
+optional_file \
+  'optional Electron Chromium license bundle' \
   "${electron_resources}/LICENSES.chromium.html" \
   "${electron_framework_resources}/LICENSES.chromium.html" \
   "${electron_framework_versioned_resources}/LICENSES.chromium.html"

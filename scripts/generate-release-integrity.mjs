@@ -262,10 +262,13 @@ export function generateReleaseIntegrity({
       bundledFonts: OUTLINE_FONTS.length + CNC_STROKE_FONTS.length,
       openClipartAssets: OPENCLIPART_ASSETS.length,
       electronRuntime: {
-        status: 'artifact-verification-required',
+        status: 'package-notices-required-runtime-bundles-diagnostic',
         packageVersion: electronPackage.version,
         requiredFilesByPlatform: {
           windows: ['LICENSE.electron.txt', 'LICENSES.chromium.html'],
+          macos: [],
+        },
+        diagnosticFilesByPlatform: {
           macos: ['LICENSE', 'LICENSES.chromium.html'],
         },
       },

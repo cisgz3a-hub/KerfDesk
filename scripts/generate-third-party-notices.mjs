@@ -105,7 +105,7 @@ function electronSection(rootDir) {
     dependencySection(electron),
     'Electron embeds Chromium and other upstream runtime components. Desktop',
     'packaging must retain the Electron package license in these generated',
-    'notices and the packaged Chromium license bundle when electron-builder',
+    'notices and any packaged Chromium license bundle when electron-builder',
     'emits it for the target platform.',
   ].join('\n');
 }
@@ -125,7 +125,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     'Desktop artifacts also embed the Electron/Chromium runtime. Its upstream',
     'Electron package license is reproduced below; Electron/Chromium',
     'artifact-level license bundles emitted by the platform packager are',
-    'retained and verified by desktop packaging.',
+    'retained and reported by desktop packaging.',
   ].join('\n');
   const standardTexts = Object.entries(LICENSE_TEXTS)
     .map(([spdx, text]) => `=== ${spdx} full license text ===\n\n${text.trim()}`)
