@@ -58,6 +58,7 @@ import {
 } from './start-job-readiness-policy';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 import { startControllerPolicy } from './start-job-controller-policy';
+import type { PreparedJobMetrics } from './prepared-job-metrics';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
@@ -73,6 +74,7 @@ export type StartJobPreparation =
       readonly warnings: ReadonlyArray<string>;
       readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
       readonly canvasPlan: CanvasMotionPlan;
+      readonly metrics: PreparedJobMetrics;
       /** Exact compiled/placed Job used for this G-code. Recovery may only
        * derive a smaller semantic Job from this already-gated source. */
       readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;

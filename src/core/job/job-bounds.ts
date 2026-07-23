@@ -17,7 +17,7 @@ import {
   type Job,
   type RasterGroup,
 } from './job';
-import { rasterRow } from './raster-rows';
+import { rasterRowsInProviderOrder } from './raster-rows';
 import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
 
 export type JobBounds = {
@@ -204,24 +204,19 @@ function extendBoundsForPoint(
 }
 
 function hasActiveRasterPixel(group: RasterGroup): boolean {
-  for (let y = 0; y < group.pixelHeight; y += 1)
-    if (rasterRow(group, y).some((s) => s > 0)) return true;
+  for (const { row } of rasterRowsInProviderOrder(group)) if (row.some((s) => s > 0)) return true;
   return false;
 }
 
 function hasActiveReverseRasterRow(group: RasterGroup): boolean {
   if (group.bidirectional === false) return false;
   let emittedRowCount = 0;
-  for (let y = 0; y < group.pixelHeight; y += 1) {
-    if (!hasActivePixelInRasterRow(group, y)) continue;
+  for (const { row } of rasterRowsInProviderOrder(group)) {
+    if (!row.some((s) => s > 0)) continue;
     if (emittedRowCount % 2 === 1) return true;
     emittedRowCount += 1;
   }
   return false;
-}
-
-function hasActivePixelInRasterRow(group: RasterGroup, y: number): boolean {
-  return rasterRow(group, y).some((s) => s > 0);
 }
 
 function scanOffsetForGroup(device: DeviceProfile | undefined, speed: number): number {

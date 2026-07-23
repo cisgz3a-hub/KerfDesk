@@ -147,7 +147,8 @@ function hasVariableText(project: Project): boolean {
 
 // Over-budget scenes pause the synchronous preview; the ADR-244 worker
 // prepares the real toolpath in the background and fills the canvas in when
-// done. Rejections (superseded/no worker) keep the paused banner.
+// done. A real worker failure becomes an explicit retryable preview issue;
+// superseded work is ignored through the cancellation generation.
 function settleBuiltToolpath(args: {
   readonly built: PreviewToolpath;
   readonly project: Project;
@@ -170,7 +171,19 @@ function settleBuiltToolpath(args: {
     (prepared) => {
       if (!args.isCancelled()) setToolpath(prepared.toolpath);
     },
-    () => undefined,
+    (error: unknown) => {
+      if (args.isCancelled()) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setToolpath({
+        ...built,
+        previewIssue: {
+          kind: 'preparation-failed',
+          messages: [
+            `Background preparation failed: ${message}. Edit the job or reopen Preview to retry.`,
+          ],
+        },
+      });
+    },
   );
 }
 

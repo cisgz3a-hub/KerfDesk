@@ -1,7 +1,6 @@
 import type { OverrideValues, StatusReport, StreamingMode } from '../../../core/controllers/grbl';
 import type { ControllerKind } from '../../../core/devices';
 import type { JobOriginPlacement } from '../../../core/job';
-import type { Group, RasterGroup } from '../../../core/job/job';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import { MAX_RASTER_WORKING_BYTES } from '../../../core/raster/raster-budget';
 import {
@@ -16,6 +15,8 @@ import {
 } from '../../../core/recovery/cnc';
 import { machineKindOf, type OutputScope } from '../../../core/scene';
 import type { PreparedOutput } from '../../../io/gcode';
+import { prepareOutputForStructuredClone } from '../../../io/gcode/prepared-output-persistence';
+export { hydratePreparedExecutionOutput } from '../../../io/gcode/prepared-output-persistence';
 import type { CanvasMotionPlan } from '../canvas-motion-plan';
 import type { CncToolPlanEntry } from '../cnc-tool-plan';
 import type { WorkCoordinateOffset } from '../origin-actions';
@@ -34,9 +35,9 @@ export { estimateExecutionArtifactBytes } from './execution-artifact-size';
 
 export const LEGACY_EXECUTION_ARTIFACT_SCHEMA_VERSION = 1;
 export const EXECUTION_ARTIFACT_SCHEMA_VERSION = 2;
-/** Keep the archive copy plus IndexedDB's structured clone within the same
- * bounded-memory envelope as raster compilation. Larger streamed jobs remain
- * executable, but deliberately run without recovery/archive capture. */
+/** Legacy public threshold retained for artifact readers and tests. Streamed
+ * rasters no longer allocate this buffer: archives persist a deterministic
+ * provider recipe instead. */
 export const MAX_EXECUTION_ARTIFACT_RASTER_BYTES = MAX_RASTER_WORKING_BYTES / 2;
 type ExecutionArtifactSchemaVersion =
   | typeof LEGACY_EXECUTION_ARTIFACT_SCHEMA_VERSION
@@ -165,12 +166,8 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
   );
 
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
-  assertExecutionArtifactSizeWithinBudget(
-    args,
-    streamedRasterMaterializationBytes(args.prepared),
-    true,
-  );
-  const prepared = preparedOutputForPersistence(args.prepared);
+  assertExecutionArtifactSizeWithinBudget(args, 0, true);
+  const prepared = prepareOutputForStructuredClone(args.prepared);
   const machineKind = machineKindOf(prepared.project.machine);
   const device = prepared.project.device;
   const cncRecoveryManifest =
@@ -225,71 +222,6 @@ function archivedObservationForArtifact(args: {
       ? {}
       : { controllerObservation: args.controllerObservation }),
   });
-}
-
-/** IndexedDB structured clone cannot persist the function-valued row provider
- * used by large runtime rasters. Materialize only the artifact copy; the live
- * compiled job keeps streaming rows and therefore keeps its bounded-memory
- * execution behavior. */
-function preparedOutputForPersistence(prepared: PreparedExecutionOutput): PreparedExecutionOutput {
-  const rasterBytes = prepared.job.groups.reduce(
-    (total, group) => total + executionArtifactRasterBytes(group),
-    0,
-  );
-  if (!Number.isSafeInteger(rasterBytes) || rasterBytes > MAX_EXECUTION_ARTIFACT_RASTER_BYTES) {
-    throw new Error('Raster dimensions are too large to archive safely.');
-  }
-  let changed = false;
-  const groups = prepared.job.groups.map((group): Group => {
-    if (group.kind !== 'raster' || group.rowProvider === undefined) return group;
-    changed = true;
-    return materializedRasterGroup(group);
-  });
-  return changed ? { ...prepared, job: { ...prepared.job, groups } } : prepared;
-}
-
-function executionArtifactRasterBytes(group: Group): number {
-  if (group.kind !== 'raster') return 0;
-  if (group.rowProvider === undefined) return group.sValues.byteLength;
-  const valueCount = group.pixelWidth * group.pixelHeight;
-  const byteLength = valueCount * Uint16Array.BYTES_PER_ELEMENT;
-  return Number.isSafeInteger(valueCount) && valueCount >= 0 && Number.isSafeInteger(byteLength)
-    ? byteLength
-    : Number.POSITIVE_INFINITY;
-}
-
-function streamedRasterMaterializationBytes(prepared: PreparedExecutionOutput): number {
-  return prepared.job.groups.reduce((total, group) => {
-    return group.kind === 'raster' && group.rowProvider !== undefined
-      ? total + executionArtifactRasterBytes(group)
-      : total;
-  }, 0);
-}
-
-function materializedRasterGroup(group: RasterGroup): RasterGroup {
-  const { rowProvider, ...stored } = group;
-  if (rowProvider === undefined) return group;
-  const valueCount = group.pixelWidth * group.pixelHeight;
-  const byteLength = valueCount * Uint16Array.BYTES_PER_ELEMENT;
-  if (
-    !Number.isSafeInteger(valueCount) ||
-    valueCount < 0 ||
-    !Number.isSafeInteger(byteLength) ||
-    byteLength > MAX_EXECUTION_ARTIFACT_RASTER_BYTES
-  ) {
-    throw new Error('Raster dimensions are too large to archive safely.');
-  }
-  const sValues = new Uint16Array(valueCount);
-  for (let y = 0; y < group.pixelHeight; y += 1) {
-    const row = rowProvider(y);
-    if (!(row instanceof Uint16Array) || row.length !== group.pixelWidth) {
-      throw new Error(
-        `Raster row provider returned ${row.length} values; expected ${group.pixelWidth}.`,
-      );
-    }
-    sValues.set(row, y * group.pixelWidth);
-  }
-  return { ...stored, sValues };
 }
 
 export function createRunId(

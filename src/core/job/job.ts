@@ -81,6 +81,15 @@ export type RasterGroup = {
   // S-values per pixel, already scaled by power %. Row-major.
   readonly sValues: Uint16Array;
   readonly rowProvider?: (y: number) => Uint16Array;
+  // Raster storage and streamed error-diffusion providers are consumed from
+  // source row 0 upward. A descending physical order maps those source rows
+  // onto the job from maxY to minY without reversing storage or rewinding a
+  // provider.
+  readonly rowProviderOrder?: RasterRowProviderOrder;
+  // Execution archives cannot structured-clone a function-valued provider.
+  // This marker records that the provider must be deterministically rebuilt
+  // from the archived prepared project before any semantic replay.
+  readonly archivedRowProviderRecipe?: 'prepared-project';
   readonly pixelWidth: number;
   readonly pixelHeight: number;
   readonly bounds: {
@@ -98,6 +107,8 @@ export type RasterGroup = {
   readonly bidirectional?: boolean;
   readonly scanDirection?: EffectiveScanDirection;
 };
+
+export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
 
 // CNC (router/mill) passes. Pre-expanded by core/cnc/compile-cnc-job.ts
 // (depth ramping, tab splitting, pocket rings) so the emitter is a dumb, safe

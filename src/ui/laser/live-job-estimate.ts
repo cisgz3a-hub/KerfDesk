@@ -36,7 +36,8 @@ export type LiveJobEstimate =
       readonly totalSeconds: number;
       readonly breakdown: JobDurationBreakdown;
     }
-  | { readonly kind: 'too-large' };
+  | { readonly kind: 'too-large' }
+  | { readonly kind: 'preparation-failed'; readonly message: string };
 
 export function estimateLiveJob(
   project: Project,
@@ -67,7 +68,7 @@ export function estimateLiveJob(
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared, jobOrigin);
+  return estimateLiveJobFromPrepared(prepared, jobOrigin);
 }
 
 export async function estimateLiveJobSnapshot(
@@ -98,7 +99,7 @@ export async function estimateLiveJobSnapshot(
     ...(registration === undefined ? {} : { registration }),
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared, jobOrigin);
+  return estimateLiveJobFromPrepared(prepared, jobOrigin);
 }
 
 /**
@@ -117,15 +118,20 @@ export function estimateLiveJobUnbounded(
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimatePrepared(prepared, jobOrigin, { unbounded: true });
+  return estimateLiveJobFromPrepared(prepared, jobOrigin, { unbounded: true });
 }
 
-function estimatePrepared(
+export function estimateLiveJobFromPrepared(
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
   options: { readonly unbounded?: boolean } = {},
 ): LiveJobEstimate {
-  if (!prepared.ok) return { kind: 'too-large' };
+  if (!prepared.ok) {
+    return {
+      kind: 'preparation-failed',
+      message: prepared.preflight.issues.map((issue) => issue.message).join(' '),
+    };
+  }
   if (prepared.job.groups.length === 0) return { kind: 'empty' };
   if (
     options.unbounded !== true &&

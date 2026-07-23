@@ -175,7 +175,7 @@ export function buildPreviewToolpathUnbounded(
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
-  return previewFromPrepared(project, prepared, options.jobOrigin);
+  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin);
 }
 
 export async function buildPreviewToolpathSnapshot(
@@ -200,10 +200,10 @@ export async function buildPreviewToolpathSnapshot(
     return emptyPreviewToolpath({ kind: 'too-complex' });
   }
   const prepared = await prepareOutputSnapshot(project, options);
-  return previewFromPrepared(project, prepared, options.jobOrigin);
+  return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin);
 }
 
-function previewFromPrepared(
+export function buildPreviewToolpathFromPrepared(
   project: Project,
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,

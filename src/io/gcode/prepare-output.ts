@@ -27,6 +27,10 @@ import {
   type Project,
   type Vec2,
 } from '../../core/scene';
+import {
+  isProgramMaterializationRangeError,
+  programMaterializationFailure,
+} from './program-materialization';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
@@ -71,22 +75,29 @@ export function prepareOutput(
   // Start path instead of failing preparation.
   const preEmit = runPreEmitPreflight(outputProject);
   if (!preEmit.ok) return { ok: false, preflight: preEmit };
-  const compiled = compileForMachine(outputProject);
-  const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
-  const offset = options.jobOrigin
-    ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
-    : ZERO_OFFSET;
-  const placed = applyJobOriginOffset(compiled, offset);
-  // Optimization preserves cut geometry/settings while reordering and possibly
-  // reversing paths. Joining formerly separated paths can also change planner
-  // junction timing, not only travel distance. Doing it HERE means the preview
-  // and duration estimate use the exact order the machine will run.
-  return {
-    ok: true,
-    project: outputProject,
-    job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
-    jobOriginOffset: offset,
-  };
+  try {
+    const compiled = compileForMachine(outputProject);
+    const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
+    const offset = options.jobOrigin
+      ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
+      : ZERO_OFFSET;
+    const placed = applyJobOriginOffset(compiled, offset);
+    // Optimization preserves cut geometry/settings while reordering and possibly
+    // reversing paths. Joining formerly separated paths can also change planner
+    // junction timing, not only travel distance. Doing it HERE means the preview
+    // and duration estimate use the exact order the machine will run.
+    return {
+      ok: true,
+      project: outputProject,
+      job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
+      jobOriginOffset: offset,
+    };
+  } catch (error) {
+    if (isProgramMaterializationRangeError(error)) {
+      return { ok: false, preflight: programMaterializationFailure() };
+    }
+    throw error;
+  }
 }
 
 // One compile entry per machine kind: the project's machine choice routes to

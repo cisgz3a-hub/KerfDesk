@@ -11,6 +11,7 @@ import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
+import { buildPreparedJobMetrics } from './prepared-job-metrics';
 
 export function withControllerReportUnits(
   machine: MachineStartSnapshot,
@@ -53,6 +54,7 @@ export function okPreparation(
     gcode,
     warnings,
     prepared,
+    metrics: buildPreparedJobMetrics(prepared, jobOrigin),
     ...(preflightMotionOffset === undefined ? {} : { preflightMotionOffset }),
     canvasPlan: buildCanvasMotionPlan({
       gcode,
