@@ -5,7 +5,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  RT_FEED_OV_MINUS_1,
   RT_FEED_OV_MINUS_10,
+  RT_SPINDLE_OV_PLUS_1,
   RT_SPINDLE_OV_RESET,
   type RealtimeOverrideByte,
 } from '../../core/controllers/grbl';
@@ -17,7 +19,9 @@ import { OverrideControls } from './OverrideControls';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(() => {
-  useLaserStore.setState({ ovCache: null } as Partial<ReturnType<typeof useLaserStore.getState>>);
+  useLaserStore.setState({ ovCache: null, activeJobMachineKind: null } as Partial<
+    ReturnType<typeof useLaserStore.getState>
+  >);
 });
 
 async function renderControls(): Promise<{ host: HTMLDivElement; root: Root }> {
@@ -51,6 +55,31 @@ describe('OverrideControls', () => {
     }
   });
 
+  it('notes Feed also scales plunge on a CNC job, but never on a laser job', async () => {
+    useLaserStore.setState({ activeJobMachineKind: 'cnc' } as Partial<
+      ReturnType<typeof useLaserStore.getState>
+    >);
+    const cnc = await renderControls();
+    try {
+      expect(cnc.host.textContent).toContain('Feed also scales plunge');
+    } finally {
+      await act(async () => cnc.root.unmount());
+      cnc.host.remove();
+    }
+    // A laser has no plunge — the Feed override there scales engrave speed and
+    // the Spindle row is laser power, so the plunge note must not appear.
+    useLaserStore.setState({ activeJobMachineKind: 'laser' } as Partial<
+      ReturnType<typeof useLaserStore.getState>
+    >);
+    const laser = await renderControls();
+    try {
+      expect(laser.host.textContent).not.toContain('plunge');
+    } finally {
+      await act(async () => laser.root.unmount());
+      laser.host.remove();
+    }
+  });
+
   it('fires the exact realtime byte per button', async () => {
     const original = useLaserStore.getState().sendRealtimeOverride;
     const send = vi.fn(async (_byte: RealtimeOverrideByte) => undefined);
@@ -62,15 +91,32 @@ describe('OverrideControls', () => {
       const buttons = [...host.querySelectorAll('button')];
       const feedMinus = buttons.find((b) => b.title.startsWith('Slow the feed'));
       const spindleReset = buttons.find((b) => b.title.startsWith('Reset the spindle'));
-      if (feedMinus === undefined || spindleReset === undefined) {
+      // Fine steps: the '1%' substring separates them from the '10%' coarse
+      // buttons that share the same "Slow/Raise the … override" prefix.
+      const feedMinusFine = buttons.find(
+        (b) => b.title.startsWith('Slow the feed') && b.title.includes('by 1%'),
+      );
+      const spindlePlusFine = buttons.find(
+        (b) => b.title.startsWith('Raise the spindle') && b.title.includes('by 1%'),
+      );
+      if (
+        feedMinus === undefined ||
+        spindleReset === undefined ||
+        feedMinusFine === undefined ||
+        spindlePlusFine === undefined
+      ) {
         throw new Error('override buttons missing');
       }
       await act(async () => {
         feedMinus.click();
         spindleReset.click();
+        feedMinusFine.click();
+        spindlePlusFine.click();
       });
       expect(send).toHaveBeenCalledWith(RT_FEED_OV_MINUS_10);
       expect(send).toHaveBeenCalledWith(RT_SPINDLE_OV_RESET);
+      expect(send).toHaveBeenCalledWith(RT_FEED_OV_MINUS_1);
+      expect(send).toHaveBeenCalledWith(RT_SPINDLE_OV_PLUS_1);
     } finally {
       useLaserStore.setState({ sendRealtimeOverride: original } as Partial<
         ReturnType<typeof useLaserStore.getState>
