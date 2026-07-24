@@ -23,6 +23,12 @@ function enumPassthrough(
   return typeof value === 'string' && allowed.has(value) ? { [key]: value } : {};
 }
 
+// Keep an optional boolean field only when it is actually a boolean; anything
+// else is dropped so the compile default applies by omission.
+function booleanPassthrough(key: string, value: unknown): Record<string, unknown> {
+  return typeof value === 'boolean' ? { [key]: value } : {};
+}
+
 export function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
@@ -122,6 +128,10 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
       ? { cutDirection: raw['cutDirection'] }
       : {}),
+    // ADR-253 retract-between-passes (per-layer boolean, default-on at compile
+    // for eligible cuts). Persisted so an operator's explicit OFF survives a
+    // save/load — absent stays absent and reads as the compile default.
+    ...booleanPassthrough('retractBetweenPasses', raw['retractBetweenPasses']),
     // Finish allowance: non-negative (0 = off), so a hand-edited negative value
     // is dropped rather than inflating the roughing offset the wrong way.
     ...(isNonNegativeNumber(raw['finishAllowanceMm'])
