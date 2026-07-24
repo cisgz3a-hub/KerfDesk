@@ -55,6 +55,39 @@ describe('enforceCutDirection', () => {
     const result = enforceCutDirection([CCW_SQUARE], 'conventional', 'profile-outside');
     expect(Math.abs(signedAreaMm2((result[0] as Polyline).points))).toBeCloseTo(100, 6);
   });
+
+  // ADR-252: a hole's material lies outside its boundary, so it is cut in the
+  // mirrored direction and stays wound OPPOSITE the outer — both cutting the
+  // right material side and preserving the winding opposition ADR-250 reads to
+  // aim the hole's lead into the slug rather than the kept part.
+  it('mirrors a hole so it stays wound opposite the outer', () => {
+    const outer: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+      ],
+    }; // CCW, area +10000 (the largest contour → the outer reference)
+    const hole: Polyline = {
+      closed: true,
+      points: [
+        { x: 40, y: 40 },
+        { x: 40, y: 60 },
+        { x: 60, y: 60 },
+        { x: 60, y: 40 },
+      ],
+    }; // CW, area -400 (wound opposite the outer, as the kerf offset produces)
+    for (const direction of ['climb', 'conventional'] as const) {
+      const result = enforceCutDirection([outer, hole], direction, 'profile-outside');
+      const orientedOuter = result[0] as Polyline;
+      const orientedHole = result[1] as Polyline;
+      // The outer follows the requested direction; the hole stays its mirror.
+      expect(isCounterClockwise(orientedOuter)).toBe(direction === 'climb');
+      expect(isCounterClockwise(orientedHole)).toBe(!isCounterClockwise(orientedOuter));
+    }
+  });
 });
 
 describe('rotateStartToLongestSegment', () => {
