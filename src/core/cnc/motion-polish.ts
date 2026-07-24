@@ -43,13 +43,37 @@ export function enforceCutDirection(
 ): ReadonlyArray<Polyline> {
   const wantCcw = wantsCounterClockwise(direction, cutType);
   if (wantCcw === null) return toolpaths;
+  // ADR-252: a hole's material lies OUTSIDE its boundary, so its climb direction
+  // is the mirror of the outer boundary's. Forcing one winding on every contour
+  // cut holes the wrong way round AND destroyed the winding opposition ADR-250
+  // reads to find holes, which aimed their leads into the kept part.
+  const outerSign = dominantWindingSign(toolpaths);
   return toolpaths.map((toolpath) => {
     if (!toolpath.closed || toolpath.points.length < MIN_CLOSED_POINTS) return toolpath;
-    if (Math.abs(signedAreaMm2(toolpath.points)) === 0) return toolpath;
-    const oriented =
-      isCounterClockwise(toolpath) === wantCcw ? toolpath : reversedPolyline(toolpath);
+    const area = signedAreaMm2(toolpath.points);
+    if (Math.abs(area) === 0) return toolpath;
+    const isHole = outerSign !== 0 && Math.sign(area) !== outerSign;
+    const want = isHole ? !wantCcw : wantCcw;
+    const oriented = isCounterClockwise(toolpath) === want ? toolpath : reversedPolyline(toolpath);
     return rotateStartToLongestSegment(oriented);
   });
+}
+
+// The largest-area closed toolpath carries the outer boundary's winding; a
+// contour winding the other way is a hole. Winding survives concentric
+// roughing/finishing offsets of one feature, which containment depth does not.
+function dominantWindingSign(toolpaths: ReadonlyArray<Polyline>): number {
+  let maxAbsArea = 0;
+  let sign = 0;
+  for (const toolpath of toolpaths) {
+    if (!toolpath.closed || toolpath.points.length < MIN_CLOSED_POINTS) continue;
+    const area = signedAreaMm2(toolpath.points);
+    if (Math.abs(area) > maxAbsArea) {
+      maxAbsArea = Math.abs(area);
+      sign = Math.sign(area);
+    }
+  }
+  return sign;
 }
 
 function wantsCounterClockwise(direction: CncCutDirection, cutType: CncCutType): boolean | null {

@@ -11681,3 +11681,68 @@ only. Ramp entry, helix entry, and park remain opt-in and off by default.
   leads off (`shape: 'none'`) to isolate the winding — is emitted
   counter-clockwise (climb).
 - The existing CNC G-code snapshot suite pins the new default output.
+
+## ADR-252 - Cut-direction enforcement keeps hole windings opposite the outer
+
+**Date:** 2026-07-24
+**Status:** Accepted
+
+### Context
+
+`enforceCutDirection` (motion-polish.ts) resolved ONE target winding per layer
+from the cut type alone and forced it onto every closed toolpath. That is wrong
+twice over.
+
+First, machining: with an M3 spindle climb keeps the material on the LEFT of
+travel. The material lies INSIDE an outer boundary but OUTSIDE a hole, so a
+hole's climb direction is the mirror of its outer boundary's — the module's own
+header already said so. Forcing one winding on both cut every hole in the
+direction OPPOSITE the one the operator asked for.
+
+Second, and the reason this became urgent: ADR-250 identifies a hole by its
+winding being opposite the job's outermost loop, and flips that contour to the
+inverse waste side so its lead plunges into the enclosed slug. Flattening every
+contour onto a single winding destroyed that signal. `dominantWindingSign` then
+matched the hole to the outer, `windingSide` returned the layer's base side, and
+the hole's lead was aimed OUTWARD — into the kept part. Measured on a 100 mm
+square with a 30 mm hole and a 3.175 mm bit: the lead ran a full tool radius
+(1.5875 mm) beyond the finished hole wall. `leadClearsPart` cannot catch it,
+because the points genuinely are outside the loop, which is the correct waste
+side for an outer contour.
+
+ADR-251 made cut direction default to climb, so this shipped on by default. It
+was latent before that for any layer where the operator selected climb or
+conventional by hand — the defect reproduces in BOTH directions.
+
+### Decision
+
+`enforceCutDirection` resolves the outer boundary's winding first (the
+largest-area closed toolpath) and applies the requested direction only to
+contours sharing that winding. A contour winding the other way is a hole and
+receives the MIRRORED direction. Holes therefore stay opposite their outer
+boundary, which both cuts them in the direction the operator actually asked for
+and preserves the winding opposition ADR-250 reads.
+
+Winding — not containment depth — remains the hole test, because concentric
+roughing/finishing offsets of one feature share a winding but nest by
+containment.
+
+### Consequences
+
+- Holed profile/pocket jobs with an enforced cut direction change: the hole
+  reverses, and its lead moves from outside the part to inside the slug.
+- No G-code snapshot changed: no snapshot fixture pairs a holed profile with an
+  enforced direction.
+- Pocket islands (opposite-winding rings) are mirrored too, which is correct —
+  an island boundary is a hole as far as the material side is concerned.
+
+### Verification
+
+- `compile-cnc-hole-lead-side.test.ts` asserts, for climb AND conventional, that
+  no point of a hole's led pass strays outside the hole's TOOL-CENTER ring.
+  Measuring against the drawn hole boundary instead is too loose: a point one
+  tool radius outside the ring still falls inside the drawn boundary while the
+  cutter is already into the kept part — that looseness is exactly what let the
+  defect through review.
+- Reverting only the motion-polish change fails that test at 1.5875 mm, so it is
+  a genuine regression guard rather than a vacuous assertion.
