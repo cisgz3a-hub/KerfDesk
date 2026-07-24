@@ -88,7 +88,11 @@ describe('compileCncJob — ADR-250 profile leads', () => {
     expect(passes.every((pass) => pass.kind === 'path3d')).toBe(true);
   });
 
-  it('does not lead an interior hole into the kept part (P1 regression)', () => {
+  // Renamed from an over-promising "does not lead into the kept part (P1)": this
+  // only checks that BOTH contours get a lead. The hole-lead safety property —
+  // that the lead never leaves the hole's tool-center ring — is measured in
+  // compile-cnc-hole-lead-side.test.ts, which fails when ADR-252 is reverted.
+  it('bakes a waste-side lead into both the outer and the hole', () => {
     const hole = [
       { x: 85, y: 85 },
       { x: 115, y: 85 },
