@@ -16,8 +16,8 @@ export function pauseControlMessage(
   );
 }
 
-export function resumeControlTitle(blockMessage: string | null, hasRealtimePause: boolean): string {
-  if (blockMessage !== null) return blockMessage;
+export function resumeControlTitle(advisory: string | null, hasRealtimePause: boolean): string {
+  if (advisory !== null) return advisory;
   return hasRealtimePause
     ? 'Release the feed hold and continue the job'
     : 'Continue sending the remaining job lines';

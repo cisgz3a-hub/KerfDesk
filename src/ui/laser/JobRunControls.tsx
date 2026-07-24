@@ -5,7 +5,7 @@
 // (no realtime feed hold) and may lack jog cancel — the copy says so.
 
 import { useLaserStore } from '../state/laser-store';
-import { cncResumeBlockMessage } from '../state/cnc-pause-resume-policy';
+import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { rowStyle, runningSafetyStyle } from './JobControls.styles';
 import { OverrideControls } from './OverrideControls';
 import { pauseControlMessage } from './job-control-copy';
@@ -26,14 +26,14 @@ export function RunningControls(props: {
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const pendingToolLabel = useLaserStore((s) => s.pendingToolLabel);
   const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
-  const resumeBlockMessage = cncResumeBlockMessage(activeJobMachineKind);
+  const resumeAdvisory = cncResumeAdvisoryNotice(activeJobMachineKind);
   const pauseMessage = pauseControlMessage(activeJobMachineKind, hasRealtimePause);
   const safetyMessage = runningSafetyMessage({
     isToolChange: props.isToolChange,
     isPaused: props.isPaused,
     pendingToolLabel,
     pauseMessage,
-    resumeBlockMessage,
+    resumeAdvisory,
   });
   return (
     <>
@@ -55,10 +55,10 @@ function runningSafetyMessage(options: {
   readonly isPaused: boolean;
   readonly pendingToolLabel: string | null;
   readonly pauseMessage: string;
-  readonly resumeBlockMessage: string | null;
+  readonly resumeAdvisory: string | null;
 }): string {
   if (options.isToolChange) return toolChangeMessage(options.pendingToolLabel);
-  if (options.isPaused && options.resumeBlockMessage !== null) return options.resumeBlockMessage;
+  if (options.isPaused && options.resumeAdvisory !== null) return options.resumeAdvisory;
   return options.pauseMessage;
 }
 

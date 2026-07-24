@@ -19,8 +19,10 @@ afterEach(async () => {
   useLaserStore.setState({ activeJobMachineKind: null });
 });
 
-describe('RunningControls CNC Resume policy', () => {
-  it('keeps the unsafe-resume explanation without duplicating top-bar actions', async () => {
+describe('RunningControls CNC Resume advisory', () => {
+  // ADR-180 amendment: the rail no longer explains a refusal — it shows the
+  // spindle-check advisory beside the (LiveMotionBar-owned) Resume action.
+  it('shows the spindle-check advisory without duplicating top-bar actions', async () => {
     useLaserStore.setState({ activeJobMachineKind: 'cnc' });
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -34,7 +36,7 @@ describe('RunningControls CNC Resume policy', () => {
     expect(labels).not.toContain('Resume');
     expect(labels).not.toContain('ABORT JOB');
     expect(labels).not.toContain('ABORT');
-    expect(host.textContent).toMatch(/cannot prove.*spindle/i);
+    expect(host.textContent).toMatch(/confirm the spindle/i);
     expect(host.textContent).toMatch(/newly reviewed recovery job/i);
   });
 });

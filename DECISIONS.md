@@ -7715,7 +7715,7 @@ interlock or machine-specific supervisory protocol.
 
 ## ADR-180 - Generic same-session CNC Resume is manual-recovery-only
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Amended 2026-07-24 (the resume refusal is withdrawn; see Amendment) | **Date:** 2026-07-13
 
 ### Context
 
@@ -7760,6 +7760,32 @@ engagement boundary and removes the stationary-cutter failure described by the
 maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
+
+### Amendment (2026-07-24) — same-session CNC Resume is one-click again
+
+The original decision's resume **refusal is withdrawn.** ADR-228 / CLAUDE.md
+rule 7 ("FRAME IS THE ONLY GUARD"), adopted four days after this ADR, forbids
+policy-judgment refusals: an agent's concern belongs in an informational warning,
+never a block, and the operator's real safeguards are the physical E-stop and eyes
+on the machine — not a disabled button. This ADR's resume block was exactly such a
+policy judgment (it is none of the three permitted refusal classes — transport
+precondition, compile integrity, handoff consistency), so rule 7 supersedes it.
+
+- Same-session CNC Resume now sends realtime cycle start (`~`) and refills the
+  paused stream, taking the same store branch as a laser controller with no
+  safety-door capability. This matches LightBurn and every GRBL sender (rule 3).
+- The stationary-cutter concern is **not** discarded — it is demoted to a passive
+  advisory shown beside the (now-enabled) Resume control: "confirm the spindle is
+  still spinning and the cutter is clear; if it stopped during the hold, Abort
+  instead." It informs; it never gates. No confirm dialog (that would itself be a
+  rule-7 guard).
+- What stays refused is unchanged and unrelated: CNC **checkpoint** and
+  **start-from-line** recovery (ADR-143) and **pass-boundary** recovery jobs
+  (ADR-215) are a different feature from live Pause/Resume and are untouched here.
+- The CNC Pause copy no longer claims the job "cannot be resumed automatically."
+- Not hardware-verified on a spindle machine at amendment time; the GRBL
+  feed-hold/cycle-start behavior is documented and sender-standard, but an
+  air-cut coupon on the router remains the real proof.
 
 ---
 
