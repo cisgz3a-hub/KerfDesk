@@ -1,5 +1,6 @@
 import { EndType, inflatePathsD, isPositiveD, JoinType, type PathD } from 'clipper2-ts';
 import type { Polyline } from '../scene';
+import { collapseTinySegments, MIN_OFFSET_SEGMENT_MM } from './collapse-tiny-segments';
 import { pointInPolygon } from './point-in-polygon';
 import { pathDToPolyline, polylineToPathD, tryVectorOp } from './vector-path-tools';
 
@@ -43,7 +44,12 @@ function offsetClosedPolylines(
       OFFSET_PRECISION_DECIMALS,
     ),
   );
-  return inflated.kind === 'error' ? [] : inflated.value.map(pathDToPolyline);
+  if (inflated.kind === 'error') return [];
+  // Drop the sub-micron needle vertices Clipper leaves at near-collinear joins,
+  // before they reach the emitter as ±1µm reversal moves (collapse-tiny-segments).
+  return inflated.value.map((path) =>
+    collapseTinySegments(pathDToPolyline(path), MIN_OFFSET_SEGMENT_MM),
+  );
 }
 
 function orientByContainment(paths: ReadonlyArray<PathD>): ReadonlyArray<PathD> {
