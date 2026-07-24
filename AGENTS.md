@@ -50,17 +50,58 @@ explicit prior permission in chat, which must be presumed denied.**
 
 ---
 
-# Agent completion reporting rule
+# JOB COMPLETION REPORT — every finished job, every branch. Hard rule, no exceptions.
 
-## Required final handoff
+(Maintainer, 2026-07-25. Canonical source: `CLAUDE.md` collaboration rule 8, which
+absorbs and replaces the earlier four-section completion rule. This section restates
+it in full so it is self-contained — do not rely on the reader having opened
+`CLAUDE.md`.)
 
-When a job is finished, the final response must explain the outcome from the user's perspective. It must include all four of the following sections:
+A **job** is any unit of work you were given and have stopped working on — a fix, a
+feature, an audit, an investigation, a refactor, a PR opened / updated / merged, or
+work that is blocked or abandoned — on **any** branch or worktree, by **any** agent
+(main session, subagent, fleet member, scheduled run). Answering a question or doing
+a single lookup that changes nothing is not a job.
 
-1. **Original request** — Restate what the user originally asked for. Account for the full request, including important additions made while the work was in progress, rather than describing only the last technical step.
-2. **User goal** — Explain the practical result the user wanted to achieve and why the work was requested.
-3. **Goal status** — State explicitly whether the goal was **achieved**, **partially achieved**, or **not achieved**. Support that status with the most relevant verification evidence. Never call a goal achieved while required work remains.
-4. **How the final product works** — Describe the finished user-facing behavior, how the user operates it, and what they should expect. Mention important limitations or remaining work when applicable.
+When a job ends, your final message must carry the nine sections below, **in this
+order, under these headings**. A small job gets short sections, but **no section may
+be dropped** — if one is genuinely empty, keep the heading and write "None." Every
+fact must come from a command you actually ran this session; anything you did not
+verify is labelled **not verified** rather than left implied.
 
-Use clear headings for these four sections. A technical change list, test summary, commit, deployment, or pull-request link may be included as supporting evidence, but it does not replace the required user-focused handoff.
+1. **Where we are** — branch / worktree name, PR number + link and its state (draft /
+   open / merged / closed), CI state by named check (green / red / pending / not run),
+   whether the work is on `main`, and whether anything is deployed. Facts as of now,
+   not expectations.
+2. **What we did** — the original ask restated in the maintainer's terms, including
+   anything added mid-flight, and the practical result it was meant to produce; then
+   the change list **by file path**, one line of *why* per file. Not "I updated the
+   layers panel."
+3. **Goal status** — **achieved / partially achieved / not achieved**, with the
+   evidence behind that word. Never "achieved" while required work remains.
+4. **What was verified — and what was NOT** — the commands actually run and their
+   results (`pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` — counts
+   and pass/fail), then the gap stated plainly: no perceptual render, no hardware
+   air-cut, no E2E, mock-only. Green tests are never evidence a feature works.
+5. **How it works now** — the finished user-facing behavior: what the maintainer will
+   see, where in the UI, how to operate it, what to expect, and the limits that remain.
+6. **What's next — numbered steps** — **Step 1, Step 2, Step 3 …** in the order they
+   should be done. Each step gives the exact action (a command in a fenced block, a
+   file path, or a click path), why it comes next, what a good result looks like, and
+   what to do if it fails. No "consider", "maybe", or "look into" — every step must be
+   executable exactly as written by someone who did not watch the session.
+7. **What else we could do** — the optional list, kept strictly separate from section 6
+   so *must* is never confused with *could*: adjacent work, deferred items, follow-ups.
+   One line each, with its cost and its payoff.
+8. **How to improve** — the honest quality read: risk this change introduces, debt
+   taken on, tests not written, the same pattern that may exist elsewhere in the tree,
+   and what a better version would look like with more time.
+9. **Recommended action:** — one line, the single best next step, no menu. If a genuine
+   either/or is the maintainer's call, name your recommended option first and label it
+   as recommended, then the alternative in one line.
 
-If the job is blocked or intentionally incomplete, use the same structure and state exactly what remains before the goal can be achieved.
+Blocked or intentionally incomplete work uses the same skeleton — name what is missing
+under **Goal status** and exactly what unblocks it under **What's next**. If the job
+touched more than one branch, the report covers each branch by name. This report is
+written for the maintainer, not as a changelog: a diff, test log, commit, deployment,
+or pull-request link is supporting evidence **inside** it, never a replacement for it.
