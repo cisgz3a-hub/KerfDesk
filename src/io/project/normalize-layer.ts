@@ -11,6 +11,7 @@ import { normalizeCncFeedSource } from './normalize-cnc-feed-source';
 
 const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'adaptive']);
 const LINE_ART_CONTOUR_SIDES = new Set<string>(['inner', 'outer', 'both']);
+const PROFILE_LEAD_SHAPES = new Set<string>(['arc', 'line', 'none']);
 
 // Keep a raw string field only when it is one of a known set of values —
 // used for the closed-union optional CNC layer keys.
@@ -129,6 +130,23 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     // ADR-218 traced double-line side; unknown values are dropped so the
     // compile default ('inner') applies by omission.
     ...enumPassthrough('lineArtContours', raw['lineArtContours'], LINE_ART_CONTOUR_SIDES),
+    // ADR-250 profile lead-in/out. An unknown shape drops the whole block so the
+    // default-on tool-radius arc applies by omission; malformed radius/sweep are
+    // dropped field-by-field, matching every other optional CNC setting.
+    ...normalizeProfileLead(raw['profileLead']),
+  };
+}
+
+function normalizeProfileLead(value: unknown): Record<string, unknown> {
+  if (!isObject(value)) return {};
+  const shape = value['shape'];
+  if (typeof shape !== 'string' || !PROFILE_LEAD_SHAPES.has(shape)) return {};
+  return {
+    profileLead: {
+      shape,
+      ...(isPositiveNumber(value['radiusMm']) ? { radiusMm: value['radiusMm'] } : {}),
+      ...(isPositiveNumber(value['sweepDeg']) ? { sweepDeg: value['sweepDeg'] } : {}),
+    },
   };
 }
 

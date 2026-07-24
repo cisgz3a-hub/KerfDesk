@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CNC_MACHINE_CONFIG, createProject, type Project } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  createLayer,
+  createProject,
+  type Project,
+} from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 
@@ -58,5 +64,30 @@ describe('prepareProjectForPersistence', () => {
       reason:
         'saving would change `device.controllerKind` during validation; repair or reload the project before saving',
     });
+  });
+
+  it('saves a project carrying a per-layer profile lead without a validation drift (ADR-250)', () => {
+    // profileLead is a valid shipped CncLayerSettings field; a project that sets
+    // it (e.g. the shape:'none' opt-out) must survive the save boundary rather
+    // than be rejected as a drift because normalization dropped the field.
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'profile-outside' as const,
+        profileLead: { shape: 'none' as const },
+      },
+    };
+    const project: Project = {
+      ...createProject(),
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+      scene: { ...createProject().scene, layers: [layer] },
+    };
+
+    const prepared = prepareProjectForPersistence(project);
+
+    expect(prepared.kind).toBe('ok');
+    if (prepared.kind !== 'ok') return;
+    expect(prepared.project.scene.layers[0]?.cnc?.profileLead).toEqual({ shape: 'none' });
   });
 });
