@@ -985,10 +985,10 @@ and action groups instead of shrinking the controls below their minimum target s
    `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
 3. Only after that proof does the streamer resume and send more G-code.
 
-#### Blocked — generic CNC resume
-1. The CNC **Resume** button remains visible but disabled, while **ABORT JOB** remains available.
-2. The store independently refuses CNC Resume before writing `~` or refilling the stream because a GRBL status snapshot cannot prove that the physical spindle stayed turning while the cutter may be engaged.
-3. The operator must request ABORT, inspect and clear the cutter using a machine-specific procedure, and start a newly reviewed recovery job.
+#### Success — generic CNC resume (ADR-180 amendment)
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry a spindle-check advisory: confirm the spindle is still spinning and the cutter is clear before continuing; if the spindle stopped during the hold, Abort instead and start a newly reviewed recovery job.
+2. On Resume the store writes realtime `~` and refills the stream — the same branch a laser controller without a safety door uses. Feed hold keeps the spindle commanded, so cycle-start continues the job (matching LightBurn and every GRBL sender).
+3. The advisory informs but never gates (ADR-180 amendment / rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
 
 ### F-B8. Software Abort / Controller Reset
 
@@ -3324,8 +3324,8 @@ F-CNC19 tiling.
    status frames where the intermittent field is absent.
 2. An `Ov:` report without `A:` is the protocol-backed all-off observation.
    An active accessory in that fresh cache surfaces as a Job Review warning
-   (ADR-228) rather than refusing Start; generic CNC Resume is disabled by
-   F-CNC41.
+   (ADR-228) rather than refusing Start; generic CNC Resume is one-click with a
+   spindle-check advisory per F-CNC41.
 3. When a CNC controller is otherwise idle but reports an active accessory,
    the job panel names every active channel and offers **Stop spindle & coolant**.
    After the operator confirms the cutter is clear of material and stopping is
@@ -3365,31 +3365,34 @@ F-CNC19 tiling.
    bytes, so pendant, WebUI, PLC, macro, or second-sender mutations after the
    observation require an external interlock or machine-specific protocol.
 
-### F-CNC41. Refuse generic same-session CNC Resume - Phase H.11
+### F-CNC41. Generic same-session CNC Resume with a spindle advisory - Phase H.11
 
-#### Success - controlled pause
-1. **Pause** still sends realtime feed hold and immediately stops refilling the
-   controller stream. It remains useful as the first controlled response when
-   continuing motion would be unsafe.
-2. The paused UI keeps **ABORT** available and explains that this CNC job cannot
-   be resumed automatically.
+> Amended 2026-07-24 (ADR-180 amendment / rule 7). The former refusal is withdrawn:
+> same-session CNC Resume is one-click, and the spindle concern is an advisory, not a block.
 
-#### Error - cutter may be engaged and spindle continuity is unproven
-1. **Resume** is disabled for a CNC job. A direct/stale caller is also rejected
-   by the store before the realtime cycle-start byte or any queued job bytes are
-   written.
-2. The job remains paused so the operator can request ABORT and follow a machine-specific
-   manual recovery procedure. KerfDesk never attempts `M3`, spindle orientation,
-   or a generic Z retract while cutter engagement is unknown.
+#### Success - one-click resume
+1. **Pause** sends realtime feed hold and stops refilling the controller stream —
+   the first controlled response when continuing motion would be unsafe. Feed hold
+   keeps the spindle commanded.
+2. **Resume** is enabled. The store writes realtime cycle-start `~` and refills the
+   stream (the same branch a laser controller without a safety door uses). The
+   paused UI carries a spindle-check advisory beside the enabled button.
 
-#### Edge - future machine-specific continuation
-1. `A:` and `FS:` prove controller-commanded state at one instant, not physical
-   RPM, uninterrupted rotation, VFD health, coolant flow, or exclusive command
-   ownership. Legacy GRBL therefore cannot satisfy the generic proof.
-2. A future opt-in requires a machine-profile policy, exclusive control of all
-   mutating paths, controller-visible safety/VFD faults, and an ack-neutral
-   realtime-status arbiter that proves stable `Hold:0` continuity before `~`.
-   This flow does not silently opt any current profile into that contract.
+#### Edge - spindle may have stopped during the hold
+1. A safety-door transition, spindle-stop override, VFD fault, pendant, or other
+   sender can stop the cutter during the hold; blind cycle-start would then feed a
+   stationary cutter. The advisory tells the operator to confirm spindle rotation
+   and a clear cutter, and to Abort instead if in doubt.
+2. This is surfaced as an advisory, never a refusal (rule 7): the operator's real
+   safeguards are the physical E-stop and eyes on the machine. `A:`/`FS:` snapshots
+   prove controller-commanded state at one instant, not uninterrupted RPM, VFD
+   health, coolant flow, or exclusive ownership — so the app informs rather than
+   pretending to that proof by blocking.
+
+#### Edge - unrelated recovery paths stay refused
+1. CNC checkpoint resume, start-from-line execution, and pass-boundary recovery
+   jobs (ADR-143/215) are a different feature from live Pause/Resume and remain as
+   specified in their own flows. This amendment changes only same-session Resume.
 
 ### F-CNC42. Attest exclusive controller access before CNC Frame - Phase H.11
 

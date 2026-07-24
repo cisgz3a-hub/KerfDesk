@@ -5,7 +5,6 @@ import {
   step,
   type StatusReport,
 } from '../../core/controllers/grbl';
-import { cncResumeBlockMessage } from './cnc-pause-resume-policy';
 import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
@@ -95,7 +94,10 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
 
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
-  assertResumeAllowed(context);
+  // ADR-180 amendment: same-session CNC Resume is no longer refused. A CNC job
+  // has no safety-door capability, so it takes the plain cycle-start + refill
+  // branch below — identical to a laser controller without a door. The spindle
+  // advisory is surfaced in the paused UI (rule 7: inform, never block).
   const activeDriver = context.driver();
   const confirmedLaserResume =
     context.get().activeJobMachineKind !== 'cnc' && activeDriver.realtime.safetyDoor !== null;
@@ -263,16 +265,6 @@ function assertPauseSafe(context: PauseResumeContext): void {
     log: pushLog(context.get(), `[lf2] Pause blocked: ${PAUSE_REQUIRES_LASER_MODE_MESSAGE}`),
   });
   throw new Error(PAUSE_REQUIRES_LASER_MODE_MESSAGE);
-}
-
-function assertResumeAllowed(context: PauseResumeContext): void {
-  const message = cncResumeBlockMessage(context.get().activeJobMachineKind);
-  if (message === null) return;
-  context.set({
-    lastWriteError: message,
-    log: pushLog(context.get(), `[lf2] CNC Resume blocked: ${message}`),
-  });
-  throw new Error(message);
 }
 
 function recordConfirmationFailure(context: PauseResumeContext, error: unknown): Error {

@@ -159,7 +159,11 @@ describe('laser-store pause safety', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
-  it('refuses CNC Resume without writing cycle-start or refilling the stream', async () => {
+  // ADR-180 amendment (2026-07-24): same-session CNC Resume is one-click.
+  // Feed hold keeps the spindle commanded, so cycle-start continues the job
+  // exactly like the laser plain-resume branch — matching LightBurn and every
+  // GRBL sender. The former refusal is demoted to a passive advisory (rule 7).
+  it('resumes a CNC job with cycle-start and unfreezes the stream', async () => {
     const writes: string[] = [];
     let liveConnection: FakeConnection | null = null;
     const connection = makeConnection(async (data) => {
@@ -193,11 +197,10 @@ describe('laser-store pause safety', () => {
     await useLaserStore.getState().pauseJob();
     writes.length = 0;
 
-    await expect(useLaserStore.getState().resumeJob()).rejects.toThrow(/cannot prove.*spindle/i);
+    await expect(useLaserStore.getState().resumeJob()).resolves.toBeUndefined();
 
-    expect(writes).not.toContain(RT_RESUME);
-    expect(writes).toEqual([]);
-    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+    expect(writes).toContain(RT_RESUME);
+    expect(useLaserStore.getState().streamer?.status).not.toBe('paused');
   });
 
   it('uses Safety Door when GRBL reports laser mode disabled', async () => {

@@ -132,14 +132,18 @@ describe('LiveMotionBar', () => {
     }
   });
 
-  it('shows a gated Resume and reachable Abort for a paused CNC job', async () => {
+  // ADR-180 amendment: same-session CNC Resume is one-click; the spindle
+  // advisory rides on the enabled button's tooltip (rule 7: inform, never gate).
+  it('shows an enabled Resume with a spindle advisory for a paused CNC job', async () => {
     useLaserStore.setState({
       streamer: pause(streamingStreamer()),
       activeJobMachineKind: 'cnc',
     });
     const { host, root } = await render(<LiveMotionBar />);
     try {
-      expect(buttonByText(host, 'Resume')?.disabled).toBe(true);
+      const resume = buttonByText(host, 'Resume');
+      expect(resume?.disabled).toBe(false);
+      expect(resume?.title).toMatch(/confirm the spindle/i);
       expect(buttonByText(host, 'ABORT JOB')?.disabled).toBe(false);
       expect(host.textContent).toContain('JOB PAUSED');
     } finally {

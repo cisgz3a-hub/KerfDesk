@@ -1,6 +1,6 @@
 import { progress } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
-import { cncResumeBlockMessage } from '../state/cnc-pause-resume-policy';
+import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
@@ -71,7 +71,7 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
-  const resumeBlockMessage = cncResumeBlockMessage(machineKind);
+  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind);
   const canPause =
     streamer?.status === 'streaming' || (streamer?.status === 'done' && isControllerRunning);
   if (canPause) {
@@ -87,8 +87,7 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
     return (
       <ActionButton
         label="Resume"
-        title={resumeControlTitle(resumeBlockMessage, hasRealtimePause)}
-        disabled={resumeBlockMessage !== null}
+        title={resumeControlTitle(resumeAdvisory, hasRealtimePause)}
         onClick={resumeJob}
       />
     );
