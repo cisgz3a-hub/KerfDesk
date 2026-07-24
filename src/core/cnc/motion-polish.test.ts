@@ -149,6 +149,26 @@ describe('applyRampEntry', () => {
     expect(second.points[0]?.z).toBe(-1.5);
     expect(second.points.at(-1)?.z).toBe(-3);
   });
+
+  it('does not backtrack when the ramp spans past the first segment', () => {
+    // 10 mm square, 2 mm deep, 10° ramp → ramp length ≈ 11.34 mm, so the descent
+    // crosses the first corner and reaches full depth partway up the SECOND edge
+    // at (10, ~1.34). The at-depth remainder must continue FORWARD to (10,10);
+    // the bug resumed the walk at (10,0) — a reverse move back down the edge just
+    // ramped (a re-cut on straight edges, a cross-arc gouge on curves).
+    const pass = { kind: 'contour' as const, zMm: -2, closed: true, polyline: CCW_SQUARE.points };
+    const [ramped] = applyRampEntry([pass], 10);
+    if (ramped?.kind !== 'path3d') throw new Error('ramped pass must be path3d');
+    const rampEndIndex = ramped.points.findIndex((point) => Math.abs(point.z - -2) < 1e-9);
+    const rampEnd = ramped.points[rampEndIndex];
+    const afterRamp = ramped.points[rampEndIndex + 1];
+    if (rampEnd === undefined || afterRamp === undefined) throw new Error('ramp end missing');
+    // The ramp ends on the right edge (x=10) heading +y; the next move must keep
+    // going up that edge, never step back toward y=0.
+    expect(Math.abs(rampEnd.x - 10)).toBeLessThan(1e-9);
+    expect(Math.abs(afterRamp.x - 10)).toBeLessThan(1e-9);
+    expect(afterRamp.y).toBeGreaterThan(rampEnd.y);
+  });
 });
 
 describe('parking parity (compile → emit)', () => {

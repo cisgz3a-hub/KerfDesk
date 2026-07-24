@@ -135,9 +135,11 @@ function rampContour(pass: CncContourPass, fromZ: number, tangent: number): CncP
   if (!(drop > 0) || pass.polyline.length < 2) return pass;
   const rampLengthMm = drop / tangent;
   const points: Vec3[] = [];
-  appendRampSpan(points, pass, fromZ, rampLengthMm);
-  // The remainder of the loop at full depth…
-  for (const point of walkFrom(pass, points.length > 0)) {
+  const resumeIndex = appendRampSpan(points, pass, fromZ, rampLengthMm);
+  // The remainder of the loop at full depth, resuming from the vertex the ramp
+  // actually reached — NOT always source[1], which doubled the path back down a
+  // ramp that spanned more than the first segment.
+  for (const point of walkFrom(pass, resumeIndex)) {
     points.push({ x: point.x, y: point.y, z: pass.zMm });
   }
   // …then re-cut the ramped span level so no slope is left (closed only).
@@ -148,13 +150,16 @@ function rampContour(pass: CncContourPass, fromZ: number, tangent: number): CncP
   return path;
 }
 
-// Walks the pass polyline emitting the descending ramp vertices.
+// Walks the pass polyline emitting the descending ramp vertices. Returns the
+// index of the source vertex the at-depth walk should RESUME from — the vertex
+// just past where the ramp reached full depth — so a ramp spanning several
+// segments does not make the caller double back to source[1].
 function appendRampSpan(
   points: Vec3[],
   pass: CncContourPass,
   fromZ: number,
   rampLengthMm: number,
-): void {
+): number {
   const drop = fromZ - pass.zMm;
   let travelled = 0;
   const source = pass.polyline;
@@ -172,23 +177,24 @@ function appendRampSpan(
         y: a.y + (b.y - a.y) * t,
         z: pass.zMm,
       });
-      travelled = rampLengthMm;
-      return;
+      // The ramp ended inside segment [i-1, i]; resume at source[i].
+      return i;
     }
     travelled += segment;
     points.push({ x: b.x, y: b.y, z: fromZ - (travelled / rampLengthMm) * drop });
   }
   // Path shorter than the ramp: finish the descent vertically at the end
-  // point (the ramp consumed the whole path).
+  // point (the ramp consumed the whole path); nothing left to walk forward.
   const last = source[source.length - 1] as Vec2;
   points.push({ x: last.x, y: last.y, z: pass.zMm });
+  return source.length;
 }
 
-// The full loop at depth, starting from the polyline's first vertex (the
-// ramp already stands somewhere along the first span).
-function* walkFrom(pass: CncContourPass, skipFirst: boolean): Generator<Vec2> {
+// The full loop at depth, resuming from `resumeIndex` (the vertex just past
+// where the ramp reached full depth).
+function* walkFrom(pass: CncContourPass, resumeIndex: number): Generator<Vec2> {
   const source = pass.polyline;
-  for (let i = skipFirst ? 1 : 0; i < source.length; i += 1) {
+  for (let i = resumeIndex; i < source.length; i += 1) {
     yield source[i] as Vec2;
   }
   if (pass.closed) yield source[0] as Vec2;
