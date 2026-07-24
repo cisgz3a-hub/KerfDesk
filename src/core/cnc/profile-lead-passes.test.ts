@@ -129,6 +129,33 @@ describe('applyProfileLeadPasses — per-contour side & sibling parts', () => {
     expect(result[0]?.kind).toBe('contour'); // a's plunge lands inside sibling b -> fallback
     expect(result[1]?.kind).toBe('path3d'); // b's lead is clear of a
   });
+
+  it('keeps an inside-side lead on every depth pass, not only the first', () => {
+    // Real jobs cut a profile in several depth passes, and contourPassFromPolyline
+    // clones the ring for each one. The self-collision guard must recognize a
+    // contour's own shape by GEOMETRY, not array identity — otherwise depth pass
+    // #2+ mistakes its own cloned ring for a disjoint sibling and drops the lead
+    // back to a straight plunge onto the finished wall (the entry mark ADR-250
+    // exists to prevent). The start vertex sits at the right-edge midpoint, the
+    // kind of point pointInPolygon classifies as outside and the kind of
+    // mid-segment start rotateStartToLongestSegment produces in the pipeline.
+    const corners: Vec2[] = [
+      { x: 60, y: 70 },
+      { x: 60, y: 90 },
+      { x: 50, y: 90 },
+      { x: 50, y: 50 },
+      { x: 60, y: 50 },
+    ];
+    const depthPass = (zMm: number): CncContourPass => ({
+      kind: 'contour',
+      zMm,
+      closed: true,
+      polyline: [...corners, corners[0]!],
+    });
+    const result = apply([depthPass(-1.5), depthPass(-3)], { cutType: 'profile-inside' });
+    expect(result[0]?.kind).toBe('path3d'); // first pass leads into the interior
+    expect(result[1]?.kind).toBe('path3d'); // second pass must ALSO lead, not plunge
+  });
 });
 
 describe('applyProfileLeadPasses — skips', () => {

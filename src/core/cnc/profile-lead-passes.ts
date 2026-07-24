@@ -130,8 +130,15 @@ function disjointSiblings(
 ): ReadonlyArray<ReadonlyArray<Vec2>> {
   const probe = polygon[0];
   if (probe === undefined) return [];
+  // Identify the contour's OWN shape by geometry, not array identity:
+  // contourPassFromPolyline clones the ring for every depth pass, so a
+  // reference check (`shape === polygon`) misses the clone and each depth pass
+  // after the first mistakes its own shape for a disjoint sibling — dropping
+  // the inside-side lead it should keep (an ADR-250 regression). Two genuinely
+  // different parts never share a signature (position or area differs).
+  const selfSignature = contourSignature(polygon);
   return shapes.filter((shape) => {
-    if (shape === polygon) return false;
+    if (contourSignature(shape) === selfSignature) return false;
     const other = shape[0];
     if (other === undefined) return false;
     return !pointInPolygon(probe, shape) && !pointInPolygon(other, polygon);
