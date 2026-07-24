@@ -1,6 +1,6 @@
 import { pointInPolygon } from '../geometry';
 import type { CncPass } from '../job';
-import type { CncCutType, Polyline, Vec2 } from '../scene';
+import type { CncCutType, CncLayerSettings, Polyline, Vec2 } from '../scene';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const COORD_EPS = 1e-9;
@@ -13,6 +13,15 @@ export function isProfileCutType(cutType: CncCutType): boolean {
   return (
     cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'
   );
+}
+
+// ADR-253: resolve the per-layer "retract between passes" flag to a concrete
+// boolean for the emit group. Only profile and engrave ("line") cuts — whose
+// passes re-plunge at the same XY — honor it (default ON); every other cut type
+// keeps its own motion and compiles false, so its output stays byte-identical.
+export function resolveRetractBetweenPasses(settings: CncLayerSettings): boolean {
+  const eligible = isProfileCutType(settings.cutType) || settings.cutType === 'engrave';
+  return eligible ? (settings.retractBetweenPasses ?? true) : false;
 }
 
 export function orderInnerFirst(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Polyline> {

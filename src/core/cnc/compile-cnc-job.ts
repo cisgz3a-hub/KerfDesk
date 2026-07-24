@@ -30,6 +30,7 @@ import {
   contourPassFromPolyline,
   isProfileCutType,
   orderInnerFirst,
+  resolveRetractBetweenPasses,
 } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
@@ -167,6 +168,7 @@ function cncGroupForPasses(
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
+    retractBetweenPasses: resolveRetractBetweenPasses(settings),
     passes,
   };
 }
@@ -207,6 +209,8 @@ export function vcarveClearanceGroupForLayer(
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
+    // A pocket already retracts between its regions; nothing to force here.
+    retractBetweenPasses: false,
     passes: depthMajorPasses(toolpaths, depths),
   };
 }
