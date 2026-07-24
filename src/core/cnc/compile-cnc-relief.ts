@@ -87,6 +87,9 @@ function reliefGroup(
     ...coolantFields(config),
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
+    // Relief roughing/finishing follows the surface continuously; the emitter's
+    // per-pass retract mode does not apply (ADR-253).
+    retractBetweenPasses: false,
     passes,
   };
 }

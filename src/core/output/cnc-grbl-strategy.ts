@@ -178,7 +178,7 @@ function appendGroup(
   );
   for (const [passIndex, pass] of group.passes.entries()) {
     const firstRawLine = lines.length + 1;
-    appendPass(lines, head, pass, group.safeZMm, feed, plunge);
+    appendPass(lines, head, pass, group.safeZMm, feed, plunge, group.retractBetweenPasses ?? false);
     // A degenerate pass (under two distinct points at emit precision) emits
     // nothing and gets no span; resume mapping treats it as zero-length.
     if (onPassSpan !== undefined && lines.length >= firstRawLine) {
@@ -194,15 +194,19 @@ function appendPass(
   safeZMm: number,
   feed: number,
   plunge: number,
+  retractBetweenPasses: boolean,
 ): void {
   switch (pass.kind) {
     case 'contour':
-      appendContourPass(lines, head, pass, safeZMm, feed, plunge);
+      appendContourPass(lines, head, pass, safeZMm, feed, plunge, retractBetweenPasses);
       break;
     case 'path3d':
-      appendPath3dPass(lines, head, pass, safeZMm, feed, plunge);
+      appendPath3dPass(lines, head, pass, safeZMm, feed, plunge, retractBetweenPasses);
       break;
     case 'arc':
+      // Arc passes are self-contained single moves; helical passes do their own
+      // retract/entry (positionForHelix). Neither participates in the per-pass
+      // retract mode, so they ignore the flag.
       appendArcPass(lines, head, pass, safeZMm, feed, plunge);
       break;
     case 'helical-contour':
@@ -276,6 +280,7 @@ function appendContourPass(
   safeZMm: number,
   feed: number,
   plunge: number,
+  retractBetweenPasses: boolean,
 ): void {
   const first = pass.polyline[0];
   if (first === undefined || pass.polyline.length < 2) return;
@@ -283,6 +288,10 @@ function appendContourPass(
   const startY = fmt(first.y);
   const passZ = fmt(pass.zMm);
 
+  // ADR-253: lift clear of the cut before this pass replunges, instead of
+  // stepping Z down in place. A no-op on the first pass (already at safe Z) and
+  // wherever the next pass starts at a new XY (the retract below already fires).
+  if (retractBetweenPasses) appendRetract(lines, head, safeZMm);
   const alreadyAtStartXy = head.x === startX && head.y === startY;
   if (!alreadyAtStartXy) {
     appendRetract(lines, head, safeZMm);
@@ -361,6 +370,7 @@ function appendPath3dPass(
   safeZMm: number,
   feed: number,
   plunge: number,
+  retractBetweenPasses: boolean,
 ): void {
   const first = pass.points[0];
   if (first === undefined || pass.points.length < 2) return;
@@ -368,6 +378,9 @@ function appendPath3dPass(
   const startY = fmt(first.y);
   const startZ = fmt(first.z);
 
+  // ADR-253: lift clear before a lead-in profile pass replunges (see
+  // appendContourPass). Relief/surfacing path3d groups compile the flag false.
+  if (retractBetweenPasses) appendRetract(lines, head, safeZMm);
   const alreadyAtStartXy = head.x === startX && head.y === startY;
   if (!alreadyAtStartXy) {
     appendRetract(lines, head, safeZMm);

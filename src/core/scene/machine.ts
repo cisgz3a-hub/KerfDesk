@@ -176,6 +176,12 @@ export type CncLayerSettings = {
   // closed cuts only). Absent = default-on tool-radius arc; `shape: 'none'`
   // restores the legacy straight plunge.
   readonly profileLead?: CncProfileLeadSettings;
+  // ADR-253: lift to safe Z and replunge before every pass on profile/engrave
+  // ("line") cuts, matching how pocket clearing re-enters each region. Absent =
+  // ON (the default); set false to keep the old step-down-in-place plunge.
+  // Cut types that manage their own motion (pocket, v-carve, drill, relief)
+  // ignore it — they compile with retract-between-passes off.
+  readonly retractBetweenPasses?: boolean;
 };
 
 // Machine-wide flood/mist coolant for the whole CNC job (a router setting,

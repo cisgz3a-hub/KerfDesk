@@ -24,6 +24,7 @@ import { useUiStore } from '../state/ui-store';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
+import { CncRetractPassesField } from './CncRetractPassesField';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
@@ -44,11 +45,8 @@ export function CncLayerFields(props: {
   const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
   const isProfile = settings.cutType.startsWith('profile') || settings.cutType === 'inlay-pair';
   const commitSettings = (next: CncLayerSettings): void => {
-    if (props.onSettingsChange !== undefined) {
-      props.onSettingsChange(next);
-      return;
-    }
-    setLayerParam(layer.id, { cnc: next });
+    if (props.onSettingsChange !== undefined) props.onSettingsChange(next);
+    else setLayerParam(layer.id, { cnc: next });
   };
   const commit = (patch: Partial<CncLayerSettings>): void =>
     commitSettings(withManualCncFeedPatch(settings, patch));
@@ -97,6 +95,7 @@ export function CncLayerFields(props: {
         onCommit={commit}
       />
       {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
+      <CncRetractPassesField layer={layer} settings={settings} onCommit={commit} />
       {showAdvanced ? (
         <CncLayerAdvancedGroup
           layer={layer}

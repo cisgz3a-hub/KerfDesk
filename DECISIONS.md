@@ -11746,3 +11746,54 @@ containment.
   defect through review.
 - Reverting only the motion-polish change fails that test at 1.5875 mm, so it is
   a genuine regression guard rather than a vacuous assertion.
+
+## ADR-253 - Retract between passes for profile and line cuts
+
+**Date:** 2026-07-24
+**Status:** Accepted
+
+### Context
+
+A pocket clears each region as a separate lift/rapid/replunge cycle: the bit
+retracts to safe Z, rapids to the next start, then plunges again. A multi-pass
+closed profile behaves differently - every depth pass starts at the same XY, so
+the emitter (appendContourPass) skipped the retract and stepped Z straight down
+in place from one depth to the next. profile-on-path and engrave ("line") cuts,
+which have no lead-in re-entry, therefore never lifted between passes.
+
+The maintainer asked for the pocket's lift-and-replunge to apply to those cuts
+too - before every plunge, lift clear and replunge - for chip clearing and a
+clean re-entry, matching the pocket G-code.
+
+### Decision
+
+A new per-layer setting, `retractBetweenPasses`, defaults ON. When on for a
+profile or engrave cut, the emitter lifts to safe Z and replunges before every
+pass instead of stepping Z down in place. It is resolved to a concrete flag on
+the emit group at compile time (`resolveRetractBetweenPasses`); only `profile-*`
+and `engrave` cut types honor it. Pocket already retracts by region, and
+v-carve, drill, and relief manage their own motion, so those compile the flag
+off and stay byte-identical.
+
+The emitter change is a single forced `appendRetract` at the top of a contour or
+path3d pass. It is a no-op on the first pass (already at safe Z) and wherever a
+pass already moves to a new XY (the existing retract fires anyway), so it only
+adds a lift where passes previously stacked in place.
+
+### Consequences
+
+- The G-code snapshot corpus for profile/engrave cuts changes: each subsequent
+  same-XY pass gains a `G0 Z<safe>` before its plunge. Snapshot change
+  acknowledged in the PR.
+- The field is optional on both `CncLayerSettings` and `CncGroup`. Absent reads
+  as the resolved default (ON at compile for eligible cuts; OFF in the raw
+  emitter for hand-built groups), so pre-ADR-253 fixtures stay byte-identical.
+- Resume is safe by construction: the forced retract lands inside the pass span
+  it precedes, and lifting before re-entry is always safe.
+
+### Verification
+
+- `cnc-grbl-strategy.test.ts` asserts that with `retractBetweenPasses` on, a
+  same-XY deeper pass emits `G0 Z<safe>` then replunges, and that the first pass
+  gains no spurious retract; with the flag off the step-down-in-place output is
+  unchanged.

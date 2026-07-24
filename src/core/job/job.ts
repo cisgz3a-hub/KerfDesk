@@ -217,6 +217,11 @@ export type CncGroup = {
   // jobs keep byte-identical output and unchanged group shape.
   readonly coolant?: CncCoolantMode;
   readonly safeZMm: number; // retract height for travel between passes
+  // ADR-253: when true, the emitter lifts to safe Z and replunges before every
+  // pass (profile/engrave line cuts) instead of stepping Z down in place.
+  // Resolved from the layer setting at compile. Absent = off (the emitter reads
+  // it as false), so pre-ADR-253 groups and non-profile cuts stay byte-identical.
+  readonly retractBetweenPasses?: boolean;
   // H.9 parking parity: postamble/tool-change park position. Absent = the
   // machine origin (pre-H.9 output stays byte-identical).
   readonly parkXMm?: number;
