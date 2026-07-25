@@ -10,7 +10,7 @@ import { activeCncTool, type OutputScope, type Project } from '../../core/scene'
 import { isChiploadMaterialKey } from '../../core/cnc';
 import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
 import { toolpathMoves3d } from '../../core/toolpath3d';
-import { liveViewerState } from '../viewer3d/viewer3d-live-run';
+import { liveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
@@ -113,7 +113,7 @@ function useDesignSceneSource(
     if (result.kind !== 'ok') return null;
     // buildPreviewToolpath already mapped the prepared job into scene frame,
     // which is the frame the grid above was stamped in — so the moves and the
-    // surface share one frame, as ADR-254 §2 requires.
+    // surface share one frame, as ADR-257 §2 requires.
     const materialKey = stock.materialKey;
     return {
       grid: result.grid,

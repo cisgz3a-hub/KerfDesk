@@ -12,7 +12,7 @@
 // Frame: callers pass moves in SCENE frame and the grid's scene-space origin.
 // Subtracting that origin puts the path in the removal grid's local frame —
 // the same frame the surface mesh is built in — so the single mirror applied
-// at the geometry boundary carries both (ADR-254 §2, as corrected).
+// at the geometry boundary carries both (ADR-257 §2, as corrected).
 
 import type * as ThreeNamespace from 'three';
 import type { Object3D } from 'three';

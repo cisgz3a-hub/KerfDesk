@@ -17,9 +17,9 @@ import {
   type ToolProfilePoint,
 } from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
-import type { Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
-import type { LiveViewerState } from '../viewer3d/viewer3d-live-run';
-import { sceneFromLocal } from '../viewer3d/viewer3d-picking';
+import type { Viewer3DDisplayMode } from '../cnc-viewer3d/viewer3d-display-mode';
+import type { LiveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
+import { sceneFromLocal } from '../cnc-viewer3d/viewer3d-picking';
 import {
   createReliefThreeScene,
   type ReliefSceneHandle,
@@ -32,7 +32,7 @@ const PANE_DISPLAY_CELLS_ACROSS = 300;
 export type Cnc3dSceneState = 'loading' | 'ready' | 'failed';
 
 // One simulation feeding two drawables: the carved surface and the path that
-// carved it. Both are in scene frame (ADR-254 §2).
+// carved it. Both are in scene frame (ADR-257 §2).
 export type DesignSceneSource = {
   readonly grid: RemovalGrid;
   // The job's stock material, so the carve is shaded as the stock the operator

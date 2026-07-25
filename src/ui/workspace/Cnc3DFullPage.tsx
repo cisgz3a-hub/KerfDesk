@@ -11,12 +11,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { LiveViewerState } from '../viewer3d/viewer3d-live-run';
-import { Viewer3DReadout } from '../viewer3d/Viewer3DReadout';
-import { Viewer3DToolbar } from '../viewer3d/Viewer3DToolbar';
-import { DEFAULT_DISPLAY_MODE, type Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
-import { SECTION_DISABLED_FRACTION } from '../viewer3d/viewer3d-clipping';
-import { DEFAULT_SCREENSHOT_SCALE, screenshotFileName } from '../viewer3d/viewer3d-screenshot';
+import type { LiveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
+import { Viewer3DReadout } from '../cnc-viewer3d/Viewer3DReadout';
+import { Viewer3DToolbar } from '../cnc-viewer3d/Viewer3DToolbar';
+import {
+  DEFAULT_DISPLAY_MODE,
+  type Viewer3DDisplayMode,
+} from '../cnc-viewer3d/viewer3d-display-mode';
+import { SECTION_DISABLED_FRACTION } from '../cnc-viewer3d/viewer3d-clipping';
+import { DEFAULT_SCREENSHOT_SCALE, screenshotFileName } from '../cnc-viewer3d/viewer3d-screenshot';
 import { useCnc3dScene, type DesignSceneSource, type SurfaceReading } from './use-cnc-3d-scene';
 
 const CLOSE_KEY = 'Escape';

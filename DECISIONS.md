@@ -4575,7 +4575,7 @@ buffers, and lighting is weeks of risk for zero product differentiation.
    canon-critical.
 2. **three.js is UI-only.** It may be imported beneath
    `src/ui/relief-viewer/` and nowhere else — never in `core/` or `io/`.
-   **AMENDED by ADR-254 (2026-07-25):** `src/ui/viewer3d/` is also permitted.
+   **AMENDED by ADR-254 (2026-07-25):** `src/ui/cnc-viewer3d/` is also permitted.
    Everything else in this clause stands unchanged.
    clipper2-ts remains the only geometry dependency of the core. The
    heightmap→mesh conversion stays a PURE core function returning plain
@@ -11827,7 +11827,7 @@ adds a lift where passes previously stacked in place.
   unchanged.
 
 
-## ADR-254 - CNC 3D viewport: import boundary, world frame, and display-only status
+## ADR-257 - CNC 3D viewport: import boundary, world frame, and display-only status
 
 **Status:** Accepted
 **Date:** 2026-07-25
@@ -11848,7 +11848,7 @@ commit message.
 ### Decision
 
 1. **ADR-102 §2 is amended.** three.js may be imported beneath
-   `src/ui/relief-viewer/` **and `src/ui/viewer3d/`**, and nowhere else — still
+   `src/ui/relief-viewer/` **and `src/ui/cnc-viewer3d/`**, and nowhere else — still
    never in `core/` or `io/`. The rest of ADR-102 §2 is unchanged: clipper2-ts
    remains the core's only geometry dependency, and heightmap-to-mesh
    conversion stays a PURE core function returning plain typed arrays, so the

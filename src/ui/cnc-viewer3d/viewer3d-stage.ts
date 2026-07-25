@@ -5,7 +5,7 @@
 // the stock for scale, and an axis triad so X/Y/Z are unambiguous.
 //
 // All of it is inert scenery — never picked, never occluding the work, and
-// carrying no state (ADR-254 §3).
+// carrying no state (ADR-257 §3).
 //
 // Everything is built in the viewport's shared local frame: the stock spans
 // [-w/2, +w/2] x [-h/2, +h/2] with Z=0 at the stock top and the stock bottom

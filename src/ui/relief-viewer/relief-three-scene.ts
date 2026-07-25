@@ -18,14 +18,14 @@ import {
   SECTION_DISABLED_FRACTION,
   SECTION_PLANE_NORMAL,
   sectionPlaneConstant,
-} from '../viewer3d/viewer3d-clipping';
+} from '../cnc-viewer3d/viewer3d-clipping';
 import { createSceneHandle, type SceneHandle } from './relief-scene-handle';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import {
   buildViewerContent,
   type ViewerSurfaceMesh,
   type ViewerToolpathOverlay,
-} from '../viewer3d';
+} from '../cnc-viewer3d';
 import { applySceneLighting } from './scene-lighting';
 
 export type { ViewerSurfaceMesh, ViewerToolpathOverlay };

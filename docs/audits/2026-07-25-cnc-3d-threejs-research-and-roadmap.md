@@ -301,9 +301,9 @@ SPECULATIVE. Replace CPU kernel stamping with jscut's technique: render each mov
 Each stage is intended to be one independently reviewable diff with one intent,
 per the tight-leash rule in `CLAUDE.md`.
 
-### Stage 0 — ADR-254: CNC 3D viewport upgrade — scope, import boundary, and non-guard status
+### Stage 0 — ADR-257: CNC 3D viewport upgrade — scope, import boundary, and non-guard status
 
-**Intent.** Record the architectural decision before any code: amend ADR-102 §2 to permit three.js beneath a new `src/ui/viewer3d/` folder (or explicitly keep everything under `src/ui/relief-viewer/`), restate that the whole viewport is display-only and may never gate Frame or Start, add the PROJECT.md phase row this work currently has no slot for, and add the WORKFLOW.md flows (next free id is F-CNC46) with their success/error/empty/edge states.
+**Intent.** Record the architectural decision before any code: amend ADR-102 §2 to permit three.js beneath a new `src/ui/cnc-viewer3d/` folder (or explicitly keep everything under `src/ui/relief-viewer/`), restate that the whole viewport is display-only and may never gate Frame or Start, add the PROJECT.md phase row this work currently has no slot for, and add the WORKFLOW.md flows (next free id is F-CNC46) with their success/error/empty/edge states.
 
 **Touched files**
 
@@ -353,17 +353,17 @@ per the tight-leash rule in `CLAUDE.md`.
 - stepped-surface-mesh.test.ts: analytic heightmaps (flat field → no wall quads; one-step field → exactly one wall quad row with correct height pair; single-row degenerate → zero indices), index-range validity, and explicit normal correctness (top faces +Z, wall faces horizontal).
 - Property test: total vertex/index counts match the closed-form for a W×H map.
 
-### Stage 3 — Extract the scene into src/ui/viewer3d/ with a persistent handle (pure refactor)
+### Stage 3 — Extract the scene into src/ui/cnc-viewer3d/ with a persistent handle (pure refactor)
 
 **Intent.** Move the three.js scene out of relief-three-scene.ts into a dedicated viewer3d module split by responsibility (scene lifecycle / lighting / camera), with relief-three-scene.ts left as a thin delegate so the two dialogs are untouched behaviourally — flagged as a pure refactor with no behaviour change, per the tidy-first rule.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-types.ts`
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/viewer3d-lighting.ts`
-- `src/ui/viewer3d/viewer3d-camera.ts`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-types.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/viewer3d-lighting.ts`
+- `src/ui/cnc-viewer3d/viewer3d-camera.ts`
+- `src/ui/cnc-viewer3d/index.ts`
 
 **Touched files**
 
@@ -383,12 +383,12 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-surface.ts`
+- `src/ui/cnc-viewer3d/viewer3d-surface.ts`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/viewer3d-types.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/viewer3d-types.ts`
 - `src/ui/workspace/Cnc3DPane.tsx`
 
 **Tests**
@@ -457,14 +457,14 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-toolpath.ts`
-- `src/ui/viewer3d/viewer3d-toolpath-colors.ts`
+- `src/ui/cnc-viewer3d/viewer3d-toolpath.ts`
+- `src/ui/cnc-viewer3d/viewer3d-toolpath-colors.ts`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/viewer3d-types.ts`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/viewer3d-types.ts`
+- `src/ui/cnc-viewer3d/index.ts`
 - `src/ui/workspace/Cnc3DPaneScene.tsx`
 - `src/ui/theme/viewer3d-theme.ts`
 
@@ -481,12 +481,12 @@ per the tight-leash rule in `CLAUDE.md`.
 
 - `src/core/job/toolpath-depth-bands.ts`
 - `src/core/job/toolpath-depth-bands.test.ts`
-- `src/ui/viewer3d/Viewer3DLegend.tsx`
+- `src/ui/cnc-viewer3d/Viewer3DLegend.tsx`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-toolpath.ts`
-- `src/ui/viewer3d/viewer3d-toolpath-colors.ts`
+- `src/ui/cnc-viewer3d/viewer3d-toolpath.ts`
+- `src/ui/cnc-viewer3d/viewer3d-toolpath-colors.ts`
 - `src/core/job/index.ts`
 - `src/ui/theme/viewer3d-theme.ts`
 
@@ -503,13 +503,13 @@ per the tight-leash rule in `CLAUDE.md`.
 
 - `src/core/sim/tool-profile.ts`
 - `src/core/sim/tool-profile.test.ts`
-- `src/ui/viewer3d/viewer3d-tool.ts`
+- `src/ui/cnc-viewer3d/viewer3d-tool.ts`
 
 **Touched files**
 
 - `src/core/sim/index.ts`
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/index.ts`
 
 **Tests**
 
@@ -529,8 +529,8 @@ per the tight-leash rule in `CLAUDE.md`.
 
 - `src/ui/workspace/Cnc3DPane.tsx`
 - `src/ui/workspace/Cnc3DPaneScene.tsx`
-- `src/ui/viewer3d/viewer3d-toolpath.ts`
-- `src/ui/viewer3d/viewer3d-types.ts`
+- `src/ui/cnc-viewer3d/viewer3d-toolpath.ts`
+- `src/ui/cnc-viewer3d/viewer3d-types.ts`
 
 **Tests**
 
@@ -543,14 +543,14 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-stage.ts`
-- `src/ui/viewer3d/viewer3d-view-gizmo.ts`
+- `src/ui/cnc-viewer3d/viewer3d-stage.ts`
+- `src/ui/cnc-viewer3d/viewer3d-view-gizmo.ts`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/viewer3d-camera.ts`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/viewer3d-camera.ts`
+- `src/ui/cnc-viewer3d/index.ts`
 - `src/ui/theme/viewer3d-theme.ts`
 
 **Tests**
@@ -564,14 +564,14 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-clipping.ts`
-- `src/ui/viewer3d/Viewer3DToolbar.tsx`
+- `src/ui/cnc-viewer3d/viewer3d-clipping.ts`
+- `src/ui/cnc-viewer3d/Viewer3DToolbar.tsx`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/viewer3d-types.ts`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/viewer3d-types.ts`
+- `src/ui/cnc-viewer3d/index.ts`
 - `src/ui/workspace/Cnc3DPaneScene.tsx`
 
 **Tests**
@@ -585,15 +585,15 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-picking.ts`
-- `src/ui/viewer3d/Viewer3DReadout.tsx`
+- `src/ui/cnc-viewer3d/viewer3d-picking.ts`
+- `src/ui/cnc-viewer3d/Viewer3DReadout.tsx`
 - `src/core/sim/removal-grid-probe.ts`
 - `src/core/sim/removal-grid-probe.test.ts`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-scene.ts`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-scene.ts`
+- `src/ui/cnc-viewer3d/index.ts`
 - `src/core/sim/index.ts`
 
 **Tests**
@@ -607,14 +607,14 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-live-run.ts`
+- `src/ui/cnc-viewer3d/viewer3d-live-run.ts`
 
 **Touched files**
 
 - `src/ui/workspace/use-cnc-3d-source.ts`
 - `src/ui/workspace/Cnc3DPaneScene.tsx`
-- `src/ui/viewer3d/viewer3d-toolpath.ts`
-- `src/ui/viewer3d/viewer3d-tool.ts`
+- `src/ui/cnc-viewer3d/viewer3d-toolpath.ts`
+- `src/ui/cnc-viewer3d/viewer3d-tool.ts`
 
 **Tests**
 
@@ -627,14 +627,14 @@ per the tight-leash rule in `CLAUDE.md`.
 
 **New files**
 
-- `src/ui/viewer3d/viewer3d-screenshot.ts`
-- `src/ui/viewer3d/viewer3d-surface-shading.ts`
+- `src/ui/cnc-viewer3d/viewer3d-screenshot.ts`
+- `src/ui/cnc-viewer3d/viewer3d-surface-shading.ts`
 
 **Touched files**
 
-- `src/ui/viewer3d/viewer3d-surface.ts`
-- `src/ui/viewer3d/Viewer3DToolbar.tsx`
-- `src/ui/viewer3d/index.ts`
+- `src/ui/cnc-viewer3d/viewer3d-surface.ts`
+- `src/ui/cnc-viewer3d/Viewer3DToolbar.tsx`
+- `src/ui/cnc-viewer3d/index.ts`
 
 **Tests**
 
@@ -661,7 +661,7 @@ per the tight-leash rule in `CLAUDE.md`.
 
 9. Guard-rule pressure. A richer 3D view surfaces more conditions (tool below stock bottom, path outside bed, no-go zone entry, unreachable Z). Every one of those must be a colour cue or a Job Review warning — never a block, never a refusal, never a disabled Start. Rendering a warning tint is fine; refusing to render, refusing to Frame, or gating Start on any of it violates CLAUDE.md rule 7 and PROJECT.md #21 outright.
 
-10. CI mechanics that will bite: `src/core/cnc/index.ts` is ratcheted at 67 exports in scripts/index-export-baseline.json and may only shrink, so no new exports there; `src/core/relief/index.ts` is at 17 of a hard cap of 20; a new `src/ui/viewer3d/index.ts` is capped at 20; `pnpm format:check` runs prettier repo-wide and is NOT part of `pnpm lint`; DECISIONS.md has historically mixed EOL and sed/Edit flip CRLF→LF, so doc edits need PowerShell .NET.
+10. CI mechanics that will bite: `src/core/cnc/index.ts` is ratcheted at 67 exports in scripts/index-export-baseline.json and may only shrink, so no new exports there; `src/core/relief/index.ts` is at 17 of a hard cap of 20; a new `src/ui/cnc-viewer3d/index.ts` is capped at 20; `pnpm format:check` runs prettier repo-wide and is NOT part of `pnpm lint`; DECISIONS.md has historically mixed EOL and sed/Edit flip CRLF→LF, so doc edits need PowerShell .NET.
 
 11. SharedArrayBuffer is unavailable. I verified vite.config.ts sets no COOP/COEP headers, so the worker stage must use transferable ArrayBuffer ping-pong, not SAB — the Kiri:Moto zero-copy pattern does not apply here without a headers change.
 
@@ -669,7 +669,7 @@ per the tight-leash rule in `CLAUDE.md`.
 
 ## Open questions — maintainer decisions (9)
 
-1. Where does three.js live? Amend ADR-102 §2 to permit a new `src/ui/viewer3d/` folder (my recommendation — 15+ new modules do not belong inside relief-viewer, whose responsibility is the relief dialog), or keep everything under `src/ui/relief-viewer/` and accept the naming mismatch? Related: does OrbitControls (and now ViewHelper, PMREM, lines/) count as a separate dependency under ADR-017/ADR-098 §2? ADR-102 records only the 'three' package and RESEARCH_LOG.md pins ^0.180.0.
+1. Where does three.js live? Amend ADR-102 §2 to permit a new `src/ui/cnc-viewer3d/` folder (my recommendation — 15+ new modules do not belong inside relief-viewer, whose responsibility is the relief dialog), or keep everything under `src/ui/relief-viewer/` and accept the naming mismatch? Related: does OrbitControls (and now ViewHelper, PMREM, lines/) count as a separate dependency under ADR-017/ADR-098 §2? ADR-102 records only the 'three' package and RESEARCH_LOG.md pins ^0.180.0.
 
 2. What is Z in scene frame? `preview-scene-frame.ts` maps XY into scene space (+Y down) and passes Z through untouched in machine space (+Z up). Is that an intentional asymmetry or an unnoticed one? Nothing in the file's header comment addresses Z. This must be decided before stage 8 or every 3D toolpath will be drawn in a left-handed frame.
 

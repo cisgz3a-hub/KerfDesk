@@ -27,7 +27,7 @@ type ThreeModule = typeof ThreeNamespace;
 
 // Either surface builder's output. The smooth relief mesh omits `normals` and
 // lets three average them, which is right for an organic carve; the stepped
-// CNC mesh authors them so pocket walls stay vertical (ADR-254).
+// CNC mesh authors them so pocket walls stay vertical (ADR-257).
 export type ViewerSurfaceMesh = ReliefSurfaceMesh & {
   readonly normals?: Float32Array;
 };
@@ -122,7 +122,7 @@ export async function buildViewerContent(
   // baked with, applied here as an object transform. Object matrices compose
   // as T * R * S, so setting position and scale reproduces geometry.scale()
   // followed by geometry.translate() exactly. Sharing one transform is what
-  // keeps the path registered to the cut it describes (ADR-254 §2).
+  // keeps the path registered to the cut it describes (ADR-257 §2).
   let lines: ToolpathLinesHandle | null = null;
   if (toolpath !== undefined) {
     lines = await buildToolpathLines(three, toolpath.moves, toolpath.originMm);

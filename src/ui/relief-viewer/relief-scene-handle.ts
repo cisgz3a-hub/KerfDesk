@@ -11,15 +11,15 @@
 import type * as ThreeNamespace from 'three';
 import type { WebGLRenderer } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { sectionPlaneConstant } from '../viewer3d/viewer3d-clipping';
+import { sectionPlaneConstant } from '../cnc-viewer3d/viewer3d-clipping';
 import {
   buildViewerContent,
   type ViewerContentHandle,
   type ViewerContentInput,
-} from '../viewer3d/viewer3d-content';
-import type { Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
-import { pointerNdc, type PickVec3 } from '../viewer3d/viewer3d-picking';
-import { screenshotSize } from '../viewer3d/viewer3d-screenshot';
+} from '../cnc-viewer3d/viewer3d-content';
+import type { Viewer3DDisplayMode } from '../cnc-viewer3d/viewer3d-display-mode';
+import { pointerNdc, type PickVec3 } from '../cnc-viewer3d/viewer3d-picking';
+import { screenshotSize } from '../cnc-viewer3d/viewer3d-screenshot';
 
 export type SceneHandle = {
   readonly dispose: () => void;
