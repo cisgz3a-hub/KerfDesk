@@ -18,6 +18,7 @@ import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import { materialAppearance, type MaterialAppearance } from '../theme/material-appearance';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import { displayModeFlags, type Viewer3DDisplayMode } from './viewer3d-display-mode';
+import { localFromScene } from './viewer3d-picking';
 import { buildStageFurniture } from './viewer3d-stage';
 import { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
 import { buildToolpathLines, type ToolpathLinesHandle } from './viewer3d-toolpath';
@@ -67,6 +68,9 @@ export type ViewerContentHandle = {
   readonly setScrubMm: (atMm: number | null) => void;
   /** Shows or hides the surface and the route per the display mode. */
   readonly setDisplayMode: (mode: Viewer3DDisplayMode) => void;
+  // The machined surface alone. Raycasting the whole group would also hit the
+  // grid, the stock outline and the toolpath quads, and report their depth.
+  readonly surface: Object3D;
 };
 
 /**
@@ -147,6 +151,7 @@ export async function buildViewerContent(
     dispose: () => {
       for (const dispose of disposers) dispose();
     },
+    surface: surfaceMesh,
     setDisplayMode: (mode) => {
       const flags = displayModeFlags(mode);
       surfaceMesh.visible = flags.isSurfaceVisible;
@@ -269,18 +274,13 @@ export function buildToolAt(
   return buildToolMesh(three, toolpath.toolProfile, toolLocalPosition(mesh, toolpath, atMm));
 }
 
-// Scene frame -> the viewport's local frame: mirrored to match the surface,
-// then recentred. The same composition the surface geometry is baked with,
-// done arithmetically because a single point needs no transform node. Shared
-// by the initial placement and every scrub update so the two cannot drift.
+// Shared by the initial placement and every scrub update so the two cannot
+// drift, and shared with the hover readout's inverse so a frame change has one
+// place to happen.
 function toolLocalPosition(
   mesh: ViewerSurfaceMesh,
   toolpath: ViewerToolpathOverlay,
   atMm: { readonly x: number; readonly y: number; readonly z: number },
 ): { readonly x: number; readonly y: number; readonly z: number } {
-  return {
-    x: atMm.x - toolpath.originMm.x - mesh.widthMm / 2,
-    y: -(atMm.y - toolpath.originMm.y) + mesh.heightMm / 2,
-    z: atMm.z,
-  };
+  return localFromScene(atMm, toolpath.originMm, mesh);
 }

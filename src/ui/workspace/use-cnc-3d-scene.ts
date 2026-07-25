@@ -10,9 +10,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChiploadMaterial } from '../../core/cnc';
 import { steppedSurfaceMesh } from '../../core/heightfield';
-import { downsampleRemovalGrid, type RemovalGrid, type ToolProfilePoint } from '../../core/sim';
+import {
+  downsampleRemovalGrid,
+  probeRemovalGrid,
+  type RemovalGrid,
+  type ToolProfilePoint,
+} from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import type { Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
+import { sceneFromLocal } from '../viewer3d/viewer3d-picking';
 import {
   createReliefThreeScene,
   type ReliefSceneHandle,
@@ -51,6 +57,17 @@ export type Cnc3dSceneControls = {
   readonly setDisplayMode: (mode: Viewer3DDisplayMode) => void;
   readonly setSectionFraction: (fraction: number) => void;
   readonly capturePng: (scale: number) => string | null;
+  // Position and cut depth under the pointer, or null off the part. Depth is
+  // read from the GRID, not from the mesh the ray hit: the mesh is a
+  // downsampled display copy, so reading it back would report a depth the job
+  // never cuts.
+  readonly probeAt: (offsetX: number, offsetY: number) => SurfaceReading | null;
+};
+
+export type SurfaceReading = {
+  readonly xMm: number;
+  readonly yMm: number;
+  readonly depthMm: number;
 };
 
 /**
@@ -68,6 +85,10 @@ export function useCnc3dScene(
 ): Cnc3dScene {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<ReliefSceneHandle | null>(null);
+  // Read through a ref so the controls object stays referentially stable —
+  // rebuilding it per source would retrigger every effect that depends on it.
+  const sourceRef = useRef<DesignSceneSource | null>(source);
+  sourceRef.current = source;
   const [state, setState] = useState<Cnc3dSceneState>('loading');
 
   // Zero deps: runs at unmount only. See the module header.
@@ -143,6 +164,8 @@ export function useCnc3dScene(
       setDisplayMode: (mode) => handleRef.current?.setDisplayMode(mode),
       setSectionFraction: (fraction) => handleRef.current?.setSectionFraction(fraction),
       capturePng: (scale) => handleRef.current?.capturePng(scale) ?? null,
+      probeAt: (offsetX, offsetY) =>
+        readSurface(sourceRef.current, handleRef.current, offsetX, offsetY),
     }),
     [],
   );
@@ -152,6 +175,27 @@ export function useCnc3dScene(
 
 // Total declared program length. Read from the last move rather than summed,
 // because startMm already accumulates every preceding step's declared length.
+// Raycasts the surface, converts the hit back to scene frame, then reads the
+// depth from the grid the surface was built from.
+function readSurface(
+  source: DesignSceneSource | null,
+  handle: ReliefSceneHandle | null,
+  offsetX: number,
+  offsetY: number,
+): SurfaceReading | null {
+  if (source === null || handle === null) return null;
+  const local = handle.probeAt(offsetX, offsetY);
+  if (local === null) return null;
+  const mesh = {
+    widthMm: source.grid.widthCells * source.grid.mmPerCell,
+    heightMm: source.grid.heightCells * source.grid.mmPerCell,
+  };
+  const scene = sceneFromLocal(local, { x: source.grid.originX, y: source.grid.originY }, mesh);
+  const probe = probeRemovalGrid(source.grid, scene);
+  if (probe.kind === 'outside') return null;
+  return { xMm: scene.x, yMm: scene.y, depthMm: probe.depthMm };
+}
+
 function totalLengthMm(source: DesignSceneSource | null): number {
   const last = source?.moves[source.moves.length - 1];
   return last === undefined ? 0 : last.startMm + last.lengthMm;

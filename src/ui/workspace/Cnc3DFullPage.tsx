@@ -11,11 +11,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Viewer3DReadout } from '../viewer3d/Viewer3DReadout';
 import { Viewer3DToolbar } from '../viewer3d/Viewer3DToolbar';
 import { DEFAULT_DISPLAY_MODE, type Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
 import { SECTION_DISABLED_FRACTION } from '../viewer3d/viewer3d-clipping';
 import { DEFAULT_SCREENSHOT_SCALE, screenshotFileName } from '../viewer3d/viewer3d-screenshot';
-import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
+import { useCnc3dScene, type DesignSceneSource, type SurfaceReading } from './use-cnc-3d-scene';
 
 const CLOSE_KEY = 'Escape';
 
@@ -29,6 +30,7 @@ export function Cnc3DFullPage(props: {
   const { canvasRef, state, controls } = useCnc3dScene(source, stockThicknessMm, scrubberT);
   const [mode, setMode] = useState<Viewer3DDisplayMode>(DEFAULT_DISPLAY_MODE);
   const [sectionFraction, setSectionFraction] = useState(SECTION_DISABLED_FRACTION);
+  const [reading, setReading] = useState<SurfaceReading | null>(null);
   useCloseOnEscape(onClose);
 
   // Pushed on every change AND on every state change: the controls no-op until
@@ -49,6 +51,14 @@ export function Cnc3DFullPage(props: {
     link.download = screenshotFileName('', new Date().toISOString());
     link.click();
   }, [controls]);
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      setReading(controls.probeAt(event.clientX - bounds.left, event.clientY - bounds.top));
+    },
+    [controls],
+  );
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="3D result, full page" style={overlayStyle}>
@@ -72,7 +82,16 @@ export function Cnc3DFullPage(props: {
           onSavePng={handleSavePng}
         />
       </div>
-      <canvas ref={canvasRef} aria-label="Live 3D cut result" style={canvasStyle} />
+      <canvas
+        ref={canvasRef}
+        aria-label="Live 3D cut result"
+        style={canvasStyle}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={() => setReading(null)}
+      />
+      <div style={readoutRowStyle}>
+        <Viewer3DReadout reading={reading} />
+      </div>
     </div>,
     document.body,
   );
@@ -109,6 +128,7 @@ const barStyle: React.CSSProperties = {
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const toolbarRowStyle: React.CSSProperties = { padding: '0 12px 8px', flexShrink: 0 };
+const readoutRowStyle: React.CSSProperties = { padding: '6px 12px', flexShrink: 0 };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', flex: 1 };
 const closeStyle: React.CSSProperties = { padding: '4px 12px', cursor: 'pointer' };
 // The canvas fills what's left; the hook's ResizeObserver re-fits the drawing

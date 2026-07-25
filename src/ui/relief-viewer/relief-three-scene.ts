@@ -19,13 +19,10 @@ import {
   SECTION_PLANE_NORMAL,
   sectionPlaneConstant,
 } from '../viewer3d/viewer3d-clipping';
-import type { Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
-import { screenshotSize } from '../viewer3d/viewer3d-screenshot';
+import { createSceneHandle, type SceneHandle } from './relief-scene-handle';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import {
   buildViewerContent,
-  type ViewerContentHandle,
-  type ViewerContentInput,
   type ViewerSurfaceMesh,
   type ViewerToolpathOverlay,
 } from '../viewer3d';
@@ -33,24 +30,7 @@ import { applySceneLighting } from './scene-lighting';
 
 export type { ViewerSurfaceMesh, ViewerToolpathOverlay };
 
-export type ReliefSceneHandle = {
-  readonly dispose: () => void;
-  // Re-fit the renderer + camera to a new canvas size. The scene renders on
-  // demand (no rAF loop), so a resizable host must call this when its box
-  // changes or the buffer stays at its mount-time size and scales blurrily.
-  readonly resize: (width: number, height: number) => void;
-  // Swap in new job geometry WITHOUT touching the camera. This is the whole
-  // point of the split: the operator's viewpoint survives an edit.
-  readonly updateContent: (input: ViewerContentInput) => Promise<void>;
-  /** Scrubs the cutter and path reveal without rebuilding any geometry. */
-  readonly setScrubMm: (atMm: number | null) => void;
-  /** Shows or hides the surface and the route. */
-  readonly setDisplayMode: (mode: Viewer3DDisplayMode) => void;
-  /** Slides the section plane; 1 shows the whole part. */
-  readonly setSectionFraction: (fraction: number) => void;
-  /** Renders one frame at a scale multiplier and returns it as a data URL. */
-  readonly capturePng: (scale: number) => string;
-};
+export type ReliefSceneHandle = SceneHandle;
 
 export type ReliefSceneResult =
   | { readonly kind: 'ok'; readonly handle: ReliefSceneHandle }
@@ -94,10 +74,11 @@ export async function createReliefThreeScene(
   const controls = new OrbitControls(camera, canvas);
   applyOperatorMouseBindings(three, controls);
   const sectionPlane = installSectionPlane(three, renderer, mesh.heightMm);
+  const raycaster = new three.Raycaster();
   const render = (): void => renderer.render(scene, camera);
   controls.addEventListener('change', render);
 
-  let content: ViewerContentHandle = await buildViewerContent(three, {
+  const content = await buildViewerContent(three, {
     mesh,
     stockThicknessMm,
     ...(toolpath === undefined ? {} : { toolpath }),
@@ -107,45 +88,20 @@ export async function createReliefThreeScene(
 
   return {
     kind: 'ok',
-    handle: {
-      resize: (nextWidth, nextHeight) => {
-        if (nextWidth <= 0 || nextHeight <= 0) return;
-        renderer.setSize(nextWidth, nextHeight, false);
-        camera.aspect = nextWidth / nextHeight;
-        camera.updateProjectionMatrix();
-        render();
-      },
-      updateContent: async (input) => {
-        const next = await buildViewerContent(three, input);
-        // Build the replacement BEFORE tearing down the old one, so a slow
-        // rebuild never leaves the pane blank mid-edit.
-        scene.remove(content.object);
-        content.dispose();
-        content = next;
-        scene.add(content.object);
-        render();
-      },
-      setScrubMm: (atMm) => {
-        content.setScrubMm(atMm);
-        render();
-      },
-      setDisplayMode: (mode) => {
-        content.setDisplayMode(mode);
-        render();
-      },
-      setSectionFraction: (fraction) => {
-        sectionPlane.constant = sectionPlaneConstant(fraction, mesh.heightMm);
-        render();
-      },
-      capturePng: (scale) => capturePngDataUrl({ renderer, camera, canvas, render, scale }),
-      dispose: () => {
-        controls.removeEventListener('change', render);
-        controls.dispose();
-        lighting.dispose();
-        content.dispose();
-        renderer.dispose();
-      },
-    },
+    handle: createSceneHandle({
+      three,
+      scene,
+      renderer,
+      camera,
+      canvas,
+      controls,
+      raycaster,
+      sectionPlane,
+      sectionSpanMm: mesh.heightMm,
+      content,
+      render,
+      disposeLighting: lighting.dispose,
+    }),
   };
 }
 
@@ -165,38 +121,6 @@ function framedCamera(
   camera.position.set(orbitRadius * 0.7, -orbitRadius * 0.7, orbitRadius * 0.6);
   camera.lookAt(0, 0, 0);
   return camera;
-}
-
-// Renders one frame at an enlarged size and reads it back as a PNG data URL,
-// then restores the on-screen size. preserveDrawingBuffer is off, so the
-// buffer is cleared after each present and the capture has to render into the
-// enlarged buffer itself rather than read back whatever was last shown.
-function capturePngDataUrl(input: {
-  readonly renderer: WebGLRenderer;
-  readonly camera: ThreeNamespace.PerspectiveCamera;
-  readonly canvas: HTMLCanvasElement;
-  readonly render: () => void;
-  readonly scale: number;
-}): string {
-  const { renderer, camera, canvas, render, scale } = input;
-  const previous = { width: canvas.clientWidth, height: canvas.clientHeight };
-  const size = screenshotSize(previous.width, previous.height, scale);
-  resizeTo(renderer, camera, size);
-  render();
-  const dataUrl = renderer.domElement.toDataURL('image/png');
-  resizeTo(renderer, camera, previous);
-  render();
-  return dataUrl;
-}
-
-function resizeTo(
-  renderer: WebGLRenderer,
-  camera: ThreeNamespace.PerspectiveCamera,
-  size: { readonly width: number; readonly height: number },
-): void {
-  renderer.setSize(size.width, size.height, false);
-  camera.aspect = size.width / size.height;
-  camera.updateProjectionMatrix();
 }
 
 // Left-drag PANS, right-drag orbits — the opposite of three's default. Sliding
