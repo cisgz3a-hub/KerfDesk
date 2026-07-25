@@ -62,7 +62,10 @@ describe('cncOperationDetail', () => {
   // happens.
   it('summarizes the default on-path cut without a direction it does not apply', () => {
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe(
-      '1 pass · stepover 40% · tabs off · Manual feeds',
+      // ADR-258 defaults tabs ON, so the default profile cut reports its tab
+      // configuration here instead of "tabs off". Audit 3.8 drops the cut
+      // direction: profile-on-path has no material side, so none applies.
+      '1 pass · stepover 40% · tabs 4 per shape (6 × 2 mm) · Manual feeds',
     );
   });
 

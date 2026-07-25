@@ -5,9 +5,41 @@
 
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { offsetForSpeed, shiftAlongTravel, type ScanOffsetPoint } from './scan-offset';
+import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import {
+  offsetForSpeed,
+  shiftAlongTravel,
+  validatedScanOffsetMm,
+  type ScanOffsetPoint,
+} from './scan-offset';
 
 const FUZZ_RUNS = 100;
+
+describe('validatedScanOffsetMm', () => {
+  it('passes a finite override through unchanged', () => {
+    expect(validatedScanOffsetMm(DEFAULT_DEVICE_PROFILE, 0.42)).toBe(0.42);
+    expect(validatedScanOffsetMm(DEFAULT_DEVICE_PROFILE, -0.42)).toBe(-0.42);
+    expect(validatedScanOffsetMm(DEFAULT_DEVICE_PROFILE, 0)).toBe(0);
+  });
+
+  it('returns undefined for a missing override', () => {
+    expect(validatedScanOffsetMm(DEFAULT_DEVICE_PROFILE, undefined)).toBeUndefined();
+  });
+
+  // Rule 7 / ADR-228 regression pin. This used to throw a RangeError, which the
+  // 'scan-offset-out-of-range' preflight was assumed to pre-empt — but that code
+  // is not among the compile-integrity codes either path refuses, and its
+  // message does not match isProgramMaterializationRangeError, so the throw
+  // escaped UNCAUGHT on Start. Dropping the value lets the device calibration
+  // apply (callers use `?? scanOffsetForGroup(...)`) rather than forcing 0,
+  // which would silently disable a working calibration.
+  it('drops a non-finite override instead of throwing', () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() => validatedScanOffsetMm(DEFAULT_DEVICE_PROFILE, bad)).not.toThrow();
+      expect(validatedScanOffsetMm(DEFAULT_DEVICE_PROFILE, bad)).toBeUndefined();
+    }
+  });
+});
 
 describe('offsetForSpeed', () => {
   const table: ReadonlyArray<ScanOffsetPoint> = [

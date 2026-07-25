@@ -5,17 +5,15 @@ exports[`emitGcode with distinct per-layer settings > byte-pins the three-mode, 
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; layer cut-red color #ff0000 power 60% speed 1200 mm/min passes 2
 ; pass 1 of 2
 G0 X10.000 Y390.000 S0
 G1 X30.000 Y390.000 F1200 S600
 ; pass 2 of 2
-M3 S0
+M4 S0
 G0 X10.000 Y390.000 S0
 G1 X30.000 Y390.000 F1200 S600
-M5
-M4 S0
 ; fill layer fill-blue color #0000ff power 35% speed 3000 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
 G0 X45.000 Y330.000 S0

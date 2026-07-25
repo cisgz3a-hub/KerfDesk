@@ -89,6 +89,33 @@ describe('handleSaveRd', () => {
     expect(messages.some((m) => m.includes('EXPERIMENTAL .rd export'))).toBe(true);
   });
 
+  // Rule 7 / ADR-228: a pre-emit policy finding stopped refusing this export,
+  // so it must now be SHOWN. Without this the fix trades a refusal for silence.
+  it('toasts a pre-emit policy advisory after a successful save', async () => {
+    const base = ruidaLineProject();
+    const project: Project = {
+      ...base,
+      device: { ...base.device, controlledLaserOffTravelFeedMmPerMin: 0 },
+    };
+    const target: SaveTarget = { displayName: 'job.rd', write: async () => undefined };
+    const messages: string[] = [];
+    const ctx: SaveGcodeCtx = {
+      platform: mockPlatform(async () => target),
+      project,
+      savedName: null,
+      pushToast: (message) => messages.push(message),
+    };
+
+    await handleSaveRd(ctx, { ok: true });
+
+    const emitted = emitRdFile(project);
+    if (!emitted.ok) throw new Error('fixture should emit ok');
+    expect(emitted.advisories.length).toBeGreaterThan(0);
+    for (const advisory of emitted.advisories) {
+      expect(messages).toContain(advisory.message);
+    }
+  });
+
   it('alerts and writes nothing when the job cannot be emitted', async () => {
     let picked = false;
     const ctx: SaveGcodeCtx = {

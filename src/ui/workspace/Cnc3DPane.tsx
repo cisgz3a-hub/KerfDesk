@@ -4,34 +4,27 @@
 // stays snappy) and renders the stock + cut heightfield through the ADR-102
 // three.js scene. UI-only; the compile path is the same one Preview uses.
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { reliefSurfaceMesh } from '../../core/relief';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { toSceneCoords } from '../../core/devices';
-import {
-  computeRemovalGrid,
-  downsampleRemovalGrid,
-  DEFAULT_CELL_MM,
-  kernelForTool,
-  type RemovalGrid,
-} from '../../core/sim';
 import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
+import { isChiploadMaterialKey } from '../../core/cnc';
+import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
+import { toolpathMoves3d } from '../../core/toolpath3d';
+import { liveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
-import {
-  createReliefThreeScene,
-  type ReliefSceneHandle,
-} from '../relief-viewer/relief-three-scene';
+import { useUiStore } from '../state/ui-store';
+import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
 import { buildPreviewToolpath } from './draw-preview';
+import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
+import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { useCncPaneWidth } from './use-cnc-pane-width';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
 const PANE_TARGET_CELLS_PER_AXIS = 500;
-const PANE_DISPLAY_CELLS_ACROSS = 300;
 const CANVAS_WIDTH_PX = 244;
 const CANVAS_HEIGHT_PX = 240;
-
-type PaneSceneState = 'loading' | 'ready' | 'failed';
 
 export function Cnc3DPane(): JSX.Element | null {
   const project = useStore((s) => s.project);
@@ -42,7 +35,7 @@ export function Cnc3DPane(): JSX.Element | null {
   const { collapsed, toggleCollapsed } = useCncCanvasFocus();
   const resize = useCncPaneWidth();
   const deferredProject = useDeferredValue(project);
-  const grid = useDesignRemovalGrid(deferredProject, outputScope, collapsed);
+  const source = useDesignSceneSource(deferredProject, outputScope, collapsed);
   if (project.machine?.kind !== 'cnc') return null;
   return (
     <aside
@@ -67,8 +60,8 @@ export function Cnc3DPane(): JSX.Element | null {
         {!collapsed && <span style={titleStyle}>3D result</span>}
         <Cnc3DPaneToggle collapsed={collapsed} onToggle={toggleCollapsed} />
       </div>
-      {!collapsed && <PaneScene grid={grid} stockThicknessMm={stockThicknessMm(project)} />}
-      {!collapsed && grid === null && (
+      {!collapsed && <PaneScene source={source} stockThicknessMm={stockThicknessMm(project)} />}
+      {!collapsed && source === null && (
         <p style={hintStyle}>Add CNC content on an output layer to see the simulated result.</p>
       )}
     </aside>
@@ -79,13 +72,15 @@ function stockThicknessMm(project: Project): number {
   return project.machine?.kind === 'cnc' ? project.machine.stock.thicknessMm : 0;
 }
 
-// Design-time removal grid: full job at coarse resolution, scene-space stock
-// rect (same frame as the Preview grid, so orientation matches the dialog).
-function useDesignRemovalGrid(
+// Design-time scene source: the removal grid AND the 3D moves that carved it,
+// both derived from one buildPreviewToolpath call. They are returned together
+// because computing the toolpath twice — once to stamp, once to draw — would
+// double the most expensive step in the pane.
+function useDesignSceneSource(
   project: Project,
   outputScope: OutputScope,
   collapsed: boolean,
-): RemovalGrid | null {
+): DesignSceneSource | null {
   return useMemo(() => {
     const machine = project.machine;
     if (collapsed || machine === undefined || machine.kind !== 'cnc') return null;
@@ -115,64 +110,45 @@ function useDesignRemovalGrid(
       },
       kernel,
     );
-    return result.kind === 'ok' ? result.grid : null;
+    if (result.kind !== 'ok') return null;
+    // buildPreviewToolpath already mapped the prepared job into scene frame,
+    // which is the frame the grid above was stamped in — so the moves and the
+    // surface share one frame, as ADR-261 §2 requires.
+    const materialKey = stock.materialKey;
+    return {
+      grid: result.grid,
+      // materialKey is a plain string on the model, so an unrecognised key from
+      // an older project file falls back to the default palette.
+      ...(isChiploadMaterialKey(materialKey) ? { materialKey } : {}),
+      moves: toolpathMoves3d(toolpath),
+      // Same tool record that produced the kernel above, so the drawn bit and
+      // the simulated one cannot disagree.
+      toolProfile: toolProfile(activeCncTool(machine)),
+    };
   }, [project, outputScope, collapsed]);
 }
 
 function PaneScene(props: {
-  readonly grid: RemovalGrid | null;
+  readonly source: DesignSceneSource | null;
   readonly stockThicknessMm: number;
 }): JSX.Element | null {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const handleRef = useRef<ReliefSceneHandle | null>(null);
-  const [state, setState] = useState<PaneSceneState>('loading');
-  const { grid, stockThicknessMm: thickness } = props;
+  const { source, stockThicknessMm } = props;
+  // Same scrubber the 2D preview uses, so the two views cannot disagree about
+  // where in the program the operator is looking.
+  const scrubberT = useUiStore((s) => s.scrubberT);
+  // While a job streams, the controller — not the scrubber — says where the
+  // bit is and how much of the route has actually been cut.
+  const live = liveViewerState(
+    useCanvasMotionOverlay(
+      useStore((s) => s.project),
+      false,
+    )?.run ?? null,
+  );
+  const [isFullPage, setIsFullPage] = useState(false);
+  const closeFullPage = useCallback(() => setIsFullPage(false), []);
+  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT, live);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null || grid === null) return;
-    let cancelled = false;
-    setState('loading');
-    const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
-    void createReliefThreeScene(canvas, reliefSurfaceMesh(display), thickness)
-      .then((outcome) => {
-        if (cancelled) {
-          if (outcome.kind === 'ok') outcome.handle.dispose();
-          return;
-        }
-        if (outcome.kind === 'ok') {
-          handleRef.current = outcome.handle;
-          // The pane is resizable, so fit the freshly-built scene to the
-          // canvas's actual laid-out size rather than its mount-time attrs.
-          outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
-          setState('ready');
-        } else {
-          setState('failed');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setState('failed');
-      });
-    return () => {
-      cancelled = true;
-      handleRef.current?.dispose();
-      handleRef.current = null;
-    };
-  }, [grid, thickness]);
-
-  // Keep the renderer buffer in step with the resizable pane so the 3D view
-  // stays crisp at any width (the scene renders on demand, not on a rAF loop).
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      handleRef.current?.resize(canvas.clientWidth, canvas.clientHeight);
-    });
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, []);
-
-  if (grid === null) return null;
+  if (source === null) return null;
   return (
     <>
       <canvas
@@ -182,6 +158,23 @@ function PaneScene(props: {
         aria-label="Live 3D cut result"
         style={canvasStyle}
       />
+      <button
+        type="button"
+        onClick={() => setIsFullPage(true)}
+        style={fullPageButtonStyle}
+        title="Open the 3D result at full window size."
+      >
+        Open full page
+      </button>
+      {isFullPage && (
+        <Cnc3DFullPage
+          source={source}
+          stockThicknessMm={stockThicknessMm}
+          scrubberT={scrubberT}
+          live={live}
+          onClose={closeFullPage}
+        />
+      )}
       {state === 'failed' ? (
         <p style={hintStyle} role="alert">
           3D view unavailable in this browser.
@@ -240,6 +233,12 @@ const canvasStyle: React.CSSProperties = {
   width: '100%', // fill the resizable pane; the ResizeObserver re-fits the buffer
   height: CANVAS_HEIGHT_PX,
   borderRadius: 4,
+};
+const fullPageButtonStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '4px 8px',
+  cursor: 'pointer',
+  fontSize: 11,
 };
 const hintStyle: React.CSSProperties = {
   fontSize: 11,

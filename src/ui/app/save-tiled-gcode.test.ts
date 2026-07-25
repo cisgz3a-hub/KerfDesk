@@ -111,6 +111,25 @@ describe('handleSaveTiledGcode', () => {
     expect(maxX(all)).toBeLessThan(50);
   });
 
+  // Rule 7 / ADR-228: a pre-emit policy finding stopped refusing the tiled
+  // export, so it must now be SHOWN once for the set rather than silently
+  // dropped — otherwise the fix trades a refusal for silence.
+  it('toasts a pre-emit policy advisory after a successful tiled save', async () => {
+    const base = tiledCncProject();
+    const written: string[] = [];
+    const messages: string[] = [];
+
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: { ...base, device: { ...base.device, controlledLaserOffTravelFeedMmPerMin: 0 } },
+      savedName: 'job',
+      pushToast: (message) => messages.push(message),
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    expect(messages.filter((m) => m.includes('Controlled laser-off seek feed'))).toHaveLength(1);
+  });
+
   it('exports every layer when no scope is given', async () => {
     const written: string[] = [];
     await handleSaveTiledGcode({

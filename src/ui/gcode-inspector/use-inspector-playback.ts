@@ -1,87 +1,73 @@
-// Inspector playback state (ADR-255 stage 5): a route-distance playhead with
-// play/pause, speed, scrub, and per-segment stepping, advanced by rAF.
+// Inspector playback state (ADR-255 stage 5, time-true since stage 8b).
 //
-// v1 advances by DISTANCE at a nominal rate so playback length is predictable
-// on any program; stage 8 replaces the rate with planner-true seconds.
+// A thin React wrapper over playback-transport: every rule lives there and
+// is unit-tested, this file only owns the rAF loop and the ref the loop
+// reads. The ref is written on EVERY transition — React syncs state on the
+// next render, and a stale ref is what made "press Play at the end" a no-op.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  advance,
+  initialTransport,
+  restart,
+  scrubTo,
+  stepBy,
+  togglePlay,
+  type TransportState,
+} from './playback-transport';
 
-const NOMINAL_MM_PER_SEC = 60;
 const MAX_FRAME_SECONDS = 0.1;
 
 export type PlaybackState = {
+  /** Playhead position in planner seconds. */
   readonly routeMm: number;
   readonly playing: boolean;
   readonly speed: number;
-  readonly setRouteMm: (routeMm: number) => void;
+  readonly setRouteMm: (seconds: number) => void;
   readonly setSpeed: (speed: number) => void;
   readonly togglePlay: () => void;
-  readonly stepBy: (deltaMm: number) => void;
+  readonly stepBy: (deltaSeconds: number) => void;
   readonly restart: () => void;
 };
 
-export function useInspectorPlayback(totalRouteMm: number): PlaybackState {
-  const [routeMm, setRoute] = useState(totalRouteMm);
-  const [playing, setPlaying] = useState(false);
+export function useInspectorPlayback(totalSeconds: number): PlaybackState {
+  const [transport, setTransport] = useState<TransportState>(() => initialTransport(totalSeconds));
   const [speed, setSpeed] = useState(1);
-  const routeRef = useRef(routeMm);
-  routeRef.current = routeMm;
+  const transportRef = useRef(transport);
 
-  // A new program resets the playhead to "fully drawn" so the Inspector opens
-  // showing the whole job (LightBurn's preview does the same).
+  const commit = useCallback((next: TransportState) => {
+    transportRef.current = next;
+    setTransport(next);
+  }, []);
+
+  // A new program opens fully drawn, so the whole job is visible at once.
   useEffect(() => {
-    setRoute(totalRouteMm);
-    setPlaying(false);
-  }, [totalRouteMm]);
-
-  const clamp = useCallback(
-    (value: number) => Math.min(Math.max(value, 0), totalRouteMm),
-    [totalRouteMm],
-  );
+    commit(initialTransport(totalSeconds));
+  }, [commit, totalSeconds]);
 
   useEffect(() => {
-    if (!playing || totalRouteMm <= 0) return;
+    if (!transport.playing || totalSeconds <= 0) return;
     let frame = 0;
     let last = performance.now();
     const tick = (now: number): void => {
       const elapsed = Math.min((now - last) / 1000, MAX_FRAME_SECONDS);
       last = now;
-      const next = routeRef.current + elapsed * NOMINAL_MM_PER_SEC * speed;
-      if (next >= totalRouteMm) {
-        setRoute(totalRouteMm);
-        setPlaying(false);
-        return;
-      }
-      setRoute(next);
-      frame = requestAnimationFrame(tick);
+      const next = advance(transportRef.current, elapsed, speed, totalSeconds);
+      commit(next);
+      if (next.playing) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed, totalRouteMm]);
+  }, [commit, transport.playing, speed, totalSeconds]);
 
   return {
-    routeMm,
-    playing,
+    routeMm: transport.seconds,
+    playing: transport.playing,
     speed,
-    setRouteMm: (value) => {
-      setPlaying(false);
-      setRoute(clamp(value));
-    },
+    setRouteMm: (seconds) => commit(scrubTo(seconds, totalSeconds)),
     setSpeed,
-    togglePlay: () => {
-      setPlaying((wasPlaying) => {
-        // Replaying from the end restarts rather than sticking at 100%.
-        if (!wasPlaying && routeRef.current >= totalRouteMm) setRoute(0);
-        return !wasPlaying;
-      });
-    },
-    stepBy: (deltaMm) => {
-      setPlaying(false);
-      setRoute((current) => clamp(current + deltaMm));
-    },
-    restart: () => {
-      setPlaying(false);
-      setRoute(0);
-    },
+    togglePlay: () => commit(togglePlay(transportRef.current, totalSeconds)),
+    stepBy: (deltaSeconds) => commit(stepBy(transportRef.current, deltaSeconds, totalSeconds)),
+    restart: () => commit(restart()),
   };
 }

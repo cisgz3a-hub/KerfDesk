@@ -20,3 +20,4 @@ export { arcStepRad, sampleArcPoints } from './arc-sampling';
 export { parametricEllipseCurve } from './ellipse-curve';
 export { fitCubicsThroughPoints, sampleCubics, type CubicBezier } from './cubic-fit';
 export { fairLineCurvePath, type CurveFairingOptions } from './curve-fairing';
+export { fairToolpathPolylines } from './fair-toolpath-polylines';

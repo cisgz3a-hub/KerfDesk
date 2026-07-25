@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   createLayer,
@@ -9,6 +8,7 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
+import type * as GcodeModule from '../../io/gcode';
 import { useCameraStore } from '../state/camera-store';
 import {
   cncControllerEpochOf,
@@ -26,8 +26,8 @@ import {
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { configureReadyCncRecovery, injectPreflightIssue } from './cnc-recovery-flow-testing';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
-import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareCurrentStartJob } from './start-job-source';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -35,18 +35,15 @@ vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareConfirm: vi.fn(() => true),
 }));
 
+// Spy that defaults to the real emitter; the rule-7 tests below override it.
+vi.mock('../../io/gcode', async (importOriginal) => {
+  const actual = await importOriginal<typeof GcodeModule>();
+  return { ...actual, emitPreparedGcode: vi.fn(actual.emitPreparedGcode) };
+});
+
 const originalStartJob = useLaserStore.getState().startJob;
 const NOW = '2026-07-15T10:00:00.000Z';
 const LATER = '2026-07-15T10:01:00.000Z';
-const idleStatus: StatusReport = {
-  state: 'Idle',
-  subState: null,
-  mPos: { x: 0, y: 0, z: 0 },
-  wPos: null,
-  feed: 0,
-  spindle: 0,
-  wco: null,
-};
 const lineObject: SceneObject = {
   kind: 'imported-svg',
   id: 'line-object',
@@ -107,35 +104,6 @@ function repository(): RecoveryRepository {
   });
 }
 
-function configureReadyCncRecovery(): void {
-  const project = recoveryProject();
-  useStore.setState({
-    project,
-    selectedObjectId: null,
-    additionalSelectedIds: new Set(),
-  });
-  useLaserStore.setState({
-    ...initialLaserState(),
-    connection: { kind: 'connected' },
-    statusReport: idleStatus,
-    controllerSettings: { maxPowerS: 12_000, minPowerS: 0, laserModeEnabled: false },
-    controllerQualification: { kind: 'qualified', epoch: 0, settings: 'verified' },
-    ovCache: { feed: 100, rapid: 100, spindle: 100 },
-    accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
-    workZReferenceEpoch: 7,
-    workZZeroEvidence: {
-      source: 'manual-zero',
-      referenceEpoch: 7,
-      toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
-    },
-    // Frame-first (ADR-228): a completed Frame for this exact job is the one
-    // Start policy gate; both the seeding Start and the recovery re-prepare
-    // check it against the live store (null WCO, work origin inactive here).
-    frameVerification: frameVerificationForProject(project),
-    startJob: vi.fn(async () => undefined),
-  });
-}
-
 async function saveInterruptedRun(repo: RecoveryRepository): Promise<RecoveryCapsule> {
   const laser = useLaserStore.getState();
   const prepared = await prepareCurrentStartJob(
@@ -185,7 +153,7 @@ async function saveInterruptedRun(repo: RecoveryRepository): Promise<RecoveryCap
 beforeEach(() => {
   localStorage.clear();
   resetStore();
-  configureReadyCncRecovery();
+  configureReadyCncRecovery(recoveryProject());
   vi.mocked(jobAwareAlert).mockClear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
 });
@@ -396,5 +364,37 @@ describe('runCncSupervisedRecoveryFlow', () => {
     expect(startJob).not.toHaveBeenCalled();
     expect(repo.getSnapshot().recoveryCapsule?.claim?.attemptId).toBe('other-window-attempt');
     expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('another window'));
+  });
+
+  // Rule 7 / ADR-228 regression pin. `preflight.ok` is false for ANY issue, so
+  // checking it directly refused recovery over heuristic policy findings and
+  // stranded a partially-cut workpiece. Only compile integrity may refuse.
+  it('starts recovery despite a policy-only preflight finding, showing it as a warning', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    await injectPreflightIssue({ code: 'out-of-bed', message: 'X exceeds the bed.' });
+
+    const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
+
+    expect(started).toBe(true);
+    expect(vi.mocked(jobAwareAlert)).not.toHaveBeenCalled();
+    const confirmed = vi.mocked(jobAwareConfirm).mock.calls.map(([m]) => String(m));
+    expect(confirmed.some((m) => m.includes('X exceeds the bed.'))).toBe(true);
+  });
+
+  it('still refuses recovery on a compile-integrity failure', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    await injectPreflightIssue({ code: 'empty-output', message: 'No cuts.' });
+
+    const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
+
+    expect(started).toBe(false);
+    expect(startJob).not.toHaveBeenCalled();
+    expect(vi.mocked(jobAwareAlert).mock.calls[0]?.[0] ?? '').toContain('No cuts.');
   });
 });

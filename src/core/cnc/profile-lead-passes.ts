@@ -42,10 +42,14 @@ export function applyProfileLeadPasses(
   bed: MachineBounds,
 ): ReadonlyArray<CncPass> {
   if (settings.rampEntryDeg !== undefined) return passes; // ramp owns the entry
-  // Tabs split the loop into open segments; a lead on the surviving full loops
-  // while the split passes still plunge on the wall would be inconsistent, so a
-  // tabbed profile keeps the legacy entry. Tab-aware leads are a follow-up.
-  if (settings.tabsEnabled) return passes;
+  // ADR-258 removed the `tabsEnabled` early return that used to live here. Under
+  // the split tab model a tabbed loop became open pieces that each replunged on
+  // the wall, so leading only the surviving full loops was inconsistent and leads
+  // were disabled outright. Tabs are now a Z-rise inside ONE continuous path
+  // (cnc-tab-ramp.ts), so a tabbed profile keeps exactly one entry and leads apply
+  // to it normally. Deep tabbed passes arrive here as path3d and are skipped by the
+  // `pass.kind !== 'contour'` test below; the shallower full-loop contour passes
+  // (including the pass at the tab top) still get their lead.
   const baseSide = leadSide(settings.cutType);
   const options = resolveProfileLeadOptions(settings.profileLead, toolDiameterMm);
   if (baseSide === null || options === null) return passes;

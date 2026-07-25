@@ -13,8 +13,11 @@ import {
 import type { CncContourPass, CncGroup, CncPass } from '../job';
 import { compileCncJob } from './compile-cnc-job';
 
-// compileCncJob only ever produces contour passes today (path3d arrives with
-// relief finishing / ramps); tests narrow through this to read zMm/polyline.
+// Narrows to a contour pass to read zMm/polyline. compileCncJob also produces
+// path3d passes — relief finishing, ramps, ADR-250 leads, and ADR-258 tabbed
+// passes — so tests using this must first put the layer in a state that yields
+// plain contours (leads off, tabs off). Tab behavior lives in
+// compile-cnc-tabs.test.ts.
 function contourPass(pass: CncPass): CncContourPass {
   if (pass.kind !== 'contour') throw new Error('expected a contour pass');
   return pass;
@@ -49,8 +52,15 @@ function squareObject(id: string, color: string, size: number, at = 50): Importe
   };
 }
 
+// Tabs default ON since ADR-258, which turns a deep profile pass into a path3d
+// Z-rise. Most tests here are about the depth ladder, ring closure or finish
+// geometry rather than tabs, so the helper opts out by default and the tab tests
+// pass `tabsEnabled: true` explicitly.
 function cncLayer(id: string, color: string, cnc: Partial<CncLayerSettings>): Layer {
-  return { ...createLayer({ id, color }), cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...cnc } };
+  return {
+    ...createLayer({ id, color }),
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: false, ...cnc },
+  };
 }
 
 function sceneWith(layers: Layer[], objects: ImportedSvg[]): Scene {
@@ -170,57 +180,6 @@ describe('compileCncJob', () => {
       const last = polyline[polyline.length - 1];
       expect(first).toEqual(last);
     }
-  });
-
-  it('splits deep profile passes into tab segments', () => {
-    const scene = sceneWith(
-      [
-        cncLayer('L1', '#ff0000', {
-          cutType: 'profile-outside',
-          depthMm: 6,
-          depthPerPassMm: 2,
-          tabsEnabled: true,
-          tabHeightMm: 2,
-          tabWidthMm: 6,
-          tabsPerShape: 4,
-        }),
-      ],
-      [squareObject('O1', '#ff0000', 40)],
-    );
-    const group = onlyGroup(scene);
-    // Tab top sits at -(6-2) = -4: passes at -2 and -4 cut full loops,
-    // the -6 pass splits into 4 open segments between tabs.
-    const fullLoops = group.passes.filter((pass) => pass.closed);
-    const tabbed = group.passes.filter((pass) => !pass.closed);
-    expect(fullLoops).toHaveLength(2);
-    expect(tabbed).toHaveLength(4);
-    expect(new Set(tabbed.map((pass) => contourPass(pass).zMm))).toEqual(new Set([-6]));
-  });
-
-  it('inserts a full-loop pass at the exact tab top so tabs are the requested height', () => {
-    // Single-pass through-cut: without a pass at the tab top, the only pass
-    // is tabbed and the "tabs" are full stock thickness (the tab windows are
-    // simply never cut). The ladder must gain a full loop at -(depth-tab).
-    const scene = sceneWith(
-      [
-        cncLayer('L1', '#ff0000', {
-          cutType: 'profile-outside',
-          depthMm: 3,
-          depthPerPassMm: 3,
-          tabsEnabled: true,
-          tabHeightMm: 1,
-          tabWidthMm: 6,
-          tabsPerShape: 4,
-        }),
-      ],
-      [squareObject('O1', '#ff0000', 40)],
-    );
-    const group = onlyGroup(scene);
-    const fullLoops = group.passes.filter((pass) => pass.closed);
-    const tabbed = group.passes.filter((pass) => !pass.closed);
-    expect(fullLoops.map((pass) => contourPass(pass).zMm)).toEqual([-2]);
-    expect(tabbed).toHaveLength(4);
-    expect(new Set(tabbed.map((pass) => contourPass(pass).zMm))).toEqual(new Set([-3]));
   });
 
   it('compiles v-carve as a clearing group ordered before profiles (H.3)', () => {
@@ -372,45 +331,6 @@ describe('compileCncJob', () => {
     );
     expect(finishing).toHaveLength(1);
     expect(finishing[0]?.closed).toBe(true);
-  });
-
-  it('keeps holding tabs on the finishing pass so the part is not fully severed', () => {
-    const allowanceMm = 2;
-    const group = onlyGroup(
-      sceneWith(
-        [
-          cncLayer('L1', '#ff0000', {
-            cutType: 'profile-outside',
-            depthMm: 6,
-            depthPerPassMm: 2,
-            finishAllowanceMm: allowanceMm,
-            tabsEnabled: true,
-            tabHeightMm: 2,
-            tabWidthMm: 6,
-            tabsPerShape: 4,
-          }),
-        ],
-        [squareObject('O1', '#ff0000', 40)],
-      ),
-    );
-    // Passes are in machine coordinates, so derive the shape center from the
-    // overall bounding box (the inflated roughing extent). Every roughing pass
-    // reaches that extent; every true-contour finishing pass reaches one
-    // allowance short of it — a clean offset/scale-invariant classifier.
-    const pts = group.passes.flatMap((pass) => contourPass(pass).polyline);
-    const cx = (Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2;
-    const cy = (Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2;
-    const reach = (pass: CncPass) =>
-      Math.max(
-        ...contourPass(pass).polyline.map((p) => Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy))),
-      );
-    const roughReach = Math.max(...group.passes.map(reach));
-    const finishing = group.passes.filter((pass) => reach(pass) <= roughReach - allowanceMm / 2);
-    // The true-contour finishing loop is split into multiple OPEN segments —
-    // the tab gaps that keep the part attached — all at full depth.
-    expect(finishing.length).toBeGreaterThan(1);
-    expect(finishing.every((pass) => !pass.closed)).toBe(true);
-    expect(finishing.every((pass) => Math.abs(contourPass(pass).zMm + 6) < 1e-9)).toBe(true);
   });
 
   it('drops engrave polylines with non-finite points instead of compiling NaN passes', () => {

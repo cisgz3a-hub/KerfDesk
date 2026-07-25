@@ -37,6 +37,7 @@ import {
   streamCncRecoveryProgram,
   type CncRecoveryStreamPlan,
 } from './cnc-supervised-recovery-stream';
+import { partitionEmitPreflight } from './start-job-readiness-policy';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
 type PlannedPassRecovery = Omit<CncRecoveryStreamPlan, 'executionEvidence'> & {
@@ -135,17 +136,25 @@ function planPassRecovery(
         : { preflightMotionOffset: source.preflightMotionOffset }),
     },
   );
-  if (!emitted.preflight.ok) {
-    const messages = emitted.preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
+  // Rule 7 / ADR-228: only a compile-integrity failure may refuse recovery.
+  // `preflight.ok` is false for ANY issue (core/preflight/preflight.ts), so
+  // checking it directly refused recovery over heuristic policy findings —
+  // out-of-bed, no-go-zone, plunged travel, speed range — and stranded a
+  // partially-cut workpiece. Those are demoted into the warnings the operator
+  // confirms, which also archives them in the run's provenance record.
+  const emitSplit = partitionEmitPreflight(emitted.preflight);
+  if (emitSplit.blocking.length > 0) {
+    const messages = emitSplit.blocking.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start CNC recovery:\n\n${messages}`);
     return null;
   }
-  if (!confirmWarnings(source.warnings)) return null;
+  const warnings = [...source.warnings, ...emitSplit.warnings];
+  if (!confirmWarnings(warnings)) return null;
   if (!confirmPlan(review, resume)) return null;
   return passRecoveryStreamPlan(
     capsule,
     review,
-    source,
+    { ...source, warnings },
     resume,
     emitted.gcode,
     resumePoint,

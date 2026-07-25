@@ -972,9 +972,11 @@ and action groups instead of shrinking the controls below their minimum target s
    (`$32=1`), because feed hold alone can leave laser output asserted.
 2. Software Abort requests the controller-specific reset/de-energize path but cannot guarantee delivery or physical beam-off. Use the machine's physical E-stop or power isolation when unsafe.
 
-#### Exempt — CNC / router jobs
-1. A CNC (router) job pauses with `!` without the `$32` proof: feed hold with a spinning spindle is standard sender behavior, and a router runs `$32=0`. Demanding the laser proof would block CNC pause outright.
-2. The pause warning states that generic CNC continuation is not available; Pause is a controlled hold that routes to software Abort and supervised manual recovery.
+#### Exempt — CNC / router jobs (ADR-180 amendment 2)
+1. A CNC (router) job pauses with the **safety-door byte** (`0x84`), the same path a laser uses — not a bare feed hold. GRBL's Door state decelerates the machine **in place** and de-energizes spindle and coolant, so the spindle stops. Position is kept; nothing jogs or repositions.
+2. The `$32` proof is **not** required. It is a laser-only concern (a hold at `$32=0` can leave the beam asserted); a router runs `$32=0` and demanding the proof would block CNC pause outright.
+3. Pause holds the transition open until a fresh same-session report proves a **settled Door state**. Accessory (`A:`) proof of spindle-off is required for **laser only**: GRBL omits `A:` when nothing is energized and emits `Ov:` only periodically, so demanding the field on CNC would time out and fail-dark a job that stopped correctly. A settled Door state is itself the controller reporting spindle and coolant off.
+4. The pause copy states that motion stopped in place, the spindle is off, and the job can be resumed. ABORT JOB and the physical E-stop remain the answer when the cutter is unsafe.
 
 #### Degraded — controller with no realtime hold (e.g. Marlin)
 1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console directs the operator to request **ABORT**, or use the physical E-stop when unsafe.
@@ -985,10 +987,12 @@ and action groups instead of shrinking the controls below their minimum target s
    `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
 3. Only after that proof does the streamer resume and send more G-code.
 
-#### Success — generic CNC resume (ADR-180 amendment)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry a spindle-check advisory: confirm the spindle is still spinning and the cutter is clear before continuing; if the spindle stopped during the hold, Abort instead and start a newly reviewed recovery job.
-2. On Resume the store writes realtime `~` and refills the stream — the same branch a laser controller without a safety door uses. Feed hold keeps the spindle commanded, so cycle-start continues the job (matching LightBurn and every GRBL sender).
-3. The advisory informs but never gates (ADR-180 amendment / rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
+#### Success — generic CNC resume (ADR-180 amendment 2)
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits for it to reach speed, then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming.
+2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues.
+3. **No retract.** `PARKING_ENABLE` is commented out in stock GRBL, and its `PARKING_TARGET` is a *machine coordinate* — meaningless on a no-homing router. A host-side lift is deliberately not built: it would require abandoning the door hold for a drain-to-Idle pause, reintroducing a re-entry seam. If a lift is wanted, it is a firmware setting.
+4. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
+5. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
 
 ### F-B8. Software Abort / Controller Reset
 
@@ -3374,14 +3378,22 @@ and lifts the command's CNC-only gate.)*
 
 > Amended 2026-07-24 (ADR-180 amendment / rule 7). The former refusal is withdrawn:
 > same-session CNC Resume is one-click, and the spindle concern is an advisory, not a block.
+>
+> Amended again 2026-07-25 (ADR-180 amendment 2). Pause no longer leaves the spindle
+> turning: it uses the safety-door byte, so the controller stops in place and cuts the
+> spindle. Resume restarts it, waits for spin-up, and continues the same line.
 
 #### Success - one-click resume
-1. **Pause** sends realtime feed hold and stops refilling the controller stream —
-   the first controlled response when continuing motion would be unsafe. Feed hold
-   keeps the spindle commanded.
-2. **Resume** is enabled. The store writes realtime cycle-start `~` and refills the
-   stream (the same branch a laser controller without a safety door uses). The
-   paused UI carries a spindle-check advisory beside the enabled button.
+1. **Pause** sends the realtime **safety-door byte** (`0x84`) and stops refilling the
+   controller stream. GRBL decelerates **in place** and de-energizes spindle and
+   coolant — the machine stops and the spindle stops, with position kept. Nothing
+   jogs or repositions.
+2. **Resume** is enabled. The store writes realtime cycle-start `~`, waits for a fresh
+   report proving `Run` or `Idle`, then refills the stream. GRBL restores spindle and
+   coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s stock) so the
+   cutter is at speed before the interrupted move continues — same G-code line, same
+   point. There is **no retract**: `PARKING_ENABLE` is off in stock GRBL, so the bit
+   spins back up still engaged in the cut. The paused UI says so.
 
 #### Edge - spindle may have stopped during the hold
 1. A safety-door transition, spindle-stop override, VFD fault, pendant, or other
@@ -4270,23 +4282,27 @@ Preview accepts only the strict ECMAScript pattern
 stable, leading-zero, lightweight, and malformed tags fail closed. Preview
 publishing never mutates the stable R2 feed or its metadata.
 
-**Workflow cutover and later stable activation (state updated 2026-07-22):** historical
-workflow ID `308419274` is now `disabled_manually`, the `desktop-production`
-environment does not yet exist, and the repository currently has only the legacy
-`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secret names and no CSC secrets.
-This PR is not merge-safe until the remaining unchecked pre-merge step is
-completed and recorded:
+**Workflow cutover and later stable activation (state updated 2026-07-25):** historical
+workflow ID `308419274` is now `deleted`, the `desktop-production`
+environment deliberately does not yet exist (step 4), and the repository holds
+only the `PAGES_CLOUDFLARE_API_TOKEN` / `PAGES_CLOUDFLARE_ACCOUNT_ID` secret
+names and no CSC secrets. The cutover merged; steps 1–3 and 7 are completed and
+recorded below, and only step 4 remains deliberately open:
 
-1. [ ] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
-   `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Do not delete the
-   legacy names yet because current main still consumes them.
+1. [x] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
+   `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Completed
+   2026-07-22; both names exist (the legacy names were later deleted under
+   step 3).
 2. [x] `gh workflow disable 308419274` completed and the historical workflow is
    verified `disabled_manually`; this deliberately pauses the old stable/manual
-   lane during cutover and is reversible.
-3. [ ] Merge only after exact-head CI passes. Wait for the first main Pages deploy to
+   lane during cutover and is reversible. The workflow has since been removed
+   outright (API state `deleted`, file gone from the tree).
+3. [x] Merge only after exact-head CI passes. Wait for the first main Pages deploy to
    succeed through the new names, then delete legacy `CLOUDFLARE_API_TOKEN`,
    `CLOUDFLARE_ACCOUNT_ID`, `CSC_LINK`, and `CSC_KEY_PASSWORD` repo names if
-   present.
+   present. Completed 2026-07-25: main Pages deploys succeed via the `PAGES_*`
+   names, both legacy Cloudflare names were deleted, and no `CSC_*` repo
+   secrets existed.
 4. [ ] Only when a future signed stable release is deliberately authorized, create
    the protected `desktop-production` environment and add
    `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
@@ -4298,9 +4314,12 @@ completed and recorded:
    token cannot read repository Administration settings, so the maintainer must
    re-check this setting before each tag; publication then verifies the release
    attestation and `immutable:true` result.
-7. [ ] Before the first Preview tag, enable repository rules that prevent direct
+7. [x] Before the first Preview tag, enable repository rules that prevent direct
    or forced changes to `main` and restrict `v*` tag creation/update/deletion to
-   the release maintainer. The workflow independently requires the tagged commit
+   the release maintainer. Completed and verified 2026-07-25: active rulesets
+   "Protect main branch" and "Protect release tags" (`refs/tags/v*` creation,
+   update, deletion, and non-fast-forward restricted to the release
+   maintainer). The workflow independently requires the tagged commit
    to be in current `main` history and re-resolves the remote annotated tag
    immediately before draft creation and publication.
 
@@ -4512,6 +4531,24 @@ validation must be supervised without cutting load.
 4. Program Health lists findings (severity info / notice / warning, count,
    first line, click-to-jump). The panel header states: "Findings inform.
    Nothing here blocks Frame, Start, or export."
+
+#### Success — G-code as a main-canvas view
+
+1. The canvas carries a **Design / G-code 3D** switch (top-left). Choosing
+   **G-code 3D** replaces the design canvas with the 3D view of the program
+   this project compiles to — the same viewer the file Inspector uses.
+2. It compiles on entry and on **Refresh**, not on every edit. After the
+   design changes, the view marks itself **Design changed** so what is on
+   screen is never silently stale.
+3. The switch stays available **during a job**: watching the running program
+   is the point. The view only reads — it never writes, streams, or advances
+   variable text.
+4. Choosing **Design** returns to the canvas with the artwork untouched.
+
+#### Empty — nothing to compile
+
+1. A project with no artwork shows "This design produces no G-code yet."
+   in the G-code view; the switch still works both ways.
 
 #### Error — unreadable program
 

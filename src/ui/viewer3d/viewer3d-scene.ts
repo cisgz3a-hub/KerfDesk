@@ -11,7 +11,6 @@ import type { LineMaterial as LineMaterialType } from 'three/examples/jsm/lines/
 import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.js';
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
-import type * as OrbitControlsModule from 'three/examples/jsm/controls/OrbitControls.js';
 import type { AxisBounds } from '../../core/gcode-view';
 import {
   buildSegmentBuckets,
@@ -19,6 +18,14 @@ import {
   type SegmentBuckets,
   type Viewer3dSegmentsInput,
 } from './segment-buckets';
+import { cameraPlacement, type CameraPreset } from './camera-presets';
+import {
+  createCameraRig,
+  startRenderer,
+  type CameraRig,
+  type OrbitControlsCtor,
+} from './scene-setup';
+import { createMarkers, disposeMarkers, sizeMarkers, type MarkerMesh } from './scene-markers';
 import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
 
@@ -38,6 +45,28 @@ export type Viewer3dSceneHandle = {
   readonly setTravelVisible: (visible: boolean) => void;
   /** Reveal up to the playhead and place the tool marker (null = show all). */
   readonly setPlayhead: (playhead: PlayheadMarker | null) => void;
+  /**
+   * Where the MACHINE actually is, from controller status (null hides it).
+   * Drawn distinctly from the playback marker: one is a simulation, the
+   * other is a live report, and confusing them would be dangerous.
+   */
+  readonly setLiveMachine: (
+    point: { readonly x: number; readonly y: number; readonly z: number } | null,
+  ) => void;
+  /**
+   * Recolour the drawn moves from a render-model-segment → rgb function.
+   * Rewrites the existing colour attribute only — no geometry rebuild — so
+   * switching data lenses is free (ADR-255 §11 R2).
+   */
+  readonly recolor: (colorOf: (segmentIndex: number) => readonly [number, number, number]) => void;
+  /** Snap to a standard view (Top / Front / Right / Iso) framed on the job. */
+  readonly setView: (preset: CameraPreset) => void;
+  /**
+   * PNG data URL of the current frame. Renders and reads back in the SAME
+   * task: without preserveDrawingBuffer the buffer is cleared at composite,
+   * so a deferred read returns a blank image.
+   */
+  readonly captureImage: () => string;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
   readonly dispose: () => void;
@@ -47,13 +76,8 @@ export type Viewer3dSceneResult =
   | { readonly kind: 'ok'; readonly handle: Viewer3dSceneHandle }
   | { readonly kind: 'no-webgl'; readonly reason: string };
 
-const MAX_PIXEL_RATIO = 2;
-const CAMERA_FOV_DEG = 40;
 const TRAVEL_OPACITY = 0.45;
 const FAT_LINE_PX = 2.5;
-const MARKER_RADIUS_FRACTION = 0.012;
-const MARKER_MIN_RADIUS_MM = 0.4;
-const MARKER_COLOR = 0xffffff;
 
 type ThreeModule = typeof ThreeNamespace;
 
@@ -122,7 +146,7 @@ type SceneHandleDeps = {
 // traversal visibility, view size) behind the handle's function surface.
 function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   const { modules, theme, renderer, scene, toolpathGroup, furnitureGroup } = deps;
-  const { three, LineSegments2, LineSegmentsGeometry, LineMaterial } = modules;
+  const { three } = modules;
   const { camera, controls, render } = deps.rig;
 
   // Fat-line materials size their strokes against the drawing buffer, so the
@@ -133,42 +157,39 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   let travelObject: Object3D | null = null;
   let travelVisible = true;
   let reveal: RevealTargets | null = null;
-  const marker = createMarker(three);
-  marker.visible = false;
-  scene.add(marker);
+  let lastBounds: AxisBounds | null = null;
+  const markers = createMarkers(three, scene);
+  const { marker, liveMarker } = markers;
 
   return {
     setSegments: (segments) => {
-      disposeChildren(toolpathGroup);
-      const built = buildToolpathObjects({
-        three,
-        LineSegments2,
-        LineSegmentsGeometry,
-        LineMaterial,
+      const built = rebuildToolpath(toolpathGroup, {
+        ...modules,
         segments,
         theme,
         viewWidth,
         viewHeight,
         travelVisible,
       });
-      fatMaterial = built.fatMaterial;
-      travelObject = built.travelObject;
+      ({ fatMaterial, travelObject } = built);
       reveal = built.reveal;
-      for (const object of built.objects) toolpathGroup.add(object);
-      sizeMarker(marker, segments);
+      sizeMarkers(markers, segments);
+      render();
+    },
+    recolor: (colorOf) => {
+      if (applyRecolor(reveal, colorOf)) render();
+    },
+    setLiveMachine: (point) => {
+      placeMarker(liveMarker, point);
       render();
     },
     setPlayhead: (playhead) => {
       applyReveal(reveal, playhead);
-      if (playhead?.point == null) {
-        marker.visible = false;
-      } else {
-        marker.visible = true;
-        marker.position.set(playhead.point.x, playhead.point.y, playhead.point.z);
-      }
+      placeMarker(marker, playhead?.point ?? null);
       render();
     },
     fitToBounds: (bounds) => {
+      lastBounds = bounds;
       disposeChildren(furnitureGroup);
       for (const object of buildFurniture(three, bounds, theme)) {
         furnitureGroup.add(object);
@@ -181,14 +202,19 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       if (travelObject !== null) travelObject.visible = visible;
       render();
     },
+    setView: (preset) => {
+      applyView(camera, controls, cameraPlacement(preset, lastBounds));
+      render();
+    },
+    captureImage: () => {
+      render();
+      return renderer.domElement.toDataURL('image/png');
+    },
     resize: (nextWidth, nextHeight) => {
       if (nextWidth <= 0 || nextHeight <= 0) return;
       viewWidth = nextWidth;
       viewHeight = nextHeight;
-      renderer.setSize(nextWidth, nextHeight, false);
-      camera.aspect = nextWidth / nextHeight;
-      camera.updateProjectionMatrix();
-      fatMaterial?.resolution.set(nextWidth, nextHeight);
+      applyResize({ renderer, camera, fatMaterial }, nextWidth, nextHeight);
       render();
     },
     requestRender: render,
@@ -197,39 +223,74 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       controls.dispose();
       disposeChildren(toolpathGroup);
       disposeChildren(furnitureGroup);
-      scene.remove(marker);
-      marker.geometry.dispose();
-      marker.material.dispose();
+      disposeMarkers(scene, markers);
       renderer.dispose();
     },
   };
 }
 
-// A small emissive ball at the interpolated head position: readable against
-// both cuts and rapids, and tool-shape-agnostic (an external program carries
-// no tool record). Stage 12+ swaps in a LatheGeometry profile when the tool
-// is known.
-function createMarker(
-  three: ThreeModule,
-): ThreeNamespace.Mesh<ThreeNamespace.SphereGeometry, ThreeNamespace.MeshBasicMaterial> {
-  return new three.Mesh(
-    new three.SphereGeometry(1, 16, 12),
-    new three.MeshBasicMaterial({ color: MARKER_COLOR }),
-  );
+// Swap the drawn toolpath: dispose what was there, build the new batches,
+// mount them. Disposal first — the old buffers are dead the moment the
+// program changes.
+function rebuildToolpath(
+  group: Object3D,
+  args: ToolpathBuildArgs,
+): ReturnType<typeof buildToolpathObjects> {
+  disposeChildren(group);
+  const built = buildToolpathObjects(args);
+  for (const object of built.objects) group.add(object);
+  return built;
 }
 
-// Scale the marker to the job so it reads at any program size.
-function sizeMarker(marker: ThreeNamespace.Object3D, segments: Viewer3dSegments): void {
-  let span = 0;
-  for (let index = 0; index < segments.segmentCount * 6; index += 3) {
-    span = Math.max(span, Math.abs(segments.positions[index] ?? 0));
-  }
-  const radius = Math.max(MARKER_MIN_RADIUS_MM, span * MARKER_RADIUS_FRACTION);
-  marker.scale.setScalar(radius);
+// Point the camera at a standard view and re-target the orbit controls.
+function applyView(
+  camera: PerspectiveCamera,
+  controls: { target: { set: (x: number, y: number, z: number) => void }; update: () => void },
+  view: ReturnType<typeof cameraPlacement>,
+): void {
+  camera.up.set(view.up.x, view.up.y, view.up.z);
+  camera.position.set(view.position.x, view.position.y, view.position.z);
+  controls.target.set(view.target.x, view.target.y, view.target.z);
+  camera.lookAt(view.target.x, view.target.y, view.target.z);
+  controls.update();
+}
+
+// Fat-line materials size their strokes against the drawing buffer, so the
+// material's resolution has to track the canvas.
+function applyResize(
+  parts: {
+    readonly renderer: WebGLRenderer;
+    readonly camera: PerspectiveCamera;
+    readonly fatMaterial: LineMaterialType | null;
+  },
+  width: number,
+  height: number,
+): void {
+  parts.renderer.setSize(width, height, false);
+  parts.camera.aspect = width / height;
+  parts.camera.updateProjectionMatrix();
+  parts.fatMaterial?.resolution.set(width, height);
+}
+
+// Show a marker at a point, or hide it when there is nothing to show.
+function placeMarker(
+  mesh: MarkerMesh,
+  point: { readonly x: number; readonly y: number; readonly z: number } | null,
+): void {
+  mesh.visible = point !== null;
+  if (point !== null) mesh.position.set(point.x, point.y, point.z);
 }
 
 type RevealTargets = {
-  readonly solid: { readonly geometry: { instanceCount: number }; readonly total: number } | null;
+  readonly solid: {
+    // Narrow structural type rather than the addon class: only the instance
+    // count (reveal) and colour upload (lenses) are ever touched.
+    readonly geometry: {
+      instanceCount: number;
+      setColors: (colors: Float32Array) => unknown;
+    };
+    readonly total: number;
+  } | null;
   readonly solidSource: Uint32Array;
   readonly travel: {
     readonly geometry: ThreeNamespace.BufferGeometry;
@@ -237,6 +298,28 @@ type RevealTargets = {
   } | null;
   readonly travelSource: Uint32Array;
 };
+
+// Rewrites the solid batch's colour attribute in place from a render-model
+// segment → rgb function. Returns whether anything was repainted.
+function applyRecolor(
+  targets: RevealTargets | null,
+  colorOf: (segmentIndex: number) => readonly [number, number, number],
+): boolean {
+  if (targets?.solid == null) return false;
+  const source = targets.solidSource;
+  const colors = new Float32Array(source.length * 6);
+  for (let entry = 0; entry < source.length; entry += 1) {
+    const rgb = colorOf(source[entry] ?? 0);
+    for (let end = 0; end < 2; end += 1) {
+      const at = entry * 6 + end * 3;
+      colors[at] = rgb[0];
+      colors[at + 1] = rgb[1];
+      colors[at + 2] = rgb[2];
+    }
+  }
+  targets.solid.geometry.setColors(colors);
+  return true;
+}
 
 // Reveal by draw count only — no buffer reallocation. Fat lines are instanced
 // (one instance per segment), thin lines use setDrawRange over vertex pairs.
@@ -254,73 +337,6 @@ function applyReveal(targets: RevealTargets | null, playhead: PlayheadMarker | n
       : revealCount(targets.travelSource, playhead.segmentIndex);
     targets.travel.geometry.setDrawRange(0, count * 2);
   }
-}
-
-// WebGL context creation is the one failure mode this module tolerates: jsdom
-// and WebGL-less browsers get a typed fallback instead of a throw.
-function startRenderer(
-  three: ThreeModule,
-  canvas: HTMLCanvasElement,
-  theme: Viewer3dTheme,
-):
-  | {
-      readonly kind: 'ok';
-      readonly renderer: WebGLRenderer;
-      readonly width: number;
-      readonly height: number;
-    }
-  | { readonly kind: 'no-webgl'; readonly reason: string } {
-  let renderer: WebGLRenderer;
-  try {
-    renderer = new three.WebGLRenderer({ canvas, antialias: true });
-  } catch (err) {
-    return {
-      kind: 'no-webgl',
-      reason: err instanceof Error ? err.message : 'WebGL is unavailable in this browser.',
-    };
-  }
-  // HiDPI-correct output — the single most visible quality defect of the
-  // pre-ADR-255 scene was rendering at CSS-pixel resolution.
-  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, MAX_PIXEL_RATIO));
-  const width = canvas.clientWidth || canvas.width;
-  const height = canvas.clientHeight || canvas.height;
-  renderer.setSize(width, height, false);
-  renderer.setClearColor(theme.background);
-  return { kind: 'ok', renderer, width, height };
-}
-
-type OrbitControlsCtor = typeof OrbitControlsModule.OrbitControls;
-
-type CameraRig = {
-  readonly camera: PerspectiveCamera;
-  readonly controls: InstanceType<OrbitControlsCtor>;
-  readonly render: () => void;
-};
-
-// Z-up perspective camera + orbit controls, wired to render on demand (no rAF
-// loop — the scene only redraws on interaction, resize, or data change).
-function createCameraRig(
-  three: ThreeModule,
-  OrbitControls: OrbitControlsCtor,
-  deps: {
-    readonly renderer: WebGLRenderer;
-    readonly scene: ThreeNamespace.Scene;
-    readonly canvas: HTMLCanvasElement;
-    readonly width: number;
-    readonly height: number;
-  },
-): CameraRig {
-  const camera = new three.PerspectiveCamera(
-    CAMERA_FOV_DEG,
-    deps.width / deps.height,
-    0.1,
-    100_000,
-  );
-  camera.up.set(0, 0, 1); // Z-up: the program's own frame
-  const controls = new OrbitControls(camera, deps.canvas);
-  const render = (): void => deps.renderer.render(deps.scene, camera);
-  controls.addEventListener('change', render);
-  return { camera, controls, render };
 }
 
 type ToolpathBuildArgs = {

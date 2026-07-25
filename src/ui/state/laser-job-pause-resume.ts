@@ -46,6 +46,12 @@ const PAUSE_CONFIRMATION_TIMEOUT_MESSAGE =
   'Pause did not complete within the controller safety deadline. KerfDesk froze the stream and requested a fail-dark controller reset; use physical E-stop if the machine did not stop.';
 const RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
   'Resume did not complete within the controller safety deadline. KerfDesk froze the stream and requested a fail-dark controller reset; use physical E-stop if the machine state is uncertain.';
+// ADR-180 amendment 3 (2026-07-25): a CNC confirmation timeout must not escalate
+// to a fail-dark reset, so its copy must not claim one was requested.
+const CNC_PAUSE_CONFIRMATION_TIMEOUT_MESSAGE =
+  'Pause did not confirm within the controller safety deadline. The stream is frozen and the job is kept — no controller reset was requested. Check the machine; use ABORT JOB or the physical E-stop if the spindle or cutter is unsafe.';
+const CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
+  'Resume did not confirm within the controller safety deadline. The job is kept and the stream stays frozen — no controller reset was requested. Press Resume again, or use ABORT JOB if the machine state is uncertain.';
 
 export async function runConfirmedPauseJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
@@ -77,7 +83,7 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   await runOwnedPauseResumeTransition(
     context,
     'pause',
-    PAUSE_CONFIRMATION_TIMEOUT_MESSAGE,
+    laserJob ? PAUSE_CONFIRMATION_TIMEOUT_MESSAGE : CNC_PAUSE_CONFIRMATION_TIMEOUT_MESSAGE,
     async (token) => {
       freezeStreamer(context);
       if (safetyDoor !== null) {
@@ -107,6 +113,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   // for SAFETY_DOOR_SPINDLE_DELAY (4.0s stock) so the cutter is back at speed
   // before the interrupted move continues.
   const activeDriver = context.driver();
+  const laserJob = context.get().activeJobMachineKind !== 'cnc';
   const confirmedDoorResume = activeDriver.realtime.safetyDoor !== null;
   const controlSession = context.get().controllerSessionEpoch;
   const resumeByte = activeDriver.realtime.resume;
@@ -114,7 +121,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   await runOwnedPauseResumeTransition(
     context,
     'resume',
-    RESUME_CONFIRMATION_TIMEOUT_MESSAGE,
+    laserJob ? RESUME_CONFIRMATION_TIMEOUT_MESSAGE : CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE,
     async (token) => {
       if (resumeByte !== null && confirmedDoorResume) {
         await sendRealtimeAndConfirm(
@@ -163,7 +170,13 @@ async function runOwnedPauseResumeTransition(
     completePauseResumeTransition(context.refs, owner.token);
     const failure = recordConfirmationFailure(context, error);
     cancelFreshControllerStatusWait(context.refs, failure.message);
-    if (!failDarkAlreadyOwned) requestFailDarkStop(context);
+    // ADR-180 amendment 3 (2026-07-25): only a laser escalates to a fail-dark
+    // reset. On a laser a stuck-on beam is the hazard, so resetting the
+    // controller is the correct response (ADR-179). On a router the Door state
+    // has already de-energized the spindle, and a soft reset would destroy a
+    // recoverable job — turning a missed confirmation into a scrapped workpiece.
+    // The notice still surfaces; the stream stays frozen; the operator decides.
+    if (!failDarkAlreadyOwned) recordPauseResumeStall(context);
     throw failure;
   }
 }
@@ -178,8 +191,9 @@ async function writeWhileTransitionOwner(
   assertPauseResumeTransitionOwner(context.refs, token);
 }
 
-function requestFailDarkStop(context: PauseResumeContext): void {
+function recordPauseResumeStall(context: PauseResumeContext): void {
   context.set((state) => ({ safetyNotice: state.safetyNotice ?? streamStalledNotice() }));
+  if (context.get().activeJobMachineKind === 'cnc') return;
   void context.failDarkStop().catch(() => undefined);
 }
 

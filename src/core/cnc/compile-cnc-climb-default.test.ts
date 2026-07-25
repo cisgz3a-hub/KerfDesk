@@ -60,7 +60,11 @@ describe('climb default (ADR-251)', () => {
       // pass; this isolates the climb winding of the default settings.
       cnc: {
         ...DEFAULT_CNC_LAYER_SETTINGS,
+        // ADR-256 on main made the default cut type On path, so climb needs an
+        // explicit profile cut; ADR-258 made tabs default on, which would turn the
+        // deep pass into a path3d and hide the contour winding under test.
         cutType: 'profile-outside',
+        tabsEnabled: false,
         profileLead: { shape: 'none' },
       },
     };

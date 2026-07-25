@@ -1,14 +1,25 @@
-// InspectorTimeline — playback transport under the 3D view (ADR-255 stage 5):
-// restart / step / play-pause / step / speed, plus a route scrubber. The
-// readout shows distance today; stage 8 adds planner-true elapsed time.
+// InspectorTimeline — playback transport under the 3D view (ADR-255 stage 5;
+// time-true since stage 8b): restart / step / play-pause / step / speed, plus
+// a scrubber. The readout is planner seconds, so 1× runs at machine pace.
 
 import type { PlaybackState } from './use-inspector-playback';
 
 const SPEEDS: ReadonlyArray<number> = [0.25, 0.5, 1, 2, 4, 8];
-const STEP_MM = 1;
+const STEP_SECONDS = 0.25;
+const SECONDS_PER_MINUTE = 60;
+const SCRUB_STEPS = 2000;
+
+/** m:ss for a clock the operator reads at a glance. */
+export function formatClock(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(safe / SECONDS_PER_MINUTE);
+  const rest = safe % SECONDS_PER_MINUTE;
+  return `${minutes}:${rest < 10 ? '0' : ''}${rest}`;
+}
 
 export function InspectorTimeline(props: {
   readonly playback: PlaybackState;
+  /** Program motion time in planner seconds. */
   readonly totalRouteMm: number;
 }): JSX.Element {
   const { playback, totalRouteMm } = props;
@@ -21,8 +32,8 @@ export function InspectorTimeline(props: {
       <button
         type="button"
         className="lf-btn"
-        onClick={() => playback.stepBy(-STEP_MM)}
-        title={`Step back ${STEP_MM} mm`}
+        onClick={() => playback.stepBy(-STEP_SECONDS)}
+        title={`Step back ${STEP_SECONDS} s`}
       >
         ◀
       </button>
@@ -38,8 +49,8 @@ export function InspectorTimeline(props: {
       <button
         type="button"
         className="lf-btn"
-        onClick={() => playback.stepBy(STEP_MM)}
-        title={`Step forward ${STEP_MM} mm`}
+        onClick={() => playback.stepBy(STEP_SECONDS)}
+        title={`Step forward ${STEP_SECONDS} s`}
       >
         ▶|
       </button>
@@ -47,15 +58,15 @@ export function InspectorTimeline(props: {
         type="range"
         min={0}
         max={Math.max(totalRouteMm, 0.001)}
-        step={Math.max(totalRouteMm / 2000, 0.001)}
+        step={Math.max(totalRouteMm / SCRUB_STEPS, 0.001)}
         value={playback.routeMm}
         onChange={(event) => playback.setRouteMm(Number(event.currentTarget.value))}
         style={sliderStyle}
-        title="Scrub to a position in the program"
-        aria-label="Program position"
+        title="Scrub to a moment in the program"
+        aria-label="Program time"
       />
       <span style={readoutStyle}>
-        {playback.routeMm.toFixed(1)} / {totalRouteMm.toFixed(1)} mm ({percent.toFixed(0)}%)
+        {formatClock(playback.routeMm)} / {formatClock(totalRouteMm)} ({percent.toFixed(0)}%)
       </span>
       <label style={speedStyle}>
         Speed

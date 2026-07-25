@@ -41,7 +41,21 @@ export function kernelForTool(tool: CncTool, mmPerCell: number): ToolKernel {
   return { radiusCells, offsets };
 }
 
-function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): number {
+/**
+ * Height of the tool's cutting surface above its lowest point, at a given
+ * radial distance from the axis.
+ *
+ * Exported within core/sim so the drawn tool silhouette (tool-profile.ts) is
+ * generated from the SAME function that stamps material away. Two independent
+ * copies of this maths would let the preview show a ball nose while the
+ * simulation cut a flat bottom.
+ *
+ * @param tool The tool whose cutting surface is being measured.
+ * @param dMm Radial distance from the tool axis, in mm.
+ * @param radiusMm The tool's radius, in mm.
+ * @returns Height above the tool's lowest point, in mm.
+ */
+export function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): number {
   switch (tool.kind) {
     case 'end-mill':
     case 'engraving':

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CncContourPass } from '../job';
+import type { CncContourPass, CncPass } from '../job';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -59,6 +59,20 @@ function contour(pass: unknown): CncContourPass {
   return pass as CncContourPass;
 }
 
+// Depth and X of any pass kind: a tabbed pass is a path3d (ADR-258), a led pass is
+// too (ADR-250), so neither can be read as a contour.
+function passZs(pass: CncPass): ReadonlyArray<number> {
+  if (pass.kind === 'path3d') return pass.points.map((point) => point.z);
+  if (pass.kind === 'contour') return [pass.zMm];
+  return [];
+}
+
+function passXs(pass: CncPass): ReadonlyArray<number> {
+  if (pass.kind === 'path3d') return pass.points.map((point) => point.x);
+  if (pass.kind === 'contour') return pass.polyline.map((point) => point.x);
+  return [];
+}
+
 describe('compileCncJob inlay pair', () => {
   it('cuts a radius-matched pocket before its mirrored tabbed insert', () => {
     const job = compileCncJob(inlayScene(), DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);
@@ -69,13 +83,13 @@ describe('compileCncJob inlay pair', () => {
     expect(female.cutType).toBe('pocket');
     expect(male.cutType).toBe('profile-outside');
     expect(Math.min(...female.passes.map((pass) => contour(pass).zMm))).toBe(-3);
-    expect(Math.min(...male.passes.map((pass) => contour(pass).zMm))).toBe(-6.35);
+    // ADR-258: the male insert is a tabbed profile, so its deep passes are path3d
+    // Z-rises rather than contour passes — read depth and X from either kind.
+    expect(Math.min(...male.passes.flatMap(passZs))).toBe(-6.35);
     const femaleMaxX = Math.max(
       ...female.passes.flatMap((pass) => contour(pass).polyline.map((point) => point.x)),
     );
-    const maleMinX = Math.min(
-      ...male.passes.flatMap((pass) => contour(pass).polyline.map((point) => point.x)),
-    );
+    const maleMinX = Math.min(...male.passes.flatMap(passXs));
     expect(maleMinX).toBeGreaterThan(femaleMaxX);
   });
 

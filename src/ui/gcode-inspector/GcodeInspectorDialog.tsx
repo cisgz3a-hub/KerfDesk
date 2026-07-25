@@ -1,21 +1,11 @@
-// GcodeInspectorDialog — ADR-255 stage 3 skeleton (WORKFLOW.md F-M1): parse
-// the program text into the render model and show it in the shared 3D scene
-// (work coordinates, Z-up, orbit + grid + triad). The timeline, palette
-// lenses, DRO, source pane, and Program Health panels land in stages 4-9.
+// GcodeInspectorDialog — the modal frame around InspectorView (ADR-255,
+// WORKFLOW.md F-M1). Used for opened FILES; the same view also renders
+// inline as a main-canvas mode (CanvasGcodeView).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  buildGcodeRenderModel,
-  findProgramIssues,
-  type GcodeRenderModel,
-} from '../../core/gcode-view';
+import { useMemo } from 'react';
+import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
-import { resolveViewer3dTheme } from '../viewer3d';
-import { InspectorSidebar } from './InspectorSidebar';
-import { InspectorTimeline } from './InspectorTimeline';
-import { playheadAt, routeMmAtLine } from './playhead';
-import { useInspectorPlayback } from './use-inspector-playback';
-import { useViewer3dScene } from './use-viewer3d-scene';
+import { InspectorView } from './InspectorView';
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -28,6 +18,7 @@ export type GcodeInspectorDialogProps = {
 
 export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Element {
   const result = useMemo(() => buildGcodeRenderModel(props.text), [props.text]);
+  const lines = useMemo(() => props.text.split(/\r\n|\n|\r/), [props.text]);
   return (
     <div
       role="dialog"
@@ -50,7 +41,7 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
           </button>
         </header>
         {result.kind === 'ok' ? (
-          <InspectorBody model={result.model} />
+          <InspectorView model={result.model} lines={lines} />
         ) : (
           <p style={messageStyle}>{result.reason}</p>
         )}
@@ -72,58 +63,7 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
   );
 }
 
-function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [travelVisible, setTravelVisible] = useState(true);
-  const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
-  const { model } = props;
-  const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
-  const playback = useInspectorPlayback(model.totalRouteMm);
-  const playhead = useMemo(() => playheadAt(model, playback.routeMm), [model, playback.routeMm]);
-  const findings = useMemo(() => findProgramIssues(model), [model]);
-  // Fully-drawn playhead = show everything, so the scene never hides the tail
-  // segment to floating-point rounding.
-  const atEnd = playback.routeMm >= model.totalRouteMm;
-
-  useEffect(() => {
-    handleRef.current?.setPlayhead(atEnd ? null : playhead);
-  }, [handleRef, playhead, atEnd, state]);
-
-  return (
-    <div style={bodyRowStyle}>
-      <div style={viewColumnStyle}>
-        <div style={viewportStyle}>
-          <canvas ref={canvasRef} style={canvasStyle} />
-          {state === 'no-webgl' ? (
-            <p style={messageStyle}>
-              3D view unavailable: {reason} The program parsed — readouts are live.
-            </p>
-          ) : null}
-        </div>
-        <InspectorTimeline playback={playback} totalRouteMm={model.totalRouteMm} />
-      </div>
-      <InspectorSidebar
-        model={model}
-        theme={theme}
-        playhead={playhead}
-        findings={findings}
-        travelVisible={travelVisible}
-        onTravelVisibleChange={(visible) => {
-          setTravelVisible(visible);
-          handleRef.current?.setTravelVisible(visible);
-        }}
-        onLocateLine={(line) => {
-          // Modal/event lines emit no motion; leave the playhead alone
-          // rather than jumping somewhere arbitrary.
-          const target = routeMmAtLine(model, line);
-          if (target !== null) playback.setRouteMm(target);
-        }}
-      />
-    </div>
-  );
-}
-
-function StatsStrip(props: { readonly model: GcodeRenderModel }): JSX.Element {
+export function StatsStrip(props: { readonly model: GcodeRenderModel }): JSX.Element {
   const { stats, segmentCount, events, unsupportedWords, skippedMotions } = props.model;
   const bounds = stats.motionBounds;
   const size =
@@ -156,7 +96,7 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const panelStyle: React.CSSProperties = {
-  width: 'min(96vw, 1100px)',
+  width: 'min(96vw, 1400px)',
   height: 'min(92vh, 760px)',
   display: 'flex',
   flexDirection: 'column',
@@ -173,31 +113,6 @@ const headerStyle: React.CSSProperties = {
   justifyContent: 'space-between',
   padding: '8px 12px',
   borderBottom: '1px solid var(--lf-border)',
-};
-
-const bodyRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flex: 1,
-  minHeight: 0,
-};
-
-const viewColumnStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  flex: 1,
-  minWidth: 0,
-};
-
-const viewportStyle: React.CSSProperties = {
-  position: 'relative',
-  flex: 1,
-  minHeight: 0,
-};
-
-const canvasStyle: React.CSSProperties = {
-  width: '100%',
-  height: '100%',
-  display: 'block',
 };
 
 const footerStyle: React.CSSProperties = {

@@ -4,6 +4,7 @@
 // per-feature renderers live in sibling files so no single file grows
 // beyond the 250-line soft cap (CLAUDE.md).
 
+import { isChiploadMaterialKey, type ChiploadMaterial } from '../../core/cnc';
 import type { Toolpath } from '../../core/job';
 import {
   isRegistrationBox,
@@ -171,7 +172,9 @@ function drawPreviewModeScene(
       : { onRasterPreviewReady: opts.onRasterBitmapReady },
   );
   // CNC material-removal shading under the route lines (H.2).
-  if (opts.cncRemovalGrid != null) drawCncRemoval(ctx, opts.cncRemovalGrid, view);
+  if (opts.cncRemovalGrid != null) {
+    drawCncRemoval(ctx, opts.cncRemovalGrid, view, stockMaterialKey(project));
+  }
   if (opts.previewToolpath === undefined) return;
   drawPreview(ctx, opts.previewToolpath, view, opts.scrubberT ?? 1, {
     showTravel: opts.previewShowTravel !== false,
@@ -211,6 +214,17 @@ function drawDraftShape(
   ctx.setLineDash([4, 3]);
   for (const path of draft.paths) strokePolylinesBatched(ctx, draft, path.polylines, view);
   ctx.restore();
+}
+
+// The job's stock material (ADR-112), or undefined for a laser project or a
+// "Custom" CNC job — both of which fall back to the original wood palette.
+function stockMaterialKey(project: Project): ChiploadMaterial | undefined {
+  if (project.machine?.kind !== 'cnc') return undefined;
+  // CncStock.materialKey is a plain string on the model, so an unrecognised or
+  // stale key from an older project file must fall back rather than index the
+  // appearance table with nothing behind it.
+  const key = project.machine.stock.materialKey;
+  return isChiploadMaterialKey(key) ? key : undefined;
 }
 
 function liveRasterDataUrls(project: Project): Set<string> {
