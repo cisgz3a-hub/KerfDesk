@@ -91,7 +91,14 @@ describe('compileJob explicit scan-offset boundary', () => {
     expectCompileToPreserve(raster({ bidirectionalScanOffsetMm: OUT_OF_RANGE_OFFSET_MM }), layer);
   });
 
-  it('rejects only a non-finite offset that cannot be emitted', () => {
+  // Rule 7 / ADR-228 regression pin. This previously asserted a thrown
+  // RangeError. That throw relied on the 'scan-offset-out-of-range' preflight
+  // stopping the job first, but that code is not among the compile-integrity
+  // codes either path refuses, and its message does not match
+  // isProgramMaterializationRangeError — so it escaped UNCAUGHT on Start.
+  // A non-finite override is now dropped so the device calibration applies;
+  // preflight still reports it as an advisory. Compiling must not throw.
+  it('drops a non-finite offset instead of throwing, falling back to calibration', () => {
     const layer = {
       ...createLayer({ id: 'fill', color: '#000000', mode: 'fill' }),
       hatchSpacingMm: 1,
@@ -100,7 +107,10 @@ describe('compileJob explicit scan-offset boundary', () => {
 
     expect(() =>
       compileJob({ objects: [square()], layers: [layer] }, DEFAULT_DEVICE_PROFILE),
-    ).toThrow(/scan offset NaN mm must be finite/);
+    ).not.toThrow();
+
+    const job = compileJob({ objects: [square()], layers: [layer] }, DEFAULT_DEVICE_PROFILE);
+    expect(job.groups.length).toBeGreaterThan(0);
   });
 
   it('preserves an explicit offset at the device limit', () => {
