@@ -11859,12 +11859,31 @@ commit message.
    "and". ADR-102 §3 (lazy `import()`) and §4 (graceful no-WebGL fallback)
    apply unchanged to the new folder.
 
-2. **The viewer3d world frame is the MACHINE frame: right-handed, Z-up,
-   +X to the operator's right, +Y away from the operator, +Z up, Z=0 at
-   stock top and negative into the stock.** 3D geometry is built from
-   machine-frame job data, NOT from the scene frame that the 2D canvas uses.
+2. **The whole 3D scene shares ONE frame: the removal grid's local frame —
+   scene-space XY relative to the grid origin, machine Z — mirrored once by
+   `geometry.scale(1, -1, 1)` at the geometry boundary, which yields a
+   right-handed Z-up world.** Every drawable in the viewport must be expressed
+   in that frame by the same helper. The prohibition that matters is against
+   drawing SOME geometry in one frame and some in another.
 
-   This is not a style preference. `toSceneCoords`
+   > **Corrected 2026-07-25, before any toolpath geometry was written.** This
+   > clause originally read "the viewer3d world frame is the MACHINE frame …
+   > 3D geometry is built from machine-frame job data, NOT from the scene
+   > frame". That was wrong for this codebase and would have misaligned the
+   > toolpath against the surface it overlays.
+   > `buildPreviewToolpathFromPrepared` (`src/ui/workspace/draw-preview.ts:217`)
+   > already maps the prepared job through `mapToolpathToScene`, and
+   > `useDesignRemovalGrid` (`src/ui/workspace/Cnc3DPane.tsx:95-117`) stamps
+   > that scene-frame toolpath into a grid whose origin is itself
+   > `toSceneCoords`-derived. The surface already on screen is therefore
+   > scene-derived, and a machine-frame toolpath drawn beside it would be
+   > offset and mirrored. The handedness analysis below is still correct and
+   > still the reason the rule exists — it is why nothing may be drawn in a
+   > half-converted frame — but the resolution is one uniform mirror applied to
+   > everything, not a switch to machine frame.
+
+   The handedness analysis, which is why the single-frame rule matters:
+   `toSceneCoords`
    (`src/core/devices/origin-transform.ts:28`) inverts a per-origin transform,
    and `mapToolpathToScene` (`src/ui/workspace/preview-scene-frame.ts:18`)
    maps only XY through it while every Z field rides through the object spread
@@ -11879,13 +11898,14 @@ commit message.
    | `rear-right` | X flipped | -Zm | left |
    | `center` | Y flipped | -Zm | left |
 
-   A 3D polyline drawn in that frame is mirrored on three of the five origins
-   and correct on two, which is the worst possible failure mode: it looks
-   plausible, it is wrong, and it is wrong differently per machine. No sign
-   flip fixes it because there is no single sign. Consuming machine-frame data
-   directly removes the ambiguity at the source — and it is also the honest
-   frame, because it is the one the emitted G-code describes and the one the
-   spindle physically moves in.
+   Mixing the two frames unmirrored is left-handed on three of the five
+   origins and right-handed on two, which is the worst possible failure mode:
+   it looks plausible, it is wrong, and it is wrong differently per machine.
+   No sign flip fixes it because there is no single sign. What fixes it is
+   applying the SAME mirror to every drawable exactly once, so the whole scene
+   is internally consistent no matter which origin is configured — and it then
+   also matches the 2D canvas, which is the reference the operator already
+   knows.
 
    The 2D canvas keeps using scene frame; nothing about this changes it. Where
    the two must agree (the shared scrubber, the shared preview grid), they
