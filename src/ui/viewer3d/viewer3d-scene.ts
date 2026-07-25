@@ -11,7 +11,6 @@ import type { LineMaterial as LineMaterialType } from 'three/examples/jsm/lines/
 import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.js';
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
-import type * as OrbitControlsModule from 'three/examples/jsm/controls/OrbitControls.js';
 import type { AxisBounds } from '../../core/gcode-view';
 import {
   buildSegmentBuckets,
@@ -19,6 +18,13 @@ import {
   type SegmentBuckets,
   type Viewer3dSegmentsInput,
 } from './segment-buckets';
+import { cameraPlacement, type CameraPreset } from './camera-presets';
+import {
+  createCameraRig,
+  startRenderer,
+  type CameraRig,
+  type OrbitControlsCtor,
+} from './scene-setup';
 import { createMarkers, disposeMarkers, sizeMarkers, type MarkerMesh } from './scene-markers';
 import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
@@ -53,6 +59,14 @@ export type Viewer3dSceneHandle = {
    * switching data lenses is free (ADR-255 §11 R2).
    */
   readonly recolor: (colorOf: (segmentIndex: number) => readonly [number, number, number]) => void;
+  /** Snap to a standard view (Top / Front / Right / Iso) framed on the job. */
+  readonly setView: (preset: CameraPreset) => void;
+  /**
+   * PNG data URL of the current frame. Renders and reads back in the SAME
+   * task: without preserveDrawingBuffer the buffer is cleared at composite,
+   * so a deferred read returns a blank image.
+   */
+  readonly captureImage: () => string;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
   readonly dispose: () => void;
@@ -62,8 +76,6 @@ export type Viewer3dSceneResult =
   | { readonly kind: 'ok'; readonly handle: Viewer3dSceneHandle }
   | { readonly kind: 'no-webgl'; readonly reason: string };
 
-const MAX_PIXEL_RATIO = 2;
-const CAMERA_FOV_DEG = 40;
 const TRAVEL_OPACITY = 0.45;
 const FAT_LINE_PX = 2.5;
 
@@ -145,13 +157,13 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   let travelObject: Object3D | null = null;
   let travelVisible = true;
   let reveal: RevealTargets | null = null;
+  let lastBounds: AxisBounds | null = null;
   const markers = createMarkers(three, scene);
   const { marker, liveMarker } = markers;
 
   return {
     setSegments: (segments) => {
-      disposeChildren(toolpathGroup);
-      const built = buildToolpathObjects({
+      const built = rebuildToolpath(toolpathGroup, {
         ...modules,
         segments,
         theme,
@@ -161,7 +173,6 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       });
       ({ fatMaterial, travelObject } = built);
       reveal = built.reveal;
-      for (const object of built.objects) toolpathGroup.add(object);
       sizeMarkers(markers, segments);
       render();
     },
@@ -178,6 +189,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       render();
     },
     fitToBounds: (bounds) => {
+      lastBounds = bounds;
       disposeChildren(furnitureGroup);
       for (const object of buildFurniture(three, bounds, theme)) {
         furnitureGroup.add(object);
@@ -190,14 +202,19 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       if (travelObject !== null) travelObject.visible = visible;
       render();
     },
+    setView: (preset) => {
+      applyView(camera, controls, cameraPlacement(preset, lastBounds));
+      render();
+    },
+    captureImage: () => {
+      render();
+      return renderer.domElement.toDataURL('image/png');
+    },
     resize: (nextWidth, nextHeight) => {
       if (nextWidth <= 0 || nextHeight <= 0) return;
       viewWidth = nextWidth;
       viewHeight = nextHeight;
-      renderer.setSize(nextWidth, nextHeight, false);
-      camera.aspect = nextWidth / nextHeight;
-      camera.updateProjectionMatrix();
-      fatMaterial?.resolution.set(nextWidth, nextHeight);
+      applyResize({ renderer, camera, fatMaterial }, nextWidth, nextHeight);
       render();
     },
     requestRender: render,
@@ -210,6 +227,49 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       renderer.dispose();
     },
   };
+}
+
+// Swap the drawn toolpath: dispose what was there, build the new batches,
+// mount them. Disposal first — the old buffers are dead the moment the
+// program changes.
+function rebuildToolpath(
+  group: Object3D,
+  args: ToolpathBuildArgs,
+): ReturnType<typeof buildToolpathObjects> {
+  disposeChildren(group);
+  const built = buildToolpathObjects(args);
+  for (const object of built.objects) group.add(object);
+  return built;
+}
+
+// Point the camera at a standard view and re-target the orbit controls.
+function applyView(
+  camera: PerspectiveCamera,
+  controls: { target: { set: (x: number, y: number, z: number) => void }; update: () => void },
+  view: ReturnType<typeof cameraPlacement>,
+): void {
+  camera.up.set(view.up.x, view.up.y, view.up.z);
+  camera.position.set(view.position.x, view.position.y, view.position.z);
+  controls.target.set(view.target.x, view.target.y, view.target.z);
+  camera.lookAt(view.target.x, view.target.y, view.target.z);
+  controls.update();
+}
+
+// Fat-line materials size their strokes against the drawing buffer, so the
+// material's resolution has to track the canvas.
+function applyResize(
+  parts: {
+    readonly renderer: WebGLRenderer;
+    readonly camera: PerspectiveCamera;
+    readonly fatMaterial: LineMaterialType | null;
+  },
+  width: number,
+  height: number,
+): void {
+  parts.renderer.setSize(width, height, false);
+  parts.camera.aspect = width / height;
+  parts.camera.updateProjectionMatrix();
+  parts.fatMaterial?.resolution.set(width, height);
 }
 
 // Show a marker at a point, or hide it when there is nothing to show.
@@ -277,73 +337,6 @@ function applyReveal(targets: RevealTargets | null, playhead: PlayheadMarker | n
       : revealCount(targets.travelSource, playhead.segmentIndex);
     targets.travel.geometry.setDrawRange(0, count * 2);
   }
-}
-
-// WebGL context creation is the one failure mode this module tolerates: jsdom
-// and WebGL-less browsers get a typed fallback instead of a throw.
-function startRenderer(
-  three: ThreeModule,
-  canvas: HTMLCanvasElement,
-  theme: Viewer3dTheme,
-):
-  | {
-      readonly kind: 'ok';
-      readonly renderer: WebGLRenderer;
-      readonly width: number;
-      readonly height: number;
-    }
-  | { readonly kind: 'no-webgl'; readonly reason: string } {
-  let renderer: WebGLRenderer;
-  try {
-    renderer = new three.WebGLRenderer({ canvas, antialias: true });
-  } catch (err) {
-    return {
-      kind: 'no-webgl',
-      reason: err instanceof Error ? err.message : 'WebGL is unavailable in this browser.',
-    };
-  }
-  // HiDPI-correct output — the single most visible quality defect of the
-  // pre-ADR-255 scene was rendering at CSS-pixel resolution.
-  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, MAX_PIXEL_RATIO));
-  const width = canvas.clientWidth || canvas.width;
-  const height = canvas.clientHeight || canvas.height;
-  renderer.setSize(width, height, false);
-  renderer.setClearColor(theme.background);
-  return { kind: 'ok', renderer, width, height };
-}
-
-type OrbitControlsCtor = typeof OrbitControlsModule.OrbitControls;
-
-type CameraRig = {
-  readonly camera: PerspectiveCamera;
-  readonly controls: InstanceType<OrbitControlsCtor>;
-  readonly render: () => void;
-};
-
-// Z-up perspective camera + orbit controls, wired to render on demand (no rAF
-// loop — the scene only redraws on interaction, resize, or data change).
-function createCameraRig(
-  three: ThreeModule,
-  OrbitControls: OrbitControlsCtor,
-  deps: {
-    readonly renderer: WebGLRenderer;
-    readonly scene: ThreeNamespace.Scene;
-    readonly canvas: HTMLCanvasElement;
-    readonly width: number;
-    readonly height: number;
-  },
-): CameraRig {
-  const camera = new three.PerspectiveCamera(
-    CAMERA_FOV_DEG,
-    deps.width / deps.height,
-    0.1,
-    100_000,
-  );
-  camera.up.set(0, 0, 1); // Z-up: the program's own frame
-  const controls = new OrbitControls(camera, deps.canvas);
-  const render = (): void => deps.renderer.render(deps.scene, camera);
-  controls.addEventListener('change', render);
-  return { camera, controls, render };
 }
 
 type ToolpathBuildArgs = {

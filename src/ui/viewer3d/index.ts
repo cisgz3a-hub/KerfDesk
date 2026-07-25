@@ -16,4 +16,10 @@ export {
   type SegmentBuckets,
   type Viewer3dSegmentsInput,
 } from './segment-buckets';
+export {
+  CAMERA_PRESETS,
+  CAMERA_PRESET_LABEL,
+  cameraPlacement,
+  type CameraPreset,
+} from './camera-presets';
 export { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';

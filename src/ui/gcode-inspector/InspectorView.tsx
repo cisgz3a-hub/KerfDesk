@@ -7,10 +7,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { findProgramIssues, type GcodeRenderModel } from '../../core/gcode-view';
-import { resolveViewer3dTheme } from '../viewer3d';
+import { resolveViewer3dTheme, type CameraPreset, type Viewer3dSceneHandle } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
+import { InspectorViewControls } from './InspectorViewControls';
 import { lensColorFn, type LensId } from './lenses';
 import { playheadAtTime, secondsAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
@@ -81,15 +82,13 @@ export function InspectorView(props: {
     <div style={bodyRowStyle}>
       <div style={viewColumnStyle}>
         {full ? <SourceToggle visible={sourceVisible} onToggle={setSourceVisible} /> : null}
-        <div style={viewportStyle}>
-          <canvas ref={canvasRef} style={canvasStyle} />
-          {live.streaming ? <LiveBadge live={live} /> : null}
-          {state === 'no-webgl' ? (
-            <p style={messageStyle}>
-              3D view unavailable: {reason} The program parsed — readouts are live.
-            </p>
-          ) : null}
-        </div>
+        <Viewport
+          canvasRef={canvasRef}
+          live={live}
+          handleRef={handleRef}
+          state={state}
+          reason={reason}
+        />
         <InspectorTimeline playback={playback} totalRouteMm={time.motionSeconds} />
       </div>
       {full && sourceVisible ? (
@@ -122,6 +121,33 @@ export function InspectorView(props: {
   );
 }
 
+function Viewport(props: {
+  readonly canvasRef: React.RefObject<HTMLCanvasElement>;
+  readonly live: LiveMachine;
+  readonly handleRef: React.RefObject<Viewer3dSceneHandle | null>;
+  readonly state: string;
+  readonly reason: string;
+}): JSX.Element {
+  return (
+    <div style={viewportStyle}>
+      <canvas ref={props.canvasRef} style={canvasStyle} />
+      {props.live.streaming ? <LiveBadge live={props.live} /> : null}
+      <InspectorViewControls
+        onSelectView={(preset: CameraPreset) => props.handleRef.current?.setView(preset)}
+        onCapture={() => {
+          const url = props.handleRef.current?.captureImage();
+          if (url !== undefined) downloadPng(url);
+        }}
+      />
+      {props.state === 'no-webgl' ? (
+        <p style={messageStyle}>
+          3D view unavailable: {props.reason} The program parsed — readouts are live.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 // Shown only while a job is actually streaming. Reports what the controller
 // said — never an inference — so the operator can trust it against the
 // machine in front of them.
@@ -146,6 +172,15 @@ function LiveBadge(props: { readonly live: LiveMachine }): JSX.Element {
       )}
     </div>
   );
+}
+
+// The operator asked for this frame, so handing back a file is the whole
+// point; nothing leaves the machine.
+function downloadPng(dataUrl: string): void {
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = 'gcode-view.png';
+  link.click();
 }
 
 function SourceToggle(props: {
