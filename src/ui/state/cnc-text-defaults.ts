@@ -1,8 +1,8 @@
 // applyCncTextDefaultsToNewLayer — H.6c "CNC text defaults". A fresh text
-// layer must not inherit the CNC layer default of profile-outside, which
-// CUTS THE LETTERS OUT and drops their counters (the o/e/a centers). Text
-// v-carves when the mounted bit is a v-bit — the classic router text
-// workflow — and engraves on-path otherwise. Only newly-created layers are
+// layer must not inherit the generic CNC layer default (profile-outside
+// before ADR-256 — which CUT THE LETTERS OUT and dropped their counters —
+// profile-on-path since). Text v-carves when the mounted bit is a v-bit —
+// the classic router text workflow — and engraves on-path otherwise. Only newly-created layers are
 // touched; a layer the operator already configured is never rewritten.
 //
 // PROVISIONAL interpretation: the H.6 roadmap line "CNC text defaults" is

@@ -115,20 +115,26 @@ describe('laser-store pause safety', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
-  it('allows feed-hold pause for a CNC job with laser mode off ($32=0 is router-correct)', async () => {
-    // Feed hold on a spindle machine is safe (motion holds, spindle keeps
-    // spinning — standard sender behavior); the $32 proof is a laser-only
-    // requirement and must not block router pause.
+  it('parks a CNC job with the safety-door byte even with laser mode off ($32=0 is router-correct)', async () => {
+    // ADR-180 amendment 2: CNC Pause sends the safety-door byte, so the
+    // controller stops in place AND de-energizes the spindle. The $32 proof
+    // stays a laser-only requirement and must not block router pause.
     const writes: string[] = [];
     let liveConnection: FakeConnection | null = null;
+    let doorParked = false;
     const connection = makeConnection(async (data) => {
       writes.push(data);
+      if (data === RT_SAFETY_DOOR) doorParked = true;
       if (data === 'G4 P0.01\n') {
         setTimeout(() => liveConnection?.emitLine('ok'), 0);
       }
       if (data === '?') {
         setTimeout(() => {
-          liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+          liveConnection?.emitLine(
+            doorParked
+              ? '<Door:0|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>'
+              : '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+          );
         }, 0);
       }
     });
@@ -155,7 +161,8 @@ describe('laser-store pause safety', () => {
 
     await useLaserStore.getState().pauseJob();
 
-    expect(writes).toContain(RT_HOLD);
+    expect(writes).toContain(RT_SAFETY_DOOR);
+    expect(writes).not.toContain(RT_HOLD);
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 
@@ -166,12 +173,21 @@ describe('laser-store pause safety', () => {
   it('resumes a CNC job with cycle-start and unfreezes the stream', async () => {
     const writes: string[] = [];
     let liveConnection: FakeConnection | null = null;
+    // ADR-180 amendment 2: Pause parks via the door byte, so the controller
+    // reports a settled Door until cycle-start restores it to Idle/Run.
+    let doorParked = false;
     const connection = makeConnection(async (data) => {
       writes.push(data);
+      if (data === RT_SAFETY_DOOR) doorParked = true;
+      if (data === RT_RESUME) doorParked = false;
       if (data === 'G4 P0.01\n') setTimeout(() => liveConnection?.emitLine('ok'), 0);
       if (data === '?') {
         setTimeout(() => {
-          liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+          liveConnection?.emitLine(
+            doorParked
+              ? '<Door:0|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>'
+              : '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>',
+          );
         }, 0);
       }
     });

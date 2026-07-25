@@ -61,7 +61,7 @@ describe('FeedsCalculatorRow', () => {
     const onCommitSettings = vi.fn();
     const { host, root } = await render(onCommitSettings);
     try {
-      expect(host.textContent).toContain('machine-aware feed 600');
+      expect(host.textContent).toContain('machine-aware feed 300');
       expect(host.textContent).toContain('plunge 120');
       expect(host.textContent).toContain('0.75 mm/pass');
       await apply(host);
@@ -69,7 +69,7 @@ describe('FeedsCalculatorRow', () => {
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
       expect(next).toMatchObject({
         materialKey: 'plywood-mdf',
-        feedMmPerMin: 600,
+        feedMmPerMin: 300,
         plungeMmPerMin: 120,
         spindleRpm: 12_000,
         depthPerPassMm: 0.75,
@@ -99,7 +99,7 @@ describe('FeedsCalculatorRow', () => {
     try {
       await apply(host);
       expect(onCommitSettings.mock.calls[0]?.[0]).toMatchObject({
-        feedMmPerMin: 450,
+        feedMmPerMin: 300,
         plungeMmPerMin: 80,
         spindleRpm: 10_000,
       });

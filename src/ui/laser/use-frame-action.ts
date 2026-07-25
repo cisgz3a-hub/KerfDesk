@@ -22,7 +22,7 @@ import {
   normalizeFrameWorkCoordinateSystem,
 } from './frame-controller-readiness';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
-import { useStartBlockerStore } from './start-blocker-store';
+import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import {
@@ -49,7 +49,7 @@ export function useFrameAction(): () => void {
  */
 export async function runFrameNow(): Promise<boolean> {
   ensureFramedRunInvalidationSubscriptions();
-  useStartBlockerStore.getState().clear();
+  clearStartBlockers();
   const initial = await prepareFrameReviewBundle();
   if (initial === null) return false;
   return dispatchPreparedFrame(initial);
@@ -67,7 +67,7 @@ export async function prepareTransientFrameController(
   project: Project,
 ): Promise<TransientFrameControllerPreparation | null> {
   ensureFramedRunInvalidationSubscriptions();
-  useStartBlockerStore.getState().clear();
+  clearStartBlockers();
   if (!(await requireFrameControllerQueue())) return null;
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
@@ -412,7 +412,7 @@ function candidateFrameOperation(
 }
 
 function reportFrameRefusal(messages: ReadonlyArray<string>): void {
-  useStartBlockerStore.getState().report(messages);
+  reportStartBlockers(messages);
   useToastStore.getState().pushToast(messages[0] ?? 'The job cannot be framed.', 'error');
 }
 

@@ -82,7 +82,7 @@
 | ADR-098 | 2026-07-02 | Amended by ADR-209; macOS Phase-J deferral amended by ADR-248 | CNC router mode becomes a first-class product track (Phase H "Router") |
 | ADR-100 | — | Accepted | Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params |
 | ADR-101 | 2026-07-02 | Accepted | CNC/laser UI separation policy: gate-and-hide |
-| ADR-102 | 2026-07-03 | Accepted | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
+| ADR-102 | 2026-07-03 | Accepted; §2 amended by ADR-255 | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
 | ADR-103 | — | accepted (maintainer session directive) | Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03) |
 | ADR-104 | — | Accepted; Phase-J schedule amended by ADR-248 | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
 | ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
@@ -144,7 +144,7 @@
 | ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
-| ADR-180 | 2026-07-13 | Accepted | Generic same-session CNC Resume is manual-recovery-only |
+| ADR-180 | 2026-07-13 | Amended 2026-07-24 | Generic same-session CNC Resume is manual-recovery-only — resume refusal withdrawn, one-click resume enabled |
 | ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
 | ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
 | ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
@@ -458,7 +458,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-132):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -471,7 +471,7 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
 
-The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-132). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 
@@ -4399,7 +4399,7 @@ Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
 
 ## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
-**Status:** Accepted
+**Status:** Accepted; amended by ADR-255 (Open G-code / Inspect G-code becomes mode-independent)
 **Date:** 2026-07-02
 
 > **Numbering note:** ADR-101 follows ADR-098 on this branch by design, not
@@ -4554,7 +4554,7 @@ the laser-only set" assertion updates from the source of truth automatically.
 
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
-**Status:** Accepted
+**Status:** Accepted; §2 import location amended by ADR-255 (adds `src/ui/viewer3d/`)
 **Date:** 2026-07-03
 
 ### Context
@@ -5948,7 +5948,9 @@ controller reset look like job recovery even though the durable checkpoint is a 
   controller evidence, but its incomplete/failed state is not itself a hard Laser Start gate.
   Missing `$30`/`$32` evidence follows the already accepted warning-and-acknowledgement path in Job
   Review, matching controllers that expose no numeric settings dump. A reported `$30` mismatch or
-  reported `$32=0` remains blocking. An in-flight settings transaction still owns the serial channel
+  reported `$32=0` remains blocking. **[SUPERSEDED later the same day by ADR-228 (2026-07-17): both
+  the `$30`-mismatch and `$32=0` Start blocks are withdrawn and are now Job Review warnings; a
+  completed Frame is the sole Start gate.]** An in-flight settings transaction still owns the serial channel
   until it settles. CNC Start and every supervised recovery keep the strict fresh-qualification
   requirement because spindle/WCS re-entry semantics cannot be inferred safely.
 - **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
@@ -7763,6 +7765,43 @@ maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
 
+### Amendment 2 (2026-07-25) — CNC Pause parks the spindle via the safety-door byte
+
+Amendment 1 left CNC Pause as a bare feed hold, which stops motion but leaves the
+spindle commanded. The maintainer's requirement is the opposite: **pause should stop
+the spindle in place, and resume should spin it back up and continue the same line.**
+
+Researched against the firmware rather than reasoned about (CLAUDE.md rule 9). In
+[grbl/config.h](https://github.com/gnea/grbl/blob/master/grbl/config.h):
+`SAFETY_DOOR_SPINDLE_DELAY 4.0` and `SAFETY_DOOR_COOLANT_DELAY 1.0` are **active by
+default**, while `PARKING_ENABLE` is **commented out by default**. So GRBL's Door
+state decelerates in place and de-energizes spindle and coolant, and door-resume
+restores them and holds motion for the spin-up delay before continuing the
+interrupted move — exactly the requested behavior, minus any retract.
+
+- CNC Pause now sends the **safety-door byte** (`\x84`), the same path laser already
+  used, instead of `!`. The door branch is selected by driver capability
+  (`realtime.safetyDoor !== null`), no longer by machine kind.
+- CNC Resume is correspondingly **door-confirmed**: it waits for a fresh `Run`/`Idle`
+  report before refilling the stream, rather than firing `~` blind.
+- **No retract.** `PARKING_ENABLE` is off in stock GRBL, and its `PARKING_TARGET` is a
+  *machine coordinate* — meaningless on this project's no-homing router. A host-side
+  lift is deliberately not built: it would require abandoning the door hold for a
+  drain-to-Idle pause, reintroducing a re-entry seam. The cutter therefore spins up
+  while still engaged; the advisory says so.
+- **Accessory proof is required for laser only.** GRBL omits `A:` when nothing is
+  energized and emits `Ov:` only periodically, so a CNC controller can settle into
+  Door before any report carries accessory data. Demanding the field would time out
+  and fail-dark a correctly stopped job. A settled Door state is itself the
+  controller's report that it de-energized the spindle. The laser path keeps its
+  positive proof-of-beam-off requirement (ADR-179) unchanged — this narrows a
+  refusal, which rule 7 permits, and widens none.
+- Both CNC copy strings are rewritten; they previously told the operator the spindle
+  keeps spinning, which this makes false.
+- **Not hardware-verified.** No air-cut on a spindle machine. Whether this specific
+  4040 build reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build
+  facts confirmed only by running it.
+
 ### Amendment (2026-07-24) — same-session CNC Resume is one-click again
 
 The original decision's resume **refusal is withdrawn.** ADR-228 / CLAUDE.md
@@ -8853,7 +8892,9 @@ Work-Z matching.
   its non-blocking warning, and the one-click Scanline recovery action remain available.
 - Display general Start readiness warnings as non-blocking warning toasts. ADR-210's explicitly
   approved exception requires one focused acknowledgement when a laser controller's `$32` state
-  cannot be verified; a reported `$32=0` remains a hard refusal.
+  cannot be verified; a reported `$32=0` remains a hard refusal. **[SUPERSEDED by ADR-228
+  (2026-07-17): the reported-`$32=0` Start refusal is withdrawn and is now a Job Review warning.
+  ADR-228 lists "$32=0 on laser" among the controller-readiness Start errors it removed.]**
 - Classify Console effects by what a command can change. Accessory-only commands, dwell, and
   non-positional setting writes still invalidate their own stale observations, but preserve homing,
   frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
@@ -9139,7 +9180,10 @@ containment strategy.
 - Recovery re-entry is hard-off: `M5`/`S0` precedes positioning, rapid repositioning is explicitly
   unpowered, and positive power is restored only on the first burn-motion line.
 - A laser Start whose controller cannot report `$32` requires one explicit Start-anyway
-  acknowledgement. A reported `$32=0` is still refused, and neither Machine Setup nor the confirmed
+  acknowledgement. A reported `$32=0` is still refused **[Start refusal SUPERSEDED by ADR-228
+  (2026-07-17): a reported `$32=0` no longer refuses laser Start — it is a Job Review warning, and
+  Frame is the sole Start gate. The setting-write restriction in the rest of this bullet stands.]**,
+  and neither Machine Setup nor the confirmed
   Console setting lane may write `$32=0` while the active project is a laser. Ordinary Start,
   start-from-line/recovery, and camera-marker burns all carry the same session-bound evidence to the
   final wire boundary. CNC/router projects retain their required `$32=0` path.
@@ -11826,6 +11870,195 @@ adds a lift where passes previously stacked in place.
   gains no spurious retract; with the flag off the step-down-in-place output is
   unchanged.
 
+---
+
+## ADR-254 - Dependency audit runs on a schedule, not in the merge gate
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+`release:check` chained `pnpm audit:deps` (`pnpm audit --audit-level=low`)
+between `license-check` and `test`. Because the chain is sequential `&&`, an
+audit failure ended the run before the test suite, both builds, and the three
+size/export checks ever executed.
+
+Advisories are published by third parties on their own schedule. Any new one
+touching any transitive dependency - including devDependency-only paths that
+cannot reach shipped code - turned every open PR, every main push, and the
+CI-gated Cloudflare deploy red with no code change. This fired three times in
+July 2026 alone: `tar`, `postcss` (#395, 2026-07-24), and `brace-expansion`
+reached through `electron-builder` -> `@electron/asar`, which had every open
+branch failing at the two-minute mark on 2026-07-25. In each case the author's
+own diff was never verified; the red check said nothing about their work.
+
+The 2026-07-10 full-sweep audit recorded this as S14-F7 and proposed exactly
+this fix. It was not actioned then.
+
+### Decision
+
+Remove `pnpm audit:deps` from the `release:check` chain. The script itself stays
+for local and manual use. A new `.github/workflows/audit.yml` runs it nightly
+(03:17 UTC) plus on demand, and files a single open tracking issue when
+advisories appear - never a duplicate, so a standing finding does not generate
+nightly noise. GitHub Dependabot alerts were enabled the same day as a native
+second channel, alongside secret scanning and push protection.
+
+This is not a change of supply-chain posture. It changes *when* and *how loudly*
+the same signal arrives: from "blocks unrelated work immediately" to "tracked
+within 24 hours". An advisory reachable from a production dependency remains
+release-blocking - PROJECT.md still says a dependency CVE blocks releases until
+patched - but that judgment is now made by a human reading the issue, not by a
+chain position that also hides the test results.
+
+Rejected alternatives: raising the threshold to `--audit-level=high` (the
+brace-expansion advisory *was* high, so this would not have helped);
+`continue-on-error` after `test` (keeps the CI-minute cost on every PR to
+produce a signal nobody is required to read).
+
+### Consequences
+
+- A production-reachable advisory can now merge and deploy without a red check.
+  The nightly issue is the backstop and Dependabot alerts are the second.
+  Accepted deliberately: the previous design blocked so indiscriminately that
+  the standing response was to write an override and move on, which is not
+  triage either.
+- `deploy:web` and `deploy:web:preview` call `release:check`, so deploys stop
+  being blocked by third-party advisory timing. That is the intended effect.
+- The five workflows that invoke `release:check` (ci, deploy, and the three
+  desktop release legs) all lose the audit step. A production CVE matters most
+  at desktop release time, so triage the open audit issue before cutting a `v*`
+  tag.
+
+### Verification
+
+- `deploy-workflow-gate.test.ts` asserts `release:check` no longer contains
+  `audit`, that `audit:deps` still exists unchanged, and that
+  `.github/workflows/audit.yml` runs it under a `cron:` schedule - pinning both
+  halves so neither the outage vector nor the audit itself returns by reflex.
+- NOT verified: the scheduled workflow has never fired. Its issue-filing path is
+  unexercised until the first nightly run or a manual `workflow_dispatch`.
+
+## ADR-255 - G-code Inspector: read-side 3D program viewer and informational health report
+
+**Date:** 2026-07-25
+**Status:** Accepted (maintainer approval 2026-07-25; design + executed
+self-audit in `docs/audits/2026-07-25-gcode-inspector-design-and-self-audit.md`)
+
+### Context
+
+File -> Open G-code (F-CNC10) parses an external program with the clean-room
+modal parser and shows it in the 2D simulator, CNC-only (ADR-101). The tree
+also owns a second line-indexed motion parser (`buildMotionManifest`), a
+planner-grade duration estimator (`estimateJobDuration`), text-level invariant
+scanners, and the ADR-102 three.js scene. Operators need to watch a program
+run in 3D from any angle, scrub it in time, trace every segment to its source
+line, and read a health report - before the machine runs it. Every current
+preview renders the compiled Job (the write side); nothing renders the G-code
+text itself (the read side).
+
+### Decision
+
+1. Build the **G-code Inspector** per the design doc above: a lazy-loaded 3D
+   viewer + timeline + source pane + Program Health panel over a new pure
+   `src/core/gcode-view/` render model (typed arrays, F/S retention, source
+   line map, modal events, stats).
+2. **ADR-102 §2 is amended**: three.js may be imported beneath
+   `src/ui/viewer3d/` (the shared scene home for the Inspector and the CNC 3D
+   pane upgrade track) in addition to `src/ui/relief-viewer/`. All other
+   ADR-102 terms (UI-only, lazy chunk, jsdom fallback, pure typed-array
+   seams) are unchanged.
+3. **ADR-101 is amended for this one command**: Open G-code / Inspect G-code
+   is available in BOTH laser and CNC modes (laser raster programs are the
+   performance stress case, and laser operators own `.gcode` files too).
+4. **No third parser.** Stage 1 extracts the shared modal engine used by
+   `parseGcodeProgram` and `buildMotionManifest` (outputs pinned identical by
+   tests before/after; the arc-sampling tolerance divergence unified or
+   explicitly parameterized), and the render model composes that engine.
+5. **Program Health is informational only** - findings inform and feed the
+   Job Review warning list; nothing blocks Frame, Start, parse, render, or
+   export (rule 7 / ADR-228 compliance is an acceptance criterion of every
+   stage). The only refusals are the parser's existing compile-integrity
+   facts (not-G-code, non-finite targets).
+6. **Zero new runtime dependencies**; three@0.180 (already present) plus its
+   bundled addons only. The three lazy chunk is measured before/after at
+   every stage against the <1 MB budget; postprocessing is deferred.
+7. Adopted defaults from the approved design: GRBL-flavor dialect v1 with
+   never-fatal notes (G54-G59 modal tracking in v2); red = traversal palette
+   (LightBurn convention) with a "show traversal moves" toggle; the Inspector
+   complements the F-CNC10 2D simulator rather than replacing it.
+8. Acceptance gates from design doc §12: **total line accountability** (every
+   raw line classifies into exactly one category - property-tested) and
+   **own-output-clean** (every program emitted by any built-in strategy
+   parses with zero unsupported-word notes and zero junk lines).
+
+### Alternatives considered
+
+- Extend the 2D preview instead of 3D. Rejected - Z motion (plunges, ramps,
+  pecks, helical entries) is exactly the detail the maintainer wants
+  readable, and a top-down canvas cannot show it.
+- A third standalone parser for the Inspector. Rejected - the repo already
+  carries two modal interpreters plus partial scanners; CLAUDE.md's
+  duplication rule forbids a third copy.
+- React-three-fiber component stack. Rejected by the prior ecosystem verdict
+  (requires React 19; the repo is on React 18.3).
+
+### Consequences
+
+- `src/ui/viewer3d/` becomes the sanctioned three.js home shared by two
+  consumers; the relief scene migrates there over time (pane-track stage 3).
+- The modal-engine unification touches two existing parsers; their outputs
+  are pinned by tests before the refactor lands.
+- WCS (G54-G59) and 4-axis words remain counted-not-tracked in v1 -
+  explicitly deferred, surfaced as findings.
+- Emitted G-code is untouched: the Inspector reads, it never writes. No
+  snapshot changes.
+
+### Verification
+
+- Staged plan in the design doc §7: every stage lands green and individually
+  reviewed, with pure-tier CI tests plus the §8 perceptual golden corpus
+  (dev-browser render + screenshots; jsdom cannot see WebGL, so no green
+  suite is ever claimed as visual proof).
+
+## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+The Neotronics 4040 machine starter (ADR-233, revision 1) shipped
+engineering guesses: feed 600 mm/min and plunge 120 mm/min for a 3.175 mm
+2-flute cutter in wood/MDF. Separately, a fresh CNC layer defaulted to
+`profile-outside`, so an unedited layer resized the drawn part - the opposite
+of what a laser Line layer does with the same artwork.
+
+The maintainer, from experience on the physical 4040, directed (chat,
+2026-07-25): cut type should default to cutting on the line; RPM 12000,
+plunge 250, feed 300, depth per pass 0.75.
+
+### Decision
+
+- The 4040 starter catalog entry moves to revision 2 with feed 300 mm/min and
+  plunge 250 mm/min. Spindle 12000 RPM and 0.75 mm depth per pass were already
+  the revision-1 values. Layers still carrying `machine-starter` provenance
+  refresh to the new numbers on the next setup action; manual layers are
+  untouched (provenance is withdrawn on any manual feed edit).
+- `DEFAULT_CNC_LAYER_SETTINGS.cutType` becomes `profile-on-path`. This is the
+  scene-wide default (the starter patch deliberately carries no cut type, and
+  CNC text still applies its own v-carve/engrave policy), so it applies to
+  every CNC machine, with the 4040 as the only shipped starter profile.
+
+### Consequences
+
+- The material-recipe path caps its chipload result at the starter feed, so a
+  4040 project-material layer now computes 300 mm/min feed with a 120 mm/min
+  plunge (40% of feed, under the 250 starter cap).
+- Legacy layers without a CNC block, and invalid persisted cut types, now
+  normalize to on-path instead of outside; operators choose outside/inside
+  explicitly when the part size matters.
 
 ## ADR-257 - CNC 3D viewport: import boundary, world frame, and display-only status
 

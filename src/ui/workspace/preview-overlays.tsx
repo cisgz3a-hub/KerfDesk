@@ -65,8 +65,8 @@ export function PreviewStatusOverlays(props: {
       ) : null}
       {outOfBounds ? (
         <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
-          Some objects extend past the bed (red dashed outlines). Preflight will refuse Start / Save
-          G-code until they fit.
+          Some objects extend past the bed (red dashed outlines). Save G-code refuses until they
+          fit. Start is not blocked — this appears as a Job Review warning and the Frame decides.
         </div>
       ) : null}
     </div>

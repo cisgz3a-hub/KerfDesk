@@ -9,8 +9,8 @@ describe('resolveCncMachineStarter', () => {
     });
 
     expect(result).toMatchObject({
-      feedMmPerMin: 600,
-      plungeMmPerMin: 120,
+      feedMmPerMin: 300,
+      plungeMmPerMin: 250,
       spindleRpm: 12000,
       depthPerPassMm: 0.75,
       provenance: {
@@ -25,8 +25,8 @@ describe('resolveCncMachineStarter', () => {
         field: 'feedMmPerMin',
         source: 'profile.maxFeed',
         limit: 6000,
-        valueBefore: 600,
-        valueAfter: 600,
+        valueBefore: 300,
+        valueAfter: 300,
         didLimit: false,
       },
       {
@@ -44,7 +44,7 @@ describe('resolveCncMachineStarter', () => {
     const result = resolveCncMachineStarter({
       profile: {
         ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-        maxFeed: 500,
+        maxFeed: 290,
         cncSubProfile: {
           ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.cncSubProfile,
           safeZMm: 3.81,
@@ -53,22 +53,22 @@ describe('resolveCncMachineStarter', () => {
         },
       },
       liveCaps: {
-        xMaxFeedMmPerMin: 550,
-        yMaxFeedMmPerMin: 450,
+        xMaxFeedMmPerMin: 280,
+        yMaxFeedMmPerMin: 260,
         zMaxFeedMmPerMin: 100,
         spindleMaxRpm: 9000,
       },
     });
 
     expect(result).toMatchObject({
-      feedMmPerMin: 450,
+      feedMmPerMin: 260,
       plungeMmPerMin: 100,
       spindleRpm: 9000,
       depthPerPassMm: 0.75,
     });
     expect(result?.provenance.capDetails.filter((detail) => detail.didLimit)).toEqual([
-      expect.objectContaining({ source: 'profile.maxFeed', valueAfter: 500 }),
-      expect.objectContaining({ source: 'controller.$110/$111', limit: 450, valueAfter: 450 }),
+      expect.objectContaining({ source: 'profile.maxFeed', valueAfter: 290 }),
+      expect.objectContaining({ source: 'controller.$110/$111', limit: 260, valueAfter: 260 }),
       expect.objectContaining({ source: 'controller.$112', valueAfter: 100 }),
       expect.objectContaining({
         source: 'profile.cncSubProfile.spindleMaxRpm',
@@ -82,7 +82,7 @@ describe('resolveCncMachineStarter', () => {
     const result = resolveCncMachineStarter({
       profile: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
       liveCaps: {
-        xMaxFeedMmPerMin: 500,
+        xMaxFeedMmPerMin: 280,
         yMaxFeedMmPerMin: Number.NaN,
         zMaxFeedMmPerMin: 0,
         spindleMaxRpm: Number.POSITIVE_INFINITY,
@@ -90,8 +90,8 @@ describe('resolveCncMachineStarter', () => {
     });
 
     expect(result).toMatchObject({
-      feedMmPerMin: 500,
-      plungeMmPerMin: 120,
+      feedMmPerMin: 280,
+      plungeMmPerMin: 250,
       spindleRpm: 12000,
     });
     expect(result?.provenance.capDetails.map((detail) => detail.source)).toEqual([

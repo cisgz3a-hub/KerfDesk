@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 250. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 255. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -256,6 +256,22 @@ Abort stays reachable while a job streams (non-negotiable #9). The edit→re-tra
 | IE-3 | Retouch & content: clone stamp, dodge/burn, classical background removal, raster text stamp, gradient fill, non-PatchMatch spot-heal | Planned |
 | IE-4 | Layers/blend modes/masks, `.lf2` session persistence, acceleration — each requires its own ADR | Deferred |
 
+### Phase M — v0.12 "G-code Inspector" [Approved 2026-07-25 — ADR-255; build starting at Stage 1]
+
+Read-side 3D program viewer: open any `.nc` / `.gcode` / `.tap` — or the exact
+emitted output from Job Review — into a lazy-loaded three.js Inspector with
+multi-angle playback, planner-true time, per-segment source-line links, and an
+informational Program Health report (rule 7 compliant: findings inform, never
+block). Design + executed self-audit, rendering spec, detail ladder, and the
+staged tight-leash build plan (each stage an individually reviewed, shippable
+diff): `docs/audits/2026-07-25-gcode-inspector-design-and-self-audit.md`.
+Key structural moves: shared modal G-code engine (no third parser), pure
+`src/core/gcode-view/` render model, shared `src/ui/viewer3d/` scene home
+(ADR-102 §2 amended), Open G-code available in both machine modes (ADR-101
+amended). Zero new runtime dependencies. Acceptance gates: total line
+accountability; own-output-clean (every built-in strategy's output parses
+with zero unsupported-word notes).
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
@@ -302,7 +318,7 @@ phase; tracked here so they don't get lost.
 
 1. **Bounds check** — generated paths must fit inside the configured bed.
 2. **Origin honesty** — output coordinates match the device profile's origin.
-3. **Laser-off on travel** — every `G0` move ends with `S0` or precedes an `M5`. Property-tested.
+3. **Laser-off on travel** — every `G0` move either carries `S0` on the same line, immediately **follows** an `M5`/`M107`, or runs while the last commanded `S` is already `0`. Property-tested (`src/core/invariants/predicates.ts`).
 4. **No partial output** — pipeline failure writes no file and sends no stream.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
@@ -492,7 +508,7 @@ an assumption that every folder must have an `index.ts`.
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
 - **No auto-update from arbitrary or unsigned channels.** The production desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). Preview updater trust stays false and no unsigned executable is downloaded or run. Its separate checker accepts only a newer strict Preview tag reported by a completed, successful run of the exact Preview release workflow; that workflow's final job verifies the immutable six-asset release, checksums, manifest, and attestations. The app then shows a passive status-bar link to that exact version's public `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page. API-provided URLs are ignored. No `quitAndInstall`; future trusted updates apply on quit only, never mid-burn.
-- **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. A dependency CVE blocks releases until patched. NOTE: the CI `audit:deps` gate (`pnpm audit --audit-level=low`, part of `release:check`) fails on ANY advisory (direct OR transitive) at low+ severity - stricter than "direct only", and time-dependent (a new transitive advisory can block deploys with no code change).
+- **Dependency CVE monitoring:** GitHub Dependabot alerts, secret scanning, and secret-scanning push protection are enabled on the repository (2026-07-25). A dependency CVE reachable from a production dependency blocks releases until patched — that judgment is made by a human, not by CI. Since ADR-254 the `audit:deps` scan (`pnpm audit --audit-level=low`, still stricter than "direct only") runs nightly in `.github/workflows/audit.yml` and files one tracking issue; it is **not** part of `release:check` and does not block PRs or deploys, because a third-party advisory publication is not a defect in the diff under review. Triage the open audit issue before cutting a `v*` desktop release.
 
 ---
 
@@ -584,7 +600,7 @@ Phase A merges only when **all** of these are true. Phase B starts only after Ph
 4. Tests pass in CI:
    - **Snapshot:** five fixture SVGs produce byte-identical G-code to recorded snapshots.
    - **Determinism property:** same input + same params → identical output over 100 random fuzz seeds.
-   - **Laser-off invariant property:** every `G0` line has `S0` or precedes an `M5` block, across 100 generated inputs.
+   - **Laser-off invariant property:** every `G0` line has inline `S0`, follows an `M5`/`M107`, or runs under a sticky `S0`, across 100 generated inputs.
    - **Bounds invariant property:** output coordinates fall within configured bed, across 100 generated inputs.
    - **Power-scale invariant property:** 50% slider produces correct `S` value across `$30 ∈ {100, 255, 1000}`.
    - **SVG sanitizer (via DOMPurify):** strips `<script>`, external `xlink:href`, foreign objects, non-image data URIs on a corpus of crafted-malicious SVGs.

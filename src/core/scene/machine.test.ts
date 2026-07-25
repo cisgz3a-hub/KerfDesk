@@ -81,4 +81,8 @@ describe('DEFAULT_CNC_LAYER_SETTINGS', () => {
     expect(DEFAULT_CNC_LAYER_SETTINGS.depthMm).toBeLessThan(DEFAULT_CNC_STOCK.thicknessMm);
     expect(DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled).toBe(false);
   });
+
+  it('cuts on the drawn line by default (ADR-256)', () => {
+    expect(DEFAULT_CNC_LAYER_SETTINGS.cutType).toBe('profile-on-path');
+  });
 });

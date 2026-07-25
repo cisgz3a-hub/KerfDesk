@@ -107,7 +107,9 @@ export function consoleActions(
         activeWcs: 'G54',
       }));
     },
-    clearTranscript: () => set({ transcript: [] }),
+    // Both retained histories, not just the displayed one: `log` is a parallel
+    // 200-line ring buffer that Clear used to leave untouched.
+    clearTranscript: () => set({ transcript: [], log: [] }),
   };
 }
 

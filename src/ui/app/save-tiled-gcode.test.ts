@@ -50,8 +50,16 @@ function tiledCncProject(): Project {
     scene: {
       objects: [squareObject('O1', '#ff0000', 10), squareObject('O2', '#0000ff', 60)],
       layers: [
-        { ...createLayer({ id: 'L1', color: '#ff0000' }), cnc: DEFAULT_CNC_LAYER_SETTINGS },
-        { ...createLayer({ id: 'L2', color: '#0000ff' }), cnc: DEFAULT_CNC_LAYER_SETTINGS },
+        // Explicit outside cuts: the maxX assertions below expect the tool to
+        // reach past the square's edge (ADR-256 made on-path the default).
+        {
+          ...createLayer({ id: 'L1', color: '#ff0000' }),
+          cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'profile-outside' as const },
+        },
+        {
+          ...createLayer({ id: 'L2', color: '#0000ff' }),
+          cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'profile-outside' as const },
+        },
       ],
     },
   };

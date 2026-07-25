@@ -15,14 +15,14 @@ describe('resolveCncAutoLayerSettings', () => {
       }),
     ).toMatchObject({
       toolId: 'em-3175',
-      feedMmPerMin: 600,
-      plungeMmPerMin: 120,
+      feedMmPerMin: 300,
+      plungeMmPerMin: 250,
       spindleRpm: 12000,
       depthPerPassMm: 0.75,
       feedSource: {
         kind: 'machine-starter',
         starterId: 'neotronics-4040-shallow-wood-mdf',
-        revision: 1,
+        revision: 2,
       },
     });
   });
@@ -43,7 +43,8 @@ describe('resolveCncAutoLayerSettings', () => {
       }),
     ).toMatchObject({
       materialKey: 'plywood-mdf',
-      feedMmPerMin: 600,
+      feedMmPerMin: 300,
+      // 40% of the 300 mm/min ceiling — below the starter's own 250 plunge cap.
       plungeMmPerMin: 120,
       spindleRpm: 12000,
       depthPerPassMm: 0.75,
@@ -61,13 +62,13 @@ describe('resolveCncAutoLayerSettings', () => {
         profile: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
         machine: DEFAULT_CNC_MACHINE_CONFIG,
         liveCaps: {
-          xMaxFeedMmPerMin: 500,
-          yMaxFeedMmPerMin: 450,
+          xMaxFeedMmPerMin: 280,
+          yMaxFeedMmPerMin: 260,
           zMaxFeedMmPerMin: 90,
         },
       }),
     ).toMatchObject({
-      feedMmPerMin: 450,
+      feedMmPerMin: 260,
       plungeMmPerMin: 90,
       spindleRpm: 12000,
       depthPerPassMm: 0.75,
@@ -136,7 +137,7 @@ describe('resolveCncMaterialFeedPatch', () => {
         },
       }),
     ).toMatchObject({
-      feedMmPerMin: 450,
+      feedMmPerMin: 300,
       plungeMmPerMin: 90,
       spindleRpm: 12000,
       depthPerPassMm: 0.75,
