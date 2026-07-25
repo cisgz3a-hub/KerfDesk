@@ -224,12 +224,27 @@ same session** because it breaks a shipped safety feature. Evidence — 10+ fail
 `compile-cnc-climb-default`, `compile-cnc-job`, `compile-cnc-lead`, and `compile-cnc-line-art`, the
 decisive one being `expected 'contour' to be 'path3d'`:
 
-1. `splitPassForTabs` (`compile-cnc-job.ts:398`, inside `passesForLayer` called at line 116) converts a
-   **closed** profile loop into **open** pieces — one per span between tab windows.
-2. `applyProfileLeadPasses` (`compile-cnc-job.ts:119`) runs **after** that and leads only **closed**
-   profile passes.
-3. Therefore **enabling tabs silently disables ADR-250 arc/line lead-in/out** — the feature added
-   specifically to stop square-entry gouging on profile cuts (`DECISIONS.md:11585`).
+**Mechanism — corrected 2026-07-25.** An earlier revision of this entry blamed pass ordering (tabs split
+the loop, then leads only see open passes). That is wrong, and the real cause matters more:
+
+`applyProfileLeadPasses` contains an **explicit early return** (`profile-lead-passes.ts:44-48`):
+
+```js
+if (settings.rampEntryDeg !== undefined) return passes; // ramp owns the entry
+// Tabs split the loop into open segments; a lead on the surviving full loops
+// while the split passes still plunge on the wall would be inconsistent, so a
+// tabbed profile keeps the legacy entry. Tab-aware leads are a follow-up.
+if (settings.tabsEnabled) return passes;
+```
+
+So **leads never run when tabs are enabled** — deliberately, and ADR-250's own header records it: tabs
+"fall back to the legacy straight plunge" (`profile-lead-passes.ts:18-20`). The interaction was known and
+deferred by ADR-250's author, and the deferral is ADR-sanctioned rather than a defect.
+
+Consequence for the default flip is unchanged and still blocking: **tabs on ⇒ no leads**, so a
+tabs-by-default world reverts every profile cut to a square full-depth plunge on the wall — exactly what
+ADR-250 was written to eliminate. But the remedy is **not** a reordering. Reordering changes nothing while
+that early return stands; what is required is the "tab-aware leads" follow-up the comment names.
 
 Secondary effects of the flip, both inherent to tabs rather than bugs, but material at the shipped
 defaults (`tabHeightMm: 2`, `tabWidthMm: 6`, `tabsPerShape: 4`, 3.175 mm bit):
@@ -241,9 +256,25 @@ defaults (`tabHeightMm: 2`, `tabWidthMm: 6`, `tabsPerShape: 4`, 3.175 mm bit):
   pass, so a shallow profile groove gets four uncut gaps. Logically consistent — a tab taller than the
   cut means "don't cut here" — but surprising as a default.
 
-**Prerequisite before the default can flip:** apply leads *before* tab splitting, or lead each split
-piece. Then re-evaluate the two secondary effects, likely by scoping tabs to passes that actually reach
-through-depth. Needs its own ADR and its own diff.
+**Prerequisite before the default can flip: implement tab-aware leads.** Three candidate designs, none
+of them a reordering:
+
+1. **Lead every split piece.** Each open piece gets a waste-side lead-in at its start and lead-out at its
+   end. Most faithful to ADR-250's intent, and the most work: `computeProfileLead` is written against a
+   closed `Polyline` and its waste-side/self-collision guards (`leadClearsPart`,
+   `leadClearsSiblings`) assume a full loop, so open-piece semantics have to be defined rather than
+   inherited. Piece count multiplies lead count, so bed-fit and sibling-collision rejections get more
+   frequent and need a defined fallback per piece.
+2. **Ramp each split piece instead.** `applyRampEntry` already handles open contours, so a tabbed profile
+   could descend along the path rather than plunge. Cheaper geometrically, but `applyRampEntry` tracks
+   `previousZ` across a depth ladder (`motion-polish.ts:114-131`) and sibling pieces sharing one Z break
+   that assumption — it would need a per-piece variant.
+3. **Lead only the first piece.** Cheapest; explicitly rejected by the existing comment as
+   "inconsistent", and rightly so — the remaining pieces still plunge on the wall.
+
+(1) is the correct target, (2) is the pragmatic one. Either needs its own ADR, its own diff, and — because
+both change real machine motion at full depth — a coupon before being trusted. Also re-evaluate the two
+secondary effects above, likely by scoping tabs to passes that genuinely reach through-depth.
 
 Until then the correct remedy for D-14 remains the **Job Review warning**: when a profile cut's depth
 reaches or exceeds material thickness and tabs are off, inform the operator. Rule 7 permits informing
