@@ -12057,3 +12057,56 @@ plunge 250, feed 300, depth per pass 0.75.
 - Legacy layers without a CNC block, and invalid persisted cut types, now
   normalize to on-path instead of outside; operators choose outside/inside
   explicitly when the part size matters.
+
+## ADR-259 - Test files get a higher raw-physical-line backstop
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+CI enforces two independent file-size limits. ESLint `max-lines` caps every
+file at 400 **counted** code lines with `skipBlankLines` and `skipComments`
+on; `scripts/check-file-size-policy.mjs` separately caps every file at 600
+**raw physical** lines as a backstop against a file that is enormous but
+mostly comments.
+
+The two disagree about tests. The test override in `eslint.config.mjs` turns
+off `max-lines-per-function` for `**/*.test.ts(x)` but deliberately leaves
+`max-lines` on, so a spec is still held to 400 counted code lines. Raw lines,
+though, count exactly what this repo asks tests to carry: case tables, inline
+fixtures, and the "why, not what" comments CLAUDE.md mandates. A spec can sit
+comfortably inside 400 counted lines and still cross 600 raw.
+
+That is what blocked PR #414: `src/core/output/grbl-strategy.test.ts` reached
+605 raw lines while passing lint, so the only failing gate was the proxy
+metric. The failure also surfaced late — `release:check` is an `&&` chain and
+`check:file-size` is step 10, so it stayed invisible behind an earlier red
+test step for the whole session.
+
+The maintainer directed (chat, 2026-07-25) that 600 raw lines is acceptable
+for a test file and the cap should be raised for tests rather than the file
+split.
+
+### Decision
+
+- `check-file-size-policy.mjs` gains `TEST_MAX_RAW_LINES = 900`, applied to
+  files matching `/\.test\.[cm]?[jt]sx?$/`.
+- `MAX_RAW_LINES = 600` is unchanged for every non-test file, including
+  `src/__fixtures__/`, Electron, scripts, and the root configs.
+- The 400-counted-line ESLint `max-lines` cap continues to apply to tests
+  unchanged. **This ADR relaxes a proxy metric, not the limit that matters.**
+- Failure output now names the limit each offending file breached, since two
+  limits are now in play.
+
+### Consequences
+
+- A test file may reach 900 raw lines, but only by adding blanks and comments:
+  at 400 counted code lines ESLint still fails it. The headroom buys
+  documentation and fixtures, not more logic.
+- `grbl-strategy.test.ts` (605 raw) passes, unblocking PR #414 with no change
+  to its test content.
+- The soft-size report (`pnpm check:soft-size`, ADR-132) is untouched and
+  still lists large files without failing.
+- A genuinely oversized *production* file is caught exactly as before; this
+  narrows nothing outside tests.
