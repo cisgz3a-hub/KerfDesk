@@ -50,6 +50,37 @@ explicit prior permission in chat, which must be presumed denied.**
 
 ---
 
+# RESEARCH BEFORE YOU ANSWER — never reason your way to a fact
+
+(Maintainer, 2026-07-25. Canonical source: `CLAUDE.md` collaboration rule 9.
+Restated here in full so it is self-contained.)
+
+An unverified belief is not a deliverable. The moment you are about to write
+"I believe," "typically," "should be," "probably," "I think GRBL/LightBurn/that
+library does X," or "I have not verified this, but" — **stop and go find out
+before you answer.**
+
+Research in this order: read the code in this tree → run the actual command →
+read the vendor's own documentation or firmware source → search the web for the
+authoritative source. Then **cite what you found** (`file:line`, command output,
+or URL) so the maintainer can check it.
+
+- Never substitute plausible reasoning about how something *probably* works for
+  the documented fact.
+- Never hand the maintainer a belief for them to go verify when a search would
+  have settled it in a minute. "Please check X and paste it back" is only
+  acceptable for facts **only they can supply** — what hardware is plugged in,
+  what the machine physically did — never for anything documented.
+- If research genuinely fails, state exactly what you consulted and what is
+  still open: "I read X and searched Y; the answer is in neither." Never a bare
+  "I don't know," and never a guess dressed up as a finding.
+
+This binds hardest **outside** this repo — GRBL/grblHAL behavior, controller
+firmware, LightBurn semantics, third-party APIs — because that is precisely
+where nothing in the tree will catch the mistake for you.
+
+---
+
 # Agent completion reporting rule
 
 ## Required final handoff
