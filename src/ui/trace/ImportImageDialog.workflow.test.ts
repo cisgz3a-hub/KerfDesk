@@ -111,23 +111,25 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('offers CNC only the Smooth preset and greys the rest out', async () => {
+  it('opens CNC on Smooth while leaving every preset selectable', async () => {
     const prior = useStore.getState().project;
     useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
     try {
       await withTraceDialog(async (host) => {
         const select = presetSelect(host);
-        // Opens ON Smooth — a CNC dialog must never start on a disabled option.
+        // Smooth is the recommended CNC starting point (bench result).
         expect(select.value).toBe('Smooth');
+        // Rule 7 / ADR-228 pin: recommending a preset must never disable the
+        // others. Greying them out would be a new guard on an available input.
         const disabledByName = Object.fromEntries(
           Array.from(select.options).map((option) => [option.value, option.disabled]),
         );
         expect(disabledByName).toEqual({
-          'Line Art': true,
+          'Line Art': false,
           Smooth: false,
-          Sharp: true,
-          Centerline: true,
-          'Edge Detection': true,
+          Sharp: false,
+          Centerline: false,
+          'Edge Detection': false,
         });
       });
     } finally {

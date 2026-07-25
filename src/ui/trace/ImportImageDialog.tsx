@@ -89,8 +89,8 @@ function DialogBody(props: {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
-  // CNC opens on Smooth — the only preset it offers (PresetPicker greys out
-  // the rest), so the dialog must not start on a disabled selection.
+  // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
+  // starting selection, not a restriction — every preset stays selectable.
   const [preset, setPreset] = useState<string>(
     machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME,
   );
