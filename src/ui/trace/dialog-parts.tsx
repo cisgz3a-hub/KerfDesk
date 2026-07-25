@@ -19,6 +19,13 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Edge Detection',
 ] as const;
 
+export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
+// CNC traces with the Smooth preset only (maintainer bench result, 2026-07-25:
+// the other presets leave the bit chattering on a traced cut). The rest are
+// greyed out rather than removed so the operator can see which preset is in
+// use and that the narrowing is deliberate.
+export const CNC_TRACE_PRESET_NAME = 'Smooth';
+
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 export type TraceOutput = 'raster' | 'vector';
 
@@ -30,7 +37,12 @@ export function TraceOutputFields(props: {
   readonly traceFillStyle: TraceFillStyle;
   readonly onTraceFillStyleChange: (style: TraceFillStyle) => void;
 }): JSX.Element {
-  const vectorOutput = props.machineKind === 'cnc' || props.traceOutput === 'vector';
+  // Fill style is a laser control: Scanline / Follow Shape / Island Fill are
+  // read only by the laser job compiler (src/core/job). CNC pocketing derives
+  // its own hatch from tool diameter and stepover (cnc/pocket-paths.ts), so on
+  // CNC the picker changed nothing in the output — hide it there.
+  const showFillStyle =
+    props.machineKind === 'laser' && props.traceOutput === 'vector' && props.supportsFillStyle;
   return (
     <>
       {props.machineKind === 'cnc' ? (
@@ -38,7 +50,7 @@ export function TraceOutputFields(props: {
       ) : (
         <TraceOutputPicker value={props.traceOutput} onChange={props.onTraceOutputChange} />
       )}
-      {vectorOutput && props.supportsFillStyle ? (
+      {showFillStyle ? (
         <TraceFillStylePicker
           value={props.traceFillStyle}
           onChange={props.onTraceFillStyleChange}
@@ -79,9 +91,11 @@ function parseTraceOutput(value: string): TraceOutput {
 }
 
 export function PresetPicker(props: {
+  readonly machineKind: 'laser' | 'cnc';
   readonly value: string;
   readonly onChange: (next: string) => void;
 }): JSX.Element {
+  const smoothOnly = props.machineKind === 'cnc';
   return (
     <Field label="Preset">
       <select
@@ -90,10 +104,10 @@ export function PresetPicker(props: {
         className="lf-select"
         style={selectStyle}
         aria-label="Trace preset"
-        title="Choose a trace preset tuned for line art, smooth logos, centerlines, sharp detail, or edge-line drawings."
+        title={smoothOnly ? CNC_PRESET_PICKER_TITLE : LASER_PRESET_PICKER_TITLE}
       >
         {VISIBLE_TRACE_PRESET_NAMES.filter((key) => TRACE_PRESETS[key] !== undefined).map((key) => (
-          <option key={key} value={key}>
+          <option key={key} value={key} disabled={smoothOnly && key !== CNC_TRACE_PRESET_NAME}>
             {key}
           </option>
         ))}
@@ -101,6 +115,11 @@ export function PresetPicker(props: {
     </Field>
   );
 }
+
+const LASER_PRESET_PICKER_TITLE =
+  'Choose a trace preset tuned for line art, smooth logos, centerlines, sharp detail, or edge-line drawings.';
+const CNC_PRESET_PICKER_TITLE =
+  'CNC traces with the Smooth preset; the other presets are greyed out because they leave the bit chattering on a cut.';
 
 export function TraceFillStylePicker(props: {
   readonly value: TraceFillStyle;
@@ -199,16 +218,17 @@ export function PresetHint(): JSX.Element {
   );
 }
 
-// CNC-only advisory: outline presets trace both sides of a thin stroke, so on a
-// profile cut a thin line becomes two cuts bracketing it — point operators at
-// the Centerline preset for a single pass. Cutting out filled shapes/logos (the
-// common CNC case) is unaffected. Shown only when the project machine is CNC.
+// CNC-only advisory. Two things the operator needs: only Smooth is selectable
+// here, and Smooth is an OUTLINE preset — it traces both sides of a stroke, so
+// a thin line becomes two cuts bracketing it. Cutting out filled shapes/logos
+// (the common CNC case) is unaffected. Shown only when the machine is CNC.
 export function CncTraceHint(): JSX.Element {
   return (
     <p style={cncHintStyle}>
-      Cutting on CNC: the outline presets (Line Art, Smooth, Sharp) trace shape edges — ideal for
-      cutting a filled shape or logo out, but a thin line becomes two cuts bracketing it. For a
-      single pass down thin strokes, pick the <strong>Centerline</strong> preset.
+      Cutting on CNC: tracing uses the <strong>Smooth</strong> preset — the others trace finer
+      detail than a router bit follows cleanly. Smooth traces shape edges, ideal for cutting a
+      filled shape or logo out; a thin line becomes two cuts bracketing it rather than one pass down
+      the middle.
     </p>
   );
 }
