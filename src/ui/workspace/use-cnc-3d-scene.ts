@@ -7,11 +7,12 @@
 // used to dispose the renderer on every edit and snap the operator's orbit
 // back to the default view.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChiploadMaterial } from '../../core/cnc';
 import { steppedSurfaceMesh } from '../../core/heightfield';
 import { downsampleRemovalGrid, type RemovalGrid, type ToolProfilePoint } from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
+import type { Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
 import {
   createReliefThreeScene,
   type ReliefSceneHandle,
@@ -40,6 +41,16 @@ export type Cnc3dScene = {
   // prop. useRef's own return type is what the consumer needs.
   readonly canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
   readonly state: Cnc3dSceneState;
+  // View controls that act on the live scene without rebuilding it. Null-safe:
+  // they no-op until the scene finishes loading, so a toolbar can be rendered
+  // immediately rather than waiting on the WebGL context.
+  readonly controls: Cnc3dSceneControls;
+};
+
+export type Cnc3dSceneControls = {
+  readonly setDisplayMode: (mode: Viewer3DDisplayMode) => void;
+  readonly setSectionFraction: (fraction: number) => void;
+  readonly capturePng: (scale: number) => string | null;
 };
 
 /**
@@ -127,7 +138,16 @@ export function useCnc3dScene(
     return () => observer.disconnect();
   }, []);
 
-  return { canvasRef, state };
+  const controls = useMemo<Cnc3dSceneControls>(
+    () => ({
+      setDisplayMode: (mode) => handleRef.current?.setDisplayMode(mode),
+      setSectionFraction: (fraction) => handleRef.current?.setSectionFraction(fraction),
+      capturePng: (scale) => handleRef.current?.capturePng(scale) ?? null,
+    }),
+    [],
+  );
+
+  return { canvasRef, state, controls };
 }
 
 // Total declared program length. Read from the last move rather than summed,

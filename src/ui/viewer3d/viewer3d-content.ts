@@ -17,6 +17,7 @@ import type { ToolProfilePoint } from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import { materialAppearance, type MaterialAppearance } from '../theme/material-appearance';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
+import { displayModeFlags, type Viewer3DDisplayMode } from './viewer3d-display-mode';
 import { buildStageFurniture } from './viewer3d-stage';
 import { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
 import { buildToolpathLines, type ToolpathLinesHandle } from './viewer3d-toolpath';
@@ -64,6 +65,8 @@ export type ViewerContentHandle = {
   // scrubber ticks continuously, and re-stamping a 300x300 surface per tick
   // would make playback unusable.
   readonly setScrubMm: (atMm: number | null) => void;
+  /** Shows or hides the surface and the route per the display mode. */
+  readonly setDisplayMode: (mode: Viewer3DDisplayMode) => void;
 };
 
 /**
@@ -98,7 +101,8 @@ export async function buildViewerContent(
     roughness: appearance.roughness,
     metalness: appearance.metalness,
   });
-  group.add(new three.Mesh(geometry, surfaceMaterial));
+  const surfaceMesh = new three.Mesh(geometry, surfaceMaterial);
+  group.add(surfaceMesh);
   disposers.push(() => {
     geometry.dispose();
     surfaceMaterial.dispose();
@@ -142,6 +146,20 @@ export async function buildViewerContent(
     object: group,
     dispose: () => {
       for (const dispose of disposers) dispose();
+    },
+    setDisplayMode: (mode) => {
+      const flags = displayModeFlags(mode);
+      surfaceMesh.visible = flags.isSurfaceVisible;
+      surfaceMaterial.opacity = flags.surfaceOpacity;
+      // transparent must be toggled with the opacity, not left on: an opaque
+      // material flagged transparent is sorted per-object and z-fights the
+      // stock outline at grazing angles.
+      surfaceMaterial.transparent = flags.surfaceOpacity < 1;
+      surfaceMaterial.needsUpdate = true;
+      if (lines !== null) lines.object.visible = flags.isToolpathVisible;
+      // The cutter belongs to the route, not the result: hiding the path and
+      // leaving the bit floating over the part reads as a modelling error.
+      if (tool !== null) tool.object.visible = flags.isToolpathVisible;
     },
     setScrubMm: (atMm) => {
       lines?.setRevealMm(atMm);

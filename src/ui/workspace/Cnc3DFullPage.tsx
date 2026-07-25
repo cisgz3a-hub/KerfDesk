@@ -9,8 +9,12 @@
 // Portalled to document.body so no pane's overflow or stacking context can clip
 // it. Escape closes; the pane behind is left mounted and untouched.
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Viewer3DToolbar } from '../viewer3d/Viewer3DToolbar';
+import { DEFAULT_DISPLAY_MODE, type Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
+import { SECTION_DISABLED_FRACTION } from '../viewer3d/viewer3d-clipping';
+import { DEFAULT_SCREENSHOT_SCALE, screenshotFileName } from '../viewer3d/viewer3d-screenshot';
 import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
 
 const CLOSE_KEY = 'Escape';
@@ -22,8 +26,29 @@ export function Cnc3DFullPage(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const { source, stockThicknessMm, scrubberT, onClose } = props;
-  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT);
+  const { canvasRef, state, controls } = useCnc3dScene(source, stockThicknessMm, scrubberT);
+  const [mode, setMode] = useState<Viewer3DDisplayMode>(DEFAULT_DISPLAY_MODE);
+  const [sectionFraction, setSectionFraction] = useState(SECTION_DISABLED_FRACTION);
   useCloseOnEscape(onClose);
+
+  // Pushed on every change AND on every state change: the controls no-op until
+  // the WebGL context exists, so a mode picked while it was still loading has
+  // to be re-applied once it is ready.
+  useEffect(() => {
+    controls.setDisplayMode(mode);
+    controls.setSectionFraction(sectionFraction);
+  }, [controls, mode, sectionFraction, state]);
+
+  const handleSavePng = useCallback(() => {
+    const dataUrl = controls.capturePng(DEFAULT_SCREENSHOT_SCALE);
+    if (dataUrl === null) return;
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    // The Project model carries no name, so the filename falls back to the
+    // module's own prefix rather than inventing a field to read.
+    link.download = screenshotFileName('', new Date().toISOString());
+    link.click();
+  }, [controls]);
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="3D result, full page" style={overlayStyle}>
@@ -37,6 +62,15 @@ export function Cnc3DFullPage(props: {
         <button type="button" onClick={onClose} style={closeStyle} title="Close (Esc)">
           Close
         </button>
+      </div>
+      <div style={toolbarRowStyle}>
+        <Viewer3DToolbar
+          mode={mode}
+          onModeChange={setMode}
+          sectionFraction={sectionFraction}
+          onSectionChange={setSectionFraction}
+          onSavePng={handleSavePng}
+        />
       </div>
       <canvas ref={canvasRef} aria-label="Live 3D cut result" style={canvasStyle} />
     </div>,
@@ -74,6 +108,7 @@ const barStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
+const toolbarRowStyle: React.CSSProperties = { padding: '0 12px 8px', flexShrink: 0 };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', flex: 1 };
 const closeStyle: React.CSSProperties = { padding: '4px 12px', cursor: 'pointer' };
 // The canvas fills what's left; the hook's ResizeObserver re-fits the drawing
