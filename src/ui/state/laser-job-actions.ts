@@ -34,6 +34,7 @@ import { laserModeStartEvidenceIssue } from './laser-mode-start-evidence';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
+import { finishedJobStateReset } from './laser-session-reset';
 import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
   hasPendingControllerWrite,
@@ -249,6 +250,9 @@ async function runStopJob(context: JobActionContext): Promise<void> {
     }
   }
   set((state) => ({
+    // Abort ends the run, so its machine kind and any tool-change bits it never
+    // reached are no longer the operator's pending work.
+    ...finishedJobStateReset(),
     wcoCache: null,
     accessoryCache: null,
     airAssistOn: false,

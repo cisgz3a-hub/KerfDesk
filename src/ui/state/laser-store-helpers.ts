@@ -15,6 +15,7 @@ import * as controllerOperation from './laser-controller-operation';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import { sessionScopedJobStateReset } from './laser-session-reset';
 import type { LaserState } from './laser-store';
 import {
   isWorkZEvidenceCurrentForStart,
@@ -23,13 +24,6 @@ import {
 } from './work-z-zero-evidence';
 
 const LOG_MAX = 200;
-const TOOL_CHANGE_STATE_DEFAULTS = {
-  toolChangeIdleSeen: false,
-  toolChangeLabels: [] as ReadonlyArray<string>,
-  toolChangeToolIds: [] as ReadonlyArray<string | null>,
-  pendingToolLabel: null,
-  pendingToolId: null,
-};
 const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
@@ -373,8 +367,7 @@ export function initialLaserState(): InitialLaserState {
     controllerSessionEpoch: 0,
     statusSequence: 0,
     statusObservation: null,
-    alarmCode: null,
-    lastError: null,
+    ...sessionScopedJobStateReset(),
     lastWriteError: null,
     safetyNotice: null,
     airAssistOn: false,
@@ -386,7 +379,6 @@ export function initialLaserState(): InitialLaserState {
     streamer: null,
     activeRunId: null,
     liveCanvasRun: null,
-    activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
     homingState: 'unknown',
@@ -403,15 +395,12 @@ export function initialLaserState(): InitialLaserState {
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
-    activeWcs: null,
-    ovCache: null,
     accessoryCache: null,
     mpgActive: null,
     workOriginActive: false,
     workOriginSource: 'none',
     workOriginVersion: 0,
     workZZeroEvidence: null,
-    ...TOOL_CHANGE_STATE_DEFAULTS,
     frameVerification: null,
     framedRun: null,
     framedRunStartClaim: null,
@@ -432,6 +421,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
   return {
+    ...sessionScopedJobStateReset(),
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
     statusReport: null,
@@ -449,8 +439,6 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // G54 can survive, but the cached WCO is no longer trustworthy until a
     // fresh status frame arrives.
     wcoCache: null,
-    activeWcs: null,
-    ovCache: null,
     accessoryCache: null,
     mpgActive: null,
     workOriginActive: state.workOriginSource === 'g54-persistent',
