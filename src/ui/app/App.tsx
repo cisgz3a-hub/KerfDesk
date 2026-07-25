@@ -104,12 +104,15 @@ function CanvasArea(): JSX.Element {
   );
 }
 
-// Sits above both the canvas and the G-code preview, with its own elevation
-// so it reads as a control rather than part of the drawing.
+// Top-CENTRE, deliberately: the rulers own the left edge and the motion
+// badge owns top-right (canvas-motion-badge.tsx, top/right 12) — anchoring
+// either side buries one of them. Its own elevation so it reads as a
+// control rather than part of the drawing.
 const canvasSwitchStyle: React.CSSProperties = {
   position: 'absolute',
   top: 10,
-  right: 12,
+  left: '50%',
+  transform: 'translateX(-50%)',
   zIndex: 4,
   boxShadow: 'var(--lf-shadow)',
   borderRadius: 'var(--lf-radius-lg)',
