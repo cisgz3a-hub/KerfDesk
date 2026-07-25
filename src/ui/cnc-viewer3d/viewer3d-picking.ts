@@ -7,7 +7,7 @@
 //
 // The frame conversion is the exact inverse of the one the surface geometry is
 // baked with (mirror in Y, then recentre). Writing it here, next to nothing
-// else, keeps it checkable against ADR-257 §2 by reading two functions rather
+// else, keeps it checkable against ADR-261 §2 by reading two functions rather
 // than tracing a scene graph.
 //
 // PURE: numbers in, numbers out. No three import, no DOM.

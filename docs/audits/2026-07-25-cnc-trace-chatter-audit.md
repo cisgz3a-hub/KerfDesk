@@ -5,7 +5,7 @@ instrument: temporary vitest spec (not retained), 6 deterministic fixtures × 5
 presets · scale: verified app default **0.1 mm/px** (254 DPI,
 `src/ui/common/image-import.ts`)
 
-> **Status.** The preferred fix shipped the same day as **ADR-257 / PR #422**
+> **Status.** The preferred fix shipped the same day as **ADR-260 / PR #422**
 > (`main` squash `53cea2c2`): CNC trace commits are refaired in physical units
 > (`fairToolpathPolylines`, `src/core/geometry/fair-toolpath-polylines.ts`;
 > policy in `src/ui/trace/cnc-trace-fairing.ts`). End-to-end verification is at
@@ -104,7 +104,7 @@ segments under 0.1 mm** and 15–22° heading jitter — an ~80 Hz impulse train
 F300, and the stroke is cut twice. Centerline is the _only_ clean preset
 there. The bench result "Smooth is the only one that doesn't wobble" therefore
 implies the bench art was **filled/outline art, not thin single strokes**.
-Without the ADR-257 fairing, a thin-stroke source traced with Smooth would
+Without the ADR-260 fairing, a thin-stroke source traced with Smooth would
 chatter too.
 
 ## The physics, with the verified GRBL model
@@ -143,7 +143,7 @@ guaranteed that — and on thin strokes it stopped being true.
 ## Candidate fixes
 
 1. **Machine-aware finishing pass at the trace boundary** — **SHIPPED as
-   ADR-257 / #422** (`main` `53cea2c2`). When `machineKind === 'cnc'`, commit
+   ADR-260 / #422** (`main` `53cea2c2`). When `machineKind === 'cnc'`, commit
    refaires the polylines in mm: corner-pinned smoothing (0.05 mm clamp), then
    even-arclength resample to 0.4 mm chords; windowed 60° corners with
    arclength non-max suppression; curves rebuilt (the CNC compiler flattens
@@ -155,12 +155,12 @@ guaranteed that — and on thin strokes it stopped being true.
    fix 1.
 4. Bench coupon — **blocked: no machine available (2026-07-25)**. When one
    exists: same feed, cut (a) clean filled art traced Line Art vs Smooth;
-   (b) a thin-stroke source traced Smooth. Pre-ADR-257 the model predicts
-   wobble on (a)-LineArt and (b); post-ADR-257 it predicts neither chatters.
+   (b) a thin-stroke source traced Smooth. Pre-ADR-260 the model predicts
+   wobble on (a)-LineArt and (b); post-ADR-260 it predicts neither chatters.
    (The 2026-07-24 finding that one "wobble" was RPM-dependent spindle EMI
    makes a geometry-only A/B worth the stock.)
 
-## End-to-end verification of ADR-257 (2026-07-25, software ceiling)
+## End-to-end verification of ADR-260 (2026-07-25, software ceiling)
 
 With no machine available, the strongest possible check was run instead: the
 same traced 40 mm jittered circle compiled through the **real CNC pipeline**
@@ -168,7 +168,7 @@ same traced 40 mm jittered circle compiled through the **real CNC pipeline**
 contour pass), raw vs faired, measured in **machine millimetres** — the
 geometry the streamer would send:
 
-| contour pass (machine mm) | raw (pre-ADR-257) | faired |
+| contour pass (machine mm) | raw (pre-ADR-260) | faired |
 | --- | --- | --- |
 | vertices | 501 | 315 |
 | min / mean segment | 0.251 / 0.254 mm | **0.400 / 0.400 mm** |

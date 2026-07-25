@@ -1,5 +1,5 @@
 // core/toolpath3d — lifts a toolpath's 2D geometry and Z spans into 3D moves
-// for the viewport. Pure; machine frame (ADR-257).
+// for the viewport. Pure; machine frame (ADR-261).
 
 export {
   firstCuttingPoint,
