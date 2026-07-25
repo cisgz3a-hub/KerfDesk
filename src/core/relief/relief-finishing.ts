@@ -36,9 +36,18 @@ export function reliefFinishingPasses(
   const rowSpacingMm = scallopRowSpacingMm(options.tool, options.scallopMm);
   const rowStep = Math.max(1, Math.round(rowSpacingMm / mmPerCell));
 
+  // Row indices at the scallop stride, plus the far-Y row whenever the stride
+  // steps over it — otherwise the last rowStep-1 rows keep their roughing
+  // allowance as an uncut ridge along the far edge. surfacingRowYs solves the
+  // same problem the same way by pushing the far edge after its loop.
+  const rows: number[] = [];
+  for (let row = 0; row < heightCells; row += rowStep) rows.push(row);
+  const farRow = heightCells - 1;
+  if (rows[rows.length - 1] !== farRow) rows.push(farRow);
+
   const passes: CncPass[] = [];
   let leftToRight = true;
-  for (let row = 0; row < heightCells; row += rowStep) {
+  for (const row of rows) {
     const y = (row + 0.5) * mmPerCell;
     const points = [];
     for (let i = 0; i < widthCells; i += 1) {
