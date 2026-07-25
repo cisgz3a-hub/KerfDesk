@@ -11940,7 +11940,7 @@ produce a signal nobody is required to read).
 
 ---
 
-## ADR-256 - Vector cuts default to M4 dynamic power
+## ADR-257 - Vector cuts default to M4 dynamic power
 
 **Status:** Accepted | **Date:** 2026-07-25
 

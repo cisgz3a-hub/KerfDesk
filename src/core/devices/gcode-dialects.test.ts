@@ -26,7 +26,7 @@ describe('GRBL G-code dialect catalog', () => {
     expect(resolveGrblDialect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE).requiresS0OnRapid).toBe(true);
   });
 
-  // ADR-256: the default and raster dialects cut with M4 dynamic power so energy per
+  // ADR-257: the default and raster dialects cut with M4 dynamic power so energy per
   // mm stays flat through an accelerating corner. grbl-compatible stays constant as the
   // escape hatch for firmware without M4 (GRBL 1.1e and older); neotronics-4040-safe
   // stays constant pending its own hardware pass.

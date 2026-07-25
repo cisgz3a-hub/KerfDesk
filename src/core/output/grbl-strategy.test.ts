@@ -206,7 +206,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     const out = emit(job);
 
     expect(out).toContain(
-      // ADR-256: the between-pass re-arm carries the group's effective mode, which on
+      // ADR-257: the between-pass re-arm carries the group's effective mode, which on
       // the default dialect is now M4. The re-arm itself still happens, at zero power.
       ['; pass 2 of 2', 'M4 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
     );
@@ -468,7 +468,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
         },
       ],
     };
-    // ADR-256: the default dialect cuts dynamically, so the re-arm after a raster
+    // ADR-257: the default dialect cuts dynamically, so the re-arm after a raster
     // group's trailing M5 is M4. The raster path leaves mode 'off', so a re-arm is
     // still required — that is what this pins.
     expect(emit(job)).toContain('M5\nM4 S0\n; layer cut color #ff0000');

@@ -221,7 +221,7 @@ describe('prepareStartJob', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.gcode).toContain('M4 S0'); // ADR-256: dynamic-power cut default
+      expect(result.gcode).toContain('M4 S0'); // ADR-257: dynamic-power cut default
       expect(result.warnings).toEqual([]);
     }
   });

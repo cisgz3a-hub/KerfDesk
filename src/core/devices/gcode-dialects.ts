@@ -73,7 +73,7 @@ const GRBL_DYNAMIC_DIALECT: GrblGcodeDialect = {
   id: 'grbl-dynamic',
   label: 'GRBL Dynamic',
   description: 'KerfDesk default: dynamic-power cuts, fill and raster sweeps.',
-  // ADR-256: vector cuts default to M4 dynamic power. Under M3 the head burns at
+  // ADR-257: vector cuts default to M4 dynamic power. Under M3 the head burns at
   // full programmed S while accelerating out of a corner, depositing more energy per
   // mm exactly where it moves slowest — the scorched-corner defect. GRBL's own
   // laser_mode doc says M3 needs added lead-in/lead-out motions "for a clean cut and
@@ -94,7 +94,7 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     id: 'grbl-compatible',
     label: 'GRBL Compatible',
     description: 'Conservative GRBL v1.1 output with constant-power vector cuts.',
-    // ADR-256 deliberately leaves this one constant: it is the escape hatch for
+    // ADR-257 deliberately leaves this one constant: it is the escape hatch for
     // firmware without dynamic power (GRBL 1.1e and older, where M4 does not exist),
     // mirroring LightBurn's separate "GRBL-M3" device profile for the same firmware.
     cutPowerMode: 'constant',
@@ -110,7 +110,7 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     id: 'grbl-raster',
     label: 'GRBL Raster',
     description: 'GRBL dynamic raster behavior for image-heavy jobs.',
-    // ADR-256: a dynamic-oriented dialect keeps dynamic cuts too. Rayforge's
+    // ADR-257: a dynamic-oriented dialect keeps dynamic cuts too. Rayforge's
     // equivalent grbl_raster dialect holds M4 active across the whole job.
     cutPowerMode: 'dynamic',
     fillPowerMode: 'dynamic',

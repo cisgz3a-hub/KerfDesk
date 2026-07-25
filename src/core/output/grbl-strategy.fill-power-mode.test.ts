@@ -58,7 +58,7 @@ const cut = (): CutGroup => ({
   ],
 });
 
-// ADR-256 made the DEFAULT dialect cut dynamically too, so on that dialect there is
+// ADR-257 made the DEFAULT dialect cut dynamically too, so on that dialect there is
 // no longer any M3/M4 transition to observe — the whole job is M4. The cross-group
 // mode state machine is still live code for constant-cut dialects (grbl-compatible,
 // neotronics-4040-safe) and for per-layer overrides, so the transition tests below
@@ -103,19 +103,19 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut');
   });
 
-  // ADR-256: the shipped default now cuts under dynamic power, so a cut-only job
+  // ADR-257: the shipped default now cuts under dynamic power, so a cut-only job
   // never emits M3 at all and needs no mid-job flip to reach a fill.
-  it('cuts under M4 on the default dialect and never emits M3 (ADR-256)', () => {
+  it('cuts under M4 on the default dialect and never emits M3 (ADR-257)', () => {
     const out = emit({ groups: [cut()] });
     expect(out).toContain('G21\nG90\nG54\nG94\nM4 S0\n; layer cut');
     expect(out).not.toContain('M3');
     expect(findLaserOnTravelIssues(out)).toEqual([]);
   });
 
-  it('needs no mode flip between cut and fill on the default dialect (ADR-256)', () => {
+  it('needs no mode flip between cut and fill on the default dialect (ADR-257)', () => {
     const out = emit({ groups: [cut(), fill(5)] });
     // One arm in the preamble, and no second M4 re-arm because the mode never left
-    // dynamic — that is what ADR-256 buys across the cut/fill boundary.
+    // dynamic — that is what ADR-257 buys across the cut/fill boundary.
     expect(out.match(/^M4 S0$/gm) ?? []).toHaveLength(1);
     expect(out).not.toContain('M3');
     expect(findLaserOnTravelIssues(out)).toEqual([]);
@@ -133,7 +133,7 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
       passes: 2,
     };
     // Runs on the constant-cut dialect so the override genuinely differs from the
-    // dialect default (under ADR-256 both are dynamic on the shipped default).
+    // dialect default (under ADR-257 both are dynamic on the shipped default).
     const out = emitConstantCut({ groups: [dynamicCut, fill(5)] });
     // Pass 2 re-arms dynamic, never constant.
     expect(out).toContain('; pass 2 of 2\nM4 S0');
@@ -209,7 +209,7 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
       powerMode: 'constant',
     };
     // Constant-cut dialect: here BOTH override directions produce a real flip
-    // (M3→M4 for the dynamic cut, M4→M3 for the constant fill). On the ADR-256
+    // (M3→M4 for the dynamic cut, M4→M3 for the constant fill). On the ADR-257
     // default the dynamic-cut override matches the dialect and emits no flip.
     const out = emitConstantCut({ groups: [dynamicCut, constantFill] });
 

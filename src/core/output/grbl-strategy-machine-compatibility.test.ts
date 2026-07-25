@@ -140,7 +140,7 @@ describe('grblStrategy machine compatibility dialects', () => {
         'G90',
         'G54',
         'G94',
-        // ADR-256: the default dialect arms M4 dynamic power for vector cuts.
+        // ADR-257: the default dialect arms M4 dynamic power for vector cuts.
         'M4 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
@@ -168,7 +168,7 @@ describe('grblStrategy machine compatibility dialects', () => {
         'G90',
         'G54',
         'G94',
-        // ADR-256: cut and fill are both dynamic on the default dialect now, so the
+        // ADR-257: cut and fill are both dynamic on the default dialect now, so the
         // preamble arm carries straight into the fill body — the old M5 + M4 S0 flip
         // pair is gone. Fewer mode changes per job is a side benefit of the change.
         'M4 S0',

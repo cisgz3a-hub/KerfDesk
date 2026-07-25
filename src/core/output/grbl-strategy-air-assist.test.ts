@@ -139,7 +139,7 @@ describe('grblStrategy air assist coolant emission', () => {
       { ...DEFAULT_DEVICE_PROFILE, airAssistCommand: 'M8' },
     );
 
-    // Anchored on the raster body, not on '\nM4 S0\n': since ADR-256 the preamble
+    // Anchored on the raster body, not on '\nM4 S0\n': since ADR-257 the preamble
     // itself arms M4, so the first M4 in the file precedes the coolant line and is
     // not the raster's own arm. The invariant under test is "air on before burning".
     expect(gcode.indexOf('\nM8\n')).toBeLessThan(gcode.indexOf('; image layer'));
