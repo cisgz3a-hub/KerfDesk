@@ -47,7 +47,10 @@ describe('climb default (ADR-251)', () => {
     expect(DEFAULT_CNC_LAYER_SETTINGS.cutDirection).toBe('climb');
   });
 
-  it('emits a default profile-outside contour counter-clockwise', () => {
+  // ADR-251 as amended: climb keeps the material on the RIGHT of travel, so the
+  // default profile-outside layer walks the part's exterior CLOCKWISE. The
+  // original ADR asserted the mirror of this and shipped inverted.
+  it('emits a default profile-outside contour clockwise', () => {
     const layer: Layer = {
       ...createLayer({ id: 'L', color: '#2563eb' }),
       // Leads off (ADR-250 is default-on) so the profile stays a plain contour
@@ -60,6 +63,6 @@ describe('climb default (ADR-251)', () => {
     if (group?.kind !== 'cnc') throw new Error('expected a cnc group');
     const pass = group.passes[0];
     if (pass?.kind !== 'contour') throw new Error('expected a contour pass');
-    expect(isCounterClockwise({ closed: pass.closed, points: [...pass.polyline] })).toBe(true);
+    expect(isCounterClockwise({ closed: pass.closed, points: [...pass.polyline] })).toBe(false);
   });
 });

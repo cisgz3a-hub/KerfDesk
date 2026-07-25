@@ -11670,7 +11670,8 @@ offset happened to produce — an unpredictable, per-shape mix of climb and
 conventional, the weakest possible default.
 
 For a router cutting the outside of a part, climb milling (outside-profile =
-counter-clockwise with an M3 / top-view-clockwise spindle) pushes the fibers
+clockwise with an M3 / top-view-clockwise spindle — see the 2026-07-25
+amendment; this line originally said counter-clockwise) pushes the fibers
 into the kept material and leaves the cleaner edge, and it is the shipped default
 in Vectric, Fusion, and Easel. The one risk — climb's self-feeding force
 snapping an axis across backlash and grabbing — scales with backlash, which
@@ -11681,8 +11682,8 @@ for backlash-prone (e.g. belt-driven) machines.
 ### Decision
 
 `DEFAULT_CNC_LAYER_SETTINGS.cutDirection` is `'climb'`. New layers start in
-climb: profile-outside toolpaths are emitted counter-clockwise, profile-inside
-and pockets clockwise, with the entry point rotated to the mid-point of the
+climb: profile-outside toolpaths are emitted clockwise, profile-inside
+and pockets counter-clockwise, with the entry point rotated to the mid-point of the
 longest segment (unchanged `enforceCutDirection` behaviour). The "Default
 direction" dropdown option (unset `cutDirection`) still restores the compiler's
 natural winding per layer, and conventional is directly selectable.
@@ -11705,8 +11706,43 @@ only. Ramp entry, helix entry, and park remain opt-in and off by default.
 
 - A compile unit test asserts a default-settings profile-outside contour — with
   leads off (`shape: 'none'`) to isolate the winding — is emitted
-  counter-clockwise (climb).
+  clockwise (climb).
 - The existing CNC G-code snapshot suite pins the new default output.
+
+### Amendment 2026-07-25 - the climb winding above was inverted
+
+**Status:** Accepted, supersedes the original winding claim.
+
+As originally written this ADR asserted that climb keeps the material on the
+LEFT of travel, giving outside-profile climb = CCW and inside/pocket climb = CW.
+That is the mirror of the real convention, and `wantsCounterClockwise` in
+`motion-polish.ts` implemented the ADR faithfully — so from ADR-251 until this
+amendment, selecting **Climb** produced conventional motion and selecting
+**Conventional** produced climb, on every profile and pocket layer.
+
+Climb keeps the material on the **RIGHT** of travel for an M3 spindle: the tooth
+enters at maximum chip thickness and thins to zero. Therefore **outside-profile
+climb = CW, inside/pocket climb = CCW.** Four independent references agree:
+
+- VCarve Pro's own 2D Profile manual, which is where this ADR's Vectric claim
+  came from: "Outside … Climb (CW) … Conventional (CCW)" and "Inside … Climb
+  (CCW) … Conventional (CW)". The 2026-07-25 audit reported this page as saying
+  "Climb (CCW)" for both Outside and Inside; it does not.
+- Autodesk Fusion: contour arrows point clockwise for outer-contour selections
+  and counter-clockwise for inner-contour selections, to maintain a climb cut.
+- WoodWeb: "Conventional cutting would be cutting counterclockwise around the
+  outside of a part and clockwise on the inside of a cutout."
+- G41 (compensation left of path ⇒ material right of travel) is the climb side
+  for a right-hand cutter, which Fusion labels "Left (climb milling)".
+
+The fix swaps the two return expressions in `wantsCounterClockwise`. ADR-252's
+hole mirror needed no change — it computes `isHole ? !wantCcw : wantCcw`, so it
+follows the base value — and ADR-250's lead sides resolve from each contour's
+actual winding, so they follow too. The rule-7 surface is unchanged: nothing is
+blocked, gated or clamped by this; it is a corrected mapping.
+
+**Not verified:** no coupon was cut. This rests on documentary agreement between
+four references, not on a measured chip direction from the maintainer's machine.
 
 ## ADR-252 - Cut-direction enforcement keeps hole windings opposite the outer
 
