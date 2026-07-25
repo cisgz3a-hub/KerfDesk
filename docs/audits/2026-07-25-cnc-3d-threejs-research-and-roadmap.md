@@ -301,7 +301,7 @@ SPECULATIVE. Replace CPU kernel stamping with jscut's technique: render each mov
 Each stage is intended to be one independently reviewable diff with one intent,
 per the tight-leash rule in `CLAUDE.md`.
 
-### Stage 0 — ADR-257: CNC 3D viewport upgrade — scope, import boundary, and non-guard status
+### Stage 0 — ADR-261: CNC 3D viewport upgrade — scope, import boundary, and non-guard status
 
 **Intent.** Record the architectural decision before any code: amend ADR-102 §2 to permit three.js beneath a new `src/ui/cnc-viewer3d/` folder (or explicitly keep everything under `src/ui/relief-viewer/`), restate that the whole viewport is display-only and may never gate Frame or Start, add the PROJECT.md phase row this work currently has no slot for, and add the WORKFLOW.md flows (next free id is F-CNC46) with their success/error/empty/edge states.
 

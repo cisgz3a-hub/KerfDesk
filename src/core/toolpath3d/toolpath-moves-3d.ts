@@ -16,7 +16,7 @@
 //
 // 2. This module is frame-AGNOSTIC: XY passes through untouched and Z is read
 //    from the step's own span. It does not convert frames and must not be
-//    asked to. Per ADR-257 §2 (as corrected), the viewport's single frame is
+//    asked to. Per ADR-261 §2 (as corrected), the viewport's single frame is
 //    the removal grid's local frame — scene-space XY relative to the grid
 //    origin, machine Z — mirrored once at the geometry boundary. So the
 //    caller feeds this a SCENE-frame toolpath, the same one the removal grid

@@ -12248,7 +12248,9 @@ across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
   each tab instead of retracting and replunging. Better in principle and unproven in material.
   Cut a tabbed coupon before trusting it, and confirm the bridges hold.
 
-## ADR-257 — CNC traces commit machine-faired polylines (2026-07-25)
+## ADR-260 — CNC traces commit machine-faired polylines (2026-07-25)
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
 
 ### Context
 
@@ -12294,7 +12296,9 @@ stopped being true.
 - The pass runs in the import dialog's commit path, today's only TracedImage
   creation site; a future creation site must call it or document why not.
 
-## ADR-257 - CNC 3D viewport: import boundary, world frame, and display-only status
+## ADR-261 - CNC 3D viewport: import boundary, world frame, and display-only status
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
 
 **Status:** Accepted
 **Date:** 2026-07-25
