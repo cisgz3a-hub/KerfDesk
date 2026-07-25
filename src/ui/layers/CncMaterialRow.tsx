@@ -132,7 +132,7 @@ function machineStarterDisplay(
     };
   }
   return {
-    optionLabel: `${identity} — ${savedRevision} (engineering starter)`,
+    optionLabel: `${identity} — ${savedRevision} (${active.confidence.replace('-', ' ')})`,
     hint: `${operatorNotice} ${identity} ${savedRevision} is active. Select the actual material to recalculate; editing a value switches to Manual.`,
   };
 }
