@@ -221,7 +221,7 @@ describe('prepareStartJob', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.gcode).toContain('M3 S0');
+      expect(result.gcode).toContain('M4 S0'); // ADR-256: dynamic-power cut default
       expect(result.warnings).toEqual([]);
     }
   });
@@ -265,7 +265,7 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.warnings).toContain(
-        'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M3 constant-power vector moves and can cut if power/speed are too aggressive.',
+        'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M4 dynamic-power vector moves and can cut if power/speed are too aggressive.',
       );
     }
   });

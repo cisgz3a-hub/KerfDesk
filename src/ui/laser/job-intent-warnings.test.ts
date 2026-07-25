@@ -273,7 +273,7 @@ describe('detectJobIntentWarnings', () => {
 
   it('warns when a traced image will run as vector Line output, not raster engraving', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'line'))).toContain(
-      'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M3 constant-power vector moves and can cut if power/speed are too aggressive.',
+      'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M4 dynamic-power vector moves and can cut if power/speed are too aggressive.',
     );
   });
 
@@ -391,7 +391,7 @@ describe('detectJobIntentWarnings', () => {
 
   it('does not emit a vector-trace warning for image-mode layers', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'image'))).not.toContain(
-      'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M3 constant-power vector moves and can cut if power/speed are too aggressive.',
+      'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M4 dynamic-power vector moves and can cut if power/speed are too aggressive.',
     );
   });
 
