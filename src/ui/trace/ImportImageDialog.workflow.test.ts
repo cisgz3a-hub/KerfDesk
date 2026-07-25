@@ -111,13 +111,39 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
+  it('offers CNC only the Smooth preset and greys the rest out', async () => {
+    const prior = useStore.getState().project;
+    useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    try {
+      await withTraceDialog(async (host) => {
+        const select = presetSelect(host);
+        // Opens ON Smooth — a CNC dialog must never start on a disabled option.
+        expect(select.value).toBe('Smooth');
+        const disabledByName = Object.fromEntries(
+          Array.from(select.options).map((option) => [option.value, option.disabled]),
+        );
+        expect(disabledByName).toEqual({
+          'Line Art': true,
+          Smooth: false,
+          Sharp: true,
+          Centerline: true,
+          'Edge Detection': true,
+        });
+      });
+    } finally {
+      useStore.setState({ project: prior });
+    }
+  });
+
   it('keeps CNC tracing vector-only', async () => {
     const prior = useStore.getState().project;
     useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
     try {
       await withTraceDialog(async (host) => {
         expect(outputSelect(host)).toBeNull();
-        expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
+        // Fill style is laser-only: nothing under src/core/cnc reads fillStyle,
+        // so the picker is hidden rather than shown with no effect.
+        expect(fillStyleSelect(host)).toBeNull();
         expect(host.textContent ?? '').toContain('Cutting on CNC');
         expect(host.textContent ?? '').not.toContain(
           'Raster scan uses the same Raster/Image scan motion',

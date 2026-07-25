@@ -23,6 +23,8 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { Dialog } from '../kit';
 import {
+  CNC_TRACE_PRESET_NAME,
+  DEFAULT_TRACE_PRESET_NAME,
   DialogActions,
   DeleteImageAfterTraceToggle,
   PresetHint,
@@ -87,7 +89,11 @@ function DialogBody(props: {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
-  const [preset, setPreset] = useState<string>('Line Art');
+  // CNC opens on Smooth — the only preset it offers (PresetPicker greys out
+  // the rest), so the dialog must not start on a disabled selection.
+  const [preset, setPreset] = useState<string>(
+    machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME,
+  );
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
@@ -151,7 +157,7 @@ function DialogBody(props: {
         traceFillStyle={traceFillStyle}
         onTraceFillStyleChange={setTraceFillStyle}
       />
-      <PresetPicker value={preset} onChange={setPreset} />
+      <PresetPicker machineKind={machineKind} value={preset} onChange={setPreset} />
       <TraceSettingsControls
         preset={presetOptions}
         overrides={traceSettings}
