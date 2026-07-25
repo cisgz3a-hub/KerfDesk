@@ -2269,9 +2269,10 @@ F-CNC19 tiling.
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
    ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
 
-#### Error — depth exceeds stock
-1. Preflight (F-CNC3) reports depth > stock thickness + 1 mm; the save/start
-   path is blocked until fixed.
+#### Warning — depth exceeds stock
+1. Preflight (F-CNC3) surfaces depth > stock thickness as a Job Review warning.
+   It never blocks save or Start: ADR-228 made a completed Frame the sole Start
+   gate, and F-A10 documents the same non-blocking behavior.
 
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
@@ -2285,9 +2286,10 @@ F-CNC19 tiling.
 
 #### Success
 1. User clicks **Save G-code** in CNC mode.
-2. CNC preflight runs: settings validity, depth ≤ stock + 1 mm, machine
+2. CNC preflight runs: settings validity, depth vs stock thickness, machine
    bounds, no-go zones, plunged-travel scan (no XY rapid below safe Z, no
-   rapid plunge), non-empty output.
+   rapid plunge), non-empty output. Findings surface as Job Review warnings,
+   not refusals (ADR-228).
 3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
    postamble.

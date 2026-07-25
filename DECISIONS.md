@@ -144,7 +144,7 @@
 | ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
-| ADR-180 | 2026-07-13 | Accepted | Generic same-session CNC Resume is manual-recovery-only |
+| ADR-180 | 2026-07-13 | Amended 2026-07-24 | Generic same-session CNC Resume is manual-recovery-only — resume refusal withdrawn, one-click resume enabled |
 | ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
 | ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
 | ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
@@ -458,7 +458,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-132):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -471,7 +471,7 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
 
-The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-132). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 
@@ -5946,7 +5946,9 @@ controller reset look like job recovery even though the durable checkpoint is a 
   controller evidence, but its incomplete/failed state is not itself a hard Laser Start gate.
   Missing `$30`/`$32` evidence follows the already accepted warning-and-acknowledgement path in Job
   Review, matching controllers that expose no numeric settings dump. A reported `$30` mismatch or
-  reported `$32=0` remains blocking. An in-flight settings transaction still owns the serial channel
+  reported `$32=0` remains blocking. **[SUPERSEDED later the same day by ADR-228 (2026-07-17): both
+  the `$30`-mismatch and `$32=0` Start blocks are withdrawn and are now Job Review warnings; a
+  completed Frame is the sole Start gate.]** An in-flight settings transaction still owns the serial channel
   until it settles. CNC Start and every supervised recovery keep the strict fresh-qualification
   requirement because spindle/WCS re-entry semantics cannot be inferred safely.
 - **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
@@ -8888,7 +8890,9 @@ Work-Z matching.
   its non-blocking warning, and the one-click Scanline recovery action remain available.
 - Display general Start readiness warnings as non-blocking warning toasts. ADR-210's explicitly
   approved exception requires one focused acknowledgement when a laser controller's `$32` state
-  cannot be verified; a reported `$32=0` remains a hard refusal.
+  cannot be verified; a reported `$32=0` remains a hard refusal. **[SUPERSEDED by ADR-228
+  (2026-07-17): the reported-`$32=0` Start refusal is withdrawn and is now a Job Review warning.
+  ADR-228 lists "$32=0 on laser" among the controller-readiness Start errors it removed.]**
 - Classify Console effects by what a command can change. Accessory-only commands, dwell, and
   non-positional setting writes still invalidate their own stale observations, but preserve homing,
   frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
@@ -9174,7 +9178,10 @@ containment strategy.
 - Recovery re-entry is hard-off: `M5`/`S0` precedes positioning, rapid repositioning is explicitly
   unpowered, and positive power is restored only on the first burn-motion line.
 - A laser Start whose controller cannot report `$32` requires one explicit Start-anyway
-  acknowledgement. A reported `$32=0` is still refused, and neither Machine Setup nor the confirmed
+  acknowledgement. A reported `$32=0` is still refused **[Start refusal SUPERSEDED by ADR-228
+  (2026-07-17): a reported `$32=0` no longer refuses laser Start — it is a Job Review warning, and
+  Frame is the sole Start gate. The setting-write restriction in the rest of this bullet stands.]**,
+  and neither Machine Setup nor the confirmed
   Console setting lane may write `$32=0` while the active project is a laser. Ordinary Start,
   start-from-line/recovery, and camera-marker burns all carry the same session-bound evidence to the
   final wire boundary. CNC/router projects retain their required `$32=0` path.

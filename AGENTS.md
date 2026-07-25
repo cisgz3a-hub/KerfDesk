@@ -45,8 +45,12 @@ The only non-guard refusals permitted to exist are:
 
 Re-labeling a policy judgment as one of those three factual categories is itself a
 violation of this rule. Narrowing, correcting, or removing a refusal is normal
-work; **widening any refusal — or adding any new one — requires the maintainer's
-explicit prior permission in chat, which must be presumed denied.**
+work; **widening any of those three permitted refusals — or adding a new refusal
+inside them — requires the maintainer's explicit prior permission in chat, which
+must be presumed denied. Nothing in this paragraph authorizes a guard: adding a
+guard, or any refusal outside those three factual categories, is never permitted,
+and no ADR, test, or grant of permission can authorize it (ADR-228 standing
+denial).**
 
 ---
 

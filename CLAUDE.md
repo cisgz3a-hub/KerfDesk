@@ -1,6 +1,6 @@
 # CLAUDE.md — Operating manual for Claude Code
 
-> **Read this file at the start of every session.** Every rule here is enforced in CI or rejected at PR review. If you find yourself reasoning toward an exception, write a new ADR in `DECISIONS.md` first.
+> **Read this file at the start of every session.** Every rule here is enforced in CI or rejected at PR review. If you find yourself reasoning toward an exception, write a new ADR in `DECISIONS.md` first — **except for collaboration rule 7 (Frame is the only guard), where no ADR, test, or grant of permission can ever create an exception**: put the concern in the Job Review warnings list and stop.
 
 ---
 
@@ -38,12 +38,12 @@ These are behavioral norms for *how* to work in this repo. Unlike the coding rul
 
 ## Size limits — hard
 
-These are enforced by ESLint, `tsc`, and CI scripts, not by judgment. ESLint's file line limit counts code lines excluding blank and comment lines; CI also runs a 600 raw physical lines backstop to catch files that grow too large physically.
+Every **hard** limit below is enforced by ESLint, `tsc`, or a CI script, not by judgment — except the React-component row, which has no lint rule and is enforced at review. Every **soft** limit is advisory: `pnpm check:soft-size` lists files over the soft file limit but always exits 0 (ADR-132). ESLint's file line limit counts code lines excluding blank and comment lines; CI also runs a 600 raw physical lines backstop to catch files that grow too large physically.
 
 | Unit | Soft limit | Hard limit | Rule |
 |---|---|---|---|
-| File | 250 counted code lines | 400 counted code lines | Lint warning at soft, error at hard, excluding blank and comment lines. No exceptions to this counted-code limit; CI also enforces 600 raw physical lines. |
-| React component | 150 lines | 250 lines | If approaching, split into sub-components in a folder. |
+| File | 250 counted code lines | 400 counted code lines | Report-only listing at soft (`pnpm check:soft-size`, always exits 0 — ADR-132), ESLint `max-lines` error at hard, excluding blank and comment lines. No exceptions to this counted-code limit; CI also enforces 600 raw physical lines. |
+| React component | 150 lines | 250 lines | **Review-enforced — no component-specific lint rule exists**; the 400-counted-line file cap is the only mechanical limit on a `.tsx`. If approaching, split into sub-components in a folder. |
 | Function | 40 lines | 80 lines | If approaching, extract helpers. |
 | Cyclomatic complexity per function | 8 | 12 | Lint error at hard. |
 | Default exports per file | 1 | 1 | Named exports allowed if cohesive. |
@@ -108,7 +108,7 @@ ui/    ← imports from: core/, io/, platform/types (never platform/web or platf
 
 Enforced by `eslint-plugin-boundaries`. Violation is a CI fail, not a warning. Two scoped exceptions, both deliberate: `src/ui/app/main.tsx` is the composition root and may wire `platform/web` → `ui` (ADR-011), and **test files (`*.test.ts`, `*.test.tsx`) plus `src/__fixtures__/` are exempt from boundary enforcement** — a test may import across modules for scaffolding. Do not read the exemption as license to couple production code through a test.
 
-Cross-module imports must go through `index.ts`. Reaching into `../scene/internal/foo.ts` from outside `scene/` is forbidden.
+Cross-module imports must go through `index.ts`. Reaching into `../scene/internal/foo.ts` from outside `scene/` is forbidden — **a review-enforced convention, not a mechanical one**: `boundaries/entry-point` is not configured, and because elements are declared in folder mode a deep path still classifies as its top-level module and passes lint.
 
 No circular imports. ESLint rule `import/no-cycle` set to error.
 
@@ -163,7 +163,7 @@ Nothing in `src/core/` is allowed to:
 - Call `console.*` (use a logger passed in)
 - Throw exceptions for control flow — return a `Result<T, E>` discriminated union
 
-Enforced by ESLint `no-restricted-globals` and `no-restricted-imports`.
+Enforced by ESLint `no-restricted-globals`, `no-restricted-imports`, and `no-restricted-syntax` (the clock and randomness bans). The Result-instead-of-throw rule is **review-enforced only** — no lint rule detects a `throw` inside `src/core/`.
 
 ---
 

@@ -1,6 +1,6 @@
 # Contributing to KerfDesk (LaserForge 2.0)
 
-KerfDesk is MIT-licensed (ADR-120); by submitting a contribution you agree it is licensed under the project's MIT license. The project is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`) are live: typecheck, lint, prettier, dependency-license and vulnerability checks, Vitest, Playwright browser workflows, web/Electron builds, and file-size discipline. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
+KerfDesk is MIT-licensed (ADR-120); by submitting a contribution you agree it is licensed under the project's MIT license. The project is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`, a single `pnpm release:check` step) are live: typecheck, lint, prettier, dependency-license and vulnerability checks, Vitest, web/Electron builds, and file-size discipline. A separate Playwright browser smoke runs in `.github/workflows/e2e.yml` and is observability-only on main. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
 
 ## Non-negotiable: Frame is the only guard — never add a new one
 
@@ -18,8 +18,11 @@ deleted one, expand a refusal surface, or promote a warning into a block — not
 guard will be rejected on sight.** The only refusals permitted to exist are the
 three factual categories defined in `CLAUDE.md` rule 7 — transport preconditions,
 compile integrity, and handoff consistency; relabeling a policy judgment as one of
-them is itself a violation. Widening any refusal, or adding a new one, requires the
-maintainer's explicit prior permission in chat, which must be presumed denied.
+them is itself a violation. Widening any of those three — or adding a new refusal
+inside them — requires the maintainer's explicit prior permission in chat, which
+must be presumed denied. Nothing in this paragraph authorizes a guard: adding a
+guard, or any refusal outside those three factual categories, is never permitted,
+and no ADR, test, or grant of permission can authorize it (ADR-228 standing denial).
 
 ## Non-negotiable: we only build with verified research
 
@@ -39,7 +42,7 @@ machine move. See `CLAUDE.md` — "We only build with verified research".
 
 ## Before you open a PR
 
-1. Read [`CLAUDE.md`](./CLAUDE.md) — file-size limits, naming, anti-patterns, checklists. These rules are enforced by ESLint and CI, not by reviewer judgment.
+1. Read [`CLAUDE.md`](./CLAUDE.md) — file-size limits, naming, anti-patterns, checklists. The file-size, module-boundary, and type-strictness rules are enforced by ESLint and CI; naming, anti-patterns, and the checklists are enforced at maintainer review.
 2. Read [`PROJECT.md`](./PROJECT.md) — the current phase and scope. Anything outside the current phase needs a `PROJECT.md` revision and a `DECISIONS.md` entry before code lands.
 3. Read [`WORKFLOW.md`](./WORKFLOW.md) — if your change touches UI, the success / error / empty / edge states for the affected flow must already be documented (or you must update this file first).
 4. Read [`DECISIONS.md`](./DECISIONS.md) — architectural changes (module boundaries, state shape, build setup) require a new ADR.
