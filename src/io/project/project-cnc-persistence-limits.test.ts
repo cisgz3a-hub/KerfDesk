@@ -53,7 +53,10 @@ describe('CNC tab anchors have no count limit (audit 3.1)', () => {
   });
 
   it('still rejects a structurally invalid anchor at any position past the old cap', () => {
-    const raw = JSON.parse(serializeProject(projectWithAnchorCount(600))) as Record<string, unknown>;
+    const raw = JSON.parse(serializeProject(projectWithAnchorCount(600))) as Record<
+      string,
+      unknown
+    >;
     const scene = raw['scene'] as { objects: Array<Record<string, unknown>> };
     const list = scene.objects[0]!['cncTabAnchors'] as Array<Record<string, unknown>>;
     list[513] = { layerColor: '#ff0000', pathIndex: 0, polylineIndex: 1, pathT: 1.5 };

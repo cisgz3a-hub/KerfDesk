@@ -40,7 +40,12 @@ describe('DeviceSetupWizard router commit', () => {
       detectedControllerKind: 'grblhal',
       // $32=0 - a router with laser mode off, which is what makes $30 the
       // spindle ceiling rather than the laser PWM scale.
-      detectedSettings: { maxPowerS: 24000, bedWidth: 750, bedHeight: 610, laserModeEnabled: false },
+      detectedSettings: {
+        maxPowerS: 24000,
+        bedWidth: 750,
+        bedHeight: 610,
+        laserModeEnabled: false,
+      },
       controllerSettings: {
         maxPowerS: 24000,
         bedWidth: 750,
