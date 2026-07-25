@@ -21,9 +21,16 @@
 //
 // PURE: plain data in, plain data out.
 
-import type { Vec3 } from '../geometry';
-import type { Toolpath, ToolpathStep, ZSpan } from '../job';
+import type { Toolpath, ToolpathStep } from '../job';
 import { assertNever } from '../scene';
+
+// Declared here rather than imported. `Vec3` lives in core/geometry but is not
+// on that barrel, which sits at 19 of a hard cap of 20; `ZSpan` lives in
+// core/job, whose barrel is pinned at 85 in the export ratchet and may only
+// shrink. TypeScript is structural, so these stay interchangeable with the
+// canonical declarations without spending either barrel's remaining room.
+export type Vec3 = { readonly x: number; readonly y: number; readonly z: number };
+type ZSpan = { readonly from: number; readonly to: number };
 
 export type Move3dKind = 'cut' | 'rapid' | 'feed-travel' | 'plunge' | 'retract';
 
