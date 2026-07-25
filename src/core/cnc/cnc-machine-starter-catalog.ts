@@ -12,7 +12,9 @@ export type CncMachineStarter = {
   readonly id: string;
   readonly revision: number;
   readonly label: string;
-  readonly confidence: 'engineering-starter';
+  // 'engineering-starter' = derived from public specs and chipload math;
+  // 'maintainer-verified' = set from cutting experience on the physical machine.
+  readonly confidence: 'engineering-starter' | 'maintainer-verified';
   readonly operatorNotice: string;
   readonly sources: ReadonlyArray<{
     readonly label: string;
@@ -57,9 +59,9 @@ export const CNC_MACHINE_STARTER_CATALOG: ReadonlyArray<CncMachineStarter> = [
     id: 'neotronics-4040-shallow-wood-mdf',
     revision: 2,
     label: 'Neotronics 4040 shallow wood / MDF starter',
-    confidence: 'engineering-starter',
+    confidence: 'maintainer-verified',
     operatorNotice:
-      'Engineering starter — assumes a 3.175 mm 2-flute cutter; verify on this machine.',
+      'Maintainer-verified starter (ADR-256) — feed and plunge come from cutting experience on this machine with a 3.175 mm 2-flute cutter; confirm on scrap for a new bit or stock.',
     sources: [
       {
         label: 'Neotronics 4040 Max product specification',
