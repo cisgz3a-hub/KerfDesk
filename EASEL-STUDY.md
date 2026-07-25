@@ -200,12 +200,27 @@ away from corners and delicate areas.
 
 Ours: automatic Line-mode hard-skip tabs (`core/geometry/tabs-bridges.ts`) plus ADR-156 persisted
 drag-placeable anchors for closed CNC profiles. So we have both mechanisms, but **the automatic
-*trigger* differs**: Easel keys off "cut depth == material thickness" (i.e. it infers a through-cut).
-Whether we auto-enable tabs on a detected through-cut, or require the operator to switch them on, was
-not verified this session. If we require it, an operator who through-cuts without enabling tabs loses
-the part — and Easel would have protected them.
+*trigger* differs**: Easel keys off "cut depth == material thickness", i.e. it infers a through-cut.
 
-**Action:** verify our through-cut tab trigger. If absent, this is a real parity gap worth an ADR.
+**Now verified, and it is a real gap:**
+
+- **CNC tabs default OFF** — `tabsEnabled: false` in the CNC machine defaults
+  (`src/core/scene/machine.ts:309`), and likewise for laser layers (`src/core/scene/layer.ts:92`).
+- **No through-cut detection enables them.** `cnc-tabs.ts:56` states the intent — "CNC tabs go on every
+  through-cut contour" — but that applies once tabs are *already* enabled; nothing infers a through-cut
+  from depth vs material thickness to switch them on.
+- **Job Review does surface the state, but only as a neutral fact.**
+  `job-review-detail-facts.ts:107` renders the literal string `'tabs off'`. The operator is told; they
+  are not warned, and the fact is not correlated with the through-cut that makes it dangerous.
+
+So an operator who sets a full-depth profile cut and leaves tabs off gets a freed part with no warning.
+Easel would have added tabs for them. This is the most concrete safety-relevant parity gap found in the
+Easel pass.
+
+**Action:** when a profile cut's depth reaches or exceeds material thickness *and* tabs are off, raise a
+**Job Review warning** (not a block, not an auto-change — rule 7 permits informing only). Auto-enabling
+tabs the way Easel does would silently rewrite the operator's program, which rule 7 forbids; warning
+achieves the protection without the rewrite. Worth an ADR.
 
 ### D-15 — Roughing/finishing bit model · **PARITY**
 
