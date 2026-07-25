@@ -70,6 +70,22 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
 
   // Audit 1.18: the check compared raw stock size, so stock pushed out along an
   // axis by originOffset overhung travel with no warning at all.
+  // Audit 4.4: preflight no longer refuses a layer above the configured
+  // ceiling, so the operator has to learn it here instead — the job still runs,
+  // just clamped, with feeds that assume the higher RPM. Default ceiling is
+  // 12000 RPM.
+  it('warns when a layer requests more spindle than the configured ceiling', () => {
+    const [warning, ...rest] = detectCncMachineLimitWarnings(cncProject({ spindleRpm: 24000 }), {});
+    expect(rest).toEqual([]);
+    expect(warning).toContain('24000');
+    expect(warning).toContain('12000');
+    expect(warning).toContain('will run at');
+  });
+
+  it('stays silent when the layer sits on the configured ceiling', () => {
+    expect(detectCncMachineLimitWarnings(cncProject({ spindleRpm: 12000 }), {})).toEqual([]);
+  });
+
   it('counts the origin offset toward the overhang', () => {
     const limits: ControllerSettingsSnapshot = { bedWidth: 400, bedHeight: 400 };
     const [warning, ...rest] = detectCncMachineLimitWarnings(

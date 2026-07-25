@@ -29,6 +29,7 @@ export function detectCncMachineLimitWarnings(
     ...feedVsMax(project, limits),
     ...plungeVsZMax(project, limits),
     ...spindleVsMax(project, limits),
+    ...spindleVsConfiguredCeiling(project),
   ];
 }
 
@@ -73,6 +74,23 @@ function plungeVsZMax(project: Project, limits: ControllerSettingsSnapshot): Rea
     `A layer's plunge ${topPlunge} mm/min is above the machine's reported Z max rate ($112) ` +
       `${limits.zMaxFeed} mm/min — the controller clamps to its limit, so plunges ` +
       'run slower than planned.',
+  ];
+}
+
+// The app's OWN configured ceiling, distinct from the controller's reported $30
+// above. capSpindle clamps the layer to this at compile time, so the job still
+// runs - it just runs slower than the layer asks, with feeds that assume the
+// higher RPM. Preflight used to refuse this outright; it is an advisory now.
+function spindleVsConfiguredCeiling(project: Project): ReadonlyArray<string> {
+  const machine = project.machine;
+  if (machine === undefined || machine.kind !== 'cnc') return [];
+  const ceiling = machine.params.spindleMaxRpm;
+  const topRpm = maxOutputLayerValue(project, (cnc) => cnc.spindleRpm);
+  if (topRpm === null || topRpm <= ceiling) return [];
+  return [
+    `A layer requests spindle ${topRpm} RPM but the machine's Spindle maximum is ` +
+      `${ceiling} RPM — the job will run at ${ceiling}, while that layer's feeds ` +
+      'assume the higher speed.',
   ];
 }
 

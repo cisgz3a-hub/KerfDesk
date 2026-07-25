@@ -298,9 +298,18 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.code === 'cnc-settings-invalid')).toBe(true);
   });
 
-  it('flags a spindle speed above the machine maximum', () => {
+  // Audit 4.4: requesting more than the configured ceiling is not a compile
+  // failure. capSpindle clamps to Math.min(rpm, ceiling) at every compile site,
+  // so the program is producible and can never emit an out-of-range S word.
+  // Refusing it was policy; Job Review warns that the job runs at the ceiling.
+  it('does not refuse a spindle speed above the configured ceiling', () => {
     const result = runCncPreflight(projectWithCnc({ spindleRpm: 99999 }), config, GOOD_GCODE);
-    expect(result.issues.some((issue) => issue.code === 'cnc-settings-invalid')).toBe(true);
+    expect(result.issues.some((issue) => issue.code === 'cnc-settings-invalid')).toBe(false);
+  });
+
+  it('still refuses a non-positive spindle speed', () => {
+    const result = runCncPreflight(projectWithCnc({ spindleRpm: 0 }), config, GOOD_GCODE);
+    expect(result.issues.some((issue) => issue.message.includes('spindle RPM must be'))).toBe(true);
   });
 
   it('flags v-carve when the active bit is not a v-bit (H.3)', () => {
