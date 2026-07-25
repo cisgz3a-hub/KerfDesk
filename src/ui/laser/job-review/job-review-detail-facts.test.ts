@@ -56,9 +56,13 @@ describe('laserOperationDetail', () => {
 });
 
 describe('cncOperationDetail', () => {
-  it('summarizes the default profile cut with a computed pass count', () => {
+  // Audit 3.8: the shipped default cut type is profile-on-path (ADR-256), and
+  // enforceCutDirection returns null for it — no material side, so no direction
+  // is applied. Printing "climb" here told the operator about motion that never
+  // happens.
+  it('summarizes the default on-path cut without a direction it does not apply', () => {
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe(
-      '1 pass · stepover 40% · climb · tabs off · Manual feeds',
+      '1 pass · stepover 40% · tabs off · Manual feeds',
     );
   });
 
@@ -67,6 +71,9 @@ describe('cncOperationDetail', () => {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       depthMm: 12,
       depthPerPassMm: 2.5,
+      // Explicit: direction only renders for cut types that have a material
+      // side, and the default is now on-path (ADR-256), which has none.
+      cutType: 'pocket',
       cutDirection: 'climb',
       tabsEnabled: true,
       tabsPerShape: 3,

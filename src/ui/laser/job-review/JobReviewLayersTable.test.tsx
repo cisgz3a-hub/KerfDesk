@@ -133,6 +133,8 @@ describe('JobReviewLayersTable', () => {
     seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'cnc');
     await render('cnc');
 
-    expect(host.textContent).toContain('1 pass · stepover 40% · climb · tabs off');
+    // No direction: the default cut type is profile-on-path (ADR-256), which
+    // has no material side, so none is applied (audit 3.8).
+    expect(host.textContent).toContain('1 pass · stepover 40% · tabs off');
   });
 });
