@@ -13,7 +13,7 @@ import type * as ThreeNamespace from 'three';
 import type { BufferGeometry, Object3D } from 'three';
 import type { ReliefSurfaceMesh } from '../../core/relief';
 import type { ToolProfilePoint } from '../../core/sim';
-import { firstCuttingPoint, type Move3d } from '../../core/toolpath3d';
+import type { Move3d } from '../../core/toolpath3d';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import { buildStageFurniture } from './viewer3d-stage';
 import { buildToolMesh } from './viewer3d-tool';
@@ -95,11 +95,11 @@ export async function buildViewerContent(
     disposers.push(lines.dispose);
   }
 
-  const tool = buildParkedTool(three, mesh, toolpath);
-  if (tool !== null) {
-    group.add(tool.object);
-    disposers.push(tool.dispose);
-  }
+  // NOT drawn: the cutter. buildToolMesh and core/sim's toolProfile are ready
+  // and tested, but a tool parked at a static position with no playback to
+  // move it reads as debris stuck in the workpiece rather than as information
+  // — confirmed by the maintainer on first sight. It comes back when the
+  // scrubber can drive it along the path, which is where it earns its place.
 
   return {
     object: group,
@@ -155,24 +155,32 @@ function addStockOutline(
   });
 }
 
-// Parks the cutter at the program's first cutting point. Until playback
-// exists this is the one static position that says something true: where the
-// job starts and which bit will do it. The point arrives in the same scene
-// frame as the path, so it takes the same origin shift and mirror.
-function buildParkedTool(
+/**
+ * Places the cutter at a point on the path, in the viewport's local frame.
+ *
+ * Currently unused by the default view — see the note in buildViewerContent.
+ * Kept because it is the piece playback needs: given a scrubbed position it
+ * puts the drawn bit exactly where the simulated one is.
+ *
+ * @param three The dynamically-imported three module.
+ * @param mesh Surface mesh, for the recentring offsets.
+ * @param toolpath Overlay carrying the tool profile and the grid origin.
+ * @param atMm Scene-frame point to place the tool tip at.
+ * @returns The tool handle, or null when the job has no tool.
+ */
+export function buildToolAt(
   three: ThreeModule,
   mesh: ViewerSurfaceMesh,
-  toolpath: ViewerToolpathOverlay | undefined,
+  toolpath: ViewerToolpathOverlay,
+  atMm: { readonly x: number; readonly y: number; readonly z: number },
 ): ViewerContentHandle | null {
-  if (toolpath?.toolProfile === undefined) return null;
-  const start = firstCuttingPoint(toolpath.moves);
-  if (start === null) return null;
+  if (toolpath.toolProfile === undefined) return null;
   return buildToolMesh(three, toolpath.toolProfile, {
-    x: start.x - toolpath.originMm.x - mesh.widthMm / 2,
+    x: atMm.x - toolpath.originMm.x - mesh.widthMm / 2,
     // Mirrored to match the surface, then recentred — the same composition the
     // surface geometry is baked with, done arithmetically because a single
     // point needs no transform node.
-    y: -(start.y - toolpath.originMm.y) + mesh.heightMm / 2,
-    z: start.z,
+    y: -(atMm.y - toolpath.originMm.y) + mesh.heightMm / 2,
+    z: atMm.z,
   });
 }
