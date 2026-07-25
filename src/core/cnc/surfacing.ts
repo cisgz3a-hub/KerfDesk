@@ -91,6 +91,10 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
     // A stale G93 would interpret every F word as inverse time and can turn
     // ordinary surfacing feeds into controller-max motion.
     'G94',
+    // Same modal-state reasoning as G94: the plane survives from whatever the
+    // console or a $N startup block last set, and surfacing shares its preamble
+    // contract with the job emitter.
+    'G17',
     `G0 Z${fmt(params.safeZMm)}`,
     `M3 S${Math.round(params.spindleRpm)}`,
   ];
