@@ -7,6 +7,7 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { toSceneCoords } from '../../core/devices';
 import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
+import { isChiploadMaterialKey } from '../../core/cnc';
 import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
 import { toolpathMoves3d } from '../../core/toolpath3d';
 import { useOutputScope, useStore } from '../state';
@@ -111,8 +112,12 @@ function useDesignSceneSource(
     // buildPreviewToolpath already mapped the prepared job into scene frame,
     // which is the frame the grid above was stamped in — so the moves and the
     // surface share one frame, as ADR-254 §2 requires.
+    const materialKey = stock.materialKey;
     return {
       grid: result.grid,
+      // materialKey is a plain string on the model, so an unrecognised key from
+      // an older project file falls back to the default palette.
+      ...(isChiploadMaterialKey(materialKey) ? { materialKey } : {}),
       moves: toolpathMoves3d(toolpath),
       // Same tool record that produced the kernel above, so the drawn bit and
       // the simulated one cannot disagree.

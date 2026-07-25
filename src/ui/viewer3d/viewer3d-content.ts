@@ -11,13 +11,15 @@
 
 import type * as ThreeNamespace from 'three';
 import type { BufferGeometry, Object3D } from 'three';
+import type { ChiploadMaterial } from '../../core/cnc';
 import type { ReliefSurfaceMesh } from '../../core/relief';
 import type { ToolProfilePoint } from '../../core/sim';
-import type { Move3d } from '../../core/toolpath3d';
+import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
+import { materialAppearance, type MaterialAppearance } from '../theme/material-appearance';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import { buildStageFurniture } from './viewer3d-stage';
-import { buildToolMesh } from './viewer3d-tool';
-import { buildToolpathLines } from './viewer3d-toolpath';
+import { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
+import { buildToolpathLines, type ToolpathLinesHandle } from './viewer3d-toolpath';
 
 type ThreeModule = typeof ThreeNamespace;
 
@@ -45,6 +47,9 @@ export type ViewerContentInput = {
   readonly mesh: ViewerSurfaceMesh;
   readonly stockThicknessMm: number;
   readonly toolpath?: ViewerToolpathOverlay;
+  // The job's stock material. Absent = "Custom", which keeps the original
+  // wood palette so nothing changes for an unconfigured job.
+  readonly materialKey?: ChiploadMaterial;
 };
 
 // Guards the depth ramp against a zero stock thickness, which would divide by
@@ -54,6 +59,11 @@ const MIN_DEPTH_SPAN_MM = 0.5;
 export type ViewerContentHandle = {
   readonly object: Object3D;
   readonly dispose: () => void;
+  // Moves the cutter and reveals the path up to an arc-length position, or
+  // shows the finished job when given null. Deliberately NOT a rebuild: the
+  // scrubber ticks continuously, and re-stamping a 300x300 surface per tick
+  // would make playback unusable.
+  readonly setScrubMm: (atMm: number | null) => void;
 };
 
 /**
@@ -67,7 +77,8 @@ export async function buildViewerContent(
   three: ThreeModule,
   input: ViewerContentInput,
 ): Promise<ViewerContentHandle> {
-  const { mesh, stockThicknessMm, toolpath } = input;
+  const { mesh, stockThicknessMm, toolpath, materialKey } = input;
+  const appearance = materialAppearance(materialKey);
   const group = new three.Group();
   group.name = 'content';
   const disposers: Array<() => void> = [];
@@ -76,14 +87,16 @@ export async function buildViewerContent(
   // Shade by depth so carved areas read darker. A single flat tint leaves a
   // pocket floor almost the same value as the stock top, so the shape has to
   // be inferred from lighting alone — which is why it was hard to see.
-  applyDepthColors(three, geometry, stockThicknessMm);
+  applyDepthColors(three, geometry, stockThicknessMm, appearance);
   const surfaceMaterial = new three.MeshStandardMaterial({
     vertexColors: true,
     side: three.DoubleSide,
     flatShading: false,
-    // Machined timber is matte; specular highlights read as features.
-    roughness: 0.85,
-    metalness: 0,
+    // Per material: timber is matte and specular highlights read as features,
+    // whereas acrylic without gloss and aluminium without metalness both just
+    // look like painted wood.
+    roughness: appearance.roughness,
+    metalness: appearance.metalness,
   });
   group.add(new three.Mesh(geometry, surfaceMaterial));
   disposers.push(() => {
@@ -102,8 +115,9 @@ export async function buildViewerContent(
   // as T * R * S, so setting position and scale reproduces geometry.scale()
   // followed by geometry.translate() exactly. Sharing one transform is what
   // keeps the path registered to the cut it describes (ADR-254 §2).
+  let lines: ToolpathLinesHandle | null = null;
   if (toolpath !== undefined) {
-    const lines = await buildToolpathLines(three, toolpath.moves, toolpath.originMm);
+    lines = await buildToolpathLines(three, toolpath.moves, toolpath.originMm);
     lines.object.scale.set(1, -1, 1);
     lines.object.position.set(-mesh.widthMm / 2, mesh.heightMm / 2, 0);
     group.add(lines.object);
@@ -113,9 +127,11 @@ export async function buildViewerContent(
   // The cutter, drawn only when the scrubber says where it is. A tool parked
   // at a fixed position reads as debris stuck in the workpiece rather than as
   // information — confirmed by the maintainer on first sight — so it appears
-  // only once playback can actually move it along the path.
+  // only once playback can actually move it along the path. Built ONCE and
+  // repositioned; a LatheGeometry rebuild per scrub tick would be waste.
+  let tool: ToolMeshHandle | null = null;
   if (toolpath?.toolAtMm !== undefined) {
-    const tool = buildToolAt(three, mesh, toolpath, toolpath.toolAtMm);
+    tool = buildToolAt(three, mesh, toolpath, toolpath.toolAtMm);
     if (tool !== null) {
       group.add(tool.object);
       disposers.push(tool.dispose);
@@ -126,6 +142,14 @@ export async function buildViewerContent(
     object: group,
     dispose: () => {
       for (const dispose of disposers) dispose();
+    },
+    setScrubMm: (atMm) => {
+      lines?.setRevealMm(atMm);
+      if (tool === null || toolpath === undefined) return;
+      const at = atMm === null ? null : pointAtArcLength(toolpath.moves, atMm);
+      if (at === null) return;
+      const local = toolLocalPosition(mesh, toolpath, at);
+      tool.object.position.set(local.x, local.y, local.z);
     },
   };
 }
@@ -162,10 +186,11 @@ function applyDepthColors(
   three: ThreeModule,
   geometry: BufferGeometry,
   stockThicknessMm: number,
+  appearance: MaterialAppearance,
 ): void {
   const position = geometry.getAttribute('position');
-  const shallow = new three.Color(viewer3dTheme.toolpath.depthShallow);
-  const deep = new three.Color(viewer3dTheme.toolpath.depthDeep);
+  const shallow = new three.Color(appearance.shallow);
+  const deep = new three.Color(appearance.deep);
   const span = Math.max(stockThicknessMm, MIN_DEPTH_SPAN_MM);
   const colors = new Float32Array(position.count * 3);
   const mixed = new three.Color();
@@ -221,14 +246,23 @@ export function buildToolAt(
   mesh: ViewerSurfaceMesh,
   toolpath: ViewerToolpathOverlay,
   atMm: { readonly x: number; readonly y: number; readonly z: number },
-): ViewerContentHandle | null {
+): ToolMeshHandle | null {
   if (toolpath.toolProfile === undefined) return null;
-  return buildToolMesh(three, toolpath.toolProfile, {
+  return buildToolMesh(three, toolpath.toolProfile, toolLocalPosition(mesh, toolpath, atMm));
+}
+
+// Scene frame -> the viewport's local frame: mirrored to match the surface,
+// then recentred. The same composition the surface geometry is baked with,
+// done arithmetically because a single point needs no transform node. Shared
+// by the initial placement and every scrub update so the two cannot drift.
+function toolLocalPosition(
+  mesh: ViewerSurfaceMesh,
+  toolpath: ViewerToolpathOverlay,
+  atMm: { readonly x: number; readonly y: number; readonly z: number },
+): { readonly x: number; readonly y: number; readonly z: number } {
+  return {
     x: atMm.x - toolpath.originMm.x - mesh.widthMm / 2,
-    // Mirrored to match the surface, then recentred — the same composition the
-    // surface geometry is baked with, done arithmetically because a single
-    // point needs no transform node.
     y: -(atMm.y - toolpath.originMm.y) + mesh.heightMm / 2,
     z: atMm.z,
-  });
+  };
 }

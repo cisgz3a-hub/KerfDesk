@@ -8,6 +8,7 @@
 // back to the default view.
 
 import { useEffect, useRef, useState } from 'react';
+import type { ChiploadMaterial } from '../../core/cnc';
 import { steppedSurfaceMesh } from '../../core/heightfield';
 import { downsampleRemovalGrid, type RemovalGrid, type ToolProfilePoint } from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
@@ -26,6 +27,9 @@ export type Cnc3dSceneState = 'loading' | 'ready' | 'failed';
 // carved it. Both are in scene frame (ADR-254 §2).
 export type DesignSceneSource = {
   readonly grid: RemovalGrid;
+  // The job's stock material, so the carve is shaded as the stock the operator
+  // actually loaded rather than as generic timber.
+  readonly materialKey?: ChiploadMaterial;
   readonly moves: ReadonlyArray<Move3d>;
   readonly toolProfile: ReadonlyArray<ToolProfilePoint>;
 };
@@ -67,7 +71,7 @@ export function useCnc3dScene(
     const canvas = canvasRef.current;
     if (canvas === null || source === null) return;
     let cancelled = false;
-    const content = contentFor(source, stockThicknessMm, scrubberT);
+    const content = contentFor(source, stockThicknessMm);
 
     const existing = handleRef.current;
     if (existing !== null) {
@@ -101,7 +105,15 @@ export function useCnc3dScene(
     return () => {
       cancelled = true;
     };
-  }, [source, stockThicknessMm, scrubberT]);
+  }, [source, stockThicknessMm]);
+
+  // Scrubbing is its own effect on purpose. Folding it into the content effect
+  // above re-stamped the whole surface on every tick of the slider, which is
+  // exactly the per-keystroke rebuild this hook was written to eliminate.
+  useEffect(() => {
+    const totalMm = totalLengthMm(source);
+    handleRef.current?.setScrubMm(scrubberT >= 1 || totalMm <= 0 ? null : scrubberT * totalMm);
+  }, [source, scrubberT, state]);
 
   // Keep the renderer buffer in step with the resizable pane so the 3D view
   // stays crisp at any width (the scene renders on demand, not on a rAF loop).
@@ -118,27 +130,32 @@ export function useCnc3dScene(
   return { canvasRef, state };
 }
 
+// Total declared program length. Read from the last move rather than summed,
+// because startMm already accumulates every preceding step's declared length.
+function totalLengthMm(source: DesignSceneSource | null): number {
+  const last = source?.moves[source.moves.length - 1];
+  return last === undefined ? 0 : last.startMm + last.lengthMm;
+}
+
 function contentFor(
   source: DesignSceneSource,
   stockThicknessMm: number,
-  scrubberT: number,
 ): Parameters<ReliefSceneHandle['updateContent']>[0] {
-  const { grid, moves, toolProfile } = source;
+  const { grid, moves, toolProfile, materialKey } = source;
   const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
-  const last = moves[moves.length - 1];
-  const totalMm = last === undefined ? 0 : last.startMm + last.lengthMm;
-  const toolAt = pointAtArcLength(moves, scrubberT * totalMm);
+  // Initial cutter placement only; the scrub effect repositions it from there
+  // without rebuilding anything.
+  const toolAt = pointAtArcLength(moves, Number.POSITIVE_INFINITY);
   return {
     mesh: steppedSurfaceMesh(display),
     stockThicknessMm,
+    ...(materialKey === undefined ? {} : { materialKey }),
     // Downsampling keeps the grid's min corner, so the full-resolution origin
     // is still the right offset for the path.
     toolpath: {
       moves,
       originMm: { x: grid.originX, y: grid.originY },
       toolProfile,
-      // scrubberT is a 0..1 fraction of TOTAL path length, so it converts to
-      // the arc-length position the core lookup expects.
       ...(toolAt === null ? {} : { toolAtMm: toolAt }),
     },
   };

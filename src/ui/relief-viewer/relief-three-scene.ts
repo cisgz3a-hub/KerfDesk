@@ -12,6 +12,7 @@
 // Type-only import: erased at compile time, so three itself still loads
 // lazily through the dynamic import() below (ADR-102 §3).
 import type { WebGLRenderer } from 'three';
+import type * as ThreeNamespace from 'three';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import {
   buildViewerContent,
@@ -33,6 +34,8 @@ export type ReliefSceneHandle = {
   // Swap in new job geometry WITHOUT touching the camera. This is the whole
   // point of the split: the operator's viewpoint survives an edit.
   readonly updateContent: (input: ViewerContentInput) => Promise<void>;
+  /** Scrubs the cutter and path reveal without rebuilding any geometry. */
+  readonly setScrubMm: (atMm: number | null) => void;
 };
 
 export type ReliefSceneResult =
@@ -73,19 +76,7 @@ export async function createReliefThreeScene(
   const scene = new three.Scene();
   const lighting = applySceneLighting(three, renderer, scene, mesh);
 
-  const camera = new three.PerspectiveCamera(
-    CAMERA_FOV_DEG,
-    width / height,
-    CAMERA_NEAR_MM,
-    CAMERA_FAR_MM,
-  );
-  camera.up.set(0, 0, 1); // Z-up: depth reads vertically
-  const orbitRadius =
-    Math.max(mesh.widthMm, mesh.heightMm, stockThicknessMm * THICKNESS_FRAMING_FACTOR) *
-    ORBIT_RADIUS_FACTOR;
-  camera.position.set(orbitRadius * 0.7, -orbitRadius * 0.7, orbitRadius * 0.6);
-  camera.lookAt(0, 0, 0);
-
+  const camera = framedCamera(three, width / height, mesh, stockThicknessMm);
   const controls = new OrbitControls(camera, canvas);
   // Left-drag PANS, right-drag orbits — the opposite of three's default.
   // Sliding the part around is the move an operator reaches for constantly
@@ -126,6 +117,10 @@ export async function createReliefThreeScene(
         scene.add(content.object);
         render();
       },
+      setScrubMm: (atMm) => {
+        content.setScrubMm(atMm);
+        render();
+      },
       dispose: () => {
         controls.removeEventListener('change', render);
         controls.dispose();
@@ -135,4 +130,22 @@ export async function createReliefThreeScene(
       },
     },
   };
+}
+
+// Perspective camera framed to the stock, looking down at it from the front
+// left. Z-up so depth reads vertically, matching the machine's own axes.
+function framedCamera(
+  three: typeof ThreeNamespace,
+  aspect: number,
+  mesh: ViewerSurfaceMesh,
+  stockThicknessMm: number,
+): ThreeNamespace.PerspectiveCamera {
+  const camera = new three.PerspectiveCamera(CAMERA_FOV_DEG, aspect, CAMERA_NEAR_MM, CAMERA_FAR_MM);
+  camera.up.set(0, 0, 1);
+  const orbitRadius =
+    Math.max(mesh.widthMm, mesh.heightMm, stockThicknessMm * THICKNESS_FRAMING_FACTOR) *
+    ORBIT_RADIUS_FACTOR;
+  camera.position.set(orbitRadius * 0.7, -orbitRadius * 0.7, orbitRadius * 0.6);
+  camera.lookAt(0, 0, 0);
+  return camera;
 }

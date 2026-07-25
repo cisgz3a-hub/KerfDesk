@@ -20,6 +20,7 @@ import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import type { Move3d, Move3dKind } from '../../core/toolpath3d';
+import { revealedSegmentCount, segmentEndsMm } from './viewer3d-reveal';
 import { toolpathLineStyle } from './viewer3d-toolpath-colors';
 
 type ThreeModule = typeof ThreeNamespace;
@@ -33,6 +34,10 @@ type LinesAddons = {
 export type ToolpathLinesHandle = {
   readonly object: Object3D;
   readonly dispose: () => void;
+  // Hides every segment past an arc-length position, or shows all of them when
+  // given null. Capping instanceCount costs nothing per call — no buffer
+  // upload — which is what makes 1x/10x/40x playback affordable.
+  readonly setRevealMm: (atMm: number | null) => void;
 };
 
 // Drawn in this order so cuts land on top of the traversal web rather than
@@ -63,18 +68,23 @@ export async function buildToolpathLines(
   group.name = 'toolpath';
   const disposers: Array<() => void> = [];
 
+  const revealers: Array<(atMm: number | null) => void> = [];
   for (const kind of KIND_DRAW_ORDER) {
     const positions = segmentPositions(moves, kind, originMm);
     if (positions.length === 0) continue;
-    const built = buildKindLines(addons, kind, positions);
+    const built = buildKindLines(addons, kind, positions, segmentEndsMm(moves, kind));
     group.add(built.object);
     disposers.push(built.dispose);
+    revealers.push(built.setRevealMm);
   }
 
   return {
     object: group,
     dispose: () => {
       for (const dispose of disposers) dispose();
+    },
+    setRevealMm: (atMm) => {
+      for (const reveal of revealers) reveal(atMm);
     },
   };
 }
@@ -117,6 +127,7 @@ function buildKindLines(
   addons: LinesAddons,
   kind: Move3dKind,
   positions: readonly number[],
+  endsMm: ReadonlyArray<number>,
 ): ToolpathLinesHandle {
   const style = toolpathLineStyle(kind);
   const geometry = new addons.LineSegmentsGeometry();
@@ -153,6 +164,11 @@ function buildKindLines(
     dispose: () => {
       geometry.dispose();
       material.dispose();
+    },
+    // Infinity is InstancedBufferGeometry's own "draw everything" sentinel, so
+    // restoring it is a genuine reset rather than a large finite guess.
+    setRevealMm: (atMm) => {
+      geometry.instanceCount = atMm === null ? Infinity : revealedSegmentCount(endsMm, atMm);
     },
   };
 }
