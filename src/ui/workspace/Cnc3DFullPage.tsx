@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { LiveViewerState } from '../viewer3d/viewer3d-live-run';
 import { Viewer3DReadout } from '../viewer3d/Viewer3DReadout';
 import { Viewer3DToolbar } from '../viewer3d/Viewer3DToolbar';
 import { DEFAULT_DISPLAY_MODE, type Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
@@ -24,10 +25,11 @@ export function Cnc3DFullPage(props: {
   readonly source: DesignSceneSource;
   readonly stockThicknessMm: number;
   readonly scrubberT: number;
+  readonly live: LiveViewerState | null;
   readonly onClose: () => void;
 }): JSX.Element {
-  const { source, stockThicknessMm, scrubberT, onClose } = props;
-  const { canvasRef, state, controls } = useCnc3dScene(source, stockThicknessMm, scrubberT);
+  const { source, stockThicknessMm, scrubberT, live, onClose } = props;
+  const { canvasRef, state, controls } = useCnc3dScene(source, stockThicknessMm, scrubberT, live);
   const [mode, setMode] = useState<Viewer3DDisplayMode>(DEFAULT_DISPLAY_MODE);
   const [sectionFraction, setSectionFraction] = useState(SECTION_DISABLED_FRACTION);
   const [reading, setReading] = useState<SurfaceReading | null>(null);

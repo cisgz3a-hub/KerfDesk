@@ -10,6 +10,7 @@ import { activeCncTool, type OutputScope, type Project } from '../../core/scene'
 import { isChiploadMaterialKey } from '../../core/cnc';
 import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
 import { toolpathMoves3d } from '../../core/toolpath3d';
+import { liveViewerState } from '../viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
@@ -17,6 +18,7 @@ import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
 import { buildPreviewToolpath } from './draw-preview';
 import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
+import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { useCncPaneWidth } from './use-cnc-pane-width';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
@@ -134,9 +136,17 @@ function PaneScene(props: {
   // Same scrubber the 2D preview uses, so the two views cannot disagree about
   // where in the program the operator is looking.
   const scrubberT = useUiStore((s) => s.scrubberT);
+  // While a job streams, the controller — not the scrubber — says where the
+  // bit is and how much of the route has actually been cut.
+  const live = liveViewerState(
+    useCanvasMotionOverlay(
+      useStore((s) => s.project),
+      false,
+    )?.run ?? null,
+  );
   const [isFullPage, setIsFullPage] = useState(false);
   const closeFullPage = useCallback(() => setIsFullPage(false), []);
-  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT);
+  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT, live);
 
   if (source === null) return null;
   return (
@@ -161,6 +171,7 @@ function PaneScene(props: {
           source={source}
           stockThicknessMm={stockThicknessMm}
           scrubberT={scrubberT}
+          live={live}
           onClose={closeFullPage}
         />
       )}

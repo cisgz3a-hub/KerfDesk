@@ -18,6 +18,7 @@ import {
 } from '../../core/sim';
 import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import type { Viewer3DDisplayMode } from '../viewer3d/viewer3d-display-mode';
+import type { LiveViewerState } from '../viewer3d/viewer3d-live-run';
 import { sceneFromLocal } from '../viewer3d/viewer3d-picking';
 import {
   createReliefThreeScene,
@@ -82,6 +83,7 @@ export function useCnc3dScene(
   source: DesignSceneSource | null,
   stockThicknessMm: number,
   scrubberT: number,
+  live: LiveViewerState | null,
 ): Cnc3dScene {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<ReliefSceneHandle | null>(null);
@@ -144,8 +146,15 @@ export function useCnc3dScene(
   // exactly the per-keystroke rebuild this hook was written to eliminate.
   useEffect(() => {
     const totalMm = totalLengthMm(source);
+    // A live run wins over the scrubber: while the machine is moving, what the
+    // operator needs to see is where it actually is, not where they last
+    // dragged a slider to.
+    if (live !== null) {
+      handleRef.current?.setScrubMm(live.revealMm);
+      return;
+    }
     handleRef.current?.setScrubMm(scrubberT >= 1 || totalMm <= 0 ? null : scrubberT * totalMm);
-  }, [source, scrubberT, state]);
+  }, [source, scrubberT, state, live]);
 
   // Keep the renderer buffer in step with the resizable pane so the 3D view
   // stays crisp at any width (the scene renders on demand, not on a rAF loop).
