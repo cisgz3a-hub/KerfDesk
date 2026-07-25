@@ -349,6 +349,11 @@ function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSet
     draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
     cncDraft,
     presetApplied: true,
+    // Picking a catalog card replaces the draft with that profile verbatim, so
+    // any earlier "Use detected values" no longer describes what is on screen.
+    // Leaving this true kept the Connect step claiming detected values were
+    // applied to a draft they had just been overwritten in.
+    detectedApplied: false,
   });
 }
 

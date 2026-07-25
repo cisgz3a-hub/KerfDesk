@@ -5,7 +5,12 @@
 // see core/cnc/feeds-calculator.ts); every number stays editable after.
 
 import { useState } from 'react';
-import { CHIPLOAD_MATERIALS, chiploadFor, type ChiploadMaterial } from '../../core/cnc';
+import {
+  CHIPLOAD_MATERIALS,
+  chiploadFor,
+  isChiploadMaterialKey,
+  type ChiploadMaterial,
+} from '../../core/cnc';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
@@ -19,8 +24,20 @@ export function FeedsCalculatorRow(props: {
   const machine = useStore((s) => s.project.machine);
   const profile = useStore((s) => s.project.device);
   const liveCaps = useStore((s) => s.cncLiveCaps);
-  const [material, setMaterial] = useState<ChiploadMaterial>('plywood-mdf');
-  const [flutes, setFlutes] = useState(DEFAULT_ASSUMED_FLUTE_COUNT);
+  // Open on the layer's own recipe when it has one. Seeding these from
+  // constants meant the panel previewed - and on Apply committed - a different
+  // material's numbers under this layer's name.
+  const recipe = props.settings.feedSource;
+  const [material, setMaterial] = useState<ChiploadMaterial>(
+    // materialKey is a plain string on the wire, so a foreign or stale .lf2 can
+    // carry a key the chipload chart no longer has.
+    recipe?.kind === 'material-recipe' && isChiploadMaterialKey(recipe.materialKey)
+      ? recipe.materialKey
+      : 'plywood-mdf',
+  );
+  const [flutes, setFlutes] = useState(
+    recipe?.kind === 'material-recipe' ? recipe.fluteCount : DEFAULT_ASSUMED_FLUTE_COUNT,
+  );
   if (machine?.kind !== 'cnc') return null;
 
   const tool = layerCncTool(machine, props.settings);

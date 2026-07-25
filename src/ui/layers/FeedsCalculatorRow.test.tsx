@@ -33,17 +33,14 @@ function install4040Cnc(): void {
 
 async function render(
   onCommitSettings: (settings: CncLayerSettings) => void,
+  settings: CncLayerSettings = DEFAULT_CNC_LAYER_SETTINGS,
 ): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
     root.render(
-      <FeedsCalculatorRow
-        layer={LAYER}
-        settings={DEFAULT_CNC_LAYER_SETTINGS}
-        onCommitSettings={onCommitSettings}
-      />,
+      <FeedsCalculatorRow layer={LAYER} settings={settings} onCommitSettings={onCommitSettings} />,
     );
   });
   return { host, root };
@@ -56,6 +53,30 @@ async function apply(host: HTMLElement): Promise<void> {
 }
 
 describe('FeedsCalculatorRow', () => {
+  // Audit 1.20: the panel opened on hardcoded 'plywood-mdf' / 2 flutes whatever
+  // the layer's own recipe said, so it previewed - and on Apply committed -
+  // another material's numbers under this layer's name.
+  it('opens on the layer’s own material recipe rather than the chart default', async () => {
+    install4040Cnc();
+    const onCommitSettings = vi.fn();
+    const { host, root } = await render(onCommitSettings, {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      feedSource: { kind: 'material-recipe', materialKey: 'hardwood', fluteCount: 3 },
+    });
+    try {
+      await apply(host);
+      const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
+      expect(next.feedSource).toMatchObject({
+        kind: 'material-recipe',
+        materialKey: 'hardwood',
+        fluteCount: 3,
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('applies the central 4040-aware material recipe with provenance', async () => {
     install4040Cnc();
     const onCommitSettings = vi.fn();
