@@ -44,7 +44,11 @@ export function openGcodeInspectorAction(deps: GcodeActionDeps): () => void {
   return () => void handleOpenGcodeInspector(deps.platform, deps.openInspector, deps.pushToast);
 }
 
-function saveGcodeContext(deps: GcodeActionDeps): Omit<SaveGcodeArgs, 'advanceVariablesAfter'> {
+/** Shared by the commands above and the main-canvas G-code view, so every
+ * surface compiles through the identical Save path. */
+export function saveGcodeContext(
+  deps: GcodeActionDeps,
+): Omit<SaveGcodeArgs, 'advanceVariablesAfter'> {
   const { app, laser } = deps;
   return {
     platform: deps.platform,

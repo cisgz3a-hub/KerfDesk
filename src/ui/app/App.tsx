@@ -3,8 +3,10 @@
 // and keyboard shortcuts live in dedicated hooks so this component stays a
 // thin layout shell.
 
+import { useState } from 'react';
 import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
+import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
@@ -61,13 +63,7 @@ export function App(): JSX.Element {
       <CommandShell />
       <main style={mainStyle}>
         <ToolStrip />
-        <div style={canvasAreaStyle}>
-          <Workspace />
-          <WorkspaceCameraOverlay />
-          <RegistrationJigPanel />
-          <CameraPanel />
-          <BoardCapturePanel />
-        </div>
+        <CanvasArea />
         <Cnc3DPane />
         <WorkspaceSidePanels />
       </main>
@@ -81,6 +77,25 @@ export function App(): JSX.Element {
       <ConfirmSaveDialog />
       <JobReviewDialog />
       <ImageEditorHost />
+    </div>
+  );
+}
+
+// The main canvas has two modes: the design view, and the ADR-255 G-code 3D
+// view of what this project compiles to. The switch stays on the canvas so
+// the operator can flip between "what I drew" and "what the machine runs" —
+// including while a job is streaming, where watching it is the whole point.
+function CanvasArea(): JSX.Element {
+  const [showGcode, setShowGcode] = useState(false);
+  return (
+    <div style={canvasAreaStyle}>
+      <Workspace />
+      <WorkspaceCameraOverlay />
+      <RegistrationJigPanel />
+      <CameraPanel />
+      <BoardCapturePanel />
+      {showGcode ? <CanvasGcodeView active={showGcode} /> : null}
+      <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
     </div>
   );
 }
