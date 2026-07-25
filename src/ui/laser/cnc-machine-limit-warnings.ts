@@ -32,13 +32,19 @@ export function detectCncMachineLimitWarnings(
   ];
 }
 
+// Compare the stock's FAR EDGE against travel, not its raw size: stock placed
+// at an origin offset reaches originOffset + size, so a 300 mm sheet at (150,
+// 150) runs 50 mm past a 400 mm axis while its width alone looks in range. The
+// sibling detector already works in extents (cnc-stock-warnings.ts).
 function stockVsBed(stock: CncStock, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
+  const maxX = stock.originOffset.x + stock.widthMm;
+  const maxY = stock.originOffset.y + stock.heightMm;
   const over: string[] = [];
-  if (limits.bedWidth !== undefined && stock.widthMm > limits.bedWidth) {
-    over.push(`width ${stock.widthMm} mm > ${limits.bedWidth} mm`);
+  if (limits.bedWidth !== undefined && maxX > limits.bedWidth) {
+    over.push(`X reaches ${maxX} mm > ${limits.bedWidth} mm`);
   }
-  if (limits.bedHeight !== undefined && stock.heightMm > limits.bedHeight) {
-    over.push(`height ${stock.heightMm} mm > ${limits.bedHeight} mm`);
+  if (limits.bedHeight !== undefined && maxY > limits.bedHeight) {
+    over.push(`Y reaches ${maxY} mm > ${limits.bedHeight} mm`);
   }
   if (over.length === 0) return [];
   return [

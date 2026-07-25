@@ -64,8 +64,31 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
       limits,
     );
     expect(rest).toEqual([]);
-    expect(warning).toContain('width 500 mm > 400 mm');
+    expect(warning).toContain('X reaches 500 mm > 400 mm');
     expect(warning).toContain('reported travel');
+  });
+
+  // Audit 1.18: the check compared raw stock size, so stock pushed out along an
+  // axis by originOffset overhung travel with no warning at all.
+  it('counts the origin offset toward the overhang', () => {
+    const limits: ControllerSettingsSnapshot = { bedWidth: 400, bedHeight: 400 };
+    const [warning, ...rest] = detectCncMachineLimitWarnings(
+      cncProject({ stock: { widthMm: 300, heightMm: 300, originOffset: { x: 150, y: 150 } } }),
+      limits,
+    );
+    expect(rest).toEqual([]);
+    expect(warning).toContain('X reaches 450 mm > 400 mm');
+    expect(warning).toContain('Y reaches 450 mm > 400 mm');
+  });
+
+  it('stays silent when the offset still leaves the stock inside travel', () => {
+    const limits: ControllerSettingsSnapshot = { bedWidth: 400, bedHeight: 400 };
+    expect(
+      detectCncMachineLimitWarnings(
+        cncProject({ stock: { widthMm: 300, heightMm: 300, originOffset: { x: 50, y: 50 } } }),
+        limits,
+      ),
+    ).toEqual([]);
   });
 
   it('names only the axis that overhangs (height)', () => {
@@ -74,8 +97,8 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
       cncProject({ stock: { heightMm: 450 } }),
       limits,
     );
-    expect(warning).toContain('height 450 mm > 400 mm');
-    expect(warning).not.toContain('width');
+    expect(warning).toContain('Y reaches 450 mm > 400 mm');
+    expect(warning).not.toContain('X reaches');
   });
 
   it('warns when a layer feed exceeds the reported max rate', () => {
