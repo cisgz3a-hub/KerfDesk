@@ -9,6 +9,7 @@ export type {
 export { runControllerReadiness } from './controller-readiness';
 export type { PreflightCode, PreflightIssue, PreflightOptions, PreflightResult } from './preflight';
 export { runPreflight } from './preflight';
+export { COMPILE_INTEGRITY_PREFLIGHT_CODES } from './blocking-codes';
 export { runPreEmitPreflight } from './pre-emit';
 export { firstZoneCrossedBySegment } from './no-go-zones';
 export type { CncPreflightOptions } from './cnc-preflight';
