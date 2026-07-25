@@ -11937,3 +11937,89 @@ produce a signal nobody is required to read).
   halves so neither the outage vector nor the audit itself returns by reflex.
 - NOT verified: the scheduled workflow has never fired. Its issue-filing path is
   unexercised until the first nightly run or a manual `workflow_dispatch`.
+
+---
+
+## ADR-256 - Vector cuts default to M4 dynamic power
+
+**Status:** Accepted | **Date:** 2026-07-25
+
+### Context
+
+Since ADR-036 the laser emitter has armed **M4 dynamic power for fill** and kept **M3 constant
+power for vector cuts**. The code comment defended M3-for-cut as "a slow corner must still cut
+fully through" (`grbl-strategy.ts`). The maintainer reports **scorched corners** on vector cuts.
+
+The Phase 2 LightBurn cross-reference (`LIGHTBURN-STUDY.md` section 8, entry D-01) surfaced that
+this is a divergence from every comparable reference, and that our stated rationale is the direct
+inverse of theirs. Three independent primary sources, all read 2026-07-25:
+
+1. **GRBL upstream** (`gnea/grbl` `doc/markdown/laser_mode.md`) - M4 is "very useful for clean,
+   precise engraving and cutting on simple materials across a large range of G-code generation
+   methods." For M3 it warns: "For a clean cut and prevent scorching with `M3` constant power mode,
+   it's a good idea to add lead-in and lead-out motions around the line you want to cut to give some
+   space for the machine to accelerate and decelerate." It also notes M4 "will never burn a hole
+   through your table, if you stop and forget to turn `M3` off."
+2. **LightBurn** (docs.lightburnsoftware.com) - the modern GRBL device profile defaults to M4 for
+   all layer types; a per-layer **Constant Power** toggle opts back into M3. A separate legacy
+   **GRBL-M3** device exists for firmware 1.1e and older, which has no M4.
+3. **Rayforge** (`barebaric/rayforge`, MIT, read at source) -
+   `rayforge/machine/models/dialect/grbl.py` sets `laser_on="M4 S{power:.0f}"`. The same M4 form
+   appears in its per-device profiles (`resources/devices/*/dialect.yaml`), its `base.py` default,
+   and its `lightburn_importer.py`. Its GRBL dialect has **no M3 laser path at all**.
+
+The decisive detail is that GRBL's M3 guidance is **conditional on emitting lead-in/lead-out
+motion**, and our default profiles do not. ADR-239 tangential feed-matched contour entries exist but
+are scoped to the 4040-safe profile, so a default-profile cut gets M3 with no runway - exactly the
+configuration GRBL says will scorch.
+
+### Decision
+
+`cutPowerMode: 'dynamic'` for the two dynamic-oriented GRBL dialects:
+
+- **`grbl-dynamic`** - the KerfDesk default. Cuts now emit M4.
+- **`grbl-raster`** - a dynamic-oriented dialect; its cuts follow. Rayforge's equivalent
+  `grbl_raster` dialect likewise holds M4 active across the job.
+
+Two dialects deliberately keep `cutPowerMode: 'constant'`:
+
+- **`grbl-compatible`** - the escape hatch for firmware without dynamic power (GRBL 1.1e and older,
+  where M4 does not exist). This mirrors LightBurn's separate GRBL-M3 device profile. Its label and
+  description already promise constant-power cuts.
+- **`neotronics-4040-safe`** - a deliberately conservative profile with its own tuning history
+  (ADR-234, ADR-236, ADR-239). Changing it is a separate decision requiring its own hardware pass.
+
+ADR-190's per-layer `powerMode` override is unchanged, so any single layer can still be pinned to
+constant power. ADR-036 is **not** superseded: its fill reasoning stands. This ADR extends the same
+energy-per-mm argument from fill to cut.
+
+### Alternatives considered
+
+- **Keep M3, add default lead-in/lead-out instead.** Rejected for now: it satisfies GRBL's condition
+  but is a much larger geometry change, and it would still leave us diverging from LightBurn and
+  Rayforge on the power word. Worth revisiting as a quality improvement on top of M4.
+- **Expose a user-facing Constant Power toggle and leave the default at M3.** Rejected as the primary
+  fix: ADR-190 already provides the per-layer override, so the only question here is the *default*,
+  and every reference default is M4.
+- **Change all four dialects.** Rejected - see the two exclusions above.
+
+### Consequences
+
+- **G-code output changes.** Cut groups now emit `M4 S0` where they emitted `M3 S0`. Snapshots move.
+- Under M4 the beam is dark whenever motion stops, so the laser-off-on-travel invariant
+  (non-negotiable #3) becomes strictly easier to satisfy, not harder.
+- **Thin-material cut-through must be re-tested.** M4 reduces delivered power in acceleration zones;
+  that is the point, but a job previously tuned to just cut through at M3 may now need a small power
+  increase. This is the one regression risk and it is a real one.
+- Machines on firmware older than 1.1f must select `grbl-compatible`. Detection already records the
+  firmware family (ADR-157), so a follow-up may auto-steer that selection.
+
+### Verification
+
+- Unit: `grbl-dynamic` and `grbl-raster` resolve `cutPowerMode: 'dynamic'`; `grbl-compatible` and
+  `neotronics-4040-safe` resolve `'constant'`. Pinned in `gcode-dialects.test.ts`.
+- Emission: a cut-only job on the default dialect contains `M4 S0` and no `M3`.
+- Invariant: laser-off-on-travel and power-scale property tests stay green.
+- **NOT VERIFIED - hardware.** No coupon has been burned under this change. The scorched-corner
+  improvement and the thin-material cut-through risk are both **CLAIMED** until the maintainer burns
+  an M3-vs-M4 comparison on the Falcon.

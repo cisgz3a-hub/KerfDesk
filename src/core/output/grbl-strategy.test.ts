@@ -11,10 +11,10 @@ function emit(job: Job): string {
 }
 
 describe('grblStrategy preamble/postamble', () => {
-  it('emits G21, G90, M3 S0 preamble and M5 + park postamble around an empty job', () => {
+  it('emits G21, G90, M4 S0 preamble and M5 + park postamble around an empty job', () => {
     const out = emit(EMPTY_JOB);
     expect(out).toBe(
-      ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'),
+      ['G21', 'G90', 'G54', 'G94', 'M4 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'),
     );
   });
 
@@ -22,7 +22,7 @@ describe('grblStrategy preamble/postamble', () => {
     const out = grblStrategy.emit(EMPTY_JOB, dev, { finishPosition: { x: 120, y: 80 } });
 
     expect(out).toBe(
-      ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X120.000 Y80.000 S0', ''].join('\n'),
+      ['G21', 'G90', 'G54', 'G94', 'M4 S0', 'M5', 'G0 X120.000 Y80.000 S0', ''].join('\n'),
     );
   });
 });
@@ -59,7 +59,7 @@ describe('grblStrategy single-segment job', () => {
         'G90',
         'G54',
         'G94',
-        'M3 S0',
+        'M4 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
         'G0 X10.000 Y20.000 S0',
@@ -178,7 +178,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     expect(out.match(/G1 X5\.000 Y0\.000 F1000 S1000/g)).toHaveLength(3);
   });
 
-  it('re-arms constant-power cut mode at zero power before each repeated pass', () => {
+  it('re-arms the cut power mode at zero power before each repeated pass', () => {
     const job: Job = {
       groups: [
         {
@@ -206,7 +206,9 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     const out = emit(job);
 
     expect(out).toContain(
-      ['; pass 2 of 2', 'M3 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
+      // ADR-256: the between-pass re-arm carries the group's effective mode, which on
+      // the default dialect is now M4. The re-arm itself still happens, at zero power.
+      ['; pass 2 of 2', 'M4 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
     );
   });
 });
@@ -428,7 +430,7 @@ describe('grblStrategy fill hatch overscan', () => {
 });
 
 describe('grblStrategy mixed raster/vector mode transitions', () => {
-  it('re-arms M3 before a cut group that follows a raster group', () => {
+  it('re-arms the cut power mode before a cut group that follows a raster group', () => {
     const job: Job = {
       groups: [
         {
@@ -466,7 +468,10 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
         },
       ],
     };
-    expect(emit(job)).toContain('M5\nM3 S0\n; layer cut color #ff0000');
+    // ADR-256: the default dialect cuts dynamically, so the re-arm after a raster
+    // group's trailing M5 is M4. The raster path leaves mode 'off', so a re-arm is
+    // still required — that is what this pins.
+    expect(emit(job)).toContain('M5\nM4 S0\n; layer cut color #ff0000');
   });
 
   it('arms M4 (dynamic power) before a fill group that follows a raster group', () => {

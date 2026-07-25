@@ -39,7 +39,7 @@ describe('smoothiewareStrategy', () => {
     const out = smoothiewareStrategy.emit(JOB, SMOOTHIE_DEVICE);
     expect(out).toContain('S0.500'); // 50% of max 1.0
     expect(out).not.toMatch(/\bS500\b/); // the integer-scale word must be gone
-    expect(out).toContain('M3 S0'); // arm line keeps S0
+    expect(out).toContain('M4 S0'); // arm line keeps S0 (ADR-256: dynamic cut default)
   });
 
   it('keeps travel laser-off (non-negotiable #3) at fractional scale', () => {

@@ -58,9 +58,21 @@ const cut = (): CutGroup => ({
   ],
 });
 
+// ADR-256 made the DEFAULT dialect cut dynamically too, so on that dialect there is
+// no longer any M3/M4 transition to observe — the whole job is M4. The cross-group
+// mode state machine is still live code for constant-cut dialects (grbl-compatible,
+// neotronics-4040-safe) and for per-layer overrides, so the transition tests below
+// run against `grbl-compatible` to keep that machinery covered rather than deleting
+// the coverage. Default-dialect behavior is pinned separately at the end.
+const constantCutDev = {
+  ...DEFAULT_DEVICE_PROFILE,
+  gcodeDialect: { dialectId: 'grbl-compatible' as const },
+};
+const emitConstantCut = (job: Job): string => grblStrategy.emit(job, constantCutDev);
+
 describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
   it('arms M4 dynamic power before the fill body, after the M3 preamble', () => {
-    const out = emit({ groups: [fill(5)] });
+    const out = emitConstantCut({ groups: [fill(5)] });
     // Preamble arms constant M3, then the fill flips to dynamic M4 (M5 clears
     // the constant mode first, mirroring emit-raster) before any burn.
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\nM5\nM4 S0\n; fill layer');
@@ -73,22 +85,40 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
   });
 
   it('restores constant power (M3) when a cut group follows a fill group', () => {
-    const out = emit({ groups: [fill(5), cut()] });
-    // fill arms M4; the cut that follows must flip back to constant M3 so a slow
-    // corner still cuts through.
+    const out = emitConstantCut({ groups: [fill(5), cut()] });
+    // fill arms M4; on a constant-cut dialect the cut that follows must flip back
+    // to constant M3 so a slow corner still cuts through.
     expect(out).toContain('M3 S0\n; layer cut color #ff0000');
     expect(out.indexOf('M3 S0\n; layer cut')).toBeGreaterThan(out.indexOf('M4 S0'));
   });
 
   it('emits a single M4 flip for consecutive fill groups (no redundant re-arm)', () => {
-    const out = emit({ groups: [fill(5), fill(10)] });
+    const out = emitConstantCut({ groups: [fill(5), fill(10)] });
     expect(out.match(/^M4 S0$/gm) ?? []).toHaveLength(1);
   });
 
-  it('leaves a cut-only job byte-identical — never emits M4', () => {
-    const out = emit({ groups: [cut()] });
+  it('leaves a constant-cut-dialect cut-only job byte-identical — never emits M4', () => {
+    const out = emitConstantCut({ groups: [cut()] });
     expect(out).not.toContain('M4');
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut');
+  });
+
+  // ADR-256: the shipped default now cuts under dynamic power, so a cut-only job
+  // never emits M3 at all and needs no mid-job flip to reach a fill.
+  it('cuts under M4 on the default dialect and never emits M3 (ADR-256)', () => {
+    const out = emit({ groups: [cut()] });
+    expect(out).toContain('G21\nG90\nG54\nG94\nM4 S0\n; layer cut');
+    expect(out).not.toContain('M3');
+    expect(findLaserOnTravelIssues(out)).toEqual([]);
+  });
+
+  it('needs no mode flip between cut and fill on the default dialect (ADR-256)', () => {
+    const out = emit({ groups: [cut(), fill(5)] });
+    // One arm in the preamble, and no second M4 re-arm because the mode never left
+    // dynamic — that is what ADR-256 buys across the cut/fill boundary.
+    expect(out.match(/^M4 S0$/gm) ?? []).toHaveLength(1);
+    expect(out).not.toContain('M3');
+    expect(findLaserOnTravelIssues(out)).toEqual([]);
   });
 
   it('re-arms between passes with the GROUP effective mode, not the dialect default', () => {
@@ -102,7 +132,9 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
       powerMode: 'dynamic',
       passes: 2,
     };
-    const out = emit({ groups: [dynamicCut, fill(5)] });
+    // Runs on the constant-cut dialect so the override genuinely differs from the
+    // dialect default (under ADR-256 both are dynamic on the shipped default).
+    const out = emitConstantCut({ groups: [dynamicCut, fill(5)] });
     // Pass 2 re-arms dynamic, never constant.
     expect(out).toContain('; pass 2 of 2\nM4 S0');
     // The ONLY M3 S0 in the file is the preamble arm — the controller is in
@@ -113,7 +145,7 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
 
   it('re-arms between passes with constant power for a plain multi-pass cut (unchanged)', () => {
     const multiCut: CutGroup = { ...cut(), layerId: 'plain-multi', passes: 2 };
-    const out = emit({ groups: [multiCut] });
+    const out = emitConstantCut({ groups: [multiCut] });
     expect(out).toContain('; pass 2 of 2\nM3 S0');
     expect(out).not.toContain('M4');
   });
@@ -176,7 +208,10 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
       layerId: 'constant-fill',
       powerMode: 'constant',
     };
-    const out = emit({ groups: [dynamicCut, constantFill] });
+    // Constant-cut dialect: here BOTH override directions produce a real flip
+    // (M3→M4 for the dynamic cut, M4→M3 for the constant fill). On the ADR-256
+    // default the dynamic-cut override matches the dialect and emits no flip.
+    const out = emitConstantCut({ groups: [dynamicCut, constantFill] });
 
     expect(out).toContain('M5\nM4 S0\n; layer dynamic-cut');
     expect(out).toContain('M3 S0\n; fill layer constant-fill');
