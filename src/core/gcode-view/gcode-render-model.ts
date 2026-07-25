@@ -13,6 +13,7 @@ import {
   stripInlineComments,
 } from '../gcode';
 import { sampleArcPoints } from '../geometry';
+import { expandCannedCycle } from './canned-cycle';
 import { applyLineWords, type RenderModal } from './render-model-words';
 import { computeProgramStats } from './program-stats';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
@@ -93,6 +94,13 @@ function freshModal(): RenderModal {
     power: 0,
     plane: XY_PLANE,
     ended: false,
+    cycle: null,
+    // LinuxCNC's default retract mode is G98 (back to the initial Z).
+    retractMode: 98,
+    cycleR: null,
+    cycleZ: null,
+    cycleQ: null,
+    cycleInitialZ: 0,
   };
 }
 
@@ -111,18 +119,30 @@ function processLine(context: BuildContext, raw: string, line: number): number {
     countUnsupported: (word, atLine) => countUnsupported(context.unsupported, word, atLine),
     pushEvent: (event) => context.events.push(event),
   });
-  if (outcome.homeAxes !== null) {
-    emitHome(context, outcome.homeAxes, line);
-    return LINE_CATEGORY.motion;
-  }
-  if (outcome.axisWords.size > 0) {
-    emitMotion(context, outcome.axisWords, line);
-    return LINE_CATEGORY.motion;
-  }
+  if (emitLineMotion(context, outcome, line)) return LINE_CATEGORY.motion;
   if (outcome.sawEvent) return LINE_CATEGORY.event;
   if (outcome.sawModal) return LINE_CATEGORY.modalOnly;
   if (outcome.sawUnsupported) return LINE_CATEGORY.unsupported;
   return LINE_CATEGORY.modalOnly;
+}
+
+// Routes a line to the right emitter. Returns whether it produced motion.
+function emitLineMotion(
+  context: BuildContext,
+  outcome: ReturnType<typeof applyLineWords>,
+  line: number,
+): boolean {
+  if (outcome.homeAxes !== null) {
+    emitHome(context, outcome.homeAxes, line);
+    return true;
+  }
+  if (outcome.axisWords.size === 0) return false;
+  if (context.modal.cycle !== null) {
+    emitCannedCycle(context, outcome.axisWords, outcome.peckDepth, line);
+    return true;
+  }
+  emitMotion(context, outcome.axisWords, line);
+  return true;
 }
 
 // G28 homes the named axes (all when none named) to work zero — rendered as
@@ -165,6 +185,50 @@ function emitMotion(
   modal.x = target.x;
   modal.y = target.y;
   modal.z = target.z;
+}
+
+// One canned-cycle hole. R/Z/Q are sticky, so a bare X/Y line after the
+// cycle word drills another hole with the same depth and clearance.
+function emitCannedCycle(
+  context: BuildContext,
+  axisWords: ReadonlyMap<string, number>,
+  peckDepth: number | null,
+  line: number,
+): void {
+  const { modal } = context;
+  const cycle = modal.cycle;
+  if (cycle === null) return;
+  const scaled = (letter: string): number | null => {
+    const raw = axisWords.get(letter);
+    return raw === undefined ? null : raw * modal.unitScale;
+  };
+  modal.cycleR = scaled('R') ?? modal.cycleR;
+  modal.cycleZ = scaled('Z') ?? modal.cycleZ;
+  modal.cycleQ = peckDepth === null ? modal.cycleQ : peckDepth * modal.unitScale;
+  const target = resolveTarget(modal, axisWords);
+  if (modal.cycleR === null || modal.cycleZ === null) {
+    context.skipped.push({ line, reason: 'canned cycle needs both R and Z' });
+    return;
+  }
+  const from = { x: modal.x, y: modal.y, z: modal.z };
+  const moves = expandCannedCycle({
+    cycle,
+    retract: modal.retractMode,
+    target: { x: target.x, y: target.y, z: modal.cycleZ },
+    rPlane: modal.cycleR,
+    peck: modal.cycleQ,
+    from,
+    initialZ: modal.cycleInitialZ,
+  });
+  for (const move of moves) {
+    const savedMotion = modal.motion;
+    modal.motion = move.rapid ? 0 : 1;
+    emitLinear(context, move.to, line);
+    modal.motion = savedMotion;
+    modal.x = move.to.x;
+    modal.y = move.to.y;
+    modal.z = move.to.z;
+  }
 }
 
 function resolveTarget(

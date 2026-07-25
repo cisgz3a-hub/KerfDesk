@@ -53,6 +53,7 @@ export type ProgramEvent =
   | { readonly kind: 'pause'; readonly line: number; readonly optional: boolean }
   | { readonly kind: 'program-end'; readonly line: number }
   | { readonly kind: 'wcs-select'; readonly line: number; readonly code: number }
+  | { readonly kind: 'canned-cycle'; readonly line: number; readonly code: number }
   | { readonly kind: 'tool-word'; readonly line: number; readonly tool: number }
   | {
       readonly kind: 'home';
