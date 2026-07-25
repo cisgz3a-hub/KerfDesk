@@ -193,7 +193,7 @@ Per `PROJECT.md:138`, every Phase H sub-phase is **"Built = code + tests landed,
 CLAIMED"**. Specifically unverified:
 
 - **All of H.15–H.18** (rest machining, adaptive clearing, inlay pairs, drag tabs) — hardware CLAIMED.
-- **Climb direction correctness** — the P1 above. Cut a coupon.
+- **Climb direction correctness** — the P1 above. Unresolvable here - no machine to test on. The origin-by-origin sign algebra in [03](03-coordinates-and-origin.md) is the only evidence available.
 - **ADR-180 amendment 2 spindle park** — not hardware-verified.
 - **Dimensional accuracy of V-carve, relief, and adaptive paths** — the suite asserts determinism and
   pass structure, never that the carved surface matches the model.
