@@ -1,4 +1,5 @@
 import { isSendableGcodeLine } from '../controllers/grbl';
+import { applySharedGCode, resolveAxisTarget, scanGcodeWords, stripInlineComments } from '../gcode';
 import type { MachineKind } from '../scene';
 import { sampleMotionArc } from './motion-manifest-arc';
 import type {
@@ -9,9 +10,7 @@ import type {
   MotionPoint,
 } from './motion-manifest';
 
-const WORD = /([A-Za-z])[ \t]*([+-]?(?:\d+\.?\d*|\.\d+))/g;
 const EPSILON = 1e-9;
-const INCH_TO_MM = 25.4;
 
 type ModalState = {
   motion: 0 | 1 | 2 | 3;
@@ -77,7 +76,7 @@ function appendManifestLine(
   if (!isSendableGcodeLine(rawLine)) return;
   const sendableLineIndex = build.sendableLineIndex;
   build.sendableLineIndex += 1;
-  const words = parseWords(stripComments(rawLine));
+  const words = parseWords(stripInlineComments(rawLine));
   if (words.mCodes.some(isProgramStop)) build.parkBoundaries.push(rawLineIndex);
   applyModalState(build.modal, words);
   const points = motionPoints(build.modal, words);
@@ -132,40 +131,26 @@ function isMaterialEntry(machineKind: MachineKind, state: ModalState, block: Mot
   return state.spindleArmed && from !== undefined && to !== undefined && to.z < from.z;
 }
 
-function stripComments(line: string): string {
-  const noParens = line.replace(/\([^)]*\)/g, ' ');
-  const semicolon = noParens.indexOf(';');
-  return (semicolon < 0 ? noParens : noParens.slice(0, semicolon)).trim();
-}
-
 function parseWords(line: string): ParsedWords {
   const values = new Map<string, number>();
   const gCodes: number[] = [];
   const mCodes: number[] = [];
-  for (const match of line.matchAll(WORD)) {
-    const letter = (match[1] ?? '').toUpperCase();
-    const value = Number.parseFloat(match[2] ?? '0');
-    if (!Number.isFinite(value)) continue;
-    if (letter === 'G') gCodes.push(value);
-    else if (letter === 'M') mCodes.push(value);
-    else values.set(letter, value);
+  for (const match of scanGcodeWords(line)) {
+    if (!Number.isFinite(match.value)) continue;
+    if (match.letter === 'G') gCodes.push(match.value);
+    else if (match.letter === 'M') mCodes.push(match.value);
+    else values.set(match.letter, match.value);
   }
   return { values, gCodes, mCodes };
 }
 
 function applyModalState(state: ModalState, words: ParsedWords): void {
-  words.gCodes.forEach((code) => applyGCode(state, code));
+  words.gCodes.forEach((code) => {
+    applySharedGCode(state, code);
+  });
   words.mCodes.forEach((code) => applyMCode(state, code));
   const power = words.values.get('S');
   if (power !== undefined) state.power = power;
-}
-
-function applyGCode(state: ModalState, code: number): void {
-  if (code === 0 || code === 1 || code === 2 || code === 3) state.motion = code;
-  else if (code === 20) state.unitScale = INCH_TO_MM;
-  else if (code === 21) state.unitScale = 1;
-  else if (code === 90) state.absolute = true;
-  else if (code === 91) state.absolute = false;
 }
 
 function applyMCode(state: ModalState, code: number): void {
@@ -196,17 +181,7 @@ function motionPoints(state: ModalState, words: ParsedWords): ReadonlyArray<Moti
 }
 
 function resolveTarget(state: ModalState, words: ReadonlyMap<string, number>): MotionPoint {
-  const axis = (name: string, current: number): number => {
-    const value = words.get(name);
-    if (value === undefined) return current;
-    const mm = value * state.unitScale;
-    return state.absolute ? mm : current + mm;
-  };
-  return {
-    x: axis('X', state.position.x),
-    y: axis('Y', state.position.y),
-    z: axis('Z', state.position.z),
-  };
+  return resolveAxisTarget(state.position, words, state);
 }
 
 function classifyMotion(

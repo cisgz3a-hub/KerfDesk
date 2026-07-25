@@ -1,3 +1,4 @@
+import axis3d from 'lucide-static/icons/axis-3d.svg?raw';
 import box from 'lucide-static/icons/box.svg?raw';
 import brush from 'lucide-static/icons/brush.svg?raw';
 import camera from 'lucide-static/icons/camera.svg?raw';
@@ -35,6 +36,7 @@ const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'tools.edit-image': brush,
   'tools.convert-to-bitmap': imageDown,
   'file.save-gcode': fileDown,
+  'file.inspect-gcode': axis3d,
   'window.toggle-preview': eye,
   shortcuts: keyboard,
 };
