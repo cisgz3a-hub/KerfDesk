@@ -28,7 +28,7 @@ import {
   type RecoveryRepository,
 } from '../state/recovery';
 import { useCameraStore } from '../state/camera-store';
-import { useStartBlockerStore } from './start-blocker-store';
+import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
 import {
   checkpointProgramIssue,
@@ -77,7 +77,7 @@ export async function runStartJobFlow(
 }
 
 async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<void> {
-  useStartBlockerStore.getState().clear();
+  clearStartBlockers();
   const permit = useLaserStore.getState().framedRun;
   const issue = framedRunReadinessIssue(permit);
   if (issue !== null) {
@@ -171,7 +171,7 @@ async function runStartJobFlowWithCheckpoint(
   repository: RecoveryRepository,
   offerPolicy: StartOfferPolicy = 'offer-fixes',
 ): Promise<void> {
-  useStartBlockerStore.getState().clear();
+  clearStartBlockers();
   const laser = useLaserStore.getState();
   const app = useStore.getState();
   const initialCheckpointIssue = checkpointStartIssue(checkpointToReplace);
@@ -280,7 +280,7 @@ async function repairOrReportBlockedStart(
     if (repair === 'retry') return 'retry';
     if (repair === 'handled') return 'blocked';
   }
-  useStartBlockerStore.getState().report(messages);
+  reportStartBlockers(messages);
   const lines = messages.map((message) => `• ${message}`).join('\n');
   jobAwareAlert(`Cannot start job:\n\n${lines}`);
   return 'blocked';
@@ -365,9 +365,9 @@ async function armFreshStartHandoff(
   await repository.cancelPendingStart(runId);
   await repository.discardStagedRun(runId);
   if (!armed.ok) return { staged: false, armed: false, blocked: false };
-  useStartBlockerStore
-    .getState()
-    .report(['Another job Start is already being prepared. Wait for it to finish and try again.']);
+  reportStartBlockers([
+    'Another job Start is already being prepared. Wait for it to finish and try again.',
+  ]);
   return { staged: false, armed: false, blocked: true };
 }
 
