@@ -36,6 +36,13 @@ export function tabTopZMm(depthMm: number, tabHeightMm: number): number {
 }
 
 export function passNeedsTabs(zMm: number, depthMm: number, tabHeightMm: number): boolean {
+  // A tab only means anything when the cut goes DEEPER than the tab: otherwise the
+  // "tab" spans the whole cut and leaves the full depth uncut at each window. With
+  // the shipped defaults (1 mm depth, 2 mm tab height) that would put four uncut
+  // gaps in every shallow profile — visible, pointless, and unable to hold a part
+  // that was never being released. Bailing here also makes tabTopZMm's clamped
+  // "tabs everywhere" case unreachable from compilation (ADR-258).
+  if (!(depthMm > tabHeightMm + TAB_EPS)) return false;
   return zMm < tabTopZMm(depthMm, tabHeightMm) - TAB_EPS;
 }
 

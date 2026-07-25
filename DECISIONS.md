@@ -12029,3 +12029,100 @@ energy-per-mm argument from fill to cut.
   observed before it. Both the expected corner-quality benefit and the thin-material cut-through risk
   are **CLAIMED** until someone burns an M3-vs-M4 comparison. Note the benefit is predicted from GRBL's
   documentation, not from a defect this project reproduced.
+
+---
+
+## ADR-258 - Holding tabs are a Z-rise in one continuous toolpath, and default on
+
+**Status:** Accepted | **Date:** 2026-07-25
+
+### Context
+
+Tabs were implemented by SPLITTING a closed profile loop into one open piece per span
+between tab windows (`splitPassForTabs`). Each piece then needed its own retract, rapid, and
+**full-depth plunge on the finished wall**. Three consequences followed:
+
+1. **Leads had to be disabled.** `applyProfileLeadPasses` carried an explicit
+   `if (settings.tabsEnabled) return passes`, because leading the surviving full loops while
+   split pieces still plunged on the wall would be inconsistent. ADR-250's own header
+   recorded tabs as falling back to "the legacy straight plunge", with tab-aware leads named
+   as a follow-up. So enabling tabs silently disabled the feature that exists to stop
+   square-entry gouging.
+2. **Small contours lost their deep pass entirely.** When the requested windows swallowed a
+   perimeter the split returned no pieces (AUDIT A5), so a hole under roughly 11.7 mm
+   diameter at the shipped defaults never cut through.
+3. **Tabs could not be defaulted on**, which left a full-depth profile freeing the part under
+   a running spindle with nothing but a neutral "tabs off" line in Job Review.
+
+Research settled the design question. **Fusion 360 does not split the toolpath**: "During
+tabbed toolpaths, the tool goes up in places where tabs are located, leaving a thin layer of
+material", with tab shapes Rectangular or Triangular. Autodesk further documents that "the
+plunge feedrate controls both the plunge and ramp feedrates for tabs and lead-in/out". A tab
+is a **Z-rise inside one continuous path**; the cutter stays engaged. Our split model was the
+outlier, and every problem above was an artifact of it rather than something to work around.
+
+### Decision
+
+A tabbed deep pass becomes ONE `path3d` that rides the cutting depth and rises to the tab top
+across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
+
+- Rectangular tab walls: the rise is a same-XY vertical pair, which the existing emitter
+  already sends at the plunge feed (`appendPath3dCutMoves`). No emitter change was required,
+  and this reproduces Fusion's documented tab-ramp feed behavior for free. Triangular/ramped
+  tab walls remain a follow-up.
+- The `tabsEnabled` early return in `applyProfileLeadPasses` is **removed**, not worked
+  around: one continuous path has one entry, so ADR-250 leads apply normally again.
+- `passNeedsTabs` now requires `depthMm > tabHeightMm`. A tab at least as tall as the cut
+  spans the whole cut and would leave the full depth uncut at each window - four pointless
+  gaps in a shallow groove, holding a part that was never being released. This also makes
+  `tabTopZMm`'s clamped "tabs everywhere" branch unreachable from compilation.
+- **CNC tabs default ON** for profile cuts (`DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled`). Easel
+  adds tabs automatically on a through-cut (EASEL-STUDY D-14); we left them off. This is a
+  default, not a guard: it is visible in the layer card and freely switched off, so PROJECT.md
+  non-negotiable #21 is not engaged. It is inert on the shipped shallow default (1 mm cut
+  against a 2 mm tab), so the default job is unchanged.
+- All three tab call sites converted so a single job cannot mix models: profile passes
+  (`compile-cnc-job.ts`), finishing passes (`finish-allowance.ts`), and inlay male profiles
+  (`inlay-pair-operation.ts`). Finishing tab centres are still projected from the matching
+  roughing toolpath - now via `tabFractionsFromReference` - so an offset start vertex cannot
+  move the physical bridges.
+
+### Alternatives considered
+
+- **Lead every split piece.** The faithful reading of ADR-250's follow-up, and more work:
+  `computeProfileLead` and its waste-side/sibling guards are written against a closed loop, so
+  open-piece semantics would have to be defined rather than inherited. Rejected because
+  Z-modulation removes the need entirely.
+- **Ramp each split piece.** Cheaper, but `applyRampEntry` tracks `previousZ` across a depth
+  ladder and sibling pieces sharing one Z break that assumption.
+- **Lead only the first piece.** Already rejected in-code as inconsistent; the other pieces
+  still plunge on the wall.
+- **Reorder leads before tab splitting.** Does nothing while the explicit early return stands;
+  this was an earlier misdiagnosis of the mechanism.
+
+### Consequences
+
+- **G-code changes for tabbed profile cuts.** Snapshot moved: three `G0 Z<safe>` retracts and
+  three `G1 Z<depth>` replunges disappear, replaced by fed `G1 X Y Z` moves, and a lead-in arc
+  now appears on the tabbed profile where none could exist before.
+- A contour fully covered by tab windows now rides at the tab top instead of losing its pass.
+  The AUDIT A5 safety property - never cut below the tab top in that case - is preserved by a
+  different mechanism, and `compile-cnc-tab-coverage.test.ts` still asserts it unchanged.
+- `splitPassForTabs` and `splitPassForTabsAlignedToReference` are now unused by production
+  code. They remain exported and tested; removing them is deliberate follow-up work, not part
+  of this diff.
+- The CNC motion invariant is untouched: `findPlungedTravelIssues` flags only **G0** rapids
+  below safe Z, and every tab wall here is a fed `G1`.
+
+### Verification
+
+- `cnc-tab-ramp.test.ts` pins: only two Z levels ever appear (cut and tab top, never above),
+  every tab wall is a same-XY vertical move, one rise and one fall per tab, a tiny contour
+  still returns a usable path, manual ADR-156 anchors place the wall half a window before the
+  anchor centre, and open/non-rise/zero-window inputs decline cleanly.
+- Compile-level tests assert one deep pass rather than N pieces, rises landing exactly on the
+  tab top, and tabs surviving on the finishing pass.
+- 417 `src/core` test files green; typecheck, eslint and prettier clean.
+- **NOT VERIFIED - hardware.** This changes full-depth motion: a tabbed profile now rides over
+  each tab instead of retracting and replunging. Better in principle and unproven in material.
+  Cut a tabbed coupon before trusting it, and confirm the bridges hold.

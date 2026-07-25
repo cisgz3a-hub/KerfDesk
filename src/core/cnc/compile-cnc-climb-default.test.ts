@@ -52,7 +52,7 @@ describe('climb default (ADR-251)', () => {
       ...createLayer({ id: 'L', color: '#2563eb' }),
       // Leads off (ADR-250 is default-on) so the profile stays a plain contour
       // pass; this isolates the climb winding of the default settings.
-      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, profileLead: { shape: 'none' } },
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: false, profileLead: { shape: 'none' } },
     };
     const scene: Scene = { objects: [squareSvg()], layers: [layer] };
     const job = compileCncJob(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);

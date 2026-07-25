@@ -21,6 +21,7 @@
 //
 // Pure: no clock, no randomness, no I/O.
 
+import { automaticTabAnchorPoints } from '../geometry/tabs-bridges';
 import type { Vec3 } from '../geometry/vec3';
 import type { Polyline, Vec2 } from '../scene';
 
@@ -68,6 +69,107 @@ export function tabRampedPoints(
 
   const stops = orderedStops(cumulative, windows, perimeter);
   return walkWithTabRises(points, cumulative, perimeter, stops, windows, cutZMm, tabTopZMm);
+}
+
+/**
+ * Tab centres for `target`, expressed as normalized perimeter fractions, taken
+ * from whichever of `references` it most closely follows.
+ *
+ * Finishing passes must put their bridges where the roughing pass put them: a
+ * finishing contour is a different offset of the same feature, so its own even
+ * spacing would land the tabs somewhere else and the physical bridge would be cut
+ * away. The split model solved this with `splitPassForTabsAlignedToReference`;
+ * this is the same projection expressed as fractions `tabRampedPoints` accepts.
+ *
+ * Returns null when no usable closed reference exists, in which case the caller
+ * should fall back to ordinary even spacing.
+ */
+export function tabFractionsFromReference(
+  target: Polyline,
+  references: ReadonlyArray<Polyline>,
+  tabsPerShape: number,
+): ReadonlyArray<number> | null {
+  const reference = closestClosedReference(target, references);
+  if (reference === null) return null;
+  const anchors = automaticTabAnchorPoints(reference, tabsPerShape);
+  if (anchors.length === 0) return null;
+  const points = closedLoopPoints(target.points);
+  if (points.length < 3) return null;
+  const cumulative = cumulativeDistances(points);
+  const perimeter = cumulative[cumulative.length - 1] ?? 0;
+  if (!(perimeter > EPS)) return null;
+  return anchors.map((anchor) => nearestDistance(points, anchor) / perimeter);
+}
+
+// The closed reference whose shape the target follows most closely, by mean
+// vertex distance — the same selection the split model used.
+function closestClosedReference(
+  target: Polyline,
+  references: ReadonlyArray<Polyline>,
+): Polyline | null {
+  let best: Polyline | null = null;
+  let bestDistance = Infinity;
+  for (const reference of references) {
+    if (!reference.closed || reference.points.length < 3) continue;
+    const mean = meanNearestDistance(target.points, reference.points);
+    if (mean < bestDistance - EPS) {
+      best = reference;
+      bestDistance = mean;
+    }
+  }
+  return best;
+}
+
+function meanNearestDistance(points: ReadonlyArray<Vec2>, against: ReadonlyArray<Vec2>): number {
+  if (points.length === 0) return Infinity;
+  let total = 0;
+  for (const point of points) total += pointToLoopDistance(point, against);
+  return total / points.length;
+}
+
+// Arc-length position along the ring of the point nearest `anchor`.
+function nearestDistance(points: ReadonlyArray<Vec2>, anchor: Vec2): number {
+  let bestDistance = Infinity;
+  let bestAt = 0;
+  let travelled = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const a = points[index] as Vec2;
+    const b = points[(index + 1) % points.length] as Vec2;
+    const span = Math.hypot(b.x - a.x, b.y - a.y);
+    const { distance, ratio } = projectOntoSegment(anchor, a, b);
+    if (distance < bestDistance - EPS) {
+      bestDistance = distance;
+      bestAt = travelled + ratio * span;
+    }
+    travelled += span;
+  }
+  return bestAt;
+}
+
+function pointToLoopDistance(point: Vec2, loop: ReadonlyArray<Vec2>): number {
+  let nearest = Infinity;
+  for (let index = 0; index < loop.length; index += 1) {
+    const a = loop[index] as Vec2;
+    const b = loop[(index + 1) % loop.length] as Vec2;
+    nearest = Math.min(nearest, projectOntoSegment(point, a, b).distance);
+  }
+  return nearest;
+}
+
+function projectOntoSegment(
+  point: Vec2,
+  a: Vec2,
+  b: Vec2,
+): { readonly distance: number; readonly ratio: number } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const ratio =
+    lengthSquared <= EPS
+      ? 0
+      : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+  const distance = Math.hypot(point.x - (a.x + dx * ratio), point.y - (a.y + dy * ratio));
+  return { distance, ratio };
 }
 
 type TabWindow = { readonly start: number; readonly end: number };

@@ -64,26 +64,44 @@ function scene(objects: ReadonlyArray<ImportedSvg>, finishAllowanceMm = 0): Scen
   return { layers: [layer], objects };
 }
 
-function deepestOpenPassCount(input: Scene): number {
+// Since ADR-258 a tabbed deep pass is ONE path3d that rises to the tab top at each
+// tab, rather than N open contour pieces. Counting rises is the direct translation
+// of the old "count the open pieces" measure — a loop with N tabs has N rises — so
+// the expected counts below are unchanged from the split model.
+const DEEPEST_Z_MM = -6;
+const Z_EPS = 1e-9;
+
+function deepestTabRiseCount(input: Scene): number {
   const job = compileCncJob(input, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);
   const group = job.groups[0];
   if (group?.kind !== 'cnc') throw new Error('expected CNC group');
-  return group.passes.filter((pass) => pass.kind === 'contour' && pass.zMm === -6 && !pass.closed)
-    .length;
+  let rises = 0;
+  for (const pass of group.passes) {
+    if (pass.kind !== 'path3d') continue;
+    const deepest = pass.points.reduce((min, point) => Math.min(min, point.z), Infinity);
+    if (Math.abs(deepest - DEEPEST_Z_MM) > Z_EPS) continue;
+    for (let index = 1; index < pass.points.length; index += 1) {
+      const previous = pass.points[index - 1];
+      const current = pass.points[index];
+      if (previous === undefined || current === undefined) continue;
+      if (current.z > previous.z + Z_EPS) rises += 1;
+    }
+  }
+  return rises;
 }
 
 describe('compileCncJob manual tabs', () => {
   it('uses persisted anchors instead of automatic spacing', () => {
-    expect(deepestOpenPassCount(scene([square('manual', 20, true)]))).toBe(2);
+    expect(deepestTabRiseCount(scene([square('manual', 20, true)]))).toBe(2);
   });
 
   it('keeps automatic tabs on untouched objects in the same layer', () => {
     expect(
-      deepestOpenPassCount(scene([square('manual', 20, true), square('automatic', 100, false)])),
+      deepestTabRiseCount(scene([square('manual', 20, true), square('automatic', 100, false)])),
     ).toBe(6);
   });
 
   it('projects the same manual anchors onto roughing and finishing contours', () => {
-    expect(deepestOpenPassCount(scene([square('manual', 20, true)], 2))).toBe(4);
+    expect(deepestTabRiseCount(scene([square('manual', 20, true)], 2))).toBe(4);
   });
 });
