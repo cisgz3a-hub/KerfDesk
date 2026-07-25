@@ -12,6 +12,7 @@ import {
 import type { MachineKind } from '../../core/scene';
 import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
+import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
 import { playheadAt, routeMmAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
@@ -28,6 +29,7 @@ export type GcodeInspectorDialogProps = {
 
 export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Element {
   const result = useMemo(() => buildGcodeRenderModel(props.text), [props.text]);
+  const lines = useMemo(() => props.text.split(/\r\n|\n|\r/), [props.text]);
   return (
     <div
       role="dialog"
@@ -50,7 +52,7 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
           </button>
         </header>
         {result.kind === 'ok' ? (
-          <InspectorBody model={result.model} />
+          <InspectorBody model={result.model} lines={lines} />
         ) : (
           <p style={messageStyle}>{result.reason}</p>
         )}
@@ -72,9 +74,14 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
   );
 }
 
-function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element {
+function InspectorBody(props: {
+  readonly model: GcodeRenderModel;
+  readonly lines: ReadonlyArray<string>;
+}): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [travelVisible, setTravelVisible] = useState(true);
+  const [sourceVisible, setSourceVisible] = useState(true);
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
   const { model } = props;
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
@@ -89,9 +96,34 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
     handleRef.current?.setPlayhead(atEnd ? null : playhead);
   }, [handleRef, playhead, atEnd, state]);
 
+  // 3D -> source: the line whose move the playhead is executing.
+  const activeLine =
+    playhead.segmentIndex < 0 ? null : (model.segLine[playhead.segmentIndex] ?? null);
+
+  // source -> 3D: select the line, and move the playhead to its first move.
+  // Modal/event lines emit no motion, so the playhead stays put rather than
+  // jumping somewhere arbitrary — the selection still updates.
+  const locateLine = (line: number): void => {
+    setSelectedLine(line);
+    const target = routeMmAtLine(model, line);
+    if (target !== null) playback.setRouteMm(target);
+  };
+
   return (
     <div style={bodyRowStyle}>
       <div style={viewColumnStyle}>
+        <div style={sourceToggleRowStyle}>
+          <button
+            type="button"
+            className="lf-btn"
+            title="Show or hide the program source"
+            aria-pressed={sourceVisible}
+            style={sourceToggleStyle}
+            onClick={() => setSourceVisible((visible) => !visible)}
+          >
+            {sourceVisible ? 'Hide source' : 'Show source'}
+          </button>
+        </div>
         <div style={viewportStyle}>
           <canvas ref={canvasRef} style={canvasStyle} />
           {state === 'no-webgl' ? (
@@ -102,6 +134,15 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
         </div>
         <InspectorTimeline playback={playback} totalRouteMm={model.totalRouteMm} />
       </div>
+      {sourceVisible ? (
+        <InspectorSourcePane
+          lines={props.lines}
+          categories={model.lineCategories}
+          activeLine={activeLine}
+          selectedLine={selectedLine}
+          onSelectLine={locateLine}
+        />
+      ) : null}
       <InspectorSidebar
         model={model}
         theme={theme}
@@ -112,12 +153,7 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
           setTravelVisible(visible);
           handleRef.current?.setTravelVisible(visible);
         }}
-        onLocateLine={(line) => {
-          // Modal/event lines emit no motion; leave the playhead alone
-          // rather than jumping somewhere arbitrary.
-          const target = routeMmAtLine(model, line);
-          if (target !== null) playback.setRouteMm(target);
-        }}
+        onLocateLine={locateLine}
       />
     </div>
   );
@@ -155,8 +191,19 @@ const overlayStyle: React.CSSProperties = {
   zIndex: 1000,
 };
 
+const sourceToggleRowStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  padding: '4px 8px 0',
+};
+
+const sourceToggleStyle: React.CSSProperties = {
+  padding: '1px 8px',
+  fontSize: 'var(--lf-text-xs)',
+};
+
 const panelStyle: React.CSSProperties = {
-  width: 'min(96vw, 1100px)',
+  width: 'min(96vw, 1400px)',
   height: 'min(92vh, 760px)',
   display: 'flex',
   flexDirection: 'column',
