@@ -7,6 +7,7 @@
 
 import {
   afterEndFinding,
+  cannedCycleFinding,
   cutBeforeSpindleFinding,
   cutWithoutFeedFinding,
   junkLineFinding,
@@ -24,6 +25,7 @@ import type { GcodeRenderModel } from './render-model-types';
 const SINGLE_CHECKS = [
   rapidThroughMaterialFinding,
   rapidPlungeFinding,
+  cannedCycleFinding,
   cutBeforeSpindleFinding,
   cutWithoutFeedFinding,
   skippedMotionFinding,

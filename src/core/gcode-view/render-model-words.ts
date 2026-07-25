@@ -5,6 +5,7 @@
 
 import { applySharedGCode } from '../gcode';
 import type { GcodeWordMatch } from '../gcode';
+import { CANNED_CYCLES, type CannedCycle, type RetractMode } from './canned-cycle';
 import type { ProgramEvent } from './render-model-types';
 
 export type RenderModal = {
@@ -18,6 +19,16 @@ export type RenderModal = {
   power: number;
   plane: 17 | 18 | 19;
   ended: boolean;
+  /** Active canned drilling cycle (G73/G81/G82/G83); null after G80. */
+  cycle: CannedCycle | null;
+  /** G98 (retract to initial Z) or G99 (retract to R plane). */
+  retractMode: RetractMode;
+  /** Sticky cycle parameters — a bare X/Y line repeats the hole. */
+  cycleR: number | null;
+  cycleZ: number | null;
+  cycleQ: number | null;
+  /** Z the tool sat at when the cycle began: the G98 retract height. */
+  cycleInitialZ: number;
 };
 
 export type LineWordOutcome = {
@@ -28,6 +39,8 @@ export type LineWordOutcome = {
   readonly axisWords: ReadonlyMap<string, number>;
   /** G28 home request: axes named on the line (empty = all). Null otherwise. */
   readonly homeAxes: ReadonlyArray<'X' | 'Y' | 'Z'> | null;
+  /** Q — canned-cycle peck depth, in the line's units. */
+  readonly peckDepth: number | null;
 };
 
 export type WordAccounting = {
@@ -45,6 +58,7 @@ type LineTally = {
   sawEvent: boolean;
   sawUnsupported: boolean;
   dwellSeconds: number | null;
+  peckDepth: number | null;
   sawDwell: boolean;
   sawHome: boolean;
 };
@@ -67,6 +81,7 @@ export function applyLineWords(
     sawEvent: false,
     sawUnsupported: false,
     dwellSeconds: null,
+    peckDepth: null,
     sawDwell: false,
     sawHome: false,
   };
@@ -79,6 +94,7 @@ export function applyLineWords(
     sawUnsupported: tally.sawUnsupported,
     axisWords: tally.sawHome ? new Map() : tally.axisWords,
     homeAxes,
+    peckDepth: tally.peckDepth,
   };
 }
 
@@ -107,6 +123,13 @@ function applyOneWord(
   }
   if (word.letter === 'P') {
     tally.dwellSeconds = word.value;
+    return;
+  }
+  if (word.letter === 'Q') {
+    // Peck depth for a drilling cycle. Not an axis: on its own it commands
+    // no motion, so it must not make a line look like a move.
+    tally.peckDepth = word.value;
+    tally.sawModal = true;
     return;
   }
   if (word.letter === 'T') {
@@ -189,6 +212,8 @@ function applyExtendedGWord(
     modal.plane = code;
     return 'modal';
   }
+  const cycleOutcome = applyCycleGWord(modal, code, line, accounting);
+  if (cycleOutcome !== null) return cycleOutcome;
   if (code === 4) return 'dwell';
   if (code === 28) return 'home';
   if (code === 94) return 'modal';
@@ -198,6 +223,37 @@ function applyExtendedGWord(
   }
   accounting.countUnsupported(`G${code}`, line);
   return 'unsupported';
+}
+
+// G73/G81/G82/G83 start a cycle, G80 cancels it, G98/G99 set where it
+// retracts to. Null when the code is none of those.
+function applyCycleGWord(
+  modal: RenderModal,
+  code: number,
+  line: number,
+  accounting: WordAccounting,
+): WordOutcome | null {
+  if (isCannedCycle(code)) {
+    // Capture the retract height BEFORE any of the cycle's own moves run —
+    // G98 returns here, and the cycle word precedes the first hole.
+    if (modal.cycle === null) modal.cycleInitialZ = modal.z;
+    modal.cycle = code as CannedCycle;
+    accounting.pushEvent({ kind: 'canned-cycle', line, code });
+    return 'event';
+  }
+  if (code === 80) {
+    modal.cycle = null;
+    return 'modal';
+  }
+  if (code === 98 || code === 99) {
+    modal.retractMode = code;
+    return 'modal';
+  }
+  return null;
+}
+
+function isCannedCycle(code: number): boolean {
+  return (CANNED_CYCLES as ReadonlyArray<number>).includes(code);
 }
 
 function applyMWord(

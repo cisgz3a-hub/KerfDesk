@@ -182,6 +182,27 @@ export function unitsNotDeclaredFinding(model: GcodeRenderModel): ProgramFinding
   };
 }
 
+/**
+ * GRBL v1.1's supported set stops at G80 — it implements no canned cycles
+ * (verified against the gnea/grbl v1.1 command reference). We still DRAW
+ * them, but a program using them will not run as-is on a GRBL controller,
+ * and that is worth saying out loud rather than letting the operator find
+ * out at the machine.
+ */
+export function cannedCycleFinding(model: GcodeRenderModel): ProgramFinding | null {
+  const first = model.events.find((event) => event.kind === 'canned-cycle');
+  if (first === undefined) return null;
+  const count = model.events.filter((event) => event.kind === 'canned-cycle').length;
+  return {
+    id: 'canned-cycle-unsupported',
+    severity: 'warning',
+    title: 'Canned drilling cycles',
+    detail: `${count} canned-cycle word(s) (G73/G81/G82/G83). The Inspector expands them into the moves they stand for, but GRBL does not implement canned cycles — this program will not run as-is on a GRBL controller.`,
+    line: first.line,
+    count,
+  };
+}
+
 export function noProgramEndFinding(model: GcodeRenderModel): ProgramFinding | null {
   if (model.segmentCount === 0) return null;
   if (model.events.some((event) => event.kind === 'program-end')) return null;
