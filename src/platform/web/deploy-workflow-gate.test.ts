@@ -89,7 +89,6 @@ describe('Cloudflare production deploy gate', () => {
       'pnpm lint:electron',
       'pnpm format:check',
       'pnpm license-check',
-      'pnpm audit:deps',
       'pnpm test',
       'pnpm build:web',
       'pnpm build:electron-main',
@@ -104,6 +103,23 @@ describe('Cloudflare production deploy gate', () => {
     expect(packageJson.scripts['deploy:web:preview']).toMatch(
       /^pnpm guard:repo && pnpm release:check && /,
     );
+  });
+
+  // ADR-254: the dependency audit deliberately does NOT gate merges or deploys.
+  // A third-party advisory publication is not a defect in the diff under review,
+  // and inside release:check's sequential `&&` chain it masked every verification
+  // step after it. Pin both halves: the outage vector must not be restored by
+  // reflex, and the audit must not quietly disappear either.
+  it('runs the dependency audit on a schedule, not in the merge gate', () => {
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      scripts: Record<string, string>;
+    };
+    const auditWorkflow = repoFile('.github/workflows/audit.yml');
+
+    expect(packageJson.scripts['release:check']).not.toContain('audit');
+    expect(packageJson.scripts['audit:deps']).toBe('pnpm audit --audit-level=low');
+    expect(auditWorkflow).toContain('pnpm audit:deps');
+    expect(auditWorkflow).toContain('cron:');
   });
 
   it('repo guard accepts the canonical GitHub Actions remote without .git', () => {

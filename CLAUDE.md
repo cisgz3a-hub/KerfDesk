@@ -1,6 +1,6 @@
 # CLAUDE.md — Operating manual for Claude Code
 
-> **Read this file at the start of every session.** Every rule here is enforced in CI or rejected at PR review. If you find yourself reasoning toward an exception, write a new ADR in `DECISIONS.md` first.
+> **Read this file at the start of every session.** Every rule here is enforced in CI or rejected at PR review. If you find yourself reasoning toward an exception, write a new ADR in `DECISIONS.md` first — **except for collaboration rule 7 (Frame is the only guard), where no ADR, test, or grant of permission can ever create an exception**: put the concern in the Job Review warnings list and stop.
 
 ---
 
@@ -34,16 +34,30 @@ These are behavioral norms for *how* to work in this repo. Unlike the coding rul
 
 7. **FRAME IS THE ONLY GUARD — no guard will ever be created again. Hard rule, no exceptions.** (Maintainer, 2026-07-17; ADR-228, clarified by ADR-232.) A *guard* is any behavior that blocks, refuses, gates, caps, clamps, delays, hides, disables, rewrites, or adds confirmation before an otherwise available action, input, output, machine command, job start, preview, save, import, export, or G-code emission. The ONE Start guard is the frame-first gate: a completed Frame for the exact current job (bounds signature + origin identity) opens Start on both laser and CNC; the Job Review dialog is the single warning surface the operator confirms. **Frame is the source of truth: calculated bed bounds, configured no-go zones, and controller-setting policy may warn in Job Review, but must never refuse Frame or Start. The actual clean Frame completion decides whether a permit exists.** Never add a new guard, re-add a deleted one, expand any refusal surface, or promote a warning into a block — not for "safety," not for "defense in depth," not with tests or an ADR, not ever. Anything an agent believes the operator should know goes into the Job Review warnings list, which informs and never refuses. The only non-guard refusals permitted to exist are: (a) transport preconditions — the serial channel factually cannot accept a stream (disconnected, no status yet, controller Alarm/not-Idle, a job/jog/frame/operation already running, MPG owning control, a line larger than the RX buffer) — each of which must offer its fix in place where one exists; (b) compile integrity — the program factually cannot be produced or contains unstreamable bytes (compile failure, NaN coordinates, empty output); and (c) handoff consistency — the exact reviewed program/setup must be the one streamed (evidence epochs, attestation binding, resume fingerprints). Re-labeling a policy judgment as one of these three categories is a violation of this rule. Narrowing, correcting, or removing refusals remains normal work; widening any of them requires the maintainer's explicit prior permission in chat, which should be presumed denied (PROJECT.md non-negotiable #21).
 
+8. **Every finished job ends with a full Job Completion Report. Hard rule, no exceptions.** (Maintainer, 2026-07-25.) A *job* is any unit of work an agent was given and has stopped working on — a fix, a feature, an audit, an investigation, a refactor, a PR opened / updated / merged, or work that is blocked or abandoned — on **any** branch or worktree, by **any** agent (main session, subagent, fleet, scheduled run). Answering a question or doing a single lookup that changes nothing is not a job; rule 6 alone covers those. When a job ends, the final message must carry the nine sections below, in this order, under these headings. A small job gets short sections, but **no section may be dropped** — if one is genuinely empty, keep the heading and write "None." Every fact in the report must come from a command actually run in this session (rule 5); anything not verified is labeled **not verified** rather than left implied.
+
+   1. **Where we are** — branch / worktree name, PR number + link and its state (draft / open / merged / closed), CI state by named check (green / red / pending / not run), whether the work is on `main`, and whether anything is deployed. Facts as of now, not expectations.
+   2. **What we did** — the original ask restated in the maintainer's terms, including anything added mid-flight, and the practical result it was meant to produce; then the change list **by file path**, one line of *why* per file. Not "I updated the layers panel."
+   3. **Goal status** — **achieved / partially achieved / not achieved**, with the evidence behind that word. Never "achieved" while required work remains.
+   4. **What was verified — and what was NOT** — the commands actually run and their results (`pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` — counts and pass/fail), then the gap stated plainly: no perceptual render, no hardware air-cut, no E2E, mock-only. Rule 2 governs this section; green tests are never evidence a feature works.
+   5. **How it works now** — the finished user-facing behavior: what the maintainer will see, where in the UI, how to operate it, what to expect, and the limits that remain.
+   6. **What's next — numbered steps** — **Step 1, Step 2, Step 3 …** in the order they should be done. Each step gives the exact action (a command in a fenced block, a file path, or a click path), why it comes next, what a good result looks like, and what to do if it fails. No "consider", "maybe", or "look into" — every step must be executable exactly as written by someone who did not watch the session.
+   7. **What else we could do** — the optional list, kept strictly separate from step 6 so *must* is never confused with *could*: adjacent work, deferred items, follow-ups. One line each, with its cost and its payoff.
+   8. **How to improve** — the honest quality read: risk this change introduces, debt taken on, tests not written, the same pattern that may exist elsewhere in the tree, and what a better version would look like with more time.
+   9. **Recommended action:** — rule 6 unchanged: one line, the single best next step, no menu.
+
+   Blocked or intentionally incomplete work uses the same skeleton — name what is missing under **Goal status** and exactly what unblocks it under **What's next**. If the job touched more than one branch, the report covers each branch by name. This report is written for the maintainer, not as a changelog: a diff, test log, commit, or PR link is supporting evidence inside it, never a replacement for it.
+
 ---
 
 ## Size limits — hard
 
-These are enforced by ESLint, `tsc`, and CI scripts, not by judgment. ESLint's file line limit counts code lines excluding blank and comment lines; CI also runs a 600 raw physical lines backstop to catch files that grow too large physically.
+Every **hard** limit below is enforced by ESLint, `tsc`, or a CI script, not by judgment — except the React-component row, which has no lint rule and is enforced at review. Every **soft** limit is advisory: `pnpm check:soft-size` lists files over the soft file limit but always exits 0 (ADR-132). ESLint's file line limit counts code lines excluding blank and comment lines; CI also runs a 600 raw physical lines backstop to catch files that grow too large physically.
 
 | Unit | Soft limit | Hard limit | Rule |
 |---|---|---|---|
-| File | 250 counted code lines | 400 counted code lines | Lint warning at soft, error at hard, excluding blank and comment lines. No exceptions to this counted-code limit; CI also enforces 600 raw physical lines. |
-| React component | 150 lines | 250 lines | If approaching, split into sub-components in a folder. |
+| File | 250 counted code lines | 400 counted code lines | Report-only listing at soft (`pnpm check:soft-size`, always exits 0 — ADR-132), ESLint `max-lines` error at hard, excluding blank and comment lines. No exceptions to this counted-code limit; CI also enforces 600 raw physical lines. |
+| React component | 150 lines | 250 lines | **Review-enforced — no component-specific lint rule exists**; the 400-counted-line file cap is the only mechanical limit on a `.tsx`. If approaching, split into sub-components in a folder. |
 | Function | 40 lines | 80 lines | If approaching, extract helpers. |
 | Cyclomatic complexity per function | 8 | 12 | Lint error at hard. |
 | Default exports per file | 1 | 1 | Named exports allowed if cohesive. |
@@ -108,7 +122,7 @@ ui/    ← imports from: core/, io/, platform/types (never platform/web or platf
 
 Enforced by `eslint-plugin-boundaries`. Violation is a CI fail, not a warning. Two scoped exceptions, both deliberate: `src/ui/app/main.tsx` is the composition root and may wire `platform/web` → `ui` (ADR-011), and **test files (`*.test.ts`, `*.test.tsx`) plus `src/__fixtures__/` are exempt from boundary enforcement** — a test may import across modules for scaffolding. Do not read the exemption as license to couple production code through a test.
 
-Cross-module imports must go through `index.ts`. Reaching into `../scene/internal/foo.ts` from outside `scene/` is forbidden.
+Cross-module imports must go through `index.ts`. Reaching into `../scene/internal/foo.ts` from outside `scene/` is forbidden — **a review-enforced convention, not a mechanical one**: `boundaries/entry-point` is not configured, and because elements are declared in folder mode a deep path still classifies as its top-level module and passes lint.
 
 No circular imports. ESLint rule `import/no-cycle` set to error.
 
@@ -163,7 +177,7 @@ Nothing in `src/core/` is allowed to:
 - Call `console.*` (use a logger passed in)
 - Throw exceptions for control flow — return a `Result<T, E>` discriminated union
 
-Enforced by ESLint `no-restricted-globals` and `no-restricted-imports`.
+Enforced by ESLint `no-restricted-globals`, `no-restricted-imports`, and `no-restricted-syntax` (the clock and randomness bans). The Result-instead-of-throw rule is **review-enforced only** — no lint rule detects a `throw` inside `src/core/`.
 
 ---
 
@@ -287,9 +301,37 @@ PR titles use Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs
 
 ---
 
-## When you don't know — say so
+## We only build with verified research — never guess, never hallucinate
 
-You are not penalized for saying "I don't know." You are penalized for inventing.
+You are not penalized for saying "I don't know." You are penalized for inventing — and
+equally for **speculating out loud instead of going and finding out.** When you don't know
+something, go do the research: read the source, run the command, fetch the upstream document.
+Then answer. Uncertainty is a trigger to investigate, never a licence to guess.
+
+**Banned moves.** If you catch yourself writing one of these, stop mid-sentence and go
+research instead:
+- "Maybe I should…" / "I think it works like this" / "It probably…" / "This should be fine"
+- Proposing a design whose feasibility you have not checked
+- Stating an API, flag, version range, CVE range, config key, default, or firmware behavior
+  from memory
+- Recommending a fix you have not confirmed actually fixes the thing
+
+**Evidence you must hold, from this session, before stating a fact or recommending a fix:**
+- The actual source read in the current tree — cite `file:line`; or
+- The actual command run, with its real output and exit code; or
+- The **upstream primary source fetched and read** — vendor docs, the advisory record, the
+  spec, the changelog, the firmware manual, the issue thread; or
+- A reproduction you ran yourself.
+
+"I read it somewhere," "that's how it usually works," and "the docs probably say" are not
+sources. **External research is expected, not a last resort** — fetch the page, read the
+GRBL/LightBurn documentation, read the advisory, read the datasheet. Cite what you used so
+the maintainer can check it. Time spent verifying is never wasted; a confident wrong answer
+costs far more, and on this project it can mean a ruined workpiece or an unsafe machine move.
+
+Highest-risk category, look every one up every time: version numbers and semver ranges,
+CVE/advisory affected-vs-patched ranges, controller settings (`$` numbers) and their
+semantics, G-code word behavior, API signatures, and what LightBurn actually does.
 
 If you are about to:
 - Reference an API you haven't verified
@@ -297,7 +339,8 @@ If you are about to:
 - Claim a behavior you haven't tested
 - Quote a config value you haven't checked
 
-**Stop.** Read the actual code, run the actual command, check the actual docs. Then proceed.
+**Stop.** Read the actual code, run the actual command, fetch the actual documentation. Then
+proceed.
 
 If you cannot verify something in the current session, say:
 

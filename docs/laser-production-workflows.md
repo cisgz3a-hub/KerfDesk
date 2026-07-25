@@ -2,7 +2,7 @@
 
 ## Device and Labs setup
 
-1. Open **Set up device** and choose the closest supported profile.
+1. Open **Machine Setup** and choose the closest supported profile.
 2. Connect, read controller settings, and confirm the work area, origin, maximum feed, and power scale.
 3. Open **Tools > Labs** only for workflows still awaiting hardware acceptance.
 4. Keep Rotary, rotary image engraving, low-power Fire, Print and Cut, and camera alignment v2 disabled unless the connected profile supports them.
@@ -34,7 +34,7 @@
 1. Use a homing-enabled absolute-position profile and enable Print and Cut in Labs.
 2. Home the machine, open **Tools > Print and Cut**, and enter two distinct design targets.
 3. Move the head to each printed target and capture its machine point.
-4. Apply registration and keep absolute placement active. Job-origin placement is disabled while registered.
+4. Apply registration and keep absolute placement active. Job-origin placement is **not** disabled while registered — if registration and a non-absolute job origin are both active, Frame and Job Review warn that the physical Frame traces the combined transform. Confirm the traced position before continuing.
 5. Re-register after disconnect, alarm, reset, release-motors, or any trusted-position loss.
 
 ## Camera sources
@@ -65,4 +65,4 @@
 1. Confirm the intended output layers and material settings.
 2. Use Preview to inspect cut order, travel, curves, arrays, variables, nesting, and registration.
 3. Frame on the connected machine with the laser off.
-4. Start only after bounds, position, controller readiness, raster, curve-segment, and safety checks pass.
+4. Start is opened by that completed Frame for the exact current job — nothing else gates it. Bounds, position, controller readiness, raster, and curve-segment findings surface as Job Review warnings, which inform and never refuse (ADR-228; `CLAUDE.md` rule 7).
