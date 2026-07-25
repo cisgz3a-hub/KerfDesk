@@ -67,4 +67,19 @@ describe('emitRdFile', () => {
     const result = emitRdFile(ruidaLineProject(405));
     expect(result.ok).toBe(true);
   });
+
+  // Rule 7 / ADR-228: prepareOutput used to refuse on ANY pre-emit finding,
+  // including heuristic policy codes, so an unusable controlled laser-off
+  // travel feed refused the whole .rd export for a finding that merely warns
+  // on Start. The export must proceed; the finding rides along as an advisory.
+  it('does not make a pre-emit policy finding an export refusal', () => {
+    const base = ruidaLineProject();
+    const result = emitRdFile({
+      ...base,
+      device: { ...base.device, controlledLaserOffTravelFeedMmPerMin: 0 },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.bytes.length).toBeGreaterThan(0);
+  });
 });

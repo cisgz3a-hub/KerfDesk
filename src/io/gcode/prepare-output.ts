@@ -19,7 +19,12 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import { compileCncJob } from '../../core/cnc';
-import { runPreEmitPreflight, type PreflightResult } from '../../core/preflight';
+import {
+  COMPILE_INTEGRITY_PREFLIGHT_CODES,
+  runPreEmitPreflight,
+  type PreflightIssue,
+  type PreflightResult,
+} from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
   validateOutputScope,
@@ -45,6 +50,11 @@ export type PreparedOutput =
       // Translation applyJobOrigin applied (zero for absolute placements).
       // The preview undoes it to register the toolpath with the scene (H3).
       readonly jobOriginOffset: Vec2;
+      // Pre-emit findings that inform but never refuse (rule 7 / ADR-228).
+      // Optional because a prepared output archived by an earlier build is
+      // restored from IndexedDB without this field (prepared-output-persistence);
+      // prepareOutput itself always sets it. Read it as `advisories ?? []`.
+      readonly advisories?: ReadonlyArray<PreflightIssue>;
     }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
@@ -73,8 +83,23 @@ export function prepareOutput(
   // segment count compile, and rasters of any pixel size stream row-by-row.
   // Compiled-work size measurements surface as Job Review advisories in the
   // Start path instead of failing preparation.
+  // Rule 7 / ADR-228: preparation refuses ONLY on compile integrity. Pre-emit
+  // reports heuristic policy codes too (speed-out-of-range,
+  // scan-offset-out-of-range), and PreflightResult.ok is issues.length === 0 —
+  // so refusing on `!preEmit.ok` turned any policy finding into a refusal, and
+  // the operator saw a REFUSED .rd export (emit-rd) and a refused tiled CNC
+  // export for a finding that merely warns on Start. Split against the one
+  // canonical set both the Start and Save paths key off so the three cannot
+  // drift apart. The blocking bucket is empty for every code pre-emit can emit
+  // today; it stays so a later integrity check here still refuses correctly.
   const preEmit = runPreEmitPreflight(outputProject);
-  if (!preEmit.ok) return { ok: false, preflight: preEmit };
+  const blocking = preEmit.issues.filter((issue) =>
+    COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
+  );
+  if (blocking.length > 0) return { ok: false, preflight: { ok: false, issues: blocking } };
+  const advisories = preEmit.issues.filter(
+    (issue) => !COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code),
+  );
   try {
     const compiled = compileForMachine(outputProject);
     const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
@@ -91,6 +116,7 @@ export function prepareOutput(
       project: outputProject,
       job: optimizePaths(placed, project.optimization, project.device.scanningOffsets),
       jobOriginOffset: offset,
+      advisories,
     };
   } catch (error) {
     if (isProgramMaterializationRangeError(error)) {
