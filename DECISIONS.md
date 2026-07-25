@@ -7761,6 +7761,43 @@ maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
 
+### Amendment 2 (2026-07-25) — CNC Pause parks the spindle via the safety-door byte
+
+Amendment 1 left CNC Pause as a bare feed hold, which stops motion but leaves the
+spindle commanded. The maintainer's requirement is the opposite: **pause should stop
+the spindle in place, and resume should spin it back up and continue the same line.**
+
+Researched against the firmware rather than reasoned about (CLAUDE.md rule 9). In
+[grbl/config.h](https://github.com/gnea/grbl/blob/master/grbl/config.h):
+`SAFETY_DOOR_SPINDLE_DELAY 4.0` and `SAFETY_DOOR_COOLANT_DELAY 1.0` are **active by
+default**, while `PARKING_ENABLE` is **commented out by default**. So GRBL's Door
+state decelerates in place and de-energizes spindle and coolant, and door-resume
+restores them and holds motion for the spin-up delay before continuing the
+interrupted move — exactly the requested behavior, minus any retract.
+
+- CNC Pause now sends the **safety-door byte** (`\x84`), the same path laser already
+  used, instead of `!`. The door branch is selected by driver capability
+  (`realtime.safetyDoor !== null`), no longer by machine kind.
+- CNC Resume is correspondingly **door-confirmed**: it waits for a fresh `Run`/`Idle`
+  report before refilling the stream, rather than firing `~` blind.
+- **No retract.** `PARKING_ENABLE` is off in stock GRBL, and its `PARKING_TARGET` is a
+  *machine coordinate* — meaningless on this project's no-homing router. A host-side
+  lift is deliberately not built: it would require abandoning the door hold for a
+  drain-to-Idle pause, reintroducing a re-entry seam. The cutter therefore spins up
+  while still engaged; the advisory says so.
+- **Accessory proof is required for laser only.** GRBL omits `A:` when nothing is
+  energized and emits `Ov:` only periodically, so a CNC controller can settle into
+  Door before any report carries accessory data. Demanding the field would time out
+  and fail-dark a correctly stopped job. A settled Door state is itself the
+  controller's report that it de-energized the spindle. The laser path keeps its
+  positive proof-of-beam-off requirement (ADR-179) unchanged — this narrows a
+  refusal, which rule 7 permits, and widens none.
+- Both CNC copy strings are rewritten; they previously told the operator the spindle
+  keeps spinning, which this makes false.
+- **Not hardware-verified.** No air-cut on a spindle machine. Whether this specific
+  4040 build reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build
+  facts confirmed only by running it.
+
 ### Amendment (2026-07-24) — same-session CNC Resume is one-click again
 
 The original decision's resume **refusal is withdrawn.** ADR-228 / CLAUDE.md
