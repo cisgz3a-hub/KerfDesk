@@ -3,7 +3,7 @@ import { cncPauseMessage, cncResumeAdvisoryNotice } from './cnc-pause-resume-pol
 
 describe('CNC pause/resume policy', () => {
   it('surfaces a spindle-check advisory for CNC Resume and nothing for laser', () => {
-    expect(cncResumeAdvisoryNotice('cnc')).toMatch(/confirm the spindle/i);
+    expect(cncResumeAdvisoryNotice('cnc')).toMatch(/restarts the spindle/i);
     expect(cncResumeAdvisoryNotice('laser')).toBeNull();
     expect(cncResumeAdvisoryNotice(null)).toBeNull();
   });

@@ -287,9 +287,37 @@ PR titles use Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs
 
 ---
 
-## When you don't know — say so
+## We only build with verified research — never guess, never hallucinate
 
-You are not penalized for saying "I don't know." You are penalized for inventing.
+You are not penalized for saying "I don't know." You are penalized for inventing — and
+equally for **speculating out loud instead of going and finding out.** When you don't know
+something, go do the research: read the source, run the command, fetch the upstream document.
+Then answer. Uncertainty is a trigger to investigate, never a licence to guess.
+
+**Banned moves.** If you catch yourself writing one of these, stop mid-sentence and go
+research instead:
+- "Maybe I should…" / "I think it works like this" / "It probably…" / "This should be fine"
+- Proposing a design whose feasibility you have not checked
+- Stating an API, flag, version range, CVE range, config key, default, or firmware behavior
+  from memory
+- Recommending a fix you have not confirmed actually fixes the thing
+
+**Evidence you must hold, from this session, before stating a fact or recommending a fix:**
+- The actual source read in the current tree — cite `file:line`; or
+- The actual command run, with its real output and exit code; or
+- The **upstream primary source fetched and read** — vendor docs, the advisory record, the
+  spec, the changelog, the firmware manual, the issue thread; or
+- A reproduction you ran yourself.
+
+"I read it somewhere," "that's how it usually works," and "the docs probably say" are not
+sources. **External research is expected, not a last resort** — fetch the page, read the
+GRBL/LightBurn documentation, read the advisory, read the datasheet. Cite what you used so
+the maintainer can check it. Time spent verifying is never wasted; a confident wrong answer
+costs far more, and on this project it can mean a ruined workpiece or an unsafe machine move.
+
+Highest-risk category, look every one up every time: version numbers and semver ranges,
+CVE/advisory affected-vs-patched ranges, controller settings (`$` numbers) and their
+semantics, G-code word behavior, API signatures, and what LightBurn actually does.
 
 If you are about to:
 - Reference an API you haven't verified
@@ -297,7 +325,8 @@ If you are about to:
 - Claim a behavior you haven't tested
 - Quote a config value you haven't checked
 
-**Stop.** Read the actual code, run the actual command, check the actual docs. Then proceed.
+**Stop.** Read the actual code, run the actual command, fetch the actual documentation. Then
+proceed.
 
 If you cannot verify something in the current session, say:
 

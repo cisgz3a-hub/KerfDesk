@@ -24,6 +24,22 @@ must be presumed denied. Nothing in this paragraph authorizes a guard: adding a
 guard, or any refusal outside those three factual categories, is never permitted,
 and no ADR, test, or grant of permission can authorize it (ADR-228 standing denial).
 
+## Non-negotiable: we only build with verified research
+
+**When you don't know something, go find out — do not guess.** Read the source, run the
+command, fetch the upstream document (vendor docs, advisory record, spec, changelog,
+firmware manual). Uncertainty is a trigger to investigate, never a licence to speculate,
+and external research is expected rather than a last resort.
+
+Do not open a PR whose description or code rests on "I think it works like this,"
+"probably," "this should be fine," or a design whose feasibility was never checked. Every
+factual claim — an API signature, a version or semver range, a CVE's affected-vs-patched
+range, a controller `$` setting, a G-code behavior, a LightBurn behavior — must be backed
+by something you actually read or ran in the course of the work, and cited so a reviewer
+can check it. "I read it somewhere" is not a source. A confident wrong answer costs far
+more than the verification would have; here it can mean a ruined workpiece or an unsafe
+machine move. See `CLAUDE.md` — "We only build with verified research".
+
 ## Before you open a PR
 
 1. Read [`CLAUDE.md`](./CLAUDE.md) — file-size limits, naming, anti-patterns, checklists. The file-size, module-boundary, and type-strictness rules are enforced by ESLint and CI; naming, anti-patterns, and the checklists are enforced at maintainer review.

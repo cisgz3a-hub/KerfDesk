@@ -51,7 +51,13 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   assertNoPauseResumeTransition(context);
   const activeDriver = context.driver();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
-  const safetyDoor = laserJob ? activeDriver.realtime.safetyDoor : null;
+  // ADR-180 amendment 2 (2026-07-25): CNC Pause now takes the same safety-door
+  // byte as laser instead of a bare feed hold. GRBL's Door state decelerates in
+  // place and de-energizes spindle and coolant; door-resume restores them and
+  // waits SAFETY_DOOR_SPINDLE_DELAY (4.0s in stock config.h) before motion
+  // continues, so the job carries on mid-line at full RPM. Feed hold cannot do
+  // this — it stops motion only and leaves the spindle commanded.
+  const safetyDoor = activeDriver.realtime.safetyDoor;
   const pauseByte = safetyDoor ?? activeDriver.realtime.hold;
   const controlSession = context.get().controllerSessionEpoch;
 
@@ -80,11 +86,11 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
           token,
           pauseByte,
           controlSession,
-          isSettledWithAccessoriesOff,
+          (report) => isSettledWithAccessoriesOff(report, laserJob),
           PAUSE_CONFIRMATION_TIMEOUT_MESSAGE,
           'pause',
         );
-        assertCurrentPauseConfirmation(context);
+        assertCurrentPauseConfirmation(context, laserJob);
       } else {
         await writeWhileTransitionOwner(context, token, pauseByte, 'pause');
       }
@@ -94,13 +100,14 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
 
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
-  // ADR-180 amendment: same-session CNC Resume is no longer refused. A CNC job
-  // has no safety-door capability, so it takes the plain cycle-start + refill
-  // branch below — identical to a laser controller without a door. The spindle
-  // advisory is surfaced in the paused UI (rule 7: inform, never block).
+  // ADR-180 amendment 2 (2026-07-25): Resume is door-confirmed whenever the
+  // driver has a door byte, for CNC as well as laser — Pause parked via Door, so
+  // Resume must wait for the controller to report Run/Idle before the stream is
+  // refilled. GRBL restores spindle and coolant on door-resume and holds motion
+  // for SAFETY_DOOR_SPINDLE_DELAY (4.0s stock) so the cutter is back at speed
+  // before the interrupted move continues.
   const activeDriver = context.driver();
-  const confirmedLaserResume =
-    context.get().activeJobMachineKind !== 'cnc' && activeDriver.realtime.safetyDoor !== null;
+  const confirmedDoorResume = activeDriver.realtime.safetyDoor !== null;
   const controlSession = context.get().controllerSessionEpoch;
   const resumeByte = activeDriver.realtime.resume;
 
@@ -109,7 +116,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
     'resume',
     RESUME_CONFIRMATION_TIMEOUT_MESSAGE,
     async (token) => {
-      if (resumeByte !== null && confirmedLaserResume) {
+      if (resumeByte !== null && confirmedDoorResume) {
         await sendRealtimeAndConfirm(
           context,
           token,
@@ -214,21 +221,21 @@ async function sendRealtimeAndConfirm(
   }
 }
 
-function isSettledWithAccessoriesOff(report: StatusReport): boolean {
+function isSettledWithAccessoriesOff(report: StatusReport, requireProof: boolean): boolean {
   const settled =
     (report.state === 'Door' && (report.subState === 0 || report.subState === 1)) ||
     (report.state === 'Hold' && report.subState === 0);
-  return settled && accessoriesAreOff(report.accessories);
+  return settled && accessoriesAreOff(report.accessories, requireProof);
 }
 
-function assertCurrentPauseConfirmation(context: PauseResumeContext): void {
+function assertCurrentPauseConfirmation(context: PauseResumeContext, requireProof: boolean): void {
   const state = context.get();
   const report = state.statusReport;
   const settled =
     report !== null &&
     ((report.state === 'Door' && (report.subState === 0 || report.subState === 1)) ||
       (report.state === 'Hold' && report.subState === 0));
-  if (settled && accessoriesAreOff(state.accessoryCache)) return;
+  if (settled && accessoriesAreOff(state.accessoryCache, requireProof)) return;
   throw new Error(PAUSE_CONFIRMATION_TIMEOUT_MESSAGE);
 }
 
@@ -238,14 +245,22 @@ function assertCurrentResumeConfirmation(context: PauseResumeContext): void {
   throw new Error(RESUME_CONFIRMATION_TIMEOUT_MESSAGE);
 }
 
-function accessoriesAreOff(accessories: StatusReport['accessories'] | undefined): boolean {
+function accessoriesAreOff(
+  accessories: StatusReport['accessories'] | undefined,
+  requireProof: boolean,
+): boolean {
+  if (accessories === null || accessories === undefined) {
+    // GRBL omits the `A:` field when nothing is energized and emits `Ov:` only
+    // periodically, so a CNC controller can settle into Door before any report
+    // carries accessory data at all. A settled Door state is itself the
+    // controller reporting it de-energized spindle and coolant, so demanding the
+    // field would time out and fail-dark a job that stopped correctly — losing a
+    // recoverable run. The laser path still requires positive proof the beam is
+    // off (ADR-179), where a stuck-on beam is the hazard.
+    return !requireProof;
+  }
   return (
-    accessories !== null &&
-    accessories !== undefined &&
-    !accessories.spindleCw &&
-    !accessories.spindleCcw &&
-    !accessories.flood &&
-    !accessories.mist
+    !accessories.spindleCw && !accessories.spindleCcw && !accessories.flood && !accessories.mist
   );
 }
 

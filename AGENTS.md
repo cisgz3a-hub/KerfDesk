@@ -54,6 +54,38 @@ denial).**
 
 ---
 
+# We only build with verified research — never guess, never hallucinate
+
+**When you don't know something, go do the research.** Read the source in the current
+tree, run the command, fetch the upstream document — vendor docs, the advisory record,
+the spec, the changelog, the firmware manual. Then answer. Uncertainty is a trigger to
+investigate, never a licence to guess. External research is expected, not a last resort.
+
+**Banned moves.** If you catch yourself writing one, stop mid-sentence and go research:
+
+- "Maybe I should…" / "I think it works like this" / "It probably…" / "This should be fine"
+- Proposing a design whose feasibility you have not checked
+- Stating an API, flag, version or semver range, CVE affected/patched range, config key,
+  default, or firmware behavior from memory
+- Recommending a fix you have not confirmed actually fixes the thing
+
+**Before stating a fact or recommending a fix, hold one of these from THIS session:** the
+source read in the tree (cite `file:line`), the command run with its real output and exit
+code, the upstream primary source fetched and read, or a reproduction you ran yourself.
+"I read it somewhere," "that's how it usually works," and "the docs probably say" are not
+sources. Cite what you used so the maintainer can check it.
+
+Highest-risk category — look every one up, every time: version numbers and semver ranges,
+CVE/advisory affected-vs-patched ranges, controller `$` settings and their semantics,
+G-code word behavior, API signatures, and what LightBurn actually does.
+
+Say "I don't know X; to answer it I need to read/run/fetch Y" and then **go do Y.** Never
+fill the gap with a plausible guess. A confident wrong answer costs far more than the time
+verifying would have taken — on this project it can mean a ruined workpiece or an unsafe
+machine move.
+
+---
+
 # Agent completion reporting rule
 
 ## Required final handoff
