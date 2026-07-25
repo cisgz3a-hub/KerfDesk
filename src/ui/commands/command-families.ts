@@ -10,6 +10,7 @@ import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
+import { gcodeInspectorCommands } from './gcode-command-family';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -52,14 +53,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.saveGcode,
       'Ctrl+Shift+E',
     ),
-    // CNC-only (hidden in laser mode by the machine gate, ADR-101).
-    enabled(
-      'file.open-gcode',
-      'file',
-      'Open G-code (Preview)...',
-      'Simulate a .nc program',
-      ctx.openGcodePreview,
-    ),
+    ...gcodeInspectorCommands(ctx),
   ];
 }
 

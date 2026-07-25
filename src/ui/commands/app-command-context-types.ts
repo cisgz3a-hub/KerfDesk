@@ -6,6 +6,8 @@ export type CommandShellCallbacks = {
   readonly requestMultiFileTrace: () => void;
   readonly requestConvertToBitmap: () => void;
   readonly requestAdjustImage: () => void;
+  /** Open the ADR-255 G-code Inspector with an already-read program. */
+  readonly requestGcodeInspector: (programName: string, text: string) => void;
   readonly requestBoxGenerator: () => void;
   readonly requestBoxFitTest: () => void;
   readonly requestMaterialTest: () => void;
