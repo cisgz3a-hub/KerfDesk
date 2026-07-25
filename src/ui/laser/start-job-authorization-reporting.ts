@@ -1,7 +1,7 @@
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
-import { useStartBlockerStore } from './start-blocker-store';
+import { reportStartBlockers } from './start-blocker-invalidation';
 import type { StartAuthorizationRefusal } from './start-job-authorization';
 
 export function startAuthorizationRefusalMessage(refusal: StartAuthorizationRefusal): string {
@@ -38,7 +38,7 @@ export async function reportStartAuthorizationRefusal(
 }
 
 export function reportBlockedStart(message: string): void {
-  useStartBlockerStore.getState().report([message]);
+  reportStartBlockers([message]);
   jobAwareAlert(`Cannot start job:\n\n${message}`);
 }
 

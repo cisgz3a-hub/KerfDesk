@@ -1,8 +1,38 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 import { appVersion, buildTimeIso, gitShortSha } from './src/platform/web/build-info';
+
+const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Directories Vite's dev and test transforms may read from.
+ *
+ * A git worktree is checked out under `<repo>/.claude/worktrees/<name>` and
+ * carries its own lockfile, so Vite's workspace-root detection stops at the
+ * worktree — while pnpm's real package store stays in the parent repo's
+ * `node_modules`, which the worktree only symlinks into. Every `?raw` asset
+ * import from a dependency then fails to load with "Denied ID", which takes
+ * out every suite that renders a lucide icon.
+ *
+ * Allow the project plus any ancestor that actually holds a `node_modules`. On
+ * an ordinary clone that resolves to the project root alone, so a normal
+ * checkout keeps exactly the default access.
+ */
+function fileSystemAllowList(): ReadonlyArray<string> {
+  const roots = [PROJECT_ROOT];
+  let dir = dirname(PROJECT_ROOT);
+  for (;;) {
+    if (existsSync(join(dir, 'node_modules')) && !roots.includes(dir)) roots.push(dir);
+    const parent = dirname(dir);
+    if (parent === dir) return roots;
+    dir = parent;
+  }
+}
 
 // Vite config for the web build (ADR-003, ADR-009).
 // The Electron build reuses this config via electron-builder's renderer entry
@@ -110,6 +140,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    fs: { allow: [...fileSystemAllowList()] },
   },
   preview: {
     port: 4173,

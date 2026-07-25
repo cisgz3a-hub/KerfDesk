@@ -14,6 +14,7 @@ import {
   observeControllerIdleWait,
 } from './laser-interactive-command';
 import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
+import { finishedJobStateReset } from './laser-session-reset';
 import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
@@ -67,7 +68,12 @@ export function handleStatusLine(
   // it itself — but when the settle failed or never started, no operation owns
   // the release and the same Idle-means-motion-stopped reasoning applies.
   const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, state.controllerOperation, report);
-  const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
+  // Releasing the streamer is the moment the run is over, so the run's own
+  // state goes with it — otherwise a finished CNC job left the store claiming
+  // machineKind 'cnc' and holding an unconsumed tool-change queue indefinitely.
+  const completedStreamerPatch = jobOverAtIdle
+    ? { streamer: null, ...finishedJobStateReset() }
+    : {};
 
   const positionInvalidated = report.mpgActive === true && state.mpgActive !== true;
   const nextSequence = state.statusSequence + 1;
