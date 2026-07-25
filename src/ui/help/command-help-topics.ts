@@ -38,6 +38,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'file',
     tooltip: 'Open a .nc/.gcode/.tap program in the 3D Inspector (both machine modes).',
   },
+  'file.inspect-gcode': {
+    family: 'file',
+    tooltip: "Compile this project's G-code and inspect it in 3D — read-only, nothing is saved.",
+  },
   'file.save-gcode': {
     family: 'file',
     tooltip: 'Export the current job as GRBL G-code.',

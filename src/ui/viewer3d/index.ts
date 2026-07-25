@@ -7,4 +7,11 @@ export {
   type Viewer3dSceneResult,
   type Viewer3dSegments,
 } from './viewer3d-scene';
+export {
+  buildSegmentBuckets,
+  cssHexColor,
+  rgbTriple,
+  type SegmentBuckets,
+  type Viewer3dSegmentsInput,
+} from './segment-buckets';
 export { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';

@@ -6,7 +6,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
-import { createViewer3dScene, type Viewer3dSceneHandle } from '../viewer3d';
+import { createViewer3dScene, resolveViewer3dTheme, type Viewer3dSceneHandle } from '../viewer3d';
+import { InspectorSidebar } from './InspectorSidebar';
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -60,6 +61,8 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
   const handleRef = useRef<Viewer3dSceneHandle | null>(null);
   const [state, setState] = useState<SceneState>('loading');
   const [reason, setReason] = useState('');
+  const [travelVisible, setTravelVisible] = useState(true);
+  const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
   const { model } = props;
 
   useEffect(() => {
@@ -108,12 +111,23 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
 
   return (
     <div style={bodyStyle}>
-      <canvas ref={canvasRef} style={canvasStyle} />
-      {state === 'no-webgl' ? (
-        <p style={messageStyle}>
-          3D view unavailable: {reason} The program parsed — stats below are live.
-        </p>
-      ) : null}
+      <div style={viewportStyle}>
+        <canvas ref={canvasRef} style={canvasStyle} />
+        {state === 'no-webgl' ? (
+          <p style={messageStyle}>
+            3D view unavailable: {reason} The program parsed — readouts are live.
+          </p>
+        ) : null}
+      </div>
+      <InspectorSidebar
+        model={model}
+        theme={theme}
+        travelVisible={travelVisible}
+        onTravelVisibleChange={(visible) => {
+          setTravelVisible(visible);
+          handleRef.current?.setTravelVisible(visible);
+        }}
+      />
     </div>
   );
 }
@@ -171,9 +185,15 @@ const headerStyle: React.CSSProperties = {
 };
 
 const bodyStyle: React.CSSProperties = {
-  position: 'relative',
+  display: 'flex',
   flex: 1,
   minHeight: 0,
+};
+
+const viewportStyle: React.CSSProperties = {
+  position: 'relative',
+  flex: 1,
+  minWidth: 0,
 };
 
 const canvasStyle: React.CSSProperties = {

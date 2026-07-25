@@ -7,19 +7,22 @@
 // lazily through the dynamic import() below (ADR-102 §3).
 import type * as ThreeNamespace from 'three';
 import type { Object3D, PerspectiveCamera, WebGLRenderer } from 'three';
-import { SEG_KIND, type AxisBounds } from '../../core/gcode-view';
+import type { LineMaterial as LineMaterialType } from 'three/examples/jsm/lines/LineMaterial.js';
+import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.js';
+import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
+import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import type * as OrbitControlsModule from 'three/examples/jsm/controls/OrbitControls.js';
+import type { AxisBounds } from '../../core/gcode-view';
+import { buildSegmentBuckets, type Viewer3dSegmentsInput } from './segment-buckets';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
 
-export type Viewer3dSegments = {
-  readonly segmentCount: number;
-  /** Six floats per segment: x0 y0 z0 x1 y1 z1 (work coordinates, mm). */
-  readonly positions: Float32Array;
-  readonly segKind: Uint8Array;
-};
+export type Viewer3dSegments = Viewer3dSegmentsInput;
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
   readonly fitToBounds: (bounds: AxisBounds | null) => void;
+  /** LightBurn's "show traversal moves" toggle. */
+  readonly setTravelVisible: (visible: boolean) => void;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
   readonly dispose: () => void;
@@ -32,17 +35,129 @@ export type Viewer3dSceneResult =
 const MAX_PIXEL_RATIO = 2;
 const CAMERA_FOV_DEG = 40;
 const TRAVEL_OPACITY = 0.45;
+const FAT_LINE_PX = 2.5;
 const FIT_DISTANCE_FACTOR = 1.7;
 const DEFAULT_VIEW_MM = 100;
 const GRID_STEP_MM = 10;
 
 type ThreeModule = typeof ThreeNamespace;
 
-export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Viewer3dSceneResult> {
+// Every three module the scene needs, loaded in one lazy chunk (ADR-102 §3).
+async function loadThree(): Promise<{
+  readonly three: ThreeModule;
+  readonly OrbitControls: OrbitControlsCtor;
+  readonly LineSegments2: typeof LineSegments2Module.LineSegments2;
+  readonly LineSegmentsGeometry: typeof LineSegmentsGeometryModule.LineSegmentsGeometry;
+  readonly LineMaterial: typeof LineMaterialModule.LineMaterial;
+}> {
   const three = await import('three');
   const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
+  const { LineSegments2 } = await import('three/examples/jsm/lines/LineSegments2.js');
+  const { LineSegmentsGeometry } = await import('three/examples/jsm/lines/LineSegmentsGeometry.js');
+  const { LineMaterial } = await import('three/examples/jsm/lines/LineMaterial.js');
+  return { three, OrbitControls, LineSegments2, LineSegmentsGeometry, LineMaterial };
+}
+
+export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Viewer3dSceneResult> {
+  const { three, OrbitControls, LineSegments2, LineSegmentsGeometry, LineMaterial } =
+    await loadThree();
   const theme = resolveViewer3dTheme(canvas);
 
+  const started = startRenderer(three, canvas, theme);
+  if (started.kind === 'no-webgl') return started;
+  const { renderer, width, height } = started;
+
+  const scene = new three.Scene();
+  const toolpathGroup = new three.Group();
+  const furnitureGroup = new three.Group();
+  scene.add(toolpathGroup);
+  scene.add(furnitureGroup);
+
+  const { camera, controls, render } = createCameraRig(three, OrbitControls, {
+    renderer,
+    scene,
+    canvas,
+    width,
+    height,
+  });
+
+  // Fat-line materials size their strokes against the drawing buffer, so the
+  // current view size is tracked and pushed into the material on resize.
+  let viewWidth = width;
+  let viewHeight = height;
+  let fatMaterial: LineMaterialType | null = null;
+  let travelObject: Object3D | null = null;
+  let travelVisible = true;
+
+  const handle: Viewer3dSceneHandle = {
+    setSegments: (segments) => {
+      disposeChildren(toolpathGroup);
+      const built = buildToolpathObjects({
+        three,
+        LineSegments2,
+        LineSegmentsGeometry,
+        LineMaterial,
+        segments,
+        theme,
+        viewWidth,
+        viewHeight,
+        travelVisible,
+      });
+      fatMaterial = built.fatMaterial;
+      travelObject = built.travelObject;
+      for (const object of built.objects) toolpathGroup.add(object);
+      render();
+    },
+    fitToBounds: (bounds) => {
+      disposeChildren(furnitureGroup);
+      for (const object of buildFurniture(three, bounds, theme)) {
+        furnitureGroup.add(object);
+      }
+      frameCamera(camera, controls, bounds);
+      render();
+    },
+    setTravelVisible: (visible) => {
+      travelVisible = visible;
+      if (travelObject !== null) travelObject.visible = visible;
+      render();
+    },
+    resize: (nextWidth, nextHeight) => {
+      if (nextWidth <= 0 || nextHeight <= 0) return;
+      viewWidth = nextWidth;
+      viewHeight = nextHeight;
+      renderer.setSize(nextWidth, nextHeight, false);
+      camera.aspect = nextWidth / nextHeight;
+      camera.updateProjectionMatrix();
+      fatMaterial?.resolution.set(nextWidth, nextHeight);
+      render();
+    },
+    requestRender: render,
+    dispose: () => {
+      controls.removeEventListener('change', render);
+      controls.dispose();
+      disposeChildren(toolpathGroup);
+      disposeChildren(furnitureGroup);
+      renderer.dispose();
+    },
+  };
+  handle.fitToBounds(null);
+  return { kind: 'ok', handle };
+}
+
+// WebGL context creation is the one failure mode this module tolerates: jsdom
+// and WebGL-less browsers get a typed fallback instead of a throw.
+function startRenderer(
+  three: ThreeModule,
+  canvas: HTMLCanvasElement,
+  theme: Viewer3dTheme,
+):
+  | {
+      readonly kind: 'ok';
+      readonly renderer: WebGLRenderer;
+      readonly width: number;
+      readonly height: number;
+    }
+  | { readonly kind: 'no-webgl'; readonly reason: string } {
   let renderer: WebGLRenderer;
   try {
     renderer = new three.WebGLRenderer({ canvas, antialias: true });
@@ -59,90 +174,89 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
   const height = canvas.clientHeight || canvas.height;
   renderer.setSize(width, height, false);
   renderer.setClearColor(theme.background);
-
-  const scene = new three.Scene();
-  const toolpathGroup = new three.Group();
-  const furnitureGroup = new three.Group();
-  scene.add(toolpathGroup);
-  scene.add(furnitureGroup);
-
-  const camera = new three.PerspectiveCamera(CAMERA_FOV_DEG, width / height, 0.1, 100_000);
-  camera.up.set(0, 0, 1); // Z-up: the program's own frame
-  const controls = new OrbitControls(camera, canvas);
-  const render = (): void => renderer.render(scene, camera);
-  controls.addEventListener('change', render);
-
-  const handle: Viewer3dSceneHandle = {
-    setSegments: (segments) => {
-      disposeChildren(toolpathGroup);
-      for (const object of buildSegmentObjects(three, segments, theme)) {
-        toolpathGroup.add(object);
-      }
-      render();
-    },
-    fitToBounds: (bounds) => {
-      disposeChildren(furnitureGroup);
-      for (const object of buildFurniture(three, bounds, theme)) {
-        furnitureGroup.add(object);
-      }
-      frameCamera(camera, controls, bounds);
-      render();
-    },
-    resize: (nextWidth, nextHeight) => {
-      if (nextWidth <= 0 || nextHeight <= 0) return;
-      renderer.setSize(nextWidth, nextHeight, false);
-      camera.aspect = nextWidth / nextHeight;
-      camera.updateProjectionMatrix();
-      render();
-    },
-    requestRender: render,
-    dispose: () => {
-      controls.removeEventListener('change', render);
-      controls.dispose();
-      disposeChildren(toolpathGroup);
-      disposeChildren(furnitureGroup);
-      renderer.dispose();
-    },
-  };
-  handle.fitToBounds(null);
-  return { kind: 'ok', handle };
+  return { kind: 'ok', renderer, width, height };
 }
 
-// Two batched polyline objects for stage 3: recessive traversal (LightBurn's
-// red-means-rapid, thin + translucent) and everything else. Per-kind palette
-// and fat cut lines arrive in stage 4.
-function buildSegmentObjects(
+type OrbitControlsCtor = typeof OrbitControlsModule.OrbitControls;
+
+type CameraRig = {
+  readonly camera: PerspectiveCamera;
+  readonly controls: InstanceType<OrbitControlsCtor>;
+  readonly render: () => void;
+};
+
+// Z-up perspective camera + orbit controls, wired to render on demand (no rAF
+// loop — the scene only redraws on interaction, resize, or data change).
+function createCameraRig(
   three: ThreeModule,
-  segments: Viewer3dSegments,
-  theme: Viewer3dTheme,
-): ReadonlyArray<Object3D> {
-  let travelCount = 0;
-  for (let index = 0; index < segments.segmentCount; index += 1) {
-    if (segments.segKind[index] === SEG_KIND.travel) travelCount += 1;
-  }
-  const cutCount = segments.segmentCount - travelCount;
-  const travelPositions = new Float32Array(travelCount * 6);
-  const cutPositions = new Float32Array(cutCount * 6);
-  let travelAt = 0;
-  let cutAt = 0;
-  for (let index = 0; index < segments.segmentCount; index += 1) {
-    const isTravel = segments.segKind[index] === SEG_KIND.travel;
-    const target = isTravel ? travelPositions : cutPositions;
-    const offset = isTravel ? travelAt : cutAt;
-    for (let component = 0; component < 6; component += 1) {
-      target[offset + component] = segments.positions[index * 6 + component] ?? 0;
-    }
-    if (isTravel) travelAt += 6;
-    else cutAt += 6;
-  }
+  OrbitControls: OrbitControlsCtor,
+  deps: {
+    readonly renderer: WebGLRenderer;
+    readonly scene: ThreeNamespace.Scene;
+    readonly canvas: HTMLCanvasElement;
+    readonly width: number;
+    readonly height: number;
+  },
+): CameraRig {
+  const camera = new three.PerspectiveCamera(
+    CAMERA_FOV_DEG,
+    deps.width / deps.height,
+    0.1,
+    100_000,
+  );
+  camera.up.set(0, 0, 1); // Z-up: the program's own frame
+  const controls = new OrbitControls(camera, deps.canvas);
+  const render = (): void => deps.renderer.render(deps.scene, camera);
+  controls.addEventListener('change', render);
+  return { camera, controls, render };
+}
+
+type ToolpathBuildArgs = {
+  readonly three: ThreeModule;
+  readonly LineSegments2: typeof LineSegments2Module.LineSegments2;
+  readonly LineSegmentsGeometry: typeof LineSegmentsGeometryModule.LineSegmentsGeometry;
+  readonly LineMaterial: typeof LineMaterialModule.LineMaterial;
+  readonly segments: Viewer3dSegments;
+  readonly theme: Viewer3dTheme;
+  readonly viewWidth: number;
+  readonly viewHeight: number;
+  readonly travelVisible: boolean;
+};
+
+// Solid moves render as vertex-colored fat lines (one batch, per-kind color);
+// traversal stays a thin translucent line object under them (LightBurn's
+// recessive-rapid convention), toggleable without a geometry rebuild.
+function buildToolpathObjects(args: ToolpathBuildArgs): {
+  readonly objects: ReadonlyArray<Object3D>;
+  readonly fatMaterial: LineMaterialType | null;
+  readonly travelObject: Object3D | null;
+} {
+  const buckets = buildSegmentBuckets(args.segments, args.theme);
   const objects: Object3D[] = [];
-  if (cutCount > 0) {
-    objects.push(lineSegmentsObject(three, cutPositions, theme.cut, 1, 1));
+  let fatMaterial: LineMaterialType | null = null;
+  let travelObject: Object3D | null = null;
+  if (buckets.solid.count > 0) {
+    const geometry = new args.LineSegmentsGeometry();
+    geometry.setPositions(buckets.solid.positions);
+    geometry.setColors(buckets.solid.colors);
+    fatMaterial = new args.LineMaterial({ vertexColors: true, linewidth: FAT_LINE_PX });
+    fatMaterial.resolution.set(args.viewWidth, args.viewHeight);
+    const lines = new args.LineSegments2(geometry, fatMaterial);
+    lines.renderOrder = 1;
+    objects.push(lines);
   }
-  if (travelCount > 0) {
-    objects.push(lineSegmentsObject(three, travelPositions, theme.travel, TRAVEL_OPACITY, 0));
+  if (buckets.travel.count > 0) {
+    travelObject = lineSegmentsObject(
+      args.three,
+      buckets.travel.positions,
+      args.theme.travel,
+      TRAVEL_OPACITY,
+      0,
+    );
+    travelObject.visible = args.travelVisible;
+    objects.push(travelObject);
   }
-  return objects;
+  return { objects, fatMaterial, travelObject };
 }
 
 function lineSegmentsObject(
