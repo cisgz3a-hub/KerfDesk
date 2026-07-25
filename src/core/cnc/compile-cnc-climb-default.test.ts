@@ -13,8 +13,10 @@ import { isCounterClockwise } from '../geometry/polyline-orientation';
 import { compileCncJob } from './compile-cnc-job';
 
 // ADR-251: a new layer's default cut direction is climb. Verify the shipped
-// default value, and that a default profile-outside cut compiles to a
-// counter-clockwise (climb) toolpath regardless of the source winding.
+// default value, and that a profile-outside cut with the default direction
+// compiles to a counter-clockwise (climb) toolpath regardless of the source
+// winding. (Outside is explicit here — ADR-256 made on-path the default
+// cut type, and on-path enforces no winding.)
 
 function squareSvg(): ImportedSvg {
   return {
@@ -47,12 +49,16 @@ describe('climb default (ADR-251)', () => {
     expect(DEFAULT_CNC_LAYER_SETTINGS.cutDirection).toBe('climb');
   });
 
-  it('emits a default profile-outside contour counter-clockwise', () => {
+  it('emits a profile-outside contour counter-clockwise by default direction', () => {
     const layer: Layer = {
       ...createLayer({ id: 'L', color: '#2563eb' }),
       // Leads off (ADR-250 is default-on) so the profile stays a plain contour
       // pass; this isolates the climb winding of the default settings.
-      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, profileLead: { shape: 'none' } },
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'profile-outside',
+        profileLead: { shape: 'none' },
+      },
     };
     const scene: Scene = { objects: [squareSvg()], layers: [layer] };
     const job = compileCncJob(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG);

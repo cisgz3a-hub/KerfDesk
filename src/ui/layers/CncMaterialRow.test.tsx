@@ -157,17 +157,17 @@ describe('CncMaterialRow', () => {
       feedSource: {
         kind: 'machine-starter',
         starterId: 'neotronics-4040-shallow-wood-mdf',
-        revision: 1,
+        revision: 2,
       },
     };
     const { host, root } = await render(automatic, vi.fn(), onCommitSettings);
     try {
       const optionLabels = [...host.querySelectorAll('option')].map((option) => option.textContent);
       expect(optionLabels).toContain(
-        'Neotronics 4040 shallow wood / MDF starter — revision 1 (engineering starter)',
+        'Neotronics 4040 shallow wood / MDF starter — revision 2 (engineering starter)',
       );
       expect(optionLabels).toContain('Manual — verify feeds');
-      expect(host.textContent).toContain('revision 1 is active');
+      expect(host.textContent).toContain('revision 2 is active');
       expect(host.textContent).toContain(
         'Engineering starter — assumes a 3.175 mm 2-flute cutter; verify on this machine.',
       );
@@ -214,7 +214,7 @@ describe('CncMaterialRow', () => {
     };
     const { host, root } = await render(settings, vi.fn(), vi.fn());
     try {
-      expect(host.textContent).toContain('saved revision 7 (current revision 1)');
+      expect(host.textContent).toContain('saved revision 7 (current revision 2)');
       expect(host.textContent).toContain('is outdated');
     } finally {
       await act(async () => root.unmount());

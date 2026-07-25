@@ -63,7 +63,7 @@ describe('CNC automatic-setting transition policy', () => {
             operation('manual', manual),
             operation('known', starterSettings(333)),
             operation('unknown', starterSettings(444, 'unknown-starter')),
-            operation('newer', starterSettings(555, STARTER_ID, 2)),
+            operation('newer', starterSettings(555, STARTER_ID, 3)),
           ],
         },
       },
@@ -72,11 +72,11 @@ describe('CNC automatic-setting transition policy', () => {
     useStore.getState().setMachineKind('cnc');
 
     expect(cncSettings('absent')).toMatchObject({
-      feedMmPerMin: 600,
-      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 1 },
+      feedMmPerMin: 300,
+      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 2 },
     });
     expect(cncSettings('manual')).toEqual(manual);
-    expect(cncSettings('known')).toMatchObject({ feedMmPerMin: 600 });
+    expect(cncSettings('known')).toMatchObject({ feedMmPerMin: 300 });
     expect(cncSettings('unknown')?.feedMmPerMin).toBe(444);
     expect(cncSettings('unknown')?.feedSource).toBeUndefined();
     expect(cncSettings('newer')?.feedMmPerMin).toBe(555);
@@ -108,8 +108,8 @@ describe('CNC automatic-setting transition policy', () => {
 
     useStore.getState().replaceMachineSetup(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, machine);
 
-    expect(cncSettings('absent')?.feedMmPerMin).toBe(600);
-    expect(cncSettings('automatic')?.feedMmPerMin).toBe(600);
+    expect(cncSettings('absent')?.feedMmPerMin).toBe(300);
+    expect(cncSettings('automatic')?.feedMmPerMin).toBe(300);
     expect(cncSettings('manual')).toEqual(manual);
   });
 
@@ -133,11 +133,11 @@ describe('CNC automatic-setting transition policy', () => {
     expect(useStore.getState().project.scene).toBe(sceneBeforeBedEdit);
     expect(cncSettings('automatic')?.feedMmPerMin).toBe(333);
 
-    useStore.getState().updateDeviceProfile({ maxFeed: 500 });
+    useStore.getState().updateDeviceProfile({ maxFeed: 250 });
 
     expect(cncSettings('automatic')).toMatchObject({
-      feedMmPerMin: 500,
-      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 1 },
+      feedMmPerMin: 250,
+      feedSource: { kind: 'machine-starter', starterId: STARTER_ID, revision: 2 },
     });
     expect(cncSettings('manual')).toEqual(manual);
   });
