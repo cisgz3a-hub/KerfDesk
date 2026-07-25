@@ -94,4 +94,8 @@ describe('DEFAULT_CNC_LAYER_SETTINGS', () => {
       DEFAULT_CNC_LAYER_SETTINGS.tabHeightMm,
     );
   });
+
+  it('cuts on the drawn line by default (ADR-256)', () => {
+    expect(DEFAULT_CNC_LAYER_SETTINGS.cutType).toBe('profile-on-path');
+  });
 });

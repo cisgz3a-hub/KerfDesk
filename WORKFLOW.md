@@ -2492,6 +2492,9 @@ F-CNC19 tiling.
 
 ### F-CNC10. Open a G-code program in the simulator — Phase H.6
 
+*(This 2D flow remains. ADR-255's 3D G-code Inspector — F-M1 — complements it
+and lifts the command's CNC-only gate.)*
+
 #### Success
 1. In CNC mode, the user picks a `.nc` / `.gcode` / `.tap` file via
    File → Open G-code (Preview). The command is CNC-only (ADR-101
@@ -4487,3 +4490,49 @@ validation must be supervised without cutting load.
 2. These stamps do not yet establish a safe probe envelope. Production XYZ
    probing still requires an owned complete build/settings exchange and a fresh
    direct MPos in the same session before any probe motion is permitted.
+
+## Phase M flows (G-code Inspector — ADR-255)
+
+### F-M1. Inspect a G-code program in 3D
+
+#### Success
+
+1. User picks File → Open G-code… (available in BOTH laser and CNC modes —
+   ADR-255 amends the ADR-101 CNC-only gate for this command), or clicks
+   **Inspect G-code** in Job Review / after Save G-code, or drops a
+   `.nc` / `.gcode` / `.tap` file on the workspace.
+2. The program parses into the render model (off the UI thread past the
+   synchronous cap); the Inspector opens: 3D viewport (work coordinates,
+   Z-up, bed/grid/origin triad), timeline (play / pause / speed / scrub),
+   DRO, stats, source pane, and the Program Health panel.
+3. Playback reveals motion in program order; the tool marker interpolates
+   within the active segment. Hover/click a segment shows kind, F, S, Z,
+   length, and source line; clicking a source line flashes its segment and
+   jumps the playhead (two-way sync).
+4. Program Health lists findings (severity info / notice / warning, count,
+   first line, click-to-jump). The panel header states: "Findings inform.
+   Nothing here blocks Frame, Start, or export."
+
+#### Error — unreadable program
+
+1. Not-G-code or non-finite targets: the Inspector opens with whatever
+   motion parsed, plus findings explaining the rest. If nothing parsed at
+   all, a toast reports the first junk line (existing parser wording).
+   Nothing is blocked and nothing retries in a loop.
+
+#### Empty
+
+1. A program with no motion (comments/setup only) opens the Inspector with
+   an empty viewport, zeroed stats, and a "no motion found" finding.
+
+#### Edge — very large program
+
+1. Beyond the synchronous cap, the worker path parses with a progress
+   indicator; the UI stays responsive; playback uses draw-range reveal.
+   The worker path's own memory-derived cap is set at Stage 11 (ADR-255).
+
+#### Edge — our own emitted output
+
+1. Opening a program emitted by any built-in strategy shows zero
+   unsupported-word notes and zero junk lines (ADR-255 acceptance gate —
+   own-output-clean).

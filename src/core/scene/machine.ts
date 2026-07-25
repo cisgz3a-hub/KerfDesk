@@ -293,7 +293,10 @@ export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
 // Conservative wood/MDF starting point for a 1/8 in bit — same spirit as
 // Easel's recommended settings.
 export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
-  cutType: 'profile-outside',
+  // ADR-256: new CNC layers cut ON the drawn line — the same reading a laser
+  // Line layer gives the path — so an unedited layer never resizes the part.
+  // Outside/inside remain explicit per-layer choices.
+  cutType: 'profile-on-path',
   // ADR-218: literal must match DEFAULT_LINE_ART_CONTOURS in core/cnc
   // (scene cannot import cnc without a cycle).
   lineArtContours: 'inner',

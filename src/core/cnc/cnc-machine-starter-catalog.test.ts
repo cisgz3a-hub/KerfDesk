@@ -27,8 +27,8 @@ describe('CNC_MACHINE_STARTER_CATALOG', () => {
         tool: { toolId: 'em-3175', diameterMm: 3.175, fluteCount: 2 },
         material: { key: 'plywood-mdf', label: 'Wood / MDF' },
         values: {
-          feedMmPerMin: 600,
-          plungeMmPerMin: 120,
+          feedMmPerMin: 300,
+          plungeMmPerMin: 250,
           spindleRpm: 12000,
           depthPerPassMm: 0.75,
         },
@@ -57,7 +57,7 @@ describe('CNC_MACHINE_STARTER_CATALOG', () => {
   it('looks up persisted starter provenance by id', () => {
     expect(findCncMachineStarterById('neotronics-4040-shallow-wood-mdf')).toMatchObject({
       label: 'Neotronics 4040 shallow wood / MDF starter',
-      revision: 1,
+      revision: 2,
     });
     expect(findCncMachineStarterById('unknown-starter')).toBeNull();
   });

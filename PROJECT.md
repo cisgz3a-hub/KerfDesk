@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 250. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
+> **Status:** v4.1 — KerfDesk Desktop Preview governance, packaging, and notify-only update discovery are implemented under ADR-247/248/249, pending merge and real-OS qualification before the first Preview tag. Repository release immutability is enabled. The existing web/PWA stays first-class; exact-version Windows x64 and macOS x64/arm64 Electron Previews do not change machining workflows, core, toolpaths, runtime trust, or the current MIT/public/free posture. Phase L "Image Studio" remains in progress under ADR-242. A completed Frame for the exact current job remains the sole ordinary Start guard on laser and CNC (ADR-228), and Job Review remains the single warning surface. ADR tail at 255. The conservative dependency policy remains in force (ADR-017). Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -255,6 +255,22 @@ Abort stays reachable while a job streams (non-negotiable #9). The edit→re-tra
 | IE-2 | Adjust & filters: levels/curves/histogram, Enhance (unsharp) parity, blur/median/despeckle, selection-scoped adjustments, Image/Canvas Size with bilinear resample, arbitrary rotate, Halftone/Newsprint/Sketch image modes, live trace overlay | Planned |
 | IE-3 | Retouch & content: clone stamp, dodge/burn, classical background removal, raster text stamp, gradient fill, non-PatchMatch spot-heal | Planned |
 | IE-4 | Layers/blend modes/masks, `.lf2` session persistence, acceleration — each requires its own ADR | Deferred |
+
+### Phase M — v0.12 "G-code Inspector" [Approved 2026-07-25 — ADR-255; build starting at Stage 1]
+
+Read-side 3D program viewer: open any `.nc` / `.gcode` / `.tap` — or the exact
+emitted output from Job Review — into a lazy-loaded three.js Inspector with
+multi-angle playback, planner-true time, per-segment source-line links, and an
+informational Program Health report (rule 7 compliant: findings inform, never
+block). Design + executed self-audit, rendering spec, detail ladder, and the
+staged tight-leash build plan (each stage an individually reviewed, shippable
+diff): `docs/audits/2026-07-25-gcode-inspector-design-and-self-audit.md`.
+Key structural moves: shared modal G-code engine (no third parser), pure
+`src/core/gcode-view/` render model, shared `src/ui/viewer3d/` scene home
+(ADR-102 §2 amended), Open G-code available in both machine modes (ADR-101
+amended). Zero new runtime dependencies. Acceptance gates: total line
+accountability; own-output-clean (every built-in strategy's output parses
+with zero unsupported-word notes).
 
 ### Anything past Phase F
 

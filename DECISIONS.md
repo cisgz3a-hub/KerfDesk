@@ -82,7 +82,7 @@
 | ADR-098 | 2026-07-02 | Amended by ADR-209; macOS Phase-J deferral amended by ADR-248 | CNC router mode becomes a first-class product track (Phase H "Router") |
 | ADR-100 | — | Accepted | Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params |
 | ADR-101 | 2026-07-02 | Accepted | CNC/laser UI separation policy: gate-and-hide |
-| ADR-102 | 2026-07-03 | Accepted | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
+| ADR-102 | 2026-07-03 | Accepted; §2 amended by ADR-255 | three.js for the 3D relief viewer (explicit ADR-098 §2 override) |
 | ADR-103 | — | accepted (maintainer session directive) | Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03) |
 | ADR-104 | — | Accepted; Phase-J schedule amended by ADR-248 | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
 | ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
@@ -4399,7 +4399,7 @@ Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
 
 ## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
-**Status:** Accepted
+**Status:** Accepted; amended by ADR-255 (Open G-code / Inspect G-code becomes mode-independent)
 **Date:** 2026-07-02
 
 > **Numbering note:** ADR-101 follows ADR-098 on this branch by design, not
@@ -4554,7 +4554,7 @@ the laser-only set" assertion updates from the source of truth automatically.
 
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
-**Status:** Accepted
+**Status:** Accepted; §2 import location amended by ADR-255 (adds `src/ui/viewer3d/`)
 **Date:** 2026-07-03
 
 ### Context
@@ -11938,6 +11938,125 @@ produce a signal nobody is required to read).
 - NOT verified: the scheduled workflow has never fired. Its issue-filing path is
   unexercised until the first nightly run or a manual `workflow_dispatch`.
 
+## ADR-255 - G-code Inspector: read-side 3D program viewer and informational health report
+
+**Date:** 2026-07-25
+**Status:** Accepted (maintainer approval 2026-07-25; design + executed
+self-audit in `docs/audits/2026-07-25-gcode-inspector-design-and-self-audit.md`)
+
+### Context
+
+File -> Open G-code (F-CNC10) parses an external program with the clean-room
+modal parser and shows it in the 2D simulator, CNC-only (ADR-101). The tree
+also owns a second line-indexed motion parser (`buildMotionManifest`), a
+planner-grade duration estimator (`estimateJobDuration`), text-level invariant
+scanners, and the ADR-102 three.js scene. Operators need to watch a program
+run in 3D from any angle, scrub it in time, trace every segment to its source
+line, and read a health report - before the machine runs it. Every current
+preview renders the compiled Job (the write side); nothing renders the G-code
+text itself (the read side).
+
+### Decision
+
+1. Build the **G-code Inspector** per the design doc above: a lazy-loaded 3D
+   viewer + timeline + source pane + Program Health panel over a new pure
+   `src/core/gcode-view/` render model (typed arrays, F/S retention, source
+   line map, modal events, stats).
+2. **ADR-102 §2 is amended**: three.js may be imported beneath
+   `src/ui/viewer3d/` (the shared scene home for the Inspector and the CNC 3D
+   pane upgrade track) in addition to `src/ui/relief-viewer/`. All other
+   ADR-102 terms (UI-only, lazy chunk, jsdom fallback, pure typed-array
+   seams) are unchanged.
+3. **ADR-101 is amended for this one command**: Open G-code / Inspect G-code
+   is available in BOTH laser and CNC modes (laser raster programs are the
+   performance stress case, and laser operators own `.gcode` files too).
+4. **No third parser.** Stage 1 extracts the shared modal engine used by
+   `parseGcodeProgram` and `buildMotionManifest` (outputs pinned identical by
+   tests before/after; the arc-sampling tolerance divergence unified or
+   explicitly parameterized), and the render model composes that engine.
+5. **Program Health is informational only** - findings inform and feed the
+   Job Review warning list; nothing blocks Frame, Start, parse, render, or
+   export (rule 7 / ADR-228 compliance is an acceptance criterion of every
+   stage). The only refusals are the parser's existing compile-integrity
+   facts (not-G-code, non-finite targets).
+6. **Zero new runtime dependencies**; three@0.180 (already present) plus its
+   bundled addons only. The three lazy chunk is measured before/after at
+   every stage against the <1 MB budget; postprocessing is deferred.
+7. Adopted defaults from the approved design: GRBL-flavor dialect v1 with
+   never-fatal notes (G54-G59 modal tracking in v2); red = traversal palette
+   (LightBurn convention) with a "show traversal moves" toggle; the Inspector
+   complements the F-CNC10 2D simulator rather than replacing it.
+8. Acceptance gates from design doc §12: **total line accountability** (every
+   raw line classifies into exactly one category - property-tested) and
+   **own-output-clean** (every program emitted by any built-in strategy
+   parses with zero unsupported-word notes and zero junk lines).
+
+### Alternatives considered
+
+- Extend the 2D preview instead of 3D. Rejected - Z motion (plunges, ramps,
+  pecks, helical entries) is exactly the detail the maintainer wants
+  readable, and a top-down canvas cannot show it.
+- A third standalone parser for the Inspector. Rejected - the repo already
+  carries two modal interpreters plus partial scanners; CLAUDE.md's
+  duplication rule forbids a third copy.
+- React-three-fiber component stack. Rejected by the prior ecosystem verdict
+  (requires React 19; the repo is on React 18.3).
+
+### Consequences
+
+- `src/ui/viewer3d/` becomes the sanctioned three.js home shared by two
+  consumers; the relief scene migrates there over time (pane-track stage 3).
+- The modal-engine unification touches two existing parsers; their outputs
+  are pinned by tests before the refactor lands.
+- WCS (G54-G59) and 4-axis words remain counted-not-tracked in v1 -
+  explicitly deferred, surfaced as findings.
+- Emitted G-code is untouched: the Inspector reads, it never writes. No
+  snapshot changes.
+
+### Verification
+
+- Staged plan in the design doc §7: every stage lands green and individually
+  reviewed, with pure-tier CI tests plus the §8 perceptual golden corpus
+  (dev-browser render + screenshots; jsdom cannot see WebGL, so no green
+  suite is ever claimed as visual proof).
+
+## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+The Neotronics 4040 machine starter (ADR-233, revision 1) shipped
+engineering guesses: feed 600 mm/min and plunge 120 mm/min for a 3.175 mm
+2-flute cutter in wood/MDF. Separately, a fresh CNC layer defaulted to
+`profile-outside`, so an unedited layer resized the drawn part - the opposite
+of what a laser Line layer does with the same artwork.
+
+The maintainer, from experience on the physical 4040, directed (chat,
+2026-07-25): cut type should default to cutting on the line; RPM 12000,
+plunge 250, feed 300, depth per pass 0.75.
+
+### Decision
+
+- The 4040 starter catalog entry moves to revision 2 with feed 300 mm/min and
+  plunge 250 mm/min. Spindle 12000 RPM and 0.75 mm depth per pass were already
+  the revision-1 values. Layers still carrying `machine-starter` provenance
+  refresh to the new numbers on the next setup action; manual layers are
+  untouched (provenance is withdrawn on any manual feed edit).
+- `DEFAULT_CNC_LAYER_SETTINGS.cutType` becomes `profile-on-path`. This is the
+  scene-wide default (the starter patch deliberately carries no cut type, and
+  CNC text still applies its own v-carve/engrave policy), so it applies to
+  every CNC machine, with the 4040 as the only shipped starter profile.
+
+### Consequences
+
+- The material-recipe path caps its chipload result at the starter feed, so a
+  4040 project-material layer now computes 300 mm/min feed with a 120 mm/min
+  plunge (40% of feed, under the 250 starter cap).
+- Legacy layers without a CNC block, and invalid persisted cut types, now
+  normalize to on-path instead of outside; operators choose outside/inside
+  explicitly when the part size matters.
 ---
 
 ## ADR-257 - Vector cuts default to M4 dynamic power
