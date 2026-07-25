@@ -98,7 +98,7 @@ Compounding factors:
   largest-area contour — winding-based, not containment-based, chosen because winding survives
   concentric roughing/finishing offsets where containment depth does not.
 
-**Recommended verification** (not performed): cut a two-feature coupon — one outer profile, one
+**The verification that would settle it** (CANNOT be performed - no machine to test on): cut a two-feature coupon — one outer profile, one
 interior hole — on a `front-left` machine and confirm chip ejection and edge finish match climb
 on both. Repeat with origin set to `rear-left`. If the coupon differs between origins, the
 inversion is real.

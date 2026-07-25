@@ -12146,10 +12146,8 @@ energy-per-mm argument from fill to cut.
   `neotronics-4040-safe` resolve `'constant'`. Pinned in `gcode-dialects.test.ts`.
 - Emission: a cut-only job on the default dialect contains `M4 S0` and no `M3`.
 - Invariant: laser-off-on-travel and power-scale property tests stay green.
-- **NOT VERIFIED - hardware.** No coupon has been burned under this change, and no scorching was
-  observed before it. Both the expected corner-quality benefit and the thin-material cut-through risk
-  are **CLAIMED** until someone burns an M3-vs-M4 comparison. Note the benefit is predicted from GRBL's
-  documentation, not from a defect this project reproduced.
+- **NOT VERIFIED - hardware, and it cannot be.** No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task. No scorching was observed before this change either, so both the expected corner-quality benefit and the thin-material cut-through risk stay **permanently CLAIMED**. The benefit is predicted from GRBL's documentation, LightBurn's default and Rayforge's source - not from a defect this project reproduced.
+- **Nearest available check:** this change follows three independent references rather than inventing behavior, which is the strongest position obtainable without a machine. To go further, generate the same cut in LightBurn or Rayforge and diff the emitted power words.
 
 ---
 
@@ -12246,9 +12244,12 @@ across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
 - 417 `src/core` test files green; typecheck, eslint and prettier clean.
 - **NOT VERIFIED - hardware.** This changes full-depth motion: a tabbed profile now rides over
   each tab instead of retracting and replunging. Better in principle and unproven in material.
-  Cut a tabbed coupon before trusting it, and confirm the bridges hold.
+  It cannot be proven here: No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task.
+- **Nearest available check:** run an exported .nc through an INDEPENDENT viewer (NC Viewer, CAMotics). Our own 3D preview and core/sim share the emitter's codebase, so a geometry fault can look correct in both; an outside parser cannot. Note the Z-rise model itself is Fusion 360's documented behavior, but the `depth > tabHeight` guard and the small-contour ride-at-tab-top fallback are this project's own inventions and match no reference.
 
 ## ADR-260 — CNC traces commit machine-faired polylines (2026-07-25)
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
 
 ### Context
 
@@ -12295,6 +12296,8 @@ stopped being true.
   creation site; a future creation site must call it or document why not.
 
 ## ADR-261 - CNC 3D viewport: import boundary, world frame, and display-only status
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
 
 **Status:** Accepted
 **Date:** 2026-07-25
