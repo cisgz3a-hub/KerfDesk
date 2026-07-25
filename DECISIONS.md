@@ -12019,3 +12019,41 @@ text itself (the read side).
   reviewed, with pure-tier CI tests plus the §8 perceptual golden corpus
   (dev-browser render + screenshots; jsdom cannot see WebGL, so no green
   suite is ever claimed as visual proof).
+
+## ADR-256 - 4040 starter feeds revised and CNC cut type defaults to On path
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+The Neotronics 4040 machine starter (ADR-233, revision 1) shipped
+engineering guesses: feed 600 mm/min and plunge 120 mm/min for a 3.175 mm
+2-flute cutter in wood/MDF. Separately, a fresh CNC layer defaulted to
+`profile-outside`, so an unedited layer resized the drawn part - the opposite
+of what a laser Line layer does with the same artwork.
+
+The maintainer, from experience on the physical 4040, directed (chat,
+2026-07-25): cut type should default to cutting on the line; RPM 12000,
+plunge 250, feed 300, depth per pass 0.75.
+
+### Decision
+
+- The 4040 starter catalog entry moves to revision 2 with feed 300 mm/min and
+  plunge 250 mm/min. Spindle 12000 RPM and 0.75 mm depth per pass were already
+  the revision-1 values. Layers still carrying `machine-starter` provenance
+  refresh to the new numbers on the next setup action; manual layers are
+  untouched (provenance is withdrawn on any manual feed edit).
+- `DEFAULT_CNC_LAYER_SETTINGS.cutType` becomes `profile-on-path`. This is the
+  scene-wide default (the starter patch deliberately carries no cut type, and
+  CNC text still applies its own v-carve/engrave policy), so it applies to
+  every CNC machine, with the 4040 as the only shipped starter profile.
+
+### Consequences
+
+- The material-recipe path caps its chipload result at the starter feed, so a
+  4040 project-material layer now computes 300 mm/min feed with a 120 mm/min
+  plunge (40% of feed, under the 250 starter cap).
+- Legacy layers without a CNC block, and invalid persisted cut types, now
+  normalize to on-path instead of outside; operators choose outside/inside
+  explicitly when the part size matters.

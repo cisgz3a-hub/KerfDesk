@@ -110,7 +110,7 @@ describe('JobReviewLayersTable', () => {
     const cnc = storedLayer('red').cnc;
     expect(cnc?.feedMmPerMin).toBe(777);
     expect(cnc?.depthMm).toBe(1);
-    expect(cnc?.cutType).toBe('profile-outside');
+    expect(cnc?.cutType).toBe('profile-on-path');
   });
 
   it('states plainly when nothing has Output enabled', async () => {

@@ -24,14 +24,14 @@ function expect4040Starter(color: string): void {
     .project.scene.layers.find((layer) => layer.color === color)?.cnc;
   expect(settings).toMatchObject({
     toolId: 'em-3175',
-    feedMmPerMin: 600,
-    plungeMmPerMin: 120,
+    feedMmPerMin: 300,
+    plungeMmPerMin: 250,
     spindleRpm: 12_000,
     depthPerPassMm: 0.75,
     feedSource: {
       kind: 'machine-starter',
       starterId: 'neotronics-4040-shallow-wood-mdf',
-      revision: 1,
+      revision: 2,
     },
   });
 }
@@ -85,8 +85,8 @@ describe('4040 machine-aware CNC starters', () => {
     const logo = scene.objects.find((object) => object.id === 'logo');
     const settings =
       logo === undefined ? undefined : primaryOperationForObject(logo, scene.layers)?.cnc;
-    expect(settings?.feedMmPerMin).toBe(600);
-    expect(settings?.plungeMmPerMin).toBe(120);
+    expect(settings?.feedMmPerMin).toBe(300);
+    expect(settings?.plungeMmPerMin).toBe(250);
     expect(settings?.feedSource?.kind).toBe('machine-starter');
   });
 
@@ -95,7 +95,7 @@ describe('4040 machine-aware CNC starters', () => {
     useStore.getState().createManualLayer('#111111');
     useStore.getState().setCncLiveCaps({
       xMaxFeedMmPerMin: 500,
-      yMaxFeedMmPerMin: 450,
+      yMaxFeedMmPerMin: 250,
       zMaxFeedMmPerMin: 80,
       spindleMaxRpm: 10_000,
     });
@@ -104,12 +104,12 @@ describe('4040 machine-aware CNC starters', () => {
 
     const layers = useStore.getState().project.scene.layers;
     expect(layers.find((layer) => layer.color === '#111111')?.cnc).toMatchObject({
-      feedMmPerMin: 600,
-      plungeMmPerMin: 120,
+      feedMmPerMin: 300,
+      plungeMmPerMin: 250,
       spindleRpm: 12_000,
     });
     expect(layers.find((layer) => layer.color === '#222222')?.cnc).toMatchObject({
-      feedMmPerMin: 450,
+      feedMmPerMin: 250,
       plungeMmPerMin: 80,
       spindleRpm: 10_000,
     });
