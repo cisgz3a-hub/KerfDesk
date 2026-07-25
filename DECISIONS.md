@@ -12058,6 +12058,52 @@ plunge 250, feed 300, depth per pass 0.75.
   normalize to on-path instead of outside; operators choose outside/inside
   explicitly when the part size matters.
 
+## ADR-257 — CNC traces commit machine-faired polylines (2026-07-25)
+
+### Context
+
+Trace output tolerances are pixel-denominated (DP epsilon 0.45 x lineTolerance,
+which doubles as the output spline's deviation cap; ~1.5 px resample pitch) and
+tuned for visual fidelity. On CNC every polyline vertex becomes a G1 endpoint at
+the object's physical scale (0.1 mm/px at the 254-DPI import default). The
+2026-07-25 chatter audit measured the consequence: Line Art leaves 1 vertex in
+10 turning >=15 deg (p95 22.3 deg) on a clean circle, and on thin-stroke art
+every filled preset emits ~0.6 px segments with 15-22 deg heading jitter. GRBL's
+junction limiter (verified from planner.c) never brakes for bends this shallow,
+so the machine absorbs a lateral velocity impulse v*sin(theta) at every vertex —
+a 15-80 Hz excitation train at F300: the bench chatter. Smooth was machinable by
+accident of its 2x epsilon; nothing guaranteed it, and on thin strokes it
+stopped being true.
+
+### Decision
+
+- At trace commit, and only when the live project is CNC, traced polylines are
+  refaired in physical units by `fairToolpathPolylines` (core/geometry):
+  corner-pinned smoothing (two 1/4-1/2-1/4 passes, per-vertex displacement
+  clamped to 0.05 mm) followed by an even-arclength resample to a 0.4 mm
+  minimum chord. Corners (windowed 60-deg turns with arclength non-max
+  suppression; exact per-vertex turns count only when both legs are >=2 px) and
+  open-chain endpoints are pinned exactly; chords between two nearby corners
+  may undershoot the floor — corners win.
+- `curves` are rebuilt from the faired polylines at commit
+  (`src/ui/trace/cnc-trace-fairing.ts`) because the CNC compiler flattens
+  curves, not polylines — stale curves would feed the machine the unfaired
+  geometry.
+- Laser commits pass the tracer's output through untouched.
+
+### Consequences
+
+- Every preset commits machinable geometry on CNC (pinned in-test: p95 turn
+  <=10 deg, chords >=0.38 mm away from corners, deviation from the traced
+  boundary bounded by the 0.05 mm clamp).
+- The scene stores the faired geometry, so canvas preview, exports, and laser
+  output after a machine-kind switch all match what the CNC cuts (WYSIWYG; the
+  deviation is sub-pixel at the default import scale).
+- Traces committed before this ADR keep their dense geometry — re-trace on a
+  CNC project to refair them.
+- The pass runs in the import dialog's commit path, today's only TracedImage
+  creation site; a future creation site must call it or document why not.
+
 ## ADR-259 - Test files get a higher raw-physical-line backstop
 
 **Date:** 2026-07-25

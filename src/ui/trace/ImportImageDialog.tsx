@@ -42,6 +42,7 @@ import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
+import { fairTracedPathsForCnc } from './cnc-trace-fairing';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
@@ -351,6 +352,11 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     // pixel-for-pixel over the features they came from (ADR-026).
     const traceMode = traceModeForOptions(args.options);
     const operationOverride = operationOverrideForTrace(traceMode, args.traceFillStyle);
+    // CNC commits machinable geometry (cnc-trace-fairing.ts); the live
+    // machine kind decides, mirroring the raster path's mid-dialog-switch
+    // handling. Laser keeps the tracer's output untouched.
+    const cncProject = ctx.getCurrentProject().machine?.kind === 'cnc';
+    const commitPaths = cncProject ? fairTracedPathsForCnc(paths, args.seed, width) : paths;
     const traced: TracedImage = {
       kind: 'traced-image',
       id: args.replaceTraceId ?? crypto.randomUUID(),
@@ -361,7 +367,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       tracePixelHeight: height,
       bounds,
       transform: IDENTITY_TRANSFORM,
-      paths,
+      paths: commitPaths,
       ...(operationOverride === undefined ? {} : { operationOverride }),
     };
     const liveProject = ctx.getCurrentProject();
