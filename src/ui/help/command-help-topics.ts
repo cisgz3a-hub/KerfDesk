@@ -36,7 +36,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'file.open-gcode': {
     family: 'file',
-    tooltip: 'Open a .nc G-code program in the CNC simulator (preview only, CNC mode).',
+    tooltip: 'Open a .nc/.gcode/.tap program in the 3D Inspector (both machine modes).',
   },
   'file.save-gcode': {
     family: 'file',

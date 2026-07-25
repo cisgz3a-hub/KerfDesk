@@ -11,7 +11,7 @@ import {
   handleSaveGcode,
   handleSaveProject,
 } from '../app/file-actions';
-import { handleOpenGcodePreview } from '../app/gcode-open-action';
+import { handleOpenGcodeInspector } from '../app/gcode-open-action';
 import { connectOptionsForDevice } from './connect-options';
 import { railPanelCommandContext } from './command-context-helpers';
 import { currentOutputScope, useStore } from '../state';
@@ -224,7 +224,7 @@ function fileCommandContext(
     importImage: callbacks.requestImportImage,
     saveGcode: saveGcodeAction(platform, app, laser, pushToast),
     openGcodePreview: () =>
-      void handleOpenGcodePreview(platform, app.openExternalGcodePreview, pushToast),
+      void handleOpenGcodeInspector(platform, callbacks.requestGcodeInspector, pushToast),
   };
 }
 

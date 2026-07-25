@@ -40,7 +40,10 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
 
 // CNC-only commands (hidden in laser mode): the .nc program simulator —
 // the laser pipeline has no Z-aware removal model to feed.
-export const CNC_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>(['file.open-gcode']);
+// ADR-255 lifted the last CNC-only command: file.open-gcode now opens the
+// G-code Inspector in both machine modes. The gate machinery stays for
+// future commands.
+export const CNC_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>();
 
 export function gateCommandsForMachineKind(
   commands: ReadonlyArray<AppCommand>,
