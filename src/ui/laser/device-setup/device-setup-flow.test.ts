@@ -239,6 +239,25 @@ describe('unified machine setup flow', () => {
     expect(state.detectedApplied).toBe(false);
   });
 
+  // Audit 3.9: applyPreset replaced the draft with the catalog profile verbatim
+  // but left detectedApplied true, so the Connect step kept claiming detected
+  // values were applied to a draft they had just been overwritten in.
+  it('clears the detected-applied note when a catalog preset replaces the draft', () => {
+    let state = deviceSetupReducer(open({ bedWidth: 610 }), {
+      kind: 'detected-updated',
+      detected: { bedWidth: 610 },
+      controllerRead: true,
+    });
+    state = deviceSetupReducer(state, { kind: 'accept-detected', patch: { bedWidth: 610 } });
+    expect(state.detectedApplied).toBe(true);
+
+    const preset = GRBL_MACHINE_PROFILE_CATALOG[0];
+    if (preset === undefined) throw new Error('expected a catalog profile');
+    state = deviceSetupReducer(state, { kind: 'apply-preset', profile: preset });
+    expect(state.presetApplied).toBe(true);
+    expect(state.detectedApplied).toBe(false);
+  });
+
   it('blocks invalid geometry on editing steps while capability and connect stay passable', () => {
     let state = deviceSetupReducer(open(), { kind: 'edit', patch: { bedWidth: 0 } });
     // Capability and connect hold no fixable field, so Next never strands the
