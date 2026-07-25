@@ -133,6 +133,9 @@ describe('JobReviewLayersTable', () => {
     seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'cnc');
     await render('cnc');
 
-    expect(host.textContent).toContain('1 pass · stepover 40% · climb · tabs off');
+    // ADR-258 defaults tabs ON, so the detail line reports the tab configuration.
+    expect(host.textContent).toContain(
+      '1 pass · stepover 40% · climb · tabs 4 per shape (6 × 2 mm)',
+    );
   });
 });
