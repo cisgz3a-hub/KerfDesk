@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import type { JobInterruptionKind } from '../../core/recovery';
 import {
@@ -29,6 +28,7 @@ import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/ex
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
+import { configureReadyCncRecovery } from './cnc-recovery-flow-testing';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import { expectCncPassRecoveryProvenance } from './cnc-pass-recovery-provenance-testing';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
@@ -44,15 +44,6 @@ const originalStartJob = useLaserStore.getState().startJob;
 const NOW = '2026-07-16T10:00:00.000Z';
 const LATER = '2026-07-16T10:01:00.000Z';
 const ARCHIVED_WCO = { x: 0, y: 0, z: 0 };
-const idleStatus: StatusReport = {
-  state: 'Idle',
-  subState: null,
-  mPos: { x: 0, y: 0, z: 0 },
-  wPos: null,
-  feed: 0,
-  spindle: 0,
-  wco: null,
-};
 const lineObject: SceneObject = {
   kind: 'imported-svg',
   id: 'line-object',
@@ -117,35 +108,6 @@ function repository(): RecoveryRepository {
   });
 }
 
-function configureReadyCncRecovery(): void {
-  const project = recoveryProject();
-  useStore.setState({
-    project,
-    selectedObjectId: null,
-    additionalSelectedIds: new Set(),
-  });
-  useLaserStore.setState({
-    ...initialLaserState(),
-    connection: { kind: 'connected' },
-    statusReport: idleStatus,
-    controllerSettings: { maxPowerS: 12_000, minPowerS: 0, laserModeEnabled: false },
-    controllerQualification: { kind: 'qualified', epoch: 0, settings: 'verified' },
-    ovCache: { feed: 100, rapid: 100, spindle: 100 },
-    accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
-    workZReferenceEpoch: 7,
-    workZZeroEvidence: {
-      source: 'manual-zero',
-      referenceEpoch: 7,
-      toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
-    },
-    // Frame-first (ADR-228): a completed Frame for this exact job is the one
-    // Start policy gate; both the seeding Start and the recovery re-prepare
-    // check it against the live store (null WCO, work origin inactive here).
-    frameVerification: frameVerificationForProject(project),
-    startJob: vi.fn(async () => undefined),
-  });
-}
-
 async function saveInterruptedRun(
   repo: RecoveryRepository,
   options?: {
@@ -205,7 +167,7 @@ async function saveInterruptedRun(
 beforeEach(() => {
   localStorage.clear();
   resetStore();
-  configureReadyCncRecovery();
+  configureReadyCncRecovery(recoveryProject());
   vi.mocked(jobAwareAlert).mockClear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
 });
