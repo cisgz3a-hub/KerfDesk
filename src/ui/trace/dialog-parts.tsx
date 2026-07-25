@@ -20,10 +20,10 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
 ] as const;
 
 export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
-// CNC traces with the Smooth preset only (maintainer bench result, 2026-07-25:
-// the other presets leave the bit chattering on a traced cut). The rest are
-// greyed out rather than removed so the operator can see which preset is in
-// use and that the narrowing is deliberate.
+// CNC opens on Smooth (maintainer bench result, 2026-07-25: the other presets
+// leave the bit chattering on a traced cut). This is the starting selection
+// only — rule 7 / ADR-228: every preset stays selectable, and the reason
+// Smooth is preferred is stated in the picker's tooltip rather than enforced.
 export const CNC_TRACE_PRESET_NAME = 'Smooth';
 
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
@@ -95,7 +95,7 @@ export function PresetPicker(props: {
   readonly value: string;
   readonly onChange: (next: string) => void;
 }): JSX.Element {
-  const smoothOnly = props.machineKind === 'cnc';
+  const isCnc = props.machineKind === 'cnc';
   return (
     <Field label="Preset">
       <select
@@ -104,10 +104,10 @@ export function PresetPicker(props: {
         className="lf-select"
         style={selectStyle}
         aria-label="Trace preset"
-        title={smoothOnly ? CNC_PRESET_PICKER_TITLE : LASER_PRESET_PICKER_TITLE}
+        title={isCnc ? CNC_PRESET_PICKER_TITLE : LASER_PRESET_PICKER_TITLE}
       >
         {VISIBLE_TRACE_PRESET_NAMES.filter((key) => TRACE_PRESETS[key] !== undefined).map((key) => (
-          <option key={key} value={key} disabled={smoothOnly && key !== CNC_TRACE_PRESET_NAME}>
+          <option key={key} value={key}>
             {key}
           </option>
         ))}
@@ -119,7 +119,7 @@ export function PresetPicker(props: {
 const LASER_PRESET_PICKER_TITLE =
   'Choose a trace preset tuned for line art, smooth logos, centerlines, sharp detail, or edge-line drawings.';
 const CNC_PRESET_PICKER_TITLE =
-  'CNC traces with the Smooth preset; the other presets are greyed out because they leave the bit chattering on a cut.';
+  'Smooth is the recommended CNC preset — the others can leave the bit chattering on a traced cut. All presets remain available.';
 
 export function TraceFillStylePicker(props: {
   readonly value: TraceFillStyle;
