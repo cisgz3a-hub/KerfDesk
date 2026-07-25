@@ -55,4 +55,12 @@ export const viewer3dTheme = {
   // Traversals also sit back in opacity so a dense rapid web never buries the
   // cut it is connecting.
   toolpathTravelOpacity: 0.55,
+  // Scenery: dim enough to read as context rather than content. If the grid
+  // competes with the toolpath for attention it is doing the opposite of its
+  // job.
+  stage: {
+    gridMinor: 0x3a4048,
+    gridMajor: 0x525b66,
+    gridOpacity: 0.5,
+  },
 } as const;

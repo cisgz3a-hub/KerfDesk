@@ -10,7 +10,7 @@ import type { BufferGeometry, Scene, WebGLRenderer } from 'three';
 import type { ReliefSurfaceMesh } from '../../core/relief';
 import type { Move3d } from '../../core/toolpath3d';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
-import { buildToolpathLines } from '../viewer3d';
+import { buildStageFurniture, buildToolpathLines } from '../viewer3d';
 import { applySceneLighting } from './scene-lighting';
 
 // The toolpath to overlay, in the SAME scene frame the removal grid was
@@ -123,6 +123,8 @@ export async function createReliefThreeScene(
   scene.add(new three.Mesh(geometry, surfaceMaterial));
 
   const stock = addStockOutline(three, scene, mesh, stockThicknessMm);
+  const stage = buildStageFurniture(three, mesh, stockThicknessMm);
+  scene.add(stage.object);
 
   // The toolpath rides the SAME mirror and recentre the surface geometry got
   // baked with, applied here as an object transform. Object matrices compose
@@ -167,6 +169,7 @@ export async function createReliefThreeScene(
         controls.dispose();
         lighting.dispose();
         toolpathLines?.dispose();
+        stage.dispose();
         geometry.dispose();
         surfaceMaterial.dispose();
         stock.dispose();
