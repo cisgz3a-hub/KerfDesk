@@ -335,7 +335,10 @@ function entry(
   const builtInProfile = {
     ...profile,
     profileSource: 'built-in' as const,
-    catalogVersion: PROFILE_CATALOG_VERSION,
+    // A profile revised after the catalog baseline keeps its own version date
+    // (e.g. the 4040's 2026-07-19); the catalog constant is the fallback so
+    // unrevised profiles still carry a provenance date.
+    catalogVersion: profile.catalogVersion ?? PROFILE_CATALOG_VERSION,
   };
   return {
     profile: builtInProfile,

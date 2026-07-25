@@ -40,6 +40,15 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     }
   });
 
+  it('keeps a revised profile’s own catalogVersion instead of the catalog baseline', () => {
+    const revised = profileCatalogEntryById('neotronics-4040-max-lt4lds-v2-20w');
+    const baseline = profileCatalogEntryById('xtool-d1-pro');
+    if (revised === undefined || baseline === undefined) throw new Error('profiles missing');
+
+    expect(revised.profile.catalogVersion).toBe('2026-07-19');
+    expect(baseline.profile.catalogVersion).toBe('2026-06-17');
+  });
+
   it('ships a specific Falcon A1 Pro grblHAL profile before the broad fallback', () => {
     const specific = profileCatalogEntryById('creality-falcon-a1-pro-grblhal');
     const fallback = profileCatalogEntryById('creality-falcon-a1-pro-compatible');
