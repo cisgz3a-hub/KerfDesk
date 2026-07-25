@@ -4532,6 +4532,24 @@ validation must be supervised without cutting load.
    first line, click-to-jump). The panel header states: "Findings inform.
    Nothing here blocks Frame, Start, or export."
 
+#### Success — G-code as a main-canvas view
+
+1. The canvas carries a **Design / G-code 3D** switch (top-left). Choosing
+   **G-code 3D** replaces the design canvas with the 3D view of the program
+   this project compiles to — the same viewer the file Inspector uses.
+2. It compiles on entry and on **Refresh**, not on every edit. After the
+   design changes, the view marks itself **Design changed** so what is on
+   screen is never silently stale.
+3. The switch stays available **during a job**: watching the running program
+   is the point. The view only reads — it never writes, streams, or advances
+   variable text.
+4. Choosing **Design** returns to the canvas with the artwork untouched.
+
+#### Empty — nothing to compile
+
+1. A project with no artwork shows "This design produces no G-code yet."
+   in the G-code view; the switch still works both ways.
+
 #### Error — unreadable program
 
 1. Not-G-code or non-finite targets: the Inspector opens with whatever

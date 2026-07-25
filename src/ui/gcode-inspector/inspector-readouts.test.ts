@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
-import type { Viewer3dTheme } from '../viewer3d';
-import { droRows, legendEntries, statsRows } from './inspector-readouts';
-
-const THEME: Viewer3dTheme = {
-  background: 0x000000,
-  gridMinor: 0x111111,
-  gridMajor: 0x222222,
-  travel: 0xcc4444,
-  cut: 0x4fa3ff,
-  plunge: 0xffb84d,
-  retract: 0x9a7fd4,
-};
+import { droRows, statsRows } from './inspector-readouts';
 
 function model(text: string): GcodeRenderModel {
   const result = buildGcodeRenderModel(text);
@@ -39,17 +28,7 @@ describe('droRows', () => {
   });
 });
 
-describe('legendEntries', () => {
-  it('counts each move kind with its theme swatch', () => {
-    const entries = legendEntries(model(PROGRAM), THEME);
-    const byLabel = new Map(entries.map((entry) => [entry.label, entry]));
-    expect(byLabel.get('Cut')?.count).toBe(1);
-    expect(byLabel.get('Plunge')?.count).toBe(1);
-    expect(byLabel.get('Retract')?.count).toBe(1);
-    expect(byLabel.get('Traversal')?.count).toBe(1);
-    expect(byLabel.get('Traversal')?.color).toBe('#cc4444');
-  });
-});
+// Legend moved to lenses.ts (ADR-255 stage 9); covered by lenses.test.ts.
 
 describe('statsRows', () => {
   it('summarizes size, distances, ranges, and Z levels', () => {
