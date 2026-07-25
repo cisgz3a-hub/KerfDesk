@@ -58,7 +58,9 @@ describe('laserOperationDetail', () => {
 describe('cncOperationDetail', () => {
   it('summarizes the default profile cut with a computed pass count', () => {
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS)).toBe(
-      '1 pass · stepover 40% · climb · tabs off · Manual feeds',
+      // ADR-258 defaults tabs ON, so the default profile cut now reports its tab
+      // configuration here instead of "tabs off".
+      '1 pass · stepover 40% · climb · tabs 4 per shape (6 × 2 mm) · Manual feeds',
     );
   });
 

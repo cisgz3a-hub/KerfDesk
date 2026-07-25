@@ -11,10 +11,15 @@ import {
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
 
-// AUDIT A5: requested tab windows that swallow a contour's whole perimeter
-// must SKIP the below-tab-top passes (the loop stays one full bridge), never
-// fall back to cutting the unsplit loop — that freed the part with the
-// spindle running.
+// AUDIT A5, as preserved by ADR-258: requested tab windows that swallow a
+// contour's whole perimeter must never cut below the tab top, because doing so
+// frees the part with the spindle running.
+//
+// The mechanism changed but the property did not. The split model achieved it by
+// SKIPPING the below-tab-top passes (the split returned no pieces). ADR-258's
+// Z-rise model achieves it by riding the whole loop at the tab top — nothing is
+// skipped, nothing is dropped, and no material below the tab top is removed.
+// These tests therefore still assert the safety property, not the mechanism.
 
 const dev = DEFAULT_DEVICE_PROFILE;
 const config = DEFAULT_CNC_MACHINE_CONFIG; // 1/8 in bit (3.175 mm)
@@ -70,9 +75,17 @@ function compiledPassZs(cnc: Partial<CncLayerSettings>, size: number): ReadonlyA
     dev,
     config,
   );
+  // Every Z any pass actually cuts at, across both pass kinds. Since ADR-258 a
+  // tabbed deep pass is a path3d carrying its own per-vertex Z (cut depth plus the
+  // tab-top rises), and ADR-250 leads turn full-loop contour passes into path3d
+  // too — so filtering on kind === 'contour' would see nothing at all here.
   return job.groups.flatMap((group) =>
     group.kind === 'cnc'
-      ? group.passes.flatMap((pass) => (pass.kind === 'contour' ? [pass.zMm] : []))
+      ? group.passes.flatMap((pass) => {
+          if (pass.kind === 'contour') return [pass.zMm];
+          if (pass.kind === 'path3d') return pass.points.map((point) => point.z);
+          return [];
+        })
       : [],
   );
 }

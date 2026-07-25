@@ -22,7 +22,8 @@ import {
   type Scene,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
-import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
+import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
+import { tabRampedPoints } from './cnc-tab-ramp';
 import { coolantFields } from './coolant-fields';
 import {
   capFeed,
@@ -387,6 +388,10 @@ function depthsWithTabTopPass(
   return [...depths, tabTop].sort((a, b) => b - a);
 }
 
+// ADR-258: a tabbed deep pass stays ONE continuous path that rises to the tab top
+// across each window, instead of splitting into pieces that each replunge at full
+// depth. When the rise cannot be built (open/degenerate loop, zero window) the
+// ordinary contour pass is kept, which is the same fallback the split model used.
 function appendTabbedPasses(
   passes: CncPass[],
   toolpath: Polyline,
@@ -395,17 +400,22 @@ function appendTabbedPasses(
   toolDiameterMm: number,
   manualCenters?: ReadonlyArray<number>,
 ): void {
-  for (const piece of splitPassForTabs(
+  const points = tabRampedPoints(
     toolpath,
+    zMm,
+    tabTopZMm(settings.depthMm, settings.tabHeightMm),
     {
       tabWidthMm: settings.tabWidthMm,
       tabsPerShape: settings.tabsPerShape,
       toolDiameterMm,
     },
     manualCenters,
-  )) {
-    if (piece.points.length >= 2) passes.push(contourPassFromPolyline(piece, zMm));
+  );
+  if (points === null || points.length < 2) {
+    passes.push(contourPassFromPolyline(toolpath, zMm));
+    return;
   }
+  passes.push({ kind: 'path3d', points, closed: false });
 }
 
 // Clear every ring at one depth before stepping down — pockets remove the

@@ -106,31 +106,50 @@ M0
 G0 Z3.810
 M3 S12000
 G4 P3.000
-; cnc layer profile profile-outside tool 6.350 mm feed 1000 plunge 300 spindle 12000 rpm passes 5
-G0 X113.175 Y310.000
+; cnc layer profile profile-outside tool 6.350 mm feed 1000 plunge 300 spindle 12000 rpm passes 2
+G0 X116.350 Y306.825
 G1 Z-2.000 F300
-G1 X113.175 Y333.175 F1000
-G1 X66.825 Y333.175
-G1 X66.825 Y286.825
-G1 X113.175 Y286.825
-G1 X113.175 Y310.000
+G1 X115.528 Y306.933 Z-2.000 F1000
+G1 X114.762 Y307.250 Z-2.000
+G1 X114.105 Y307.755 Z-2.000
+G1 X113.600 Y308.413 Z-2.000
+G1 X113.283 Y309.178 Z-2.000
+G1 X113.175 Y310.000 Z-2.000
+G1 X113.175 Y333.175 Z-2.000
+G1 X66.825 Y333.175 Z-2.000
+G1 X66.825 Y286.825 Z-2.000
+G1 X113.175 Y286.825 Z-2.000
+G1 X113.175 Y310.000 Z-2.000
+G1 X113.283 Y310.822 Z-2.000
+G1 X113.600 Y311.587 Z-2.000
+G1 X114.105 Y312.245 Z-2.000
+G1 X114.762 Y312.750 Z-2.000
+G1 X115.528 Y313.067 Z-2.000
+G1 X116.350 Y313.175 Z-2.000
 G0 Z3.810
-G0 X107.000 Y333.175
+G0 X113.175 Y310.000
 G1 Z-3.000 F300
-G1 X73.000 Y333.175 F1000
-G0 Z3.810
-G0 X66.825 Y327.000
-G1 Z-3.000 F300
-G1 X66.825 Y293.000 F1000
-G0 Z3.810
-G0 X73.000 Y286.825
-G1 Z-3.000 F300
-G1 X107.000 Y286.825 F1000
-G0 Z3.810
-G0 X113.175 Y293.000
-G1 Z-3.000 F300
-G1 X113.175 Y310.000 F1000
-G1 X113.175 Y327.000
+G1 X113.175 Y327.000 Z-3.000 F1000
+G1 X113.175 Y327.000 Z-2.000 F300
+G1 X113.175 Y333.175 Z-2.000 F1000
+G1 X107.000 Y333.175 Z-2.000
+G1 X107.000 Y333.175 Z-3.000 F300
+G1 X73.000 Y333.175 Z-3.000 F1000
+G1 X73.000 Y333.175 Z-2.000 F300
+G1 X66.825 Y333.175 Z-2.000 F1000
+G1 X66.825 Y327.000 Z-2.000
+G1 X66.825 Y327.000 Z-3.000 F300
+G1 X66.825 Y293.000 Z-3.000 F1000
+G1 X66.825 Y293.000 Z-2.000 F300
+G1 X66.825 Y286.825 Z-2.000 F1000
+G1 X73.000 Y286.825 Z-2.000
+G1 X73.000 Y286.825 Z-3.000 F300
+G1 X107.000 Y286.825 Z-3.000 F1000
+G1 X107.000 Y286.825 Z-2.000 F300
+G1 X113.175 Y286.825 Z-2.000 F1000
+G1 X113.175 Y293.000 Z-2.000
+G1 X113.175 Y293.000 Z-3.000 F300
+G1 X113.175 Y310.000 Z-3.000 F1000
 G0 Z3.810
 M5
 G0 X0.000 Y0.000
@@ -142,7 +161,7 @@ exports[`emitGcode production composition — fixture snapshots > curve-bearing-
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
 G0 X10.000 Y350.000 S0
@@ -284,8 +303,6 @@ exports[`emitGcode production composition — fixture snapshots > fill-donut-wit
 G90
 G54
 G94
-M3 S0
-M5
 M4 S0
 ; fill layer fill-#0000ff color #0000ff power 30% speed 1500 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
@@ -426,9 +443,9 @@ G0 X10.000 Y390.000
 M106 S77
 G1 X30.000 Y380.000 F1500
 G1 X50.000 Y390.000
-M107
 ; fill layer fill-#0000ff color #0000ff power 30% speed 1500 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
+M107
 G0 X45.000 Y310.000
 G0 X50.000 Y310.000
 M106 S77
@@ -618,13 +635,11 @@ exports[`emitGcode production composition — fixture snapshots > mixed scene wi
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
 G0 X0.000 Y95.000 S0
 G1 X20.000 Y95.000 F1500 S300
-M5
-M4 S0
 ; fill layer fill-#0000ff color #0000ff power 30% speed 1500 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
 G0 X35.000 Y15.000 S0
@@ -782,13 +797,11 @@ exports[`emitGcode production composition — fixture snapshots > mixed-line-fil
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
 G0 X10.000 Y390.000 S0
 G1 X30.000 Y390.000 F1500 S300
-M5
-M4 S0
 ; fill layer fill-#0000ff color #0000ff power 30% speed 1500 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
 G0 X45.000 Y310.000 S0
@@ -946,7 +959,7 @@ exports[`emitGcode production composition — fixture snapshots > raster-2x2-thr
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; image layer image-#808080 color #808080 power 30%
 ; 10 × 5 px, 10.000 × 5.000 mm
 ; feed 1500 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
@@ -982,7 +995,7 @@ exports[`emitGcode production composition — fixture snapshots > rounded-rectan
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
 G0 X88.000 Y372.000 S0
@@ -1073,14 +1086,12 @@ exports[`emitGcode production composition — fixture snapshots > smoothieware-v
 G90
 G54
 G94
-M3 S0
+M4 S0
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
 G0 X10.000 Y390.000 S0
 G1 X30.000 Y380.000 F1500 S0.300
 G1 X50.000 Y390.000
-M5
-M4 S0
 ; fill layer fill-#0000ff color #0000ff power 30% speed 1500 mm/min passes 1 overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)
 ; pass 1 of 1
 G0 X45.000 Y310.000 S0

@@ -7,7 +7,8 @@ import {
   type Vec2,
 } from '../scene';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
-import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
+import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
+import { tabRampedPoints } from './cnc-tab-ramp';
 import { zPassDepths } from './depth-passes';
 import { planStraightInlayPairForSettings, straightInlayPocketDepthMm } from './inlay-pair';
 
@@ -102,6 +103,8 @@ function profileDepths(settings: CncLayerSettings): ReadonlyArray<number> {
   return [...depths, tabTop].sort((a, b) => b - a);
 }
 
+// ADR-258: one continuous Z-rise path, matching the profile and finishing paths.
+// Leaving this on the split model would mix both tab models inside a single job.
 function appendTabPieces(
   passes: CncPass[],
   toolpath: Polyline,
@@ -109,13 +112,16 @@ function appendTabPieces(
   settings: CncLayerSettings,
   toolDiameterMm: number,
 ): void {
-  for (const piece of splitPassForTabs(toolpath, {
+  const points = tabRampedPoints(toolpath, zMm, tabTopZMm(settings.depthMm, settings.tabHeightMm), {
     tabWidthMm: settings.tabWidthMm,
     tabsPerShape: settings.tabsPerShape,
     toolDiameterMm,
-  })) {
-    if (piece.points.length >= 2) passes.push(contourPass(piece, zMm));
+  });
+  if (points !== null && points.length >= 2) {
+    passes.push({ kind: 'path3d', points, closed: false });
+    return;
   }
+  if (toolpath.points.length >= 2) passes.push(contourPass(toolpath, zMm));
 }
 
 function contourPass(polyline: Polyline, zMm: number): CncContourPass {

@@ -1,15 +1,21 @@
 // detectCncFullTabCoverageWarnings — CNC-mode advisory: holding tabs are
 // enabled, but the requested windows (tab width + bit diameter, times tabs
-// per shape) cover the whole perimeter of the layer's shapes, so the compiler
-// skips every pass below the tab top and the part is NEVER cut through — the
-// loop stays one full bridge (AUDIT A5). Detected from the compiled job: the
-// layer produced profile passes at/above its tab top but none below it.
+// per shape) cover the whole perimeter of the layer's shapes, so no material
+// below the tab top is ever removed and the part is NEVER cut through — the loop
+// stays one full bridge (AUDIT A5). Detected from the compiled job: the layer
+// cuts at/above its tab top but nowhere below it.
 //
-// This is an advisory, not a gate (ADR-206: warn, don't block) — the
-// compiler's skip already keeps the cut safe; this explains WHY the part
-// will not come free. Limitation: a layer where only SOME shapes are fully
-// covered still has deep passes from the others and is not flagged here —
-// those shapes still keep their bridges, the advisory just stays quiet.
+// ADR-258 changed the mechanism, not the condition. The split model achieved
+// this by SKIPPING the below-tab-top passes; tabs are now a Z-rise, so the loop
+// RIDES at the tab top instead. Either way nothing is cut deeper, so the
+// advisory is still correct and still needed — which is why it reads Z from
+// path3d passes as well as contour ones.
+//
+// This is an advisory, not a gate (ADR-206: warn, don't block) — the compiler
+// already keeps the cut safe; this explains WHY the part will not come free.
+// Limitation: a layer where only SOME shapes are fully covered still has deep
+// passes from the others and is not flagged here — those shapes still keep
+// their bridges, the advisory just stays quiet.
 
 import { compileCncJob, isProfileCutType, passNeedsTabs, tabTopZMm } from '../../core/cnc';
 import { DEFAULT_CNC_LAYER_SETTINGS, type Layer, type Project } from '../../core/scene';
@@ -34,7 +40,15 @@ export function detectCncFullTabCoverageWarnings(project: Project): ReadonlyArra
           ? group.passes
           : [],
       )
-      .flatMap((pass) => (pass.kind === 'contour' ? [pass.zMm] : []));
+      // Read Z from BOTH pass kinds. Since ADR-258 a tabbed deep pass is a path3d
+      // carrying per-vertex Z, and ADR-250 leads turn full-loop contour passes into
+      // path3d too — so a contour-only filter sees nothing at all on a tabbed layer
+      // and this advisory silently stops firing.
+      .flatMap((pass) => {
+        if (pass.kind === 'contour') return [pass.zMm];
+        if (pass.kind === 'path3d') return pass.points.map((point) => point.z);
+        return [];
+      });
     const cutsAtOrAboveTabTop = passZs.some((zMm) => zMm >= tabTop - Z_EPS);
     const cutsBelowTabTop = passZs.some((zMm) => zMm < tabTop - Z_EPS);
     if (cutsAtOrAboveTabTop && !cutsBelowTabTop) {

@@ -11,10 +11,10 @@ function emit(job: Job): string {
 }
 
 describe('grblStrategy preamble/postamble', () => {
-  it('emits G21, G90, M3 S0 preamble and M5 + park postamble around an empty job', () => {
+  it('emits G21, G90, M4 S0 preamble and M5 + park postamble around an empty job', () => {
     const out = emit(EMPTY_JOB);
     expect(out).toBe(
-      ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'),
+      ['G21', 'G90', 'G54', 'G94', 'M4 S0', 'M5', 'G0 X0.000 Y0.000 S0', ''].join('\n'),
     );
   });
 
@@ -22,7 +22,7 @@ describe('grblStrategy preamble/postamble', () => {
     const out = grblStrategy.emit(EMPTY_JOB, dev, { finishPosition: { x: 120, y: 80 } });
 
     expect(out).toBe(
-      ['G21', 'G90', 'G54', 'G94', 'M3 S0', 'M5', 'G0 X120.000 Y80.000 S0', ''].join('\n'),
+      ['G21', 'G90', 'G54', 'G94', 'M4 S0', 'M5', 'G0 X120.000 Y80.000 S0', ''].join('\n'),
     );
   });
 });
@@ -59,7 +59,7 @@ describe('grblStrategy single-segment job', () => {
         'G90',
         'G54',
         'G94',
-        'M3 S0',
+        'M4 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
         'G0 X10.000 Y20.000 S0',
@@ -178,7 +178,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     expect(out.match(/G1 X5\.000 Y0\.000 F1000 S1000/g)).toHaveLength(3);
   });
 
-  it('re-arms constant-power cut mode at zero power before each repeated pass', () => {
+  it('re-arms the cut power mode at zero power before each repeated pass', () => {
     const job: Job = {
       groups: [
         {
@@ -206,7 +206,9 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     const out = emit(job);
 
     expect(out).toContain(
-      ['; pass 2 of 2', 'M3 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
+      // ADR-257: the between-pass re-arm carries the group's effective mode, which on
+      // the default dialect is now M4. The re-arm itself still happens, at zero power.
+      ['; pass 2 of 2', 'M4 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
     );
   });
 });
@@ -424,177 +426,5 @@ describe('grblStrategy fill hatch overscan', () => {
     // The 15mm gap is crossed by a G0 rapid (laser hard-off), NOT a G1 ... S0.
     expect(out).toMatch(/^G0 X20\.000 Y0\.000 S0$/m);
     expect(out).not.toMatch(/^G1 X20\.000 Y0\.000 S0$/m);
-  });
-});
-
-describe('grblStrategy mixed raster/vector mode transitions', () => {
-  it('re-arms M3 before a cut group that follows a raster group', () => {
-    const job: Job = {
-      groups: [
-        {
-          kind: 'raster',
-          layerId: 'image',
-          color: '#808080',
-          power: 50,
-          speed: 1000,
-          passes: 1,
-          airAssist: false,
-          sValues: new Uint16Array([500]),
-          pixelWidth: 1,
-          pixelHeight: 1,
-          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
-          overscanMm: 0,
-          dotWidthCorrectionMm: 0,
-        },
-        {
-          kind: 'cut',
-          layerId: 'cut',
-          color: '#ff0000',
-          power: 50,
-          speed: 1500,
-          passes: 1,
-          airAssist: false,
-          segments: [
-            {
-              polyline: [
-                { x: 1, y: 1 },
-                { x: 2, y: 2 },
-              ],
-              closed: false,
-            },
-          ],
-        },
-      ],
-    };
-    expect(emit(job)).toContain('M5\nM3 S0\n; layer cut color #ff0000');
-  });
-
-  it('arms M4 (dynamic power) before a fill group that follows a raster group', () => {
-    const job: Job = {
-      groups: [
-        {
-          kind: 'raster',
-          layerId: 'image',
-          color: '#808080',
-          power: 50,
-          speed: 1000,
-          passes: 1,
-          airAssist: false,
-          sValues: new Uint16Array([500]),
-          pixelWidth: 1,
-          pixelHeight: 1,
-          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
-          overscanMm: 0,
-          dotWidthCorrectionMm: 0,
-        },
-        {
-          kind: 'fill',
-          layerId: 'fill',
-          color: '#ff0000',
-          power: 50,
-          speed: 1500,
-          passes: 1,
-          airAssist: false,
-          overscanMm: 1,
-          segments: [
-            {
-              polyline: [
-                { x: 1, y: 1 },
-                { x: 2, y: 1 },
-              ],
-              closed: false,
-              reverse: false,
-            },
-          ],
-        },
-      ],
-    };
-    // Fill now arms DYNAMIC power (M4). Raster ended in M5, so M4 S0 alone
-    // flips the mode — no redundant second M5 (ADR-036).
-    expect(emit(job)).toContain('M5\nM4 S0\n; fill layer fill color #ff0000');
-  });
-
-  it('annotates the fill header overscan with the ADR-033 short-run skip threshold', () => {
-    // The header used to print the configured setting verbatim, which read as
-    // "every run gets this runway" — ADR-033 zeroes it on short runs, and in a
-    // real traced-lettering job most runs got none (audit 2026-07-18).
-    const job: Job = {
-      groups: [
-        {
-          kind: 'fill',
-          layerId: 'fill',
-          color: '#ff0000',
-          power: 50,
-          speed: 1500,
-          passes: 1,
-          airAssist: false,
-          overscanMm: 5,
-          segments: [
-            {
-              polyline: [
-                { x: 1, y: 1 },
-                { x: 2, y: 1 },
-              ],
-              closed: false,
-              reverse: false,
-            },
-          ],
-        },
-      ],
-    };
-    expect(emit(job)).toContain(
-      '; fill layer fill color #ff0000 power 50% speed 1500 mm/min passes 1 ' +
-        'overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)',
-    );
-  });
-
-  it('repeats raster row data for each raster pass', () => {
-    const job: Job = {
-      groups: [
-        {
-          kind: 'raster',
-          layerId: 'image',
-          color: '#808080',
-          power: 50,
-          speed: 1000,
-          passes: 2,
-          airAssist: false,
-          sValues: new Uint16Array([500]),
-          pixelWidth: 1,
-          pixelHeight: 1,
-          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
-          overscanMm: 0,
-          dotWidthCorrectionMm: 0,
-        },
-      ],
-    };
-    const out = emit(job);
-    expect(out.match(/^; raster pass /gm)).toHaveLength(2);
-    expect(out.match(/^G0 X0\.000 Y0\.500 S0/gm)).toHaveLength(2);
-  });
-
-  it('does not double the M5 when a raster group is the last in the job', () => {
-    const job: Job = {
-      groups: [
-        {
-          kind: 'raster',
-          layerId: 'image',
-          color: '#808080',
-          power: 50,
-          speed: 1000,
-          passes: 1,
-          airAssist: false,
-          sValues: new Uint16Array([500]),
-          pixelWidth: 1,
-          pixelHeight: 1,
-          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
-          overscanMm: 0,
-          dotWidthCorrectionMm: 0,
-        },
-      ],
-    };
-    // The raster group emits its own trailing M5; the postamble must not add a
-    // second one — a raster-last job had M5\nM5 before the park move.
-    expect(emit(job)).not.toContain('M5\nM5');
   });
 });

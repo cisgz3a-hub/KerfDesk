@@ -12057,6 +12057,194 @@ plunge 250, feed 300, depth per pass 0.75.
 - Legacy layers without a CNC block, and invalid persisted cut types, now
   normalize to on-path instead of outside; operators choose outside/inside
   explicitly when the part size matters.
+---
+
+## ADR-257 - Vector cuts default to M4 dynamic power
+
+**Status:** Accepted | **Date:** 2026-07-25
+
+### Context
+
+Since ADR-036 the laser emitter has armed **M4 dynamic power for fill** and kept **M3 constant
+power for vector cuts**. The code comment defended M3-for-cut as "a slow corner must still cut
+fully through" (`grbl-strategy.ts`).
+
+**No scorched-corner defect has been observed.** The maintainer asked to move to M4 *to prevent*
+over-burnt corners, on the strength of the documentary evidence below - not from a reproduction. This
+ADR is therefore a **parity and prevention** change, not a defect fix. Nothing in this repo has
+demonstrated a scorching problem, and nothing here should be cited as evidence that one existed.
+
+The Phase 2 LightBurn cross-reference (`LIGHTBURN-STUDY.md` section 8, entry D-01) surfaced that
+this is a divergence from every comparable reference, and that our stated rationale is the direct
+inverse of theirs. Three independent primary sources, all read 2026-07-25:
+
+1. **GRBL upstream** (`gnea/grbl` `doc/markdown/laser_mode.md`) - M4 is "very useful for clean,
+   precise engraving and cutting on simple materials across a large range of G-code generation
+   methods." For M3 it warns: "For a clean cut and prevent scorching with `M3` constant power mode,
+   it's a good idea to add lead-in and lead-out motions around the line you want to cut to give some
+   space for the machine to accelerate and decelerate." It also notes M4 "will never burn a hole
+   through your table, if you stop and forget to turn `M3` off."
+2. **LightBurn** (docs.lightburnsoftware.com) - the modern GRBL device profile defaults to M4 for
+   all layer types; a per-layer **Constant Power** toggle opts back into M3. A separate legacy
+   **GRBL-M3** device exists for firmware 1.1e and older, which has no M4.
+3. **Rayforge** (`barebaric/rayforge`, MIT, read at source) -
+   `rayforge/machine/models/dialect/grbl.py` sets `laser_on="M4 S{power:.0f}"`. The same M4 form
+   appears in its per-device profiles (`resources/devices/*/dialect.yaml`), its `base.py` default,
+   and its `lightburn_importer.py`. Its GRBL dialect has **no M3 laser path at all**.
+
+The decisive detail is that GRBL's M3 guidance is **conditional on emitting lead-in/lead-out
+motion**, and our default profiles do not. ADR-239 tangential feed-matched contour entries exist but
+are scoped to the 4040-safe profile, so a default-profile cut gets M3 with no runway - exactly the
+configuration GRBL says will scorch.
+
+### Decision
+
+`cutPowerMode: 'dynamic'` for the two dynamic-oriented GRBL dialects:
+
+- **`grbl-dynamic`** - the KerfDesk default. Cuts now emit M4.
+- **`grbl-raster`** - a dynamic-oriented dialect; its cuts follow. Rayforge's equivalent
+  `grbl_raster` dialect likewise holds M4 active across the job.
+
+Two dialects deliberately keep `cutPowerMode: 'constant'`:
+
+- **`grbl-compatible`** - the escape hatch for firmware without dynamic power (GRBL 1.1e and older,
+  where M4 does not exist). This mirrors LightBurn's separate GRBL-M3 device profile. Its label and
+  description already promise constant-power cuts.
+- **`neotronics-4040-safe`** - a deliberately conservative profile with its own tuning history
+  (ADR-234, ADR-236, ADR-239). Changing it is a separate decision requiring its own hardware pass.
+
+ADR-190's per-layer `powerMode` override is unchanged, so any single layer can still be pinned to
+constant power. ADR-036 is **not** superseded: its fill reasoning stands. This ADR extends the same
+energy-per-mm argument from fill to cut.
+
+### Alternatives considered
+
+- **Keep M3, add default lead-in/lead-out instead.** Rejected for now: it satisfies GRBL's condition
+  but is a much larger geometry change, and it would still leave us diverging from LightBurn and
+  Rayforge on the power word. Worth revisiting as a quality improvement on top of M4.
+- **Expose a user-facing Constant Power toggle and leave the default at M3.** Rejected as the primary
+  fix: ADR-190 already provides the per-layer override, so the only question here is the *default*,
+  and every reference default is M4.
+- **Change all four dialects.** Rejected - see the two exclusions above.
+
+### Consequences
+
+- **G-code output changes.** Cut groups now emit `M4 S0` where they emitted `M3 S0`. Snapshots move.
+- Under M4 the beam is dark whenever motion stops, so the laser-off-on-travel invariant
+  (non-negotiable #3) becomes strictly easier to satisfy, not harder.
+- **Thin-material cut-through must be re-tested.** M4 reduces delivered power in acceleration zones;
+  that is the point, but a job previously tuned to just cut through at M3 may now need a small power
+  increase. This is the one regression risk and it is a real one.
+- Machines on firmware older than 1.1f must select `grbl-compatible`. Detection already records the
+  firmware family (ADR-157), so a follow-up may auto-steer that selection.
+
+### Verification
+
+- Unit: `grbl-dynamic` and `grbl-raster` resolve `cutPowerMode: 'dynamic'`; `grbl-compatible` and
+  `neotronics-4040-safe` resolve `'constant'`. Pinned in `gcode-dialects.test.ts`.
+- Emission: a cut-only job on the default dialect contains `M4 S0` and no `M3`.
+- Invariant: laser-off-on-travel and power-scale property tests stay green.
+- **NOT VERIFIED - hardware.** No coupon has been burned under this change, and no scorching was
+  observed before it. Both the expected corner-quality benefit and the thin-material cut-through risk
+  are **CLAIMED** until someone burns an M3-vs-M4 comparison. Note the benefit is predicted from GRBL's
+  documentation, not from a defect this project reproduced.
+
+---
+
+## ADR-258 - Holding tabs are a Z-rise in one continuous toolpath, and default on
+
+**Status:** Accepted | **Date:** 2026-07-25
+
+### Context
+
+Tabs were implemented by SPLITTING a closed profile loop into one open piece per span
+between tab windows (`splitPassForTabs`). Each piece then needed its own retract, rapid, and
+**full-depth plunge on the finished wall**. Three consequences followed:
+
+1. **Leads had to be disabled.** `applyProfileLeadPasses` carried an explicit
+   `if (settings.tabsEnabled) return passes`, because leading the surviving full loops while
+   split pieces still plunged on the wall would be inconsistent. ADR-250's own header
+   recorded tabs as falling back to "the legacy straight plunge", with tab-aware leads named
+   as a follow-up. So enabling tabs silently disabled the feature that exists to stop
+   square-entry gouging.
+2. **Small contours lost their deep pass entirely.** When the requested windows swallowed a
+   perimeter the split returned no pieces (AUDIT A5), so a hole under roughly 11.7 mm
+   diameter at the shipped defaults never cut through.
+3. **Tabs could not be defaulted on**, which left a full-depth profile freeing the part under
+   a running spindle with nothing but a neutral "tabs off" line in Job Review.
+
+Research settled the design question. **Fusion 360 does not split the toolpath**: "During
+tabbed toolpaths, the tool goes up in places where tabs are located, leaving a thin layer of
+material", with tab shapes Rectangular or Triangular. Autodesk further documents that "the
+plunge feedrate controls both the plunge and ramp feedrates for tabs and lead-in/out". A tab
+is a **Z-rise inside one continuous path**; the cutter stays engaged. Our split model was the
+outlier, and every problem above was an artifact of it rather than something to work around.
+
+### Decision
+
+A tabbed deep pass becomes ONE `path3d` that rides the cutting depth and rises to the tab top
+across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
+
+- Rectangular tab walls: the rise is a same-XY vertical pair, which the existing emitter
+  already sends at the plunge feed (`appendPath3dCutMoves`). No emitter change was required,
+  and this reproduces Fusion's documented tab-ramp feed behavior for free. Triangular/ramped
+  tab walls remain a follow-up.
+- The `tabsEnabled` early return in `applyProfileLeadPasses` is **removed**, not worked
+  around: one continuous path has one entry, so ADR-250 leads apply normally again.
+- `passNeedsTabs` now requires `depthMm > tabHeightMm`. A tab at least as tall as the cut
+  spans the whole cut and would leave the full depth uncut at each window - four pointless
+  gaps in a shallow groove, holding a part that was never being released. This also makes
+  `tabTopZMm`'s clamped "tabs everywhere" branch unreachable from compilation.
+- **CNC tabs default ON** for profile cuts (`DEFAULT_CNC_LAYER_SETTINGS.tabsEnabled`). Easel
+  adds tabs automatically on a through-cut (EASEL-STUDY D-14); we left them off. This is a
+  default, not a guard: it is visible in the layer card and freely switched off, so PROJECT.md
+  non-negotiable #21 is not engaged. It is inert on the shipped shallow default (1 mm cut
+  against a 2 mm tab), so the default job is unchanged.
+- All three tab call sites converted so a single job cannot mix models: profile passes
+  (`compile-cnc-job.ts`), finishing passes (`finish-allowance.ts`), and inlay male profiles
+  (`inlay-pair-operation.ts`). Finishing tab centres are still projected from the matching
+  roughing toolpath - now via `tabFractionsFromReference` - so an offset start vertex cannot
+  move the physical bridges.
+
+### Alternatives considered
+
+- **Lead every split piece.** The faithful reading of ADR-250's follow-up, and more work:
+  `computeProfileLead` and its waste-side/sibling guards are written against a closed loop, so
+  open-piece semantics would have to be defined rather than inherited. Rejected because
+  Z-modulation removes the need entirely.
+- **Ramp each split piece.** Cheaper, but `applyRampEntry` tracks `previousZ` across a depth
+  ladder and sibling pieces sharing one Z break that assumption.
+- **Lead only the first piece.** Already rejected in-code as inconsistent; the other pieces
+  still plunge on the wall.
+- **Reorder leads before tab splitting.** Does nothing while the explicit early return stands;
+  this was an earlier misdiagnosis of the mechanism.
+
+### Consequences
+
+- **G-code changes for tabbed profile cuts.** Snapshot moved: three `G0 Z<safe>` retracts and
+  three `G1 Z<depth>` replunges disappear, replaced by fed `G1 X Y Z` moves, and a lead-in arc
+  now appears on the tabbed profile where none could exist before.
+- A contour fully covered by tab windows now rides at the tab top instead of losing its pass.
+  The AUDIT A5 safety property - never cut below the tab top in that case - is preserved by a
+  different mechanism, and `compile-cnc-tab-coverage.test.ts` still asserts it unchanged.
+- `splitPassForTabs` and `splitPassForTabsAlignedToReference` are now unused by production
+  code. They remain exported and tested; removing them is deliberate follow-up work, not part
+  of this diff.
+- The CNC motion invariant is untouched: `findPlungedTravelIssues` flags only **G0** rapids
+  below safe Z, and every tab wall here is a fed `G1`.
+
+### Verification
+
+- `cnc-tab-ramp.test.ts` pins: only two Z levels ever appear (cut and tab top, never above),
+  every tab wall is a same-XY vertical move, one rise and one fall per tab, a tiny contour
+  still returns a usable path, manual ADR-156 anchors place the wall half a window before the
+  anchor centre, and open/non-rise/zero-window inputs decline cleanly.
+- Compile-level tests assert one deep pass rather than N pieces, rises landing exactly on the
+  tab top, and tabs surviving on the finishing pass.
+- 417 `src/core` test files green; typecheck, eslint and prettier clean.
+- **NOT VERIFIED - hardware.** This changes full-depth motion: a tabbed profile now rides over
+  each tab instead of retracting and replunging. Better in principle and unproven in material.
+  Cut a tabbed coupon before trusting it, and confirm the bridges hold.
 
 ## ADR-257 — CNC traces commit machine-faired polylines (2026-07-25)
 

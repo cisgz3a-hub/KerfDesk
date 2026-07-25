@@ -50,7 +50,7 @@ function objectWithPolylines(id: string, polylines: ReadonlyArray<Polyline>): Im
 function cncLayer(cnc: Partial<CncLayerSettings>): Layer {
   return {
     ...createLayer({ id: 'L1', color: '#ff0000' }),
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...cnc },
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: false, ...cnc },
   };
 }
 

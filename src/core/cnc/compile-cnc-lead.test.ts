@@ -47,7 +47,7 @@ function square(): ImportedSvg {
 function scene(cnc: Partial<CncLayerSettings>): Scene {
   const layer: Layer = {
     ...createLayer({ id: 'op', color: '#2563eb' }),
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...cnc },
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: false, ...cnc },
   };
   return { objects: [square()], layers: [layer] };
 }
