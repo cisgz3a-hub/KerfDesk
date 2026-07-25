@@ -5946,7 +5946,9 @@ controller reset look like job recovery even though the durable checkpoint is a 
   controller evidence, but its incomplete/failed state is not itself a hard Laser Start gate.
   Missing `$30`/`$32` evidence follows the already accepted warning-and-acknowledgement path in Job
   Review, matching controllers that expose no numeric settings dump. A reported `$30` mismatch or
-  reported `$32=0` remains blocking. An in-flight settings transaction still owns the serial channel
+  reported `$32=0` remains blocking. **[SUPERSEDED later the same day by ADR-228 (2026-07-17): both
+  the `$30`-mismatch and `$32=0` Start blocks are withdrawn and are now Job Review warnings; a
+  completed Frame is the sole Start gate.]** An in-flight settings transaction still owns the serial channel
   until it settles. CNC Start and every supervised recovery keep the strict fresh-qualification
   requirement because spindle/WCS re-entry semantics cannot be inferred safely.
 - **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
@@ -8851,7 +8853,9 @@ Work-Z matching.
   its non-blocking warning, and the one-click Scanline recovery action remain available.
 - Display general Start readiness warnings as non-blocking warning toasts. ADR-210's explicitly
   approved exception requires one focused acknowledgement when a laser controller's `$32` state
-  cannot be verified; a reported `$32=0` remains a hard refusal.
+  cannot be verified; a reported `$32=0` remains a hard refusal. **[SUPERSEDED by ADR-228
+  (2026-07-17): the reported-`$32=0` Start refusal is withdrawn and is now a Job Review warning.
+  ADR-228 lists "$32=0 on laser" among the controller-readiness Start errors it removed.]**
 - Classify Console effects by what a command can change. Accessory-only commands, dwell, and
   non-positional setting writes still invalidate their own stale observations, but preserve homing,
   frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
@@ -9137,7 +9141,10 @@ containment strategy.
 - Recovery re-entry is hard-off: `M5`/`S0` precedes positioning, rapid repositioning is explicitly
   unpowered, and positive power is restored only on the first burn-motion line.
 - A laser Start whose controller cannot report `$32` requires one explicit Start-anyway
-  acknowledgement. A reported `$32=0` is still refused, and neither Machine Setup nor the confirmed
+  acknowledgement. A reported `$32=0` is still refused **[Start refusal SUPERSEDED by ADR-228
+  (2026-07-17): a reported `$32=0` no longer refuses laser Start — it is a Job Review warning, and
+  Frame is the sole Start gate. The setting-write restriction in the rest of this bullet stands.]**,
+  and neither Machine Setup nor the confirmed
   Console setting lane may write `$32=0` while the active project is a laser. Ordinary Start,
   start-from-line/recovery, and camera-marker burns all carry the same session-bound evidence to the
   final wire boundary. CNC/router projects retain their required `$32=0` path.
