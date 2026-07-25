@@ -36,7 +36,12 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
       <div style={panelStyle}>
         <header style={headerStyle}>
           <strong>{props.programName}</strong>
-          <button type="button" className="lf-btn" onClick={props.onClose}>
+          <button
+            type="button"
+            className="lf-btn"
+            title="Close the Inspector (Esc)"
+            onClick={props.onClose}
+          >
             Close
           </button>
         </header>
@@ -48,7 +53,12 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
         <footer style={footerStyle}>
           {result.kind === 'ok' ? <StatsStrip model={result.model} /> : <span />}
           {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
-            <button type="button" className="lf-btn" onClick={props.onOpen2dSimulator}>
+            <button
+              type="button"
+              className="lf-btn"
+              title="Open this program in the 2D simulator (F-CNC10)"
+              onClick={props.onOpen2dSimulator}
+            >
               Open in 2D simulator
             </button>
           ) : null}

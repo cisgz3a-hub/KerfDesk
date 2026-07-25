@@ -32,6 +32,7 @@ export function InspectorSidebar(props: {
         <label style={toggleStyle}>
           <input
             type="checkbox"
+            title="Show or hide the non-cutting moves between shapes"
             checked={props.travelVisible}
             onChange={(event) => props.onTravelVisibleChange(event.currentTarget.checked)}
           />

@@ -51,6 +51,7 @@ export function InspectorTimeline(props: {
         value={playback.routeMm}
         onChange={(event) => playback.setRouteMm(Number(event.currentTarget.value))}
         style={sliderStyle}
+        title="Scrub to a position in the program"
         aria-label="Program position"
       />
       <span style={readoutStyle}>
@@ -61,6 +62,7 @@ export function InspectorTimeline(props: {
         <select
           value={playback.speed}
           onChange={(event) => playback.setSpeed(Number(event.currentTarget.value))}
+          title="How fast playback advances through the program"
           aria-label="Playback speed"
         >
           {SPEEDS.map((speed) => (
