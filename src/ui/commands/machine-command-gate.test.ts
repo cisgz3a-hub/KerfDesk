@@ -8,6 +8,9 @@ import { baseCtx } from './command-registry-test-helpers';
 // geometry sources, edit/arrange, file, preview, connection. The Trace family
 // joined this set in the 2026-07-13 ADR-101 amendment — traced vectors are
 // cuttable on CNC, so Trace/Re-trace/Multi-file trace must stay visible in CNC.
+// The pixel-baking bitmap-prep commands joined for the same reason: they
+// rewrite RasterImage.dataUrl, which is what the tracer reads, so hiding them
+// left CNC able to trace a bitmap but unable to crop or mask it first.
 const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'file.new',
   'file.import-svg',
@@ -22,6 +25,9 @@ const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'tools.trace-image',
   'tools.retrace-original',
   'tools.multi-file-trace',
+  'tools.crop-image',
+  'tools.apply-image-mask',
+  'tools.remove-image-mask',
   'arrange.align-left',
   'arrange.break-apart',
   'laser.connect',
