@@ -6,6 +6,7 @@
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel, ProgramStats } from '../../core/gcode-view';
 import type { PlayheadState } from './playhead';
+import { timeSplit } from './time-split';
 
 export type Readout = {
   readonly label: string;
@@ -64,6 +65,7 @@ export function statsRows(
   const { stats } = model;
   return [
     ...(time === undefined ? [] : timeRows(time)),
+    ...(time === undefined ? [] : timeSplitRows(model, time)),
     { label: 'Size', value: boundsSize(stats) },
     { label: 'Cut', value: `${num(stats.cutMm)} mm` },
     { label: 'Traversal', value: `${num(stats.travelMm)} mm` },
@@ -88,6 +90,15 @@ function timeRows(time: ProgramTimeModel): ReadonlyArray<Readout> {
     rows.push({ label: 'Below set feed', value: `${limited} moves` });
   }
   return rows;
+}
+
+// Where the minutes actually go. Distance answers a different question:
+// a long rapid and a short plunge can cost the same time.
+function timeSplitRows(model: GcodeRenderModel, time: ProgramTimeModel): ReadonlyArray<Readout> {
+  return timeSplit(model, time).map((share) => ({
+    label: share.label,
+    value: `${clock(share.seconds)} (${Math.round(share.percent)}%)`,
+  }));
 }
 
 function countFeedLimited(flags: Uint8Array): number {
