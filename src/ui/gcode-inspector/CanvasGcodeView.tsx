@@ -1,7 +1,8 @@
-// CanvasGcodeView — the G-code Inspector rendered as a MAIN-CANVAS mode
-// (ADR-255 stage 9b), not a modal. Toggling the canvas to G-code shows the
-// program the current project compiles to, in the same 3D view the file
-// Inspector uses.
+// CanvasGcodeView — a G-code PREVIEW in place of the design canvas (ADR-255
+// stage 9b). The canvas switch shows the toolpath and its transport, nothing
+// else: it answers "what will this run?" at a glance. The toolbar's
+// "Inspect G-code (3D)" opens the in-depth screen with readouts, source and
+// health.
 //
 // It only reads: nothing here writes, streams, or advances variable text, and
 // it stays available during a job (watching what is running is the point).
@@ -57,7 +58,7 @@ function Body(props: {
   if (props.parsed.kind !== 'ok') {
     return <p style={messageStyle}>{props.parsed.reason}</p>;
   }
-  return <InspectorView model={props.parsed.model} lines={props.lines} />;
+  return <InspectorView model={props.parsed.model} lines={props.lines} variant="preview" />;
 }
 
 const wrapStyle: React.CSSProperties = {
@@ -73,9 +74,10 @@ const wrapStyle: React.CSSProperties = {
 const barStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
-  padding: '4px 10px',
+  gap: 10,
+  padding: '6px 10px',
   borderBottom: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-0)',
   fontSize: 'var(--lf-text-sm)',
 };
 

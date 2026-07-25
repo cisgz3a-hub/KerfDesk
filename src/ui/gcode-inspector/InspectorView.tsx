@@ -26,10 +26,19 @@ const INSPECTOR_LIMITS: MotionLimits = {
   maxFeedMmPerMin: 6000,
 };
 
+/**
+ * 'full' is the in-depth screen: 3D + source pane + readouts + health.
+ * 'preview' is the canvas mode: the 3D toolpath and its transport only —
+ * a look at the program, not a workbench.
+ */
+export type InspectorVariant = 'full' | 'preview';
+
 export function InspectorView(props: {
   readonly model: GcodeRenderModel;
   readonly lines: ReadonlyArray<string>;
+  readonly variant?: InspectorVariant;
 }): JSX.Element {
+  const full = (props.variant ?? 'full') === 'full';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [travelVisible, setTravelVisible] = useState(true);
   const [lens, setLens] = useState<LensId>('kind');
@@ -69,7 +78,7 @@ export function InspectorView(props: {
   return (
     <div style={bodyRowStyle}>
       <div style={viewColumnStyle}>
-        <SourceToggle visible={sourceVisible} onToggle={setSourceVisible} />
+        {full ? <SourceToggle visible={sourceVisible} onToggle={setSourceVisible} /> : null}
         <div style={viewportStyle}>
           <canvas ref={canvasRef} style={canvasStyle} />
           {state === 'no-webgl' ? (
@@ -80,7 +89,7 @@ export function InspectorView(props: {
         </div>
         <InspectorTimeline playback={playback} totalRouteMm={time.motionSeconds} />
       </div>
-      {sourceVisible ? (
+      {full && sourceVisible ? (
         <InspectorSourcePane
           lines={props.lines}
           categories={model.lineCategories}
@@ -89,21 +98,23 @@ export function InspectorView(props: {
           onSelectLine={locateLine}
         />
       ) : null}
-      <InspectorSidebar
-        model={model}
-        theme={theme}
-        playhead={playhead}
-        time={time}
-        findings={findings}
-        lens={lens}
-        onLensChange={setLens}
-        travelVisible={travelVisible}
-        onTravelVisibleChange={(visible) => {
-          setTravelVisible(visible);
-          handleRef.current?.setTravelVisible(visible);
-        }}
-        onLocateLine={locateLine}
-      />
+      {full ? (
+        <InspectorSidebar
+          model={model}
+          theme={theme}
+          playhead={playhead}
+          time={time}
+          findings={findings}
+          lens={lens}
+          onLensChange={setLens}
+          travelVisible={travelVisible}
+          onTravelVisibleChange={(visible) => {
+            setTravelVisible(visible);
+            handleRef.current?.setTravelVisible(visible);
+          }}
+          onLocateLine={locateLine}
+        />
+      ) : null}
     </div>
   );
 }

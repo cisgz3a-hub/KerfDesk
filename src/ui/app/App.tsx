@@ -3,10 +3,10 @@
 // and keyboard shortcuts live in dedicated hooks so this component stays a
 // thin layout shell.
 
-import { useState } from 'react';
 import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
+import { useCanvasViewStore } from '../state/canvas-view-store';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
@@ -81,12 +81,14 @@ export function App(): JSX.Element {
   );
 }
 
-// The main canvas has two modes: the design view, and the ADR-255 G-code 3D
-// view of what this project compiles to. The switch stays on the canvas so
-// the operator can flip between "what I drew" and "what the machine runs" —
-// including while a job is streaming, where watching it is the whole point.
+// The main canvas has two modes (ADR-255): the design view, and a G-code 3D
+// PREVIEW of what this project compiles to. The switch is on the canvas
+// because it is a glance, not a workbench — the toolbar's "Inspect G-code
+// (3D)" opens the in-depth screen. Both stay usable during a job, where
+// watching the running program is the point.
 function CanvasArea(): JSX.Element {
-  const [showGcode, setShowGcode] = useState(false);
+  const showGcode = useCanvasViewStore((store) => store.showGcode);
+  const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
   return (
     <div style={canvasAreaStyle}>
       <Workspace />
@@ -94,11 +96,24 @@ function CanvasArea(): JSX.Element {
       <RegistrationJigPanel />
       <CameraPanel />
       <BoardCapturePanel />
-      {showGcode ? <CanvasGcodeView active={showGcode} /> : null}
-      <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
+      {showGcode ? <CanvasGcodeView active /> : null}
+      <div style={canvasSwitchStyle}>
+        <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
+      </div>
     </div>
   );
 }
+
+// Sits above both the canvas and the G-code preview, with its own elevation
+// so it reads as a control rather than part of the drawing.
+const canvasSwitchStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 10,
+  right: 12,
+  zIndex: 4,
+  boxShadow: 'var(--lf-shadow)',
+  borderRadius: 'var(--lf-radius-lg)',
+};
 
 const shellStyle: React.CSSProperties = {
   display: 'flex',

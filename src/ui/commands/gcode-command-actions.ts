@@ -36,6 +36,11 @@ export function saveGcodeAction(deps: GcodeActionDeps): () => void {
     });
 }
 
+/**
+ * Opens the IN-DEPTH Inspector on the current project: 3D plus readouts,
+ * source pane and Program Health. The canvas switch is the quick preview;
+ * this is the workbench.
+ */
 export function inspectCurrentGcodeAction(deps: GcodeActionDeps): () => void {
   return () => void handleInspectCurrentGcode(saveGcodeContext(deps), deps.openInspector);
 }

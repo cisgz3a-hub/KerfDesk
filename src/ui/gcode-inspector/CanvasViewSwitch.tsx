@@ -1,7 +1,10 @@
 // CanvasViewSwitch — swaps the MAIN canvas between the design view and the
-// G-code 3D view (ADR-255 stage 9b). Pinned to the canvas itself rather than
-// buried in a menu, because switching between "what I drew" and "what the
-// machine will run" is a thing operators do constantly.
+// G-code 3D PREVIEW (ADR-255 stage 9b). The preview is a glance at the
+// program; the toolbar's "Inspect G-code (3D)" opens the in-depth screen.
+//
+// The selected side uses the design system's primary-button look (solid
+// accent) rather than a tint: at canvas scale a pale wash reads as
+// "disabled", not "current".
 
 const DESIGN_LABEL = 'Design';
 const GCODE_LABEL = 'G-code 3D';
@@ -37,13 +40,13 @@ function Option(props: {
   return (
     <button
       type="button"
-      className="lf-btn"
+      className={props.selected ? 'lf-btn lf-btn--primary' : 'lf-btn'}
       title={props.title}
       aria-pressed={props.selected}
       style={{
         ...optionStyle,
-        background: props.selected ? 'var(--lf-accent-wash)' : 'transparent',
-        fontWeight: props.selected ? 600 : 400,
+        ...(props.selected ? {} : unselectedStyle),
+        fontWeight: props.selected ? 600 : 500,
       }}
       onClick={props.onSelect}
     >
@@ -53,20 +56,23 @@ function Option(props: {
 }
 
 const wrapStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 8,
-  left: 8,
-  zIndex: 3,
   display: 'flex',
   gap: 2,
   padding: 2,
-  borderRadius: 6,
+  borderRadius: 'var(--lf-radius-lg)',
   border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-1)',
+  background: 'var(--lf-bg-2)',
 };
 
 const optionStyle: React.CSSProperties = {
-  padding: '2px 10px',
-  fontSize: 'var(--lf-text-xs)',
-  border: 'none',
+  padding: '4px 14px',
+  fontSize: 'var(--lf-text-md)',
+  lineHeight: 1.4,
+  borderRadius: 'var(--lf-radius-md)',
+  whiteSpace: 'nowrap',
+};
+
+const unselectedStyle: React.CSSProperties = {
+  background: 'transparent',
+  borderColor: 'transparent',
 };
