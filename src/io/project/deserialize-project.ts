@@ -170,13 +170,14 @@ function normalizeCncTiling(raw: unknown): { tiling: CncTiling } | Record<string
   const overlapMm = raw['overlapMm'];
   if (!isFiniteNumber(tileWidthMm) || tileWidthMm <= 0) return {};
   if (!isFiniteNumber(tileHeightMm) || tileHeightMm <= 0) return {};
-  if (
-    !isFiniteNumber(overlapMm) ||
-    overlapMm < 0 ||
-    overlapMm >= Math.min(tileWidthMm, tileHeightMm)
-  ) {
-    return {};
-  }
+  // Overlap is checked for shape only, not against the tile size. The panel
+  // clamps tile width/height and overlap independently with no cross-field
+  // check, so an overlap at or above the smaller tile dimension is a value the
+  // UI freely produces - and dropping the block here made every save fail the
+  // ADR-204 drift check with nothing naming Overlap as the cause. Nothing
+  // downstream needs the guarantee: planTiles already floors the step at
+  // MIN_TILE_STEP_MM. A degenerate overlap belongs in Job Review, not here.
+  if (!isFiniteNumber(overlapMm) || overlapMm < 0) return {};
   return {
     tiling: {
       tileWidthMm,

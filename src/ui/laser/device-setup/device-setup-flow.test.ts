@@ -181,7 +181,8 @@ describe('unified machine setup flow', () => {
     );
     state = deviceSetupReducer(state, {
       kind: 'accept-detected',
-      patch: { maxPowerS: 24000, minPowerS: 80, laserModeEnabled: true, bedWidth: 610 },
+      // $32=0: laser mode off, so $30 really is the spindle ceiling.
+      patch: { maxPowerS: 24000, minPowerS: 80, laserModeEnabled: false, bedWidth: 610 },
     });
     expect(state.draft.maxPowerS).toBe(DEFAULT_DEVICE_PROFILE.maxPowerS);
     expect(state.draft.minPowerS).toBe(DEFAULT_DEVICE_PROFILE.minPowerS);
@@ -189,6 +190,26 @@ describe('unified machine setup flow', () => {
     expect(state.draft.bedWidth).toBe(610);
     if (state.draftMachine.kind !== 'cnc') throw new Error('expected CNC draft');
     expect(state.draftMachine.params.spindleMaxRpm).toBe(24000);
+  });
+
+  it('leaves the spindle ceiling alone when the controller is in laser mode ($32=1)', () => {
+    let state = initDeviceSetup(
+      DEFAULT_DEVICE_PROFILE,
+      { maxPowerS: 1000, bedWidth: 400 },
+      { machine: DEFAULT_CNC_MACHINE_CONFIG, controllerRead: true },
+    );
+    const before =
+      state.draftMachine.kind === 'cnc' ? state.draftMachine.params.spindleMaxRpm : null;
+    state = deviceSetupReducer(state, {
+      kind: 'accept-detected',
+      // The 4040 hybrid: $30 is the laser PWM scale here, not spindle RPM.
+      // Adopting it would cap every layer at S1000 while feeds still assume
+      // 12000 RPM - a 12x chipload error.
+      patch: { maxPowerS: 1000, laserModeEnabled: true, bedWidth: 400 },
+    });
+    if (state.draftMachine.kind !== 'cnc') throw new Error('expected CNC draft');
+    expect(state.draftMachine.params.spindleMaxRpm).toBe(before);
+    expect(state.draftMachine.params.spindleMaxRpm).not.toBe(1000);
   });
 
   it('keeps apply confirmation through duplicate detected syncs and clears it for new values', () => {
