@@ -102,21 +102,6 @@ export function statsRows(model: GcodeRenderModel): ReadonlyArray<Readout> {
   ];
 }
 
-export function findingsSummary(model: GcodeRenderModel): string | null {
-  const parts: string[] = [];
-  for (const entry of model.unsupportedWords) {
-    parts.push(`${entry.count}× unsupported ${entry.word} (first line ${entry.firstLine + 1})`);
-  }
-  if (model.skippedMotions.length > 0) {
-    const first = model.skippedMotions[0];
-    parts.push(
-      `${model.skippedMotions.length} skipped move${model.skippedMotions.length === 1 ? '' : 's'}` +
-        (first === undefined ? '' : ` — line ${first.line + 1}: ${first.reason}`),
-    );
-  }
-  return parts.length === 0 ? null : parts.join(' · ');
-}
-
 function boundsSize(stats: ProgramStats): string {
   const bounds = stats.motionBounds;
   if (bounds === null) return '—';

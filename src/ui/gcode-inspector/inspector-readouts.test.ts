@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
-import { droRows, findingsSummary, legendEntries, statsRows } from './inspector-readouts';
+import { droRows, legendEntries, statsRows } from './inspector-readouts';
 
 const THEME: Viewer3dTheme = {
   background: 0x000000,
@@ -65,12 +65,5 @@ describe('statsRows', () => {
   });
 });
 
-describe('findingsSummary', () => {
-  it('is null for a clean program and lists findings otherwise', () => {
-    expect(findingsSummary(model(PROGRAM))).toBeNull();
-    const summary = findingsSummary(model('G21\nG99 X1\nG2 X5 Y5'));
-    expect(summary).toContain('unsupported G99');
-    expect(summary).toContain('first line 2');
-    expect(summary).toContain('skipped move');
-  });
-});
+// Findings moved to core/gcode-view/program-findings (ADR-255 stage 6) and
+// are covered by program-findings.test.ts.

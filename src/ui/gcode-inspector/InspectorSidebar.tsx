@@ -2,11 +2,11 @@
 // (ADR-255 stage 4). Presentational: every number comes from the pure
 // readout helpers, and the traversal toggle uses LightBurn's exact wording.
 
-import type { GcodeRenderModel } from '../../core/gcode-view';
+import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
+import { InspectorHealthPanel } from './InspectorHealthPanel';
 import {
   droRows,
-  findingsSummary,
   legendEntries,
   statsRows,
   type LegendEntry,
@@ -18,10 +18,11 @@ export function InspectorSidebar(props: {
   readonly model: GcodeRenderModel;
   readonly theme: Viewer3dTheme;
   readonly playhead: PlayheadState;
+  readonly findings: ReadonlyArray<ProgramFinding>;
   readonly travelVisible: boolean;
   readonly onTravelVisibleChange: (visible: boolean) => void;
+  readonly onLocateLine: (line: number) => void;
 }): JSX.Element {
-  const findings = findingsSummary(props.model);
   return (
     <aside style={sidebarStyle} aria-label="Program readouts">
       <Section title="Position">
@@ -42,12 +43,7 @@ export function InspectorSidebar(props: {
       <Section title="Program">
         <ReadoutGrid rows={statsRows(props.model)} />
       </Section>
-      {findings === null ? null : (
-        <Section title="Findings">
-          <p style={findingsStyle}>{findings}</p>
-          <p style={noteStyle}>Findings inform. Nothing here blocks Frame, Start, or export.</p>
-        </Section>
-      )}
+      <InspectorHealthPanel findings={props.findings} onLocate={props.onLocateLine} />
     </aside>
   );
 }
@@ -157,12 +153,4 @@ const toggleStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
-};
-
-const findingsStyle: React.CSSProperties = { margin: '0 0 6px' };
-
-const noteStyle: React.CSSProperties = {
-  margin: 0,
-  color: 'var(--lf-text-muted)',
-  fontSize: 'var(--lf-text-xs)',
 };
