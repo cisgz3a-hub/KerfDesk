@@ -157,8 +157,7 @@ The register ADR-027 requires. **Verdicts:** `PARITY` · `DIVERGENCE (ADR)` = de
   through" (`grbl-strategy.ts:439-440`) — the exact opposite of LightBurn's stated M4 rationale
   ("corners get over-burnt"). **Both cannot be right.** One is a claim about penetration, the other about
   scorching.
-- **Action:** burn a comparison coupon — same vector at same power/speed under M3 and M4 — before
-  defending our default. Not a code change; an evidence gap.
+- **Action:** a comparison coupon would settle it, but no hardware verification is available. There is no machine to test on (maintainer, 2026-07-25), so this is a TERMINAL limitation rather than a pending task. So this evidence gap cannot be closed here. What IS available: our default now matches LightBurn, Rayforge and GRBL's own guidance, so the divergence is resolved in the references' favour rather than defended by us.
 
 ### D-02 — Constant Power is a per-layer toggle there, a per-layer power *mode* here · **PARITY (near)**
 
@@ -245,7 +244,7 @@ unconfirmed in our tree. Verify before filing.
    [LB-forum] to [LB-doc]. The weakest link in the flagship finding.
 2. **Write the ADR for D-03.** A shipping divergence with no decision record is the exact condition
    ADR-027 forbids.
-3. **Burn the D-01 M3-vs-M4 cut coupon.** Our rationale and LightBurn's directly contradict.
+3. **D-01 M3-vs-M4 cannot be settled here** - no machine to test on. Our old rationale and LightBurn's directly contradicted each other; we resolved it toward the references (ADR-257). Treat as closed-by-deference, not proven.
 4. **Research §5 framing** — decides whether frame-first is differentiator or divergence.
 5. **Add Jarvis dithering** (G-01) — highest-value quality gap found so far.
 6. Then §6 optimization and §7 trace.

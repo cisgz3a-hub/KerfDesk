@@ -1,5 +1,29 @@
 # 9 — Weakness register and Phase 2 grid
 
+> ## Standing constraint: there is no machine to test on
+>
+> Confirmed by the maintainer, 2026-07-25. **No hardware verification is available on this project, and
+> that is a terminal limitation rather than a pending task.** Every "HARDWARE CLAIMED" marker in this
+> document set, in `PROJECT.md`'s Phase H table, and in `docs/hardware/laser-9-acceptance-protocol.md`
+> should be read as *permanently* unproven, not as awaiting a test someone will run.
+>
+> Do not close a finding by recommending a cut. The substitutes, best first:
+>
+> 1. **An independent G-code viewer** (NC Viewer, CAMotics) on an exported `.nc`. This is the strongest
+>    available check precisely because it is a different implementation - our own 3D preview and
+>    `src/core/sim` share the emitter's codebase, so one geometry fault can look correct in both.
+> 2. **Reference-CAM diffing** - build the same part in LightBurn or Easel/Fusion free tiers and compare
+>    their strategy to ours. This is what [LIGHTBURN-STUDY.md](../../LIGHTBURN-STUDY.md) and
+>    [EASEL-STUDY.md](../../EASEL-STUDY.md) exist to support.
+> 3. **Arithmetic on the physical claim** - e.g. whether four 6 mm bridges at 2 mm actually hold a part.
+>    A calculation, not a test, but checkable.
+> 4. **Someone else's machine** - community verification.
+>
+> **The risk discriminator that matters more than testing: copied vs invented.** Behavior copied from a
+> reference (M4 cut default, tabs-as-Z-rise) carries the references' evidence. Behavior this project
+> invented carries none - and those are the entries to distrust. Currently invented and unproven: the
+> ADR-258 `depth > tabHeight` guard and its small-contour ride-at-tab-top fallback.
+
 Where to press hardest when the LightBurn and Easel documentation arrives.
 
 Everything here is carried forward from evidence in the tree, prior audits, or project memory. Nothing
@@ -36,7 +60,7 @@ made climb the **default**, so this runs on ordinary jobs, and ADR-250 lead plac
 winding — so a sign error propagates into lead geometry.
 
 Full analysis: [03-coordinates-and-origin.md](03-coordinates-and-origin.md).
-**Status: UNVERIFIED. Cut a two-feature coupon before trusting climb output.**
+**Status: PERMANENTLY UNVERIFIED - no machine to test on.** The two-feature coupon that would settle it cannot be run here; the origin-by-origin sign algebra is the only evidence available.
 
 ### W-03 — Fidelity is unmeasured across the whole output surface · **P1, systemic**
 
@@ -148,5 +172,5 @@ Fill one row per subsystem. Verdicts per [README.md](README.md).
    product of this exercise.
 4. **Run the output benchmark** ([08](08-invariants-and-verification.md) item 2). Documentation
    comparison finds design gaps; only output comparison finds fidelity gaps, and fidelity is W-03.
-5. **Cut the W-02 coupon.** It is the one item here that can ruin a workpiece, and no amount of reading
+5. **W-02 cannot be closed here** - no machine to test on. It remains the one item that can ruin a workpiece, and no amount of reading
    will settle it.

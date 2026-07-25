@@ -166,7 +166,7 @@ because climb induces chatter on machines with limited rigidity. Combined with *
 origin-dependent sign inversion), the shipped default may be both *the wrong choice* and *not the choice
 we think it is*.
 
-**Recommended coupon design** (not yet run): one outer profile plus one interior hole, cut four times —
+**Coupon design, for whenever a machine exists** (CANNOT be run here - no machine to test on): one outer profile plus one interior hole, cut four times —
 climb and conventional, on `front-left` and on `rear-left`. That single test settles W-02's sign question
 and D-11's default question together, and it is the highest-value physical test outstanding anywhere in
 this repo.
@@ -316,7 +316,7 @@ around the split model that Option 4 removes:
    "inconsistent", and rightly so — the remaining pieces still plunge on the wall.
 
 (1) is the correct target, (2) is the pragmatic one. Either needs its own ADR, its own diff, and — because
-both change real machine motion at full depth — a coupon before being trusted. Also re-evaluate the two
+both change real machine motion at full depth — hardware verification that is NOT available here. There is no machine to test on (maintainer, 2026-07-25), so this is a TERMINAL limitation rather than a pending task. They must therefore be justified by reference agreement rather than by cutting. Also re-evaluate the two
 secondary effects above, likely by scoping tabs to passes that genuinely reach through-depth.
 
 Until then the correct remedy for D-14 remains the **Job Review warning**: when a profile cut's depth
@@ -333,7 +333,7 @@ scallop-driven stepover, two-tool sections (ADR-153). Same model.
 
 ## Next actions, in order
 
-1. **Cut the D-11 / W-02 coupon.** Four cuts, two origins, two directions. Settles the only
+1. **D-11 / W-02 CANNOT be settled here** - no machine to test on. The four-cut coupon below is the design to run if hardware ever becomes available. Until then this stays the only
    safety-relevant open question in the CNC chain.
 2. **Generate G-code from Easel and read it.** Easel has no post-processor reference, so preamble
    ordering (D-09), depth-per-pass defaults, and any cut-direction behavior can only be recovered from
