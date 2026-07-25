@@ -13,6 +13,7 @@ export {
   type RemovalGridSpec,
 } from './removal-grid';
 export { kernelForTool, type ToolKernel, type ToolKernelOffset } from './tool-kernels';
+export { toolProfile, type ToolProfilePoint } from './tool-profile';
 export {
   computeRemovalGrid,
   type ComputeRemovalGridResult,
