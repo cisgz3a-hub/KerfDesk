@@ -6,6 +6,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { steppedSurfaceMesh } from '../../core/heightfield';
+import { toolpathMoves3d, type Move3d } from '../../core/toolpath3d';
 import { toSceneCoords } from '../../core/devices';
 import {
   computeRemovalGrid,
@@ -33,6 +34,13 @@ const CANVAS_HEIGHT_PX = 240;
 
 type PaneSceneState = 'loading' | 'ready' | 'failed';
 
+// One simulation feeding two drawables: the carved surface and the path that
+// carved it. Both are in scene frame (ADR-254 §2).
+type DesignSceneSource = {
+  readonly grid: RemovalGrid;
+  readonly moves: ReadonlyArray<Move3d>;
+};
+
 export function Cnc3DPane(): JSX.Element | null {
   const project = useStore((s) => s.project);
   // Value-stable across hover (setCursorMm) — subscribing to currentOutputScope
@@ -42,7 +50,7 @@ export function Cnc3DPane(): JSX.Element | null {
   const { collapsed, toggleCollapsed } = useCncCanvasFocus();
   const resize = useCncPaneWidth();
   const deferredProject = useDeferredValue(project);
-  const grid = useDesignRemovalGrid(deferredProject, outputScope, collapsed);
+  const source = useDesignSceneSource(deferredProject, outputScope, collapsed);
   if (project.machine?.kind !== 'cnc') return null;
   return (
     <aside
@@ -67,8 +75,8 @@ export function Cnc3DPane(): JSX.Element | null {
         {!collapsed && <span style={titleStyle}>3D result</span>}
         <Cnc3DPaneToggle collapsed={collapsed} onToggle={toggleCollapsed} />
       </div>
-      {!collapsed && <PaneScene grid={grid} stockThicknessMm={stockThicknessMm(project)} />}
-      {!collapsed && grid === null && (
+      {!collapsed && <PaneScene source={source} stockThicknessMm={stockThicknessMm(project)} />}
+      {!collapsed && source === null && (
         <p style={hintStyle}>Add CNC content on an output layer to see the simulated result.</p>
       )}
     </aside>
@@ -79,13 +87,15 @@ function stockThicknessMm(project: Project): number {
   return project.machine?.kind === 'cnc' ? project.machine.stock.thicknessMm : 0;
 }
 
-// Design-time removal grid: full job at coarse resolution, scene-space stock
-// rect (same frame as the Preview grid, so orientation matches the dialog).
-function useDesignRemovalGrid(
+// Design-time scene source: the removal grid AND the 3D moves that carved it,
+// both derived from one buildPreviewToolpath call. They are returned together
+// because computing the toolpath twice — once to stamp, once to draw — would
+// double the most expensive step in the pane.
+function useDesignSceneSource(
   project: Project,
   outputScope: OutputScope,
   collapsed: boolean,
-): RemovalGrid | null {
+): DesignSceneSource | null {
   return useMemo(() => {
     const machine = project.machine;
     if (collapsed || machine === undefined || machine.kind !== 'cnc') return null;
@@ -115,26 +125,36 @@ function useDesignRemovalGrid(
       },
       kernel,
     );
-    return result.kind === 'ok' ? result.grid : null;
+    if (result.kind !== 'ok') return null;
+    // buildPreviewToolpath already mapped the prepared job into scene frame,
+    // which is the frame the grid above was stamped in — so the moves and the
+    // surface share one frame, as ADR-254 §2 requires.
+    return { grid: result.grid, moves: toolpathMoves3d(toolpath) };
   }, [project, outputScope, collapsed]);
 }
 
 function PaneScene(props: {
-  readonly grid: RemovalGrid | null;
+  readonly source: DesignSceneSource | null;
   readonly stockThicknessMm: number;
 }): JSX.Element | null {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<ReliefSceneHandle | null>(null);
   const [state, setState] = useState<PaneSceneState>('loading');
-  const { grid, stockThicknessMm: thickness } = props;
+  const { source, stockThicknessMm: thickness } = props;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas === null || grid === null) return;
+    if (canvas === null || source === null) return;
     let cancelled = false;
     setState('loading');
+    const { grid, moves } = source;
     const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
-    void createReliefThreeScene(canvas, steppedSurfaceMesh(display), thickness)
+    // Downsampling keeps the grid's min corner, so the full-resolution origin
+    // is still the right offset for the path.
+    void createReliefThreeScene(canvas, steppedSurfaceMesh(display), thickness, {
+      moves,
+      originMm: { x: grid.originX, y: grid.originY },
+    })
       .then((outcome) => {
         if (cancelled) {
           if (outcome.kind === 'ok') outcome.handle.dispose();
@@ -158,7 +178,7 @@ function PaneScene(props: {
       handleRef.current?.dispose();
       handleRef.current = null;
     };
-  }, [grid, thickness]);
+  }, [source, thickness]);
 
   // Keep the renderer buffer in step with the resizable pane so the 3D view
   // stays crisp at any width (the scene renders on demand, not on a rAF loop).
@@ -172,7 +192,7 @@ function PaneScene(props: {
     return () => observer.disconnect();
   }, []);
 
-  if (grid === null) return null;
+  if (source === null) return null;
   return (
     <>
       <canvas

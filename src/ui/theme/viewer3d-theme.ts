@@ -32,4 +32,27 @@ export const viewer3dTheme = {
   // Retina panes render 4× the pixels for a barely-visible gain; 2 is the
   // usual quality/cost knee and keeps integrated GPUs inside budget.
   maxPixelRatio: 2,
+  // Move-kind palette. RED MEANS TRAVERSAL, following LightBurn, which
+  // PROJECT.md names as this project's reference. Note OpenBuilds CONTROL uses
+  // the opposite convention (red = G1 cut), so this is a real fork in the road
+  // and not an arbitrary pick — an operator reading it backwards would think
+  // rapids were cuts.
+  toolpath: {
+    rapid: 0xd4483c,
+    feedTravel: 0xc98a2b,
+    cut: 0x3f9fd0,
+    plunge: 0xe07a35,
+    retract: 0x8f7566,
+  },
+  // Screen-space line widths in CSS pixels (worldUnits: false), so the path
+  // stays legible at any zoom. Traversals are drawn thinner than cuts because
+  // they are context, not the subject.
+  toolpathWidthPx: {
+    cut: 2.4,
+    plunge: 2,
+    travel: 1.2,
+  },
+  // Traversals also sit back in opacity so a dense rapid web never buries the
+  // cut it is connecting.
+  toolpathTravelOpacity: 0.55,
 } as const;

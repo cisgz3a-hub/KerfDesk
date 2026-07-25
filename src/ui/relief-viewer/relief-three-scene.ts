@@ -5,10 +5,22 @@
 
 // Type-only import: erased at compile time, so three itself still loads
 // lazily through the dynamic import() below (ADR-102 §3).
-import type { WebGLRenderer } from 'three';
+import type * as ThreeNamespace from 'three';
+import type { BufferGeometry, Scene, WebGLRenderer } from 'three';
 import type { ReliefSurfaceMesh } from '../../core/relief';
+import type { Move3d } from '../../core/toolpath3d';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
+import { buildToolpathLines } from '../viewer3d';
 import { applySceneLighting } from './scene-lighting';
+
+// The toolpath to overlay, in the SAME scene frame the removal grid was
+// stamped from, plus that grid's scene-space min corner.
+type ThreeModule = typeof ThreeNamespace;
+
+export type ViewerToolpathOverlay = {
+  readonly moves: ReadonlyArray<Move3d>;
+  readonly originMm: { readonly x: number; readonly y: number };
+};
 
 export type ReliefSceneHandle = {
   readonly dispose: () => void;
@@ -31,10 +43,58 @@ export type ViewerSurfaceMesh = ReliefSurfaceMesh & {
 
 const CAMERA_FOV_DEG = 40;
 
+// Builds the carved-surface geometry in the viewport's shared frame.
+function buildSurfaceGeometry(three: ThreeModule, mesh: ViewerSurfaceMesh): BufferGeometry {
+  const geometry = new three.BufferGeometry();
+  geometry.setAttribute('position', new three.BufferAttribute(mesh.positions.slice(), 3));
+  geometry.setIndex(new three.BufferAttribute(mesh.indices.slice(), 1));
+  // Authored normals are attached BEFORE the mirror so three's applyMatrix4
+  // carries them through its normal matrix. Attaching them afterwards would
+  // leave every wall lit as though it faced the other way.
+  if (mesh.normals !== undefined) {
+    geometry.setAttribute('normal', new three.BufferAttribute(mesh.normals.slice(), 3));
+  }
+  // The heightmap's row axis points down the canvas; mirror it so text
+  // reliefs read the right way round, then recenter on the origin.
+  geometry.scale(1, -1, 1);
+  geometry.translate(-mesh.widthMm / 2, mesh.heightMm / 2, 0);
+  // Only the smooth builder needs averaged normals. Running this over an
+  // authored mesh would average the vertical walls back into 45° ramps.
+  if (mesh.normals === undefined) {
+    geometry.computeVertexNormals();
+  }
+  return geometry;
+}
+
+// Stock outline: a wire box from the stock top (z=0) down one thickness.
+// BoxGeometry is only the source shape — EdgesGeometry is what the
+// LineSegments actually holds, so both need disposing.
+function addStockOutline(
+  three: ThreeModule,
+  scene: Scene,
+  mesh: ViewerSurfaceMesh,
+  stockThicknessMm: number,
+): { readonly dispose: () => void } {
+  const stockGeometry = new three.BoxGeometry(mesh.widthMm, mesh.heightMm, stockThicknessMm);
+  const edgeGeometry = new three.EdgesGeometry(stockGeometry);
+  const edgeMaterial = new three.LineBasicMaterial({ color: viewer3dTheme.color.stockEdge });
+  const edges = new three.LineSegments(edgeGeometry, edgeMaterial);
+  edges.position.set(0, 0, -stockThicknessMm / 2);
+  scene.add(edges);
+  return {
+    dispose: () => {
+      stockGeometry.dispose();
+      edgeGeometry.dispose();
+      edgeMaterial.dispose();
+    },
+  };
+}
+
 export async function createReliefThreeScene(
   canvas: HTMLCanvasElement,
   mesh: ViewerSurfaceMesh,
   stockThicknessMm: number,
+  toolpath?: ViewerToolpathOverlay,
 ): Promise<ReliefSceneResult> {
   const three = await import('three');
   const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
@@ -54,24 +114,7 @@ export async function createReliefThreeScene(
   renderer.setClearColor(viewer3dTheme.color.background);
 
   const scene = new three.Scene();
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.BufferAttribute(mesh.positions.slice(), 3));
-  geometry.setIndex(new three.BufferAttribute(mesh.indices.slice(), 1));
-  // Authored normals are attached BEFORE the mirror so three's applyMatrix4
-  // carries them through its normal matrix. Attaching them afterwards would
-  // leave every wall lit as though it faced the other way.
-  if (mesh.normals !== undefined) {
-    geometry.setAttribute('normal', new three.BufferAttribute(mesh.normals.slice(), 3));
-  }
-  // The heightmap's row axis points down the canvas; mirror it so text
-  // reliefs read the right way round, then recenter on the origin.
-  geometry.scale(1, -1, 1);
-  geometry.translate(-mesh.widthMm / 2, mesh.heightMm / 2, 0);
-  // Only the smooth builder needs averaged normals. Running this over an
-  // authored mesh would average the vertical walls back into 45° ramps.
-  if (mesh.normals === undefined) {
-    geometry.computeVertexNormals();
-  }
+  const geometry = buildSurfaceGeometry(three, mesh);
   const surfaceMaterial = new three.MeshStandardMaterial({
     color: viewer3dTheme.color.surface,
     side: three.DoubleSide,
@@ -79,17 +122,22 @@ export async function createReliefThreeScene(
   });
   scene.add(new three.Mesh(geometry, surfaceMaterial));
 
-  // Stock outline: a wire box from the stock top (z=0) down one thickness.
-  // BoxGeometry is only the source shape — EdgesGeometry is what the
-  // LineSegments actually holds, so both need disposing.
-  const stockGeometry = new three.BoxGeometry(mesh.widthMm, mesh.heightMm, stockThicknessMm);
-  const stockEdgeGeometry = new three.EdgesGeometry(stockGeometry);
-  const stockEdgeMaterial = new three.LineBasicMaterial({
-    color: viewer3dTheme.color.stockEdge,
-  });
-  const stockEdges = new three.LineSegments(stockEdgeGeometry, stockEdgeMaterial);
-  stockEdges.position.set(0, 0, -stockThicknessMm / 2);
-  scene.add(stockEdges);
+  const stock = addStockOutline(three, scene, mesh, stockThicknessMm);
+
+  // The toolpath rides the SAME mirror and recentre the surface geometry got
+  // baked with, applied here as an object transform. Object matrices compose
+  // as T * R * S, so setting position and scale reproduces geometry.scale()
+  // followed by geometry.translate() exactly. Sharing one transform is what
+  // keeps the path registered to the cut it describes (ADR-254 §2).
+  const toolpathLines =
+    toolpath === undefined
+      ? null
+      : await buildToolpathLines(three, toolpath.moves, toolpath.originMm);
+  if (toolpathLines !== null) {
+    toolpathLines.object.scale.set(1, -1, 1);
+    toolpathLines.object.position.set(-mesh.widthMm / 2, mesh.heightMm / 2, 0);
+    scene.add(toolpathLines.object);
+  }
 
   const lighting = applySceneLighting(three, renderer, scene, mesh);
 
@@ -118,11 +166,10 @@ export async function createReliefThreeScene(
         controls.removeEventListener('change', render);
         controls.dispose();
         lighting.dispose();
+        toolpathLines?.dispose();
         geometry.dispose();
         surfaceMaterial.dispose();
-        stockGeometry.dispose();
-        stockEdgeGeometry.dispose();
-        stockEdgeMaterial.dispose();
+        stock.dispose();
         renderer.dispose();
       },
     },

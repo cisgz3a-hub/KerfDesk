@@ -14,10 +14,15 @@
 //    sync with the 2D scrubber. Arc-length position in mm is the one quantity
 //    the 2D and 3D views can safely agree on.
 //
-// 2. Frame is the MACHINE frame (ADR-254): right-handed, Z-up, Z=0 at stock
-//    top and negative into the stock. Callers must NOT feed this the output of
-//    mapToolpathToScene — that frame mixes scene XY with machine Z and its
-//    handedness changes with the configured origin.
+// 2. This module is frame-AGNOSTIC: XY passes through untouched and Z is read
+//    from the step's own span. It does not convert frames and must not be
+//    asked to. Per ADR-254 §2 (as corrected), the viewport's single frame is
+//    the removal grid's local frame — scene-space XY relative to the grid
+//    origin, machine Z — mirrored once at the geometry boundary. So the
+//    caller feeds this a SCENE-frame toolpath, the same one the removal grid
+//    was stamped from, and the viewer applies the shared mirror to the result.
+//    Feeding it one frame while the surface uses another is the failure this
+//    contract exists to prevent.
 //
 // PURE: plain data in, plain data out.
 

@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import type { Move3dKind } from '../../core/toolpath3d';
+import { toolpathLineStyle } from './viewer3d-toolpath-colors';
+
+const ALL_KINDS: readonly Move3dKind[] = ['cut', 'rapid', 'feed-travel', 'plunge', 'retract'];
+
+describe('toolpathLineStyle', () => {
+  it('returns a usable style for every move kind', () => {
+    for (const kind of ALL_KINDS) {
+      const style = toolpathLineStyle(kind);
+      expect(Number.isInteger(style.color)).toBe(true);
+      expect(style.widthPx).toBeGreaterThan(0);
+      expect(style.opacity).toBeGreaterThan(0);
+      expect(style.opacity).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('dashes moves that remove no material and keeps cutting moves solid', () => {
+    // This is the whole point of the table: a glance must separate "the bit is
+    // in the work" from "the bit is in the air".
+    expect(toolpathLineStyle('cut').dashed).toBe(false);
+    expect(toolpathLineStyle('plunge').dashed).toBe(false);
+    expect(toolpathLineStyle('rapid').dashed).toBe(true);
+    expect(toolpathLineStyle('feed-travel').dashed).toBe(true);
+    expect(toolpathLineStyle('retract').dashed).toBe(true);
+  });
+
+  it('draws traversals recessive to the cuts they connect', () => {
+    const cut = toolpathLineStyle('cut');
+    for (const kind of ['rapid', 'feed-travel', 'retract'] as const) {
+      const travel = toolpathLineStyle(kind);
+      expect(travel.opacity).toBeLessThan(cut.opacity);
+      expect(travel.widthPx).toBeLessThan(cut.widthPx);
+    }
+  });
+
+  it('keeps cutting moves at full opacity', () => {
+    expect(toolpathLineStyle('cut').opacity).toBe(1);
+    expect(toolpathLineStyle('plunge').opacity).toBe(1);
+  });
+
+  it('gives every kind a distinct colour', () => {
+    // Two kinds sharing a colour would silently merge in the viewport, which
+    // reads as a single continuous move that does not exist.
+    const colors = ALL_KINDS.map((kind) => toolpathLineStyle(kind).color);
+    expect(new Set(colors).size).toBe(ALL_KINDS.length);
+  });
+
+  it('distinguishes rapid from feed travel', () => {
+    // Both are traversals, but they run at different speeds; collapsing them
+    // would hide why a job is slower than expected.
+    expect(toolpathLineStyle('rapid').color).not.toBe(toolpathLineStyle('feed-travel').color);
+  });
+});
