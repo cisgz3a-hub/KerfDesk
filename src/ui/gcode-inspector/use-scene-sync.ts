@@ -13,8 +13,10 @@ export function useSceneSync(args: {
   /** Null reveals the whole program and hides the tool marker. */
   readonly playhead: PlayheadMarker | null;
   readonly colorOf: (segmentIndex: number) => readonly [number, number, number];
+  /** Live machine position from controller status; null hides the marker. */
+  readonly live: { readonly x: number; readonly y: number; readonly z: number } | null;
 }): void {
-  const { handleRef, state, playhead, colorOf } = args;
+  const { handleRef, state, playhead, colorOf, live } = args;
 
   useEffect(() => {
     handleRef.current?.setPlayhead(playhead);
@@ -23,4 +25,12 @@ export function useSceneSync(args: {
   useEffect(() => {
     handleRef.current?.recolor(colorOf);
   }, [handleRef, colorOf, state]);
+
+  // Depends on the coordinates, not the object identity: status reports
+  // arrive continuously and a fresh object each poll would re-render the
+  // scene even when the machine has not moved.
+  useEffect(() => {
+    handleRef.current?.setLiveMachine(live);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [handleRef, state, live?.x, live?.y, live?.z, live === null]);
 }

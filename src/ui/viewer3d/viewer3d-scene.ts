@@ -19,6 +19,7 @@ import {
   type SegmentBuckets,
   type Viewer3dSegmentsInput,
 } from './segment-buckets';
+import { createMarkers, disposeMarkers, sizeMarkers, type MarkerMesh } from './scene-markers';
 import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
 
@@ -39,6 +40,14 @@ export type Viewer3dSceneHandle = {
   /** Reveal up to the playhead and place the tool marker (null = show all). */
   readonly setPlayhead: (playhead: PlayheadMarker | null) => void;
   /**
+   * Where the MACHINE actually is, from controller status (null hides it).
+   * Drawn distinctly from the playback marker: one is a simulation, the
+   * other is a live report, and confusing them would be dangerous.
+   */
+  readonly setLiveMachine: (
+    point: { readonly x: number; readonly y: number; readonly z: number } | null,
+  ) => void;
+  /**
    * Recolour the drawn moves from a render-model-segment → rgb function.
    * Rewrites the existing colour attribute only — no geometry rebuild — so
    * switching data lenses is free (ADR-255 §11 R2).
@@ -57,9 +66,6 @@ const MAX_PIXEL_RATIO = 2;
 const CAMERA_FOV_DEG = 40;
 const TRAVEL_OPACITY = 0.45;
 const FAT_LINE_PX = 2.5;
-const MARKER_RADIUS_FRACTION = 0.012;
-const MARKER_MIN_RADIUS_MM = 0.4;
-const MARKER_COLOR = 0xffffff;
 
 type ThreeModule = typeof ThreeNamespace;
 
@@ -139,9 +145,8 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   let travelObject: Object3D | null = null;
   let travelVisible = true;
   let reveal: RevealTargets | null = null;
-  const marker = createMarker(three);
-  marker.visible = false;
-  scene.add(marker);
+  const markers = createMarkers(three, scene);
+  const { marker, liveMarker } = markers;
 
   return {
     setSegments: (segments) => {
@@ -157,20 +162,19 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       ({ fatMaterial, travelObject } = built);
       reveal = built.reveal;
       for (const object of built.objects) toolpathGroup.add(object);
-      sizeMarker(marker, segments);
+      sizeMarkers(markers, segments);
       render();
     },
     recolor: (colorOf) => {
       if (applyRecolor(reveal, colorOf)) render();
     },
+    setLiveMachine: (point) => {
+      placeMarker(liveMarker, point);
+      render();
+    },
     setPlayhead: (playhead) => {
       applyReveal(reveal, playhead);
-      if (playhead?.point == null) {
-        marker.visible = false;
-      } else {
-        marker.visible = true;
-        marker.position.set(playhead.point.x, playhead.point.y, playhead.point.z);
-      }
+      placeMarker(marker, playhead?.point ?? null);
       render();
     },
     fitToBounds: (bounds) => {
@@ -202,35 +206,19 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       controls.dispose();
       disposeChildren(toolpathGroup);
       disposeChildren(furnitureGroup);
-      scene.remove(marker);
-      marker.geometry.dispose();
-      marker.material.dispose();
+      disposeMarkers(scene, markers);
       renderer.dispose();
     },
   };
 }
 
-// A small emissive ball at the interpolated head position: readable against
-// both cuts and rapids, and tool-shape-agnostic (an external program carries
-// no tool record). Stage 12+ swaps in a LatheGeometry profile when the tool
-// is known.
-function createMarker(
-  three: ThreeModule,
-): ThreeNamespace.Mesh<ThreeNamespace.SphereGeometry, ThreeNamespace.MeshBasicMaterial> {
-  return new three.Mesh(
-    new three.SphereGeometry(1, 16, 12),
-    new three.MeshBasicMaterial({ color: MARKER_COLOR }),
-  );
-}
-
-// Scale the marker to the job so it reads at any program size.
-function sizeMarker(marker: ThreeNamespace.Object3D, segments: Viewer3dSegments): void {
-  let span = 0;
-  for (let index = 0; index < segments.segmentCount * 6; index += 3) {
-    span = Math.max(span, Math.abs(segments.positions[index] ?? 0));
-  }
-  const radius = Math.max(MARKER_MIN_RADIUS_MM, span * MARKER_RADIUS_FRACTION);
-  marker.scale.setScalar(radius);
+// Show a marker at a point, or hide it when there is nothing to show.
+function placeMarker(
+  mesh: MarkerMesh,
+  point: { readonly x: number; readonly y: number; readonly z: number } | null,
+): void {
+  mesh.visible = point !== null;
+  if (point !== null) mesh.position.set(point.x, point.y, point.z);
 }
 
 type RevealTargets = {

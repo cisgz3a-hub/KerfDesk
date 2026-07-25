@@ -14,6 +14,7 @@ import { InspectorTimeline } from './InspectorTimeline';
 import { lensColorFn, type LensId } from './lenses';
 import { playheadAtTime, secondsAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
+import { useLiveMachine, type LiveMachine } from './use-live-machine';
 import { useSceneSync } from './use-scene-sync';
 import { useViewer3dScene } from './use-viewer3d-scene';
 
@@ -59,8 +60,9 @@ export function InspectorView(props: {
   // segment to floating-point rounding.
   const atEnd = playback.routeMm >= time.motionSeconds;
   const colorOf = useMemo(() => lensColorFn(model, time, lens, theme), [model, time, lens, theme]);
+  const live = useLiveMachine();
 
-  useSceneSync({ handleRef, state, playhead: atEnd ? null : playhead, colorOf });
+  useSceneSync({ handleRef, state, playhead: atEnd ? null : playhead, colorOf, live: live.point });
 
   // 3D -> source: the line whose move the playhead is executing.
   const activeLine =
@@ -81,6 +83,7 @@ export function InspectorView(props: {
         {full ? <SourceToggle visible={sourceVisible} onToggle={setSourceVisible} /> : null}
         <div style={viewportStyle}>
           <canvas ref={canvasRef} style={canvasStyle} />
+          {live.streaming ? <LiveBadge live={live} /> : null}
           {state === 'no-webgl' ? (
             <p style={messageStyle}>
               3D view unavailable: {reason} The program parsed — readouts are live.
@@ -115,6 +118,32 @@ export function InspectorView(props: {
           onLocateLine={locateLine}
         />
       ) : null}
+    </div>
+  );
+}
+
+// Shown only while a job is actually streaming. Reports what the controller
+// said — never an inference — so the operator can trust it against the
+// machine in front of them.
+function LiveBadge(props: { readonly live: LiveMachine }): JSX.Element {
+  const { live } = props;
+  const percent =
+    live.progress === null || live.progress.total <= 0
+      ? null
+      : Math.round((live.progress.completed / live.progress.total) * 100);
+  return (
+    <div style={liveBadgeStyle} role="status" aria-label="Live machine">
+      <span style={liveDotStyle} aria-hidden="true" />
+      <strong>LIVE</strong>
+      {live.state === null ? null : <span>{live.state}</span>}
+      {percent === null ? null : <span>{percent}%</span>}
+      {live.point === null ? (
+        <span style={liveMutedStyle}>position not reported</span>
+      ) : (
+        <span style={liveMonoStyle}>
+          X{live.point.x.toFixed(1)} Y{live.point.y.toFixed(1)} Z{live.point.z.toFixed(1)}
+        </span>
+      )}
     </div>
   );
 }
@@ -167,6 +196,36 @@ const canvasStyle: React.CSSProperties = {
 const messageStyle: React.CSSProperties = {
   margin: 12,
 };
+
+const liveBadgeStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 10,
+  left: 10,
+  zIndex: 2,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '4px 10px',
+  borderRadius: 'var(--lf-radius-lg)',
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-1)',
+  boxShadow: 'var(--lf-shadow)',
+  fontSize: 'var(--lf-text-sm)',
+};
+
+const liveDotStyle: React.CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  background: 'var(--lf-success)',
+};
+
+const liveMonoStyle: React.CSSProperties = {
+  fontFamily: 'ui-monospace, monospace',
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const liveMutedStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 
 const sourceToggleRowStyle: React.CSSProperties = {
   display: 'flex',
