@@ -12582,3 +12582,55 @@ to see an existing 257.
   currently about eleven ADRs stale - out of scope here.
 - Numbers are unique but not gapless, and sections stay in insertion order per
   the note at the top of this file. Neither is changed by this gate.
+
+---
+
+## ADR-263 - Fragmented traced strokes weld into one cut on CNC (2026-07-25)
+
+### Context
+
+The 2026-07-25 chatter audit measured a second CNC defect class beside heading
+jitter: fragmentation. Centerline traces of rough or solid sources arrive as
+many open chains - the audit measured 6 separate chains on one rough disc -
+because scan cracks and thinning dropouts leave endpoint gaps wider than the
+tracer's own 3 px bridge (`centerlineJoinGapPx`). Each fragment costs a
+retract, reposition and plunge on CNC (pecking), and every fragment boundary
+is a full stop-and-restart in the cut. ADR-260 evened the geometry inside each
+chain but could not join chains, so the pecking survived it.
+
+### Decision
+
+- A new `core/toolpath` module owns machine-facing conditioning of final
+  polylines in physical units. `weldOpenPolylines` joins open chains whose
+  endpoints lie within a physical gap (greedy nearest-pair, endpoint
+  orientation handled), and self-closes a welded chain whose ends meet - gated
+  on the gap being small next to the chain length so a drawn open hook is
+  never stapled into a sliver ring.
+- The CNC trace policy welds at 0.5 mm before fairing
+  (`src/ui/trace/cnc-trace-fairing.ts`): joining fragments first turns pecks
+  into one cut, and the ADR-260 fairing then smooths the stitch joints like
+  any other vertex.
+- The pass NEVER deletes geometry. Standalone short chains (drawn dots and
+  ticks), anything beyond the gap (dashes are drawn content), and closed rings
+  pass through untouched. This is deliberate: pruning was the audit's original
+  phrasing, but deleting traced marks is a fidelity risk the operator cannot
+  see, whereas an unwelded fragment merely cuts as it does today.
+- The gap is crack-scale by construction: 0.5 mm sits above the tracer's 3 px
+  (0.3 mm at the 254-DPI default) bridge, which is what leaves the cracks, and
+  below dash-scale drawn spacing.
+- Laser commits are untouched.
+
+### Consequences
+
+- Measured through the real `compileCncJob` on a four-fragment traced circle:
+  4 contour passes become 1, with heading statistics unchanged (p95 turn 1.4
+  degrees, zero vertices turning >= 15 degrees) - the weld removes pecks
+  without introducing jitter.
+- `core/geometry` was at the ADR-015 20-symbol barrel cap, so the new
+  mechanism could not live there; `core/toolpath` starts a module whose remit
+  (mm-denominated machine conditioning) is distinct from `core/trace`'s
+  visual-fidelity px domain.
+- Traces committed before this ADR keep their fragments - re-trace on a CNC
+  project to weld them.
+- No G-code snapshot changes: the pass runs at trace commit, not in the
+  compiler.

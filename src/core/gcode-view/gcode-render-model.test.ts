@@ -75,7 +75,7 @@ describe('buildGcodeRenderModel — events and accountability', () => {
       'T2', // 8 event (tool word)
       'G1 X5 F100', // 9 motion
       'M0', // 10 event (pause)
-      'G99 Q7', // 11 unsupported words only
+      'G43 H1', // 11 unsupported words only
       '!!!???', // 12 junk
       'M2', // 13 event (program end)
       'G1 X9', // 14 after end
@@ -118,11 +118,13 @@ describe('buildGcodeRenderModel — events and accountability', () => {
   });
 
   it('counts unsupported words with their first line', () => {
-    const model = okModel(['G21', 'G99 X1', 'G99', 'Q5'].join('\n'));
-    const g99 = model.unsupportedWords.find((entry) => entry.word === 'G99');
-    expect(g99?.count).toBe(2);
-    expect(g99?.firstLine).toBe(1);
-    expect(model.unsupportedWords.find((entry) => entry.word === 'Q')?.count).toBe(1);
+    // G43/H remain uninterpreted; G99 and Q became meaningful when canned
+    // cycles landed, so they are no longer valid "unsupported" examples.
+    const model = okModel(['G21', 'G43 X1', 'G43', 'H5'].join('\n'));
+    const g43 = model.unsupportedWords.find((entry) => entry.word === 'G43');
+    expect(g43?.count).toBe(2);
+    expect(g43?.firstLine).toBe(1);
+    expect(model.unsupportedWords.find((entry) => entry.word === 'H')?.count).toBe(1);
   });
 
   it('homes named axes as visible rapids (G28)', () => {
