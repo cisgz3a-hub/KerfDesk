@@ -29,6 +29,7 @@ import {
   type RecoveryRepository,
 } from '../state/recovery';
 import { cncSupervisedRecoveryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
+import { partitionEmitPreflight } from './start-job-readiness-policy';
 import {
   claimCncRecoveryCapsule,
   streamCncRecoveryProgram,
@@ -166,12 +167,28 @@ function planRecoveryProgram(
     { ...context.source.prepared, job: recovery.job },
     recoveryEmitOptions(capsule, context.source),
   );
-  if (!emitted.preflight.ok) {
-    const messages = emitted.preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
+  // Rule 7 / ADR-228: only a compile-integrity failure may refuse recovery.
+  // `preflight.ok` is false for ANY issue (core/preflight/preflight.ts), so
+  // checking it directly refused recovery over heuristic policy findings and
+  // stranded a partially-cut workpiece. Demoted findings join source.warnings,
+  // which feeds both the operator's confirmation and the `warningsShown`
+  // execution evidence archived with the run — so the audit record shows
+  // exactly what the operator was told.
+  const emitSplit = partitionEmitPreflight(emitted.preflight);
+  if (emitSplit.blocking.length > 0) {
+    const messages = emitSplit.blocking.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot start CNC recovery:\n\n${messages}`);
     return null;
   }
-  return { ...context, recovery, gcode: emitted.gcode };
+  return {
+    ...context,
+    source: {
+      ...context.source,
+      warnings: [...context.source.warnings, ...emitSplit.warnings],
+    },
+    recovery,
+    gcode: emitted.gcode,
+  };
 }
 
 function clearedPathEvidence(context: RecoveryContext) {
