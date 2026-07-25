@@ -32,7 +32,7 @@ const PANE_DISPLAY_CELLS_ACROSS = 300;
 export type Cnc3dSceneState = 'loading' | 'ready' | 'failed';
 
 // One simulation feeding two drawables: the carved surface and the path that
-// carved it. Both are in scene frame (ADR-257 §2).
+// carved it. Both are in scene frame (ADR-261 §2).
 export type DesignSceneSource = {
   readonly grid: RemovalGrid;
   // The job's stock material, so the carve is shaded as the stock the operator
