@@ -8,6 +8,7 @@
 
 import { fairToolpathPolylines } from '../../core/geometry';
 import { polylineToCurveSubpath, type ColoredPath, type RasterImage } from '../../core/scene';
+import { weldOpenPolylines } from '../../core/toolpath';
 
 // Minimum G1 chord away from drawn corners. Audit band 0.3-0.5 mm; 0.4 mm
 // keeps the impulse rate below ~12 Hz at the F300 default while the chord
@@ -20,6 +21,11 @@ const CNC_TRACE_MAX_DEVIATION_MM = 0.05;
 // The tree-wide hard-corner convention (sharpener / curve-refine / dense
 // corner detection all pin at 60 degrees).
 const CNC_TRACE_CORNER_ANGLE_DEG = 60;
+// Weld gap for fragmented open chains (Centerline / Edge pieces): crack-scale.
+// The tracer's own bridge joins gaps to 3 px (0.3 mm at the 254-DPI default);
+// this catches the scan cracks it missed, while staying well under dash-scale
+// (~>=1 mm) so drawn dashes and dots are never joined or deleted.
+const CNC_TRACE_WELD_GAP_MM = 0.5;
 
 /** Fair a trace result for CNC execution. `traceWidthPx` is the trace
  *  raster's width; the traced vectors register pixel-for-pixel over the
@@ -35,7 +41,13 @@ export function fairTracedPathsForCnc(
   const widthMm = seed.bounds.maxX - seed.bounds.minX;
   const mmPerPx = traceWidthPx > 0 ? widthMm / traceWidthPx : 0;
   return paths.map((path) => {
-    const polylines = fairToolpathPolylines(path.polylines, {
+    // Weld first, then fair: joining fragments turns pecks into one cut, and
+    // the fairing pass then smooths the stitch joints like any other vertex.
+    const welded = weldOpenPolylines(path.polylines, {
+      mmPerPx,
+      maxGapMm: CNC_TRACE_WELD_GAP_MM,
+    });
+    const polylines = fairToolpathPolylines(welded, {
       mmPerPx,
       minSegmentMm: CNC_TRACE_MIN_SEGMENT_MM,
       maxDeviationMm: CNC_TRACE_MAX_DEVIATION_MM,

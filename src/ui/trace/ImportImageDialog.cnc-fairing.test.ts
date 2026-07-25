@@ -175,6 +175,65 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
     expect(curve?.segments.every((s) => s.kind === 'line')).toBe(true);
   });
 
+  it('welds fragmented centerline chains on CNC so cut count drops', async () => {
+    // A drawn circle whose trace fragmented into 4 arc pieces with 0.4 mm
+    // gaps (4px at this scale) — the audit's Centerline pecking class: every
+    // fragment is a retract->reposition->plunge cycle on CNC. The weld must
+    // join them and close the ring; nothing may be deleted.
+    const arcs: Polyline[] = [];
+    for (let k = 0; k < 4; k += 1) {
+      const points = [];
+      const start = (k * Math.PI) / 2 + 0.01;
+      const end = ((k + 1) * Math.PI) / 2 - 0.01;
+      for (let i = 0; i <= 40; i += 1) {
+        const theta = start + ((end - start) * i) / 40;
+        points.push({ x: 250 + RING_R_PX * Math.cos(theta), y: 250 + RING_R_PX * Math.sin(theta) });
+      }
+      arcs.push({ points, closed: false });
+    }
+    vi.mocked(resolveTraceCommitResult).mockResolvedValue({
+      paths: [{ color: '#000000', polylines: arcs }],
+      bounds: { minX: 49, minY: 49, maxX: 451, maxY: 451 },
+      width: SEED_PX,
+      height: SEED_PX,
+    });
+    const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
+    await commit(commitArgs(seedRaster()), ctx as never);
+    const traced = ctx.traceExistingImage.mock.calls[0]?.[1] as TracedImage;
+    const polylines = traced.paths[0]?.polylines ?? [];
+    // 4 pecks become 1 closed cut.
+    expect(polylines.length).toBe(1);
+    expect(polylines[0]?.closed).toBe(true);
+    const pts = polylines[0]?.points ?? [];
+    const first = pts[0] as { x: number; y: number };
+    const last = pts[pts.length - 1] as { x: number; y: number };
+    expect(Math.hypot(last.x - first.x, last.y - first.y)).toBeLessThanOrEqual(1e-6);
+    // Fidelity: still the same circle.
+    for (const p of pts) {
+      expect(Math.abs(Math.hypot(p.x - 250, p.y - 250) - RING_R_PX)).toBeLessThanOrEqual(1.2);
+    }
+  });
+
+  it('keeps dash gaps and standalone dots un-welded on CNC', async () => {
+    // Two dashes 1.5 mm apart (drawn content) plus a far-away short tick:
+    // the weld gap is crack-scale, not dash-scale — nothing joins, nothing
+    // is deleted.
+    const dash = (x0: number): Polyline => ({
+      points: Array.from({ length: 21 }, (_, i) => ({ x: x0 + i, y: 100 })),
+      closed: false,
+    });
+    vi.mocked(resolveTraceCommitResult).mockResolvedValue({
+      paths: [{ color: '#000000', polylines: [dash(100), dash(135), dash(400)] }],
+      bounds: { minX: 49, minY: 49, maxX: 451, maxY: 451 },
+      width: SEED_PX,
+      height: SEED_PX,
+    });
+    const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
+    await commit(commitArgs(seedRaster()), ctx as never);
+    const traced = ctx.traceExistingImage.mock.calls[0]?.[1] as TracedImage;
+    expect(traced.paths[0]?.polylines.length).toBe(3);
+  });
+
   it('passes laser commits through untouched', async () => {
     mockTraceResult();
     const ctx = ctxWith({ kind: 'laser' });
