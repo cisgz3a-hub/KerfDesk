@@ -113,7 +113,7 @@ function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         min={0.1}
         max={200}
         step={0.05}
-        title="Workpiece thickness. Cut depths deeper than this (plus 1 mm) are blocked."
+        title="Workpiece thickness. Cutting deeper than this is allowed — Job Review warns how far past the stock bottom the cut goes."
         onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
       />
       <NumberRow
