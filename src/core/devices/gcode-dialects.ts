@@ -75,7 +75,9 @@ const GRBL_DYNAMIC_DIALECT: GrblGcodeDialect = {
   description: 'KerfDesk default: dynamic-power cuts, fill and raster sweeps.',
   // ADR-257: vector cuts default to M4 dynamic power. Under M3 the head burns at
   // full programmed S while accelerating out of a corner, depositing more energy per
-  // mm exactly where it moves slowest — the scorched-corner defect. GRBL's own
+  // mm exactly where it moves slowest, which is the mechanism behind corner
+  // scorching. No scorching defect was observed in this project — this is a
+  // prevention and parity change (see ADR-257 Context). GRBL's own
   // laser_mode doc says M3 needs added lead-in/lead-out motions "for a clean cut and
   // prevent scorching", which our default profiles do not emit (ADR-239 entry runways
   // are 4040-scoped). M4 scales S by actual/programmed feed instead, so energy per mm

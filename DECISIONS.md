@@ -11948,7 +11948,12 @@ produce a signal nobody is required to read).
 
 Since ADR-036 the laser emitter has armed **M4 dynamic power for fill** and kept **M3 constant
 power for vector cuts**. The code comment defended M3-for-cut as "a slow corner must still cut
-fully through" (`grbl-strategy.ts`). The maintainer reports **scorched corners** on vector cuts.
+fully through" (`grbl-strategy.ts`).
+
+**No scorched-corner defect has been observed.** The maintainer asked to move to M4 *to prevent*
+over-burnt corners, on the strength of the documentary evidence below - not from a reproduction. This
+ADR is therefore a **parity and prevention** change, not a defect fix. Nothing in this repo has
+demonstrated a scorching problem, and nothing here should be cited as evidence that one existed.
 
 The Phase 2 LightBurn cross-reference (`LIGHTBURN-STUDY.md` section 8, entry D-01) surfaced that
 this is a divergence from every comparable reference, and that our stated rationale is the direct
@@ -12020,6 +12025,7 @@ energy-per-mm argument from fill to cut.
   `neotronics-4040-safe` resolve `'constant'`. Pinned in `gcode-dialects.test.ts`.
 - Emission: a cut-only job on the default dialect contains `M4 S0` and no `M3`.
 - Invariant: laser-off-on-travel and power-scale property tests stay green.
-- **NOT VERIFIED - hardware.** No coupon has been burned under this change. The scorched-corner
-  improvement and the thin-material cut-through risk are both **CLAIMED** until the maintainer burns
-  an M3-vs-M4 comparison on the Falcon.
+- **NOT VERIFIED - hardware.** No coupon has been burned under this change, and no scorching was
+  observed before it. Both the expected corner-quality benefit and the thin-material cut-through risk
+  are **CLAIMED** until someone burns an M3-vs-M4 comparison. Note the benefit is predicted from GRBL's
+  documentation, not from a defect this project reproduced.
