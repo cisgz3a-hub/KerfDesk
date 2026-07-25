@@ -6,7 +6,11 @@
 // tiling — and each tile's G-code preflights individually instead.
 
 import { tileFileName, tileJobs } from '../../core/cnc';
-import { runCncPreflight, type ControllerSettingsSnapshot } from '../../core/preflight';
+import {
+  runCncPreflight,
+  type ControllerSettingsSnapshot,
+  type PreflightIssue,
+} from '../../core/preflight';
 import { cncGrblStrategy } from '../../core/output';
 import { gcodeMetadataHeader, prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
@@ -64,7 +68,21 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
       : `Saved ${saved} of ${emitted.length} tile files.`,
     saved === emitted.length ? 'success' : 'warning',
   );
+  pushAdvisoryToasts(ctx, prepared.advisories);
   return true;
+}
+
+// Rule 7 / ADR-228: a pre-emit policy finding no longer refuses the tiled
+// export, so surface it rather than letting the fix trade a refusal for
+// silence. Reported once for the set, not once per tile. Extracted so
+// handleSaveTiledGcode stays under the complexity cap.
+function pushAdvisoryToasts(
+  ctx: SaveTiledGcodeCtx,
+  advisories: ReadonlyArray<PreflightIssue> | undefined,
+): void {
+  for (const advisory of advisories ?? []) {
+    ctx.pushToast(advisory.message, 'warning');
+  }
 }
 
 type TileFile = { readonly name: string; readonly gcode: string };
