@@ -10,6 +10,8 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
+import { emitPreparedGcode } from '../../io/gcode';
+import type * as GcodeModule from '../../io/gcode';
 import { useCameraStore } from '../state/camera-store';
 import {
   cncControllerEpochOf,
@@ -28,7 +30,7 @@ import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/ex
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
-import { configureReadyCncRecovery } from './cnc-recovery-flow-testing';
+import { configureReadyCncRecovery, injectPreflightIssue } from './cnc-recovery-flow-testing';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import { expectCncPassRecoveryProvenance } from './cnc-pass-recovery-provenance-testing';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
@@ -39,6 +41,13 @@ vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
   jobAwareConfirm: vi.fn(() => true),
 }));
+
+// Spy that defaults to the real emitter; a single test overrides one call to
+// inject a preflight finding it cannot otherwise provoke.
+vi.mock('../../io/gcode', async (importOriginal) => {
+  const actual = await importOriginal<typeof GcodeModule>();
+  return { ...actual, emitPreparedGcode: vi.fn(actual.emitPreparedGcode) };
+});
 
 const originalStartJob = useLaserStore.getState().startJob;
 const NOW = '2026-07-16T10:00:00.000Z';
@@ -406,5 +415,40 @@ describe('runCncPassRecoveryFlow', () => {
     expect(started).toBe(false);
     expect(startJob).not.toHaveBeenCalled();
     expect(vi.mocked(jobAwareAlert).mock.calls[0]?.[0] ?? '').toContain('does not exist');
+  });
+
+  // Rule 7 / ADR-228 regression pin. `preflight.ok` is false for ANY issue, so
+  // checking it directly refused recovery over heuristic policy findings and
+  // stranded a partially-cut workpiece. Only compile integrity may refuse.
+  it('starts recovery despite a policy-only preflight finding, showing it as a warning', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    await injectPreflightIssue({ code: 'out-of-bed', message: 'X exceeds the bed.' });
+
+    const started = await runCncPassRecoveryFlow(capsule, baseReview, repo);
+
+    console.log('EMIT_CALLS=' + vi.mocked(emitPreparedGcode).mock.calls.length);
+    expect(started).toBe(true);
+    expect(startJob).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(jobAwareAlert)).not.toHaveBeenCalled();
+    // The demoted finding must reach the operator, not vanish.
+    const confirmed = vi.mocked(jobAwareConfirm).mock.calls.map(([m]) => String(m));
+    expect(confirmed.some((m) => m.includes('X exceeds the bed.'))).toBe(true);
+  });
+
+  it('still refuses recovery on a compile-integrity failure', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    await injectPreflightIssue({ code: 'empty-output', message: 'No cuts.' });
+
+    const started = await runCncPassRecoveryFlow(capsule, baseReview, repo);
+
+    expect(started).toBe(false);
+    expect(startJob).not.toHaveBeenCalled();
+    expect(vi.mocked(jobAwareAlert).mock.calls[0]?.[0] ?? '').toContain('No cuts.');
   });
 });

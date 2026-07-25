@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, profileCatalogEntryById, resolveGrblDialect } from '../devices';
 import { type Job, EMPTY_JOB } from '../job';

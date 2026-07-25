@@ -17,6 +17,9 @@
 
 import { vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { PreflightIssue } from '../../core/preflight';
+import type * as GcodeModule from '../../io/gcode';
+import { emitPreparedGcode } from '../../io/gcode';
 import { DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -66,5 +69,23 @@ export function configureReadyCncRecovery(project: Project): void {
     // check it against the live store (null WCO, work origin inactive here).
     frameVerification: frameVerificationForProject(project),
     startJob: vi.fn(async () => undefined),
+  });
+}
+
+/**
+ * Force every `emitPreparedGcode` call to return its real output carrying one
+ * injected preflight `issue`.
+ *
+ * A recovery flow emits more than once (source re-prepare, then the resume
+ * job), so a one-shot mock is consumed before the refusal check is ever
+ * reached. Overriding every call guarantees the issue arrives there. Requires
+ * the calling suite to have `vi.mock`ed '../../io/gcode' with
+ * `emitPreparedGcode: vi.fn(actual.emitPreparedGcode)`.
+ */
+export async function injectPreflightIssue(issue: PreflightIssue): Promise<void> {
+  const actual = await vi.importActual<typeof GcodeModule>('../../io/gcode');
+  vi.mocked(emitPreparedGcode).mockImplementation((prepared, options) => {
+    const real = actual.emitPreparedGcode(prepared, options);
+    return { ...real, preflight: { ok: false, issues: [issue] } };
   });
 }
