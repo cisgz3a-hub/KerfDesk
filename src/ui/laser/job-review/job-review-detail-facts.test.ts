@@ -82,6 +82,33 @@ describe('cncOperationDetail', () => {
     );
   });
 
+  // Audit 1.8: the count used to be a bare Math.ceil, which disagreed with the
+  // emitter's zPassDepths on 3/4" stock with imperial bits.
+  it('reports the pass count the emitter actually steps on imperial depths', () => {
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      depthMm: 19.05, // 3/4"
+      depthPerPassMm: 1.5875, // 1/16"
+    };
+    expect(cncOperationDetail(settings)).toContain('12 passes');
+  });
+
+  // Audit 3.8: enforceCutDirection is inert for engrave and profile-on-path, so
+  // the stored word describes motion that never happens.
+  it('omits the cut direction for cut types that have no material side', () => {
+    for (const cutType of ['engrave', 'profile-on-path'] as const) {
+      const settings: CncLayerSettings = {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType,
+        cutDirection: 'climb',
+      };
+      expect(cncOperationDetail(settings)).not.toContain('climb');
+    }
+    expect(cncOperationDetail({ ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' })).toContain(
+      'climb',
+    );
+  });
+
   it('names a persisted machine starter and revision', () => {
     const settings: CncLayerSettings = {
       ...DEFAULT_CNC_LAYER_SETTINGS,
