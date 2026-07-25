@@ -1,21 +1,15 @@
-// Pure readout formatting for the Inspector panels (ADR-255 stage 4):
-// DRO rows, the move-kind legend, and the stats rows are derived here so the
-// React components stay presentational and the numbers stay unit-testable.
+// Pure readout formatting for the Inspector panels (ADR-255 stage 4): the
+// DRO rows and the program stats rows are derived here so the React
+// components stay presentational and the numbers stay unit-testable.
+// Legend rendering moved to lenses.ts in stage 9.
 
 import type { ProgramTimeModel } from '../../core/gcode-time';
-import { SEG_KIND, type GcodeRenderModel, type ProgramStats } from '../../core/gcode-view';
-import { cssHexColor, type Viewer3dTheme } from '../viewer3d';
+import type { GcodeRenderModel, ProgramStats } from '../../core/gcode-view';
 import type { PlayheadState } from './playhead';
 
 export type Readout = {
   readonly label: string;
   readonly value: string;
-};
-
-export type LegendEntry = {
-  readonly label: string;
-  readonly color: string;
-  readonly count: number;
 };
 
 const EMPTY_DRO: ReadonlyArray<Readout> = [
@@ -61,31 +55,6 @@ function segmentEndPoint(
     y: model.positions[base + 4] ?? 0,
     z: model.positions[base + 5] ?? 0,
   };
-}
-
-export function legendEntries(
-  model: GcodeRenderModel,
-  theme: Viewer3dTheme,
-): ReadonlyArray<LegendEntry> {
-  const counts = new Map<number, number>();
-  for (let index = 0; index < model.segmentCount; index += 1) {
-    const kind = model.segKind[index] ?? SEG_KIND.travel;
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
-  }
-  return [
-    { label: 'Cut', color: cssHexColor(theme.cut), count: counts.get(SEG_KIND.cut) ?? 0 },
-    { label: 'Plunge', color: cssHexColor(theme.plunge), count: counts.get(SEG_KIND.plunge) ?? 0 },
-    {
-      label: 'Retract',
-      color: cssHexColor(theme.retract),
-      count: counts.get(SEG_KIND.retract) ?? 0,
-    },
-    {
-      label: 'Traversal',
-      color: cssHexColor(theme.travel),
-      count: counts.get(SEG_KIND.travel) ?? 0,
-    },
-  ];
 }
 
 export function statsRows(

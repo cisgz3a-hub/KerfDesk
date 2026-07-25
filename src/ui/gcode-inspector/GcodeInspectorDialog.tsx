@@ -3,7 +3,7 @@
 // (work coordinates, Z-up, orbit + grid + triad). The timeline, palette
 // lenses, DRO, source pane, and Program Health panels land in stages 4-9.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import {
   buildGcodeRenderModel,
@@ -15,8 +15,10 @@ import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
+import { lensColorFn, type LensId } from './lenses';
 import { playheadAtTime, secondsAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
+import { useSceneSync } from './use-scene-sync';
 import { useViewer3dScene } from './use-viewer3d-scene';
 
 // GRBL defaults. An opened file may not belong to the current machine, so the
@@ -90,6 +92,7 @@ function InspectorBody(props: {
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [travelVisible, setTravelVisible] = useState(true);
+  const [lens, setLens] = useState<LensId>('kind');
   const [sourceVisible, setSourceVisible] = useState(true);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
@@ -106,10 +109,9 @@ function InspectorBody(props: {
   // Fully-drawn playhead = show everything, so the scene never hides the tail
   // segment to floating-point rounding.
   const atEnd = playback.routeMm >= time.motionSeconds;
+  const colorOf = useMemo(() => lensColorFn(model, time, lens, theme), [model, time, lens, theme]);
 
-  useEffect(() => {
-    handleRef.current?.setPlayhead(atEnd ? null : playhead);
-  }, [handleRef, playhead, atEnd, state]);
+  useSceneSync({ handleRef, state, playhead: atEnd ? null : playhead, colorOf });
 
   // 3D -> source: the line whose move the playhead is executing.
   const activeLine =
@@ -127,18 +129,7 @@ function InspectorBody(props: {
   return (
     <div style={bodyRowStyle}>
       <div style={viewColumnStyle}>
-        <div style={sourceToggleRowStyle}>
-          <button
-            type="button"
-            className="lf-btn"
-            title="Show or hide the program source"
-            aria-pressed={sourceVisible}
-            style={sourceToggleStyle}
-            onClick={() => setSourceVisible((visible) => !visible)}
-          >
-            {sourceVisible ? 'Hide source' : 'Show source'}
-          </button>
-        </div>
+        <SourceToggle visible={sourceVisible} onToggle={setSourceVisible} />
         <div style={viewportStyle}>
           <canvas ref={canvasRef} style={canvasStyle} />
           {state === 'no-webgl' ? (
@@ -164,6 +155,8 @@ function InspectorBody(props: {
         playhead={playhead}
         time={time}
         findings={findings}
+        lens={lens}
+        onLensChange={setLens}
         travelVisible={travelVisible}
         onTravelVisibleChange={(visible) => {
           setTravelVisible(visible);
@@ -171,6 +164,26 @@ function InspectorBody(props: {
         }}
         onLocateLine={locateLine}
       />
+    </div>
+  );
+}
+
+function SourceToggle(props: {
+  readonly visible: boolean;
+  readonly onToggle: (update: (visible: boolean) => boolean) => void;
+}): JSX.Element {
+  return (
+    <div style={sourceToggleRowStyle}>
+      <button
+        type="button"
+        className="lf-btn"
+        title="Show or hide the program source"
+        aria-pressed={props.visible}
+        style={sourceToggleStyle}
+        onClick={() => props.onToggle((visible) => !visible)}
+      >
+        {props.visible ? 'Hide source' : 'Show source'}
+      </button>
     </div>
   );
 }

@@ -38,6 +38,12 @@ export type Viewer3dSceneHandle = {
   readonly setTravelVisible: (visible: boolean) => void;
   /** Reveal up to the playhead and place the tool marker (null = show all). */
   readonly setPlayhead: (playhead: PlayheadMarker | null) => void;
+  /**
+   * Recolour the drawn moves from a render-model-segment → rgb function.
+   * Rewrites the existing colour attribute only — no geometry rebuild — so
+   * switching data lenses is free (ADR-255 §11 R2).
+   */
+  readonly recolor: (colorOf: (segmentIndex: number) => readonly [number, number, number]) => void;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
   readonly dispose: () => void;
@@ -122,7 +128,7 @@ type SceneHandleDeps = {
 // traversal visibility, view size) behind the handle's function surface.
 function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   const { modules, theme, renderer, scene, toolpathGroup, furnitureGroup } = deps;
-  const { three, LineSegments2, LineSegmentsGeometry, LineMaterial } = modules;
+  const { three } = modules;
   const { camera, controls, render } = deps.rig;
 
   // Fat-line materials size their strokes against the drawing buffer, so the
@@ -141,22 +147,21 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     setSegments: (segments) => {
       disposeChildren(toolpathGroup);
       const built = buildToolpathObjects({
-        three,
-        LineSegments2,
-        LineSegmentsGeometry,
-        LineMaterial,
+        ...modules,
         segments,
         theme,
         viewWidth,
         viewHeight,
         travelVisible,
       });
-      fatMaterial = built.fatMaterial;
-      travelObject = built.travelObject;
+      ({ fatMaterial, travelObject } = built);
       reveal = built.reveal;
       for (const object of built.objects) toolpathGroup.add(object);
       sizeMarker(marker, segments);
       render();
+    },
+    recolor: (colorOf) => {
+      if (applyRecolor(reveal, colorOf)) render();
     },
     setPlayhead: (playhead) => {
       applyReveal(reveal, playhead);
@@ -229,7 +234,15 @@ function sizeMarker(marker: ThreeNamespace.Object3D, segments: Viewer3dSegments)
 }
 
 type RevealTargets = {
-  readonly solid: { readonly geometry: { instanceCount: number }; readonly total: number } | null;
+  readonly solid: {
+    // Narrow structural type rather than the addon class: only the instance
+    // count (reveal) and colour upload (lenses) are ever touched.
+    readonly geometry: {
+      instanceCount: number;
+      setColors: (colors: Float32Array) => unknown;
+    };
+    readonly total: number;
+  } | null;
   readonly solidSource: Uint32Array;
   readonly travel: {
     readonly geometry: ThreeNamespace.BufferGeometry;
@@ -237,6 +250,28 @@ type RevealTargets = {
   } | null;
   readonly travelSource: Uint32Array;
 };
+
+// Rewrites the solid batch's colour attribute in place from a render-model
+// segment → rgb function. Returns whether anything was repainted.
+function applyRecolor(
+  targets: RevealTargets | null,
+  colorOf: (segmentIndex: number) => readonly [number, number, number],
+): boolean {
+  if (targets?.solid == null) return false;
+  const source = targets.solidSource;
+  const colors = new Float32Array(source.length * 6);
+  for (let entry = 0; entry < source.length; entry += 1) {
+    const rgb = colorOf(source[entry] ?? 0);
+    for (let end = 0; end < 2; end += 1) {
+      const at = entry * 6 + end * 3;
+      colors[at] = rgb[0];
+      colors[at + 1] = rgb[1];
+      colors[at + 2] = rgb[2];
+    }
+  }
+  targets.solid.geometry.setColors(colors);
+  return true;
+}
 
 // Reveal by draw count only — no buffer reallocation. Fat lines are instanced
 // (one instance per segment), thin lines use setDrawRange over vertex pairs.
