@@ -9,6 +9,15 @@
 // words, `(...)` and `;` comments, `%` markers, M2/M30 program end.
 // Unsupported words are counted in notes, never fatal.
 
+import {
+  applySharedGCode,
+  arcSweepAngle,
+  ijArcCenter,
+  rArcGeometry,
+  resolveAxisTarget,
+  scanGcodeWords,
+  stripInlineComments,
+} from '../../core/gcode';
 import { sampleArcPoints } from '../../core/geometry';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
@@ -17,11 +26,10 @@ import type { Vec2 } from '../../core/scene';
 export const GCODE_PREVIEW_CUT_COLOR = '#7c3aed';
 
 const MAX_PROGRAM_LINES = 500_000;
-const INCH_TO_MM = 25.4;
 const AXIS_EPSILON = 1e-9;
-// GRBL validates R-form/IJ arcs to ~0.005 in; allow the same order.
+// GRBL validates R-form/IJ arcs to ~0.005 in; allow the same order. Mirrors
+// CIRCULAR_ARC_RADIUS_TOLERANCE_MM in core/geometry/circular-arc.ts.
 const ARC_RADIUS_TOLERANCE_MM = 0.127;
-const FULL_TURN = Math.PI * 2;
 
 export type GcodeProgramSummary = {
   readonly lineCount: number;
@@ -51,8 +59,6 @@ type ModalState = {
 
 type LineWords = ReadonlyMap<string, number>;
 
-const WORD_PATTERN = /([A-Za-z])[ \t]*([+-]?(?:\d+\.?\d*|\.\d+))/g;
-
 export function parseGcodeProgram(text: string): ParseGcodeProgramResult {
   const lines = text.split(/\r\n|\n|\r/);
   if (lines.length > MAX_PROGRAM_LINES) {
@@ -73,7 +79,7 @@ export function parseGcodeProgram(text: string): ParseGcodeProgramResult {
   let firstJunkLine: { line: number; text: string } | null = null;
 
   for (let i = 0; i < lines.length && !state.ended; i += 1) {
-    const stripped = stripComments(lines[i] ?? '');
+    const stripped = stripInlineComments(lines[i] ?? '');
     if (stripped === '' || stripped === '%') continue;
     const words = readWords(stripped);
     if (words === null) {
@@ -99,29 +105,23 @@ export function parseGcodeProgram(text: string): ParseGcodeProgramResult {
   };
 }
 
-function stripComments(line: string): string {
-  const noParens = line.replace(/\([^)]*\)/g, ' ');
-  const semicolon = noParens.indexOf(';');
-  return (semicolon >= 0 ? noParens.slice(0, semicolon) : noParens).trim();
-}
-
 // null = the line contains non-word garbage (not even one letter+number).
 function readWords(line: string): LineWords | null {
   const words = new Map<string, number>();
-  let matched = 0;
+  const matches = scanGcodeWords(line);
   let consumed = 0;
-  for (const match of line.matchAll(WORD_PATTERN)) {
-    matched += 1;
-    consumed += match[0].length;
-    const letter = (match[1] ?? '').toUpperCase();
-    const value = Number.parseFloat(match[2] ?? '0');
+  for (const match of matches) {
+    consumed += match.matchedLength;
     // Multiple G words per line are modal-legal; suffix them for uniqueness.
-    if (letter === 'G' || letter === 'M') words.set(`${letter}${value}`, value);
-    else words.set(letter, value);
+    if (match.letter === 'G' || match.letter === 'M') {
+      words.set(`${match.letter}${match.value}`, match.value);
+    } else {
+      words.set(match.letter, match.value);
+    }
   }
   // Whitespace apart, everything on the line should be words.
   const nonSpace = line.replace(/\s+/g, '').length;
-  if (matched === 0 || consumed < nonSpace * 0.5) return null;
+  if (matches.length === 0 || consumed < nonSpace * 0.5) return null;
   return words;
 }
 
@@ -132,8 +132,8 @@ function executeLine(
   unsupported: Map<string, number>,
   lineNumber: number,
 ): string | null {
-  for (const key of words.keys()) {
-    const issue = applyModalWord(state, key, unsupported, lineNumber);
+  for (const [key, value] of words) {
+    const issue = applyModalWord(state, key, value, unsupported, lineNumber);
     if (issue !== null) return issue;
   }
   if (state.ended) return null;
@@ -147,33 +147,10 @@ function executeLine(
   return null;
 }
 
-// Modal-word effects, table-driven to keep applyModalWord simple. G17 and
-// the spindle/coolant M words are recognized no-ops (no geometric effect).
+// Parser-specific modal effects: program end plus recognized no-ops (G17 and
+// the spindle/coolant M words — no geometric effect). The shared motion /
+// units / distance words route through applySharedGCode first.
 const MODAL_EFFECTS: Readonly<Record<string, (state: ModalState) => void>> = {
-  G0: (s) => {
-    s.motion = 0;
-  },
-  G1: (s) => {
-    s.motion = 1;
-  },
-  G2: (s) => {
-    s.motion = 2;
-  },
-  G3: (s) => {
-    s.motion = 3;
-  },
-  G20: (s) => {
-    s.unitScale = INCH_TO_MM;
-  },
-  G21: (s) => {
-    s.unitScale = 1;
-  },
-  G90: (s) => {
-    s.absolute = true;
-  },
-  G91: (s) => {
-    s.absolute = false;
-  },
   G17: () => undefined,
   M2: (s) => {
     s.ended = true;
@@ -192,6 +169,7 @@ const MODAL_EFFECTS: Readonly<Record<string, (state: ModalState) => void>> = {
 function applyModalWord(
   state: ModalState,
   key: string,
+  value: number,
   unsupported: Map<string, number>,
   lineNumber: number,
 ): string | null {
@@ -199,6 +177,7 @@ function applyModalWord(
   if (key === 'G18' || key === 'G19') {
     return `Line ${lineNumber}: ${key} plane arcs are not supported (XY/G17 only).`;
   }
+  if (key.startsWith('G') && applySharedGCode(state, value)) return null;
   const effect = MODAL_EFFECTS[key];
   if (effect === undefined) {
     unsupported.set(key, (unsupported.get(key) ?? 0) + 1);
@@ -209,13 +188,7 @@ function applyModalWord(
 }
 
 function resolveTarget(state: ModalState, words: LineWords): { x: number; y: number; z: number } {
-  const axis = (letter: string, current: number): number => {
-    const raw = words.get(letter);
-    if (raw === undefined) return current;
-    const scaled = raw * state.unitScale;
-    return state.absolute ? scaled : current + scaled;
-  };
-  return { x: axis('X', state.x), y: axis('Y', state.y), z: axis('Z', state.z) };
+  return resolveAxisTarget({ x: state.x, y: state.y, z: state.z }, words, state);
 }
 
 function emitLinear(
@@ -295,7 +268,8 @@ function emitArc(
 
 // I/J are ALWAYS incremental offsets from the current point in GRBL; the
 // R form solves the center on the correct side for the ≤180° arc (negative
-// R asks for the >180° arc, per the G-code spec).
+// R asks for the >180° arc, per the G-code spec). Geometry is shared with
+// the motion manifest (core/gcode); the error POLICY here is this parser's.
 function arcCenter(
   state: ModalState,
   words: LineWords,
@@ -307,36 +281,20 @@ function arcCenter(
   const i = words.get('I');
   const j = words.get('J');
   if (i !== undefined || j !== undefined) {
-    return {
-      x: from.x + (i ?? 0) * state.unitScale,
-      y: from.y + (j ?? 0) * state.unitScale,
-    };
+    return ijArcCenter(from, i, j, state.unitScale);
   }
   const r = words.get('R');
   if (r === undefined) {
     return `Line ${lineNumber}: G${state.motion} arc needs I/J or R.`;
   }
-  const radius = Math.abs(r) * state.unitScale;
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const chord = Math.hypot(dx, dy);
-  if (chord <= AXIS_EPSILON) {
+  const solved = rArcGeometry(from, to, r, clockwise, state.unitScale);
+  if (solved === null) {
     return `Line ${lineNumber}: R-form arc cannot start and end at the same point.`;
   }
-  const halfChordSq = radius * radius - (chord / 2) * (chord / 2);
-  if (halfChordSq < -ARC_RADIUS_TOLERANCE_MM * chord) {
-    return `Line ${lineNumber}: arc radius ${radius.toFixed(3)} mm is too small for its chord.`;
+  if (solved.halfChordGapSq < -ARC_RADIUS_TOLERANCE_MM * solved.chordMm) {
+    return `Line ${lineNumber}: arc radius ${solved.radiusMm.toFixed(3)} mm is too small for its chord.`;
   }
-  const h = Math.sqrt(Math.max(0, halfChordSq));
-  // The center sits on the chord's left normal (-dy, dx) for a CCW minor
-  // arc and on the right for a CW minor arc; negative R asks for the major
-  // arc, which flips the side.
-  const wantMinor = r >= 0;
-  const side = (clockwise ? -1 : 1) * (wantMinor ? 1 : -1);
-  return {
-    x: from.x + dx / 2 + side * (-dy / chord) * h,
-    y: from.y + dy / 2 + side * (dx / chord) * h,
-  };
+  return solved.center;
 }
 
 function arcSweep(
@@ -348,14 +306,7 @@ function arcSweep(
 ): number {
   const samePoint =
     Math.abs(from.x - to.x) <= AXIS_EPSILON && Math.abs(from.y - to.y) <= AXIS_EPSILON;
-  if (samePoint) return clockwise ? -FULL_TURN : FULL_TURN;
-  let sweep = endAngle - startAngle;
-  if (clockwise) {
-    while (sweep >= 0) sweep -= FULL_TURN;
-  } else {
-    while (sweep <= 0) sweep += FULL_TURN;
-  }
-  return sweep;
+  return arcSweepAngle(startAngle, endAngle, clockwise, samePoint);
 }
 
 function summarize(lineCount: number, steps: ReadonlyArray<ToolpathStep>): GcodeProgramSummary {
