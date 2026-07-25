@@ -17,6 +17,16 @@ import type { AppCommand, CommandId } from './command-types';
 // kind:'cnc' groups through untouched). The Trace family was reclassified
 // machine-agnostic by the 2026-07-13 ADR-101 amendment (traced vectors flow
 // into the CNC cut pipeline), so it is deliberately NOT in this set.
+//
+// Raster commands split on bake-vs-engrave-stage, because CNC can trace a
+// bitmap even though it can never engrave one. A command that BAKES pixels
+// changes what traceImage() reads out of RasterImage.dataUrl, so it is
+// machine-agnostic; one that only carries engrave-stage scalars is laser-only.
+// Crop and the mask pair bake (cropMaskedRasterImage commits a replacement
+// RasterImage), so they are not in this set. Adjust Image stays laser-only:
+// its brightness/contrast/gamma are live engrave-stage scalars that never
+// touch dataUrl. Convert to Bitmap (vectors -> raster) and Save Processed
+// Bitmap (export after laser layer processing) stay laser-only too.
 export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>([
   'tools.material-test',
   'tools.interval-test',
@@ -27,9 +37,6 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
   'tools.close-fill-contours-with-tolerance',
   'tools.convert-to-bitmap',
   'tools.adjust-image',
-  'tools.apply-image-mask',
-  'tools.crop-image',
-  'tools.remove-image-mask',
   'tools.save-processed-bitmap',
   'tools.registration-jig',
   'tools.print-and-cut',
@@ -40,7 +47,10 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
 
 // CNC-only commands (hidden in laser mode): the .nc program simulator —
 // the laser pipeline has no Z-aware removal model to feed.
-export const CNC_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>(['file.open-gcode']);
+// ADR-255 lifted the last CNC-only command: file.open-gcode now opens the
+// G-code Inspector in both machine modes. The gate machinery stays for
+// future commands.
+export const CNC_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>();
 
 export function gateCommandsForMachineKind(
   commands: ReadonlyArray<AppCommand>,

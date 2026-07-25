@@ -122,7 +122,7 @@ describe('cncOperationDetail', () => {
       'Machine starter values: Neotronics 4040 shallow wood / MDF starter (revision 1)',
     );
     expect(cncOperationDetail(settings)).toContain(
-      'Engineering starter — assumes a 3.175 mm 2-flute cutter; verify on this machine.',
+      'Maintainer-verified starter (ADR-256) — feed and plunge come from cutting experience on this machine with a 3.175 mm 2-flute cutter; confirm on scrap for a new bit or stock.',
     );
   });
 

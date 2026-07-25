@@ -73,6 +73,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     importDxf: vi.fn(),
     importImage: vi.fn(),
     openGcodePreview: vi.fn(),
+    inspectCurrentGcode: vi.fn(),
     multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),
     undo: vi.fn(),
