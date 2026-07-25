@@ -34,6 +34,13 @@
 // Pure-core compliant: no clock, no random, no I/O.
 
 import { resolveGrblDialect, type DeviceProfile } from '../devices';
+import {
+  blockMotion,
+  blockTime,
+  junctionVelocity,
+  planVelocities,
+  type Block,
+} from '../motion-planner';
 import type { Vec2 } from '../scene';
 import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
@@ -44,24 +51,6 @@ import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
-
-type BlockKind = 'cut' | 'travel';
-type BlockMotion = 'rapid' | 'feed';
-
-type Block = {
-  readonly kind: BlockKind;
-  // Timing/accounting and kinematic continuity are independent. A G1/S0
-  // runway is travel for the operator-facing breakdown but feed motion for
-  // junction planning, so it must blend into the following powered G1.
-  readonly motion?: BlockMotion;
-  readonly distance: number; // mm
-  readonly targetVelocity: number; // mm/sec
-  /** Legacy narrow tag for a continuous S0/burn chain without motion metadata. */
-  readonly feedMatchedLaserMotion?: boolean;
-  // Unit direction vector. Travels with zero length are filtered out
-  // before block creation so this is always defined for real blocks.
-  readonly direction: Vec2;
-};
 
 export type PlannedDuration = {
   readonly totalSeconds: number;
@@ -352,147 +341,6 @@ function appendCut(out: Block[], from: Vec2, to: Vec2, v: number): void {
   });
 }
 
-type PlanEntry = { entryV: number; exitV: number };
-
-// Two-pass lookahead. Sets entry/exit velocities per block such that
-// physics holds (accel/decel reachable) AND cornering doesn't exceed
-// junction-deviation limits. Exported for white-box invariant tests
-// (alongside junctionVelocity/blockTime).
-export function planVelocities(
-  blocks: ReadonlyArray<Block>,
-  accel: number,
-  jd: number,
-): PlanEntry[] {
-  const plan: PlanEntry[] = blocks.map(() => ({ entryV: 0, exitV: 0 }));
-  capJunctionEntries(blocks, plan, accel, jd);
-  backwardPass(blocks, plan, accel);
-  forwardPass(blocks, plan, accel);
-  return plan;
-}
-
-// Tentative junction-cap entry velocities (max corner speed entering
-// each block based on the previous block's direction). First block
-// enters from rest (no previous block).
-function capJunctionEntries(
-  blocks: ReadonlyArray<Block>,
-  plan: PlanEntry[],
-  accel: number,
-  jd: number,
-): void {
-  for (let i = 1; i < blocks.length; i += 1) {
-    const prev = blocks[i - 1];
-    const next = blocks[i];
-    const p = plan[i];
-    if (prev === undefined || next === undefined || p === undefined) continue;
-    const vJunction = junctionVelocity(prev, next, accel, jd);
-    // Clamp to BOTH adjacent blocks' target speeds (GRBL mins the junction
-    // against both nominal speeds). Omitting prev.targetVelocity let the slower
-    // block inherit an exitV above its own target via backwardPass, which made
-    // blockTime's tDecel negative and shaved time off the estimate.
-    p.entryV = Math.min(prev.targetVelocity, next.targetVelocity, vJunction);
-  }
-}
-
-// Backward pass: ensure each entry is reachable by decel from exit.
-// Last block exits to rest (postamble decel to zero).
-function backwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: number): void {
-  for (let i = blocks.length - 1; i >= 0; i -= 1) {
-    const block = blocks[i];
-    const p = plan[i];
-    if (block === undefined || p === undefined) continue;
-    const exit = i === blocks.length - 1 ? 0 : (plan[i + 1]?.entryV ?? 0);
-    p.exitV = exit;
-    const maxEntry = Math.sqrt(exit * exit + 2 * accel * block.distance);
-    p.entryV = Math.min(p.entryV, maxEntry);
-  }
-}
-
-// Forward pass: ensure each exit is reachable by accel from entry.
-function forwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: number): void {
-  for (let i = 0; i < blocks.length; i += 1) {
-    const block = blocks[i];
-    const p = plan[i];
-    if (block === undefined || p === undefined) continue;
-    const entry = i === 0 ? 0 : (plan[i - 1]?.exitV ?? 0);
-    p.entryV = Math.min(p.entryV, entry, block.targetVelocity);
-    const maxExit = Math.sqrt(p.entryV ** 2 + 2 * accel * block.distance);
-    // Also bound exit by this block's own target so blockTime's decel leg can
-    // never go negative (belt-and-suspenders alongside the capJunctionEntries fix).
-    p.exitV = Math.min(p.exitV, maxExit, block.targetVelocity);
-  }
-}
-
-// Sonny Jeon's junction-deviation formula. θ is the angle between the
-// previous block's direction and the next block's direction.
-// sin(θ/2) is computed from the dot product without an explicit acos.
-export function junctionVelocity(prev: Block, next: Block, accel: number, jd: number): number {
-  // Rapid and feed motion retain the estimator's conservative stop boundary.
-  // Laser state is not a motion boundary: G1/S0 feed travel blends through a
-  // powered G1 span exactly as the emitted continuous sweep does.
-  if (blockMotion(prev) !== blockMotion(next) && !isContinuousFeedMatchedLaserJunction(prev, next))
-    return 0;
-  const cosTheta = prev.direction.x * next.direction.x + prev.direction.y * next.direction.y;
-  // Clamp to handle float noise just outside [-1, 1].
-  const clamped = Math.min(1, Math.max(-1, cosTheta));
-  // Sonny Jeon's junction-deviation half-angle. θ is the DEVIATION angle
-  // (0 = straight, π = reversal); GRBL derives sin(θ/2) from the NEGATED
-  // dot product, so sin(θ/2) = √((1 + cosTheta) / 2) with cosTheta = prev·next:
-  //   straight (cosTheta = +1) → sin = 1 → v_j → ∞ (caller mins against target)
-  //   reversal (cosTheta = −1) → sin = 0 → v_j = 0 (must stop)
-  // The √((1 − cosTheta)/2) form is inverted: it collapses to ~0 velocity on
-  // gentle turns and BLOWS UP toward ∞ on near-reversals, so float noise that
-  // nudged a 180° corner off exactly −1 removed the required full stop.
-  const sinHalf = Math.sqrt((1 + clamped) / 2);
-  if (sinHalf >= 1) return Number.POSITIVE_INFINITY; // straight
-  if (sinHalf <= 0) return 0; // reversal
-  return Math.sqrt((accel * jd * sinHalf) / (1 - sinHalf));
-}
-
-function isContinuousFeedMatchedLaserJunction(prev: Block, next: Block): boolean {
-  return (
-    prev.feedMatchedLaserMotion === true &&
-    next.feedMatchedLaserMotion === true &&
-    prev.targetVelocity === next.targetVelocity
-  );
-}
-
-// Generalized trapezoidal time from v_entry through optional v_peak
-// to v_exit over a given distance, capped at v_target.
-export function blockTime(block: Block, entryV: number, exitV: number, accel: number): number {
-  const d = block.distance;
-  if (d <= 0) return 0;
-  const vTarget = block.targetVelocity;
-  // Distance needed to accel from entryV to vTarget then decel to exitV.
-  const dAccel = Math.max(0, (vTarget * vTarget - entryV * entryV) / (2 * accel));
-  const dDecel = Math.max(0, (vTarget * vTarget - exitV * exitV) / (2 * accel));
-  if (dAccel + dDecel <= d) {
-    // Trapezoid: hits vTarget, optional cruise.
-    const tAccel = (vTarget - entryV) / accel;
-    const tDecel = (vTarget - exitV) / accel;
-    const tCruise = (d - dAccel - dDecel) / vTarget;
-    return tAccel + tCruise + tDecel;
-  }
-  // Triangle: never reaches vTarget. Find the peak velocity v_peak that
-  // satisfies: dAccel(entry→peak) + dDecel(peak→exit) = d.
-  // Solving: v_peak² = (entry² + exit²)/2 + a·d
-  const vPeakSq = (entryV * entryV + exitV * exitV) / 2 + accel * d;
-  const vPeak = Math.sqrt(Math.max(0, vPeakSq));
-  // If the math says peak < max(entry, exit), the move is decel-only
-  // or accel-only — entry and exit can't both be satisfied at this
-  // distance with this accel. Fall back to the constraining single-
-  // phase time (no cruise, no triangle).
-  if (vPeak <= Math.max(entryV, exitV)) {
-    // Pure accel (entry < exit) or pure decel (entry > exit) over d.
-    // Time = 2d / (entry + exit) if entry+exit > 0; else accel-from-rest.
-    const sum = entryV + exitV;
-    if (sum > 0) return (2 * d) / sum;
-    return Math.sqrt((2 * d) / accel);
-  }
-  const tAccel = (vPeak - entryV) / accel;
-  const tDecel = (vPeak - exitV) / accel;
-  return tAccel + tDecel;
-}
-
 function distance(a: Vec2, b: Vec2): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -503,11 +351,10 @@ function unitVector(from: Vec2, to: Vec2, length: number): Vec2 {
   return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
 }
 
-function blockMotion(block: Block): BlockMotion {
-  return block.motion ?? (block.kind === 'cut' ? 'feed' : 'rapid');
-}
-
 // Compatibility note: a future per-group export could expose Block[]
 // for visualization (preview G-code velocity profile). Out of scope
 // for the estimator itself.
+// Kinematics now live in core/motion-planner; re-exported so existing
+// white-box planner tests keep importing them from here.
+export { blockTime, junctionVelocity, planVelocities };
 export type { Block, CutGroup, FillGroup };
