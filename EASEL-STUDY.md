@@ -217,10 +217,38 @@ So an operator who sets a full-depth profile cut and leaves tabs off gets a free
 Easel would have added tabs for them. This is the most concrete safety-relevant parity gap found in the
 Easel pass.
 
-**Action:** when a profile cut's depth reaches or exceeds material thickness *and* tabs are off, raise a
-**Job Review warning** (not a block, not an auto-change — rule 7 permits informing only). Auto-enabling
-tabs the way Easel does would silently rewrite the operator's program, which rule 7 forbids; warning
-achieves the protection without the rewrite. Worth an ADR.
+### D-14a — Tabs cannot be defaulted ON yet: they disable ADR-250 leads · **P1 BLOCKER**
+
+The maintainer asked for tabs default ON (2026-07-25). It was implemented, tested, and **reverted the
+same session** because it breaks a shipped safety feature. Evidence — 10+ failures across
+`compile-cnc-climb-default`, `compile-cnc-job`, `compile-cnc-lead`, and `compile-cnc-line-art`, the
+decisive one being `expected 'contour' to be 'path3d'`:
+
+1. `splitPassForTabs` (`compile-cnc-job.ts:398`, inside `passesForLayer` called at line 116) converts a
+   **closed** profile loop into **open** pieces — one per span between tab windows.
+2. `applyProfileLeadPasses` (`compile-cnc-job.ts:119`) runs **after** that and leads only **closed**
+   profile passes.
+3. Therefore **enabling tabs silently disables ADR-250 arc/line lead-in/out** — the feature added
+   specifically to stop square-entry gouging on profile cuts (`DECISIONS.md:11585`).
+
+Secondary effects of the flip, both inherent to tabs rather than bugs, but material at the shipped
+defaults (`tabHeightMm: 2`, `tabWidthMm: 6`, `tabsPerShape: 4`, 3.175 mm bit):
+
+- Total skipped perimeter is `4 × (6 + 3.175) = 36.7 mm`. On a contour whose perimeter is shorter than
+  that — a hole under ~11.7 mm diameter — the documented degenerate path (`cnc-tabs.ts:10-13`, AUDIT A5)
+  skips the deep pass entirely, so **small holes stop cutting through**.
+- When `depthMm ≤ tabHeightMm` (≤ 2 mm), `tabTopZMm` returns 0 and `passNeedsTabs` is true for every
+  pass, so a shallow profile groove gets four uncut gaps. Logically consistent — a tab taller than the
+  cut means "don't cut here" — but surprising as a default.
+
+**Prerequisite before the default can flip:** apply leads *before* tab splitting, or lead each split
+piece. Then re-evaluate the two secondary effects, likely by scoping tabs to passes that actually reach
+through-depth. Needs its own ADR and its own diff.
+
+Until then the correct remedy for D-14 remains the **Job Review warning**: when a profile cut's depth
+reaches or exceeds material thickness and tabs are off, inform the operator. Rule 7 permits informing
+only — and note that Easel's silent auto-enable would additionally have hit this same lead-disabling
+interaction.
 
 ### D-15 — Roughing/finishing bit model · **PARITY**
 

@@ -306,6 +306,14 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   plungeMmPerMin: 300,
   spindleRpm: 12000,
   stepoverPercent: 40,
+  // Tabs stay OFF by default pending the ADR-250 interaction fix. Defaulting them
+  // ON was attempted 2026-07-25 and reverted: splitPassForTabs
+  // (compile-cnc-job.ts:398, inside passesForLayer) converts a closed profile loop
+  // into OPEN pieces, and applyProfileLeadPasses (line 119) runs afterwards and
+  // only leads CLOSED passes — so enabling tabs silently disables ADR-250 arc/line
+  // lead-in/out, the feature that prevents square-entry gouging. Leads must be
+  // applied before tab splitting (or per piece) before this default can flip.
+  // See EASEL-STUDY.md D-14.
   tabsEnabled: false,
   tabHeightMm: 2,
   tabWidthMm: 6,
