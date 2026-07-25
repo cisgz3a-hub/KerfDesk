@@ -3,7 +3,9 @@
 
 export {
   firstCuttingPoint,
+  moveDepthRange,
   toolpathMoves3d,
+  type DepthRange,
   type Move3d,
   type Move3dKind,
   type Vec3,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Move3dKind } from '../../core/toolpath3d';
+import { viewer3dTheme } from '../theme/viewer3d-theme';
 import { toolpathLineStyle } from './viewer3d-toolpath-colors';
 
 const ALL_KINDS: readonly Move3dKind[] = ['cut', 'rapid', 'feed-travel', 'plunge', 'retract'];
@@ -44,6 +45,15 @@ describe('toolpathLineStyle', () => {
     // reads as a single continuous move that does not exist.
     const colors = ALL_KINDS.map((kind) => toolpathLineStyle(kind).color);
     expect(new Set(colors).size).toBe(ALL_KINDS.length);
+  });
+
+  it('keeps the 3D depth ramp identical to the 2D canvas ramp', () => {
+    // draw-cnc-removal.ts ramps the 2D depth map between these exact RGB
+    // endpoints. If the two drift, the same cut reads as two different depths
+    // depending on which preview the operator happens to be looking at — and
+    // nothing else in the suite would notice.
+    expect(viewer3dTheme.toolpath.depthShallow).toBe((196 << 16) | (160 << 8) | 116);
+    expect(viewer3dTheme.toolpath.depthDeep).toBe((74 << 16) | (48 << 8) | 28);
   });
 
   it('distinguishes rapid from feed travel', () => {

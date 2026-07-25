@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Toolpath } from '../job';
-import { toolpathMoves3d } from './toolpath-moves-3d';
+import { moveDepthRange, toolpathMoves3d } from './toolpath-moves-3d';
 
 function toolpath(steps: Toolpath['steps'], totalLength = 0): Toolpath {
   return { steps, totalLength };
@@ -151,6 +151,67 @@ describe('toolpathMoves3d', () => {
     );
 
     expect(moves[0]?.points.every((p) => Number.isFinite(p.z))).toBe(true);
+  });
+
+  it('measures the depth range across cutting moves only', () => {
+    // The retract climbs to +5. If clearance air counted, the ramp would span
+    // 5 to -3 and every actual cut would collapse into the same shade.
+    const moves = toolpathMoves3d(
+      toolpath([
+        {
+          kind: 'travel',
+          from: { x: 0, y: 0 },
+          to: { x: 1, y: 0 },
+          length: 1,
+          z: { from: 5, to: 5 },
+        },
+        { kind: 'plunge', at: { x: 1, y: 0 }, fromZ: 5, toZ: -1, length: 6 },
+        {
+          kind: 'cut',
+          color: '#000',
+          polyline: [
+            { x: 1, y: 0 },
+            { x: 2, y: 0 },
+          ],
+          length: 1,
+          z: { from: -3, to: -3 },
+        },
+        { kind: 'plunge', at: { x: 2, y: 0 }, fromZ: -3, toZ: 5, length: 8 },
+      ]),
+    );
+
+    // The downward plunge starts at +5, so that IS a cutting move's extent;
+    // what must be excluded is the travel and the retract.
+    const range = moveDepthRange(moves);
+    expect(range?.minZ).toBe(-3);
+    expect(range?.maxZ).toBe(5);
+  });
+
+  it('returns null for a job that never cuts', () => {
+    const moves = toolpathMoves3d(
+      toolpath([{ kind: 'travel', from: { x: 0, y: 0 }, to: { x: 5, y: 0 }, length: 5 }]),
+    );
+
+    expect(moveDepthRange(moves)).toBeNull();
+  });
+
+  it('reports a zero-width range for a single-depth job rather than failing', () => {
+    const moves = toolpathMoves3d(
+      toolpath([
+        {
+          kind: 'cut',
+          color: '#000',
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 5, y: 0 },
+          ],
+          length: 5,
+          z: { from: -2, to: -2 },
+        },
+      ]),
+    );
+
+    expect(moveDepthRange(moves)).toEqual({ minZ: -2, maxZ: -2 });
   });
 
   it('preserves program order across mixed step kinds', () => {

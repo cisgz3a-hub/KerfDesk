@@ -78,6 +78,36 @@ export function toolpathMoves3d(toolpath: Toolpath): ReadonlyArray<Move3d> {
 // Kinds where the bit is actually in the work.
 const CUTTING_KINDS: ReadonlySet<Move3dKind> = new Set<Move3dKind>(['cut', 'plunge']);
 
+export type DepthRange = {
+  readonly minZ: number;
+  readonly maxZ: number;
+};
+
+/**
+ * Z range spanned by the CUTTING moves, for a depth colour ramp.
+ *
+ * Deliberately ignores travels and retracts: those climb to safe height, and
+ * including them would stretch the ramp across clearance air so every real cut
+ * collapsed into one shade. Derived from Z rather than from `cut.passIndex`,
+ * which indexes the flat pass list — tab splits, extra contours and finishing
+ * passes included — and is therefore not a depth ordinal.
+ *
+ * @param moves Moves in program order.
+ * @returns The cutting Z range, or null if nothing cuts.
+ */
+export function moveDepthRange(moves: ReadonlyArray<Move3d>): DepthRange | null {
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  for (const move of moves) {
+    if (!CUTTING_KINDS.has(move.kind)) continue;
+    for (const point of move.points) {
+      if (point.z < minZ) minZ = point.z;
+      if (point.z > maxZ) maxZ = point.z;
+    }
+  }
+  return Number.isFinite(minZ) && Number.isFinite(maxZ) ? { minZ, maxZ } : null;
+}
+
 /**
  * Finds where the program first puts the tool into the material.
  *

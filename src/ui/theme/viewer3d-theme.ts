@@ -43,6 +43,11 @@ export const viewer3dTheme = {
     cut: 0x3f9fd0,
     plunge: 0xe07a35,
     retract: 0x8f7566,
+    // Depth ramp for cutting moves. Endpoints mirror the 2D canvas's
+    // SHALLOW_RGB/DEEP_RGB in draw-cnc-removal.ts so the two previews cannot
+    // tell the operator different stories about the same cut.
+    depthShallow: 0xc4a074,
+    depthDeep: 0x4a301c,
   },
   // Screen-space line widths in CSS pixels (worldUnits: false), so the path
   // stays legible at any zoom. Traversals are drawn thinner than cuts because

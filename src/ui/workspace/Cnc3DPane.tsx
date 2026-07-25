@@ -4,45 +4,22 @@
 // stays snappy) and renders the stock + cut heightfield through the ADR-102
 // three.js scene. UI-only; the compile path is the same one Preview uses.
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { steppedSurfaceMesh } from '../../core/heightfield';
-import { toolpathMoves3d, type Move3d } from '../../core/toolpath3d';
+import { useDeferredValue, useMemo } from 'react';
 import { toSceneCoords } from '../../core/devices';
-import {
-  computeRemovalGrid,
-  downsampleRemovalGrid,
-  DEFAULT_CELL_MM,
-  kernelForTool,
-  toolProfile,
-  type RemovalGrid,
-  type ToolProfilePoint,
-} from '../../core/sim';
 import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
+import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
+import { toolpathMoves3d } from '../../core/toolpath3d';
 import { useOutputScope, useStore } from '../state';
-import {
-  createReliefThreeScene,
-  type ReliefSceneHandle,
-} from '../relief-viewer/relief-three-scene';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
 import { buildPreviewToolpath } from './draw-preview';
+import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
 import { useCncCanvasFocus } from './use-cnc-canvas-focus';
 import { useCncPaneWidth } from './use-cnc-pane-width';
 
 // Coarser than the Preview grid — the pane recomputes on every edit.
 const PANE_TARGET_CELLS_PER_AXIS = 500;
-const PANE_DISPLAY_CELLS_ACROSS = 300;
 const CANVAS_WIDTH_PX = 244;
 const CANVAS_HEIGHT_PX = 240;
-
-type PaneSceneState = 'loading' | 'ready' | 'failed';
-
-// One simulation feeding two drawables: the carved surface and the path that
-// carved it. Both are in scene frame (ADR-254 §2).
-type DesignSceneSource = {
-  readonly grid: RemovalGrid;
-  readonly moves: ReadonlyArray<Move3d>;
-  readonly toolProfile: ReadonlyArray<ToolProfilePoint>;
-};
 
 export function Cnc3DPane(): JSX.Element | null {
   const project = useStore((s) => s.project);
@@ -146,61 +123,8 @@ function PaneScene(props: {
   readonly source: DesignSceneSource | null;
   readonly stockThicknessMm: number;
 }): JSX.Element | null {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const handleRef = useRef<ReliefSceneHandle | null>(null);
-  const [state, setState] = useState<PaneSceneState>('loading');
-  const { source, stockThicknessMm: thickness } = props;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null || source === null) return;
-    let cancelled = false;
-    setState('loading');
-    const { grid, moves, toolProfile: profile } = source;
-    const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
-    // Downsampling keeps the grid's min corner, so the full-resolution origin
-    // is still the right offset for the path.
-    void createReliefThreeScene(canvas, steppedSurfaceMesh(display), thickness, {
-      moves,
-      originMm: { x: grid.originX, y: grid.originY },
-      toolProfile: profile,
-    })
-      .then((outcome) => {
-        if (cancelled) {
-          if (outcome.kind === 'ok') outcome.handle.dispose();
-          return;
-        }
-        if (outcome.kind === 'ok') {
-          handleRef.current = outcome.handle;
-          // The pane is resizable, so fit the freshly-built scene to the
-          // canvas's actual laid-out size rather than its mount-time attrs.
-          outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
-          setState('ready');
-        } else {
-          setState('failed');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setState('failed');
-      });
-    return () => {
-      cancelled = true;
-      handleRef.current?.dispose();
-      handleRef.current = null;
-    };
-  }, [source, thickness]);
-
-  // Keep the renderer buffer in step with the resizable pane so the 3D view
-  // stays crisp at any width (the scene renders on demand, not on a rAF loop).
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      handleRef.current?.resize(canvas.clientWidth, canvas.clientHeight);
-    });
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, []);
+  const { source, stockThicknessMm } = props;
+  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm);
 
   if (source === null) return null;
   return (
