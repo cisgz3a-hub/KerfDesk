@@ -156,6 +156,38 @@ describe('Trace Image workflow controls', () => {
     }
   });
 
+  it('commits a CNC trace with no laser fill override', async () => {
+    const prior = useStore.getState();
+    const traceExistingImage = vi.fn();
+    useStore.setState({
+      project: {
+        ...prior.project,
+        machine: DEFAULT_CNC_MACHINE_CONFIG,
+        scene: { ...prior.project.scene, objects: [seedRaster()] },
+      },
+      traceExistingImage,
+    });
+    try {
+      await withTraceDialog(async (host) => {
+        const form = host.querySelector('form');
+        expect(form).toBeInstanceOf(HTMLFormElement);
+        await act(async () => {
+          form?.requestSubmit();
+        });
+        // commit() awaits the trace worker and the live-source re-check.
+        for (let i = 0; i < 5; i += 1) await act(async () => undefined);
+        expect(traceExistingImage).toHaveBeenCalledTimes(1);
+        // The fill style is laser-only and its picker is hidden on CNC.
+        // Committing mode:'fill' would silently hatch-engrave this object if
+        // the project were later switched to laser, from a setting the
+        // operator never saw.
+        expect(traceExistingImage.mock.calls[0]?.[1]).not.toHaveProperty('operationOverride');
+      });
+    } finally {
+      useStore.setState(prior, true);
+    }
+  });
+
   it('shows vector trace settings without image-adjustment controls', async () => {
     await withTraceDialog(async (host) => {
       const text = host.textContent ?? '';
