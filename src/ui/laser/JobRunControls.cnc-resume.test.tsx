@@ -36,7 +36,7 @@ describe('RunningControls CNC Resume advisory', () => {
     expect(labels).not.toContain('Resume');
     expect(labels).not.toContain('ABORT JOB');
     expect(labels).not.toContain('ABORT');
-    expect(host.textContent).toMatch(/confirm the spindle/i);
-    expect(host.textContent).toMatch(/newly reviewed recovery job/i);
+    expect(host.textContent).toMatch(/restarts the spindle/i);
+    expect(host.textContent).toMatch(/spins back up\s+engaged/i);
   });
 });

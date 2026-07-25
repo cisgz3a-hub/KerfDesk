@@ -143,7 +143,7 @@ describe('LiveMotionBar', () => {
     try {
       const resume = buttonByText(host, 'Resume');
       expect(resume?.disabled).toBe(false);
-      expect(resume?.title).toMatch(/confirm the spindle/i);
+      expect(resume?.title).toMatch(/restarts the spindle/i);
       expect(buttonByText(host, 'ABORT JOB')?.disabled).toBe(false);
       expect(host.textContent).toContain('JOB PAUSED');
     } finally {

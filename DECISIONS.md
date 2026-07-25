@@ -144,7 +144,7 @@
 | ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
-| ADR-180 | 2026-07-13 | Accepted | Generic same-session CNC Resume is manual-recovery-only |
+| ADR-180 | 2026-07-13 | Amended 2026-07-24 | Generic same-session CNC Resume is manual-recovery-only — resume refusal withdrawn, one-click resume enabled |
 | ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
 | ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
 | ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
@@ -458,7 +458,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-132):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -471,7 +471,7 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
 
-The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-132). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 
@@ -5946,7 +5946,9 @@ controller reset look like job recovery even though the durable checkpoint is a 
   controller evidence, but its incomplete/failed state is not itself a hard Laser Start gate.
   Missing `$30`/`$32` evidence follows the already accepted warning-and-acknowledgement path in Job
   Review, matching controllers that expose no numeric settings dump. A reported `$30` mismatch or
-  reported `$32=0` remains blocking. An in-flight settings transaction still owns the serial channel
+  reported `$32=0` remains blocking. **[SUPERSEDED later the same day by ADR-228 (2026-07-17): both
+  the `$30`-mismatch and `$32=0` Start blocks are withdrawn and are now Job Review warnings; a
+  completed Frame is the sole Start gate.]** An in-flight settings transaction still owns the serial channel
   until it settles. CNC Start and every supervised recovery keep the strict fresh-qualification
   requirement because spindle/WCS re-entry semantics cannot be inferred safely.
 - **Forget Controller** safely stops when necessary, closes/revokes transport, advances epochs, and
@@ -7761,6 +7763,43 @@ maintainer. Hardware-backed spindle-at-speed and machine-specific continuation
 remain a separate, fault-injected implementation rather than an inference from
 legacy GRBL telemetry.
 
+### Amendment 2 (2026-07-25) — CNC Pause parks the spindle via the safety-door byte
+
+Amendment 1 left CNC Pause as a bare feed hold, which stops motion but leaves the
+spindle commanded. The maintainer's requirement is the opposite: **pause should stop
+the spindle in place, and resume should spin it back up and continue the same line.**
+
+Researched against the firmware rather than reasoned about (CLAUDE.md rule 9). In
+[grbl/config.h](https://github.com/gnea/grbl/blob/master/grbl/config.h):
+`SAFETY_DOOR_SPINDLE_DELAY 4.0` and `SAFETY_DOOR_COOLANT_DELAY 1.0` are **active by
+default**, while `PARKING_ENABLE` is **commented out by default**. So GRBL's Door
+state decelerates in place and de-energizes spindle and coolant, and door-resume
+restores them and holds motion for the spin-up delay before continuing the
+interrupted move — exactly the requested behavior, minus any retract.
+
+- CNC Pause now sends the **safety-door byte** (`\x84`), the same path laser already
+  used, instead of `!`. The door branch is selected by driver capability
+  (`realtime.safetyDoor !== null`), no longer by machine kind.
+- CNC Resume is correspondingly **door-confirmed**: it waits for a fresh `Run`/`Idle`
+  report before refilling the stream, rather than firing `~` blind.
+- **No retract.** `PARKING_ENABLE` is off in stock GRBL, and its `PARKING_TARGET` is a
+  *machine coordinate* — meaningless on this project's no-homing router. A host-side
+  lift is deliberately not built: it would require abandoning the door hold for a
+  drain-to-Idle pause, reintroducing a re-entry seam. The cutter therefore spins up
+  while still engaged; the advisory says so.
+- **Accessory proof is required for laser only.** GRBL omits `A:` when nothing is
+  energized and emits `Ov:` only periodically, so a CNC controller can settle into
+  Door before any report carries accessory data. Demanding the field would time out
+  and fail-dark a correctly stopped job. A settled Door state is itself the
+  controller's report that it de-energized the spindle. The laser path keeps its
+  positive proof-of-beam-off requirement (ADR-179) unchanged — this narrows a
+  refusal, which rule 7 permits, and widens none.
+- Both CNC copy strings are rewritten; they previously told the operator the spindle
+  keeps spinning, which this makes false.
+- **Not hardware-verified.** No air-cut on a spindle machine. Whether this specific
+  4040 build reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build
+  facts confirmed only by running it.
+
 ### Amendment (2026-07-24) — same-session CNC Resume is one-click again
 
 The original decision's resume **refusal is withdrawn.** ADR-228 / CLAUDE.md
@@ -8851,7 +8890,9 @@ Work-Z matching.
   its non-blocking warning, and the one-click Scanline recovery action remain available.
 - Display general Start readiness warnings as non-blocking warning toasts. ADR-210's explicitly
   approved exception requires one focused acknowledgement when a laser controller's `$32` state
-  cannot be verified; a reported `$32=0` remains a hard refusal.
+  cannot be verified; a reported `$32=0` remains a hard refusal. **[SUPERSEDED by ADR-228
+  (2026-07-17): the reported-`$32=0` Start refusal is withdrawn and is now a Job Review warning.
+  ADR-228 lists "$32=0 on laser" among the controller-readiness Start errors it removed.]**
 - Classify Console effects by what a command can change. Accessory-only commands, dwell, and
   non-positional setting writes still invalidate their own stale observations, but preserve homing,
   frame, origin, Work-Z, WCO, and trusted-position evidence. Motion, coordinate, tool, reference,
@@ -9137,7 +9178,10 @@ containment strategy.
 - Recovery re-entry is hard-off: `M5`/`S0` precedes positioning, rapid repositioning is explicitly
   unpowered, and positive power is restored only on the first burn-motion line.
 - A laser Start whose controller cannot report `$32` requires one explicit Start-anyway
-  acknowledgement. A reported `$32=0` is still refused, and neither Machine Setup nor the confirmed
+  acknowledgement. A reported `$32=0` is still refused **[Start refusal SUPERSEDED by ADR-228
+  (2026-07-17): a reported `$32=0` no longer refuses laser Start — it is a Job Review warning, and
+  Frame is the sole Start gate. The setting-write restriction in the rest of this bullet stands.]**,
+  and neither Machine Setup nor the confirmed
   Console setting lane may write `$32=0` while the active project is a laser. Ordinary Start,
   start-from-line/recovery, and camera-marker burns all carry the same session-bound evidence to the
   final wire boundary. CNC/router projects retain their required `$32=0` path.
@@ -11859,3 +11903,73 @@ adds a lift where passes previously stacked in place.
   same-XY deeper pass emits `G0 Z<safe>` then replunges, and that the first pass
   gains no spurious retract; with the flag off the step-down-in-place output is
   unchanged.
+
+---
+
+## ADR-254 - Dependency audit runs on a schedule, not in the merge gate
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+`release:check` chained `pnpm audit:deps` (`pnpm audit --audit-level=low`)
+between `license-check` and `test`. Because the chain is sequential `&&`, an
+audit failure ended the run before the test suite, both builds, and the three
+size/export checks ever executed.
+
+Advisories are published by third parties on their own schedule. Any new one
+touching any transitive dependency - including devDependency-only paths that
+cannot reach shipped code - turned every open PR, every main push, and the
+CI-gated Cloudflare deploy red with no code change. This fired three times in
+July 2026 alone: `tar`, `postcss` (#395, 2026-07-24), and `brace-expansion`
+reached through `electron-builder` -> `@electron/asar`, which had every open
+branch failing at the two-minute mark on 2026-07-25. In each case the author's
+own diff was never verified; the red check said nothing about their work.
+
+The 2026-07-10 full-sweep audit recorded this as S14-F7 and proposed exactly
+this fix. It was not actioned then.
+
+### Decision
+
+Remove `pnpm audit:deps` from the `release:check` chain. The script itself stays
+for local and manual use. A new `.github/workflows/audit.yml` runs it nightly
+(03:17 UTC) plus on demand, and files a single open tracking issue when
+advisories appear - never a duplicate, so a standing finding does not generate
+nightly noise. GitHub Dependabot alerts were enabled the same day as a native
+second channel, alongside secret scanning and push protection.
+
+This is not a change of supply-chain posture. It changes *when* and *how loudly*
+the same signal arrives: from "blocks unrelated work immediately" to "tracked
+within 24 hours". An advisory reachable from a production dependency remains
+release-blocking - PROJECT.md still says a dependency CVE blocks releases until
+patched - but that judgment is now made by a human reading the issue, not by a
+chain position that also hides the test results.
+
+Rejected alternatives: raising the threshold to `--audit-level=high` (the
+brace-expansion advisory *was* high, so this would not have helped);
+`continue-on-error` after `test` (keeps the CI-minute cost on every PR to
+produce a signal nobody is required to read).
+
+### Consequences
+
+- A production-reachable advisory can now merge and deploy without a red check.
+  The nightly issue is the backstop and Dependabot alerts are the second.
+  Accepted deliberately: the previous design blocked so indiscriminately that
+  the standing response was to write an override and move on, which is not
+  triage either.
+- `deploy:web` and `deploy:web:preview` call `release:check`, so deploys stop
+  being blocked by third-party advisory timing. That is the intended effect.
+- The five workflows that invoke `release:check` (ci, deploy, and the three
+  desktop release legs) all lose the audit step. A production CVE matters most
+  at desktop release time, so triage the open audit issue before cutting a `v*`
+  tag.
+
+### Verification
+
+- `deploy-workflow-gate.test.ts` asserts `release:check` no longer contains
+  `audit`, that `audit:deps` still exists unchanged, and that
+  `.github/workflows/audit.yml` runs it under a `cron:` schedule - pinning both
+  halves so neither the outage vector nor the audit itself returns by reflex.
+- NOT verified: the scheduled workflow has never fired. Its issue-filing path is
+  unexercised until the first nightly run or a manual `workflow_dispatch`.

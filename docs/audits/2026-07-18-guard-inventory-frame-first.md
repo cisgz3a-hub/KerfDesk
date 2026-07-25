@@ -1,5 +1,14 @@
 # Full guard/block/alarm inventory — frame-first disposition (ADR-228)
 
+> **DATED SNAPSHOT (2026-07-18) — no longer a current inventory.** Two known drifts
+> since: (1) the **CNC Resume manual-recovery block listed below as KEPT was removed
+> on 2026-07-24** when the maintainer enabled one-click CNC resume and ADR-180 was
+> amended — that refusal no longer exists; (2) despite the "full inventory" title,
+> this document enumerates only non-Start surfaces and **omits the Frame surface
+> itself**, so it is not a complete census. Re-derive from the tree before relying on
+> it. The governing rule is `CLAUDE.md` collaboration rule 7 / ADR-228 as clarified
+> by ADR-232, not this list.
+
 **Date:** 2026-07-18 · **Directive:** maintainer, verbatim: "FRAME IS SOURCE OF TRUTH … when a
 frame completes. start can start with no blocks or guards or checks at all. no alarm. frame is
 good start is open … no guard will ever be created again."
