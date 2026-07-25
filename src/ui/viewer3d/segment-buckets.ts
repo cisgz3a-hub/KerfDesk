@@ -19,11 +19,15 @@ export type SolidBucket = {
   readonly positions: Float32Array;
   /** Normalized rgb at both segment endpoints (6 floats per segment). */
   readonly colors: Float32Array;
+  /** Render-model segment index of each bucket entry, ascending. */
+  readonly sourceIndex: Uint32Array;
 };
 
 export type TravelBucket = {
   readonly count: number;
   readonly positions: Float32Array;
+  /** Render-model segment index of each bucket entry, ascending. */
+  readonly sourceIndex: Uint32Array;
 };
 
 export type SegmentBuckets = {
@@ -43,6 +47,8 @@ export function buildSegmentBuckets(
   const travelPositions = new Float32Array(travelCount * FLOATS_PER_SEGMENT);
   const solidPositions = new Float32Array(solidCount * FLOATS_PER_SEGMENT);
   const solidColors = new Float32Array(solidCount * FLOATS_PER_SEGMENT);
+  const travelSource = new Uint32Array(travelCount);
+  const solidSource = new Uint32Array(solidCount);
   const kindRgb = kindColorTable(theme);
   let travelAt = 0;
   let solidAt = 0;
@@ -50,17 +56,41 @@ export function buildSegmentBuckets(
     const kind = segments.segKind[index] ?? SEG_KIND.travel;
     if (kind === SEG_KIND.travel) {
       copySegment(segments.positions, index, travelPositions, travelAt);
+      travelSource[travelAt / FLOATS_PER_SEGMENT] = index;
       travelAt += FLOATS_PER_SEGMENT;
       continue;
     }
     copySegment(segments.positions, index, solidPositions, solidAt);
     writeEndpointColors(solidColors, solidAt, kindRgb.get(kind) ?? FALLBACK_RGB);
+    solidSource[solidAt / FLOATS_PER_SEGMENT] = index;
     solidAt += FLOATS_PER_SEGMENT;
   }
   return {
-    solid: { count: solidCount, positions: solidPositions, colors: solidColors },
-    travel: { count: travelCount, positions: travelPositions },
+    solid: {
+      count: solidCount,
+      positions: solidPositions,
+      colors: solidColors,
+      sourceIndex: solidSource,
+    },
+    travel: { count: travelCount, positions: travelPositions, sourceIndex: travelSource },
   };
+}
+
+/**
+ * How many entries of a bucket fall at or before `segmentIndex` — the draw
+ * count that reveals geometry up to the playhead. `sourceIndex` is ascending,
+ * so this is a binary search (called once per bucket per frame).
+ */
+export function revealCount(sourceIndex: Uint32Array, segmentIndex: number): number {
+  if (segmentIndex < 0) return 0;
+  let low = 0;
+  let high = sourceIndex.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if ((sourceIndex[mid] ?? 0) <= segmentIndex) low = mid + 1;
+    else high = mid;
+  }
+  return low;
 }
 
 function countTravelSegments(segments: Viewer3dSegmentsInput): number {

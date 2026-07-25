@@ -4,6 +4,7 @@
 
 import { SEG_KIND, type GcodeRenderModel, type ProgramStats } from '../../core/gcode-view';
 import { cssHexColor, type Viewer3dTheme } from '../viewer3d';
+import type { PlayheadState } from './playhead';
 
 export type Readout = {
   readonly label: string;
@@ -16,31 +17,49 @@ export type LegendEntry = {
   readonly count: number;
 };
 
-/** Modal machine state at the end of the program (stage 5 makes it follow
- * the playhead; the shape is already playhead-shaped). */
-export function droRows(model: GcodeRenderModel): ReadonlyArray<Readout> {
-  const last = model.segmentCount - 1;
-  if (last < 0) {
-    return [
-      { label: 'X', value: '—' },
-      { label: 'Y', value: '—' },
-      { label: 'Z', value: '—' },
-      { label: 'F', value: '—' },
-      { label: 'S', value: '—' },
-      { label: 'Line', value: '—' },
-    ];
-  }
-  const base = last * 6;
-  const feed = model.segFeed[last] ?? 0;
-  const power = model.segPower[last] ?? 0;
+const EMPTY_DRO: ReadonlyArray<Readout> = [
+  { label: 'X', value: '—' },
+  { label: 'Y', value: '—' },
+  { label: 'Z', value: '—' },
+  { label: 'F', value: '—' },
+  { label: 'S', value: '—' },
+  { label: 'Line', value: '—' },
+];
+
+/**
+ * Modal machine state at the playhead: the interpolated tool position plus
+ * the F / S / source line of the segment being executed. Falls back to the
+ * program's final segment when no playhead is supplied.
+ */
+export function droRows(model: GcodeRenderModel, playhead?: PlayheadState): ReadonlyArray<Readout> {
+  const index =
+    playhead === undefined || playhead.segmentIndex < 0
+      ? model.segmentCount - 1
+      : playhead.segmentIndex;
+  if (index < 0) return EMPTY_DRO;
+  const feed = model.segFeed[index] ?? 0;
+  const power = model.segPower[index] ?? 0;
+  const point = playhead?.point ?? segmentEndPoint(model, index);
   return [
-    { label: 'X', value: `${num(model.positions[base + 3] ?? 0)} mm` },
-    { label: 'Y', value: `${num(model.positions[base + 4] ?? 0)} mm` },
-    { label: 'Z', value: `${num(model.positions[base + 5] ?? 0)} mm` },
+    { label: 'X', value: `${num(point.x)} mm` },
+    { label: 'Y', value: `${num(point.y)} mm` },
+    { label: 'Z', value: `${num(point.z)} mm` },
     { label: 'F', value: feed > 0 ? `${Math.round(feed)} mm/min` : '—' },
     { label: 'S', value: power > 0 ? `${num(power)}` : '—' },
-    { label: 'Line', value: `${(model.segLine[last] ?? 0) + 1}` },
+    { label: 'Line', value: `${(model.segLine[index] ?? 0) + 1}` },
   ];
+}
+
+function segmentEndPoint(
+  model: GcodeRenderModel,
+  index: number,
+): { readonly x: number; readonly y: number; readonly z: number } {
+  const base = index * 6;
+  return {
+    x: model.positions[base + 3] ?? 0,
+    y: model.positions[base + 4] ?? 0,
+    z: model.positions[base + 5] ?? 0,
+  };
 }
 
 export function legendEntries(

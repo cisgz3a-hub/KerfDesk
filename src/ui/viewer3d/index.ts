@@ -3,6 +3,7 @@
 
 export {
   createViewer3dScene,
+  type PlayheadMarker,
   type Viewer3dSceneHandle,
   type Viewer3dSceneResult,
   type Viewer3dSegments,
@@ -10,6 +11,7 @@ export {
 export {
   buildSegmentBuckets,
   cssHexColor,
+  revealCount,
   rgbTriple,
   type SegmentBuckets,
   type Viewer3dSegmentsInput,

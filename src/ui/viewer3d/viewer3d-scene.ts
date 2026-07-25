@@ -13,16 +13,31 @@ import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import type * as OrbitControlsModule from 'three/examples/jsm/controls/OrbitControls.js';
 import type { AxisBounds } from '../../core/gcode-view';
-import { buildSegmentBuckets, type Viewer3dSegmentsInput } from './segment-buckets';
+import {
+  buildSegmentBuckets,
+  revealCount,
+  type SegmentBuckets,
+  type Viewer3dSegmentsInput,
+} from './segment-buckets';
+import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
 
 export type Viewer3dSegments = Viewer3dSegmentsInput;
+
+export type PlayheadMarker = {
+  /** Reveal geometry through this segment; -1 hides everything. */
+  readonly segmentIndex: number;
+  /** Interpolated tool position, or null to hide the marker. */
+  readonly point: { readonly x: number; readonly y: number; readonly z: number } | null;
+};
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
   readonly fitToBounds: (bounds: AxisBounds | null) => void;
   /** LightBurn's "show traversal moves" toggle. */
   readonly setTravelVisible: (visible: boolean) => void;
+  /** Reveal up to the playhead and place the tool marker (null = show all). */
+  readonly setPlayhead: (playhead: PlayheadMarker | null) => void;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
   readonly dispose: () => void;
@@ -36,20 +51,22 @@ const MAX_PIXEL_RATIO = 2;
 const CAMERA_FOV_DEG = 40;
 const TRAVEL_OPACITY = 0.45;
 const FAT_LINE_PX = 2.5;
-const FIT_DISTANCE_FACTOR = 1.7;
-const DEFAULT_VIEW_MM = 100;
-const GRID_STEP_MM = 10;
+const MARKER_RADIUS_FRACTION = 0.012;
+const MARKER_MIN_RADIUS_MM = 0.4;
+const MARKER_COLOR = 0xffffff;
 
 type ThreeModule = typeof ThreeNamespace;
 
-// Every three module the scene needs, loaded in one lazy chunk (ADR-102 §3).
-async function loadThree(): Promise<{
+type ThreeModules = {
   readonly three: ThreeModule;
   readonly OrbitControls: OrbitControlsCtor;
   readonly LineSegments2: typeof LineSegments2Module.LineSegments2;
   readonly LineSegmentsGeometry: typeof LineSegmentsGeometryModule.LineSegmentsGeometry;
   readonly LineMaterial: typeof LineMaterialModule.LineMaterial;
-}> {
+};
+
+// Every three module the scene needs, loaded in one lazy chunk (ADR-102 §3).
+async function loadThree(): Promise<ThreeModules> {
   const three = await import('three');
   const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
   const { LineSegments2 } = await import('three/examples/jsm/lines/LineSegments2.js');
@@ -59,8 +76,8 @@ async function loadThree(): Promise<{
 }
 
 export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Viewer3dSceneResult> {
-  const { three, OrbitControls, LineSegments2, LineSegmentsGeometry, LineMaterial } =
-    await loadThree();
+  const modules = await loadThree();
+  const { three, OrbitControls } = modules;
   const theme = resolveViewer3dTheme(canvas);
 
   const started = startRenderer(three, canvas, theme);
@@ -73,23 +90,54 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
   scene.add(toolpathGroup);
   scene.add(furnitureGroup);
 
-  const { camera, controls, render } = createCameraRig(three, OrbitControls, {
+  const rig = createCameraRig(three, OrbitControls, { renderer, scene, canvas, width, height });
+  const handle = createSceneHandle({
+    modules,
+    theme,
     renderer,
     scene,
-    canvas,
+    toolpathGroup,
+    furnitureGroup,
+    rig,
     width,
     height,
   });
+  handle.fitToBounds(null);
+  return { kind: 'ok', handle };
+}
+
+type SceneHandleDeps = {
+  readonly modules: ThreeModules;
+  readonly theme: Viewer3dTheme;
+  readonly renderer: WebGLRenderer;
+  readonly scene: ThreeNamespace.Scene;
+  readonly toolpathGroup: Object3D;
+  readonly furnitureGroup: Object3D;
+  readonly rig: CameraRig;
+  readonly width: number;
+  readonly height: number;
+};
+
+// Owns the scene's mutable render state (current buffers, reveal targets,
+// traversal visibility, view size) behind the handle's function surface.
+function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
+  const { modules, theme, renderer, scene, toolpathGroup, furnitureGroup } = deps;
+  const { three, LineSegments2, LineSegmentsGeometry, LineMaterial } = modules;
+  const { camera, controls, render } = deps.rig;
 
   // Fat-line materials size their strokes against the drawing buffer, so the
   // current view size is tracked and pushed into the material on resize.
-  let viewWidth = width;
-  let viewHeight = height;
+  let viewWidth = deps.width;
+  let viewHeight = deps.height;
   let fatMaterial: LineMaterialType | null = null;
   let travelObject: Object3D | null = null;
   let travelVisible = true;
+  let reveal: RevealTargets | null = null;
+  const marker = createMarker(three);
+  marker.visible = false;
+  scene.add(marker);
 
-  const handle: Viewer3dSceneHandle = {
+  return {
     setSegments: (segments) => {
       disposeChildren(toolpathGroup);
       const built = buildToolpathObjects({
@@ -105,7 +153,19 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
       });
       fatMaterial = built.fatMaterial;
       travelObject = built.travelObject;
+      reveal = built.reveal;
       for (const object of built.objects) toolpathGroup.add(object);
+      sizeMarker(marker, segments);
+      render();
+    },
+    setPlayhead: (playhead) => {
+      applyReveal(reveal, playhead);
+      if (playhead?.point == null) {
+        marker.visible = false;
+      } else {
+        marker.visible = true;
+        marker.position.set(playhead.point.x, playhead.point.y, playhead.point.z);
+      }
       render();
     },
     fitToBounds: (bounds) => {
@@ -137,11 +197,63 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
       controls.dispose();
       disposeChildren(toolpathGroup);
       disposeChildren(furnitureGroup);
+      scene.remove(marker);
+      marker.geometry.dispose();
+      marker.material.dispose();
       renderer.dispose();
     },
   };
-  handle.fitToBounds(null);
-  return { kind: 'ok', handle };
+}
+
+// A small emissive ball at the interpolated head position: readable against
+// both cuts and rapids, and tool-shape-agnostic (an external program carries
+// no tool record). Stage 12+ swaps in a LatheGeometry profile when the tool
+// is known.
+function createMarker(
+  three: ThreeModule,
+): ThreeNamespace.Mesh<ThreeNamespace.SphereGeometry, ThreeNamespace.MeshBasicMaterial> {
+  return new three.Mesh(
+    new three.SphereGeometry(1, 16, 12),
+    new three.MeshBasicMaterial({ color: MARKER_COLOR }),
+  );
+}
+
+// Scale the marker to the job so it reads at any program size.
+function sizeMarker(marker: ThreeNamespace.Object3D, segments: Viewer3dSegments): void {
+  let span = 0;
+  for (let index = 0; index < segments.segmentCount * 6; index += 3) {
+    span = Math.max(span, Math.abs(segments.positions[index] ?? 0));
+  }
+  const radius = Math.max(MARKER_MIN_RADIUS_MM, span * MARKER_RADIUS_FRACTION);
+  marker.scale.setScalar(radius);
+}
+
+type RevealTargets = {
+  readonly solid: { readonly geometry: { instanceCount: number }; readonly total: number } | null;
+  readonly solidSource: Uint32Array;
+  readonly travel: {
+    readonly geometry: ThreeNamespace.BufferGeometry;
+    readonly total: number;
+  } | null;
+  readonly travelSource: Uint32Array;
+};
+
+// Reveal by draw count only — no buffer reallocation. Fat lines are instanced
+// (one instance per segment), thin lines use setDrawRange over vertex pairs.
+function applyReveal(targets: RevealTargets | null, playhead: PlayheadMarker | null): void {
+  if (targets === null) return;
+  const showAll = playhead === null;
+  if (targets.solid !== null) {
+    targets.solid.geometry.instanceCount = showAll
+      ? targets.solid.total
+      : revealCount(targets.solidSource, playhead.segmentIndex);
+  }
+  if (targets.travel !== null) {
+    const count = showAll
+      ? targets.travel.total
+      : revealCount(targets.travelSource, playhead.segmentIndex);
+    targets.travel.geometry.setDrawRange(0, count * 2);
+  }
 }
 
 // WebGL context creation is the one failure mode this module tolerates: jsdom
@@ -230,11 +342,14 @@ function buildToolpathObjects(args: ToolpathBuildArgs): {
   readonly objects: ReadonlyArray<Object3D>;
   readonly fatMaterial: LineMaterialType | null;
   readonly travelObject: Object3D | null;
+  readonly reveal: RevealTargets;
 } {
   const buckets = buildSegmentBuckets(args.segments, args.theme);
   const objects: Object3D[] = [];
   let fatMaterial: LineMaterialType | null = null;
   let travelObject: Object3D | null = null;
+  let solidTarget: RevealTargets['solid'] = null;
+  let travelTarget: RevealTargets['travel'] = null;
   if (buckets.solid.count > 0) {
     const geometry = new args.LineSegmentsGeometry();
     geometry.setPositions(buckets.solid.positions);
@@ -244,19 +359,40 @@ function buildToolpathObjects(args: ToolpathBuildArgs): {
     const lines = new args.LineSegments2(geometry, fatMaterial);
     lines.renderOrder = 1;
     objects.push(lines);
+    solidTarget = { geometry, total: buckets.solid.count };
   }
   if (buckets.travel.count > 0) {
-    travelObject = lineSegmentsObject(
+    const travel = lineSegmentsObject(
       args.three,
       buckets.travel.positions,
       args.theme.travel,
       TRAVEL_OPACITY,
       0,
     );
-    travelObject.visible = args.travelVisible;
-    objects.push(travelObject);
+    travel.visible = args.travelVisible;
+    travelObject = travel;
+    objects.push(travel);
+    travelTarget = { geometry: travel.geometry, total: buckets.travel.count };
   }
-  return { objects, fatMaterial, travelObject };
+  return {
+    objects,
+    fatMaterial,
+    travelObject,
+    reveal: revealTargets(buckets, solidTarget, travelTarget),
+  };
+}
+
+function revealTargets(
+  buckets: SegmentBuckets,
+  solid: RevealTargets['solid'],
+  travel: RevealTargets['travel'],
+): RevealTargets {
+  return {
+    solid,
+    solidSource: buckets.solid.sourceIndex,
+    travel,
+    travelSource: buckets.travel.sourceIndex,
+  };
 }
 
 function lineSegmentsObject(
@@ -265,7 +401,7 @@ function lineSegmentsObject(
   color: number,
   opacity: number,
   renderOrder: number,
-): Object3D {
+): ThreeNamespace.LineSegments<ThreeNamespace.BufferGeometry, ThreeNamespace.LineBasicMaterial> {
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.BufferAttribute(positions, 3));
   const material = new three.LineBasicMaterial({
@@ -276,65 +412,4 @@ function lineSegmentsObject(
   const lines = new three.LineSegments(geometry, material);
   lines.renderOrder = renderOrder;
   return lines;
-}
-
-function buildFurniture(
-  three: ThreeModule,
-  bounds: AxisBounds | null,
-  theme: Viewer3dTheme,
-): ReadonlyArray<Object3D> {
-  const extent = boundsExtent(bounds);
-  const gridSize = Math.ceil((extent * FIT_DISTANCE_FACTOR) / GRID_STEP_MM) * GRID_STEP_MM * 2;
-  const divisions = Math.max(2, Math.round(gridSize / GRID_STEP_MM));
-  const grid = new three.GridHelper(gridSize, divisions, theme.gridMajor, theme.gridMinor);
-  // GridHelper lies in XZ; rotate onto the XY work plane (Z-up frame).
-  grid.rotation.x = Math.PI / 2;
-  const center = boundsCenter(bounds);
-  grid.position.set(center.x, center.y, 0);
-  const axes = new three.AxesHelper(Math.max(GRID_STEP_MM, extent * 0.25));
-  return [grid, axes];
-}
-
-function frameCamera(
-  camera: PerspectiveCamera,
-  controls: { target: { set: (x: number, y: number, z: number) => void }; update: () => void },
-  bounds: AxisBounds | null,
-): void {
-  const center = boundsCenter(bounds);
-  const distance = boundsExtent(bounds) * FIT_DISTANCE_FACTOR;
-  camera.position.set(center.x + distance * 0.6, center.y - distance * 0.6, distance * 0.55);
-  controls.target.set(center.x, center.y, center.z);
-  camera.lookAt(center.x, center.y, center.z);
-  controls.update();
-}
-
-function boundsCenter(bounds: AxisBounds | null): { x: number; y: number; z: number } {
-  if (bounds === null) return { x: 0, y: 0, z: 0 };
-  return {
-    x: (bounds.minX + bounds.maxX) / 2,
-    y: (bounds.minY + bounds.maxY) / 2,
-    z: (bounds.minZ + bounds.maxZ) / 2,
-  };
-}
-
-function boundsExtent(bounds: AxisBounds | null): number {
-  if (bounds === null) return DEFAULT_VIEW_MM;
-  const spanX = bounds.maxX - bounds.minX;
-  const spanY = bounds.maxY - bounds.minY;
-  const spanZ = bounds.maxZ - bounds.minZ;
-  return Math.max(spanX, spanY, spanZ, GRID_STEP_MM);
-}
-
-// Complete disposal: geometry AND material of every child (the pre-ADR-255
-// scene leaked materials on every rebuild — [R3D] gap 4).
-function disposeChildren(group: Object3D): void {
-  for (const child of [...group.children]) {
-    group.remove(child);
-    const mesh = child as { geometry?: { dispose?: () => void }; material?: unknown };
-    mesh.geometry?.dispose?.();
-    const material = mesh.material;
-    for (const entry of Array.isArray(material) ? material : [material]) {
-      (entry as { dispose?: () => void } | undefined)?.dispose?.();
-    }
-  }
 }

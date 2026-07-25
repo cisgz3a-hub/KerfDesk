@@ -12,10 +12,12 @@ import {
   type LegendEntry,
   type Readout,
 } from './inspector-readouts';
+import type { PlayheadState } from './playhead';
 
 export function InspectorSidebar(props: {
   readonly model: GcodeRenderModel;
   readonly theme: Viewer3dTheme;
+  readonly playhead: PlayheadState;
   readonly travelVisible: boolean;
   readonly onTravelVisibleChange: (visible: boolean) => void;
 }): JSX.Element {
@@ -23,7 +25,7 @@ export function InspectorSidebar(props: {
   return (
     <aside style={sidebarStyle} aria-label="Program readouts">
       <Section title="Position">
-        <ReadoutGrid rows={droRows(props.model)} />
+        <ReadoutGrid rows={droRows(props.model, props.playhead)} />
       </Section>
       <Section title="Moves">
         <Legend entries={legendEntries(props.model, props.theme)} />

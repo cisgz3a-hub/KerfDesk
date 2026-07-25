@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SEG_KIND } from '../../core/gcode-view';
-import { buildSegmentBuckets, cssHexColor, rgbTriple } from './segment-buckets';
+import { buildSegmentBuckets, cssHexColor, revealCount, rgbTriple } from './segment-buckets';
 import type { Viewer3dTheme } from './viewer3d-theme';
 
 const THEME: Viewer3dTheme = {
@@ -30,6 +30,33 @@ describe('buildSegmentBuckets', () => {
     expect(buckets.solid.colors[8]).toBeCloseTo(1, 6);
     expect(buckets.solid.colors[11]).toBeCloseTo(1, 6);
     expect(buckets.solid.colors[0]).toBeCloseTo(0, 6);
+  });
+});
+
+describe('revealCount', () => {
+  it('counts bucket entries at or before the playhead segment', () => {
+    // Bucket holds render-model segments 0, 2, 5.
+    const source = new Uint32Array([0, 2, 5]);
+    expect(revealCount(source, -1)).toBe(0);
+    expect(revealCount(source, 0)).toBe(1);
+    expect(revealCount(source, 1)).toBe(1);
+    expect(revealCount(source, 2)).toBe(2);
+    expect(revealCount(source, 4)).toBe(2);
+    expect(revealCount(source, 5)).toBe(3);
+    expect(revealCount(source, 99)).toBe(3);
+  });
+
+  it('maps buckets back to their source segments', () => {
+    const segments = {
+      segmentCount: 4,
+      positions: new Float32Array(24),
+      segKind: new Uint8Array([SEG_KIND.travel, SEG_KIND.cut, SEG_KIND.travel, SEG_KIND.plunge]),
+    };
+    const buckets = buildSegmentBuckets(segments, THEME);
+    expect([...buckets.travel.sourceIndex]).toEqual([0, 2]);
+    expect([...buckets.solid.sourceIndex]).toEqual([1, 3]);
+    expect(revealCount(buckets.solid.sourceIndex, 1)).toBe(1);
+    expect(revealCount(buckets.travel.sourceIndex, 1)).toBe(1);
   });
 });
 

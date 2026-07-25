@@ -6,8 +6,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
-import { createViewer3dScene, resolveViewer3dTheme, type Viewer3dSceneHandle } from '../viewer3d';
+import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
+import { InspectorTimeline } from './InspectorTimeline';
+import { playheadAt } from './playhead';
+import { useInspectorPlayback } from './use-inspector-playback';
+import { useViewer3dScene } from './use-viewer3d-scene';
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -17,8 +21,6 @@ export type GcodeInspectorDialogProps = {
   readonly onOpen2dSimulator?: () => void;
   readonly onClose: () => void;
 };
-
-type SceneState = 'loading' | 'ready' | 'no-webgl';
 
 export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Element {
   const result = useMemo(() => buildGcodeRenderModel(props.text), [props.text]);
@@ -58,70 +60,37 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
 
 function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const handleRef = useRef<Viewer3dSceneHandle | null>(null);
-  const [state, setState] = useState<SceneState>('loading');
-  const [reason, setReason] = useState('');
   const [travelVisible, setTravelVisible] = useState(true);
   const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
   const { model } = props;
+  const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
+  const playback = useInspectorPlayback(model.totalRouteMm);
+  const playhead = useMemo(() => playheadAt(model, playback.routeMm), [model, playback.routeMm]);
+  // Fully-drawn playhead = show everything, so the scene never hides the tail
+  // segment to floating-point rounding.
+  const atEnd = playback.routeMm >= model.totalRouteMm;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null) return;
-    let cancelled = false;
-    setState('loading');
-    void createViewer3dScene(canvas)
-      .then((outcome) => {
-        if (cancelled) {
-          if (outcome.kind === 'ok') outcome.handle.dispose();
-          return;
-        }
-        if (outcome.kind === 'ok') {
-          handleRef.current = outcome.handle;
-          outcome.handle.setSegments(model);
-          outcome.handle.fitToBounds(model.stats.motionBounds);
-          outcome.handle.resize(canvas.clientWidth, canvas.clientHeight);
-          setState('ready');
-        } else {
-          setReason(outcome.reason);
-          setState('no-webgl');
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setReason(err instanceof Error ? err.message : String(err));
-        setState('no-webgl');
-      });
-    return () => {
-      cancelled = true;
-      handleRef.current?.dispose();
-      handleRef.current = null;
-    };
-  }, [model]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      handleRef.current?.resize(canvas.clientWidth, canvas.clientHeight);
-    });
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, []);
+    handleRef.current?.setPlayhead(atEnd ? null : playhead);
+  }, [handleRef, playhead, atEnd, state]);
 
   return (
-    <div style={bodyStyle}>
-      <div style={viewportStyle}>
-        <canvas ref={canvasRef} style={canvasStyle} />
-        {state === 'no-webgl' ? (
-          <p style={messageStyle}>
-            3D view unavailable: {reason} The program parsed — readouts are live.
-          </p>
-        ) : null}
+    <div style={bodyRowStyle}>
+      <div style={viewColumnStyle}>
+        <div style={viewportStyle}>
+          <canvas ref={canvasRef} style={canvasStyle} />
+          {state === 'no-webgl' ? (
+            <p style={messageStyle}>
+              3D view unavailable: {reason} The program parsed — readouts are live.
+            </p>
+          ) : null}
+        </div>
+        <InspectorTimeline playback={playback} totalRouteMm={model.totalRouteMm} />
       </div>
       <InspectorSidebar
         model={model}
         theme={theme}
+        playhead={playhead}
         travelVisible={travelVisible}
         onTravelVisibleChange={(visible) => {
           setTravelVisible(visible);
@@ -184,16 +153,23 @@ const headerStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--lf-border)',
 };
 
-const bodyStyle: React.CSSProperties = {
+const bodyRowStyle: React.CSSProperties = {
   display: 'flex',
   flex: 1,
   minHeight: 0,
 };
 
+const viewColumnStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  flex: 1,
+  minWidth: 0,
+};
+
 const viewportStyle: React.CSSProperties = {
   position: 'relative',
   flex: 1,
-  minWidth: 0,
+  minHeight: 0,
 };
 
 const canvasStyle: React.CSSProperties = {
