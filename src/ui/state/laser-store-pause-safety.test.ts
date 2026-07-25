@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_HOLD, RT_RESUME } from '../../core/controllers/grbl';
-import { RT_SAFETY_DOOR } from '../../core/controllers/grbl/commands';
+import { RT_SAFETY_DOOR, RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
@@ -218,6 +218,45 @@ describe('laser-store pause safety', () => {
     expect(writes).toContain(RT_RESUME);
     expect(useLaserStore.getState().streamer?.status).not.toBe('paused');
   });
+
+  // ADR-180 amendment 3: amendment 2 made CNC Pause wait for a settled Door.
+  // A controller that never reports one would previously fall through to
+  // `requestFailDarkStop` — a soft reset that scraps a recoverable job. Pause
+  // failing is acceptable; Pause destroying the run is not.
+  it('keeps a CNC job when Pause never confirms — no fail-dark reset', async () => {
+    const writes: string[] = [];
+    let liveConnection: FakeConnection | null = null;
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === 'G4 P0.01\n') setTimeout(() => liveConnection?.emitLine('ok'), 0);
+      // Never reports Door — the exact controller shape that used to kill the job.
+      if (data === '?') {
+        setTimeout(() => {
+          liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+        }, 0);
+      }
+    });
+    liveConnection = connection;
+    await connectWith(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });
+    const gcode = 'G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n';
+    await useLaserStore.getState().startJob(gcode, {
+      machineKind: 'cnc',
+      cncSetupAttestation: createCncSetupAttestation(
+        gcode,
+        cncControllerEpochOf(useLaserStore.getState()),
+      ),
+    });
+    writes.length = 0;
+
+    await useLaserStore
+      .getState()
+      .pauseJob()
+      .catch(() => undefined);
+
+    expect(writes).not.toContain(RT_SOFT_RESET);
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+  }, 10_000);
 
   it('uses Safety Door when GRBL reports laser mode disabled', async () => {
     const writes: string[] = [];
