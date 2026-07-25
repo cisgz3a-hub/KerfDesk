@@ -7,7 +7,13 @@ here was fixed in this session — this document set is **audit-only** per CLAUD
 
 ## Ranked weaknesses
 
-### W-01 — The LightBurn reference document does not exist · **P1, blocks Phase 2**
+### W-01 — The LightBurn reference document did not exist · **PARTIALLY RESOLVED 2026-07-25**
+
+> **Update.** `LIGHTBURN-STUDY.md` now exists at the repo root, rebuilt from fetched LightBurn
+> documentation. §§1–4 (device/G-code settings, layer modes, image/dither, power modes) and the §8
+> divergence ledger are populated; §§5–7 (framing, optimization, trace) are still **NOT YET RESEARCHED**.
+> Seven ledger entries are open, including **D-03**, which reclassifies our `M3 S0` preamble pre-arm as a
+> shipping divergence with **no ADR**. Original finding retained below for context.
 
 ADR-027 (`DECISIONS.md:1272`) makes LightBurn canonical and declares **`LIGHTBURN-STUDY.md`** the
 authoritative behavior reference (`:1293`) and the running divergence ledger (`:1295`).
