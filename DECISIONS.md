@@ -12488,3 +12488,61 @@ split.
   still lists large files without failing.
 - A genuinely oversized *production* file is caught exactly as before; this
   narrows nothing outside tests.
+
+---
+
+## ADR-262 - ADR numbers are unique by CI, not by care
+
+**Status:** Accepted
+**Date:** 2026-07-25
+
+### Context
+
+On 2026-07-25 three decisions landed on main all numbered ADR-257 - M4 dynamic
+power (`fcc1c2da`), machine-faired trace polylines (#422), and the CNC 3D
+viewport (#417). Two further branches, `chore/adr-uniqueness` and
+`claude/adr-257-renumber`, were independently mid-fix without knowing about
+each other. A sweep of remote branches found five more still holding an
+ADR-257 heading, one of them holding three.
+
+Every author had checked the number before writing. Each check was correct at
+the moment it ran and stale by the time their CI finished: this repo's merge
+gate takes about 25 minutes, and PRs land faster than that. The failure is
+therefore structural, not careless. Review cannot catch it either, because two
+correct reviews of two independently-correct branches still produce a
+collision at merge.
+
+The cost is not cosmetic. A shared number makes every citation ambiguous. Of
+the 32 in-tree references to ADR-257, 20 belonged to the M4 decision and 12 to
+the viewport, and untangling them required reading each one - a
+find-and-replace would have silently re-pointed twenty comments at a decision
+about a 3D viewport.
+
+### Decision
+
+`scripts/check-adr-numbers.mjs` fails the build when two ADR decision headings
+in `DECISIONS.md` claim the same number. It runs in `release:check` directly
+after `format:check` - early, because it costs under a second and answers a
+question about the diff itself, and learning about a collision after the test
+suite and both builds is the exact delay this gate exists to remove.
+
+Amendment headings (`## ADR-211 Amendment - ...`) deliberately re-use their
+decision's number and are not collisions; they are counted separately.
+
+On success the gate prints the next free number, so the cheapest way to pick
+one is to run the script rather than to grep the file and guess. Grepping is
+what produced the collision: the ADR-257 renumber in #430 was chosen by
+reading `tail -4` of the headings, which did not reach far enough up the file
+to see an existing 257.
+
+### Consequences
+
+- A collision now fails CI on the second branch to run, naming both headings
+  with file:line, instead of being discovered after both have merged.
+- Numbering races still happen; they are just no longer silent. The loser
+  renumbers, which is a one-line edit plus its references.
+- The gate does not verify that an amendment refers to a decision that exists,
+  and does not check the decision index at the top of the file. The index is
+  currently about eleven ADRs stale - out of scope here.
+- Numbers are unique but not gapless, and sections stay in insertion order per
+  the note at the top of this file. Neither is changed by this gate.
