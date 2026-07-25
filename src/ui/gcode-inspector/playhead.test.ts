@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
-import { playheadAt, segmentIndexAtRoute } from './playhead';
+import { playheadAt, routeMmAtLine, segmentIndexAtRoute } from './playhead';
 
 function model(text: string): GcodeRenderModel {
   const result = buildGcodeRenderModel(text);
@@ -37,6 +37,19 @@ describe('playheadAt', () => {
     const state = playheadAt(model('G21 G90\nM3 S0\nM5'), 5);
     expect(state.segmentIndex).toBe(-1);
     expect(state.point).toBeNull();
+  });
+});
+
+describe('routeMmAtLine', () => {
+  it('returns the route position where a line’s motion begins', () => {
+    const built = model(PROGRAM);
+    expect(routeMmAtLine(built, 1)).toBe(0);
+    expect(routeMmAtLine(built, 2)).toBeCloseTo(10, 6);
+    expect(routeMmAtLine(built, 3)).toBeCloseTo(20, 6);
+  });
+
+  it('returns null for a line that produced no motion', () => {
+    expect(routeMmAtLine(model(PROGRAM), 0)).toBeNull();
   });
 });
 

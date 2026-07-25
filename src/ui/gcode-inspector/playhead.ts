@@ -43,6 +43,19 @@ export function playheadAt(model: GcodeRenderModel, routeMm: number): PlayheadSt
   };
 }
 
+/**
+ * Route position where the first segment emitted by `line` begins — the
+ * jump target for click-to-locate from the findings list and source pane.
+ * Returns null when the line produced no motion (a modal or event line).
+ */
+export function routeMmAtLine(model: GcodeRenderModel, line: number): number | null {
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    if (model.segLine[index] !== line) continue;
+    return index === 0 ? 0 : (model.segRouteEndMm[index - 1] ?? 0);
+  }
+  return null;
+}
+
 /** First segment whose cumulative route end reaches `routeMm` (binary search
  * over the monotonic route array). */
 export function segmentIndexAtRoute(model: GcodeRenderModel, routeMm: number): number {

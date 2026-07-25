@@ -4,12 +4,16 @@
 // lenses, DRO, source pane, and Program Health panels land in stages 4-9.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
+import {
+  buildGcodeRenderModel,
+  findProgramIssues,
+  type GcodeRenderModel,
+} from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
 import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorTimeline } from './InspectorTimeline';
-import { playheadAt } from './playhead';
+import { playheadAt, routeMmAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useViewer3dScene } from './use-viewer3d-scene';
 
@@ -76,6 +80,7 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
   const playback = useInspectorPlayback(model.totalRouteMm);
   const playhead = useMemo(() => playheadAt(model, playback.routeMm), [model, playback.routeMm]);
+  const findings = useMemo(() => findProgramIssues(model), [model]);
   // Fully-drawn playhead = show everything, so the scene never hides the tail
   // segment to floating-point rounding.
   const atEnd = playback.routeMm >= model.totalRouteMm;
@@ -101,10 +106,17 @@ function InspectorBody(props: { readonly model: GcodeRenderModel }): JSX.Element
         model={model}
         theme={theme}
         playhead={playhead}
+        findings={findings}
         travelVisible={travelVisible}
         onTravelVisibleChange={(visible) => {
           setTravelVisible(visible);
           handleRef.current?.setTravelVisible(visible);
+        }}
+        onLocateLine={(line) => {
+          // Modal/event lines emit no motion; leave the playhead alone
+          // rather than jumping somewhere arbitrary.
+          const target = routeMmAtLine(model, line);
+          if (target !== null) playback.setRouteMm(target);
         }}
       />
     </div>
