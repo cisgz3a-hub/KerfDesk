@@ -18,6 +18,23 @@ describe('partitionSavePreflight', () => {
     expect(split.advisories).toEqual([]);
   });
 
+  // Audit 4.3: rule 7 says configured no-go zones "may warn in Job Review, but
+  // must never refuse Frame or Start". Start already demoted this code; the
+  // export path did not, so a job Start would stream could not be saved.
+  it('demotes no-go-zone uncertainty to a save advisory (rule 7)', () => {
+    const split = partitionSavePreflight([
+      {
+        code: 'no-go-zone-collision',
+        message: 'No-go zones cannot be checked from this hand-set origin.',
+      },
+      { code: 'non-finite-coordinate', message: 'Line 3: X is NaN.' },
+    ]);
+
+    expect(split.advisories.map((issue) => issue.code)).toEqual(['no-go-zone-collision']);
+    // Compile integrity is untouched — that one still refuses.
+    expect(split.blocking.map((issue) => issue.code)).toEqual(['non-finite-coordinate']);
+  });
+
   it('demotes the scan-offset magnitude cap to a save advisory (rule 7)', () => {
     const split = partitionSavePreflight([
       {
