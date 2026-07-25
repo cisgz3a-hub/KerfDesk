@@ -1,19 +1,19 @@
 import type { MachineKind } from '../../core/scene';
 
-// ADR-180 amendment (2026-07-24): same-session CNC Resume is one-click again.
-// GRBL feed hold keeps the spindle commanded, so cycle-start continues the job
-// (LightBurn / every GRBL sender behaves this way). Per CLAUDE.md rule 7 the
-// former refusal is demoted to a passive advisory: it INFORMS the operator and
-// never blocks Resume. The operator's real safeguards stay the physical E-stop
-// and eyes on the machine.
+// ADR-180 amendment 2 (2026-07-25): CNC Pause now uses GRBL's safety-door byte
+// rather than a bare feed hold, so the machine stops in place AND the controller
+// de-energizes the spindle. Resume restores the spindle and holds motion for
+// SAFETY_DOOR_SPINDLE_DELAY (4.0s in stock grbl config.h) before continuing the
+// interrupted line. These strings previously told the operator the spindle keeps
+// spinning, which is now false. Per CLAUDE.md rule 7 both INFORM and never block.
 export const CNC_RESUME_ADVISORY_MESSAGE =
-  'Before Resume, confirm the spindle is still spinning and the cutter is clear. ' +
-  'Feed hold keeps the spindle commanded, so Resume continues the job; if the spindle ' +
-  'stopped during the hold, Abort instead and start a newly reviewed recovery job.';
+  'Resume restarts the spindle, waits for it to reach speed, then continues the same ' +
+  'line from where it stopped. The cutter is still in the cut, so it spins back up ' +
+  'engaged — on a deep or full-width pass, check the bit before resuming.';
 
 const CNC_PAUSE_MESSAGE =
-  'Pause applies feed hold; the spindle keeps spinning and the job can be resumed. ' +
-  'Use ABORT JOB or the physical E-stop if the spindle stopped or the cutter is unsafe.';
+  'Pause stops motion in place and switches the spindle off; position is kept and the ' +
+  'job can be resumed. Use ABORT JOB or the physical E-stop if the cutter is unsafe.';
 
 /**
  * Advisory shown beside a paused CNC job's Resume control. Informational only —
