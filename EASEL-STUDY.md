@@ -15,6 +15,7 @@ no entries. Do not read an empty section as parity.
 | Marker | Meaning |
 |---|---|
 | **[Easel-doc]** + URL | Fetched from the official Easel Support Center (`support.easel.com`) |
+| **[Easel-doc via search]** + URL | Official support article, but content relayed by the **search index** — `support.easel.com` returns **HTTP 403** to direct fetches, so the page was not read in full. Stronger than forum, weaker than a page read end to end. Quotes are as the index returned them; re-read in a browser before treating any figure as exact. |
 | **[Easel-forum]** | Community forum — **weak**. Community consensus, not vendor behavior. Upgrade before acting. |
 | **NOT YET RESEARCHED** | No source pulled. |
 
@@ -84,10 +85,41 @@ underlying constraint — **GRBL has no plunge-only override; the feed override 
 ship more than Easel here. Easel's ±10%-per-click behavior is consistent with that constraint, so this
 corroborates the earlier finding rather than contradicting it.
 
-**Depth-per-pass and feed defaults: NOT YET RESEARCHED against official docs.** Forum examples exist
-(e.g. a 1-inch surfacing bit at feed 32 / plunge 9 / depth-per-pass 0.04 in; another at 1016 mm/min /
-228.6 mm/min / 1.6 mm) but these are user reports, not vendor defaults, and are useless for comparing
-against our material-picker numbers (ADR-111/112). Settle by reading Easel's material presets in-app.
+### Depth per pass — Easel publishes a hard rule, we have none
+
+**[Easel-doc via search]** *Cut Depth and Depth Per Pass*
+(https://support.easel.com/hc/en-us/articles/360015957214-Cut-Depth-and-Depth-Per-Pass):
+
+> "As a general rule, your depth per pass should never exceed half the diameter of your bit. For
+> example, the depth per pass for a 1/4" (.25") bit should not exceed .125" per pass, the depth per pass
+> for a 1/8" bit (.125") should not exceed .0625" per pass."
+
+So Easel's rule is **depth-per-pass ≤ bit diameter ÷ 2**.
+
+**Ours: no such relationship exists anywhere.** Verified:
+
+- `zPassDepths` (`src/core/cnc/depth-passes.ts:11-15`) clamps only to the total depth
+  (`Math.min(depthPerPassMm, depthMm)`).
+- Neither `depth-passes.ts` nor `feeds-calculator.ts` references `diameterMm` at all.
+- `cnc-preflight.ts:129` checks only `settings.depthPerPassMm > 0`.
+
+**Our shipped starter does comply**, comfortably: the 4040 starter uses
+`NEOTRONICS_4040_DEPTH_PER_PASS_MM = 0.75` mm (`cnc-machine-starter-catalog.ts:50`) on
+`DEFAULT_END_MILL_DIAMETER_MM = 3.175` mm (1/8") — that is 24% of diameter, against a 50% ceiling. The
+gap is that **a user-entered value has nothing checking it.** See §5 D-13.
+
+**Feed defaults still NOT YET RESEARCHED** against official per-material presets. Forum examples exist
+(a 1-inch surfacing bit at feed 32 / plunge 9 / depth-per-pass 0.04 in; another at 1016 mm/min /
+228.6 mm/min / 1.6 mm) but those are user reports, not vendor defaults, and are useless for comparing
+against ADR-111/112 numbers. Settle by reading Easel's material presets in-app.
+
+### Bit guidance
+
+**[Easel-doc via search]**: "any end mill bit ¼" or ⅛" diameter will work well as a roughing bit; for
+the finishing pass, we strongly recommend using a ⅛" ballnose bit."
+
+Matches our relief finishing design — ADR-098 H.8 is a ball-nose max-plus tip surface with
+scallop-driven stepover. **PARITY on the tooling model.**
 
 ## §4 — Two-stage carves, 3D, and other features
 
@@ -143,6 +175,42 @@ this repo.
 
 Easel: ±10% per click on feed and plunge. Ours: feed, spindle, and rapid overrides (ADR-103).
 Corroborates the known GRBL constraint that plunge cannot be overridden independently.
+
+### D-13 — No depth-per-pass vs bit-diameter advisory · **GAP, rule-7 compatible**
+
+Easel publishes **depth-per-pass ≤ bit diameter ÷ 2** (§3). We relate the two nowhere:
+`depth-passes.ts:11-15` clamps only against total depth, `feeds-calculator.ts` never reads
+`diameterMm`, and `cnc-preflight.ts:129` only checks the value is positive. An operator can set 6 mm
+per pass on a 3 mm bit and we will emit it.
+
+Our own starter is conservative and compliant (0.75 mm on a 3.175 mm bit = 24%), so this is not a
+shipped-defaults defect — it is a missing advisory for hand-entered values.
+
+**This belongs in Job Review as a warning, never as a block** (CLAUDE.md rule 7, PROJECT.md #21). A
+depth-per-pass judgement is exactly the "policy finding" class that may inform and must not refuse.
+Cheap to add, and it is the kind of advisory that protects a bit and a workpiece.
+
+### D-14 — Tabs: Easel auto-adds on full-depth cutouts · **DIVERGENCE in trigger, needs check**
+
+**[Easel-doc via search]** *How To Use Tabs*
+(https://support.easel.com/hc/en-us/articles/360012453214-How-To-Use-Tabs): tabs are **added
+automatically when the cut depth of an outline shape equals the material thickness**, and with a
+full-depth cutout the operator can edit "Use Tabs" to reposition them — explicitly so tabs can be kept
+away from corners and delicate areas.
+
+Ours: automatic Line-mode hard-skip tabs (`core/geometry/tabs-bridges.ts`) plus ADR-156 persisted
+drag-placeable anchors for closed CNC profiles. So we have both mechanisms, but **the automatic
+*trigger* differs**: Easel keys off "cut depth == material thickness" (i.e. it infers a through-cut).
+Whether we auto-enable tabs on a detected through-cut, or require the operator to switch them on, was
+not verified this session. If we require it, an operator who through-cuts without enabling tabs loses
+the part — and Easel would have protected them.
+
+**Action:** verify our through-cut tab trigger. If absent, this is a real parity gap worth an ADR.
+
+### D-15 — Roughing/finishing bit model · **PARITY**
+
+Easel: ¼" or ⅛" end mill to rough, ⅛" ballnose to finish. Ours: ADR-098 H.8 ball-nose finishing with
+scallop-driven stepover, two-tool sections (ADR-153). Same model.
 
 ---
 
