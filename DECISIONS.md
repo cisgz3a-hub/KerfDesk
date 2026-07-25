@@ -11823,3 +11823,73 @@ adds a lift where passes previously stacked in place.
   same-XY deeper pass emits `G0 Z<safe>` then replunges, and that the first pass
   gains no spurious retract; with the flag off the step-down-in-place output is
   unchanged.
+
+---
+
+## ADR-254 - Dependency audit runs on a schedule, not in the merge gate
+
+**Date:** 2026-07-25
+**Status:** Accepted
+
+### Context
+
+`release:check` chained `pnpm audit:deps` (`pnpm audit --audit-level=low`)
+between `license-check` and `test`. Because the chain is sequential `&&`, an
+audit failure ended the run before the test suite, both builds, and the three
+size/export checks ever executed.
+
+Advisories are published by third parties on their own schedule. Any new one
+touching any transitive dependency - including devDependency-only paths that
+cannot reach shipped code - turned every open PR, every main push, and the
+CI-gated Cloudflare deploy red with no code change. This fired three times in
+July 2026 alone: `tar`, `postcss` (#395, 2026-07-24), and `brace-expansion`
+reached through `electron-builder` -> `@electron/asar`, which had every open
+branch failing at the two-minute mark on 2026-07-25. In each case the author's
+own diff was never verified; the red check said nothing about their work.
+
+The 2026-07-10 full-sweep audit recorded this as S14-F7 and proposed exactly
+this fix. It was not actioned then.
+
+### Decision
+
+Remove `pnpm audit:deps` from the `release:check` chain. The script itself stays
+for local and manual use. A new `.github/workflows/audit.yml` runs it nightly
+(03:17 UTC) plus on demand, and files a single open tracking issue when
+advisories appear - never a duplicate, so a standing finding does not generate
+nightly noise. GitHub Dependabot alerts were enabled the same day as a native
+second channel, alongside secret scanning and push protection.
+
+This is not a change of supply-chain posture. It changes *when* and *how loudly*
+the same signal arrives: from "blocks unrelated work immediately" to "tracked
+within 24 hours". An advisory reachable from a production dependency remains
+release-blocking - PROJECT.md still says a dependency CVE blocks releases until
+patched - but that judgment is now made by a human reading the issue, not by a
+chain position that also hides the test results.
+
+Rejected alternatives: raising the threshold to `--audit-level=high` (the
+brace-expansion advisory *was* high, so this would not have helped);
+`continue-on-error` after `test` (keeps the CI-minute cost on every PR to
+produce a signal nobody is required to read).
+
+### Consequences
+
+- A production-reachable advisory can now merge and deploy without a red check.
+  The nightly issue is the backstop and Dependabot alerts are the second.
+  Accepted deliberately: the previous design blocked so indiscriminately that
+  the standing response was to write an override and move on, which is not
+  triage either.
+- `deploy:web` and `deploy:web:preview` call `release:check`, so deploys stop
+  being blocked by third-party advisory timing. That is the intended effect.
+- The five workflows that invoke `release:check` (ci, deploy, and the three
+  desktop release legs) all lose the audit step. A production CVE matters most
+  at desktop release time, so triage the open audit issue before cutting a `v*`
+  tag.
+
+### Verification
+
+- `deploy-workflow-gate.test.ts` asserts `release:check` no longer contains
+  `audit`, that `audit:deps` still exists unchanged, and that
+  `.github/workflows/audit.yml` runs it under a `cron:` schedule - pinning both
+  halves so neither the outage vector nor the audit itself returns by reflex.
+- NOT verified: the scheduled workflow has never fired. Its issue-filing path is
+  unexercised until the first nightly run or a manual `workflow_dispatch`.
