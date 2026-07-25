@@ -256,8 +256,51 @@ defaults (`tabHeightMm: 2`, `tabWidthMm: 6`, `tabsPerShape: 4`, 3.175 mm bit):
   pass, so a shallow profile groove gets four uncut gaps. Logically consistent — a tab taller than the
   cut means "don't cut here" — but surprising as a default.
 
-**Prerequisite before the default can flip: implement tab-aware leads.** Three candidate designs, none
-of them a reordering:
+### The framing was wrong — our tab model is the outlier
+
+**Researched 2026-07-25.** Before choosing among tab-aware-lead designs, check how CAM actually implements
+tabs. It does not split the toolpath at all.
+
+**[Fusion-doc]** https://help.autodesk.com/view/fusion360/ENU/?contextId=2D-CONTOUR-STEPS and
+https://cadcamlessons.com/fusion-360-tabs/ — *"During tabbed toolpaths, the tool goes up in places where
+tabs are located, leaving a thin layer of material."* Two tab shapes are offered, **Rectangular or
+Triangular** — triangular being a ramp up and back down over the tab.
+
+**[Autodesk-doc]** https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/CNC-path-issue-abbreviated-tool-life.html
+— *"the plunge feedrate controls both the plunge and ramp feedrates for tabs and lead-in/out"*, i.e.
+Fusion's tabs are **ramp moves**, sharing the plunge feed with leads.
+
+So the industry model is: **a tab is a Z-rise in ONE continuous toolpath.** The cutter stays engaged,
+lifts over the tab, and comes back down. Ours instead splits the loop into N discrete pieces, each
+needing its own retract → rapid → **full-depth plunge** (`compile-cnc-job.ts:398`, `cnc-tabs.ts`).
+
+That single design difference is the root of everything in this entry:
+
+| Consequence of splitting | Under the Fusion-style Z-rise model |
+|---|---|
+| N full-depth plunges into the wall per pass | Zero — the tool never leaves the cut |
+| Leads had to be disabled (`profile-lead-passes.ts:48`) | **No conflict.** One continuous path keeps one entry, so the lead applies normally |
+| Small contours hit the degenerate no-pieces path and **stop cutting through** (`cnc-tabs.ts:10-13`) | Cannot occur — nothing is split, so no perimeter to swallow |
+| `depth ≤ tabHeight` leaves four uncut gaps | Degrades gracefully to a shallower cut over the tab |
+
+**Our architecture already supports it with no emitter change.** `CncPath3dPass` carries `points: Vec3[]`,
+and `appendPath3dCutMoves` (`cnc-grbl-strategy.ts:398-424`) already emits per-vertex `G1 X Y Z` and
+already switches a pure-vertical segment to the plunge feed (lines 414-417) — which is exactly Fusion's
+"plunge feedrate controls the tab ramp" behavior, for free. The CNC motion invariant is unaffected:
+`findPlungedTravelIssues` only flags **G0** rapids below safe Z, and every tab rise/fall here is a fed
+`G1`.
+
+**Recommended design — Option 4, tabs as Z-modulation.** Replace `splitPassForTabs` for the tabbed case
+with a transform that converts a tabbed contour pass into a single `path3d` riding at cut depth and rising
+to `tabTopZMm` across each tab window. Leads then need no special-casing, and
+`profile-lead-passes.ts:44-48`'s `tabsEnabled` early return can be deleted rather than worked around.
+Needs its own ADR (it supersedes the split model), and a coupon — but it is less code than tab-aware
+leads and strictly better on every axis above.
+
+---
+
+**Superseded — the three tab-aware-lead designs.** Kept for the record; all three exist only to work
+around the split model that Option 4 removes:
 
 1. **Lead every split piece.** Each open piece gets a waste-side lead-in at its start and lead-out at its
    end. Most faithful to ADR-250's intent, and the most work: `computeProfileLead` is written against a
