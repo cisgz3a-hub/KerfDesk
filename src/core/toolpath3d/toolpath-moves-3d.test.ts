@@ -1,6 +1,45 @@
 import { describe, expect, it } from 'vitest';
 import type { Toolpath } from '../job';
-import { moveDepthRange, toolpathMoves3d } from './toolpath-moves-3d';
+import { moveDepthRange, pointAtArcLength, toolpathMoves3d } from './toolpath-moves-3d';
+
+describe('pointAtArcLength', () => {
+  const moves = () =>
+    toolpathMoves3d(
+      toolpath([
+        {
+          kind: 'cut',
+          color: '#000',
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 10, y: 0 },
+          ],
+          length: 10,
+          z: { from: -2, to: -2 },
+        },
+        { kind: 'plunge', at: { x: 10, y: 0 }, fromZ: -2, toZ: 4, length: 6 },
+      ]),
+    );
+
+  it('interpolates inside a move instead of snapping to its boundary', () => {
+    // Halfway through the 10mm cut. Snapping to move boundaries would give
+    // x=0 or x=10 and the tool would teleport between steps during playback.
+    expect(pointAtArcLength(moves(), 5)).toEqual({ x: 5, y: 0, z: -2 });
+  });
+
+  it('crosses into the next move at the right arc-length position', () => {
+    // 13mm in: 10mm of cut, then 3mm of the 6mm plunge -> halfway up.
+    expect(pointAtArcLength(moves(), 13)).toEqual({ x: 10, y: 0, z: 1 });
+  });
+
+  it('clamps before the start and after the end rather than returning null', () => {
+    expect(pointAtArcLength(moves(), -5)).toEqual({ x: 0, y: 0, z: -2 });
+    expect(pointAtArcLength(moves(), 999)).toEqual({ x: 10, y: 0, z: 4 });
+  });
+
+  it('returns null for an empty program', () => {
+    expect(pointAtArcLength([], 0)).toBeNull();
+  });
+});
 
 function toolpath(steps: Toolpath['steps'], totalLength = 0): Toolpath {
   return { steps, totalLength };

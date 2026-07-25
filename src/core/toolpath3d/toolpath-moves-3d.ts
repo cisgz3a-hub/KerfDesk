@@ -78,6 +78,70 @@ export function toolpathMoves3d(toolpath: Toolpath): ReadonlyArray<Move3d> {
 // Kinds where the bit is actually in the work.
 const CUTTING_KINDS: ReadonlySet<Move3dKind> = new Set<Move3dKind>(['cut', 'plunge']);
 
+/**
+ * Point on the path at an arc-length position, for driving the drawn cutter.
+ *
+ * Interpolates INSIDE the active move rather than snapping to move boundaries,
+ * so playback glides instead of teleporting between steps. Positions are
+ * measured in the same arc-length space the 2D scrubber uses, which is the one
+ * quantity the two previews can safely share — it is frame-independent.
+ *
+ * On arc and helical steps `lengthMm` is the true arc length and deliberately
+ * exceeds the chord sum of the sampled points, so the within-move fraction is
+ * applied to the CHORD distance. That keeps the tool on the drawn line rather
+ * than running off its end.
+ *
+ * @param moves Moves in program order.
+ * @param atMm Arc-length position in mm from the job start.
+ * @returns The point, or null when there are no moves.
+ */
+export function pointAtArcLength(moves: ReadonlyArray<Move3d>, atMm: number): Vec3 | null {
+  if (moves.length === 0) return null;
+  const first = moves[0]?.points[0];
+  if (first === undefined) return null;
+  for (const move of moves) {
+    const end = move.startMm + move.lengthMm;
+    if (atMm > end && move !== moves[moves.length - 1]) continue;
+    const fraction = move.lengthMm <= 0 ? 0 : (atMm - move.startMm) / move.lengthMm;
+    return pointAlong(move.points, Math.min(1, Math.max(0, fraction))) ?? first;
+  }
+  return first;
+}
+
+// Walks the move's own points by chord length to the given 0..1 fraction.
+function pointAlong(points: ReadonlyArray<Vec3>, fraction: number): Vec3 | null {
+  if (points.length === 0) return null;
+  const start = points[0];
+  if (start === undefined) return null;
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    total += segmentLength(points[i - 1], points[i]);
+  }
+  if (total === 0) return start;
+  let target = fraction * total;
+  for (let i = 1; i < points.length; i += 1) {
+    const from = points[i - 1];
+    const to = points[i];
+    if (from === undefined || to === undefined) continue;
+    const span = segmentLength(from, to);
+    if (target <= span || i === points.length - 1) {
+      const t = span === 0 ? 0 : Math.min(1, target / span);
+      return {
+        x: from.x + (to.x - from.x) * t,
+        y: from.y + (to.y - from.y) * t,
+        z: from.z + (to.z - from.z) * t,
+      };
+    }
+    target -= span;
+  }
+  return points[points.length - 1] ?? start;
+}
+
+function segmentLength(from: Vec3 | undefined, to: Vec3 | undefined): number {
+  if (from === undefined || to === undefined) return 0;
+  return Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+}
+
 export type DepthRange = {
   readonly minZ: number;
   readonly maxZ: number;

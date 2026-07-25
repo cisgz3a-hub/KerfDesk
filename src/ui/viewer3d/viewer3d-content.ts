@@ -35,6 +35,10 @@ export type ViewerToolpathOverlay = {
   readonly originMm: { readonly x: number; readonly y: number };
   // Omitted for jobs with no CNC tool; the path still draws without a cutter.
   readonly toolProfile?: ReadonlyArray<ToolProfilePoint>;
+  // Where the cutter sits, in the same scene frame as `moves`. Driven by the
+  // scrubber, so the tool moves along the path instead of parking somewhere
+  // arbitrary — which is the only way it reads as information and not debris.
+  readonly toolAtMm?: { readonly x: number; readonly y: number; readonly z: number };
 };
 
 export type ViewerContentInput = {
@@ -106,11 +110,17 @@ export async function buildViewerContent(
     disposers.push(lines.dispose);
   }
 
-  // NOT drawn: the cutter. buildToolMesh and core/sim's toolProfile are ready
-  // and tested, but a tool parked at a static position with no playback to
-  // move it reads as debris stuck in the workpiece rather than as information
-  // — confirmed by the maintainer on first sight. It comes back when the
-  // scrubber can drive it along the path, which is where it earns its place.
+  // The cutter, drawn only when the scrubber says where it is. A tool parked
+  // at a fixed position reads as debris stuck in the workpiece rather than as
+  // information — confirmed by the maintainer on first sight — so it appears
+  // only once playback can actually move it along the path.
+  if (toolpath?.toolAtMm !== undefined) {
+    const tool = buildToolAt(three, mesh, toolpath, toolpath.toolAtMm);
+    if (tool !== null) {
+      group.add(tool.object);
+      disposers.push(tool.dispose);
+    }
+  }
 
   return {
     object: group,

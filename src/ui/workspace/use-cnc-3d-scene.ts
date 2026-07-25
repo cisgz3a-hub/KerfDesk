@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { steppedSurfaceMesh } from '../../core/heightfield';
 import { downsampleRemovalGrid, type RemovalGrid, type ToolProfilePoint } from '../../core/sim';
-import type { Move3d } from '../../core/toolpath3d';
+import { pointAtArcLength, type Move3d } from '../../core/toolpath3d';
 import {
   createReliefThreeScene,
   type ReliefSceneHandle,
@@ -49,6 +49,7 @@ export type Cnc3dScene = {
 export function useCnc3dScene(
   source: DesignSceneSource | null,
   stockThicknessMm: number,
+  scrubberT: number,
 ): Cnc3dScene {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<ReliefSceneHandle | null>(null);
@@ -66,7 +67,7 @@ export function useCnc3dScene(
     const canvas = canvasRef.current;
     if (canvas === null || source === null) return;
     let cancelled = false;
-    const content = contentFor(source, stockThicknessMm);
+    const content = contentFor(source, stockThicknessMm, scrubberT);
 
     const existing = handleRef.current;
     if (existing !== null) {
@@ -100,7 +101,7 @@ export function useCnc3dScene(
     return () => {
       cancelled = true;
     };
-  }, [source, stockThicknessMm]);
+  }, [source, stockThicknessMm, scrubberT]);
 
   // Keep the renderer buffer in step with the resizable pane so the 3D view
   // stays crisp at any width (the scene renders on demand, not on a rAF loop).
@@ -120,14 +121,25 @@ export function useCnc3dScene(
 function contentFor(
   source: DesignSceneSource,
   stockThicknessMm: number,
+  scrubberT: number,
 ): Parameters<ReliefSceneHandle['updateContent']>[0] {
   const { grid, moves, toolProfile } = source;
   const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
+  const last = moves[moves.length - 1];
+  const totalMm = last === undefined ? 0 : last.startMm + last.lengthMm;
+  const toolAt = pointAtArcLength(moves, scrubberT * totalMm);
   return {
     mesh: steppedSurfaceMesh(display),
     stockThicknessMm,
     // Downsampling keeps the grid's min corner, so the full-resolution origin
     // is still the right offset for the path.
-    toolpath: { moves, originMm: { x: grid.originX, y: grid.originY }, toolProfile },
+    toolpath: {
+      moves,
+      originMm: { x: grid.originX, y: grid.originY },
+      toolProfile,
+      // scrubberT is a 0..1 fraction of TOTAL path length, so it converts to
+      // the arc-length position the core lookup expects.
+      ...(toolAt === null ? {} : { toolAtMm: toolAt }),
+    },
   };
 }

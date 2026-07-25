@@ -4,6 +4,7 @@
 export {
   firstCuttingPoint,
   moveDepthRange,
+  pointAtArcLength,
   toolpathMoves3d,
   type DepthRange,
   type Move3d,

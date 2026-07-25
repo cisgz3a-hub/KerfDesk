@@ -4,12 +4,14 @@
 // stays snappy) and renders the stock + cut heightfield through the ADR-102
 // three.js scene. UI-only; the compile path is the same one Preview uses.
 
-import { useDeferredValue, useMemo } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { toSceneCoords } from '../../core/devices';
 import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
 import { computeRemovalGrid, DEFAULT_CELL_MM, kernelForTool, toolProfile } from '../../core/sim';
 import { toolpathMoves3d } from '../../core/toolpath3d';
 import { useOutputScope, useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
+import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
 import { buildPreviewToolpath } from './draw-preview';
 import { useCnc3dScene, type DesignSceneSource } from './use-cnc-3d-scene';
@@ -124,7 +126,12 @@ function PaneScene(props: {
   readonly stockThicknessMm: number;
 }): JSX.Element | null {
   const { source, stockThicknessMm } = props;
-  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm);
+  // Same scrubber the 2D preview uses, so the two views cannot disagree about
+  // where in the program the operator is looking.
+  const scrubberT = useUiStore((s) => s.scrubberT);
+  const [isFullPage, setIsFullPage] = useState(false);
+  const closeFullPage = useCallback(() => setIsFullPage(false), []);
+  const { canvasRef, state } = useCnc3dScene(source, stockThicknessMm, scrubberT);
 
   if (source === null) return null;
   return (
@@ -136,6 +143,22 @@ function PaneScene(props: {
         aria-label="Live 3D cut result"
         style={canvasStyle}
       />
+      <button
+        type="button"
+        onClick={() => setIsFullPage(true)}
+        style={fullPageButtonStyle}
+        title="Open the 3D result at full window size."
+      >
+        Open full page
+      </button>
+      {isFullPage && (
+        <Cnc3DFullPage
+          source={source}
+          stockThicknessMm={stockThicknessMm}
+          scrubberT={scrubberT}
+          onClose={closeFullPage}
+        />
+      )}
       {state === 'failed' ? (
         <p style={hintStyle} role="alert">
           3D view unavailable in this browser.
@@ -194,6 +217,12 @@ const canvasStyle: React.CSSProperties = {
   width: '100%', // fill the resizable pane; the ResizeObserver re-fits the buffer
   height: CANVAS_HEIGHT_PX,
   borderRadius: 4,
+};
+const fullPageButtonStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '4px 8px',
+  cursor: 'pointer',
+  fontSize: 11,
 };
 const hintStyle: React.CSSProperties = {
   fontSize: 11,

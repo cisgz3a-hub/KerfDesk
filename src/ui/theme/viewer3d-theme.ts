@@ -40,8 +40,8 @@ export const viewer3dTheme = {
   toolpath: {
     rapid: 0xd4483c,
     feedTravel: 0xc98a2b,
-    cut: 0x3f9fd0,
-    plunge: 0xe07a35,
+    cut: 0x11486e,
+    plunge: 0x9c4a13,
     retract: 0x8f7566,
     // Depth ramp for cutting moves. Endpoints mirror the 2D canvas's
     // SHALLOW_RGB/DEEP_RGB in draw-cnc-removal.ts so the two previews cannot
