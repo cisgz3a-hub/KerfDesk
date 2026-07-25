@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
+import { CANVAS_MOTION_SLOT_ID } from '../common/status-bar-slots';
 import { startLiveCanvasRun, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import { CanvasMotionBadge } from './canvas-motion-badge';
@@ -50,19 +51,31 @@ function runningOverlay(confirmedRouteMm: number): CanvasMotionOverlay {
   };
 }
 
+// The badge portals its message into the StatusBar's slot, so the harness
+// stands in for the bar: `host` is a wrapper holding both the React container
+// and the slot, which keeps every `host.querySelector` below finding the
+// in-tree probe and the portalled message alike.
 async function renderBadge(overlay: CanvasMotionOverlay): Promise<{
   readonly host: HTMLDivElement;
+  readonly container: HTMLDivElement;
+  readonly slot: HTMLDivElement;
   readonly unmount: () => Promise<void>;
 }> {
   const host = document.createElement('div');
+  const container = document.createElement('div');
+  const slot = document.createElement('div');
+  slot.id = CANVAS_MOTION_SLOT_ID;
+  host.append(container, slot);
   document.body.appendChild(host);
   let root: Root | null = null;
   await act(async () => {
-    root = createRoot(host);
+    root = createRoot(container);
     root.render(<CanvasMotionBadge overlay={overlay} />);
   });
   return {
     host,
+    container,
+    slot,
     unmount: async () => {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -275,6 +288,45 @@ describe('CanvasMotionBadge artwork-relative laser status', () => {
       expect(status?.textContent).toBe('Relative view — physical bed position unverified');
     } finally {
       await unmount();
+    }
+  });
+});
+
+describe('CanvasMotionBadge status placement', () => {
+  it('renders the message in the status-bar slot, never over the canvas', async () => {
+    const plan: CanvasMotionPlan = {
+      ...laserPlan(),
+      coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+    };
+    const { container, slot, unmount } = await renderBadge({ plan, run: null });
+    try {
+      expect(slot.querySelector('[data-testid="canvas-motion-status"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="canvas-motion-status"]')).toBeNull();
+      // The hidden probe stays in the canvas overlay tree it belongs to.
+      expect(container.querySelector('[data-testid="canvas-motion-probe"]')).not.toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('shows no message when no status-bar slot exists', async () => {
+    const plan: CanvasMotionPlan = {
+      ...laserPlan(),
+      coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+    };
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | null = null;
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CanvasMotionBadge overlay={{ plan, run: null }} />);
+    });
+    try {
+      expect(document.querySelector('[data-testid="canvas-motion-status"]')).toBeNull();
+      expect(container.querySelector('[data-testid="canvas-motion-probe"]')).not.toBeNull();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      container.remove();
     }
   });
 });
