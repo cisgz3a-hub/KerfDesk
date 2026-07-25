@@ -3,6 +3,7 @@
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
+import type { PreflightIssue } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../gcode';
 
@@ -12,7 +13,15 @@ export type EmitRdOptions = {
 };
 
 export type EmitRdResult =
-  | { readonly ok: true; readonly bytes: Uint8Array }
+  | {
+      readonly ok: true;
+      readonly bytes: Uint8Array;
+      // Pre-emit findings that inform but never refuse (rule 7 / ADR-228).
+      // The .rd path runs no post-compile preflight, so this is the ONLY
+      // channel by which such a finding can reach the operator — handleSaveRd
+      // toasts them after the write.
+      readonly advisories: ReadonlyArray<PreflightIssue>;
+    }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
 export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitRdResult {
@@ -33,7 +42,7 @@ export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitR
   );
   const encoded = encodeRdJob(machineJob, prepared.project.device);
   if (!encoded.ok) return { ok: false, messages: [describeRdEncodeError(encoded.error)] };
-  return { ok: true, bytes: encoded.bytes };
+  return { ok: true, bytes: encoded.bytes, advisories: prepared.advisories ?? [] };
 }
 
 function describeRdEncodeError(error: RdEncodeError): string {

@@ -82,4 +82,26 @@ describe('emitRdFile', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.bytes.length).toBeGreaterThan(0);
   });
+
+  // The .rd path runs no post-compile preflight, so this field is the only way
+  // a pre-emit finding can reach the operator (handleSaveRd toasts it).
+  it('carries the policy finding out as an advisory', () => {
+    const base = ruidaLineProject();
+    const result = emitRdFile({
+      ...base,
+      device: { ...base.device, controlledLaserOffTravelFeedMmPerMin: 0 },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.advisories).toEqual([expect.objectContaining({ code: 'speed-out-of-range' })]);
+  });
+
+  it('reports no advisories for a clean project', () => {
+    const result = emitRdFile(ruidaLineProject());
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.advisories).toEqual([]);
+  });
 });
