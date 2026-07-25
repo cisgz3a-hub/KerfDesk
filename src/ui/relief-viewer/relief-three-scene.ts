@@ -7,6 +7,8 @@
 // lazily through the dynamic import() below (ADR-102 §3).
 import type { WebGLRenderer } from 'three';
 import type { ReliefSurfaceMesh } from '../../core/relief';
+import { viewer3dTheme } from '../theme/viewer3d-theme';
+import { applySceneLighting } from './scene-lighting';
 
 export type ReliefSceneHandle = {
   readonly dispose: () => void;
@@ -20,9 +22,6 @@ export type ReliefSceneResult =
   | { readonly kind: 'ok'; readonly handle: ReliefSceneHandle }
   | { readonly kind: 'no-webgl'; readonly reason: string };
 
-const SURFACE_COLOR = 0xb08050; // carved-wood tone, matches the canvas depth map
-const STOCK_EDGE_COLOR = 0x707070;
-const BACKGROUND_COLOR = 0x1c1f24;
 const CAMERA_FOV_DEG = 40;
 
 export async function createReliefThreeScene(
@@ -45,7 +44,7 @@ export async function createReliefThreeScene(
   const width = canvas.clientWidth || canvas.width;
   const height = canvas.clientHeight || canvas.height;
   renderer.setSize(width, height, false);
-  renderer.setClearColor(BACKGROUND_COLOR);
+  renderer.setClearColor(viewer3dTheme.color.background);
 
   const scene = new three.Scene();
   const geometry = new three.BufferGeometry();
@@ -56,29 +55,26 @@ export async function createReliefThreeScene(
   geometry.scale(1, -1, 1);
   geometry.translate(-mesh.widthMm / 2, mesh.heightMm / 2, 0);
   geometry.computeVertexNormals();
-  const surface = new three.Mesh(
-    geometry,
-    new three.MeshStandardMaterial({
-      color: SURFACE_COLOR,
-      side: three.DoubleSide,
-      flatShading: false,
-    }),
-  );
-  scene.add(surface);
+  const surfaceMaterial = new three.MeshStandardMaterial({
+    color: viewer3dTheme.color.surface,
+    side: three.DoubleSide,
+    flatShading: false,
+  });
+  scene.add(new three.Mesh(geometry, surfaceMaterial));
 
   // Stock outline: a wire box from the stock top (z=0) down one thickness.
+  // BoxGeometry is only the source shape — EdgesGeometry is what the
+  // LineSegments actually holds, so both need disposing.
   const stockGeometry = new three.BoxGeometry(mesh.widthMm, mesh.heightMm, stockThicknessMm);
-  const stockEdges = new three.LineSegments(
-    new three.EdgesGeometry(stockGeometry),
-    new three.LineBasicMaterial({ color: STOCK_EDGE_COLOR }),
-  );
+  const stockEdgeGeometry = new three.EdgesGeometry(stockGeometry);
+  const stockEdgeMaterial = new three.LineBasicMaterial({
+    color: viewer3dTheme.color.stockEdge,
+  });
+  const stockEdges = new three.LineSegments(stockEdgeGeometry, stockEdgeMaterial);
   stockEdges.position.set(0, 0, -stockThicknessMm / 2);
   scene.add(stockEdges);
 
-  scene.add(new three.AmbientLight(0xffffff, 0.55));
-  const keyLight = new three.DirectionalLight(0xffffff, 1.1);
-  keyLight.position.set(mesh.widthMm, -mesh.heightMm, Math.max(mesh.widthMm, mesh.heightMm));
-  scene.add(keyLight);
+  const lighting = applySceneLighting(three, renderer, scene, mesh);
 
   const camera = new three.PerspectiveCamera(CAMERA_FOV_DEG, width / height, 0.1, 10_000);
   camera.up.set(0, 0, 1); // Z-up: depth reads vertically
@@ -104,8 +100,12 @@ export async function createReliefThreeScene(
       dispose: () => {
         controls.removeEventListener('change', render);
         controls.dispose();
+        lighting.dispose();
         geometry.dispose();
+        surfaceMaterial.dispose();
         stockGeometry.dispose();
+        stockEdgeGeometry.dispose();
+        stockEdgeMaterial.dispose();
         renderer.dispose();
       },
     },
