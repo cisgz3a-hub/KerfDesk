@@ -251,9 +251,9 @@ describe('unified machine setup flow', () => {
     state = deviceSetupReducer(state, { kind: 'accept-detected', patch: { bedWidth: 610 } });
     expect(state.detectedApplied).toBe(true);
 
-    const preset = GRBL_MACHINE_PROFILE_CATALOG[0];
-    if (preset === undefined) throw new Error('expected a catalog profile');
-    state = deviceSetupReducer(state, { kind: 'apply-preset', profile: preset });
+    const entry = GRBL_MACHINE_PROFILE_CATALOG[0];
+    if (entry === undefined) throw new Error('expected a catalog entry');
+    state = deviceSetupReducer(state, { kind: 'apply-preset', profile: entry.profile });
     expect(state.presetApplied).toBe(true);
     expect(state.detectedApplied).toBe(false);
   });

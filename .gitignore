@@ -25,6 +25,7 @@ perceptual-artifacts/
 
 # Trace audit harness — opt-in render dumps (TRACE_AUDIT=1)
 trace-audit-artifacts/
+cnc-audit-artifacts/
 
 # Trace fixtures — local user assets (logos/photos), not committed
 fixtures/*.png
