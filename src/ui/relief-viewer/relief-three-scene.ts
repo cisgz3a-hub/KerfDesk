@@ -87,6 +87,14 @@ export async function createReliefThreeScene(
   camera.lookAt(0, 0, 0);
 
   const controls = new OrbitControls(camera, canvas);
+  // Left-drag PANS, right-drag orbits — the opposite of three's default.
+  // Sliding the part around is the move an operator reaches for constantly
+  // while inspecting a cut; re-aiming the camera is occasional.
+  controls.mouseButtons = {
+    LEFT: three.MOUSE.PAN,
+    MIDDLE: three.MOUSE.DOLLY,
+    RIGHT: three.MOUSE.ROTATE,
+  };
   const render = (): void => renderer.render(scene, camera);
   controls.addEventListener('change', render);
 

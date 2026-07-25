@@ -19,13 +19,7 @@ import type { Object3D } from 'three';
 import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.js';
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
-import {
-  moveDepthRange,
-  type DepthRange,
-  type Move3d,
-  type Move3dKind,
-} from '../../core/toolpath3d';
-import { viewer3dTheme } from '../theme/viewer3d-theme';
+import type { Move3d, Move3dKind } from '../../core/toolpath3d';
 import { toolpathLineStyle } from './viewer3d-toolpath-colors';
 
 type ThreeModule = typeof ThreeNamespace;
@@ -50,11 +44,6 @@ const KIND_DRAW_ORDER: readonly Move3dKind[] = ['rapid', 'retract', 'feed-travel
 const DASH_SIZE_MM = 1.6;
 const GAP_SIZE_MM = 1.1;
 
-const FLOATS_PER_POINT = 3;
-
-// Kinds where the bit is in the work, and so where depth means something.
-const CUTTING_KINDS: ReadonlySet<Move3dKind> = new Set<Move3dKind>(['cut', 'plunge']);
-
 /**
  * Builds one batched fat-line object per move kind.
  *
@@ -73,16 +62,11 @@ export async function buildToolpathLines(
   const group = new three.Group();
   group.name = 'toolpath';
   const disposers: Array<() => void> = [];
-  const depth = moveDepthRange(moves);
 
   for (const kind of KIND_DRAW_ORDER) {
     const positions = segmentPositions(moves, kind, originMm);
     if (positions.length === 0) continue;
-    // Only cutting moves get the depth ramp. Ramping a traversal would imply
-    // it removed material at that depth, which is the opposite of true.
-    const colors =
-      depth !== null && CUTTING_KINDS.has(kind) ? depthColors(three, positions, depth) : null;
-    const built = buildKindLines(addons, kind, positions, colors);
+    const built = buildKindLines(addons, kind, positions);
     group.add(built.object);
     disposers.push(built.dispose);
   }
@@ -129,48 +113,16 @@ function segmentPositions(
   return positions;
 }
 
-// Depth ramp over the CUT segments: shallow reads light, deep reads dark, so
-// depth is legible without hovering anything.
-//
-// Colours are built through THREE.Color rather than as raw 0..1 triples so
-// three's ColorManagement performs the sRGB -> linear conversion. Hand-authored
-// values skip that step and render noticeably too bright.
-function depthColors(
-  three: ThreeModule,
-  positions: readonly number[],
-  depth: DepthRange,
-): Float32Array {
-  const shallow = new three.Color(viewer3dTheme.toolpath.depthShallow);
-  const deep = new three.Color(viewer3dTheme.toolpath.depthDeep);
-  const span = depth.maxZ - depth.minZ;
-  const colors = new Float32Array(positions.length);
-  const mixed = new three.Color();
-  for (let index = 0; index < positions.length; index += FLOATS_PER_POINT) {
-    const z = positions[index + 2] ?? 0;
-    // A single-depth job has no range to ramp across; hold it at shallow
-    // rather than dividing by zero and painting everything NaN.
-    const t = span === 0 ? 0 : (depth.maxZ - z) / span;
-    mixed.copy(shallow).lerp(deep, Math.min(1, Math.max(0, t)));
-    colors[index] = mixed.r;
-    colors[index + 1] = mixed.g;
-    colors[index + 2] = mixed.b;
-  }
-  return colors;
-}
-
 function buildKindLines(
   addons: LinesAddons,
   kind: Move3dKind,
   positions: readonly number[],
-  colors: Float32Array | null,
 ): ToolpathLinesHandle {
   const style = toolpathLineStyle(kind);
   const geometry = new addons.LineSegmentsGeometry();
   geometry.setPositions(Float32Array.from(positions));
-  if (colors !== null) geometry.setColors(colors);
 
   const material = new addons.LineMaterial({
-    vertexColors: colors !== null,
     color: style.color,
     linewidth: style.widthPx,
     // Screen-space width: a constant pixel thickness at every zoom level.

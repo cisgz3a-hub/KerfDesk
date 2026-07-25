@@ -43,6 +43,10 @@ export type ViewerContentInput = {
   readonly toolpath?: ViewerToolpathOverlay;
 };
 
+// Guards the depth ramp against a zero stock thickness, which would divide by
+// zero and paint the whole surface one colour.
+const MIN_DEPTH_SPAN_MM = 0.5;
+
 export type ViewerContentHandle = {
   readonly object: Object3D;
   readonly dispose: () => void;
@@ -65,10 +69,17 @@ export async function buildViewerContent(
   const disposers: Array<() => void> = [];
 
   const geometry = buildSurfaceGeometry(three, mesh);
+  // Shade by depth so carved areas read darker. A single flat tint leaves a
+  // pocket floor almost the same value as the stock top, so the shape has to
+  // be inferred from lighting alone — which is why it was hard to see.
+  applyDepthColors(three, geometry, stockThicknessMm);
   const surfaceMaterial = new three.MeshStandardMaterial({
-    color: viewer3dTheme.color.surface,
+    vertexColors: true,
     side: three.DoubleSide,
     flatShading: false,
+    // Machined timber is matte; specular highlights read as features.
+    roughness: 0.85,
+    metalness: 0,
   });
   group.add(new three.Mesh(geometry, surfaceMaterial));
   disposers.push(() => {
@@ -130,6 +141,33 @@ function buildSurfaceGeometry(three: ThreeModule, mesh: ViewerSurfaceMesh): Buff
     geometry.computeVertexNormals();
   }
   return geometry;
+}
+
+// Ramps the surface from light at the stock top to dark at full depth.
+// Normalised over STOCK THICKNESS, not the deepest cut, so depth reads as an
+// absolute fraction of the material — a 1 mm scratch must not look like a
+// through-pocket. Colours go through THREE.Color so ColorManagement does the
+// sRGB -> linear conversion; raw 0..1 triples render too bright.
+function applyDepthColors(
+  three: ThreeModule,
+  geometry: BufferGeometry,
+  stockThicknessMm: number,
+): void {
+  const position = geometry.getAttribute('position');
+  const shallow = new three.Color(viewer3dTheme.toolpath.depthShallow);
+  const deep = new three.Color(viewer3dTheme.toolpath.depthDeep);
+  const span = Math.max(stockThicknessMm, MIN_DEPTH_SPAN_MM);
+  const colors = new Float32Array(position.count * 3);
+  const mixed = new three.Color();
+  for (let index = 0; index < position.count; index += 1) {
+    // Z is 0 at the stock top and negative into the material.
+    const depth = Math.min(1, Math.max(0, -position.getZ(index) / span));
+    mixed.copy(shallow).lerp(deep, depth);
+    colors[index * 3] = mixed.r;
+    colors[index * 3 + 1] = mixed.g;
+    colors[index * 3 + 2] = mixed.b;
+  }
+  geometry.setAttribute('color', new three.BufferAttribute(colors, 3));
 }
 
 // Stock outline: a wire box from the stock top (z=0) down one thickness.
