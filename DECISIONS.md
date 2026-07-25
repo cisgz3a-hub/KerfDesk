@@ -144,7 +144,7 @@
 | ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
-| ADR-180 | 2026-07-13 | Accepted | Generic same-session CNC Resume is manual-recovery-only |
+| ADR-180 | 2026-07-13 | Amended 2026-07-24 | Generic same-session CNC Resume is manual-recovery-only — resume refusal withdrawn, one-click resume enabled |
 | ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
 | ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
 | ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
@@ -458,7 +458,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-132):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -471,7 +471,7 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
 
-The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-132). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 

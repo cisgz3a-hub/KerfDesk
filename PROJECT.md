@@ -302,7 +302,7 @@ phase; tracked here so they don't get lost.
 
 1. **Bounds check** — generated paths must fit inside the configured bed.
 2. **Origin honesty** — output coordinates match the device profile's origin.
-3. **Laser-off on travel** — every `G0` move ends with `S0` or precedes an `M5`. Property-tested.
+3. **Laser-off on travel** — every `G0` move either carries `S0` on the same line, immediately **follows** an `M5`/`M107`, or runs while the last commanded `S` is already `0`. Property-tested (`src/core/invariants/predicates.ts`).
 4. **No partial output** — pipeline failure writes no file and sends no stream.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
@@ -584,7 +584,7 @@ Phase A merges only when **all** of these are true. Phase B starts only after Ph
 4. Tests pass in CI:
    - **Snapshot:** five fixture SVGs produce byte-identical G-code to recorded snapshots.
    - **Determinism property:** same input + same params → identical output over 100 random fuzz seeds.
-   - **Laser-off invariant property:** every `G0` line has `S0` or precedes an `M5` block, across 100 generated inputs.
+   - **Laser-off invariant property:** every `G0` line has inline `S0`, follows an `M5`/`M107`, or runs under a sticky `S0`, across 100 generated inputs.
    - **Bounds invariant property:** output coordinates fall within configured bed, across 100 generated inputs.
    - **Power-scale invariant property:** 50% slider produces correct `S` value across `$30 ∈ {100, 255, 1000}`.
    - **SVG sanitizer (via DOMPurify):** strips `<script>`, external `xlink:href`, foreign objects, non-image data URIs on a corpus of crafted-malicious SVGs.
