@@ -25,14 +25,39 @@ export type PlayheadState = {
   readonly segmentFraction: number;
 };
 
-export function playheadAt(model: GcodeRenderModel, routeMm: number): PlayheadState {
+/**
+ * Playhead at a moment in PLANNER TIME (ADR-255 stage 8b). Same shape as the
+ * distance form, driven by per-segment seconds instead of millimetres, so the
+ * tool visibly slows into corners the way the machine will.
+ *
+ * Position within the active segment is interpolated linearly in time. Inside
+ * one short move that is a close approximation; across the program the timing
+ * is the planner's, not a constant-speed guess.
+ */
+export function playheadAtTime(
+  model: GcodeRenderModel,
+  segTimeEndSec: Float32Array,
+  seconds: number,
+): PlayheadState {
+  return playheadFromCumulative(model, segTimeEndSec, seconds);
+}
+
+function playheadFromCumulative(
+  model: GcodeRenderModel,
+  cumulative: Float32Array,
+  value: number,
+): PlayheadState {
   if (model.segmentCount === 0) {
     return { routeMm: 0, segmentIndex: -1, point: null, segmentFraction: 0 };
   }
-  const clamped = Math.min(Math.max(routeMm, 0), model.totalRouteMm);
-  const segmentIndex = segmentIndexAtRoute(model, clamped);
-  const start = segmentIndex === 0 ? 0 : (model.segRouteEndMm[segmentIndex - 1] ?? 0);
-  const end = model.segRouteEndMm[segmentIndex] ?? start;
+  // Clamp against the cumulative array's OWN last entry, not a separately
+  // accumulated total: the array is Float32 and the total Float64, so the
+  // two disagree in the last ulp and the end of the program would land a
+  // hair short of the final vertex.
+  const clamped = Math.min(Math.max(value, 0), cumulative[model.segmentCount - 1] ?? 0);
+  const segmentIndex = indexInCumulative(cumulative, model.segmentCount, clamped);
+  const start = segmentIndex === 0 ? 0 : (cumulative[segmentIndex - 1] ?? 0);
+  const end = cumulative[segmentIndex] ?? start;
   const span = end - start;
   const fraction = span <= 0 ? 1 : Math.min(Math.max((clamped - start) / span, 0), 1);
   return {
@@ -43,30 +68,29 @@ export function playheadAt(model: GcodeRenderModel, routeMm: number): PlayheadSt
   };
 }
 
-/**
- * Route position where the first segment emitted by `line` begins — the
- * jump target for click-to-locate from the findings list and source pane.
- * Returns null when the line produced no motion (a modal or event line).
- */
-export function routeMmAtLine(model: GcodeRenderModel, line: number): number | null {
-  for (let index = 0; index < model.segmentCount; index += 1) {
-    if (model.segLine[index] !== line) continue;
-    return index === 0 ? 0 : (model.segRouteEndMm[index - 1] ?? 0);
-  }
-  return null;
-}
-
-/** First segment whose cumulative route end reaches `routeMm` (binary search
- * over the monotonic route array). */
-export function segmentIndexAtRoute(model: GcodeRenderModel, routeMm: number): number {
+function indexInCumulative(cumulative: Float32Array, count: number, value: number): number {
   let low = 0;
-  let high = model.segmentCount - 1;
+  let high = count - 1;
   while (low < high) {
     const mid = (low + high) >> 1;
-    if ((model.segRouteEndMm[mid] ?? 0) < routeMm) low = mid + 1;
+    if ((cumulative[mid] ?? 0) < value) low = mid + 1;
     else high = mid;
   }
   return low;
+}
+
+/** Seconds at which a source line's first move begins — the time-domain
+ * jump target for click-to-locate. Null when the line emits no motion. */
+export function secondsAtLine(
+  model: GcodeRenderModel,
+  segTimeEndSec: Float32Array,
+  line: number,
+): number | null {
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    if (model.segLine[index] !== line) continue;
+    return index === 0 ? 0 : (segTimeEndSec[index - 1] ?? 0);
+  }
+  return null;
 }
 
 function interpolateSegment(

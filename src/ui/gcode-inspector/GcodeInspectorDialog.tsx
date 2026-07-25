@@ -4,6 +4,7 @@
 // lenses, DRO, source pane, and Program Health panels land in stages 4-9.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import {
   buildGcodeRenderModel,
   findProgramIssues,
@@ -14,9 +15,18 @@ import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
-import { playheadAt, routeMmAtLine } from './playhead';
+import { playheadAtTime, secondsAtLine } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useViewer3dScene } from './use-viewer3d-scene';
+
+// GRBL defaults. An opened file may not belong to the current machine, so the
+// Inspector times it against stock kinematics rather than silently borrowing
+// the connected device's — the timeline is labelled as an estimate.
+const INSPECTOR_LIMITS: MotionLimits = {
+  accelMmPerSec2: 500,
+  junctionDeviationMm: 0.01,
+  maxFeedMmPerMin: 6000,
+};
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -85,12 +95,17 @@ function InspectorBody(props: {
   const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
   const { model } = props;
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
-  const playback = useInspectorPlayback(model.totalRouteMm);
-  const playhead = useMemo(() => playheadAt(model, playback.routeMm), [model, playback.routeMm]);
+  // Planner-true seconds: the same kinematics Job Review estimates with.
+  const time = useMemo(() => buildProgramTime(model, INSPECTOR_LIMITS), [model]);
+  const playback = useInspectorPlayback(time.motionSeconds);
+  const playhead = useMemo(
+    () => playheadAtTime(model, time.segTimeEndSec, playback.routeMm),
+    [model, time, playback.routeMm],
+  );
   const findings = useMemo(() => findProgramIssues(model), [model]);
   // Fully-drawn playhead = show everything, so the scene never hides the tail
   // segment to floating-point rounding.
-  const atEnd = playback.routeMm >= model.totalRouteMm;
+  const atEnd = playback.routeMm >= time.motionSeconds;
 
   useEffect(() => {
     handleRef.current?.setPlayhead(atEnd ? null : playhead);
@@ -105,7 +120,7 @@ function InspectorBody(props: {
   // jumping somewhere arbitrary — the selection still updates.
   const locateLine = (line: number): void => {
     setSelectedLine(line);
-    const target = routeMmAtLine(model, line);
+    const target = secondsAtLine(model, time.segTimeEndSec, line);
     if (target !== null) playback.setRouteMm(target);
   };
 
@@ -132,7 +147,7 @@ function InspectorBody(props: {
             </p>
           ) : null}
         </div>
-        <InspectorTimeline playback={playback} totalRouteMm={model.totalRouteMm} />
+        <InspectorTimeline playback={playback} totalRouteMm={time.motionSeconds} />
       </div>
       {sourceVisible ? (
         <InspectorSourcePane
@@ -147,6 +162,7 @@ function InspectorBody(props: {
         model={model}
         theme={theme}
         playhead={playhead}
+        time={time}
         findings={findings}
         travelVisible={travelVisible}
         onTravelVisibleChange={(visible) => {

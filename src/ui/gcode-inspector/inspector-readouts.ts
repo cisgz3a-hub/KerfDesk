@@ -2,6 +2,7 @@
 // DRO rows, the move-kind legend, and the stats rows are derived here so the
 // React components stay presentational and the numbers stay unit-testable.
 
+import type { ProgramTimeModel } from '../../core/gcode-time';
 import { SEG_KIND, type GcodeRenderModel, type ProgramStats } from '../../core/gcode-view';
 import { cssHexColor, type Viewer3dTheme } from '../viewer3d';
 import type { PlayheadState } from './playhead';
@@ -87,9 +88,13 @@ export function legendEntries(
   ];
 }
 
-export function statsRows(model: GcodeRenderModel): ReadonlyArray<Readout> {
+export function statsRows(
+  model: GcodeRenderModel,
+  time?: ProgramTimeModel,
+): ReadonlyArray<Readout> {
   const { stats } = model;
   return [
+    ...(time === undefined ? [] : timeRows(time)),
     { label: 'Size', value: boundsSize(stats) },
     { label: 'Cut', value: `${num(stats.cutMm)} mm` },
     { label: 'Traversal', value: `${num(stats.travelMm)} mm` },
@@ -100,6 +105,33 @@ export function statsRows(model: GcodeRenderModel): ReadonlyArray<Readout> {
     { label: 'Segments', value: `${model.segmentCount}` },
     { label: 'Lines', value: `${model.lineCount}` },
   ];
+}
+
+// Planner-grade, but against stock GRBL kinematics rather than the connected
+// machine's, so it is labelled an estimate rather than a promise.
+function timeRows(time: ProgramTimeModel): ReadonlyArray<Readout> {
+  const limited = countFeedLimited(time.segFeedLimited);
+  const rows: Readout[] = [{ label: 'Est. time', value: `~${clock(time.totalSeconds)}` }];
+  if (time.dwellSeconds > 0) {
+    rows.push({ label: 'of which dwell', value: clock(time.dwellSeconds) });
+  }
+  if (limited > 0) {
+    rows.push({ label: 'Below set feed', value: `${limited} moves` });
+  }
+  return rows;
+}
+
+function countFeedLimited(flags: Uint8Array): number {
+  let count = 0;
+  for (const flag of flags) if (flag === 1) count += 1;
+  return count;
+}
+
+function clock(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(safe / 60);
+  const rest = safe % 60;
+  return minutes > 0 ? `${minutes}m ${rest}s` : `${rest}s`;
 }
 
 function boundsSize(stats: ProgramStats): string {

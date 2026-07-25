@@ -1,15 +1,15 @@
-// Inspector playback state (ADR-255 stage 5): a route-distance playhead with
-// play/pause, speed, scrub, and per-segment stepping, advanced by rAF.
+// Inspector playback state (ADR-255 stage 5, time-true since stage 8b).
 //
-// v1 advances by DISTANCE at a nominal rate so playback length is predictable
-// on any program; stage 8 replaces the rate with planner-true seconds.
+// The playhead is now measured in PLANNER SECONDS: at 1× the program plays
+// in the time the machine will actually take, so "speed" is a real-time
+// multiplier rather than an arbitrary scrub rate.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const NOMINAL_MM_PER_SEC = 60;
 const MAX_FRAME_SECONDS = 0.1;
 
 export type PlaybackState = {
+  /** Playhead position in planner seconds. */
   readonly routeMm: number;
   readonly playing: boolean;
   readonly speed: number;
@@ -46,7 +46,7 @@ export function useInspectorPlayback(totalRouteMm: number): PlaybackState {
     const tick = (now: number): void => {
       const elapsed = Math.min((now - last) / 1000, MAX_FRAME_SECONDS);
       last = now;
-      const next = routeRef.current + elapsed * NOMINAL_MM_PER_SEC * speed;
+      const next = routeRef.current + elapsed * speed;
       if (next >= totalRouteMm) {
         setRoute(totalRouteMm);
         setPlaying(false);

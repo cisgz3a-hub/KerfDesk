@@ -2,6 +2,7 @@
 // (ADR-255 stage 4). Presentational: every number comes from the pure
 // readout helpers, and the traversal toggle uses LightBurn's exact wording.
 
+import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
@@ -18,6 +19,7 @@ export function InspectorSidebar(props: {
   readonly model: GcodeRenderModel;
   readonly theme: Viewer3dTheme;
   readonly playhead: PlayheadState;
+  readonly time: ProgramTimeModel;
   readonly findings: ReadonlyArray<ProgramFinding>;
   readonly travelVisible: boolean;
   readonly onTravelVisibleChange: (visible: boolean) => void;
@@ -41,7 +43,7 @@ export function InspectorSidebar(props: {
         </label>
       </Section>
       <Section title="Program">
-        <ReadoutGrid rows={statsRows(props.model)} />
+        <ReadoutGrid rows={statsRows(props.model, props.time)} />
       </Section>
       <InspectorHealthPanel findings={props.findings} onLocate={props.onLocateLine} />
     </aside>
