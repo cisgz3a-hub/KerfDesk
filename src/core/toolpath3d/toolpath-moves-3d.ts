@@ -1,0 +1,137 @@
+// toolpathMoves3d — lifts a 2D toolpath plus its Z spans into 3D polylines.
+//
+// The toolpath model carries Z on three separate carriers: `cut.z` and
+// `travel.z` as a ZSpan, and `plunge.fromZ/toZ`. Nothing has ever assembled
+// them into a single 3D route, because the 2D canvas only ever reads Z as a
+// scalar for depth shading. A 3D viewport needs the route itself.
+//
+// Two contracts this module deliberately honours:
+//
+// 1. `startMm` accumulates `step.length` VERBATIM and never re-derives length
+//    from the emitted geometry. On arc and helical-contour steps the true
+//    arc length deliberately differs from the chord sum of the sampled
+//    polyline, so a viewer that measured its own geometry would drift out of
+//    sync with the 2D scrubber. Arc-length position in mm is the one quantity
+//    the 2D and 3D views can safely agree on.
+//
+// 2. Frame is the MACHINE frame (ADR-254): right-handed, Z-up, Z=0 at stock
+//    top and negative into the stock. Callers must NOT feed this the output of
+//    mapToolpathToScene — that frame mixes scene XY with machine Z and its
+//    handedness changes with the configured origin.
+//
+// PURE: plain data in, plain data out.
+
+import type { Vec3 } from '../geometry';
+import type { Toolpath, ToolpathStep, ZSpan } from '../job';
+import { assertNever } from '../scene';
+
+export type Move3dKind = 'cut' | 'rapid' | 'feed-travel' | 'plunge' | 'retract';
+
+export type Move3d = {
+  readonly kind: Move3dKind;
+  readonly points: ReadonlyArray<Vec3>;
+  // Arc-length position of this move's start, in mm from the job start.
+  readonly startMm: number;
+  // This move's own length, copied from the source step.
+  readonly lengthMm: number;
+};
+
+// Laser steps carry no Z at all; they sit at the stock top so a mixed job
+// still produces a drawable route rather than NaNs.
+const DEFAULT_Z_MM = 0;
+
+type PlanarPoint = { readonly x: number; readonly y: number };
+
+/**
+ * Lifts every step of a toolpath into a 3D polyline tagged by move kind.
+ *
+ * @param toolpath Machine-frame toolpath, as produced for output.
+ * @returns One move per step, in program order, with cumulative start offsets.
+ */
+export function toolpathMoves3d(toolpath: Toolpath): ReadonlyArray<Move3d> {
+  const moves: Move3d[] = [];
+  let startMm = 0;
+  for (const step of toolpath.steps) {
+    moves.push({
+      kind: moveKind(step),
+      points: movePoints(step),
+      startMm,
+      lengthMm: step.length,
+    });
+    startMm += step.length;
+  }
+  return moves;
+}
+
+function moveKind(step: ToolpathStep): Move3dKind {
+  switch (step.kind) {
+    case 'cut':
+      return 'cut';
+    // An absent `motion` means legacy/unspecified travel, which the model
+    // documents as rapid.
+    case 'travel':
+      return step.motion === 'feed' ? 'feed-travel' : 'rapid';
+    // A plunge step is vertical-only; its direction is what distinguishes
+    // cutting downward from clearing upward, and they want different colours.
+    case 'plunge':
+      return step.toZ < step.fromZ ? 'plunge' : 'retract';
+    default:
+      return assertNever(step, 'ToolpathStep');
+  }
+}
+
+function movePoints(step: ToolpathStep): ReadonlyArray<Vec3> {
+  switch (step.kind) {
+    case 'cut':
+      return spanAlongPolyline(step.polyline, step.z);
+    case 'travel':
+      return spanAlongPolyline([step.from, step.to], step.z);
+    case 'plunge':
+      return [
+        { x: step.at.x, y: step.at.y, z: step.fromZ },
+        { x: step.at.x, y: step.at.y, z: step.toZ },
+      ];
+    default:
+      return assertNever(step, 'ToolpathStep');
+  }
+}
+
+// Distributes a step's Z span along its polyline by cumulative chord length, so
+// a lead-in ramp descends smoothly instead of stepping at one vertex. Where the
+// span is flat — which is every ordinary contour pass — this is exact. Where it
+// is not, it is an even ramp: the model records only the span's endpoints, so
+// the true per-vertex Z of a ramp or drill peck is not recoverable here.
+function spanAlongPolyline(
+  polyline: ReadonlyArray<PlanarPoint>,
+  z: ZSpan | undefined,
+): ReadonlyArray<Vec3> {
+  const fromZ = z?.from ?? DEFAULT_Z_MM;
+  const toZ = z?.to ?? fromZ;
+  if (fromZ === toZ) {
+    return polyline.map((point) => ({ x: point.x, y: point.y, z: fromZ }));
+  }
+  const cumulative = cumulativeChordLengths(polyline);
+  const total = cumulative[cumulative.length - 1] ?? 0;
+  if (total === 0) {
+    return polyline.map((point) => ({ x: point.x, y: point.y, z: fromZ }));
+  }
+  return polyline.map((point, index) => ({
+    x: point.x,
+    y: point.y,
+    z: fromZ + (toZ - fromZ) * ((cumulative[index] ?? 0) / total),
+  }));
+}
+
+function cumulativeChordLengths(polyline: ReadonlyArray<PlanarPoint>): ReadonlyArray<number> {
+  const lengths: number[] = [];
+  let running = 0;
+  for (let index = 0; index < polyline.length; index += 1) {
+    const previous = polyline[index - 1];
+    const current = polyline[index];
+    if (previous !== undefined && current !== undefined) {
+      running += Math.hypot(current.x - previous.x, current.y - previous.y);
+    }
+    lengths.push(running);
+  }
+  return lengths;
+}
