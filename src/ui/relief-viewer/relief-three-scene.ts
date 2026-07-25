@@ -22,11 +22,18 @@ export type ReliefSceneResult =
   | { readonly kind: 'ok'; readonly handle: ReliefSceneHandle }
   | { readonly kind: 'no-webgl'; readonly reason: string };
 
+// Either surface builder's output. The smooth relief mesh omits `normals` and
+// lets three average them, which is right for an organic carve; the stepped CNC
+// mesh authors them so pocket walls stay vertical (ADR-254).
+export type ViewerSurfaceMesh = ReliefSurfaceMesh & {
+  readonly normals?: Float32Array;
+};
+
 const CAMERA_FOV_DEG = 40;
 
 export async function createReliefThreeScene(
   canvas: HTMLCanvasElement,
-  mesh: ReliefSurfaceMesh,
+  mesh: ViewerSurfaceMesh,
   stockThicknessMm: number,
 ): Promise<ReliefSceneResult> {
   const three = await import('three');
@@ -50,11 +57,21 @@ export async function createReliefThreeScene(
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.BufferAttribute(mesh.positions.slice(), 3));
   geometry.setIndex(new three.BufferAttribute(mesh.indices.slice(), 1));
+  // Authored normals are attached BEFORE the mirror so three's applyMatrix4
+  // carries them through its normal matrix. Attaching them afterwards would
+  // leave every wall lit as though it faced the other way.
+  if (mesh.normals !== undefined) {
+    geometry.setAttribute('normal', new three.BufferAttribute(mesh.normals.slice(), 3));
+  }
   // The heightmap's row axis points down the canvas; mirror it so text
   // reliefs read the right way round, then recenter on the origin.
   geometry.scale(1, -1, 1);
   geometry.translate(-mesh.widthMm / 2, mesh.heightMm / 2, 0);
-  geometry.computeVertexNormals();
+  // Only the smooth builder needs averaged normals. Running this over an
+  // authored mesh would average the vertical walls back into 45° ramps.
+  if (mesh.normals === undefined) {
+    geometry.computeVertexNormals();
+  }
   const surfaceMaterial = new three.MeshStandardMaterial({
     color: viewer3dTheme.color.surface,
     side: three.DoubleSide,

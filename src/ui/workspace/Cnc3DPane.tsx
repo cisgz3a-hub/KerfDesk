@@ -5,7 +5,7 @@
 // three.js scene. UI-only; the compile path is the same one Preview uses.
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { reliefSurfaceMesh } from '../../core/relief';
+import { steppedSurfaceMesh } from '../../core/heightfield';
 import { toSceneCoords } from '../../core/devices';
 import {
   computeRemovalGrid,
@@ -134,7 +134,7 @@ function PaneScene(props: {
     let cancelled = false;
     setState('loading');
     const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
-    void createReliefThreeScene(canvas, reliefSurfaceMesh(display), thickness)
+    void createReliefThreeScene(canvas, steppedSurfaceMesh(display), thickness)
       .then((outcome) => {
         if (cancelled) {
           if (outcome.kind === 'ok') outcome.handle.dispose();
