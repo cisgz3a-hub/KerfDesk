@@ -13,9 +13,13 @@ export {
   type RemovalGridSpec,
 } from './removal-grid';
 export { kernelForTool, type ToolKernel, type ToolKernelOffset } from './tool-kernels';
+export { toolProfile, type ToolProfilePoint } from './tool-profile';
 export {
   computeRemovalGrid,
   type ComputeRemovalGridResult,
   type ComputeRemovalOptions,
 } from './stamp-toolpath';
 export { downsampleRemovalGrid } from './removal-grid-display';
+// Only the function is exported: this barrel sits at the hard cap of 20, and
+// callers narrow on the returned union structurally without naming it.
+export { probeRemovalGrid } from './removal-grid-probe';

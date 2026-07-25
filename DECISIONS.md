@@ -4575,6 +4575,8 @@ buffers, and lighting is weeks of risk for zero product differentiation.
    canon-critical.
 2. **three.js is UI-only.** It may be imported beneath
    `src/ui/relief-viewer/` and nowhere else — never in `core/` or `io/`.
+   **AMENDED by ADR-254 (2026-07-25):** `src/ui/cnc-viewer3d/` is also permitted.
+   Everything else in this clause stands unchanged.
    clipper2-ts remains the only geometry dependency of the core. The
    heightmap→mesh conversion stays a PURE core function returning plain
    `Float32Array`s (positions/indices/normals feed three's BufferGeometry
@@ -12291,6 +12293,145 @@ stopped being true.
   CNC project to refair them.
 - The pass runs in the import dialog's commit path, today's only TracedImage
   creation site; a future creation site must call it or document why not.
+
+## ADR-257 - CNC 3D viewport: import boundary, world frame, and display-only status
+
+**Status:** Accepted
+**Date:** 2026-07-25
+
+### Context
+
+The CNC 3D pane renders one thing: a smooth-displaced removal heightfield with
+a wire stock box, lit by one ambient plus one directional light, rebuilt from
+scratch on every project edit. It shows no toolpath, no cutter, no bed, no
+origin, no depth ramp, and it resets the operator's camera on every keystroke.
+
+Research recorded in `docs/audits/2026-07-25-cnc-3d-threejs-research-and-roadmap.md`
+mapped the existing stack and the data already available to a richer viewer,
+and verified the r180 APIs against the installed `three@0.180.0` tree. Three
+decisions in that research are architectural and belong here rather than in a
+commit message.
+
+### Decision
+
+1. **ADR-102 §2 is amended.** three.js may be imported beneath
+   `src/ui/relief-viewer/` **and `src/ui/cnc-viewer3d/`**, and nowhere else — still
+   never in `core/` or `io/`. The rest of ADR-102 §2 is unchanged: clipper2-ts
+   remains the core's only geometry dependency, and heightmap-to-mesh
+   conversion stays a PURE core function returning plain typed arrays, so the
+   viewer's geometry stays testable without WebGL. A dedicated folder is
+   warranted because the viewport grows to a dozen-plus modules whose
+   responsibility is the CNC viewport, not the relief dialog; leaving them in
+   `relief-viewer/` would make that folder's one-sentence description need an
+   "and". ADR-102 §3 (lazy `import()`) and §4 (graceful no-WebGL fallback)
+   apply unchanged to the new folder.
+
+2. **The whole 3D scene shares ONE frame: the removal grid's local frame —
+   scene-space XY relative to the grid origin, machine Z — mirrored once by
+   `geometry.scale(1, -1, 1)` at the geometry boundary, which yields a
+   right-handed Z-up world.** Every drawable in the viewport must be expressed
+   in that frame by the same helper. The prohibition that matters is against
+   drawing SOME geometry in one frame and some in another.
+
+   > **Corrected 2026-07-25, before any toolpath geometry was written.** This
+   > clause originally read "the viewer3d world frame is the MACHINE frame …
+   > 3D geometry is built from machine-frame job data, NOT from the scene
+   > frame". That was wrong for this codebase and would have misaligned the
+   > toolpath against the surface it overlays.
+   > `buildPreviewToolpathFromPrepared` (`src/ui/workspace/draw-preview.ts:217`)
+   > already maps the prepared job through `mapToolpathToScene`, and
+   > `useDesignRemovalGrid` (`src/ui/workspace/Cnc3DPane.tsx:95-117`) stamps
+   > that scene-frame toolpath into a grid whose origin is itself
+   > `toSceneCoords`-derived. The surface already on screen is therefore
+   > scene-derived, and a machine-frame toolpath drawn beside it would be
+   > offset and mirrored. The handedness analysis below is still correct and
+   > still the reason the rule exists — it is why nothing may be drawn in a
+   > half-converted frame — but the resolution is one uniform mirror applied to
+   > everything, not a switch to machine frame.
+
+   The handedness analysis, which is why the single-frame rule matters:
+   `toSceneCoords`
+   (`src/core/devices/origin-transform.ts:28`) inverts a per-origin transform,
+   and `mapToolpathToScene` (`src/ui/workspace/preview-scene-frame.ts:18`)
+   maps only XY through it while every Z field rides through the object spread
+   untouched in machine frame. The resulting mixed triple changes handedness
+   with the configured origin:
+
+   | Origin | Scene XY vs machine | Xs x Ys | Handedness with machine Z |
+   |---|---|---|---|
+   | `front-left` | Y flipped | -Zm | left |
+   | `front-right` | X and Y flipped | +Zm | right |
+   | `rear-left` | identity | +Zm | right |
+   | `rear-right` | X flipped | -Zm | left |
+   | `center` | Y flipped | -Zm | left |
+
+   Mixing the two frames unmirrored is left-handed on three of the five
+   origins and right-handed on two, which is the worst possible failure mode:
+   it looks plausible, it is wrong, and it is wrong differently per machine.
+   No sign flip fixes it because there is no single sign. What fixes it is
+   applying the SAME mirror to every drawable exactly once, so the whole scene
+   is internally consistent no matter which origin is configured — and it then
+   also matches the 2D canvas, which is the reference the operator already
+   knows.
+
+   The 2D canvas keeps using scene frame; nothing about this changes it. Where
+   the two must agree (the shared scrubber, the shared preview grid), they
+   agree on arc-length position in mm, which is frame-independent.
+
+3. **The 3D viewport is display-only and is not a guard.** It may color, tint,
+   label, annotate, or surface a warning; it may never block, gate, disable,
+   delay, cap, or refuse Frame, Start, preview, save, export, or emission, and
+   nothing it computes may become a precondition for any of them. A richer
+   viewport necessarily surfaces more conditions — tool below stock bottom,
+   path outside the bed, no-go entry, unreachable Z — and every one of those is
+   a color cue or a Job Review warning, never a refusal. This restates
+   CLAUDE.md rule 7, PROJECT.md non-negotiable #21, and ADR-228 as clarified by
+   ADR-232, and is called out explicitly because this is exactly the kind of
+   feature that invites a well-meaning guard.
+
+4. **No new runtime dependency.** The ecosystem was evaluated (camera-controls,
+   postprocessing, n8ao, three-mesh-bvh, three-bvh-csg, three-stdlib, meshline,
+   troika-three-text, R3F + drei, gcode-preview) and the verdict is to adopt
+   none. Everything the viewport needs — `Line2`/`LineSegments2`/`LineMaterial`,
+   `EffectComposer` and the AO passes, `ViewHelper`, `PMREMGenerator`,
+   `BufferGeometryUtils`, `CSS2DRenderer` — already ships inside the installed
+   `three@0.180.0` addons and is therefore already paid for. Notable specifics:
+   R3F is flatly incompatible (it requires React 19; this repo is pinned to
+   React 18.3.1), and `gcode-preview` lists `three` as a direct dependency
+   rather than a peer, so installing it would pull a second copy of three into
+   the tree. `lil-gui` and `stats.js` clear the lower devDependency bar if
+   tuning by eye ever needs them. ADR-098 §2 otherwise stands.
+
+### Alternatives considered
+
+- **Keep three.js confined to `src/ui/relief-viewer/`.** Rejected: the folder's
+  responsibility would become "the relief dialog AND the CNC viewport", which
+  fails the single-responsibility test in CLAUDE.md.
+- **Draw 3D in scene frame and flip a sign.** Rejected: there is no single
+  sign, per the table above.
+- **Normalize Z into scene frame inside `mapToolpathToScene`.** Rejected: it
+  would make a function the 2D preview depends on carry a 3D concern, and it
+  would still leave a left-handed frame on three origins.
+- **Adopt R3F and rewrite the scene declaratively.** Rejected: requires React
+  19, and the existing imperative scene is small.
+
+### Verification
+
+- Pure unit tests for everything that can be pure: camera fit maths, color
+  tables, tool profiles, depth banding, source selection.
+- Honest limit, stated up front: `src/__fixtures__/jsdom-canvas-setup.ts:113`
+  forces `getContext` to return null for any WebGL request, so
+  `new WebGLRenderer` throws in vitest and every line after it is unreachable.
+  No automated test in this repo can prove the viewport LOOKS right. Visual
+  confirmation in a real browser is the only evidence for appearance, and any
+  claim about appearance must say whether it was actually looked at.
+
+### Reversal triggers
+
+- ADR-102's own trigger still applies: a bundle-size or supply-chain audit
+  flagging three.js reverts the viewer to a static isometric canvas projection.
+- If the lazily-loaded 3D chunk exceeds the budget the maintainer sets for it,
+  postprocessing is dropped first — it is the most optional layer.
 
 ## ADR-259 - Test files get a higher raw-physical-line backstop
 
