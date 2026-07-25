@@ -10,7 +10,7 @@ describe('toolpathLineStyle', () => {
     for (const kind of ALL_KINDS) {
       const style = toolpathLineStyle(kind);
       expect(Number.isInteger(style.color)).toBe(true);
-      expect(style.widthPx).toBeGreaterThan(0);
+      expect(style.widthMm).toBeGreaterThan(0);
       expect(style.opacity).toBeGreaterThan(0);
       expect(style.opacity).toBeLessThanOrEqual(1);
     }
@@ -31,7 +31,7 @@ describe('toolpathLineStyle', () => {
     for (const kind of ['rapid', 'feed-travel', 'retract'] as const) {
       const travel = toolpathLineStyle(kind);
       expect(travel.opacity).toBeLessThan(cut.opacity);
-      expect(travel.widthPx).toBeLessThan(cut.widthPx);
+      expect(travel.widthMm).toBeLessThan(cut.widthMm);
     }
   });
 

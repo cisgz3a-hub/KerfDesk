@@ -124,9 +124,14 @@ function buildKindLines(
 
   const material = new addons.LineMaterial({
     color: style.color,
-    linewidth: style.widthPx,
-    // Screen-space width: a constant pixel thickness at every zoom level.
-    worldUnits: false,
+    linewidth: style.widthMm,
+    // WORLD UNITS, not screen space. LineMaterial's shader only emits its cap
+    // extension inside `#ifdef WORLD_UNITS` (verified in the installed r180
+    // source), so with screen-space width two segments meeting at a corner
+    // have nothing filling the join and leave a wedge-shaped notch — the gap
+    // the maintainer spotted. World units cost a constant pixel width at every
+    // zoom; capped corners are worth more than that on a cut preview.
+    worldUnits: true,
     dashed: style.dashed,
     dashSize: DASH_SIZE_MM,
     gapSize: GAP_SIZE_MM,

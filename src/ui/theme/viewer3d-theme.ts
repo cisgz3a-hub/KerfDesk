@@ -52,10 +52,10 @@ export const viewer3dTheme = {
   // Screen-space line widths in CSS pixels (worldUnits: false), so the path
   // stays legible at any zoom. Traversals are drawn thinner than cuts because
   // they are context, not the subject.
-  toolpathWidthPx: {
-    cut: 2.4,
-    plunge: 2,
-    travel: 1.2,
+  toolpathWidthMm: {
+    cut: 0.45,
+    plunge: 0.4,
+    travel: 0.2,
   },
   // Traversals also sit back in opacity so a dense rapid web never buries the
   // cut it is connecting.

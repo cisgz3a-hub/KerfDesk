@@ -15,10 +15,11 @@ import { viewer3dTheme } from '../theme/viewer3d-theme';
 
 export type ToolpathLineStyle = {
   readonly color: number;
-  // CSS pixels: the material runs in screen space (worldUnits: false), so a
-  // path stays equally legible whether the operator is zoomed to the whole bed
-  // or to one corner.
-  readonly widthPx: number;
+  // MILLIMETRES. The material runs in world units so its shader emits the cap
+  // extension that fills corner joins; screen-space width leaves a notch at
+  // every corner. Roughly a cut line's own width, so the path reads as the
+  // slot it will actually make.
+  readonly widthMm: number;
   readonly opacity: number;
   // Dashes read as "nothing is being removed here" at a glance, which is the
   // fastest way to tell a traversal from a cut without consulting a legend.
@@ -31,22 +32,22 @@ const OPAQUE = 1;
  * Resolves the line style for one move kind.
  *
  * @param kind Move kind from the 3D toolpath lift.
- * @returns Colour, screen-space width, opacity and dash flag for that kind.
+ * @returns Colour, world-space width in mm, opacity and dash flag for that kind.
  */
 export function toolpathLineStyle(kind: Move3dKind): ToolpathLineStyle {
-  const { toolpath, toolpathWidthPx, toolpathTravelOpacity } = viewer3dTheme;
+  const { toolpath, toolpathWidthMm, toolpathTravelOpacity } = viewer3dTheme;
   switch (kind) {
     case 'cut':
       return {
         color: toolpath.cut,
-        widthPx: toolpathWidthPx.cut,
+        widthMm: toolpathWidthMm.cut,
         opacity: OPAQUE,
         dashed: false,
       };
     case 'rapid':
       return {
         color: toolpath.rapid,
-        widthPx: toolpathWidthPx.travel,
+        widthMm: toolpathWidthMm.travel,
         opacity: toolpathTravelOpacity,
         dashed: true,
       };
@@ -55,7 +56,7 @@ export function toolpathLineStyle(kind: Move3dKind): ToolpathLineStyle {
     case 'feed-travel':
       return {
         color: toolpath.feedTravel,
-        widthPx: toolpathWidthPx.travel,
+        widthMm: toolpathWidthMm.travel,
         opacity: toolpathTravelOpacity,
         dashed: true,
       };
@@ -64,14 +65,14 @@ export function toolpathLineStyle(kind: Move3dKind): ToolpathLineStyle {
     case 'plunge':
       return {
         color: toolpath.plunge,
-        widthPx: toolpathWidthPx.plunge,
+        widthMm: toolpathWidthMm.plunge,
         opacity: OPAQUE,
         dashed: false,
       };
     case 'retract':
       return {
         color: toolpath.retract,
-        widthPx: toolpathWidthPx.travel,
+        widthMm: toolpathWidthMm.travel,
         opacity: toolpathTravelOpacity,
         dashed: true,
       };
