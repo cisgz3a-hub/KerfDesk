@@ -12247,7 +12247,9 @@ across each window. New pure module `src/core/cnc/cnc-tab-ramp.ts`.
   It cannot be proven here: No hardware verification is available on this project (maintainer, 2026-07-25): there is no machine to test on. This is a TERMINAL limitation, not a pending task.
 - **Nearest available check:** run an exported .nc through an INDEPENDENT viewer (NC Viewer, CAMotics). Our own 3D preview and core/sim share the emitter's codebase, so a geometry fault can look correct in both; an outside parser cannot. Note the Z-rise model itself is Fusion 360's documented behavior, but the `depth > tabHeight` guard and the small-contour ride-at-tab-top fallback are this project's own inventions and match no reference.
 
-## ADR-257 — CNC traces commit machine-faired polylines (2026-07-25)
+## ADR-260 — CNC traces commit machine-faired polylines (2026-07-25)
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
 
 ### Context
 
@@ -12293,7 +12295,9 @@ stopped being true.
 - The pass runs in the import dialog's commit path, today's only TracedImage
   creation site; a future creation site must call it or document why not.
 
-## ADR-257 - CNC 3D viewport: import boundary, world frame, and display-only status
+## ADR-261 - CNC 3D viewport: import boundary, world frame, and display-only status
+
+> Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
 
 **Status:** Accepted
 **Date:** 2026-07-25
