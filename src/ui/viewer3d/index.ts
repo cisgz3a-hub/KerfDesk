@@ -2,5 +2,6 @@
 // Display-only: nothing here may gate or refuse an operator action (§3).
 
 export { buildStageFurniture, type StageFurnitureHandle } from './viewer3d-stage';
+export { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
 export { buildToolpathLines, type ToolpathLinesHandle } from './viewer3d-toolpath';
 export { toolpathLineStyle, type ToolpathLineStyle } from './viewer3d-toolpath-colors';

@@ -63,4 +63,10 @@ export const viewer3dTheme = {
     gridMajor: 0x525b66,
     gridOpacity: 0.5,
   },
+  // The cutter. Translucent because an opaque tool hides precisely the cut the
+  // operator is inspecting — it is always sitting in it.
+  tool: {
+    body: 0xe8a13a,
+    opacity: 0.5,
+  },
 } as const;

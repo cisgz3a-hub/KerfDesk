@@ -13,7 +13,9 @@ import {
   downsampleRemovalGrid,
   DEFAULT_CELL_MM,
   kernelForTool,
+  toolProfile,
   type RemovalGrid,
+  type ToolProfilePoint,
 } from '../../core/sim';
 import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
 import { useOutputScope, useStore } from '../state';
@@ -39,6 +41,7 @@ type PaneSceneState = 'loading' | 'ready' | 'failed';
 type DesignSceneSource = {
   readonly grid: RemovalGrid;
   readonly moves: ReadonlyArray<Move3d>;
+  readonly toolProfile: ReadonlyArray<ToolProfilePoint>;
 };
 
 export function Cnc3DPane(): JSX.Element | null {
@@ -129,7 +132,13 @@ function useDesignSceneSource(
     // buildPreviewToolpath already mapped the prepared job into scene frame,
     // which is the frame the grid above was stamped in — so the moves and the
     // surface share one frame, as ADR-254 §2 requires.
-    return { grid: result.grid, moves: toolpathMoves3d(toolpath) };
+    return {
+      grid: result.grid,
+      moves: toolpathMoves3d(toolpath),
+      // Same tool record that produced the kernel above, so the drawn bit and
+      // the simulated one cannot disagree.
+      toolProfile: toolProfile(activeCncTool(machine)),
+    };
   }, [project, outputScope, collapsed]);
 }
 
@@ -147,13 +156,14 @@ function PaneScene(props: {
     if (canvas === null || source === null) return;
     let cancelled = false;
     setState('loading');
-    const { grid, moves } = source;
+    const { grid, moves, toolProfile: profile } = source;
     const display = downsampleRemovalGrid(grid, PANE_DISPLAY_CELLS_ACROSS);
     // Downsampling keeps the grid's min corner, so the full-resolution origin
     // is still the right offset for the path.
     void createReliefThreeScene(canvas, steppedSurfaceMesh(display), thickness, {
       moves,
       originMm: { x: grid.originX, y: grid.originY },
+      toolProfile: profile,
     })
       .then((outcome) => {
         if (cancelled) {

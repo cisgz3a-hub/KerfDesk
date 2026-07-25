@@ -6,11 +6,12 @@
 // Type-only import: erased at compile time, so three itself still loads
 // lazily through the dynamic import() below (ADR-102 §3).
 import type * as ThreeNamespace from 'three';
-import type { BufferGeometry, Scene, WebGLRenderer } from 'three';
+import type { BufferGeometry, Object3D, Scene, WebGLRenderer } from 'three';
 import type { ReliefSurfaceMesh } from '../../core/relief';
-import type { Move3d } from '../../core/toolpath3d';
+import type { ToolProfilePoint } from '../../core/sim';
+import { firstCuttingPoint, type Move3d } from '../../core/toolpath3d';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
-import { buildStageFurniture, buildToolpathLines } from '../viewer3d';
+import { buildStageFurniture, buildToolMesh, buildToolpathLines } from '../viewer3d';
 import { applySceneLighting } from './scene-lighting';
 
 // The toolpath to overlay, in the SAME scene frame the removal grid was
@@ -20,6 +21,8 @@ type ThreeModule = typeof ThreeNamespace;
 export type ViewerToolpathOverlay = {
   readonly moves: ReadonlyArray<Move3d>;
   readonly originMm: { readonly x: number; readonly y: number };
+  // Omitted for jobs with no CNC tool; the path still draws without a cutter.
+  readonly toolProfile?: ReadonlyArray<ToolProfilePoint>;
 };
 
 export type ReliefSceneHandle = {
@@ -90,6 +93,28 @@ function addStockOutline(
   };
 }
 
+// Parks the cutter at the program's first cutting point. Until playback
+// exists this is the one static position that says something true: where the
+// job starts and which bit will do it. The point arrives in the same scene
+// frame as the path, so it takes the same origin shift and mirror.
+function buildParkedTool(
+  three: ThreeModule,
+  mesh: ViewerSurfaceMesh,
+  toolpath: ViewerToolpathOverlay | undefined,
+): { readonly object: Object3D; readonly dispose: () => void } | null {
+  if (toolpath?.toolProfile === undefined) return null;
+  const start = firstCuttingPoint(toolpath.moves);
+  if (start === null) return null;
+  return buildToolMesh(three, toolpath.toolProfile, {
+    x: start.x - toolpath.originMm.x - mesh.widthMm / 2,
+    // Mirrored to match the surface, then recentred — the same composition the
+    // surface geometry is baked with, done arithmetically because a single
+    // point needs no transform node.
+    y: -(start.y - toolpath.originMm.y) + mesh.heightMm / 2,
+    z: start.z,
+  });
+}
+
 export async function createReliefThreeScene(
   canvas: HTMLCanvasElement,
   mesh: ViewerSurfaceMesh,
@@ -141,6 +166,9 @@ export async function createReliefThreeScene(
     scene.add(toolpathLines.object);
   }
 
+  const tool = buildParkedTool(three, mesh, toolpath);
+  if (tool !== null) scene.add(tool.object);
+
   const lighting = applySceneLighting(three, renderer, scene, mesh);
 
   const camera = new three.PerspectiveCamera(CAMERA_FOV_DEG, width / height, 0.1, 10_000);
@@ -169,6 +197,7 @@ export async function createReliefThreeScene(
         controls.dispose();
         lighting.dispose();
         toolpathLines?.dispose();
+        tool?.dispose();
         stage.dispose();
         geometry.dispose();
         surfaceMaterial.dispose();

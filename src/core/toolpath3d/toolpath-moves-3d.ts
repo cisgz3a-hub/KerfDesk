@@ -75,6 +75,29 @@ export function toolpathMoves3d(toolpath: Toolpath): ReadonlyArray<Move3d> {
   return moves;
 }
 
+// Kinds where the bit is actually in the work.
+const CUTTING_KINDS: ReadonlySet<Move3dKind> = new Set<Move3dKind>(['cut', 'plunge']);
+
+/**
+ * Finds where the program first puts the tool into the material.
+ *
+ * Used to park the drawn cutter somewhere meaningful before playback exists:
+ * the start of the first cut says both "here is where this job begins" and
+ * "here is the bit that will do it". Rapids are skipped deliberately — parking
+ * the tool on a traversal would suggest it cuts there.
+ *
+ * @param moves Moves in program order.
+ * @returns The first cutting point, or null for a job that never cuts.
+ */
+export function firstCuttingPoint(moves: ReadonlyArray<Move3d>): Vec3 | null {
+  for (const move of moves) {
+    if (!CUTTING_KINDS.has(move.kind)) continue;
+    const point = move.points[0];
+    if (point !== undefined) return point;
+  }
+  return null;
+}
+
 function moveKind(step: ToolpathStep): Move3dKind {
   switch (step.kind) {
     case 'cut':
