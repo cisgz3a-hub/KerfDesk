@@ -2716,11 +2716,12 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
 
 #### Success
-1. The layer card's "Entry" row (profile/pocket/engrave) offers
-   Climb / Conventional / Default direction and a ramp angle.
+1. The layer card's "Entry" row offers a ramp angle for profile/pocket/engrave
+   cuts. Climb / Conventional / Default direction appears only for
+   outside/inside profiles and pockets, where direction affects winding.
 2. Direction enforcement re-orients closed toolpaths (M3 spindle: climb
-   keeps material LEFT of travel — outside profiles run CCW,
-   inside/pocket run CW) and rotates entry points to the midpoint of
+   keeps material RIGHT of travel — outside profiles run CW,
+   inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
 3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
    that angle; closed loops re-cut the ramped span level afterwards.
