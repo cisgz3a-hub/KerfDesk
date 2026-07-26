@@ -130,6 +130,35 @@ describe('handleSaveTiledGcode', () => {
     expect(messages.filter((m) => m.includes('Controlled laser-off seek feed'))).toHaveLength(1);
   });
 
+  // Rule 7 / ADR-228, the LAST refusal on this path: emitTileFiles refused the
+  // whole set on `!preflight.ok`, and runCncPreflight reports heuristic policy
+  // codes (cnc-settings-invalid, no-go-zone-collision, plunged-travel) next to
+  // the integrity ones. A negative spindle spin-up delay is a settings
+  // judgment, not an inability to produce the program — the tiles must still
+  // be written, with the finding surfaced as a warning.
+  it('writes every tile when a per-tile preflight reports only a policy finding', async () => {
+    const base = tiledCncProject();
+    const written: string[] = [];
+    const messages: string[] = [];
+
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: {
+        ...base,
+        machine: {
+          ...DEFAULT_CNC_MACHINE_CONFIG,
+          tiling: DEFAULT_CNC_TILING,
+          params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, spindleSpinupSec: -1 },
+        },
+      },
+      savedName: 'job',
+      pushToast: (message) => messages.push(message),
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    expect(messages.filter((m) => m.includes('spin-up delay'))).toHaveLength(1);
+  });
+
   it('exports every layer when no scope is given', async () => {
     const written: string[] = [];
     await handleSaveTiledGcode({
