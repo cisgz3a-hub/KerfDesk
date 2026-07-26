@@ -11,6 +11,7 @@ const THEME: Viewer3dTheme = {
   cut: 0x0000ff,
   plunge: 0x00ff00,
   retract: 0xff0000,
+  arrow: 0xf2f4f8,
 };
 
 describe('buildSegmentBuckets', () => {

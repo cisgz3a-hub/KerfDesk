@@ -6,6 +6,7 @@
 
 import type * as ThreeNamespace from 'three';
 import type { ArrowPlacement } from './direction-arrows';
+import type { Viewer3dTheme } from './viewer3d-theme';
 
 type ThreeModule = typeof ThreeNamespace;
 
@@ -14,7 +15,6 @@ export type ArrowMesh = ThreeNamespace.InstancedMesh<
   ThreeNamespace.MeshBasicMaterial
 >;
 
-const ARROW_COLOR = 0xf2f4f8;
 const ARROW_LENGTH_FRACTION = 0.02;
 const ARROW_MIN_LENGTH_MM = 0.8;
 const ARROW_ASPECT = 0.45;
@@ -29,11 +29,12 @@ export function createArrowMesh(
   three: ThreeModule,
   placements: ReadonlyArray<ArrowPlacement>,
   extentMm: number,
+  theme: Viewer3dTheme,
 ): ArrowMesh | null {
   if (placements.length === 0) return null;
   const length = Math.max(ARROW_MIN_LENGTH_MM, extentMm * ARROW_LENGTH_FRACTION);
   const geometry = new three.ConeGeometry(length * ARROW_ASPECT, length, 8);
-  const material = new three.MeshBasicMaterial({ color: ARROW_COLOR });
+  const material = new three.MeshBasicMaterial({ color: theme.arrow });
   const mesh: ArrowMesh = new three.InstancedMesh(geometry, material, placements.length);
   const matrix = new three.Matrix4();
   const quaternion = new three.Quaternion();

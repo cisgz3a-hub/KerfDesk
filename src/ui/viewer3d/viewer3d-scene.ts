@@ -202,7 +202,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     },
 
     setDirectionArrows: (placements) => {
-      arrowMesh = swapArrows(three, scene, arrowMesh, placements, boundsExtent(lastBounds));
+      arrowMesh = swapArrows(three, scene, arrowMesh, placements, boundsExtent(lastBounds), theme);
       render();
     },
     setView: (preset) => {
@@ -264,10 +264,11 @@ function swapArrows(
   previous: ArrowMesh | null,
   placements: ReadonlyArray<ArrowPlacement> | null,
   extentMm: number,
+  theme: Viewer3dTheme,
 ): ArrowMesh | null {
   disposeArrowMesh(scene, previous);
   if (placements === null) return null;
-  const mesh = createArrowMesh(three, placements, extentMm);
+  const mesh = createArrowMesh(three, placements, extentMm, theme);
   if (mesh !== null) scene.add(mesh);
   return mesh;
 }
