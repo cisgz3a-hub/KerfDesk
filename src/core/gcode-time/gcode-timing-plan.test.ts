@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import type { CncGroup, CutGroup, Job } from '../job';
 import { cncGrblStrategy, grblStrategy } from '../output';
 import {
@@ -22,6 +22,11 @@ const CUT_PATH = [
   { x: 10, y: 10 },
 ];
 
+type LaserAirAssist = { readonly kind: 'enabled' } | { readonly kind: 'disabled' };
+
+const AIR_ASSIST_ENABLED: LaserAirAssist = { kind: 'enabled' };
+const AIR_ASSIST_DISABLED: LaserAirAssist = { kind: 'disabled' };
+
 function cncGroup(spindleRpm: number): CncGroup {
   return {
     kind: 'cnc',
@@ -38,7 +43,7 @@ function cncGroup(spindleRpm: number): CncGroup {
   };
 }
 
-function laserCutGroup(airAssist = false): CutGroup {
+function laserCutGroup(airAssistMode: LaserAirAssist): CutGroup {
   return {
     kind: 'cut',
     layerId: 'laser-cut',
@@ -46,7 +51,7 @@ function laserCutGroup(airAssist = false): CutGroup {
     power: 50,
     speed: 6_000,
     passes: 1,
-    airAssist,
+    airAssist: airAssistMode.kind === 'enabled',
     segments: [
       {
         polyline: [
@@ -59,11 +64,11 @@ function laserCutGroup(airAssist = false): CutGroup {
   };
 }
 
-function laserJob(airAssist = false): Job {
-  return { groups: [laserCutGroup(airAssist)] };
+function laserJob(): Job {
+  return { groups: [laserCutGroup(AIR_ASSIST_DISABLED)] };
 }
 
-describe('buildGcodeTimingPlan', () => {
+describe('buildGcodeTimingPlan — timeline totals', () => {
   it('times the exact program including a spindle spin-up dwell', () => {
     const result = buildGcodeTimingPlan(
       ['G21 G90', 'M3 S12000', 'G4 P4', 'G1 X60 F600'].join('\n'),
@@ -88,7 +93,9 @@ describe('buildGcodeTimingPlan', () => {
       totalSeconds: 4,
     });
   });
+});
 
+describe('buildGcodeTimingPlan — emitted command boundaries', () => {
   it('includes every dwell emitted for CNC spindle start and RPM changes', () => {
     const gcode = cncGrblStrategy.emit(
       { groups: [cncGroup(12_000), cncGroup(8_000)] },
@@ -114,13 +121,16 @@ describe('buildGcodeTimingPlan', () => {
     if (shutdown.kind !== 'ok') return;
     expectStoppedAcrossLastCommand(shutdown.plan, shutdownGcode, 'M5');
 
-    const airDevice = { ...DEFAULT_DEVICE_PROFILE, airAssistCommand: 'M8' as const };
+    const airDevice: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      airAssistCommand: 'M8',
+    };
     const airGcode = grblStrategy.emit(
       {
         groups: [
-          laserCutGroup(true),
+          laserCutGroup(AIR_ASSIST_ENABLED),
           {
-            ...laserCutGroup(false),
+            ...laserCutGroup(AIR_ASSIST_DISABLED),
             layerId: 'dry-cut',
             segments: [
               {
@@ -141,7 +151,9 @@ describe('buildGcodeTimingPlan', () => {
     if (air.kind !== 'ok') return;
     expectStoppedAcrossLastCommand(air.plan, airGcode, 'M9');
   });
+});
 
+describe('buildGcodeTimingPlan — position and route projection', () => {
   it('uses the real controller start position for the first emitted move', () => {
     const result = buildGcodeTimingPlan('G21 G90\nG0 X100', LIMITS, {
       x: 100,

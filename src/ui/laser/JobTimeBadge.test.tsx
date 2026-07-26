@@ -10,25 +10,25 @@ import { JobTimeBadge } from './JobTimeBadge';
 
 type MountedBadge = { readonly host: HTMLElement; readonly root: Root };
 
-const mountedBadges: MountedBadge[] = [];
-
-afterEach(() => {
-  for (const mounted of mountedBadges.splice(0)) {
-    act(() => mounted.root.unmount());
-    mounted.host.remove();
-  }
-});
-
-function render(state: Parameters<typeof JobTimeBadge>[0]['state']): HTMLElement {
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  mountedBadges.push({ host, root });
-  act(() => root.render(<JobTimeBadge state={state} />));
-  return host;
-}
-
 describe('JobTimeBadge', () => {
+  const mountedBadges: MountedBadge[] = [];
+
+  afterEach(() => {
+    for (const mounted of mountedBadges.splice(0)) {
+      act(() => mounted.root.unmount());
+      mounted.host.remove();
+    }
+  });
+
+  function render(state: Parameters<typeof JobTimeBadge>[0]['state']): HTMLElement {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    mountedBadges.push({ host, root });
+    act(() => root.render(<JobTimeBadge state={state} />));
+    return host;
+  }
+
   it('shows live remaining time without mixing in acknowledged lines', () => {
     const host = render({ kind: 'running', remainingSeconds: 83 });
     expect(host.textContent).toBe('~1m 23s remaining');

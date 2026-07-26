@@ -1,5 +1,6 @@
 import type { GcodeTimingPlan, GcodeTimingPlanResult } from '../../core/gcode-time';
 import type { MotionBlock, MotionManifest } from '../../core/job/motion-manifest';
+import { assertNever } from '../../core/scene';
 import type { LaserState } from './laser-store';
 import {
   completeLiveJobTiming,
@@ -14,6 +15,11 @@ import {
 } from './live-job-timing';
 import type { LiveCanvasLifecycle, LiveCanvasRun } from './canvas-motion-plan';
 
+type LiveCanvasTimingEvidence = {
+  readonly isTrustworthyRouteProgress: boolean;
+  readonly isControllerExecutionConfirmed: boolean;
+};
+
 export function initialLiveCanvasTiming(
   result: GcodeTimingPlanResult | undefined,
   now: number,
@@ -26,9 +32,8 @@ export function initialLiveCanvasTiming(
 export function liveCanvasTimingForStatus(
   previous: LiveCanvasRun,
   updated: LiveCanvasRun,
-  trustworthyRouteProgress: boolean,
+  evidence: LiveCanvasTimingEvidence,
   now: number,
-  controllerExecutionConfirmed: boolean,
 ): LiveJobTiming | undefined {
   const timing = previous.timing;
   if (timing === undefined) return undefined;
@@ -38,10 +43,16 @@ export function liveCanvasTimingForStatus(
   // start consuming the estimate. Route proof is stricter and only calibrates
   // pacing after the run clock is active.
   const transitioned =
-    timing.kind === 'estimating' && updated.lifecycle === 'running' && !controllerExecutionConfirmed
+    timing.kind === 'estimating' &&
+    updated.lifecycle === 'running' &&
+    !evidence.isControllerExecutionConfirmed
       ? timing
       : liveCanvasTimingForLifecycle(timing, updated.lifecycle, now);
-  if (transitioned === undefined || !trustworthyRouteProgress || updated.lifecycle !== 'running') {
+  if (
+    transitioned === undefined ||
+    !evidence.isTrustworthyRouteProgress ||
+    updated.lifecycle !== 'running'
+  ) {
     return transitioned;
   }
   if (
@@ -92,7 +103,7 @@ export function liveCanvasLifecyclePatch(
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
   if (run === null) return {};
-  if (run.lifecycle === 'finished' && lifecycle === 'running') return {};
+  if (isTerminalCanvasLifecycle(run.lifecycle) && !isTerminalCanvasLifecycle(lifecycle)) return {};
   const timing = liveCanvasTimingForLifecycle(run.timing, lifecycle, now);
   return {
     liveCanvasRun: {
@@ -168,6 +179,8 @@ function liveCanvasTimingForLifecycle(
       return interruptLiveJobTiming('job stopped');
     case 'errored':
       return interruptLiveJobTiming('controller reported a job error');
+    default:
+      return assertNever(lifecycle, 'LiveCanvasLifecycle');
   }
 }
 

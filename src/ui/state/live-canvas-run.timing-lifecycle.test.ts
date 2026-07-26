@@ -10,7 +10,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildGcodeTimingPlan } from '../../core/gcode-time';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
-import type { CanvasMotionPlan, LiveCanvasRun } from './canvas-motion-plan';
+import type { CanvasMotionPlan, LiveCanvasLifecycle, LiveCanvasRun } from './canvas-motion-plan';
 import { buildPortClosePatch } from './laser-store-helpers';
 import {
   liveCanvasLifecyclePatch,
@@ -44,6 +44,19 @@ const PAUSE_CASES: ReadonlyArray<{
 }> = [
   { name: 'Hold', controllerState: 'Hold', streamStatus: 'paused' },
   { name: 'tool change', controllerState: 'Tool', streamStatus: 'tool-change' },
+];
+
+const TERMINAL_LIFECYCLES: ReadonlyArray<LiveCanvasLifecycle> = [
+  'stopped',
+  'disconnected',
+  'errored',
+  'finished',
+];
+
+const ACTIVE_LIFECYCLES: ReadonlyArray<Exclude<LiveCanvasLifecycle, 'finished'>> = [
+  'running',
+  'paused',
+  'tool-change',
 ];
 
 function canvasPlan(): CanvasMotionPlan {
@@ -332,4 +345,30 @@ describe('live countdown lifecycle integration', () => {
     expect(repeatedClose.liveCanvasRun?.endedAtMs).toBe(5_000);
     expect(repeatedClose.liveCanvasRun?.timing?.kind).toBe('disconnected');
   });
+
+  it.each(TERMINAL_LIFECYCLES)(
+    'does not revive a %s run through later active lifecycle patches',
+    (terminalLifecycle) => {
+      const current = startedState();
+      const liveCanvasRun = current.liveCanvasRun;
+      if (liveCanvasRun === undefined || liveCanvasRun === null) {
+        throw new Error('Expected a live canvas run.');
+      }
+      const terminalRun: LiveCanvasRun = {
+        ...liveCanvasRun,
+        lifecycle: terminalLifecycle,
+        endedAtMs: 5_000,
+      };
+
+      for (const activeLifecycle of ACTIVE_LIFECYCLES) {
+        expect(
+          liveCanvasLifecyclePatch(
+            { ...current, liveCanvasRun: terminalRun },
+            activeLifecycle,
+            90_000,
+          ),
+        ).toEqual({});
+      }
+    },
+  );
 });

@@ -57,7 +57,7 @@ export type ProgramEvent =
       readonly code: 'M400' | 'spindle' | 'coolant';
       /** State changes execute before motion on the same block; M400 executes
        * after all earlier planned motion and carries no motion of its own. */
-      readonly beforeMotion: boolean;
+      readonly isBeforeMotion: boolean;
     }
   | { readonly kind: 'program-end'; readonly line: number }
   | { readonly kind: 'wcs-select'; readonly line: number; readonly code: number }

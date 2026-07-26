@@ -24,10 +24,18 @@ type SafeWriteFn = (
 const STABLE_IDLE_REPORTS = 2;
 const SETTLE_MARKER_ACTIVITY_TIMEOUT_MS = 30_000;
 
+/**
+ * Controller lifecycle refs with the concrete active driver required to choose
+ * the family-specific settlement marker.
+ */
 export type PostJobSettleRefs = ControllerLifecycleRefs & {
   readonly driver: ControllerDriver;
 };
 
+/**
+ * Starts family-specific post-job drain confirmation and marks completion only
+ * after that driver's settle marker and stable Idle evidence.
+ */
 export function beginPostJobSettle(
   set: SetFn,
   get: GetFn,

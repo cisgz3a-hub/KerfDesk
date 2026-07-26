@@ -19,6 +19,13 @@ type TrustedTimingSample = {
   readonly progress: PlannedProgramProgress;
 };
 
+type MotionPaceSample = {
+  readonly previous: TrustedTimingSample;
+  readonly progress: PlannedProgramProgress;
+  readonly routeMm: number;
+  readonly atMs: number;
+};
+
 type PlannedTimingState = {
   readonly plan: GcodeTimingPlan;
   /** Prediction frozen at `updatedAtMs`. Only confirmed running consumes wall time. */
@@ -100,8 +107,13 @@ export function observeTrustedLiveJobProgress(
   const motionPace =
     previous === null
       ? running.motionPace
-      : calibratedMotionPace(running.motionPace, previous, progress, boundedRoute, now);
-  const retainCalibrationAnchor =
+      : calibratedMotionPace(running.motionPace, {
+          previous,
+          progress,
+          routeMm: boundedRoute,
+          atMs: now,
+        });
+  const shouldRetainCalibrationAnchor =
     previous !== null &&
     progress.motionSeconds - previous.progress.motionSeconds <
       MINIMUM_PLANNED_MOTION_SAMPLE_SECONDS;
@@ -110,7 +122,7 @@ export function observeTrustedLiveJobProgress(
     remainingSecondsAtUpdate: predictedRemaining(running.plan, progress, motionPace),
     motionPace,
     updatedAtMs: now,
-    lastTrustedSample: retainCalibrationAnchor
+    lastTrustedSample: shouldRetainCalibrationAnchor
       ? previous
       : { atMs: now, routeMm: boundedRoute, progress },
   };
@@ -171,22 +183,21 @@ export function describeLiveJobTiming(timing: LiveJobTiming, now: number): LiveJ
   }
 }
 
-function calibratedMotionPace(
-  current: number,
-  previous: TrustedTimingSample,
-  progress: PlannedProgramProgress,
-  routeMm: number,
-  now: number,
-): number {
+function calibratedMotionPace(current: number, sample: MotionPaceSample): number {
+  const { previous, progress, routeMm, atMs } = sample;
   if (routeMm <= previous.routeMm + ROUTE_PROGRESS_EPSILON_MM) return current;
   const plannedMotion = progress.motionSeconds - previous.progress.motionSeconds;
   if (plannedMotion < MINIMUM_PLANNED_MOTION_SAMPLE_SECONDS) return current;
   const plannedDwell = Math.max(0, progress.dwellSeconds - previous.progress.dwellSeconds);
-  const observedWall = Math.max(0, now - previous.atMs) / 1000;
+  const observedWall = Math.max(0, atMs - previous.atMs) / 1000;
   const observedMotion = observedWall - plannedDwell;
   if (!Number.isFinite(observedMotion) || observedMotion <= 0) return current;
-  const sample = clamp(observedMotion / plannedMotion, MINIMUM_MOTION_PACE, MAXIMUM_MOTION_PACE);
-  return current * PACING_HISTORY_WEIGHT + sample * PACING_SAMPLE_WEIGHT;
+  const observedPace = clamp(
+    observedMotion / plannedMotion,
+    MINIMUM_MOTION_PACE,
+    MAXIMUM_MOTION_PACE,
+  );
+  return current * PACING_HISTORY_WEIGHT + observedPace * PACING_SAMPLE_WEIGHT;
 }
 
 function predictedRemaining(

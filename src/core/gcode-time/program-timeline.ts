@@ -9,12 +9,17 @@ import {
 import { buildProgramTime, type ProgramTimeModel } from './program-time';
 import type { MotionLimits } from './motion-limits';
 
+/** An emitted M0/M1 boundary mapped to both raw and controller-sendable lines. */
 export type ProgramPauseBarrier = {
   readonly rawLineIndex: number;
   readonly sendableLineIndex: number;
   readonly optional: boolean;
 };
 
+/**
+ * Exact emitted-program clocks on raw-line, sendable-line, and geometric-route
+ * axes. Motion and deterministic dwell clocks remain separate for live pacing.
+ */
 export type ProgramTimeline = {
   readonly totalSeconds: number;
   readonly motionSeconds: number;
@@ -42,11 +47,13 @@ export type ProgramTimeline = {
   readonly pauseBarriers: ReadonlyArray<ProgramPauseBarrier>;
 };
 
+/** A strict timeline, a parse error, or an advisory reason timing is unavailable. */
 export type ProgramTimelineResult =
   | { readonly kind: 'ok'; readonly timeline: ProgramTimeline }
   | { readonly kind: 'error'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+/** Parser evidence and allocation limits required by bounded timing consumers. */
 export type ProgramTimelineOptions = {
   readonly initialPositionMm?: { readonly x: number; readonly y: number; readonly z: number };
   readonly maxSegments?: number;
@@ -214,10 +221,11 @@ function pauseBarriers(
   gcode: string,
   events: ReadonlyArray<ProgramEvent>,
 ): ReadonlyArray<ProgramPauseBarrier> {
-  const rawToSendable = new Int32Array(gcode.split(/\r\n|\n|\r/).length);
+  const rawLines = gcode.split(/\r\n|\n|\r/);
+  const rawToSendable = new Int32Array(rawLines.length);
   rawToSendable.fill(-1);
   let sendableIndex = 0;
-  gcode.split(/\r\n|\n|\r/).forEach((line, rawLineIndex) => {
+  rawLines.forEach((line, rawLineIndex) => {
     if (!isSendableGcodeLine(line)) return;
     rawToSendable[rawLineIndex] = sendableIndex;
     sendableIndex += 1;

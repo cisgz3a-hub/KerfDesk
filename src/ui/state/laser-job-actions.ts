@@ -142,6 +142,7 @@ async function runStartJob(
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
     const entersHoldNow = stepped.state.status === 'tool-change';
+    const isImmediateToolChange = entersHoldNow && stepped.toSend.length === 0;
     set((state) => ({
       streamer: stepped.state,
       activeRunId: options.runId ?? null,
@@ -149,7 +150,7 @@ async function runStartJob(
         options.canvasPlan,
         Date.now(),
         validatedStartJobTimingPlan(gcode, options, state),
-        'running',
+        isImmediateToolChange ? 'tool-change' : 'running',
       ),
       accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
       activeJobMachineKind: options.machineKind ?? 'laser',

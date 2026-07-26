@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { buildMotionManifest } from '../../core/job/motion-manifest';
-import { fingerprintGcode } from '../../core/recovery';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { canvasJobTimingPlan } from './canvas-job-timing-plan';
-import type { CanvasMotionPlan } from './canvas-motion-plan';
+import { laserCountdownTestHandoff } from './laser-countdown-test-handoff';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
@@ -81,28 +77,7 @@ function controllerOperation(): ControllerOperationSnapshot {
 // A five-line job whose lines all fit the first RX window, so five oks reach
 // 'done' and the post-job settle begins.
 const JOB_GCODE = 'G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n';
-
-function countdownCanvasPlan(gcode: string): CanvasMotionPlan {
-  const manifest = buildMotionManifest(gcode, {
-    machineKind: 'laser',
-    initialPosition: { x: 0, y: 0, z: 0 },
-  });
-  return {
-    manifest,
-    fingerprint: fingerprintGcode(gcode),
-    retentionKey: 'post-job-settle-countdown',
-    machineKind: 'laser',
-    device: DEFAULT_DEVICE_PROFILE,
-    coordinateFrame: { kind: 'machine', workOffsetMm: { x: 0, y: 0, z: 0 } },
-    framePerimeter: [],
-    jobStart: { x: 0, y: 0 },
-    approachFrom: { x: 0, y: 0 },
-    capability: 'realtime',
-    unavailableReason: null,
-    resumed: false,
-    positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
-  };
-}
+const POST_JOB_COUNTDOWN_RETENTION_KEY = 'post-job-settle-countdown';
 
 // Mirrors DEFAULT_IDLE_TIMEOUT_MS in laser-interactive-command.ts.
 const IDLE_WAIT_TIMEOUT_MS = 8_000;
@@ -110,18 +85,11 @@ const FRESH_STATUS_INTERVAL_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS / 2;
 
 async function runJobUntilSettleAwaitsIdle(connection: FakeConnection): Promise<void> {
   await startTestLaserJob(JOB_GCODE, {
-    canvasPlan: countdownCanvasPlan(JOB_GCODE),
-    jobTimingPlan: canvasJobTimingPlan(
-      JOB_GCODE,
-      DEFAULT_DEVICE_PROFILE,
-      { x: 0, y: 0, z: 0 },
-      {
-        controllerSessionEpoch: useLaserStore.getState().controllerSessionEpoch,
-        positionEpoch: useLaserStore.getState().trustedPositionEpoch,
-        activeControllerKind: useLaserStore.getState().activeControllerKind,
-        detectedControllerKind: useLaserStore.getState().detectedControllerKind,
-      },
-    ),
+    ...laserCountdownTestHandoff({
+      gcode: JOB_GCODE,
+      retentionKey: POST_JOB_COUNTDOWN_RETENTION_KEY,
+      capability: 'realtime',
+    }),
   });
   for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
   await flush();

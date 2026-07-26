@@ -69,6 +69,10 @@ describe('buildProgramTime', () => {
       model(['M3 S100', 'G1 X100 F6000', 'M5', 'G1 X200 F6000'].join('\n')),
       LIMITS,
     );
+    const marlinFanModel = model(
+      ['M106 S100', 'G1 X100 F6000', 'M107', 'G1 X200 F6000'].join('\n'),
+    );
+    const marlinFanOff = buildProgramTime(marlinFanModel, LIMITS);
     const spindleSpeed = buildProgramTime(
       model(['M3 S100', 'G1 X100 F6000', 'S200', 'G1 X200 F6000'].join('\n')),
       LIMITS,
@@ -88,6 +92,10 @@ describe('buildProgramTime', () => {
 
     expect(uninterrupted.motionSeconds).toBeCloseTo(2.2, 5);
     expect(spindleOff.motionSeconds).toBeCloseTo(2.4, 5);
+    // Marlin attaches fan power to the next planner block; M106/M107 are
+    // domain on/off events, not evidence of a full-stop planner drain.
+    expect(marlinFanModel.events.map((event) => event.kind)).toEqual(['spindle-on', 'spindle-off']);
+    expect(marlinFanOff.motionSeconds).toBeCloseTo(uninterrupted.motionSeconds, 5);
     expect(spindleSpeed.motionSeconds).toBeCloseTo(2.4, 5);
     expect(coolantOn.motionSeconds).toBeCloseTo(2.4, 5);
     expect(redundantSpindle.motionSeconds).toBeCloseTo(uninterrupted.motionSeconds, 5);

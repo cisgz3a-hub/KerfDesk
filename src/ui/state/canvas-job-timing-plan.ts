@@ -93,14 +93,14 @@ export function validatedCanvasJobTimingPlan(
   if (result === undefined || result.kind !== 'ok') return result;
   const evidence = result.evidence;
   const currentFingerprint = fingerprintGcode(gcode);
-  const evidenceMatches =
+  const isEvidenceMatch =
     fingerprintsEqual(evidence.fingerprint, currentFingerprint) &&
     evidence.controllerSessionEpoch === current.controllerSessionEpoch &&
     evidence.positionEpoch === current.positionEpoch &&
     evidence.activeControllerKind === current.activeControllerKind &&
     evidence.detectedControllerKind === current.detectedControllerKind &&
     positionsMatch(evidence.initialPosition, current.initialPosition);
-  return evidenceMatches
+  return isEvidenceMatch
     ? result
     : {
         kind: 'unavailable',

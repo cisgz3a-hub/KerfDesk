@@ -66,6 +66,27 @@ type LineTally = {
   sawHome: boolean;
 };
 
+type WordEffectContext = {
+  readonly modal: RenderModal;
+  readonly linePower: number;
+  readonly line: number;
+  readonly accounting: WordAccounting;
+};
+
+type WordApplicationContext = WordEffectContext & {
+  readonly tally: LineTally;
+};
+
+type LineMotionPresence = 'with-motion-words' | 'without-motion-words';
+
+type ControllerSynchronizationContext = {
+  readonly before: ControllerState;
+  readonly after: RenderModal;
+  readonly lineMotion: LineMotionPresence;
+  readonly line: number;
+  readonly accounting: WordAccounting;
+};
+
 /**
  * Applies every non-axis word of one line to the modal state, records events
  * and unsupported words, and returns the axis words plus category evidence.
@@ -90,10 +111,13 @@ export function applyLineWords(
     sawDwell: false,
     sawHome: false,
   };
-  for (const word of words) applyOneWord(modal, word, linePower, line, accounting, tally);
+  const context: WordApplicationContext = { modal, linePower, line, accounting, tally };
+  for (const word of words) applyOneWord(word, context);
   resolveDwell(tally, line, accounting);
   const homeAxes = resolveHome(tally, line, accounting);
-  if (pushControllerSynchronization(before, modal, tally.axisWords.size > 0, line, accounting)) {
+  const lineMotion: LineMotionPresence =
+    tally.axisWords.size > 0 ? 'with-motion-words' : 'without-motion-words';
+  if (pushControllerSynchronization({ before, after: modal, lineMotion, line, accounting })) {
     tally.sawEvent = true;
   }
   return {
@@ -106,14 +130,8 @@ export function applyLineWords(
   };
 }
 
-function applyOneWord(
-  modal: RenderModal,
-  word: GcodeWordMatch,
-  linePower: number,
-  line: number,
-  accounting: WordAccounting,
-  tally: LineTally,
-): void {
+function applyOneWord(word: GcodeWordMatch, context: WordApplicationContext): void {
+  const { modal, line, accounting, tally } = context;
   if (AXIS_LETTERS.has(word.letter)) {
     tally.axisWords.set(word.letter, word.value);
     return;
@@ -150,7 +168,7 @@ function applyOneWord(
     const outcome =
       word.letter === 'G'
         ? applyGWord(modal, word.value, line, accounting)
-        : applyMWord(modal, word.value, linePower, line, accounting);
+        : applyMWord(word.value, context);
     noteOutcome(tally, outcome);
     return;
   }
@@ -265,13 +283,8 @@ function isCannedCycle(code: number): boolean {
   return (CANNED_CYCLES as ReadonlyArray<number>).includes(code);
 }
 
-function applyMWord(
-  modal: RenderModal,
-  code: number,
-  linePower: number,
-  line: number,
-  accounting: WordAccounting,
-): WordOutcome {
+function applyMWord(code: number, context: WordEffectContext): WordOutcome {
+  const { modal, linePower, line, accounting } = context;
   if (code === 2 || code === 30) {
     modal.ended = true;
     accounting.pushEvent({ kind: 'program-end', line });
@@ -280,7 +293,12 @@ function applyMWord(
   if (code === 400) {
     // Marlin/Smoothieware M400 has no duration of its own, but it drains the
     // planner. Preserve it as a timing synchronization boundary.
-    accounting.pushEvent({ kind: 'synchronization', line, code: 'M400', beforeMotion: false });
+    accounting.pushEvent({
+      kind: 'synchronization',
+      line,
+      code: 'M400',
+      isBeforeMotion: false,
+    });
     return 'event';
   }
   const event = mEventFor(code, line, linePower);
@@ -299,8 +317,10 @@ function mEventFor(code: number, line: number, power: number): ProgramEvent | nu
 }
 
 function spindleOrCoolantEventFor(code: number, line: number, power: number): ProgramEvent | null {
+  // Marlin fan power is attached to planner blocks. M106/M107 stay domain
+  // events only; controller-state tracking intentionally ignores them so they
+  // cannot create full-stop synchronization boundaries.
   if (code === 3 || code === 4 || code === 106) {
-    // M106 is the Marlin fan-dialect laser-on (mirrors the motion manifest).
     return { kind: 'spindle-on', line, mode: code === 3 ? 'constant' : 'dynamic', power };
   }
   if (code === 5 || code === 107) return { kind: 'spindle-off', line };
@@ -342,37 +362,34 @@ function applyControllerStateMCode(modal: RenderModal, code: number): void {
   }
 }
 
-function pushControllerSynchronization(
-  before: ControllerState,
-  after: RenderModal,
-  lineHasMotionWords: boolean,
-  line: number,
-  accounting: WordAccounting,
-): boolean {
-  const spindleModeChanged = before.spindleMode !== after.spindleMode;
+function pushControllerSynchronization(context: ControllerSynchronizationContext): boolean {
+  const { before, after, lineMotion, line, accounting } = context;
+  const hasSpindleModeChanged = before.spindleMode !== after.spindleMode;
   // Stock GRBL can carry laser S changes in the same planned motion block.
   // Standalone active-spindle speed changes drain the planner; app-emitted CNC
   // RPM changes use that form, while app-emitted laser power rides on motion.
-  const standaloneSpindleSpeedChanged =
-    !lineHasMotionWords && after.spindleMode !== 'off' && before.power !== after.power;
-  const spindleChanged = spindleModeChanged || standaloneSpindleSpeedChanged;
-  const coolantChanged =
+  const hasStandaloneSpindleSpeedChanged =
+    lineMotion === 'without-motion-words' &&
+    after.spindleMode !== 'off' &&
+    before.power !== after.power;
+  const hasSpindleChanged = hasSpindleModeChanged || hasStandaloneSpindleSpeedChanged;
+  const hasCoolantChanged =
     before.coolantMist !== after.coolantMist || before.coolantFlood !== after.coolantFlood;
-  if (spindleChanged) {
+  if (hasSpindleChanged) {
     accounting.pushEvent({
       kind: 'synchronization',
       line,
       code: 'spindle',
-      beforeMotion: true,
+      isBeforeMotion: true,
     });
   }
-  if (coolantChanged) {
+  if (hasCoolantChanged) {
     accounting.pushEvent({
       kind: 'synchronization',
       line,
       code: 'coolant',
-      beforeMotion: true,
+      isBeforeMotion: true,
     });
   }
-  return spindleChanged || coolantChanged;
+  return hasSpindleChanged || hasCoolantChanged;
 }

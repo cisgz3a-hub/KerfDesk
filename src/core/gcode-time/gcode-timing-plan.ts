@@ -59,16 +59,16 @@ export function plannedProgressAtRoute(
   const totalStart = plan.plannedStartSeconds[index] ?? motionStart;
   const dwellSeconds = Math.max(0, totalStart - motionStart);
   const segmentDistance = plan.segmentDistanceMm[index] ?? Math.max(0, routeEnd - routeStart);
-  const elapsedInSegment = blockElapsedTimeAtDistance(
-    {
+  const elapsedInSegment = blockElapsedTimeAtDistance({
+    block: {
       distance: segmentDistance,
       targetVelocity: plan.segmentTargetVelocityMmPerSec[index] ?? 0,
     },
-    plan.segmentEntryVelocityMmPerSec[index] ?? 0,
-    plan.segmentExitVelocityMmPerSec[index] ?? 0,
-    plan.accelMmPerSec2,
-    segmentDistance * fraction,
-  );
+    entryVelocity: plan.segmentEntryVelocityMmPerSec[index] ?? 0,
+    exitVelocity: plan.segmentExitVelocityMmPerSec[index] ?? 0,
+    acceleration: plan.accelMmPerSec2,
+    distance: segmentDistance * fraction,
+  });
   const motionSeconds =
     motionStart + Math.min(Math.max(0, motionEnd - motionStart), elapsedInSegment);
   return { motionSeconds, dwellSeconds, totalSeconds: motionSeconds + dwellSeconds };

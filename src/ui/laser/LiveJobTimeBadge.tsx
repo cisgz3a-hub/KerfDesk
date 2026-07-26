@@ -7,6 +7,10 @@ import type { LiveJobEstimate } from './live-job-estimate';
 
 const CLOCK_TICK_MS = 1_000;
 
+/**
+ * Shows the prepared estimate before a run, then switches to the active run's
+ * exact-program timing state without treating acknowledged lines as elapsed time.
+ */
 export function LiveJobTimeBadge({
   estimate,
 }: {

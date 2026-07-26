@@ -5,19 +5,15 @@ import {
   type MarlinSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { buildMotionManifest } from '../../core/job/motion-manifest';
-import { fingerprintGcode } from '../../core/recovery';
-import { canvasJobTimingPlan } from './canvas-job-timing-plan';
-import type { CanvasMotionPlan } from './canvas-motion-plan';
+import { laserCountdownTestHandoff } from './laser-countdown-test-handoff';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
-const ORIGIN = { x: 0, y: 0, z: 0 };
 const SETTLE_JOB = 'G1 X10 Y0 F600 S100\nM5\n';
 const DRAINED_PAUSE_JOB = 'G1 X10 Y0 F600 S100\n';
+const MARLIN_COUNTDOWN_RETENTION_KEY = 'marlin-countdown';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -73,42 +69,14 @@ async function connectMarlinIdle(
   return sim;
 }
 
-function countdownCanvasPlan(gcode: string): CanvasMotionPlan {
-  return {
-    manifest: buildMotionManifest(gcode, {
-      machineKind: 'laser',
-      initialPosition: ORIGIN,
-    }),
-    fingerprint: fingerprintGcode(gcode),
-    retentionKey: 'marlin-countdown',
-    machineKind: 'laser',
-    device: DEFAULT_DEVICE_PROFILE,
-    coordinateFrame: { kind: 'machine', workOffsetMm: ORIGIN },
-    framePerimeter: [],
-    jobStart: ORIGIN,
-    approachFrom: ORIGIN,
-    capability: 'settle-only',
-    unavailableReason: null,
-    resumed: false,
-    positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
-  };
-}
-
-function countdownTimingPlan(gcode: string) {
-  const state = useLaserStore.getState();
-  return canvasJobTimingPlan(gcode, DEFAULT_DEVICE_PROFILE, ORIGIN, {
-    controllerSessionEpoch: state.controllerSessionEpoch,
-    positionEpoch: state.trustedPositionEpoch,
-    activeControllerKind: state.activeControllerKind,
-    detectedControllerKind: state.detectedControllerKind,
-  });
-}
-
 async function startCountdownJob(gcode: string): Promise<void> {
   await startTestLaserJob(gcode, {
     streamingMode: 'ping-pong',
-    canvasPlan: countdownCanvasPlan(gcode),
-    jobTimingPlan: countdownTimingPlan(gcode),
+    ...laserCountdownTestHandoff({
+      gcode,
+      retentionKey: MARLIN_COUNTDOWN_RETENTION_KEY,
+      capability: 'settle-only',
+    }),
   });
 }
 

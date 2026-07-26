@@ -3,20 +3,43 @@
 
 import type { Block } from './block';
 
+type BlockElapsedTimeAtDistanceInput = {
+  readonly block: Pick<Block, 'distance' | 'targetVelocity'>;
+  readonly entryVelocity: number;
+  readonly exitVelocity: number;
+  readonly acceleration: number;
+  readonly distance: number;
+};
+
+type SinglePhaseElapsedTimeInput = {
+  readonly entryVelocity: number;
+  readonly exitVelocity: number;
+  readonly acceleration: number;
+  readonly totalDistance: number;
+  readonly distance: number;
+};
+
 // Generalized trapezoidal time from v_entry through optional v_peak
 // to v_exit over a given distance, capped at v_target.
 export function blockTime(block: Block, entryV: number, exitV: number, accel: number): number {
-  return blockElapsedTimeAtDistance(block, entryV, exitV, accel, block.distance);
+  return blockElapsedTimeAtDistance({
+    block,
+    entryVelocity: entryV,
+    exitVelocity: exitV,
+    acceleration: accel,
+    distance: block.distance,
+  });
 }
 
 /** Elapsed planner time after travelling `distance` through one planned block. */
-export function blockElapsedTimeAtDistance(
-  block: Pick<Block, 'distance' | 'targetVelocity'>,
-  entryV: number,
-  exitV: number,
-  accel: number,
-  distance: number,
-): number {
+export function blockElapsedTimeAtDistance(input: BlockElapsedTimeAtDistanceInput): number {
+  const {
+    block,
+    entryVelocity: entryV,
+    exitVelocity: exitV,
+    acceleration: accel,
+    distance,
+  } = input;
   const d = block.distance;
   if (d <= 0) return 0;
   const x = Math.max(0, Math.min(distance, d));
@@ -46,7 +69,13 @@ export function blockElapsedTimeAtDistance(
   // distance with this accel. Fall back to the constraining single-
   // phase time (no cruise, no triangle).
   if (vPeak <= Math.max(entryV, exitV)) {
-    return singlePhaseElapsedTime(entryV, exitV, a, d, x);
+    return singlePhaseElapsedTime({
+      entryVelocity: entryV,
+      exitVelocity: exitV,
+      acceleration: a,
+      totalDistance: d,
+      distance: x,
+    });
   }
   const peakDistance = Math.max(0, (vPeak * vPeak - entryV * entryV) / (2 * a));
   const tAccel = (vPeak - entryV) / a;
@@ -71,13 +100,14 @@ function decelerationTime(initialVelocity: number, accel: number, distance: numb
   );
 }
 
-function singlePhaseElapsedTime(
-  entryV: number,
-  exitV: number,
-  accel: number,
-  totalDistance: number,
-  distance: number,
-): number {
+function singlePhaseElapsedTime(input: SinglePhaseElapsedTimeInput): number {
+  const {
+    entryVelocity: entryV,
+    exitVelocity: exitV,
+    acceleration: accel,
+    totalDistance,
+    distance,
+  } = input;
   const effectiveAcceleration =
     totalDistance <= 0 ? 0 : (exitV * exitV - entryV * entryV) / (2 * totalDistance);
   if (Math.abs(effectiveAcceleration) <= Number.EPSILON) {

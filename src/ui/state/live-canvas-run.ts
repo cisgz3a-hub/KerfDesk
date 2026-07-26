@@ -5,6 +5,7 @@ import {
 import type { StatusReport, StreamerState } from '../../core/controllers/grbl';
 import type { GcodeTimingPlanResult } from '../../core/gcode-time';
 import { normalizeReportedFeedRateToMm } from '../../core/controllers/grbl/machine-envelope';
+import { assertNever } from '../../core/scene';
 import type { LaserState } from './laser-store';
 import {
   completeLiveCanvasRun,
@@ -20,6 +21,12 @@ import {
   type LiveCanvasLifecycle,
   type LiveCanvasRun,
 } from './canvas-motion-plan';
+
+type LiveCanvasStatusFrame = {
+  readonly report: StatusReport;
+  readonly streamer: StreamerState | null;
+  readonly reportedHead: LiveCanvasRun['reportedHead'];
+};
 
 export function liveCanvasStatusPatch(
   state: LaserState,
@@ -50,14 +57,17 @@ export function liveCanvasStatusPatch(
   // passed through unscaled — it is an RPM/power value, not a unit distance.
   const reportedFeedMmPerMin = normalizeReportedFeedRateToMm(report.feed, reportInches);
   const updated = updatedRun(state, run, report, streamer, lifecycle, reportedHead);
-  const controllerExecutionConfirmed =
+  const statusFrame: LiveCanvasStatusFrame = { report, streamer, reportedHead };
+  const isControllerExecutionConfirmed =
     report.state === 'Run' && mayReconcile(run, streamer, report, state);
   const timing = liveCanvasTimingForStatus(
     run,
     updated,
-    mayTrustTimingProgress(state, run, updated, report, streamer, reportedHead),
+    {
+      isTrustworthyRouteProgress: mayTrustTimingProgress(state, run, updated, statusFrame),
+      isControllerExecutionConfirmed,
+    },
     now,
-    controllerExecutionConfirmed,
   );
   return {
     liveCanvasRun: {
@@ -226,18 +236,16 @@ function mayTrustTimingProgress(
   state: LaserState,
   previous: LiveCanvasRun,
   updated: LiveCanvasRun,
-  report: StatusReport,
-  streamer: StreamerState | null,
-  reportedHead: LiveCanvasRun['reportedHead'],
+  frame: LiveCanvasStatusFrame,
 ): boolean {
   return (
     updated.lifecycle === 'running' &&
-    report.state === 'Run' &&
-    (streamer?.status === 'streaming' ||
-      streamer?.status === 'tool-change' ||
-      streamer?.status === 'done') &&
-    reportedHead !== null &&
-    mayReconcile(previous, streamer, report, state) &&
+    frame.report.state === 'Run' &&
+    (frame.streamer?.status === 'streaming' ||
+      frame.streamer?.status === 'tool-change' ||
+      frame.streamer?.status === 'done') &&
+    frame.reportedHead !== null &&
+    mayReconcile(previous, frame.streamer, frame.report, state) &&
     !updated.route.uncertain
   );
 }
@@ -292,7 +300,8 @@ function streamerLifecycle(
   streamer: StreamerState | null,
   toolChangeIsHeld: boolean,
 ): LiveCanvasLifecycle | null {
-  switch (streamer?.status) {
+  const status = streamer?.status;
+  switch (status) {
     case 'paused':
       return 'paused';
     case 'tool-change':
@@ -308,6 +317,8 @@ function streamerLifecycle(
     case 'done':
     case 'streaming':
       return null;
+    default:
+      return assertNever(status, 'StreamerState status');
   }
 }
 

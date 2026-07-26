@@ -91,7 +91,7 @@ export function buildProgramTime(
 }
 
 type MotionSpan = { readonly startIndex: number; readonly endIndex: number };
-type SynchronizationBoundary = { readonly line: number; readonly beforeMotion: boolean };
+type SynchronizationBoundary = { readonly line: number; readonly isBeforeMotion: boolean };
 
 function motionSpans(model: GcodeRenderModel, segmentCount: number): ReadonlyArray<MotionSpan> {
   const spans: MotionSpan[] = [];
@@ -121,15 +121,15 @@ function synchronizationBoundaries(
       continue;
     }
     if (event.kind !== 'synchronization') continue;
-    boundaries.set(event.line, (boundaries.get(event.line) ?? false) || event.beforeMotion);
+    boundaries.set(event.line, (boundaries.get(event.line) ?? false) || event.isBeforeMotion);
   }
   return [...boundaries]
-    .map(([line, beforeMotion]) => ({ line, beforeMotion }))
+    .map(([line, isBeforeMotion]) => ({ line, isBeforeMotion }))
     .sort((left, right) => left.line - right.line);
 }
 
 function segmentPrecedesBoundary(segmentLine: number, boundary: SynchronizationBoundary): boolean {
-  return boundary.beforeMotion ? segmentLine < boundary.line : segmentLine <= boundary.line;
+  return boundary.isBeforeMotion ? segmentLine < boundary.line : segmentLine <= boundary.line;
 }
 
 // Trapezoid test: the move reaches its target only if there is room to

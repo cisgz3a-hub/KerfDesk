@@ -25,6 +25,7 @@ type ProgramWriteControl = { gate: Promise<void> | null };
 
 const IDLE = '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>';
 const INITIAL_POSITION = { x: 0, y: 0, z: 0 };
+const TOOL_CHANGE_COUNTDOWN_RETENTION_KEY = 'tool-change-countdown';
 
 function makeConnection(writes: string[], writeControl?: ProgramWriteControl): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
@@ -154,15 +155,28 @@ const CNC_THREE_PLAN = [
   { id: 'em-3000', name: '3.0 mm end mill' },
 ];
 
-function countdownCanvasPlan(positionEpoch: number): CanvasMotionPlan {
-  const manifest = buildMotionManifest(CNC_THREE_TOOL, {
+const CNC_IMMEDIATE_TOOL_CHANGE = [
+  `${TOOL_CHANGE_LOAD_PREFIX}6.35 mm end mill`,
+  'M0',
+  'G0 Z5',
+  'M3 S12000',
+  'G1 X3 Y3 F600',
+].join('\n');
+
+const CNC_IMMEDIATE_TOOL_PLAN = [
+  { id: 'em-3175', name: '3.175 mm end mill' },
+  { id: 'em-6350', name: '6.35 mm end mill' },
+];
+
+function countdownCanvasPlan(gcode: string, positionEpoch: number): CanvasMotionPlan {
+  const manifest = buildMotionManifest(gcode, {
     machineKind: 'cnc',
     initialPosition: INITIAL_POSITION,
   });
   return {
     manifest,
-    fingerprint: fingerprintGcode(CNC_THREE_TOOL),
-    retentionKey: 'three-tool-countdown',
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: TOOL_CHANGE_COUNTDOWN_RETENTION_KEY,
     machineKind: 'cnc',
     device: DEFAULT_DEVICE_PROFILE,
     coordinateFrame: { kind: 'machine', workOffsetMm: INITIAL_POSITION },
@@ -176,9 +190,9 @@ function countdownCanvasPlan(positionEpoch: number): CanvasMotionPlan {
   };
 }
 
-function countdownTimingPlan() {
+function countdownTimingPlan(gcode: string) {
   const laser = useLaserStore.getState();
-  return canvasJobTimingPlan(CNC_THREE_TOOL, DEFAULT_DEVICE_PROFILE, INITIAL_POSITION, {
+  return canvasJobTimingPlan(gcode, DEFAULT_DEVICE_PROFILE, INITIAL_POSITION, {
     controllerSessionEpoch: laser.controllerSessionEpoch,
     positionEpoch: laser.trustedPositionEpoch,
     activeControllerKind: laser.activeControllerKind,
@@ -186,13 +200,16 @@ function countdownTimingPlan() {
   });
 }
 
-function startCountdownJob(): Promise<void> {
-  return useLaserStore.getState().startJob(CNC_THREE_TOOL, {
+function startCountdownJob(
+  gcode: string = CNC_THREE_TOOL,
+  cncToolPlan: ReadonlyArray<{ readonly id: string; readonly name: string }> = CNC_THREE_PLAN,
+): Promise<void> {
+  return useLaserStore.getState().startJob(gcode, {
     machineKind: 'cnc',
-    cncToolPlan: CNC_THREE_PLAN,
-    cncSetupAttestation: currentCncSetupAttestation(CNC_THREE_TOOL),
-    canvasPlan: countdownCanvasPlan(currentPositionEpoch()),
-    jobTimingPlan: countdownTimingPlan(),
+    cncToolPlan,
+    cncSetupAttestation: currentCncSetupAttestation(gcode),
+    canvasPlan: countdownCanvasPlan(gcode, currentPositionEpoch()),
+    jobTimingPlan: countdownTimingPlan(gcode),
   });
 }
 
@@ -228,6 +245,19 @@ afterEach(async () => {
 });
 
 describe('CNC tool-change Continue into the next hold (F22)', () => {
+  it('starts paused when the first executable boundary is an immediate M0', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectWith(connection);
+    writes.length = 0;
+
+    await startCountdownJob(CNC_IMMEDIATE_TOOL_CHANGE, CNC_IMMEDIATE_TOOL_PLAN);
+
+    expectStreamStatus('tool-change');
+    expectCountdownState('tool-change', 'paused');
+    expect(writes).toEqual(['G4 P0.01\n', '?']);
+  });
+
   it('invalidates Z evidence and advances the label when Continue lands directly in the next hold', async () => {
     const writes: string[] = [];
     const writeControl: ProgramWriteControl = { gate: null };
