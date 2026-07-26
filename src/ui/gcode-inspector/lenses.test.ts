@@ -12,6 +12,7 @@ const THEME: Viewer3dTheme = {
   cut: 0x4fa3ff,
   plunge: 0xffb84d,
   retract: 0x9a7fd4,
+  arrow: 0xf2f4f8,
 };
 
 const LIMITS: MotionLimits = {

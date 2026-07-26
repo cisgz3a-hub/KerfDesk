@@ -13,6 +13,8 @@ export type Viewer3dTheme = {
   readonly cut: number;
   readonly plunge: number;
   readonly retract: number;
+  /** Direction arrowheads: reads over the toolpath, not as another move kind. */
+  readonly arrow: number;
 };
 
 const FALLBACK: Viewer3dTheme = {
@@ -23,6 +25,7 @@ const FALLBACK: Viewer3dTheme = {
   cut: 0x4fa3ff,
   plunge: 0xffb84d,
   retract: 0x9a7fd4,
+  arrow: 0xf2f4f8,
 };
 
 const VAR_NAMES: Readonly<Record<keyof Viewer3dTheme, string>> = {
@@ -33,6 +36,7 @@ const VAR_NAMES: Readonly<Record<keyof Viewer3dTheme, string>> = {
   cut: '--lf-viewer3d-cut',
   plunge: '--lf-viewer3d-plunge',
   retract: '--lf-viewer3d-retract',
+  arrow: '--lf-viewer3d-arrow',
 };
 
 const HEX_COLOR = /^#([0-9a-f]{6})$/i;
@@ -55,5 +59,6 @@ export function resolveViewer3dTheme(root?: Element | null): Viewer3dTheme {
     cut: resolve('cut'),
     plunge: resolve('plunge'),
     retract: resolve('retract'),
+    arrow: resolve('arrow'),
   };
 }

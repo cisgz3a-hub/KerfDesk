@@ -25,6 +25,8 @@ export function InspectorSidebar(props: {
   readonly findings: ReadonlyArray<ProgramFinding>;
   readonly lens: LensId;
   readonly onLensChange: (lens: LensId) => void;
+  readonly arrowsVisible: boolean;
+  readonly onArrowsVisibleChange: (visible: boolean) => void;
   readonly travelVisible: boolean;
   readonly onTravelVisibleChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
@@ -57,6 +59,15 @@ export function InspectorSidebar(props: {
             onChange={(event) => props.onTravelVisibleChange(event.currentTarget.checked)}
           />
           Show traversal moves
+        </label>
+        <label style={toggleStyle}>
+          <input
+            type="checkbox"
+            title="Mark the cut path with arrows showing direction of travel"
+            checked={props.arrowsVisible}
+            onChange={(event) => props.onArrowsVisibleChange(event.currentTarget.checked)}
+          />
+          Show direction arrows
         </label>
       </Section>
       <Section title="Program">

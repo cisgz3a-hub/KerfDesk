@@ -19,6 +19,9 @@ import {
   type Viewer3dSegmentsInput,
 } from './segment-buckets';
 import { cameraPlacement, type CameraPreset } from './camera-presets';
+import type { ArrowPlacement } from './direction-arrows';
+import { createArrowMesh, disposeArrowMesh, type ArrowMesh } from './scene-arrows';
+import { boundsExtent } from './scene-furniture';
 import {
   createCameraRig,
   startRenderer,
@@ -67,6 +70,8 @@ export type Viewer3dSceneHandle = {
    * so a deferred read returns a blank image.
    */
   readonly captureImage: () => string;
+  /** Direction arrowheads over the cut path; null clears them. */
+  readonly setDirectionArrows: (placements: ReadonlyArray<ArrowPlacement> | null) => void;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
   readonly dispose: () => void;
@@ -158,6 +163,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   let travelVisible = true;
   let reveal: RevealTargets | null = null;
   let lastBounds: AxisBounds | null = null;
+  let arrowMesh: ArrowMesh | null = null;
   const markers = createMarkers(three, scene);
   const { marker, liveMarker } = markers;
 
@@ -176,13 +182,8 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       sizeMarkers(markers, segments);
       render();
     },
-    recolor: (colorOf) => {
-      if (applyRecolor(reveal, colorOf)) render();
-    },
-    setLiveMachine: (point) => {
-      placeMarker(liveMarker, point);
-      render();
-    },
+    recolor: (colorOf) => void (applyRecolor(reveal, colorOf) && render()),
+    setLiveMachine: (point) => (placeMarker(liveMarker, point), render()),
     setPlayhead: (playhead) => {
       applyReveal(reveal, playhead);
       placeMarker(marker, playhead?.point ?? null);
@@ -190,16 +191,18 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     },
     fitToBounds: (bounds) => {
       lastBounds = bounds;
-      disposeChildren(furnitureGroup);
-      for (const object of buildFurniture(three, bounds, theme)) {
-        furnitureGroup.add(object);
-      }
+      rebuildFurniture(three, furnitureGroup, bounds, theme);
       frameCamera(camera, controls, bounds);
       render();
     },
     setTravelVisible: (visible) => {
       travelVisible = visible;
       if (travelObject !== null) travelObject.visible = visible;
+      render();
+    },
+
+    setDirectionArrows: (placements) => {
+      arrowMesh = swapArrows(three, scene, arrowMesh, placements, boundsExtent(lastBounds), theme);
       render();
     },
     setView: (preset) => {
@@ -240,6 +243,34 @@ function rebuildToolpath(
   const built = buildToolpathObjects(args);
   for (const object of built.objects) group.add(object);
   return built;
+}
+
+// Swap the bed/grid/triad for a new job extent.
+function rebuildFurniture(
+  three: ThreeModule,
+  group: Object3D,
+  bounds: AxisBounds | null,
+  theme: Viewer3dTheme,
+): void {
+  disposeChildren(group);
+  for (const object of buildFurniture(three, bounds, theme)) group.add(object);
+}
+
+// Replace the arrow overlay: the old instanced mesh is dead the moment the
+// overlay is toggled or the program changes.
+function swapArrows(
+  three: ThreeModule,
+  scene: ThreeNamespace.Scene,
+  previous: ArrowMesh | null,
+  placements: ReadonlyArray<ArrowPlacement> | null,
+  extentMm: number,
+  theme: Viewer3dTheme,
+): ArrowMesh | null {
+  disposeArrowMesh(scene, previous);
+  if (placements === null) return null;
+  const mesh = createArrowMesh(three, placements, extentMm, theme);
+  if (mesh !== null) scene.add(mesh);
+  return mesh;
 }
 
 // Point the camera at a standard view and re-target the orbit controls.

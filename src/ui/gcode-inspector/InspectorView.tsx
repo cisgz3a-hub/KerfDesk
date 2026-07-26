@@ -7,7 +7,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { findProgramIssues, type GcodeRenderModel } from '../../core/gcode-view';
-import { resolveViewer3dTheme, type CameraPreset, type Viewer3dSceneHandle } from '../viewer3d';
+import {
+  directionArrows,
+  resolveViewer3dTheme,
+  type CameraPreset,
+  type Viewer3dSceneHandle,
+} from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
@@ -44,30 +49,24 @@ export function InspectorView(props: {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [travelVisible, setTravelVisible] = useState(true);
   const [lens, setLens] = useState<LensId>('kind');
+  const [arrowsVisible, setArrowsVisible] = useState(false);
   const [sourceVisible, setSourceVisible] = useState(true);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
   const { model } = props;
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
-  // Planner-true seconds: the same kinematics Job Review estimates with.
-  const time = useMemo(() => buildProgramTime(model, INSPECTOR_LIMITS), [model]);
-  const playback = useInspectorPlayback(time.motionSeconds);
-  const playhead = useMemo(
-    () => playheadAtTime(model, time.segTimeEndSec, playback.routeMm),
-    [model, time, playback.routeMm],
-  );
-  const findings = useMemo(() => findProgramIssues(model), [model]);
-  // Fully-drawn playhead = show everything, so the scene never hides the tail
-  // segment to floating-point rounding.
-  const atEnd = playback.routeMm >= time.motionSeconds;
-  const colorOf = useMemo(() => lensColorFn(model, time, lens, theme), [model, time, lens, theme]);
+  const { time, playback, playhead, findings, atEnd, colorOf, arrows, activeLine } =
+    useInspectorDerived(model, lens, theme, arrowsVisible);
   const live = useLiveMachine();
 
-  useSceneSync({ handleRef, state, playhead: atEnd ? null : playhead, colorOf, live: live.point });
-
-  // 3D -> source: the line whose move the playhead is executing.
-  const activeLine =
-    playhead.segmentIndex < 0 ? null : (model.segLine[playhead.segmentIndex] ?? null);
+  useSceneSync({
+    handleRef,
+    state,
+    playhead: atEnd ? null : playhead,
+    colorOf,
+    live: live.point,
+    arrows,
+  });
 
   // source -> 3D: select the line, and move the playhead to its first move.
   // Modal/event lines emit no motion, so the playhead stays put rather than
@@ -109,6 +108,8 @@ export function InspectorView(props: {
           findings={findings}
           lens={lens}
           onLensChange={setLens}
+          arrowsVisible={arrowsVisible}
+          onArrowsVisibleChange={setArrowsVisible}
           travelVisible={travelVisible}
           onTravelVisibleChange={(visible) => {
             setTravelVisible(visible);
@@ -119,6 +120,53 @@ export function InspectorView(props: {
       ) : null}
     </div>
   );
+}
+
+/** Everything derived from the program: planner time, playhead, findings,
+ * lens colours and the arrow overlay. Extracted to keep InspectorView inside
+ * the function-size cap. */
+function useInspectorDerived(
+  model: GcodeRenderModel,
+  lens: LensId,
+  theme: ReturnType<typeof resolveViewer3dTheme>,
+  arrowsVisible: boolean,
+): {
+  readonly time: ReturnType<typeof buildProgramTime>;
+  readonly playback: ReturnType<typeof useInspectorPlayback>;
+  readonly playhead: ReturnType<typeof playheadAtTime>;
+  readonly findings: ReturnType<typeof findProgramIssues>;
+  readonly atEnd: boolean;
+  readonly colorOf: ReturnType<typeof lensColorFn>;
+  readonly arrows: ReturnType<typeof directionArrows> | null;
+  /** 3D -> source: the line whose move the playhead is executing. */
+  readonly activeLine: number | null;
+} {
+  // Planner-true seconds: the same kinematics Job Review estimates with.
+  const time = useMemo(() => buildProgramTime(model, INSPECTOR_LIMITS), [model]);
+  const playback = useInspectorPlayback(time.motionSeconds);
+  const playhead = useMemo(
+    () => playheadAtTime(model, time.segTimeEndSec, playback.routeMm),
+    [model, time, playback.routeMm],
+  );
+  const findings = useMemo(() => findProgramIssues(model), [model]);
+  const colorOf = useMemo(() => lensColorFn(model, time, lens, theme), [model, time, lens, theme]);
+  // Cut direction is invisible without these: climb vs conventional.
+  const arrows = useMemo(
+    () => (arrowsVisible ? directionArrows(model) : null),
+    [model, arrowsVisible],
+  );
+  return {
+    time,
+    playback,
+    playhead,
+    findings,
+    // Fully-drawn playhead = show everything, so the scene never hides the
+    // tail segment to floating-point rounding.
+    atEnd: playback.routeMm >= time.motionSeconds,
+    colorOf,
+    arrows,
+    activeLine: playhead.segmentIndex < 0 ? null : (model.segLine[playhead.segmentIndex] ?? null),
+  };
 }
 
 function Viewport(props: {
