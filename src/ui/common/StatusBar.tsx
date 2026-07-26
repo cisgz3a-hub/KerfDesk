@@ -12,6 +12,7 @@ import { selectedOpenFillContourCount } from './fill-diagnostics';
 import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
+import './status-bar.css';
 
 export function StatusBar(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -26,7 +27,7 @@ export function StatusBar(): JSX.Element {
   const outputLayerCount = project.scene.layers.filter((l) => l.output).length;
   const selectedFillWarning = fillWarning(project, selectedObjectId, additionalSelectedIds);
   return (
-    <footer aria-label="Status bar" style={barStyle}>
+    <footer aria-label="Status bar" className="lf-status-bar" style={barStyle}>
       <Segment>
         {cursorMm === null
           ? 'Cursor: —'
