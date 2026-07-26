@@ -208,28 +208,34 @@ export function MotionPolishRows(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
+  const showCutDirection =
+    props.settings.cutType === 'profile-outside' ||
+    props.settings.cutType === 'profile-inside' ||
+    props.settings.cutType === 'pocket';
   return (
     <Row label="Entry">
-      <select
-        value={props.settings.cutDirection ?? ''}
-        onChange={(e) => {
-          if (e.target.value === '') {
-            const { cutDirection: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
-          } else {
-            props.onCommit({
-              cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
-            });
-          }
-        }}
-        aria-label={`Cut direction for ${props.layer.color}`}
-        title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
-        style={directionSelectStyle}
-      >
-        <option value="">Default direction</option>
-        <option value="climb">Climb</option>
-        <option value="conventional">Conventional</option>
-      </select>
+      {showCutDirection ? (
+        <select
+          value={props.settings.cutDirection ?? ''}
+          onChange={(e) => {
+            if (e.target.value === '') {
+              const { cutDirection: _removed, ...rest } = props.settings;
+              props.onCommitSettings(rest);
+            } else {
+              props.onCommit({
+                cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
+              });
+            }
+          }}
+          aria-label={`Cut direction for ${props.layer.color}`}
+          title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
+          style={directionSelectStyle}
+        >
+          <option value="">Default direction</option>
+          <option value="climb">Climb</option>
+          <option value="conventional">Conventional</option>
+        </select>
+      ) : null}
       <ClearableNumberField
         min={0}
         max={45}
