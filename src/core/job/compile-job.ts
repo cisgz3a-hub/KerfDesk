@@ -270,7 +270,7 @@ function collectFillSegmentsForLayer(
       ? offsetFillContours({
           polylines: collectFillContoursForLayer(objects, layer, device),
           spacingMm: layer.hatchSpacingMm,
-        }).map((polyline) => ({ ...polyline, reverse: false }))
+        }).contours.map((polyline) => ({ ...polyline, reverse: false }))
       : memoizedLayerFillHatching(objects, layer, device);
   return polylines.map((polyline) => ({
     polyline: polyline.points,

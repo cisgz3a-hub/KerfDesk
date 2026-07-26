@@ -1,4 +1,4 @@
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { isClosedEnough, type Polyline } from '../scene';
 
 const MIN_OFFSET_FILL_SPACING_MM = 0.05;
@@ -10,27 +10,44 @@ export type OffsetFillInput = {
   readonly spacingMm: number;
 };
 
-export function offsetFillContours(input: OffsetFillInput): ReadonlyArray<Polyline> {
+export type OffsetFillResult = {
+  readonly contours: ReadonlyArray<Polyline>;
+  // True when an offset pass failed rather than legitimately running out of
+  // interior. Both cases stop the loop and both can yield no contours, so
+  // without this flag a lost fill is indistinguishable from a finished one.
+  readonly offsetFailed: boolean;
+};
+
+type OffsetPass = {
+  readonly contours: ReadonlyArray<Polyline>;
+  readonly failed: boolean;
+};
+
+export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const spacing = Math.max(MIN_OFFSET_FILL_SPACING_MM, input.spacingMm);
   const source = input.polylines.filter(isUsableClosedContour);
-  if (source.length === 0) return [];
+  if (source.length === 0) return { contours: [], offsetFailed: false };
 
   let current = offsetBy(source, -spacing / 2);
   const out: Polyline[] = [];
   const passLimit = offsetPassLimit(source, spacing);
-  for (let pass = 0; current.length > 0 && pass < passLimit; pass += 1) {
-    out.push(...current);
-    current = offsetBy(current, -spacing);
+  for (let pass = 0; current.contours.length > 0 && pass < passLimit; pass += 1) {
+    out.push(...current.contours);
+    current = offsetBy(current.contours, -spacing);
   }
-  return out;
+  // Only the final pass can have failed: a failed pass yields no contours, which
+  // ends the loop immediately.
+  return { contours: out, offsetFailed: current.failed };
 }
 
-function offsetBy(polylines: ReadonlyArray<Polyline>, offsetMm: number): ReadonlyArray<Polyline> {
-  try {
-    return offsetClosedPolylinesForKerf(polylines, offsetMm).filter(isUsableClosedContour);
-  } catch {
-    return [];
-  }
+function offsetBy(polylines: ReadonlyArray<Polyline>, offsetMm: number): OffsetPass {
+  // The checked variant keeps the clipper2 failure that kerf-offset already
+  // detects, instead of flattening it to an empty list. Without it a failed
+  // offset is indistinguishable from a fill that legitimately ran out of
+  // interior, and the pass silently disappears from the job.
+  const offset = offsetClosedPolylinesForKerfChecked(polylines, offsetMm);
+  if (offset.kind === 'error') return { contours: [], failed: true };
+  return { contours: offset.value.filter(isUsableClosedContour), failed: false };
 }
 
 function offsetPassLimit(polylines: ReadonlyArray<Polyline>, spacing: number): number {
