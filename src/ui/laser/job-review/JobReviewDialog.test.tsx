@@ -98,6 +98,7 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('8 / 8 full');
     expect(host.textContent).toContain('Warnings (1)');
     expect(host.textContent).toContain('Island fill can overburn small details.');
+    expect(host.querySelector('details')?.open).toBe(false);
     expect(host.textContent).toContain('User origin — anchor front left');
     expect(host.textContent).toContain('Controller laser mode prompt body.');
     expect(host.textContent).toContain('Artwork settings');
@@ -110,6 +111,24 @@ describe('JobReviewDialog', () => {
     expect(buttonByText('Start job').disabled).toBe(false);
     expect(host.querySelector('form')).toBeNull();
   });
+
+  it.each([
+    ['mismatch', 'Controller identity mismatch: selected Marlin; active GRBL v1.1.'],
+    ['unconfirmed', 'Controller identity unconfirmed: firmware detection is still unknown.'],
+  ])(
+    'opens the warning panel for %s identity evidence without disabling Start',
+    async (_, warning) => {
+      useJobReviewStore.getState().open({ ...model, warnings: [warning] });
+      await render();
+
+      const warningDetails = [...host.querySelectorAll('details')].find((details) =>
+        details.querySelector('summary')?.textContent?.includes('Warnings'),
+      );
+      expect(warningDetails?.open).toBe(true);
+      expect(warningDetails?.textContent).toContain(warning);
+      expect(buttonByText('Start job').disabled).toBe(false);
+    },
+  );
 
   it('routes Cancel, Start, and Escape to the review store signals', async () => {
     useJobReviewStore.getState().open(model);

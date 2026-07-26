@@ -51,8 +51,8 @@ const sampleObject: SceneObject = {
   ],
 };
 
-describe('Start controller selection policy', () => {
-  it('allows the user-selected profile when detected firmware differs', () => {
+describe('Start controller identity disclosure', () => {
+  it('warns but does not refuse when detected firmware differs', () => {
     const project = projectFor('grbl-v1.1');
     const result = prepareStartJob(project, readyController, {
       ...readyMachine,
@@ -62,9 +62,12 @@ describe('Start controller selection policy', () => {
     });
 
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected advisory-only preparation');
+    expect(result.warnings.join('\n')).toContain('Controller identity mismatch:');
+    expect(result.warnings.join('\n')).toContain('firmware banner identifies Marlin');
   });
 
-  it('does not require reconnecting after the user selects another profile', () => {
+  it('warns but does not refuse after the user selects another profile', () => {
     const project = projectFor('marlin');
     const result = prepareStartJob(project, readyController, {
       ...readyMachine,
@@ -74,9 +77,12 @@ describe('Start controller selection policy', () => {
     });
 
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected advisory-only preparation');
+    expect(result.warnings.join('\n')).toContain('Controller identity mismatch:');
+    expect(result.warnings.join('\n')).toContain('Reconnect using the selected profile');
   });
 
-  it('also allows matching profile and controller identities', () => {
+  it('keeps matching profile and controller identities quiet', () => {
     const project = projectFor('grblhal');
     const result = prepareStartJob(project, readyController, {
       ...readyMachine,
@@ -86,6 +92,22 @@ describe('Start controller selection policy', () => {
     });
 
     expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected preparation success');
+    expect(result.warnings.join('\n')).not.toContain('Controller identity');
+  });
+
+  it('warns but does not refuse when firmware detection is still unknown', () => {
+    const project = projectFor('grbl-v1.1');
+    const result = prepareStartJob(project, readyController, {
+      ...readyMachine,
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: null,
+      frameVerification: frameVerificationForProject(project),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected advisory-only preparation');
+    expect(result.warnings.join('\n')).toContain('Controller identity unconfirmed:');
   });
 });
 

@@ -14,6 +14,7 @@ import type { JobOriginPlacement } from '../../core/job';
 import type { FrameVerification } from './frame-verification';
 import type { JobReviewModel } from '../laser/job-review/job-review-model';
 import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
+import type { ControllerKind } from '../../core/devices';
 
 /** The exact executable bundle prepared and reviewed before a physical Frame. */
 export type PreparedStartProgram = {
@@ -75,6 +76,10 @@ export type FramedRunCandidate = {
 
 export type FramedRunControllerSnapshot = {
   readonly controllerSessionEpoch: number;
+  /** Review/provenance evidence only. Frame remains the sole ordinary Start
+   * guard; identity disagreement is disclosed in Job Review, not refused. */
+  readonly activeControllerKind: ControllerKind;
+  readonly detectedControllerKind: ControllerKind | null;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly controllerSettingsObservation: SessionObservationStamp | null;
   readonly controllerBuildInfo: GrblBuildInfo | null;
@@ -119,6 +124,8 @@ export function framedRunControllerSnapshot(
 ): FramedRunControllerSnapshot {
   return {
     controllerSessionEpoch: source.controllerSessionEpoch,
+    activeControllerKind: source.activeControllerKind,
+    detectedControllerKind: source.detectedControllerKind,
     controllerSettings: source.controllerSettings,
     controllerSettingsObservation: source.controllerSettingsObservation,
     controllerBuildInfo: source.controllerBuildInfo,
