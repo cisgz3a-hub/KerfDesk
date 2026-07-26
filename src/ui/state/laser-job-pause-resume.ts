@@ -9,7 +9,6 @@ import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
-import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import {
   assertPauseResumeTransitionOwner,
   beginPauseResumeTransition,
@@ -18,10 +17,11 @@ import {
   type PauseResumeTransitionAction,
   type PauseResumeTransitionToken,
 } from './laser-pause-resume-transition';
+import { beginPostJobSettle, type PostJobSettleRefs } from './laser-post-job-settle';
 import { streamStalledNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
-import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { liveCanvasExecutionAcceptedPatch, liveCanvasLifecyclePatch } from './live-canvas-run';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -32,7 +32,7 @@ type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type PauseResumeContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: ControllerLifecycleRefs;
+  readonly refs: PostJobSettleRefs;
   readonly safeWrite: SafeWriteFn;
   readonly driver: () => ControllerDriver;
   readonly failDarkStop: () => Promise<void>;
@@ -117,6 +117,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   const confirmedDoorResume = activeDriver.realtime.safetyDoor !== null;
   const controlSession = context.get().controllerSessionEpoch;
   const resumeByte = activeDriver.realtime.resume;
+  let finishedWithoutRefill = false;
 
   await runOwnedPauseResumeTransition(
     context,
@@ -137,9 +138,12 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
       } else if (resumeByte !== null) {
         await writeWhileTransitionOwner(context, token, resumeByte, 'resume');
       }
-      await refillResumedStream(context, token);
+      finishedWithoutRefill = await refillResumedStream(context, token);
     },
   );
+  if (finishedWithoutRefill) {
+    beginPostJobSettle(context.set, context.get, context.refs, context.safeWrite);
+  }
 }
 
 function freezeStreamer(context: PauseResumeContext): void {
@@ -308,15 +312,25 @@ function recordConfirmationFailure(context: PauseResumeContext, error: unknown):
 async function refillResumedStream(
   context: PauseResumeContext,
   token: PauseResumeTransitionToken,
-): Promise<void> {
+): Promise<boolean> {
   assertPauseResumeTransitionOwner(context.refs, token);
   let toSend = '';
+  let finishedWithoutRefill = false;
   context.set((state) => {
     if (state.streamer === null) return state;
     const stepped = step(resumeStreamer(state.streamer));
     toSend = stepped.toSend;
-    return { streamer: stepped.state, ...liveCanvasLifecyclePatch(state, 'running') };
+    finishedWithoutRefill = stepped.state.status === 'done';
+    return { streamer: stepped.state };
   });
-  if (toSend.length === 0) return;
+  if (toSend.length === 0) {
+    // A completed Resume path with no stream bytes left still owns a physical
+    // execution tail. Start the clock when the lifecycle/controller snapshot
+    // permits it; completion remains gated by the driver's settle contract.
+    context.set((state) => liveCanvasExecutionAcceptedPatch(state, true));
+    return finishedWithoutRefill;
+  }
   await writeWhileTransitionOwner(context, token, toSend, 'resume');
+  context.set((state) => liveCanvasExecutionAcceptedPatch(state, true));
+  return false;
 }

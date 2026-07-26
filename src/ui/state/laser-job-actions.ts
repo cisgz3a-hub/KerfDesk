@@ -50,7 +50,12 @@ import {
 } from './laser-store-helpers';
 import type { LaserState, StartJobOptions } from './laser-store';
 import { normalizeStartJobOptions } from './laser-job-options';
-import { liveCanvasLifecyclePatch, liveCanvasStartPatch } from './live-canvas-run';
+import { validatedStartJobTimingPlan } from './laser-job-timing-handoff';
+import {
+  liveCanvasExecutionAcceptedPatch,
+  liveCanvasLifecyclePatch,
+  liveCanvasStartPatch,
+} from './live-canvas-run';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
 import { containActiveStreamWriteFailure } from './laser-stream-heartbeat-containment';
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
@@ -66,7 +71,10 @@ type StartSetupEpoch = CncControllerEpoch;
 type JobActionContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: ResetCleanupRefs & ControllerLifecycleRefs;
+  readonly refs: ResetCleanupRefs &
+    ControllerLifecycleRefs & {
+      readonly driver: ControllerDriver;
+    };
   readonly safeWrite: SafeWriteFn;
   readonly driver: DriverFn;
 };
@@ -85,7 +93,10 @@ const EMPTY_PROGRAM_MESSAGE = 'The job contains no sendable G-code commands.';
 export function jobActions(
   set: SetFn,
   get: GetFn,
-  refs: ResetCleanupRefs & ControllerLifecycleRefs,
+  refs: ResetCleanupRefs &
+    ControllerLifecycleRefs & {
+      readonly driver: ControllerDriver;
+    },
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
@@ -131,10 +142,16 @@ async function runStartJob(
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, options);
     const entersHoldNow = stepped.state.status === 'tool-change';
+    const isImmediateToolChange = entersHoldNow && stepped.toSend.length === 0;
     set((state) => ({
       streamer: stepped.state,
       activeRunId: options.runId ?? null,
-      ...liveCanvasStartPatch(options.canvasPlan),
+      ...liveCanvasStartPatch(
+        options.canvasPlan,
+        Date.now(),
+        validatedStartJobTimingPlan(gcode, options, state),
+        isImmediateToolChange ? 'tool-change' : 'running',
+      ),
       accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
       activeJobMachineKind: options.machineKind ?? 'laser',
       toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
@@ -146,6 +163,7 @@ async function runStartJob(
     if (stepped.toSend.length === 0) return;
     try {
       await safeWrite(stepped.toSend, 'start');
+      set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (error) {
       containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start');
       // The first transport write did not resolve as accepted, so the staged
@@ -440,12 +458,17 @@ async function runContinueToolChange(
     const enteredNextHold = stepped.state.status === 'tool-change';
     return {
       streamer: stepped.state,
-      ...(enteredNextHold ? toolChangeHoldEntryPatch(s) : {}),
+      ...(enteredNextHold
+        ? {
+            ...toolChangeHoldEntryPatch(s),
+          }
+        : {}),
     };
   });
   if (toSend.length > 0) {
     try {
       await safeWrite(toSend, 'resume');
+      set((state) => liveCanvasExecutionAcceptedPatch(state));
     } catch (err) {
       containActiveStreamWriteFailure(set, refs, safeWrite, 'resume');
       throw err;

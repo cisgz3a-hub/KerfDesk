@@ -105,6 +105,9 @@ function preparedStartOptions(
       ? {}
       : { cncSetupAttestation: args.cncSetupAttestation }),
     canvasPlan: args.prepared.canvasPlan,
+    ...(args.prepared.jobTimingPlan === undefined
+      ? {}
+      : { jobTimingPlan: args.prepared.jobTimingPlan }),
     ...(args.framedRunClaim === undefined ? {} : { framedRunPermit: args.framedRunClaim.permit }),
   };
 }

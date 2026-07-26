@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_HOLD, RT_RESUME } from '../../core/controllers/grbl';
 import { RT_SAFETY_DOOR, RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
+import { fingerprintGcode } from '../../core/recovery';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { canvasJobTimingPlan } from './canvas-job-timing-plan';
+import type { CanvasMotionPlan } from './canvas-motion-plan';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
@@ -9,6 +14,40 @@ import { startTestLaserJob } from './laser-test-start-helpers';
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
 };
+
+const END_STREAM_GCODE = 'G21\nG90\nM4 S0\nG1 X1 F600 S100\nM5';
+const ORIGIN = { x: 0, y: 0, z: 0 };
+
+function countdownCanvasPlan(gcode: string): CanvasMotionPlan {
+  return {
+    manifest: buildMotionManifest(gcode, {
+      machineKind: 'laser',
+      initialPosition: ORIGIN,
+    }),
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: 'pause-resume-countdown',
+    machineKind: 'laser',
+    device: DEFAULT_DEVICE_PROFILE,
+    coordinateFrame: { kind: 'machine', workOffsetMm: ORIGIN },
+    framePerimeter: [],
+    jobStart: ORIGIN,
+    approachFrom: ORIGIN,
+    capability: 'realtime',
+    unavailableReason: null,
+    resumed: false,
+    positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
+  };
+}
+
+function countdownTimingPlan(gcode: string) {
+  const laser = useLaserStore.getState();
+  return canvasJobTimingPlan(gcode, DEFAULT_DEVICE_PROFILE, ORIGIN, {
+    controllerSessionEpoch: laser.controllerSessionEpoch,
+    positionEpoch: laser.trustedPositionEpoch,
+    activeControllerKind: laser.activeControllerKind,
+    detectedControllerKind: laser.detectedControllerKind,
+  });
+}
 
 function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
@@ -284,6 +323,25 @@ describe('laser-store pause safety', () => {
 });
 
 describe('laser-store pause at end of stream', () => {
+  it('starts normally but makes a mismatched timing sidecar unavailable', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    const actualGcode = `${END_STREAM_GCODE}\n; exact-program fingerprint changed`;
+
+    await expect(
+      startTestLaserJob(actualGcode, {
+        canvasPlan: countdownCanvasPlan(actualGcode),
+        jobTimingPlan: countdownTimingPlan(END_STREAM_GCODE),
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+    expect(useLaserStore.getState().liveCanvasRun?.timing).toEqual({
+      kind: 'unavailable',
+      reason: 'exact emitted-program timing evidence changed before controller handoff',
+    });
+  });
+
   it('uses Safety Door after all lines are acknowledged while physical Run continues', async () => {
     const writes: string[] = [];
     let stateLine = '<Run|MPos:1.000,0.000,0.000|FS:1000,100|Ov:100,100,100|A:C>';
@@ -299,7 +357,10 @@ describe('laser-store pause at end of stream', () => {
     });
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5');
+    await startTestLaserJob(END_STREAM_GCODE, {
+      canvasPlan: countdownCanvasPlan(END_STREAM_GCODE),
+      jobTimingPlan: countdownTimingPlan(END_STREAM_GCODE),
+    });
     for (let index = 0; index < 5; index += 1) connection.emitLine('ok');
     connection.emitLine(stateLine);
     await flushConnect();
@@ -310,12 +371,14 @@ describe('laser-store pause at end of stream', () => {
 
     expect(writes).toContain(RT_SAFETY_DOOR);
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('paused');
 
     writes.length = 0;
     await useLaserStore.getState().resumeJob();
 
     expect(writes).toContain(RT_RESUME);
     expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
     expect(writes.some((data) => data.includes('G1 X'))).toBe(false);
   });
 
@@ -323,10 +386,12 @@ describe('laser-store pause at end of stream', () => {
   // the end of a job drains every ack while the machine still holds
   // unexecuted motion — the job must stay paused (Resume mounted), and Resume
   // must complete it through the normal Idle release.
-  it('stays paused when the held tail acks out; resume completes the job at Idle', async () => {
+  it('stays paused when the held tail acks out; resume completes through settlement', async () => {
+    const writes: string[] = [];
     let resumed = false;
     let liveConnection: FakeConnection | null = null;
     const connection = makeConnection(async (data) => {
+      writes.push(data);
       if (data === RT_RESUME) resumed = true;
       if (data === '?') {
         setTimeout(() => {
@@ -352,9 +417,23 @@ describe('laser-store pause at end of stream', () => {
 
     await useLaserStore.getState().resumeJob();
     expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(writes).toContain('G4 P0.01\n');
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'dwell',
+    });
 
+    connection.emitLine('ok');
+    await flushConnect();
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
     connection.emitLine('<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
-    await Promise.resolve();
+    await flushConnect();
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    connection.emitLine('<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
+    await flushConnect();
     expect(useLaserStore.getState().streamer).toBeNull();
   });
 });

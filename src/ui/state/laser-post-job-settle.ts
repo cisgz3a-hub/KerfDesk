@@ -1,9 +1,15 @@
+import type { ControllerDriver } from '../../core/controllers';
 import { startControllerCommand, waitForFreshIdle } from './laser-interactive-command';
-import type { HandlerRefs } from './laser-line-shared';
+import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
+import {
+  completeLiveCanvasRun,
+  liveCanvasFinishingPatch,
+  liveCanvasTimingUnavailablePatch,
+} from './live-canvas-run';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -18,10 +24,22 @@ type SafeWriteFn = (
 const STABLE_IDLE_REPORTS = 2;
 const SETTLE_MARKER_ACTIVITY_TIMEOUT_MS = 30_000;
 
+/**
+ * Controller lifecycle refs with the concrete active driver required to choose
+ * the family-specific settlement marker.
+ */
+export type PostJobSettleRefs = ControllerLifecycleRefs & {
+  readonly driver: ControllerDriver;
+};
+
+/**
+ * Starts family-specific post-job drain confirmation and marks completion only
+ * after that driver's settle marker and stable Idle evidence.
+ */
 export function beginPostJobSettle(
   set: SetFn,
   get: GetFn,
-  refs: HandlerRefs,
+  refs: PostJobSettleRefs,
   safeWrite: SafeWriteFn,
 ): void {
   const state = get();
@@ -37,7 +55,7 @@ export function beginPostJobSettle(
 
 async function runPostJobSettle(
   set: SetFn,
-  refs: HandlerRefs,
+  refs: PostJobSettleRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   try {
@@ -63,6 +81,7 @@ async function runPostJobSettle(
               phase: 'awaiting-idle',
               idleReports: 0,
             },
+            ...liveCanvasFinishingPatch(state),
           }
         : {},
     );
@@ -75,6 +94,7 @@ async function runPostJobSettle(
         ? {
             controllerOperation: null,
             streamer: null,
+            liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
             log: pushLog(state, '[lf2] Controller settled after job.'),
           }
         : {},
@@ -93,6 +113,10 @@ async function runPostJobSettle(
             lastWriteError: message,
             safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),
+            ...liveCanvasTimingUnavailablePatch(
+              state,
+              'controller completion settlement could not be confirmed',
+            ),
           }
         : {},
     );

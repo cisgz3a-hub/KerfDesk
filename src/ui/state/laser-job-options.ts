@@ -2,6 +2,7 @@ import type { CreateStreamerOptions } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import type { CanvasMotionPlan } from './canvas-motion-plan';
+import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
 import type { CncSetupAttestation } from './cnc-setup-attestation';
 import type { CncToolPlanEntry } from './cnc-tool-plan';
 import type { RunId } from './recovery';
@@ -27,6 +28,8 @@ export type StartJobOptions = CreateStreamerOptions & {
   /** Session-bound $30/$32/M7 proof or explicit unknown-state acknowledgement. */
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly canvasPlan?: CanvasMotionPlan;
+  /** In-memory timing result for the exact G-code passed to startJob. */
+  readonly jobTimingPlan?: CanvasJobTimingPlanResult;
 };
 
 export function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

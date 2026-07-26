@@ -59,6 +59,8 @@ export function advanceStream(
   if (s === null) return;
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
+  const enteredToolChange = s.status !== 'tool-change' && stepped.state.status === 'tool-change';
+  const finishedStreaming = s.status !== 'done' && stepped.state.status === 'done';
   set((state) => ({
     streamer: stepped.state,
     ...(stepped.state.status === 'errored' ? liveCanvasLifecyclePatch(state, 'errored') : {}),
@@ -67,13 +69,13 @@ export function advanceStream(
   // work Z0 no longer holds, so the operator must re-Zero-Z for the new tool
   // (the setup gate allows it during the hold). Invalidate so the no-work-zero
   // advisory is honest again until they do (Codex audit P1).
-  if (s.status !== 'tool-change' && stepped.state.status === 'tool-change') {
+  if (enteredToolChange) {
     // New bit going in: void the prior Z0, require a FRESH Idle before the setup
     // gate / Continue unlock, and consume the next tool label so the pause UI can
     // name the bit (R5). Shared with the Continue entry site (F22).
     set((state) => toolChangeHoldEntryPatch(state));
   }
-  if (s.status !== 'done' && stepped.state.status === 'done') {
+  if (finishedStreaming) {
     beginPostJobSettle(set, get, refs, safeWrite);
   }
   if (stepped.toSend.length > 0) {

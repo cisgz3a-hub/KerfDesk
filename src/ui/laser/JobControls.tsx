@@ -35,7 +35,8 @@ import { StartBlockerNotice } from './StartBlockerNotice';
 import { RunAgainControl } from './RunAgainControl';
 import { framedRunReadinessIssue } from './framed-run-readiness';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
-import { EstimateBadge, startJobTitle } from './JobEstimatePresentation';
+import { startJobTitle } from './JobEstimatePresentation';
+import { LiveJobTimeBadge } from './LiveJobTimeBadge';
 
 type Props = {
   readonly disabled: boolean;
@@ -268,7 +269,7 @@ function SetupRow(props: {
       <span role="status" style={framedRunStatusStyle} title={framedRunIssue ?? undefined}>
         {framedRunStatusText(frameOperationActive, framedReady, hasFramedRun, framedRunIssue)}
       </span>
-      <EstimateBadge estimate={estimate} />
+      <LiveJobTimeBadge estimate={estimate} />
     </>
   );
 }

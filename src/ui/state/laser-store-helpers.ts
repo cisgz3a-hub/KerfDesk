@@ -16,6 +16,7 @@ import { disconnectedControllerQualification } from './laser-controller-qualific
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import { sessionScopedJobStateReset } from './laser-session-reset';
+import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
 import {
   isWorkZEvidenceCurrentForStart,
@@ -457,9 +458,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
     streamer: stream,
-    ...(state.liveCanvasRun === null || state.liveCanvasRun === undefined
-      ? {}
-      : { liveCanvasRun: { ...state.liveCanvasRun, lifecycle: 'disconnected' as const } }),
+    ...liveCanvasLifecyclePatch(state, 'disconnected'),
     // Replies and transport completions owned by the dead session can no
     // longer qualify. teardown() advanced writeEpoch before this patch, so a
     // late completion is intentionally unable to mutate the new ledger.

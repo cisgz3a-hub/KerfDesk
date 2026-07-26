@@ -1021,7 +1021,58 @@ link; it does not claim that bytes can cross a cable that is already physically 
 
 ### F-B11. Job progress UI
 
-The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state, and the Machine rail may retain its detailed progress bar. Both update whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
+The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state,
+and the Machine rail may retain its detailed progress bar. Both update whenever the streamer
+advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
+reconciliation; it is not presented as elapsed-time or remaining-time progress.
+
+Before Start, the existing project estimate remains visible. Once the exact output artifact exists,
+the in-job remaining-time baseline comes from the exact emitted G-code timeline: modeled motion and
+every deterministic timing command, including CNC `G4` spindle spin-up dwells. A deterministic dwell
+keeps its emitted duration and is never multiplied by an observed motion-pacing correction. Motion
+lookahead also restarts where the emitted program makes the controller drain its planner: dwell/
+pause/`M400` boundaries and actual spindle or coolant state changes. Redundant `M3`/`M4`/`M7`/`M8`/
+`M9` re-arms do not invent another stop, and laser power carried by a planned motion stays on that
+motion span.
+
+While the job runs, only fresh, trustworthy, same-session controller positions that reconcile to the
+active route may calibrate the modeled motion pace. Acknowledged-line counts may bound that
+reconciliation, but they cannot calibrate time by themselves. Arc and helix progress maps by exact
+raw G-code line between the live-motion and timing tessellations; partial straight-segment progress
+uses the same acceleration profile as the baseline. The badge moves through one explicit state
+model:
+
+- **Estimating:** the exact emitted-program baseline is initialized before the first program write
+  is accepted; it does not consume wall time.
+- **Running:** executable program bytes have been accepted, or a trustworthy fresh same-session
+  `Run` report proves execution while the first write is settling. The baseline pace applies until
+  fresh route samples calibrate it, while deterministic dwell always retains its emitted duration.
+- **Paused:** the last estimate freezes; hold time does not silently consume the remaining estimate.
+  A host-side CNC `M0` alone is not physical pause proof: the clock keeps running through the
+  buffered pre-`M0` tail and freezes only after the existing fresh `Idle` tool-change proof.
+- **Disconnected:** remaining time is unavailable rather than counting down or carrying a stale
+  number across the replacement connection session.
+- **Finishing:** the active driver's settle marker (or equivalent physical `Idle` boundary) has
+  proved queued execution drained, and the final stable-controller release is still pending. Final
+  line acknowledgement alone does not select this state or remove the numeric countdown.
+- **Complete:** the active-driver settle marker has completed and the required stable `Idle` reports
+  have released the job. An acknowledged final line alone cannot select this state.
+
+The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
+session, position epoch, active driver, and current-session detected-family evidence. If any of that
+evidence changes before controller handoff, Start continues normally but remaining time is
+unavailable. A failed settle-only completion marker likewise remains unavailable through later
+position-only reports. Sidecars are bounded at 25,000 raw lines and 25,000 motion segments; larger
+jobs run normally with the countdown marked unavailable. The segment cap is enforced during render
+model construction, with at most the current source line expanded before parsing stops.
+
+If the emitted program cannot be modeled truthfully — for example, its initial controller position
+or feed state is unknown, its `G4 P` units do not match the active family, or its timing sidecar
+exceeds the bounded line/segment budget — remaining time is unavailable. The estimate uses the
+existing scalar machine-limit model, so axis-specific acceleration, controller buffering, override
+response, spindle-at-speed behavior, and real material/machine pacing remain hardware-calibration
+limits rather than software proof. This display model changes no emitted output, Start
+authorization, Frame proof, controller command, or safety boundary.
 
 ### F-B12. Disconnect during job (cable yank)
 

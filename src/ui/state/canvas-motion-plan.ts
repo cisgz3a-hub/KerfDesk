@@ -29,6 +29,7 @@ import {
 import type { PreparedOutput } from '../../io/gcode';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { cncPassRouteSpans, type CncPassRouteSpan } from './canvas-pass-progress';
+import type { LiveJobTiming } from './live-job-timing';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
 
@@ -84,6 +85,7 @@ export type LiveCanvasRun = {
    * (stopped/disconnected/errored/finished), freezing the elapsed readout;
    * null while the run can still advance. */
   readonly endedAtMs: number | null;
+  readonly timing?: LiveJobTiming;
 };
 
 const retentionKeyCache = new WeakMap<Project, Map<string, string>>();

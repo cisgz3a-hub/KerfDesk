@@ -20,7 +20,7 @@ import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { hasCustomXyOrigin } from './origin-actions';
 import { statusObservationPatch } from './laser-status-observation';
-import { liveCanvasStatusPatch } from './live-canvas-run';
+import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
@@ -104,7 +104,7 @@ export function handleStatusLine(
     ...operationPatch,
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
-    ...liveCanvasStatusPatch(state, report, streamer),
+    ...liveCanvasStatusCompletionPatch(state, report, streamer, jobOverAtIdle),
     ...completionPatch,
     ...frameFailurePatch,
     ...permitInterruptionPatch,
@@ -178,14 +178,7 @@ function liveCanvasLifecyclePatchForInvalidation(
   state: LaserState,
   alarm: boolean,
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
-  const run = state.liveCanvasRun ?? null;
-  if (run === null || run.lifecycle === 'finished') return {};
-  return {
-    liveCanvasRun: {
-      ...run,
-      lifecycle: alarm ? 'errored' : 'disconnected',
-    },
-  };
+  return liveCanvasLifecyclePatch(state, alarm ? 'errored' : 'disconnected');
 }
 
 function advanceWriteEpoch(refs: HandlerRefs): void {

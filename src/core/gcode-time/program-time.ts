@@ -22,6 +22,10 @@ import { segmentBlocks } from './segment-blocks';
 export type ProgramTimeModel = {
   /** Seconds for each segment. */
   readonly segSeconds: Float32Array;
+  readonly segDistanceMm: Float32Array;
+  readonly segTargetVelocityMmPerSec: Float32Array;
+  readonly segEntryVelocityMmPerSec: Float32Array;
+  readonly segExitVelocityMmPerSec: Float32Array;
   /** Cumulative seconds at each segment's end. */
   readonly segTimeEndSec: Float32Array;
   /** 1 where the move never sustained its programmed feed. */
@@ -32,6 +36,7 @@ export type ProgramTimeModel = {
   readonly dwellSeconds: number;
   /** motionSeconds + dwellSeconds — the ETA. */
   readonly totalSeconds: number;
+  readonly accelMmPerSec2: number;
 };
 
 export function buildProgramTime(
@@ -40,32 +45,91 @@ export function buildProgramTime(
 ): ProgramTimeModel {
   const limits = sanitizeLimits(rawLimits);
   const blocks = segmentBlocks(model, limits);
-  const plan = planVelocities(blocks, limits.accelMmPerSec2, limits.junctionDeviationMm);
   const segSeconds = new Float32Array(blocks.length);
+  const segDistanceMm = new Float32Array(blocks.length);
+  const segTargetVelocityMmPerSec = new Float32Array(blocks.length);
+  const segEntryVelocityMmPerSec = new Float32Array(blocks.length);
+  const segExitVelocityMmPerSec = new Float32Array(blocks.length);
   const segTimeEndSec = new Float32Array(blocks.length);
   const segFeedLimited = new Uint8Array(blocks.length);
   let elapsed = 0;
-  for (let index = 0; index < blocks.length; index += 1) {
-    const block = blocks[index];
-    const entry = plan[index];
-    if (block === undefined || entry === undefined) continue;
-    const seconds = blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2);
-    segSeconds[index] = seconds;
-    elapsed += seconds;
-    segTimeEndSec[index] = elapsed;
-    if (!reachesTargetVelocity(block, entry.entryV, entry.exitV, limits.accelMmPerSec2)) {
-      segFeedLimited[index] = 1;
+  for (const span of motionSpans(model, blocks.length)) {
+    const spanBlocks = blocks.slice(span.startIndex, span.endIndex);
+    const plan = planVelocities(spanBlocks, limits.accelMmPerSec2, limits.junctionDeviationMm);
+    for (let localIndex = 0; localIndex < spanBlocks.length; localIndex += 1) {
+      const index = span.startIndex + localIndex;
+      const block = spanBlocks[localIndex];
+      const entry = plan[localIndex];
+      if (block === undefined || entry === undefined) continue;
+      const seconds = blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2);
+      segSeconds[index] = seconds;
+      segDistanceMm[index] = block.distance;
+      segTargetVelocityMmPerSec[index] = block.targetVelocity;
+      segEntryVelocityMmPerSec[index] = entry.entryV;
+      segExitVelocityMmPerSec[index] = entry.exitV;
+      elapsed += seconds;
+      segTimeEndSec[index] = elapsed;
+      if (!reachesTargetVelocity(block, entry.entryV, entry.exitV, limits.accelMmPerSec2)) {
+        segFeedLimited[index] = 1;
+      }
     }
   }
   const dwellSeconds = totalDwellSeconds(model);
   return {
     segSeconds,
+    segDistanceMm,
+    segTargetVelocityMmPerSec,
+    segEntryVelocityMmPerSec,
+    segExitVelocityMmPerSec,
     segTimeEndSec,
     segFeedLimited,
     motionSeconds: elapsed,
     dwellSeconds,
     totalSeconds: elapsed + dwellSeconds,
+    accelMmPerSec2: limits.accelMmPerSec2,
   };
+}
+
+type MotionSpan = { readonly startIndex: number; readonly endIndex: number };
+type SynchronizationBoundary = { readonly line: number; readonly isBeforeMotion: boolean };
+
+function motionSpans(model: GcodeRenderModel, segmentCount: number): ReadonlyArray<MotionSpan> {
+  const spans: MotionSpan[] = [];
+  let startIndex = 0;
+  for (const boundary of synchronizationBoundaries(model)) {
+    let endIndex = startIndex;
+    while (
+      endIndex < segmentCount &&
+      segmentPrecedesBoundary(model.segLine[endIndex] ?? 0, boundary)
+    ) {
+      endIndex += 1;
+    }
+    if (endIndex > startIndex) spans.push({ startIndex, endIndex });
+    startIndex = endIndex;
+  }
+  if (startIndex < segmentCount) spans.push({ startIndex, endIndex: segmentCount });
+  return spans;
+}
+
+function synchronizationBoundaries(
+  model: GcodeRenderModel,
+): ReadonlyArray<SynchronizationBoundary> {
+  const boundaries = new Map<number, boolean>();
+  for (const event of model.events) {
+    if (event.kind === 'dwell' || event.kind === 'pause') {
+      if (!boundaries.has(event.line)) boundaries.set(event.line, false);
+      continue;
+    }
+    if (event.kind !== 'synchronization') continue;
+    boundaries.set(event.line, (boundaries.get(event.line) ?? false) || event.isBeforeMotion);
+  }
+  return [...boundaries]
+    .map(([line, isBeforeMotion]) => ({ line, isBeforeMotion }))
+    .sort((left, right) => left.line - right.line);
+}
+
+function segmentPrecedesBoundary(segmentLine: number, boundary: SynchronizationBoundary): boolean {
+  return boundary.isBeforeMotion ? segmentLine < boundary.line : segmentLine <= boundary.line;
 }
 
 // Trapezoid test: the move reaches its target only if there is room to

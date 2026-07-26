@@ -210,6 +210,13 @@ describe('runStartJobFlow', () => {
           unverifiedAcknowledged: false,
         }),
         canvasPlan: expect.objectContaining({ capability: 'realtime' }),
+        jobTimingPlan: expect.objectContaining({
+          kind: 'ok',
+          plan: expect.objectContaining({
+            totalSeconds: expect.any(Number),
+            sendableLineEndSeconds: expect.any(Float64Array),
+          }),
+        }),
       }),
     );
     expect(jobAwareConfirm).not.toHaveBeenCalled();

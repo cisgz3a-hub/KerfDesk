@@ -185,7 +185,7 @@
 | ADR-218 | 2026-07-16 | Accepted | CNC line-art contour side selection (inner / outer / both) |
 | ADR-219 | 2026-07-16 | Accepted | Centerline arc-length quadratic fairing (anti-wobble stage) |
 | ADR-220 | 2026-07-16 | Accepted | Show the live spindle RPM on the CNC canvas motion badge |
-| ADR-221 | 2026-07-17 | Accepted | Show wall-clock elapsed job time on the canvas motion badge |
+| ADR-221 | 2026-07-17 | Amended 2026-07-27 | Show wall-clock elapsed job time on the canvas motion badge |
 | ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes select the artwork by default |
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
 | ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
@@ -9550,7 +9550,7 @@ configured correctly; the badge faithfully shows what the controller reports, as
 
 ## ADR-221 - Show wall-clock elapsed job time on the canvas motion badge
 
-**Status:** Accepted | **Date:** 2026-07-17
+**Status:** Amended 2026-07-27 | **Date:** 2026-07-17
 
 ### Context
 
@@ -9583,6 +9583,48 @@ Operators see live elapsed time next to the machine state for both laser and CNC
 its final value when the run ends however it ends. The readout is display-only and wall-clock —
 it makes no claim about cutting time vs held time. Fixtures and archived runs without a start
 stamp simply omit it.
+
+### Amendment 2026-07-27 — exact emitted-program remaining time
+
+The elapsed clock above remains a separate wall-clock fact. The in-job remaining-time display uses
+one additional timing model:
+
+- Its initial baseline is the exact emitted G-code timeline, including modeled motion and every
+  deterministic timing command. In particular, CNC spindle spin-up `G4` dwells contribute their
+  emitted duration. Lookahead restarts across dwell/pause/`M400` boundaries and real spindle or
+  coolant state changes, matching the emitted program's planner drains; redundant modal re-arms do
+  not invent a stop, and laser power carried on planned motion remains in that motion span.
+- Acknowledged-line percentage remains a separate transport diagnostic and a ceiling for route
+  reconciliation. It is never converted into elapsed or remaining time.
+- Only fresh, trustworthy, same-session controller positions that reconcile to the active route may
+  calibrate modeled motion pacing. Arc/helix progress maps by exact raw G-code line across the two
+  parser tessellations, and partial-segment time follows the planner's acceleration profile.
+  Deterministic dwell time is not pace-scaled.
+- The display states are **estimating**, **running**, **paused**, **disconnected**, **finishing**,
+  and **complete**. Estimating is the pre-first-write initialization state; once executable bytes
+  are accepted (or a trustworthy fresh same-session `Run` report proves execution while that write
+  settles), Running consumes the baseline pace until route samples calibrate it. Pause freezes the
+  last estimate. A host-side CNC `M0` freezes it only after the existing fresh-`Idle` tool-change
+  proof, not while buffered pre-`M0` motion may still execute. Disconnect makes remaining time
+  unavailable rather than drifting across a replacement session.
+- Final acknowledgement does not select Finishing: realtime families keep numeric route correction
+  while fresh same-session status still reports `Run`. Finishing begins only when the active
+  driver's settle marker or equivalent physical `Idle` boundary proves queued execution drained;
+  Complete still requires the existing stable-`Idle` release contract.
+- Timing-unknown syntax, unknown initial position/feed, controller-family dwell-unit mismatch, or a
+  program beyond the 25,000-line/segment live-timing sidecar budget makes remaining time
+  unavailable instead of inviting a false estimate. The sidecar is also stamped with the exact
+  G-code fingerprint and current initial-position/session/position-epoch/active-and-detected-family
+  evidence; drift before handoff degrades the timer only and never refuses Start. A failed
+  settle-only completion marker remains unavailable through later position-only reports rather
+  than fabricating Complete. The segment budget is enforced during render construction, allowing
+  only the current source line's bounded expansion before parsing stops.
+
+The model uses the existing scalar configured velocity/acceleration limits. Axis-specific dynamics,
+controller buffering, live override response, spindle-at-speed behavior, and real material/machine
+pacing still require physical calibration; controller reports and simulator evidence do not prove
+them. The amendment is display and estimation state only: it changes no emitted G-code, Start or
+Frame authorization, controller command, settle contract, or other safety boundary.
 
 ---
 
