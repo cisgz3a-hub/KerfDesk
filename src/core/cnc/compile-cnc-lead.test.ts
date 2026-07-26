@@ -88,11 +88,10 @@ describe('compileCncJob — ADR-250 profile leads', () => {
     expect(passes.every((pass) => pass.kind === 'path3d')).toBe(true);
   });
 
-  // Renamed from an over-promising "does not lead into the kept part (P1)": this
-  // only checks that BOTH contours get a lead. The hole-lead safety property —
-  // that the lead never leaves the hole's tool-center ring — is measured in
-  // compile-cnc-hole-lead-side.test.ts, which fails when ADR-252 is reverted.
-  it('bakes a waste-side lead into both the outer and the hole', () => {
+  // This case checks only that BOTH contours compile to lead paths. The
+  // hole-lead safety property — that the lead never leaves the hole's
+  // tool-center ring — is measured in compile-cnc-hole-lead-side.test.ts.
+  it('compiles a lead path for both the outer and the hole', () => {
     const hole = [
       { x: 85, y: 85 },
       { x: 115, y: 85 },
@@ -139,11 +138,9 @@ describe('compileCncJob — ADR-250 profile leads', () => {
       return Math.max(...xs) - Math.min(...xs);
     };
     const bySpan = [...group.passes].sort((a, b) => spanX(a) - spanX(b));
-    // Both contours take a waste-side lead once the per-contour side is
-    // resolved correctly (ADR-252): the outer into the exterior waste, the hole
-    // into its own slug. Containment against the drawn hole boundary is too
-    // loose to prove safety here — that the hole's lead never leaves the hole's
-    // TOOL-CENTER ring is pinned by compile-cnc-hole-lead-side.test.ts.
+    // Both contours compile to path3d passes. This assertion deliberately does
+    // not claim which side of either contour the lead occupies; tool-center-ring
+    // containment is pinned by compile-cnc-hole-lead-side.test.ts.
     expect(bySpan[0]?.kind).toBe('path3d');
     expect(bySpan[bySpan.length - 1]?.kind).toBe('path3d');
   });
