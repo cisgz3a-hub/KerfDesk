@@ -52,28 +52,42 @@ function stockMaterial(): string | undefined {
 }
 
 describe('CncSetupPanel project material (ADR-112)', () => {
-  it('renders the Project material dropdown with Custom + materials', async () => {
+  it('renders grouped wood species alongside the general material families', async () => {
     const { host, root } = await render();
     try {
       const values = [...materialSelect(host).options].map((o) => o.value);
       expect(values).toContain(''); // Custom
       expect(values).toContain('hardwood');
+      expect(values).toContain('hardwood-walnut');
+      expect(values).toContain('softwood-pine');
       expect(values).toContain('plywood-mdf');
+      expect(
+        [...materialSelect(host).querySelectorAll('optgroup')].map((group) => group.label),
+      ).toContain('Hardwoods');
     } finally {
       await act(async () => root.unmount());
       host.remove();
     }
   });
 
-  it('picking a material sets the project stock material', async () => {
+  it('previews a species without changing the project, then applies it explicitly', async () => {
     const { host, root } = await render();
     try {
       const select = materialSelect(host);
-      select.value = 'hardwood';
+      select.value = 'hardwood-walnut';
       await act(async () => {
         Simulate.change(select);
       });
-      expect(stockMaterial()).toBe('hardwood');
+      expect(stockMaterial()).toBeUndefined();
+      expect(host.textContent).toContain('Walnut uses the hardwood starting model');
+      const apply = [...host.querySelectorAll('button')].find((button) =>
+        button.textContent?.includes('Apply Walnut preset'),
+      );
+      if (!(apply instanceof HTMLButtonElement)) throw new Error('apply button missing');
+      await act(async () => {
+        Simulate.click(apply);
+      });
+      expect(stockMaterial()).toBe('hardwood-walnut');
     } finally {
       await act(async () => root.unmount());
       host.remove();

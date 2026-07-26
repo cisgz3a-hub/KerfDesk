@@ -106,6 +106,25 @@ describe('projectWithStockMaterial (ADR-112)', () => {
     }
   });
 
+  it('keeps a named species while calculating from its material family', () => {
+    const project = projectWithStockMaterial(cncProject([cncLayer('#aa0000')]), 'hardwood-walnut');
+    const expected = expectedFeeds('hardwood');
+    expect(project.machine?.kind === 'cnc' ? project.machine.stock.materialKey : null).toBe(
+      'hardwood-walnut',
+    );
+    expect(project.scene.layers[0]?.cnc).toMatchObject({
+      materialKey: 'hardwood-walnut',
+      feedMmPerMin: expected.feedMmPerMin,
+      plungeMmPerMin: expected.plungeMmPerMin,
+      depthPerPassMm: expected.depthPerPassMm,
+      feedSource: {
+        kind: 'material-recipe',
+        materialKey: 'hardwood-walnut',
+        fluteCount: 2,
+      },
+    });
+  });
+
   it('clears the stock material but leaves layer feeds intact', () => {
     const filled = projectWithStockMaterial(cncProject([cncLayer('#aa0000')]), 'hardwood');
     const cleared = projectWithStockMaterial(filled, null);

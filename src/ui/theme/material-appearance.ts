@@ -13,7 +13,7 @@
 // PURE: a key in, constants out. No three import, so the Canvas2D path and the
 // WebGL path can both use it.
 
-import type { ChiploadMaterial } from '../../core/cnc';
+import { CHIPLOAD_MATERIALS, type ChiploadMaterial } from '../../core/cnc';
 
 export type MaterialAppearance = {
   // Stock top, and full depth. The ramp between them is the depth cue.
@@ -51,7 +51,7 @@ function packRgb(rgb: readonly [number, number, number]): number {
 // Machined timber is matte; cast acrylic is glossy; milled aluminium is bright
 // and metallic but carries fine tooling marks, so it gets metalness without a
 // mirror roughness.
-const APPEARANCE_BY_MATERIAL: Readonly<Record<ChiploadMaterial, MaterialAppearance>> = {
+const APPEARANCE_BY_MATERIAL = {
   softwood: appearance([216, 183, 132], [138, 98, 52], 0.85, 0),
   hardwood: appearance([176, 122, 68], [74, 44, 18], 0.8, 0),
   'plywood-mdf': appearance([214, 191, 154], [122, 103, 70], 0.9, 0),
@@ -70,5 +70,7 @@ const DEFAULT_APPEARANCE = appearance([196, 160, 116], [74, 48, 28], 0.85, 0);
  * @returns Colours and PBR parameters for that stock.
  */
 export function materialAppearance(key: ChiploadMaterial | undefined): MaterialAppearance {
-  return key === undefined ? DEFAULT_APPEARANCE : APPEARANCE_BY_MATERIAL[key];
+  if (key === undefined) return DEFAULT_APPEARANCE;
+  const family = CHIPLOAD_MATERIALS.find((material) => material.value === key)?.family;
+  return family === undefined ? DEFAULT_APPEARANCE : APPEARANCE_BY_MATERIAL[family];
 }

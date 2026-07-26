@@ -32,6 +32,11 @@ describe('chiploadFor', () => {
     expect(chiploadFor('hardwood', 6.35)).toBe(0.1);
     expect(chiploadFor('hardwood', 12)).toBe(0.15);
   });
+
+  it('uses the material-family chart for a named wood species', () => {
+    expect(chiploadFor('hardwood-walnut', 3.175)).toBe(chiploadFor('hardwood', 3.175));
+    expect(chiploadFor('softwood-pine', 6.35)).toBe(chiploadFor('softwood', 6.35));
+  });
 });
 
 describe('calculateFeeds', () => {

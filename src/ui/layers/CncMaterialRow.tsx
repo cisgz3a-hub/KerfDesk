@@ -5,7 +5,7 @@
 // "it just works". Full flute/RPM control stays in the (advanced) Feeds
 // calculator. CNC-only.
 
-import { CHIPLOAD_MATERIALS, type ChiploadMaterial } from '../../core/cnc';
+import { CHIPLOAD_MATERIALS, isChiploadMaterialKey } from '../../core/cnc';
 import {
   DEFAULT_ASSUMED_FLUTE_COUNT,
   findCncMachineStarter,
@@ -13,6 +13,7 @@ import {
 } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 import { Row, selectStyle } from './CncLayerPrimitives';
@@ -48,7 +49,8 @@ export function CncMaterialRow(props: {
       onCommitSettings(rest);
       return;
     }
-    const material = value as ChiploadMaterial;
+    if (!isChiploadMaterialKey(value)) return;
+    const material = value;
     const patch = materialFeedsPatch({
       materialKey: material,
       tool,
@@ -75,11 +77,7 @@ export function CncMaterialRow(props: {
             <option value={SAVED_MACHINE_STARTER}>{starterDisplay.optionLabel}</option>
           )}
           <option value={CUSTOM}>Manual — verify feeds</option>
-          {CHIPLOAD_MATERIALS.map((material) => (
-            <option key={material.value} value={material.value}>
-              {material.label}
-            </option>
-          ))}
+          <CncMaterialOptions />
         </select>
       </Row>
       <p style={hintStyle}>{materialHint(settings, tool.name, starterDisplay)}</p>

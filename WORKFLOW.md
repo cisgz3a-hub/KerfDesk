@@ -3124,12 +3124,13 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC31. Auto-fill feeds from a material — ADR-111 #1
 
 #### Success
-1. Every CNC layer card has a "Material" select at the top (Custom +
-   Softwood / Hardwood / Plywood-MDF / Acrylic / Aluminium). Picking one
-   fills feed, plunge, and depth-per-pass in a single undoable patch from
-   the chipload engine, using the layer's own bit and a 2-flute
-   assumption. A recognized machine starter and live limits can lower those
-   automatic values. Cut type, depth, bit, and tabs stay put.
+1. Every CNC layer card has a grouped "Material" select at the top (Manual +
+   common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
+   Picking one fills feed, plunge, and depth-per-pass in a single undoable
+   patch from the chipload engine, using the layer's own bit and a 2-flute
+   assumption. A named wood keeps its species identity but uses its researched
+   family starting model; a recognized machine starter and live limits can
+   lower those automatic values. Cut type, depth, bit, and tabs stay put.
 2. The choice and automatic-source provenance are remembered on the layer and
    round-trip in the .lf2 file; they are display-only and do not change compiled
    output beyond the persisted numeric settings themselves.
@@ -3216,20 +3217,25 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC35. Set the project material once (Easel-style) — ADR-112
 
 #### Success
-1. The Material & Bit panel shows a "Material" dropdown (above Bit) the
-   moment you switch to CNC — no design needed. Pick your stock material and
-   every layer's feed / plunge / depth-per-pass fills from it (each layer's
-   own bit + spindle), in one undoable step.
+1. The Material & Bit panel shows a grouped "Material" dropdown (above Bit)
+   the moment you switch to CNC — no design needed. Softwoods and Hardwoods
+   expose common species such as Pine, Cedar, Oak, Hard maple, and Walnut.
+   Choosing an entry previews its family model without changing the job;
+   **Apply [material] preset** then fills every layer's feed / plunge /
+   depth-per-pass (each layer's own bit + spindle) in one undoable step.
 2. New layers inherit it: add a layer or import an SVG after choosing the
    material and the fresh layers come in with those feeds (not the generic
    1000 / 1.5 default). Set material first, then import — the Easel order.
 
 #### Error — none (bounded select)
-1. Material is a dropdown; feeds floor at safe minimums via the calculator.
+1. Unknown saved keys are dropped during project normalization. Known species
+   resolve to a bounded family calculation; feeds floor at the calculator's
+   minimums.
 
 #### Empty
-1. The dropdown shows in CNC mode only. "Custom" clears the project material
-   and leaves current feeds untouched for hand-tuning.
+1. The dropdown shows in CNC mode only. Choosing "Custom" changes nothing
+   until **Use manual feeds** is clicked; that clears the project material and
+   leaves current feeds untouched for hand-tuning.
 
 #### Edge — per-layer override and other object types
 1. A layer's own Material picker (F-CNC31) overrides the project material for

@@ -2,14 +2,19 @@
 //
 //   feed (mm/min) = RPM × flutes × chipload (mm/tooth)
 //
-// The chipload chart is a PROVISIONAL starter set of industry-typical
-// mid-range values by material and bit-diameter band — the numbers every
-// manufacturer chart clusters around, clearly labeled as starting points in
-// the UI. Depth-per-pass and plunge percentage are rule-of-thumb fractions
-// of bit diameter / feed. Everything is editable after Apply; nothing here
-// claims to replace listening to the cut.
+// The chipload chart is a PROVISIONAL conservative starter set by material
+// family and bit-diameter band. Named wood species resolve to their family;
+// there is no defensible universal numeric recipe for every board and machine.
+// Everything is editable after Apply and must be verified with a test cut.
 
-export type ChiploadMaterial = 'softwood' | 'hardwood' | 'plywood-mdf' | 'acrylic' | 'aluminum';
+import {
+  cncMaterialFamilyFor,
+  type ChiploadMaterial,
+  type CncMaterialFamily,
+} from './cnc-material-catalog';
+
+export type { ChiploadMaterial } from './cnc-material-catalog';
+export { isChiploadMaterialKey } from './cnc-material-catalog';
 
 export type FeedsCalculatorInput = {
   readonly material: ChiploadMaterial;
@@ -33,34 +38,12 @@ export type FeedsCalculatorResult =
   | FeedsCalculatorOk
   | { readonly kind: 'error'; readonly reason: string };
 
-export const CHIPLOAD_MATERIALS: ReadonlyArray<{
-  readonly value: ChiploadMaterial;
-  readonly label: string;
-}> = [
-  { value: 'softwood', label: 'Softwood' },
-  { value: 'hardwood', label: 'Hardwood' },
-  { value: 'plywood-mdf', label: 'Plywood / MDF' },
-  { value: 'acrylic', label: 'Acrylic' },
-  { value: 'aluminum', label: 'Aluminum' },
-];
-
-const CHIPLOAD_MATERIAL_KEYS: ReadonlySet<string> = new Set(
-  CHIPLOAD_MATERIALS.map((material) => material.value),
-);
-
-// Narrow an arbitrary value to a known chipload material key. Shared by the
-// .lf2 normalizers (layer + stock materialKey) and the project-material picker
-// so a stale/unknown key is rejected instead of reaching calculateFeeds.
-export function isChiploadMaterialKey(value: unknown): value is ChiploadMaterial {
-  return typeof value === 'string' && CHIPLOAD_MATERIAL_KEYS.has(value);
-}
-
 // Diameter bands (mm): ≤1.5, ≤3.175 (1/8"), ≤6.35 (1/4"), larger.
 const BAND_LIMITS_MM = [1.5, 3.175, 6.35] as const;
 
-// mm/tooth per band, mid-range starting values.
+// mm/tooth per band, conservative starting values.
 const CHIPLOAD_CHART: Readonly<
-  Record<ChiploadMaterial, readonly [number, number, number, number]>
+  Record<CncMaterialFamily, readonly [number, number, number, number]>
 > = {
   softwood: [0.03, 0.05, 0.11, 0.19],
   hardwood: [0.02, 0.04, 0.1, 0.15],
@@ -70,7 +53,7 @@ const CHIPLOAD_CHART: Readonly<
 };
 
 // Depth-per-pass as a fraction of bit diameter.
-const DEPTH_FACTOR: Readonly<Record<ChiploadMaterial, number>> = {
+const DEPTH_FACTOR: Readonly<Record<CncMaterialFamily, number>> = {
   softwood: 0.5,
   hardwood: 0.4,
   'plywood-mdf': 0.5,
@@ -79,7 +62,7 @@ const DEPTH_FACTOR: Readonly<Record<ChiploadMaterial, number>> = {
 };
 
 // Plunge feed as a fraction of the cutting feed.
-const PLUNGE_FACTOR: Readonly<Record<ChiploadMaterial, number>> = {
+const PLUNGE_FACTOR: Readonly<Record<CncMaterialFamily, number>> = {
   softwood: 0.4,
   hardwood: 0.4,
   'plywood-mdf': 0.4,
@@ -92,7 +75,7 @@ const ROUND_FEED_TO_MM = 10;
 const ROUND_DEPTH_TO_MM = 0.1;
 
 export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): number {
-  const chart = CHIPLOAD_CHART[material];
+  const chart = CHIPLOAD_CHART[cncMaterialFamilyFor(material)];
   for (let band = 0; band < BAND_LIMITS_MM.length; band += 1) {
     const limit = BAND_LIMITS_MM[band];
     if (limit !== undefined && bitDiameterMm <= limit) return chart[band] ?? 0;
@@ -108,6 +91,7 @@ export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResu
   const rpmError = positiveFiniteReason('RPM', input.rpm);
   if (rpmError !== null) return { kind: 'error', reason: rpmError };
   const chiploadMm = chiploadFor(input.material, input.bitDiameterMm);
+  const family = cncMaterialFamilyFor(input.material);
   const rawFeed = input.rpm * Math.max(1, Math.round(input.flutes)) * chiploadMm;
   const uncappedFeed = Math.max(
     MIN_FEED_MM_PER_MIN,
@@ -122,14 +106,13 @@ export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResu
     feedMmPerMin,
     Math.max(
       MIN_FEED_MM_PER_MIN / 2,
-      Math.round((feedMmPerMin * PLUNGE_FACTOR[input.material]) / ROUND_FEED_TO_MM) *
-        ROUND_FEED_TO_MM,
+      Math.round((feedMmPerMin * PLUNGE_FACTOR[family]) / ROUND_FEED_TO_MM) * ROUND_FEED_TO_MM,
     ),
   );
   const depthPerPassMm =
     Math.max(
       ROUND_DEPTH_TO_MM,
-      Math.round((input.bitDiameterMm * DEPTH_FACTOR[input.material]) / ROUND_DEPTH_TO_MM) *
+      Math.round((input.bitDiameterMm * DEPTH_FACTOR[family]) / ROUND_DEPTH_TO_MM) *
         ROUND_DEPTH_TO_MM,
     ) || ROUND_DEPTH_TO_MM;
   return { kind: 'ok', chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };
