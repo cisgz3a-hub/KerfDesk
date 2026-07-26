@@ -87,6 +87,76 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
+  // The toolbar's W/H resize writes object.transform scale and never touches
+  // object.spec, so a panel that reported the raw spec drifted out of step with
+  // the toolbar the moment either surface was used. Both name the same
+  // millimetres on the bed; they must agree.
+  it('reports the scaled size, not the raw spec, after a toolbar resize', async () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'rect-1',
+        color: '#ff0000',
+        spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.getState().selectObject('rect-1');
+    // What the toolbar does when you type 80 into W with the AR lock off.
+    const object = useStore.getState().project.scene.objects[0];
+    if (object === undefined) throw new Error('rectangle missing');
+    useStore
+      .getState()
+      .applySelectionTransforms([
+        { id: 'rect-1', transform: { ...object.transform, scaleX: 2, scaleY: 3 } },
+      ]);
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Rectangle width"]');
+      const height = host.querySelector('input[aria-label="Rectangle height"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      if (!(height instanceof HTMLInputElement)) throw new Error('height input missing');
+      expect(width.value).toBe('80');
+      expect(height.value).toBe('60');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('divides out the scale when a size is typed into the panel', async () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'rect-1',
+        color: '#ff0000',
+        spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.getState().selectObject('rect-1');
+    const object = useStore.getState().project.scene.objects[0];
+    if (object === undefined) throw new Error('rectangle missing');
+    useStore
+      .getState()
+      .applySelectionTransforms([
+        { id: 'rect-1', transform: { ...object.transform, scaleX: 2, scaleY: 2 } },
+      ]);
+    const { host, root } = await render();
+    try {
+      const width = host.querySelector('input[aria-label="Rectangle width"]');
+      if (!(width instanceof HTMLInputElement)) throw new Error('width input missing');
+      await act(async () => {
+        width.value = '100';
+        Simulate.change(width);
+      });
+      await act(async () => Simulate.blur(width));
+      const after = useStore.getState().project.scene.objects[0];
+      if (after?.kind !== 'shape' || after.spec.kind !== 'rect') throw new Error('not a rectangle');
+      // 100 mm on the bed at 2x scale is a 50 mm spec.
+      expect(after.spec.widthMm).toBeCloseTo(50, 6);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('rematerializes a rectangle when its corner radius is edited', async () => {
     useStore.getState().drawShape(
       createRectangle({
