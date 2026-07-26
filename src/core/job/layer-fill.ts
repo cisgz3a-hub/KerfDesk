@@ -80,23 +80,38 @@ export function islandFillGroupsForLayer(
   });
 }
 
+export type LayerFillSegments = {
+  readonly segments: FillSegment[];
+  // True when the offset-fill engine failed mid-ladder. The segments below are
+  // whatever was computed before that, so the fill is incomplete rather than
+  // finished — the caller reports it instead of letting it vanish silently.
+  readonly offsetFailed: boolean;
+};
+
 export function collectFillSegmentsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-): FillSegment[] {
-  const polylines =
+): LayerFillSegments {
+  const offsetFill =
     layer.fillStyle === 'offset'
       ? offsetFillContours({
           polylines: collectFillContoursForLayer(objects, layer, device),
           spacingMm: layer.hatchSpacingMm,
-        }).contours.map((polyline) => ({ ...polyline, reverse: false }))
-      : memoizedLayerFillHatching(objects, layer, device);
-  return polylines.map((polyline) => ({
-    polyline: polyline.points,
-    closed: polyline.closed,
-    reverse: polyline.reverse,
-  }));
+        })
+      : null;
+  const polylines =
+    offsetFill === null
+      ? memoizedLayerFillHatching(objects, layer, device)
+      : offsetFill.contours.map((polyline) => ({ ...polyline, reverse: false }));
+  return {
+    segments: polylines.map((polyline) => ({
+      polyline: polyline.points,
+      closed: polyline.closed,
+      reverse: polyline.reverse,
+    })),
+    offsetFailed: offsetFill?.offsetFailed ?? false,
+  };
 }
 
 function memoizedLayerFillHatching(

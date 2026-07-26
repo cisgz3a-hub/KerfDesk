@@ -37,26 +37,49 @@ import { compilationPolylines } from './compilation-polylines';
 import { contourEntryRunwayMm } from './contour-entry';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
-import type { CutSegment, Group, Job } from './job';
+import type { CutSegment, Group, Job, JobDiagnostic } from './job';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
 
+// Groups plus anything the operator should be told about them. Threaded up
+// rather than logged, because src/core/ has no logger and a warning that never
+// reaches Job Review is the same as no warning at all.
+type VectorCompilation = {
+  readonly groups: ReadonlyArray<Group>;
+  readonly diagnostics: ReadonlyArray<JobDiagnostic>;
+};
+
+const NO_DIAGNOSTICS: ReadonlyArray<JobDiagnostic> = [];
+
+function vectorCompilation(parts: ReadonlyArray<VectorCompilation>): VectorCompilation {
+  return {
+    groups: parts.flatMap((part) => part.groups),
+    diagnostics: parts.flatMap((part) => part.diagnostics),
+  };
+}
+
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
+  const diagnostics: JobDiagnostic[] = [];
   const orderedObjects = orderedArtworkObjects(scene);
   for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
     for (const operationLayer of outputOperationLayers(layer)) {
       if (operationLayer.mode !== 'image') {
-        groups.push(
-          ...compileVectorGroupsForLayer(scene.objects, operationLayer, device, priorityObjectId),
+        const vector = compileVectorGroupsForLayer(
+          scene.objects,
+          operationLayer,
+          device,
+          priorityObjectId,
         );
+        groups.push(...vector.groups);
+        diagnostics.push(...vector.diagnostics);
       }
       groups.push(
         ...compileRasterGroupsForLayer(orderedObjects, operationLayer, device, scene.objects),
       );
     }
   }
-  return { groups };
+  return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
 }
 
 function compileVectorGroupsForLayer(
@@ -64,25 +87,23 @@ function compileVectorGroupsForLayer(
   layer: Layer,
   device: DeviceProfile,
   priorityObjectId: string,
-): Group[] {
+): VectorCompilation {
   const matchingObjects = objects.filter((obj) => vectorObjectMatchesLayer(obj, layer));
   if (matchingObjects.every((obj) => obj.operationOverride === undefined)) {
     return vectorGroupsForObjects(objects, matchingObjects, layer, device, priorityObjectId);
   }
 
-  const groups: Group[] = [];
-  for (const bucket of vectorObjectBucketsForLayer(objects, layer)) {
-    groups.push(
-      ...vectorGroupsForObjects(
+  return vectorCompilation(
+    vectorObjectBucketsForLayer(objects, layer).map((bucket) =>
+      vectorGroupsForObjects(
         bucket.objects,
         bucket.objects,
         bucket.layer,
         device,
         priorityObjectId,
       ),
-    );
-  }
-  return groups;
+    ),
+  );
 }
 
 function vectorGroupsForObjects(
@@ -91,7 +112,7 @@ function vectorGroupsForObjects(
   layer: Layer,
   device: DeviceProfile,
   priorityObjectId: string,
-): Group[] {
+): VectorCompilation {
   const onlyObject = matchingObjects.length === 1 ? matchingObjects[0] : undefined;
   if (onlyObject !== undefined) {
     return vectorGroupsForLayer(sourceObjects, layer, device, onlyObject, priorityObjectId);
@@ -106,11 +127,9 @@ function vectorGroupsForObjects(
       priorityObjectId,
     );
   }
-  const groups: Group[] = [];
-  for (const obj of matchingObjects) {
-    groups.push(...vectorGroupsForLayer([obj], layer, device, obj, priorityObjectId));
-  }
-  return groups;
+  return vectorCompilation(
+    matchingObjects.map((obj) => vectorGroupsForLayer([obj], layer, device, obj, priorityObjectId)),
+  );
 }
 
 function vectorObjectBucketsForLayer(
@@ -140,33 +159,57 @@ function vectorGroupsForLayer(
   device: DeviceProfile,
   powerSource: SceneObject | { readonly powerScale: number },
   sourceObjectId?: string,
-): Group[] {
+): VectorCompilation {
   if (layer.mode === 'fill') {
     if (layer.fillStyle === 'island') {
-      return islandFillGroupsForLayer(objects, layer, device, powerSource, sourceObjectId);
+      return {
+        groups: islandFillGroupsForLayer(objects, layer, device, powerSource, sourceObjectId),
+        diagnostics: NO_DIAGNOSTICS,
+      };
     }
-    const scanDirection = resolveFillScanDirection(device, layer);
-    const hatchingLayer =
-      layer.fillStyle === 'offset'
-        ? layer
-        : { ...layer, fillBidirectional: scanDirection.bidirectional };
-    const segments = collectFillSegmentsForLayer(objects, hatchingLayer, device);
-    if (segments.length === 0) return [];
-    const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
-    return [buildFillGroup({ layer, device, common, scanDirection, segments })];
+    return offsetOrHatchFillGroups(objects, layer, device, powerSource, sourceObjectId);
   }
   const segments = collectLineSegmentsForLayer(objects, layer, device);
-  if (segments.length === 0) return [];
+  if (segments.length === 0) return { groups: [], diagnostics: NO_DIAGNOSTICS };
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const entryRunwayMm = contourEntryRunwayMm(device, layer.fillOverscanMm);
-  return [
-    {
-      ...common,
-      kind: 'cut' as const,
-      ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
-      segments,
-    },
-  ];
+  return {
+    groups: [
+      {
+        ...common,
+        kind: 'cut' as const,
+        ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
+        segments,
+      },
+    ],
+    diagnostics: NO_DIAGNOSTICS,
+  };
+}
+
+function offsetOrHatchFillGroups(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+  powerSource: SceneObject | { readonly powerScale: number },
+  sourceObjectId?: string,
+): VectorCompilation {
+  const scanDirection = resolveFillScanDirection(device, layer);
+  const hatchingLayer =
+    layer.fillStyle === 'offset'
+      ? layer
+      : { ...layer, fillBidirectional: scanDirection.bidirectional };
+  const fill = collectFillSegmentsForLayer(objects, hatchingLayer, device);
+  // Reported even when no segments survived: that is precisely the case where
+  // the layer would otherwise disappear from the job without a trace.
+  const diagnostics: ReadonlyArray<JobDiagnostic> = fill.offsetFailed
+    ? [{ kind: 'offset-fill-failed', layerName: layer.name }]
+    : NO_DIAGNOSTICS;
+  if (fill.segments.length === 0) return { groups: [], diagnostics };
+  const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
+  return {
+    groups: [buildFillGroup({ layer, device, common, scanDirection, segments: fill.segments })],
+    diagnostics,
+  };
 }
 
 function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
