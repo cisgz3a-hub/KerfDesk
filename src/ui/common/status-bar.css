@@ -1,0 +1,11 @@
+/* Keep overflowing telemetry reachable without letting Chromium's scrollbar
+   repeatedly change the footer height as live status text changes width. */
+.lf-status-bar {
+  scrollbar-width: none;
+}
+
+.lf-status-bar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

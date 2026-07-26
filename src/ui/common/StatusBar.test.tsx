@@ -24,11 +24,12 @@ afterEach(() => {
 });
 
 describe('StatusBar', () => {
-  it('contains status segments with local horizontal scrolling', async () => {
+  it('contains status segments without a layout-consuming scrollbar', async () => {
     const { host, root } = await renderStatusBar();
     try {
       const status = host.querySelector('footer[aria-label="Status bar"]');
       expect(status).toBeInstanceOf(HTMLElement);
+      expect(status?.classList.contains('lf-status-bar')).toBe(true);
       expect((status as HTMLElement).style.overflowX).toBe('auto');
       expect((status as HTMLElement).style.minWidth).toBe('0');
       expect((status as HTMLElement).style.maxWidth).toBe('100%');
