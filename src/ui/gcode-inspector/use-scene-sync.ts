@@ -4,7 +4,7 @@
 // current lens would be dropped on the floor.
 
 import { useEffect, type RefObject } from 'react';
-import type { PlayheadMarker, Viewer3dSceneHandle } from '../viewer3d';
+import type { ArrowPlacement, PlayheadMarker, Viewer3dSceneHandle } from '../viewer3d';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
 
 export function useSceneSync(args: {
@@ -15,8 +15,10 @@ export function useSceneSync(args: {
   readonly colorOf: (segmentIndex: number) => readonly [number, number, number];
   /** Live machine position from controller status; null hides the marker. */
   readonly live: { readonly x: number; readonly y: number; readonly z: number } | null;
+  /** Direction arrowheads, or null when the overlay is off. */
+  readonly arrows: ReadonlyArray<ArrowPlacement> | null;
 }): void {
-  const { handleRef, state, playhead, colorOf, live } = args;
+  const { handleRef, state, playhead, colorOf, live, arrows } = args;
 
   useEffect(() => {
     handleRef.current?.setPlayhead(playhead);
@@ -25,6 +27,10 @@ export function useSceneSync(args: {
   useEffect(() => {
     handleRef.current?.recolor(colorOf);
   }, [handleRef, colorOf, state]);
+
+  useEffect(() => {
+    handleRef.current?.setDirectionArrows(arrows);
+  }, [handleRef, arrows, state]);
 
   // Depends on the coordinates, not the object identity: status reports
   // arrive continuously and a fresh object each poll would re-render the
