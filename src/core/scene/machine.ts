@@ -52,7 +52,7 @@ export type CncStock = {
 //                      never selectable on a layer (absent from
 //                      CNC_CUT_TYPES, rejected by .lf2 normalization).
 // H.9: which side of the travel direction the material sits on. With an M3
-// spindle, climb keeps material on the LEFT of travel (see motion-polish).
+// spindle, climb keeps material on the RIGHT of travel (see motion-polish).
 export type CncCutDirection = 'climb' | 'conventional';
 
 // Provenance for feed / plunge / spindle / depth-per-pass values. Absence is

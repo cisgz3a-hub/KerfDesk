@@ -11801,11 +11801,12 @@ four references, not on a measured chip direction from the maintainer's machine.
 from the cut type alone and forced it onto every closed toolpath. That is wrong
 twice over.
 
-First, machining: with an M3 spindle climb keeps the material on the LEFT of
-travel. The material lies INSIDE an outer boundary but OUTSIDE a hole, so a
-hole's climb direction is the mirror of its outer boundary's — the module's own
-header already said so. Forcing one winding on both cut every hole in the
-direction OPPOSITE the one the operator asked for.
+First, machining: with an M3 spindle climb keeps the material on the RIGHT of
+travel, as corrected by ADR-251's accepted 2026-07-25 amendment. The material
+lies INSIDE an outer boundary but OUTSIDE a hole, so a hole's climb direction is
+the mirror of its outer boundary's — the module's own header already said so.
+Forcing one winding on both cut every hole in the direction OPPOSITE the one the
+operator asked for.
 
 Second, and the reason this became urgent: ADR-250 identifies a hole by its
 winding being opposite the job's outermost loop, and flips that contour to the
