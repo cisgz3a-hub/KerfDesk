@@ -30,6 +30,9 @@ const CCW_SQUARE: Polyline = {
   ],
 };
 
+const OUTER_AND_HOLE_CONTOUR_COUNT = 2;
+const MISSING_ORIENTED_CONTOURS_ERROR = 'expected an oriented outer and hole';
+
 describe('enforceCutDirection', () => {
   // Climb keeps the material on the RIGHT of travel for an M3 spindle, so
   // circling a part's exterior clockwise is the climb direction. VCarve states
@@ -87,8 +90,11 @@ describe('enforceCutDirection', () => {
     }; // CW, area -400 (wound opposite the outer, as the kerf offset produces)
     for (const direction of ['climb', 'conventional'] as const) {
       const result = enforceCutDirection([outer, hole], direction, 'profile-outside');
-      const orientedOuter = result[0] as Polyline;
-      const orientedHole = result[1] as Polyline;
+      expect(result).toHaveLength(OUTER_AND_HOLE_CONTOUR_COUNT);
+      const [orientedOuter, orientedHole] = result;
+      if (orientedOuter === undefined || orientedHole === undefined) {
+        throw new Error(MISSING_ORIENTED_CONTOURS_ERROR);
+      }
       // The outer follows the requested direction (climb = CW on an exterior);
       // the hole stays its mirror.
       expect(isCounterClockwise(orientedOuter)).toBe(direction === 'conventional');
