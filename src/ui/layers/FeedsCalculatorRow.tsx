@@ -5,14 +5,10 @@
 // see core/cnc/feeds-calculator.ts); every number stays editable after.
 
 import { useState } from 'react';
-import {
-  CHIPLOAD_MATERIALS,
-  chiploadFor,
-  isChiploadMaterialKey,
-  type ChiploadMaterial,
-} from '../../core/cnc';
+import { chiploadFor, isChiploadMaterialKey, type ChiploadMaterial } from '../../core/cnc';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
+import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { useStore } from '../state';
 import { materialFeedsPatch } from '../state/cnc-project-material';
 
@@ -113,15 +109,10 @@ function MaterialSelect(props: {
         title="Material family — picks the starting chipload band."
         value={props.value}
         onChange={(e) => {
-          const next = CHIPLOAD_MATERIALS.find((m) => m.value === e.target.value);
-          if (next !== undefined) props.onPick(next.value);
+          if (isChiploadMaterialKey(e.target.value)) props.onPick(e.target.value);
         }}
       >
-        {CHIPLOAD_MATERIALS.map((m) => (
-          <option key={m.value} value={m.value}>
-            {m.label}
-          </option>
-        ))}
+        <CncMaterialOptions />
       </select>
     </label>
   );

@@ -1221,3 +1221,35 @@ PP-E required a resampler for Image Size. pica (MIT) offers Lanczos-3 in a worke
 - **Sources:** GitHub Releases REST API and immutable-release documentation;
   Electron protocol, security, shell, and notification documentation. Links are
   pinned in ADR-249.
+
+---
+
+## Species-level CNC material selector and explicit preset apply - 2026-07-26
+
+- **Need:** expand the flat Softwood/Hardwood selector into recognizable wood
+  species without shipping invented universal feeds, and prevent browsing a
+  material from silently overwriting every layer.
+- **Inventables cut-settings guidance:** the adjustable values are feed,
+  plunge, depth per pass, and spindle RPM; tested values are specific to the
+  selected machine and material, the fallback feed law is
+  `RPM × chip load × flutes`, and final-project test cuts are strongly
+  recommended. Source (updated 2025-09-09, accessed 2026-07-26):
+  https://inventableshardwaresupport.zendesk.com/hc/en-us/articles/34390465589268-How-do-I-calculate-the-right-cut-settings-for-my-bit
+- **Easel application behavior:** recommendations are matched by machine,
+  material, and bit; selecting a candidate does not overwrite saved values
+  until the operator clicks Apply, and applied settings remain editable.
+  Source (accessed 2026-07-26):
+  https://easel.com/features/community-cut-settings
+- **Manufacturer scope warning:** Carvey documents material presets as starting
+  points, mainly for 1/8-inch and 1/16-inch bits, and warns that other cutter
+  sizes may require slower feeds. Source (accessed 2026-07-26):
+  https://carvey-instructions.inventables.com/materials/
+- **Wood variability:** the USDA Wood Handbook records meaningful natural
+  variation within species and explains that specific gravity is a useful
+  index of mechanical properties, not an exact predictor for every specimen.
+  Source (accessed 2026-07-26):
+  https://research.fs.usda.gov/treesearch/37440
+- **Decision:** named species preserve identity but resolve to the existing
+  family calculation. No new numerical species multipliers were adopted.
+  The project selector previews first and applies only on an explicit click.
+  No runtime dependency or network service was added.

@@ -12635,3 +12635,70 @@ chain but could not join chains, so the pecking survived it.
   project to weld them.
 - No G-code snapshot changes: the pass runs at trace commit, not in the
   compiler.
+
+---
+
+## ADR-264 - Species-level CNC material presets apply explicitly (2026-07-26)
+
+### Context
+
+ADR-112 shipped one flat project-material list: Softwood, Hardwood,
+Plywood/MDF, Acrylic, and Aluminum. The maintainer requested the missing
+operator model visible in physical stock: Hardwood contains distinct woods, so
+the Material & Bit panel must let the operator choose the actual species and
+decide when to apply its settings.
+
+The primary-source research does not support pretending one universal numeric
+recipe is certified for every board:
+
+- Inventables says cut settings depend on the project, material, bit, and
+  machine; its tested automatic settings are machine/material/bit-specific,
+  its fallback uses `feed = RPM × chipload × flutes`, and it recommends a test
+  before the final workpiece.
+- Easel's current Community Cut Settings keeps menu exploration read-only and
+  overwrites values only after **Apply these settings**.
+- The USDA Wood Handbook documents substantial natural variation within wood
+  species and identifies specific gravity as an index rather than an exact
+  per-board machining prediction.
+
+### Decision
+
+- `core/cnc/cnc-material-catalog.ts` owns grouped material choices. Softwoods
+  include Cedar, Douglas fir, Pine, and Spruce; Hardwoods include Birch,
+  Cherry, Hard maple, Mahogany, Oak, Poplar, and Walnut. General family choices
+  remain for unknown or mixed stock.
+- The selected species key persists unchanged in `CncStock.materialKey`, each
+  automatically updated layer's `materialKey`, and material-recipe provenance.
+  Save/load validation accepts catalog keys and still drops arbitrary strings.
+- A species resolves to the existing family chipload, plunge, and
+  depth-per-pass model. No unsupported species multiplier is invented.
+  The layer's actual bit, spindle, selected machine profile, machine starter,
+  and live controller limits continue to bound the result.
+- The project picker is now a two-stage interaction. Choosing a menu entry
+  previews the choice and its scope; **Apply [material] preset** performs the
+  existing one-undo bulk update. Choosing Custom likewise waits for
+  **Use manual feeds**. Layer-level material and advanced calculator selectors
+  use the same grouped catalog.
+- The UI calls every result a starting model, states exactly which values will
+  change, and tells the operator to test on scrap. Settings remain editable.
+  This adds no Start, Frame, compile, or transport guard.
+
+### Consequences
+
+- Projects can say Walnut or Hard maple rather than only Hardwood, and Job
+  Review plus the stock preview retain that identity.
+- Species in one family can currently calculate the same numeric settings.
+  That is deliberate evidence discipline, not a claim that the woods are
+  physically identical. A future species-specific numeric revision requires
+  reproducible machine/bit/material evidence and a revisioned catalog.
+- Merely browsing the dropdown no longer rewrites every CNC layer.
+
+### Verification
+
+Catalog and calculator tests pin grouping, key validation, species-to-family
+resolution, and numeric parity with the family model. Project serialization
+tests pin stock/layer species round-trip and unknown-key rejection. The jsdom
+panel test pins no mutation on selection followed by explicit Apply. Typecheck,
+lint, format, file-size, and the full test suite remain required. Physical
+cut quality remains unverified until a scrap test records machine, cutter,
+flutes, RPM, operation, stock, and outcome.

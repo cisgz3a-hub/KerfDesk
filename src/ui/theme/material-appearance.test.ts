@@ -19,6 +19,11 @@ describe('materialAppearance', () => {
     expect(shallows.size).toBe(KEYS.length);
   });
 
+  it('shades a named wood species with its material family', () => {
+    expect(materialAppearance('hardwood-walnut')).toEqual(materialAppearance('hardwood'));
+    expect(materialAppearance('softwood-pine')).toEqual(materialAppearance('softwood'));
+  });
+
   it('packs the RGB triples to the same colour the 3D view uses', () => {
     // The 2D map reads the triples and the 3D view reads the packed number.
     // If these ever disagree the two previews shade the same cut differently.

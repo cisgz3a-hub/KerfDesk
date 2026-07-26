@@ -49,13 +49,12 @@ export {
 } from './tile-plan';
 export {
   calculateFeeds,
-  CHIPLOAD_MATERIALS,
   chiploadFor,
-  isChiploadMaterialKey,
   type ChiploadMaterial,
   type FeedsCalculatorInput,
   type FeedsCalculatorResult,
 } from './feeds-calculator';
+export { CHIPLOAD_MATERIALS, isChiploadMaterialKey } from './cnc-material-catalog';
 export { CNC_MACHINE_CATALOG, type CncMachinePreset } from './cnc-machine-catalog';
 export {
   buildSurfacingProgram,
