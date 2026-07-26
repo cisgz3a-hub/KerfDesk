@@ -295,7 +295,15 @@ function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>):
     deviceProfileWithInteractivePatch(state.draft, profilePatch),
     state.draft.controllerKind,
   ).profile;
-  if (state.machineKind !== 'cnc' || !positive(patch.maxPowerS ?? 0)) {
+  // $30 only means spindle RPM when laser mode is off. On a hybrid running
+  // $32=1 it is the laser PWM scale, so adopting it as spindleMaxRpm turns a
+  // 12000 RPM router into S1000 while the feeds still assume 12000 - a 12x
+  // chipload error. Same term as cnc-detected-apply.ts and cnc-controller-caps.
+  if (
+    state.machineKind !== 'cnc' ||
+    !positive(patch.maxPowerS ?? 0) ||
+    patch.laserModeEnabled !== false
+  ) {
     return invalidateFirmwarePlan(state, { detected: patch, draft, detectedApplied: true });
   }
   const cncDraft: CncMachineConfig = {
@@ -341,6 +349,11 @@ function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSet
     draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
     cncDraft,
     presetApplied: true,
+    // Picking a catalog card replaces the draft with that profile verbatim, so
+    // any earlier "Use detected values" no longer describes what is on screen.
+    // Leaving this true kept the Connect step claiming detected values were
+    // applied to a draft they had just been overwritten in.
+    detectedApplied: false,
   });
 }
 

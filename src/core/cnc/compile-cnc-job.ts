@@ -73,8 +73,24 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
       polylines,
       settings,
       config,
+      // The inlay pair builds its groups directly rather than through
+      // cncGroupForLayer, so it has to apply the ADR-250 lead itself or the
+      // male insert plunges full-depth onto the very wall that must fit the
+      // pocket. applyProfileLeadPasses is a no-op for the female pocket.
       (groupSettings, tool, passes) =>
-        cncGroupForPasses(layer, groupSettings, tool, passes, device, config),
+        cncGroupForPasses(
+          layer,
+          groupSettings,
+          tool,
+          applyProfileLeadPasses(
+            passes,
+            groupSettings,
+            tool.diameterMm,
+            machineBoundsForDevice(device),
+          ),
+          device,
+          config,
+        ),
     );
     if (inlayGroups !== null) {
       clearingGroups.push(tagArtworkGroup(inlayGroups.female, priorityObjectId));

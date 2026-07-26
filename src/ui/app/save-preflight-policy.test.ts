@@ -20,6 +20,13 @@ describe('partitionSavePreflight', () => {
   // and blocked everything else, so these policy findings refused the export
   // while the identical findings only warned on Start. If any of them turns up
   // in `blocking` again, a guard has been re-added.
+  //
+  // The 2026-07-25 CNC full-chain audit reached the same conclusion from the
+  // other end (finding 4.3): rule 7 says configured no-go zones "may warn in
+  // Job Review, but must never refuse Frame or Start", yet the export path
+  // still refused them, so a job Start would happily stream could not be
+  // written to a file. 'no-go-zone-collision' and 'scan-offset-above-cap'
+  // below are that finding's two codes.
   it('never refuses a save for a heuristic policy finding', () => {
     const policyIssues: ReadonlyArray<PreflightIssue> = [
       { code: 'out-of-bed', message: 'Line 9: X exceeds the bed.' },

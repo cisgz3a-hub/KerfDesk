@@ -12,11 +12,12 @@ import {
 import { isCounterClockwise } from '../geometry/polyline-orientation';
 import { compileCncJob } from './compile-cnc-job';
 
-// ADR-251: a new layer's default cut direction is climb. Verify the shipped
-// default value, and that a profile-outside cut with the default direction
-// compiles to a counter-clockwise (climb) toolpath regardless of the source
-// winding. (Outside is explicit here — ADR-256 made on-path the default
-// cut type, and on-path enforces no winding.)
+// ADR-251 as amended 2026-07-25: a new layer's default cut direction is climb.
+// Verify the shipped default value, and that a profile-outside cut with the
+// default direction compiles to a CLOCKWISE (climb) toolpath regardless of the
+// source winding — climb keeps the material on the right of travel, so an
+// exterior is walked CW. (Outside is explicit here — ADR-256 made on-path the
+// default cut type, and on-path enforces no winding.)
 
 function squareSvg(): ImportedSvg {
   return {
@@ -49,7 +50,10 @@ describe('climb default (ADR-251)', () => {
     expect(DEFAULT_CNC_LAYER_SETTINGS.cutDirection).toBe('climb');
   });
 
-  it('emits a profile-outside contour counter-clockwise by default direction', () => {
+  // ADR-251 as amended: climb keeps the material on the RIGHT of travel, so the
+  // default profile-outside layer walks the part's exterior CLOCKWISE. The
+  // original ADR asserted the mirror of this and shipped inverted.
+  it('emits a profile-outside contour clockwise by default direction', () => {
     const layer: Layer = {
       ...createLayer({ id: 'L', color: '#2563eb' }),
       // Leads off (ADR-250 is default-on) so the profile stays a plain contour
@@ -70,6 +74,6 @@ describe('climb default (ADR-251)', () => {
     if (group?.kind !== 'cnc') throw new Error('expected a cnc group');
     const pass = group.passes[0];
     if (pass?.kind !== 'contour') throw new Error('expected a contour pass');
-    expect(isCounterClockwise({ closed: pass.closed, points: [...pass.polyline] })).toBe(true);
+    expect(isCounterClockwise({ closed: pass.closed, points: [...pass.polyline] })).toBe(false);
   });
 });

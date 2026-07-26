@@ -38,8 +38,20 @@ describe('DeviceSetupWizard router commit', () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       detectedControllerKind: 'grblhal',
-      detectedSettings: { maxPowerS: 24000, bedWidth: 750, bedHeight: 610 },
-      controllerSettings: { maxPowerS: 24000, bedWidth: 750, bedHeight: 610 },
+      // $32=0 - a router with laser mode off, which is what makes $30 the
+      // spindle ceiling rather than the laser PWM scale.
+      detectedSettings: {
+        maxPowerS: 24000,
+        bedWidth: 750,
+        bedHeight: 610,
+        laserModeEnabled: false,
+      },
+      controllerSettings: {
+        maxPowerS: 24000,
+        bedWidth: 750,
+        bedHeight: 610,
+        laserModeEnabled: false,
+      },
       lastSettingsReadAt: 1718600000000,
     });
     const view = await renderWizard();

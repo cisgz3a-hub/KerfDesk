@@ -11,7 +11,7 @@ import {
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
 
-function inlayScene(): Scene {
+function inlayScene(tabsEnabled = true): Scene {
   const color = '#ff0000';
   const layer = {
     ...createLayer({ id: 'L1', color }),
@@ -23,7 +23,7 @@ function inlayScene(): Scene {
       inlayPocketDepthMm: 3,
       inlayAllowanceMm: 0.1,
       inlayPairSpacingMm: 10,
-      tabsEnabled: true,
+      tabsEnabled,
     },
   };
   const object: ImportedSvg = {
@@ -91,5 +91,24 @@ describe('compileCncJob inlay pair', () => {
     );
     const maleMinX = Math.min(...male.passes.flatMap(passXs));
     expect(maleMinX).toBeGreaterThan(femaleMaxX);
+  });
+
+  // Audit 1.12: the inlay pair builds its groups directly instead of through
+  // cncGroupForLayer, so the default-on ADR-250 lead never reached the male
+  // insert — it plunged full-depth onto the wall that has to fit the pocket.
+  it('leads the male insert in instead of plunging onto its fit wall', () => {
+    const job = compileCncJob(
+      inlayScene(false),
+      DEFAULT_DEVICE_PROFILE,
+      DEFAULT_CNC_MACHINE_CONFIG,
+    );
+    const female = job.groups[0];
+    const male = job.groups[1];
+    if (female?.kind !== 'cnc' || male?.kind !== 'cnc') throw new Error('expected CNC groups');
+    // ADR-250 turns each closed untabbed profile pass into a led path3d that
+    // enters in the waste and arrives tangentially.
+    expect(male.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
+    // The lead is profile-only, so the female pocket keeps plain contours.
+    expect(female.passes.every((pass) => pass.kind === 'contour')).toBe(true);
   });
 });

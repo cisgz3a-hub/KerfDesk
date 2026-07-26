@@ -31,18 +31,24 @@ const CCW_SQUARE: Polyline = {
 };
 
 describe('enforceCutDirection', () => {
-  it('outside-profile climb wants counter-clockwise; conventional reverses', () => {
+  // Climb keeps the material on the RIGHT of travel for an M3 spindle, so
+  // circling a part's exterior clockwise is the climb direction. VCarve states
+  // it directly ("Outside … Climb (CW)"), and Fusion points its outer-contour
+  // arrows clockwise to maintain a climb cut.
+  it('outside-profile climb wants clockwise; conventional reverses', () => {
     const climb = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-outside');
-    expect(isCounterClockwise(climb[0] as Polyline)).toBe(true);
+    expect(isCounterClockwise(climb[0] as Polyline)).toBe(false);
     const conventional = enforceCutDirection([CCW_SQUARE], 'conventional', 'profile-outside');
-    expect(isCounterClockwise(conventional[0] as Polyline)).toBe(false);
+    expect(isCounterClockwise(conventional[0] as Polyline)).toBe(true);
   });
 
-  it('inside/pocket climb wants clockwise (material lies outside the boundary)', () => {
+  // A hole's material lies outside its boundary, so its climb direction is the
+  // mirror of the exterior case ("Inside … Climb (CCW)").
+  it('inside/pocket climb wants counter-clockwise (material lies outside the boundary)', () => {
     const inside = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-inside');
-    expect(isCounterClockwise(inside[0] as Polyline)).toBe(false);
+    expect(isCounterClockwise(inside[0] as Polyline)).toBe(true);
     const pocket = enforceCutDirection([CCW_SQUARE], 'climb', 'pocket');
-    expect(isCounterClockwise(pocket[0] as Polyline)).toBe(false);
+    expect(isCounterClockwise(pocket[0] as Polyline)).toBe(true);
   });
 
   it('leaves engraves and open paths untouched', () => {
@@ -83,8 +89,9 @@ describe('enforceCutDirection', () => {
       const result = enforceCutDirection([outer, hole], direction, 'profile-outside');
       const orientedOuter = result[0] as Polyline;
       const orientedHole = result[1] as Polyline;
-      // The outer follows the requested direction; the hole stays its mirror.
-      expect(isCounterClockwise(orientedOuter)).toBe(direction === 'climb');
+      // The outer follows the requested direction (climb = CW on an exterior);
+      // the hole stays its mirror.
+      expect(isCounterClockwise(orientedOuter)).toBe(direction === 'conventional');
       expect(isCounterClockwise(orientedHole)).toBe(!isCounterClockwise(orientedOuter));
     }
   });

@@ -196,11 +196,14 @@ describe('buildCncPassResumeJob', () => {
     const result = buildCncPassResumeJob(source, 1, 1);
     if (result.kind !== 'resume-job') throw new Error(result.reason);
     const { gcode } = emitCncJobWithPassSpans(result.job, DEFAULT_DEVICE_PROFILE);
-    expect(gcode.split('\n').slice(0, 7)).toEqual([
+    expect(gcode.split('\n').slice(0, 8)).toEqual([
       'G21',
       'G90',
       'G54',
       'G94',
+      // A resumed job can still contain helical/adaptive arcs, so it needs the
+      // plane word as much as the original program does.
+      'G17',
       `G0 Z${SAFE_Z_MM.toFixed(3)}`,
       'M3 S12000',
       'G4 P3.000',

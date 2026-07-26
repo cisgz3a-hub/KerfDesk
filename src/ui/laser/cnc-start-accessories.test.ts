@@ -128,8 +128,10 @@ describe('CNC Start live accessory baseline', () => {
   it.each([null, undefined])(
     'warns for %s until A or Ov provides a fresh accessory-state observation',
     (accessories) => {
+      // Reworded: this string is pushed into the warnings list, so it states
+      // the observed condition instead of claiming Start is blocked.
       expect(warningsOf(cncProject, accessories)).toContain(
-        'CNC Start requires a fresh GRBL accessory-state observation',
+        'No fresh GRBL accessory-state observation has arrived',
       );
     },
   );

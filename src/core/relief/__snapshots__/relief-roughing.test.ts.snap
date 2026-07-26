@@ -5,6 +5,7 @@ exports[`relief roughing — compile pipeline > emits deterministic G-code (snap
 G90
 G54
 G94
+G17
 G0 Z3.810
 M3 S12000
 G4 P3.000

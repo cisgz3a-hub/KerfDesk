@@ -5,6 +5,7 @@ exports[`runCncSupervisedRecoveryFlow > streams a sealed exact artifact without 
 G90
 G54
 G94
+G17
 G0 Z3.810
 M3 S12000
 G4 P3.000

@@ -42,6 +42,41 @@ describe('detectCncThroughCutTabWarnings', () => {
     expect(warnings[0]).toContain('no holding tabs');
   });
 
+  // Audit 1.19: only tab-less profiles were checked, so a pocket, engrave,
+  // v-carve or relief layer set past the stock cut the spoilboard silently.
+  it('warns when a pocket is set deeper than the stock', () => {
+    const cnc = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket' as const,
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm + 1.65,
+    };
+    const warnings = detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('into the spoilboard');
+    expect(warnings[0]).toContain('1.65 mm past the bottom');
+  });
+
+  it('warns about spoilboard overcut on a tabbed profile, not the free-part case', () => {
+    const cnc = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm + 2,
+      tabsEnabled: true,
+    };
+    const warnings = detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('into the spoilboard');
+    expect(warnings[0]).not.toContain('no holding tabs');
+  });
+
+  it('is silent for a pocket that stops exactly on the stock bottom', () => {
+    const cnc = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket' as const,
+      depthMm: DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm,
+    };
+    expect(detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc))).toEqual([]);
+  });
+
   it('is silent when the cut depth stays inside the stock', () => {
     const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 3 };
     expect(detectCncThroughCutTabWarnings(cncProjectWithLayerCnc(cnc))).toEqual([]);

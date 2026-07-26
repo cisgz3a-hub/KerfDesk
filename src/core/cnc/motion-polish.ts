@@ -5,11 +5,18 @@
 // byte-identical to pre-H.9 jobs:
 //
 // * Cut direction. With an M3 (top-view clockwise) spindle, CLIMB cutting
-//   keeps the material on the LEFT of travel. Circling a part's exterior
-//   counter-clockwise puts the part on the left → outside-profile climb =
-//   CCW; walking a hole/pocket boundary clockwise puts the material (which
-//   lies outside the boundary) on the left → inside/pocket climb = CW.
-//   Conventional is each mirror. Enforced by reversing closed toolpaths
+//   keeps the material on the RIGHT of travel: the tooth meets the work at
+//   maximum chip thickness and thins to zero. Circling a part's exterior
+//   clockwise puts the part on the right → outside-profile climb = CW;
+//   walking a hole/pocket boundary counter-clockwise puts the material
+//   (which lies outside the boundary) on the right → inside/pocket climb =
+//   CCW. Conventional is each mirror. This matches VCarve's own profile
+//   help ("Outside … Climb (CW)", "Inside … Climb (CCW)"), Fusion's contour
+//   arrows (CW for outer, CCW for inner, to maintain a climb cut), and G41
+//   (compensation left of path ⇒ material right of travel) being the climb
+//   side for a right-hand cutter. ADR-251 originally asserted the mirror of
+//   this and shipped inverted for both cut types; see ADR-251 amendment.
+//   Enforced by reversing closed toolpaths
 //   whose shoelace orientation disagrees; open paths are left alone.
 //   Direction enforcement also rotates each closed toolpath's start to the
 //   midpoint of its longest segment, so entry witness marks land on a flat
@@ -77,8 +84,8 @@ function dominantWindingSign(toolpaths: ReadonlyArray<Polyline>): number {
 }
 
 function wantsCounterClockwise(direction: CncCutDirection, cutType: CncCutType): boolean | null {
-  if (cutType === 'profile-outside') return direction === 'climb';
-  if (cutType === 'profile-inside' || cutType === 'pocket') return direction === 'conventional';
+  if (cutType === 'profile-outside') return direction === 'conventional';
+  if (cutType === 'profile-inside' || cutType === 'pocket') return direction === 'climb';
   return null;
 }
 

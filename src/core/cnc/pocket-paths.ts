@@ -22,6 +22,10 @@ const MAX_STEPOVER_PERCENT = 85;
 // Backstop against degenerate inputs (huge pocket + microscopic stepover).
 // 4096 rings × stepover ≥ 0.1 × diameter covers any real bed.
 const MAX_POCKET_RINGS = 4096;
+// Bisection for the innermost ring: 24 halvings resolve any bed-sized span to
+// well under the tolerance, and 0.01 mm is finer than the 3-decimal emit grid.
+const RING_BISECT_ITERATIONS = 24;
+const RING_BISECT_TOLERANCE_MM = 0.01;
 
 export function pocketToolpathRings(
   polylines: ReadonlyArray<Polyline>,
@@ -45,6 +49,20 @@ export function pocketToolpathRings(
     rings.push(ring);
   }
 
+  // A stepover wider than the tool RADIUS can leave the last ring further from
+  // the medial axis than the cutter reaches, so the pocket keeps a full-depth
+  // core: a 6.35 mm bit at 85% in an R=8.175 pocket gets one ring at 5.0 and
+  // sweeps only to r=1.825, leaving a 3.65 mm pillar. Bisect for the deepest
+  // offset that still yields a ring instead of clamping the operator's
+  // stepover. At stepover <= 50% the final ring's sweep always covers the
+  // centre, so this never runs and output is unchanged.
+  const lastRing = rings.length - 1;
+  if (stepMm > radius && lastRing >= 0 && rings.length < MAX_POCKET_RINGS) {
+    const lastInset = radius + lastRing * stepMm;
+    const core = deepestRing(contours, lastInset, lastInset + stepMm);
+    if (core !== null) rings.push(core);
+  }
+
   // Innermost ring first, boundary (ring 0) last as the finishing pass.
   const out: Polyline[] = [];
   for (let k = rings.length - 1; k >= 0; k -= 1) {
@@ -52,6 +70,31 @@ export function pocketToolpathRings(
     if (ring !== undefined) out.push(...ring);
   }
   return out;
+}
+
+// Largest inset in (lo, hi] that still offsets to a non-empty ring — the
+// deepest ring the pocket geometry admits. lo is known good and hi known empty,
+// so a plain bisection converges on the medial axis to within the tolerance.
+// Returns null when nothing deeper than lo exists, leaving output untouched.
+function deepestRing(
+  contours: ReadonlyArray<Polyline>,
+  lo: number,
+  hi: number,
+): ReadonlyArray<Polyline> | null {
+  let low = lo;
+  let high = hi;
+  let best: ReadonlyArray<Polyline> | null = null;
+  for (let i = 0; i < RING_BISECT_ITERATIONS && high - low > RING_BISECT_TOLERANCE_MM; i += 1) {
+    const mid = (low + high) / 2;
+    const ring = offsetClosedPolylinesForKerf(contours, -mid);
+    if (ring.length === 0) {
+      high = mid;
+    } else {
+      low = mid;
+      best = ring;
+    }
+  }
+  return best;
 }
 
 function clampStepoverPercent(stepoverPercent: number): number {

@@ -134,12 +134,18 @@ function appendCncLayerIssues(
   }
   appendFeedIssue(layer.id, 'feed', settings.feedMmPerMin, maxFeed, issues);
   appendFeedIssue(layer.id, 'plunge rate', settings.plungeMmPerMin, maxFeed, issues);
-  if (!(settings.spindleRpm > 0) || settings.spindleRpm > config.params.spindleMaxRpm) {
+  // Only a non-positive RPM is a compile-integrity failure. Requesting MORE
+  // than the configured ceiling is not: capSpindle already clamps to
+  // Math.min(spindleRpm, spindleMaxRpm) at every compile site, so the program
+  // is producible and can never emit an out-of-range S word. Refusing it was a
+  // policy judgement (rule 7), and a narrow one - the shipped layer default
+  // equals the shipped ceiling, so lowering Spindle maximum put every
+  // hand-tuned layer over it at once. Job Review now warns that the job will
+  // run at the ceiling instead.
+  if (!(settings.spindleRpm > 0)) {
     issues.push({
       code: 'cnc-settings-invalid',
-      message:
-        `Layer ${layer.id}: spindle ${settings.spindleRpm} RPM is outside ` +
-        `(0, ${config.params.spindleMaxRpm}].`,
+      message: `Layer ${layer.id}: spindle RPM must be greater than 0.`,
     });
   }
   // H.3: v-carve depth math is driven by the bit's tip angle — a flat end

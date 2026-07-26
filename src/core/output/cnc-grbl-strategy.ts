@@ -110,6 +110,11 @@ function emitCncProgram(
   // let a stale G55-G59 redirect an otherwise valid program.
   lines.push('G54');
   lines.push('G94');
+  // Helical entry and adaptive clearing emit real G2/G3 with I/J offsets, which
+  // are read in the active plane. GRBL's plane is modal and a console command or
+  // $N startup block can leave it on G18/G19, where an XY I/J pair is an invalid
+  // offset (error:33) and Z becomes the circular axis.
+  lines.push('G17');
   if (isMultiTool && firstGroup.toolName !== undefined) {
     lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);
   }
@@ -135,6 +140,7 @@ function emitCncProgram(
     currentToolKey: firstGroup.toolId ?? '',
     maxSafeZ: 0,
     finish: options.finishPosition,
+    coolant: firstGroup.coolant,
   };
   for (const { group, jobGroupIndex } of cncGroups) {
     appendGroupTransition(lines, head, group, state);
