@@ -6,6 +6,7 @@ test('status overflow does not add a layout-consuming scrollbar', async ({ page 
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 10_000 });
 
   const metrics = await page.getByRole('contentinfo', { name: 'Status bar' }).evaluate((footer) => {
+    if (!(footer instanceof HTMLElement)) throw new Error('Status bar must be an HTML element');
     const style = getComputedStyle(footer);
     const borderHeight =
       Number.parseFloat(style.borderTopWidth) + Number.parseFloat(style.borderBottomWidth);
