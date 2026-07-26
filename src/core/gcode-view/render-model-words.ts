@@ -17,6 +17,9 @@ export type RenderModal = {
   z: number;
   feed: number;
   power: number;
+  spindleMode: 'off' | 'constant' | 'dynamic';
+  coolantMist: boolean;
+  coolantFlood: boolean;
   plane: 17 | 18 | 19;
   ended: boolean;
   /** Active canned drilling cycle (G73/G81/G82/G83); null after G80. */
@@ -75,6 +78,8 @@ export function applyLineWords(
   line: number,
   accounting: WordAccounting,
 ): LineWordOutcome {
+  const before = controllerState(modal);
+  const linePower = lastWordValue(words, 'S') ?? modal.power;
   const tally: LineTally = {
     axisWords: new Map(),
     sawModal: false,
@@ -85,9 +90,12 @@ export function applyLineWords(
     sawDwell: false,
     sawHome: false,
   };
-  for (const word of words) applyOneWord(modal, word, line, accounting, tally);
+  for (const word of words) applyOneWord(modal, word, linePower, line, accounting, tally);
   resolveDwell(tally, line, accounting);
   const homeAxes = resolveHome(tally, line, accounting);
+  if (pushControllerSynchronization(before, modal, tally.axisWords.size > 0, line, accounting)) {
+    tally.sawEvent = true;
+  }
   return {
     sawModal: tally.sawModal,
     sawEvent: tally.sawEvent,
@@ -101,6 +109,7 @@ export function applyLineWords(
 function applyOneWord(
   modal: RenderModal,
   word: GcodeWordMatch,
+  linePower: number,
   line: number,
   accounting: WordAccounting,
   tally: LineTally,
@@ -141,7 +150,7 @@ function applyOneWord(
     const outcome =
       word.letter === 'G'
         ? applyGWord(modal, word.value, line, accounting)
-        : applyMWord(modal, word.value, line, accounting);
+        : applyMWord(modal, word.value, linePower, line, accounting);
     noteOutcome(tally, outcome);
     return;
   }
@@ -259,6 +268,7 @@ function isCannedCycle(code: number): boolean {
 function applyMWord(
   modal: RenderModal,
   code: number,
+  linePower: number,
   line: number,
   accounting: WordAccounting,
 ): WordOutcome {
@@ -268,14 +278,17 @@ function applyMWord(
     return 'event';
   }
   if (code === 400) {
-    // Marlin M400 (wait for moves to settle) — recognized no-op.
-    return 'modal';
+    // Marlin/Smoothieware M400 has no duration of its own, but it drains the
+    // planner. Preserve it as a timing synchronization boundary.
+    accounting.pushEvent({ kind: 'synchronization', line, code: 'M400', beforeMotion: false });
+    return 'event';
   }
-  const event = mEventFor(code, line, modal.power);
+  const event = mEventFor(code, line, linePower);
   if (event === null) {
     accounting.countUnsupported(`M${code}`, line);
     return 'unsupported';
   }
+  applyControllerStateMCode(modal, code);
   accounting.pushEvent(event);
   return 'event';
 }
@@ -296,4 +309,70 @@ function spindleOrCoolantEventFor(code: number, line: number, power: number): Pr
   }
   if (code === 9) return { kind: 'coolant-off', line };
   return null;
+}
+
+type ControllerState = Pick<RenderModal, 'spindleMode' | 'power' | 'coolantMist' | 'coolantFlood'>;
+
+function controllerState(modal: RenderModal): ControllerState {
+  return {
+    spindleMode: modal.spindleMode,
+    power: modal.power,
+    coolantMist: modal.coolantMist,
+    coolantFlood: modal.coolantFlood,
+  };
+}
+
+function lastWordValue(words: ReadonlyArray<GcodeWordMatch>, letter: string): number | null {
+  let value: number | null = null;
+  for (const word of words) {
+    if (word.letter === letter) value = word.value;
+  }
+  return value;
+}
+
+function applyControllerStateMCode(modal: RenderModal, code: number): void {
+  if (code === 3) modal.spindleMode = 'constant';
+  if (code === 4) modal.spindleMode = 'dynamic';
+  if (code === 5) modal.spindleMode = 'off';
+  if (code === 7) modal.coolantMist = true;
+  if (code === 8) modal.coolantFlood = true;
+  if (code === 9) {
+    modal.coolantMist = false;
+    modal.coolantFlood = false;
+  }
+}
+
+function pushControllerSynchronization(
+  before: ControllerState,
+  after: RenderModal,
+  lineHasMotionWords: boolean,
+  line: number,
+  accounting: WordAccounting,
+): boolean {
+  const spindleModeChanged = before.spindleMode !== after.spindleMode;
+  // Stock GRBL can carry laser S changes in the same planned motion block.
+  // Standalone active-spindle speed changes drain the planner; app-emitted CNC
+  // RPM changes use that form, while app-emitted laser power rides on motion.
+  const standaloneSpindleSpeedChanged =
+    !lineHasMotionWords && after.spindleMode !== 'off' && before.power !== after.power;
+  const spindleChanged = spindleModeChanged || standaloneSpindleSpeedChanged;
+  const coolantChanged =
+    before.coolantMist !== after.coolantMist || before.coolantFlood !== after.coolantFlood;
+  if (spindleChanged) {
+    accounting.pushEvent({
+      kind: 'synchronization',
+      line,
+      code: 'spindle',
+      beforeMotion: true,
+    });
+  }
+  if (coolantChanged) {
+    accounting.pushEvent({
+      kind: 'synchronization',
+      line,
+      code: 'coolant',
+      beforeMotion: true,
+    });
+  }
+  return spindleChanged || coolantChanged;
 }

@@ -2,6 +2,7 @@ import { streamingModeForController } from '../../core/devices';
 import type { Job } from '../../core/job';
 import { cncToolPlan } from '../state/cnc-tool-plan';
 import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
+import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
@@ -59,7 +60,22 @@ export async function streamCncRecoveryProgram(
 ): Promise<boolean> {
   const laser = useLaserStore.getState();
   const recoveryRunId = createRunId();
-  const canvasPlan = recoveryCanvasPlan(planned, laser);
+  const initialPosition = reportedWorkPositionMm(
+    laser,
+    laser.controllerSettings?.reportInches === true,
+  );
+  const canvasPlan = recoveryCanvasPlan(planned, initialPosition);
+  const jobTimingPlan = canvasJobTimingPlan(
+    planned.gcode,
+    planned.source.project.device,
+    initialPosition,
+    {
+      controllerSessionEpoch: laser.controllerSessionEpoch,
+      positionEpoch: laser.trustedPositionEpoch,
+      activeControllerKind: laser.activeControllerKind,
+      detectedControllerKind: laser.detectedControllerKind,
+    },
+  );
   const staged = await stageRecoveryAttempt(
     planned,
     claimedCapsule,
@@ -87,6 +103,7 @@ export async function streamCncRecoveryProgram(
       cncSetupAttestation,
       ...toolPlanOption(planned.recovery),
       canvasPlan,
+      jobTimingPlan,
     });
   } catch (error) {
     await resolveFailedRecoveryAttempt(claimedCapsule, recoveryRunId, error, repository);
@@ -190,12 +207,8 @@ async function stageRecoveryAttempt(
 
 function recoveryCanvasPlan(
   planned: CncRecoveryStreamPlan,
-  laser: ReturnType<typeof useLaserStore.getState>,
+  initialPosition: ReturnType<typeof reportedWorkPositionMm>,
 ) {
-  const initialPosition = reportedWorkPositionMm(
-    laser,
-    laser.controllerSettings?.reportInches === true,
-  );
   return rebuildCanvasPlanForGcode(
     planned.source.canvasPlan,
     planned.gcode,

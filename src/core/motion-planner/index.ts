@@ -7,4 +7,4 @@
 export { blockMotion, type Block, type BlockKind, type BlockMotion } from './block';
 export { junctionVelocity } from './junction';
 export { planVelocities, type PlanEntry } from './plan-velocities';
-export { blockTime } from './block-time';
+export { blockElapsedTimeAtDistance, blockTime } from './block-time';

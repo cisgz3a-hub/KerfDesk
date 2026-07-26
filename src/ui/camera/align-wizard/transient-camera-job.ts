@@ -193,6 +193,9 @@ async function startTransientFramedRun(permit: FramedRunPermit): Promise<boolean
         ? {}
         : { cncSetupAttestation: candidate.review.cncSetupAttestation }),
       canvasPlan: candidate.preparedStart.canvasPlan,
+      ...(candidate.preparedStart.jobTimingPlan === undefined
+        ? {}
+        : { jobTimingPlan: candidate.preparedStart.jobTimingPlan }),
     });
     return true;
   } catch (err) {

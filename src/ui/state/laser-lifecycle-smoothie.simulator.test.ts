@@ -10,10 +10,18 @@ import {
   type SmoothieSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
+import { fingerprintGcode } from '../../core/recovery';
+import { canvasJobTimingPlan } from './canvas-job-timing-plan';
+import type { CanvasMotionPlan } from './canvas-motion-plan';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+
+const ORIGIN = { x: 0, y: 0, z: 0 };
+const DRAINED_PAUSE_JOB = 'G1 X10 Y0 F600 S100\n';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -79,6 +87,37 @@ function jobLines(count: number): string {
   return Array.from({ length: count }, (_, i) => `G1 X${i} Y1 F600 S200`).join('\n');
 }
 
+function countdownCanvasPlan(gcode: string): CanvasMotionPlan {
+  return {
+    manifest: buildMotionManifest(gcode, {
+      machineKind: 'laser',
+      initialPosition: ORIGIN,
+    }),
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: 'smoothie-countdown',
+    machineKind: 'laser',
+    device: DEFAULT_DEVICE_PROFILE,
+    coordinateFrame: { kind: 'machine', workOffsetMm: ORIGIN },
+    framePerimeter: [],
+    jobStart: ORIGIN,
+    approachFrom: ORIGIN,
+    capability: 'realtime',
+    unavailableReason: null,
+    resumed: false,
+    positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
+  };
+}
+
+function countdownTimingPlan(gcode: string) {
+  const state = useLaserStore.getState();
+  return canvasJobTimingPlan(gcode, DEFAULT_DEVICE_PROFILE, ORIGIN, {
+    controllerSessionEpoch: state.controllerSessionEpoch,
+    positionEpoch: state.trustedPositionEpoch,
+    activeControllerKind: state.activeControllerKind,
+    detectedControllerKind: state.detectedControllerKind,
+  });
+}
+
 describe('Smoothieware lifecycle against the simulator', () => {
   it('connects, detects the banner, and skips the settings handshake', async () => {
     const sim = await connectSmoothie();
@@ -132,6 +171,43 @@ describe('Smoothieware lifecycle against the simulator', () => {
     await pump(8000);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state().pos.x).toBe(39);
+  });
+
+  it('resumes timing and settles when the paused final line already acknowledged', async () => {
+    const sim = await connectSmoothieIdle({ motionMs: 2_000 });
+    await startTestLaserJob(DRAINED_PAUSE_JOB, {
+      streamingMode: 'ping-pong',
+      canvasPlan: countdownCanvasPlan(DRAINED_PAUSE_JOB),
+      jobTimingPlan: countdownTimingPlan(DRAINED_PAUSE_JOB),
+    });
+
+    await useLaserStore.getState().pauseJob();
+    await pump(20);
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: { status: 'paused', completed: 1, inFlight: [] },
+      liveCanvasRun: { timing: { kind: 'paused' } },
+    });
+
+    await useLaserStore.getState().resumeJob();
+    expect(sim.outbound()).toContain('~');
+    expect(sim.outbound()).toContain('M400\n');
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: { status: 'done' },
+      controllerOperation: { kind: 'post-job-settle', phase: 'dwell' },
+      liveCanvasRun: { timing: { kind: 'running' } },
+    });
+
+    sim.port.emitLine('<Run|MPos:10.0000,0.0000,0.0000|WPos:10.0000,0.0000,0.0000|F:600.0,100.0>');
+    expect(useLaserStore.getState()).toMatchObject({
+      liveCanvasRun: { lifecycle: 'running', timing: { kind: 'running' } },
+    });
+
+    await pump(4_000);
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: null,
+      controllerOperation: null,
+      liveCanvasRun: { timing: { kind: 'complete' } },
+    });
   });
 
   it('stops with Ctrl-X + M5/M9; halt recovers via M999 unlock', async () => {

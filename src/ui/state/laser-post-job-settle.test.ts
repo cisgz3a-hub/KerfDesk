@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
+import { fingerprintGcode } from '../../core/recovery';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { canvasJobTimingPlan } from './canvas-job-timing-plan';
+import type { CanvasMotionPlan } from './canvas-motion-plan';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
@@ -77,16 +82,52 @@ function controllerOperation(): ControllerOperationSnapshot {
 // 'done' and the post-job settle begins.
 const JOB_GCODE = 'G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n';
 
+function countdownCanvasPlan(gcode: string): CanvasMotionPlan {
+  const manifest = buildMotionManifest(gcode, {
+    machineKind: 'laser',
+    initialPosition: { x: 0, y: 0, z: 0 },
+  });
+  return {
+    manifest,
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: 'post-job-settle-countdown',
+    machineKind: 'laser',
+    device: DEFAULT_DEVICE_PROFILE,
+    coordinateFrame: { kind: 'machine', workOffsetMm: { x: 0, y: 0, z: 0 } },
+    framePerimeter: [],
+    jobStart: { x: 0, y: 0 },
+    approachFrom: { x: 0, y: 0 },
+    capability: 'realtime',
+    unavailableReason: null,
+    resumed: false,
+    positionEpoch: useLaserStore.getState().trustedPositionEpoch ?? 0,
+  };
+}
+
 // Mirrors DEFAULT_IDLE_TIMEOUT_MS in laser-interactive-command.ts.
 const IDLE_WAIT_TIMEOUT_MS = 8_000;
 const FRESH_STATUS_INTERVAL_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS / 2;
 
 async function runJobUntilSettleAwaitsIdle(connection: FakeConnection): Promise<void> {
-  await startTestLaserJob(JOB_GCODE);
+  await startTestLaserJob(JOB_GCODE, {
+    canvasPlan: countdownCanvasPlan(JOB_GCODE),
+    jobTimingPlan: canvasJobTimingPlan(
+      JOB_GCODE,
+      DEFAULT_DEVICE_PROFILE,
+      { x: 0, y: 0, z: 0 },
+      {
+        controllerSessionEpoch: useLaserStore.getState().controllerSessionEpoch,
+        positionEpoch: useLaserStore.getState().trustedPositionEpoch,
+        activeControllerKind: useLaserStore.getState().activeControllerKind,
+        detectedControllerKind: useLaserStore.getState().detectedControllerKind,
+      },
+    ),
+  });
   for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
   await flush();
   expect(useLaserStore.getState().streamer?.status).toBe('done');
   expect(controllerOperation()).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+  expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
   connection.emitLine('ok');
   await flush();
   expect(controllerOperation()).toMatchObject({
@@ -128,6 +169,33 @@ afterEach(async () => {
 });
 
 describe('post-job settle failure handling', () => {
+  it('keeps the countdown finishing until the settle marker and two fresh Idle reports', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    await runJobUntilSettleAwaitsIdle(connection);
+
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('finishing');
+
+    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: { status: 'done' },
+      controllerOperation: {
+        kind: 'post-job-settle',
+        phase: 'awaiting-idle',
+      },
+      liveCanvasRun: { timing: { kind: 'finishing' } },
+    });
+
+    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: null,
+      controllerOperation: null,
+      liveCanvasRun: { timing: { kind: 'complete' } },
+    });
+  });
+
   // GRBL acks lines when they are parsed, not executed — after the last ok a
   // slow-feed job can keep the machine in Run for well over the idle-wait
   // timeout. Live status reports prove the controller is healthy, so the wait

@@ -142,6 +142,17 @@ describe('buildGcodeRenderModel — events and accountability', () => {
 });
 
 describe('buildGcodeRenderModel — forgiving motion policy', () => {
+  it('seeds absolute motion from the supplied work-coordinate position', () => {
+    const result = buildGcodeRenderModel('G21 G90\nG0 X110', {
+      initialPositionMm: { x: 100, y: 20, z: 3 },
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.model.segmentCount).toBe(1);
+    expect([...result.model.positions]).toEqual([100, 20, 3, 110, 20, 3]);
+  });
+
   it('skips bad arcs with reasons instead of failing', () => {
     const model = okModel(
       [
@@ -168,5 +179,18 @@ describe('buildGcodeRenderModel — forgiving motion policy', () => {
     expect(buildGcodeRenderModel('hello world\nthis is prose').kind).toBe('error');
     const capped = buildGcodeRenderModel('G0 X1\nG0 X2\nG0 X3', { maxLines: 2 });
     expect(capped.kind).toBe('error');
+  });
+
+  it('keeps the default Inspector model uncapped while honoring an explicit segment budget', () => {
+    const program = 'G21 G90\nG0 X10 Y0\nG2 X10 Y0 I-10 J0 F600';
+    const inspector = buildGcodeRenderModel(program);
+    const bounded = buildGcodeRenderModel(program, { maxSegments: 1 });
+
+    expect(inspector.kind).toBe('ok');
+    if (inspector.kind === 'ok') expect(inspector.model.segmentCount).toBeGreaterThan(1);
+    expect(bounded).toMatchObject({
+      kind: 'error',
+      segmentLimit: { maximum: 1 },
+    });
   });
 });

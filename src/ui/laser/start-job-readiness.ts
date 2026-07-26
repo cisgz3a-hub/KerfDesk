@@ -7,6 +7,7 @@ import {
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
+import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
 import type { SimilarityTransform } from '../../core/registration';
 import type { JobOriginPlacement } from '../../core/job';
 import type {
@@ -75,6 +76,9 @@ export type StartJobPreparation =
       readonly warnings: ReadonlyArray<string>;
       readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
       readonly canvasPlan: CanvasMotionPlan;
+      /** Exact emitted-program timing result kept in memory beside the
+       * prepared program. It is not part of the persisted canvas artifact. */
+      readonly jobTimingPlan?: CanvasJobTimingPlanResult;
       readonly metrics: PreparedJobMetrics;
       /** Exact compiled/placed Job used for this G-code. Recovery may only
        * derive a smaller semantic Job from this already-gated source. */

@@ -44,6 +44,78 @@ describe('buildProgramTime', () => {
     expect(time.totalSeconds).toBeCloseTo(time.motionSeconds + 2.5, 6);
   });
 
+  it.each([
+    ['G4 P2.5', 2.5],
+    ['M0', 0],
+    ['M1', 0],
+    ['M400', 0],
+  ])('restarts lookahead from rest across the %s synchronization boundary', (barrier, dwell) => {
+    const firstMove = buildProgramTime(model('G21 G90\nG1 X10 F6000'), LIMITS);
+    const separated = buildProgramTime(
+      model(['G21 G90', 'G1 X10 F6000', barrier, 'G1 X20 F6000'].join('\n')),
+      LIMITS,
+    );
+
+    expect(separated.motionSeconds).toBeCloseTo(firstMove.motionSeconds * 2, 5);
+    expect(separated.dwellSeconds).toBeCloseTo(dwell, 6);
+  });
+
+  it('restarts lookahead for real spindle and coolant changes but not redundant re-arms', () => {
+    const uninterrupted = buildProgramTime(
+      model(['M3 S100', 'G1 X100 F6000', 'G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+    const spindleOff = buildProgramTime(
+      model(['M3 S100', 'G1 X100 F6000', 'M5', 'G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+    const spindleSpeed = buildProgramTime(
+      model(['M3 S100', 'G1 X100 F6000', 'S200', 'G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+    const coolantOn = buildProgramTime(
+      model(['M3 S100', 'G1 X100 F6000', 'M7', 'G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+    const redundantSpindle = buildProgramTime(
+      model(['M3 S100', 'G1 X100 F6000', 'M3 S100', 'G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+    const redundantCoolant = buildProgramTime(
+      model(['M7', 'G1 X100 F6000', 'M7', 'G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+
+    expect(uninterrupted.motionSeconds).toBeCloseTo(2.2, 5);
+    expect(spindleOff.motionSeconds).toBeCloseTo(2.4, 5);
+    expect(spindleSpeed.motionSeconds).toBeCloseTo(2.4, 5);
+    expect(coolantOn.motionSeconds).toBeCloseTo(2.4, 5);
+    expect(redundantSpindle.motionSeconds).toBeCloseTo(uninterrupted.motionSeconds, 5);
+    expect(redundantCoolant.motionSeconds).toBeCloseTo(uninterrupted.motionSeconds, 5);
+  });
+
+  it('applies a same-block spindle change before that block motion', () => {
+    const time = buildProgramTime(
+      model(['M3 S100', 'G1 X100 F6000', 'M5 G1 X200 F6000'].join('\n')),
+      LIMITS,
+    );
+
+    expect(time.motionSeconds).toBeCloseTo(2.4, 5);
+    expect(time.segExitVelocityMmPerSec[0]).toBe(0);
+    expect(time.segEntryVelocityMmPerSec[1]).toBe(0);
+  });
+
+  it('keeps app-style laser power changes on their planned motion span', () => {
+    const time = buildProgramTime(
+      model(['M4 S0', 'G1 X100 F6000 S100', 'G1 X200 S200'].join('\n')),
+      LIMITS,
+    );
+
+    expect(time.motionSeconds).toBeCloseTo(2.2, 5);
+    expect(time.segExitVelocityMmPerSec[0]).toBeGreaterThan(0);
+    expect(time.segEntryVelocityMmPerSec[1]).toBeGreaterThan(0);
+  });
+
   it('flags moves that never sustain their programmed feed', () => {
     // Many tiny zig-zag moves: acceleration and cornering dominate.
     const zigzag = ['G21 G90', 'M3 S1'];

@@ -51,6 +51,14 @@ export type ProgramEvent =
   | { readonly kind: 'coolant-off'; readonly line: number }
   | { readonly kind: 'dwell'; readonly line: number; readonly seconds: number }
   | { readonly kind: 'pause'; readonly line: number; readonly optional: boolean }
+  | {
+      readonly kind: 'synchronization';
+      readonly line: number;
+      readonly code: 'M400' | 'spindle' | 'coolant';
+      /** State changes execute before motion on the same block; M400 executes
+       * after all earlier planned motion and carries no motion of its own. */
+      readonly beforeMotion: boolean;
+    }
   | { readonly kind: 'program-end'; readonly line: number }
   | { readonly kind: 'wcs-select'; readonly line: number; readonly code: number }
   | { readonly kind: 'canned-cycle'; readonly line: number; readonly code: number }
@@ -132,8 +140,21 @@ export type GcodeRenderModel = {
 export type BuildRenderModelOptions = {
   /** Line cap for the synchronous path; the Stage-11 worker path raises it. */
   readonly maxLines?: number;
+  /** Optional segment cap for bounded synchronous consumers. The parser
+   * checks after each source line, so one expanded line may cross the cap. */
+  readonly maxSegments?: number;
+  /** Work-coordinate position before the first program line. */
+  readonly initialPositionMm?: { readonly x: number; readonly y: number; readonly z: number };
 };
 
 export type BuildRenderModelResult =
   | { readonly kind: 'ok'; readonly model: GcodeRenderModel }
-  | { readonly kind: 'error'; readonly reason: string };
+  | {
+      readonly kind: 'error';
+      readonly reason: string;
+      /** Present only when an explicit segment budget stopped parsing. */
+      readonly segmentLimit?: {
+        readonly maximum: number;
+        readonly observed: number;
+      };
+    };

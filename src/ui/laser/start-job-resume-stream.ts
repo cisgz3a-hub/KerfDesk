@@ -7,6 +7,7 @@ import {
   reportedWorkPositionMm,
   type CanvasMotionPlan,
 } from '../state/canvas-motion-plan';
+import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { recoveryRepository } from '../state/recovery';
@@ -60,6 +61,17 @@ export async function streamResumeFromRawLine(
       laser,
       laser.controllerSettings?.reportInches === true,
     );
+    const canvasPlan = rebuildCanvasPlanForGcode(
+      originalCanvasPlan,
+      resumeGcode,
+      initialPosition ?? undefined,
+    );
+    const jobTimingPlan = canvasJobTimingPlan(resumeGcode, project.device, initialPosition, {
+      controllerSessionEpoch: laser.controllerSessionEpoch,
+      positionEpoch: laser.trustedPositionEpoch,
+      activeControllerKind: laser.activeControllerKind,
+      detectedControllerKind: laser.detectedControllerKind,
+    });
     await laser.startJob(resumeGcode, {
       streamingMode: streamingModeForController(
         project.device.controllerKind,
@@ -68,11 +80,8 @@ export async function streamResumeFromRawLine(
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
       ...(laserModeStartEvidence === undefined ? {} : { laserModeStartEvidence }),
-      canvasPlan: rebuildCanvasPlanForGcode(
-        originalCanvasPlan,
-        resumeGcode,
-        initialPosition ?? undefined,
-      ),
+      canvasPlan,
+      jobTimingPlan,
     });
     // Manual start-from-line is deliberately outside exact recovery tracking,
     // but an accepted stream changes physical machine state. An older capsule

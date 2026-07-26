@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StatusReport } from '../../core/controllers/grbl';
+import { isSendableGcodeLine, type StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   createLayer,
@@ -118,7 +118,9 @@ describe('exact laser recovery activation', () => {
   it('passes a live unknown-$32 acknowledgement into the claimed recovery Start', async () => {
     const repository = recoveryHarness();
     const capsule = await interruptedCapsule(repository);
-    const recoveryStart = vi.fn(async () => undefined);
+    const recoveryStart = vi.fn<(gcode: string, options?: StartJobOptions) => Promise<void>>(
+      async () => undefined,
+    );
     useLaserStore.setState({ startJob: recoveryStart });
     makeLaserModeUnknown();
     vi.mocked(jobAwareConfirm).mockClear();
@@ -138,6 +140,15 @@ describe('exact laser recovery activation', () => {
         }),
       }),
     );
+    const recoveryCall = recoveryStart.mock.calls[0];
+    const resumeGcode = recoveryCall?.[0] ?? '';
+    const timing = recoveryCall?.[1]?.jobTimingPlan;
+    expect(timing?.kind).toBe('ok');
+    if (timing?.kind === 'ok') {
+      expect(timing.plan.sendableLineEndSeconds).toHaveLength(
+        resumeGcode.split('\n').filter(isSendableGcodeLine).length,
+      );
+    }
     expect(repository.getSnapshot().activeRun?.runId).not.toBe(capsule.runId);
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
   });

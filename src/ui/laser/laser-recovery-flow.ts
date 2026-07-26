@@ -1,6 +1,7 @@
 import { streamingModeForController } from '../../core/devices';
 import { fingerprintGcode, fingerprintsEqual, rawResumeLine } from '../../core/recovery';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
@@ -58,6 +59,7 @@ type StagedLaserRecovery = PlannedLaserRecovery &
   ClaimedLaserRecovery & {
     readonly recoveryRunId: string;
     readonly canvasPlan: ReturnType<typeof rebuildCanvasPlanForGcode>;
+    readonly jobTimingPlan: ReturnType<typeof canvasJobTimingPlan>;
     readonly laser: ReturnType<typeof useLaserStore.getState>;
   };
 
@@ -128,6 +130,17 @@ async function stageLaserRecoveryAttempt(
     planned.resumeGcode,
     initialPosition ?? undefined,
   );
+  const jobTimingPlan = canvasJobTimingPlan(
+    planned.resumeGcode,
+    planned.source.project.device,
+    initialPosition,
+    {
+      controllerSessionEpoch: laser.controllerSessionEpoch,
+      positionEpoch: laser.trustedPositionEpoch,
+      activeControllerKind: laser.activeControllerKind,
+      detectedControllerKind: laser.detectedControllerKind,
+    },
+  );
   const recoveryRunId = createRunId();
   let staged: Awaited<ReturnType<RecoveryRepository['stageArtifact']>> | null = null;
   try {
@@ -170,7 +183,7 @@ async function stageLaserRecoveryAttempt(
     jobAwareAlert(`Cannot start supervised recovery:\n\n${message}`);
     return null;
   }
-  return { ...planned, ...claim, recoveryRunId, canvasPlan, laser };
+  return { ...planned, ...claim, recoveryRunId, canvasPlan, jobTimingPlan, laser };
 }
 
 async function buildLaserRecoveryArtifact(
@@ -236,6 +249,7 @@ async function streamLaserRecoveryAttempt(
         ? {}
         : { laserModeStartEvidence: attempt.laserModeStartEvidence }),
       canvasPlan: attempt.canvasPlan,
+      jobTimingPlan: attempt.jobTimingPlan,
     });
   } catch (error) {
     await resolveFailedAttempt({

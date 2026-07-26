@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isSendableGcodeLine } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import type { GcodeTimingPlanResult } from '../../core/gcode-time';
 import {
   createLayer,
   createProject,
@@ -79,6 +81,27 @@ const completeRecoveryReview = {
   clearedPathConfirmed: true,
 } as const;
 
+type RecoveryStartOptions = {
+  readonly cncSetupAttestation?: CncSetupAttestation;
+  readonly machineKind?: string;
+  readonly runId?: string;
+  readonly jobTimingPlan?: GcodeTimingPlanResult;
+};
+
+function expectTimingPlanMatchesGcode(
+  options: RecoveryStartOptions | undefined,
+  gcode: string,
+): void {
+  expect(options?.jobTimingPlan?.kind).toBe('ok');
+  if (options?.jobTimingPlan?.kind !== 'ok') return;
+  const spindleDwells = gcode.match(/^G4 P3\.000$/gmu)?.length ?? 0;
+  expect(spindleDwells).toBeGreaterThan(0);
+  expect(options.jobTimingPlan.plan.dwellSeconds).toBe(spindleDwells * 3);
+  expect(options.jobTimingPlan.plan.sendableLineEndSeconds).toHaveLength(
+    gcode.split('\n').filter(isSendableGcodeLine).length,
+  );
+}
+
 function recoveryProject() {
   return {
     ...createProject({
@@ -154,6 +177,7 @@ beforeEach(() => {
   localStorage.clear();
   resetStore();
   configureReadyCncRecovery(recoveryProject());
+  useLaserStore.setState({ detectedControllerKind: 'grbl-v1.1' });
   vi.mocked(jobAwareAlert).mockClear();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
 });
@@ -190,15 +214,12 @@ describe('runCncSupervisedRecoveryFlow', () => {
     expect(recoveryGcode).toMatchSnapshot();
     expect(repo.getSnapshot().recoveryCapsule).toBeNull();
     expect(repo.getSnapshot().activeRun?.runId).not.toBe(capsule.runId);
-    const options = startJob.mock.calls[0]?.[1] as
-      | {
-          readonly cncSetupAttestation?: CncSetupAttestation;
-          readonly machineKind?: string;
-          readonly runId?: string;
-        }
-      | undefined;
+    // Vitest's generic mock call tuple preserves `object` from the stub
+    // signature, so the recovery-specific optional fields cannot be narrowed.
+    const options = startJob.mock.calls[0]?.[1] as RecoveryStartOptions | undefined;
     expect(options?.machineKind).toBe('cnc');
     expect(options?.runId).toBe(repo.getSnapshot().activeRun?.runId);
+    expectTimingPlanMatchesGcode(options, recoveryGcode);
     expect(repo.getSnapshot().activeRun?.artifact.provenance).toMatchObject({
       schemaVersion: 2,
       workflow: {

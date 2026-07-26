@@ -53,7 +53,7 @@ export function buildGcodeRenderModel(
     return { kind: 'error', reason: `Program exceeds ${maxLines} lines.` };
   }
   const context: BuildContext = {
-    modal: freshModal(),
+    modal: freshModal(options.initialPositionMm),
     segments: createSegmentBuilder(),
     events: [],
     skipped: [],
@@ -63,6 +63,17 @@ export function buildGcodeRenderModel(
   const categories = new Uint8Array(lines.length);
   for (const [index, raw] of lines.entries()) {
     categories[index] = processLine(context, raw, index);
+    const segmentCount = context.segments.count();
+    if (options.maxSegments !== undefined && segmentCount > options.maxSegments) {
+      return {
+        kind: 'error',
+        reason: `Program exceeds ${options.maxSegments} render segments.`,
+        segmentLimit: {
+          maximum: options.maxSegments,
+          observed: segmentCount,
+        },
+      };
+    }
   }
   if (context.recognizedWords === 0) {
     return { kind: 'error', reason: 'This does not look like G-code.' };
@@ -82,16 +93,23 @@ export function buildGcodeRenderModel(
   };
 }
 
-function freshModal(): RenderModal {
+function freshModal(initialPosition?: {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}): RenderModal {
   return {
     motion: 0,
     unitScale: 1,
     absolute: true,
-    x: 0,
-    y: 0,
-    z: 0,
+    x: initialPosition?.x ?? 0,
+    y: initialPosition?.y ?? 0,
+    z: initialPosition?.z ?? 0,
     feed: 0,
     power: 0,
+    spindleMode: 'off',
+    coolantMist: false,
+    coolantFlood: false,
     plane: XY_PLANE,
     ended: false,
     cycle: null,
