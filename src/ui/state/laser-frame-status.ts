@@ -72,6 +72,8 @@ export function frameCompletionPatch(args: {
   }
   const source = {
     controllerSessionEpoch: args.state.controllerSessionEpoch,
+    activeControllerKind: args.state.activeControllerKind,
+    detectedControllerKind: args.state.detectedControllerKind,
     controllerSettings: args.state.controllerSettings,
     controllerSettingsObservation: args.state.controllerSettingsObservation,
     controllerBuildInfo: args.state.controllerBuildInfo,

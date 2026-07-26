@@ -33,6 +33,8 @@ const controllerBuildInfoObservation = { sessionEpoch: 7, observedAt: 101 } as c
 function controllerSource(): FramedRunControllerSource {
   return {
     controllerSessionEpoch: 7,
+    activeControllerKind: 'grbl-v1.1',
+    detectedControllerKind: 'grbl-v1.1',
     controllerSettings: null,
     controllerSettingsObservation: null,
     controllerBuildInfo,
@@ -58,6 +60,8 @@ describe('FramedRun completion evidence', () => {
   it('captures the exact controller state observed at physical Frame completion', () => {
     expect(framedRunControllerSnapshot(controllerSource())).toEqual({
       controllerSessionEpoch: 7,
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
       controllerSettings: null,
       controllerSettingsObservation: null,
       controllerBuildInfo,
@@ -85,6 +89,26 @@ describe('FramedRun completion evidence', () => {
   it('accepts unchanged setup and the reported pre-Frame work position', () => {
     const source = controllerSource();
     expect(framedRunCompletionIssue(candidateFor(source), source)).toBeNull();
+  });
+
+  it('keeps identity drift advisory instead of turning it into a new Frame refusal', () => {
+    const source = controllerSource();
+    expect(
+      framedRunCompletionIssue(candidateFor(source), {
+        ...source,
+        detectedControllerKind: 'marlin',
+      }),
+    ).toBeNull();
+  });
+
+  it('keeps active-controller drift advisory instead of turning it into a new Frame refusal', () => {
+    const source = controllerSource();
+    expect(
+      framedRunCompletionIssue(candidateFor(source), {
+        ...source,
+        activeControllerKind: 'marlin',
+      }),
+    ).toBeNull();
   });
 
   it('uses stable cached WCO instead of an intermittent report WCO', () => {

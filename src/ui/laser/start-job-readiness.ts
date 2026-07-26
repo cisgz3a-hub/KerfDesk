@@ -59,6 +59,7 @@ import {
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
 import { startControllerPolicy } from './start-job-controller-policy';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
+import { controllerIdentityWarnings } from './controller-identity-warnings';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
@@ -319,6 +320,13 @@ function finalizeStartPreparation({
         printCutRegistrationActive,
         placement.jobOrigin,
       ),
+      ...(machine.activeControllerKind === undefined
+        ? []
+        : controllerIdentityWarnings(
+            project.device.controllerKind ?? 'grbl-v1.1',
+            machine.activeControllerKind,
+            machine.detectedControllerKind ?? null,
+          )),
       ...controllerPolicy.advisories,
       ...controller.warnings.map((issue) => issue.message),
     ],
