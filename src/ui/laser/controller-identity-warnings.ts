@@ -5,6 +5,13 @@ import type { JobReviewModel } from './job-review';
 export const CONTROLLER_IDENTITY_WARNING_PREFIX = 'Controller identity mismatch:';
 export const CONTROLLER_IDENTITY_UNCONFIRMED_PREFIX = 'Controller identity unconfirmed:';
 
+/**
+ * Builds advisory Job Review warnings from the configured, active, and detected identities.
+ * @param configured Controller selected by the project profile.
+ * @param active Driver bound to the current connection.
+ * @param detected Firmware family inferred from the current session, or `null` when unknown.
+ * @returns Zero or one non-blocking identity warning.
+ */
 export function controllerIdentityWarnings(
   configured: ControllerKind,
   active: ControllerKind,
@@ -42,6 +49,14 @@ export function controllerIdentityWarnings(
   return [];
 }
 
+/**
+ * Replaces stale identity text in a Job Review model with current session evidence.
+ * @param model Review model whose unrelated warnings must be retained.
+ * @param configured Controller selected by the project profile.
+ * @param active Driver bound to the current connection.
+ * @param detected Firmware family inferred from the current session, or `null` when unknown.
+ * @returns A review model with current identity evidence first in its warning list.
+ */
 export function refreshControllerIdentityWarnings(
   model: JobReviewModel,
   configured: ControllerKind,
@@ -55,6 +70,11 @@ export function refreshControllerIdentityWarnings(
   };
 }
 
+/**
+ * Identifies warning strings owned by the controller-identity disclosure.
+ * @param warning Warning text to classify.
+ * @returns `true` for mismatch or unconfirmed-identity warnings.
+ */
 export function isControllerIdentityWarning(warning: string): boolean {
   return (
     warning.startsWith(CONTROLLER_IDENTITY_WARNING_PREFIX) ||

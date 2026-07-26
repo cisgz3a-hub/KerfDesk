@@ -101,6 +101,16 @@ describe('FramedRun completion evidence', () => {
     ).toBeNull();
   });
 
+  it('keeps active-controller drift advisory instead of turning it into a new Frame refusal', () => {
+    const source = controllerSource();
+    expect(
+      framedRunCompletionIssue(candidateFor(source), {
+        ...source,
+        activeControllerKind: 'marlin',
+      }),
+    ).toBeNull();
+  });
+
   it('uses stable cached WCO instead of an intermittent report WCO', () => {
     const source = controllerSource();
     const changedReportWco = {
