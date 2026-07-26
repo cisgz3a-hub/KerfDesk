@@ -31,6 +31,8 @@ const EXPECTED_CLOSED_LOOP_ERROR = 'expected emitted cut motion to form a closed
 const EXPECTED_CUT_ENDPOINTS_ERROR = 'expected emitted cut step to contain endpoints';
 const EXPECTED_WINDING_POINTS_ERROR = 'expected closed-loop points while measuring winding';
 const EXPECTED_PROFILE_LOOPS_ERROR = 'expected one hole loop followed by one outer loop';
+const EXPECTED_SAMPLED_LOOP_ERROR = 'expected one sampled cut loop';
+const EXPECTED_SAMPLE_POINTS_ERROR = 'expected four sample-loop points';
 
 function square(minMm: number, maxMm: number): Polyline {
   return {
@@ -112,8 +114,11 @@ function contiguousCutLoops(steps: ReadonlyArray<ToolpathStep>): ReadonlyArray<P
     if (first === undefined || last === undefined) {
       throw new Error(EXPECTED_CUT_ENDPOINTS_ERROR);
     }
-    if (points.length === 0) points.push(first);
-    points.push(last);
+    for (const point of step.polyline) {
+      const previous = points.at(-1);
+      if (previous?.x === point.x && previous.y === point.y) continue;
+      points.push(point);
+    }
   }
   finishLoop();
   return loops;
@@ -131,6 +136,34 @@ function signedDoubleArea(points: ReadonlyArray<Vec2>): number {
   }
   return area;
 }
+
+describe('contiguousCutLoops', () => {
+  it('retains sampled vertices while removing a shared step endpoint', () => {
+    const [first, second, third, fourth] = square(0, 1).points;
+    if (
+      first === undefined ||
+      second === undefined ||
+      third === undefined ||
+      fourth === undefined
+    ) {
+      throw new Error(EXPECTED_SAMPLE_POINTS_ERROR);
+    }
+    const cutStep = (polyline: ReadonlyArray<Vec2>): ToolpathStep => ({
+      kind: 'cut',
+      color: PROFILE_COLOR,
+      polyline,
+      length: 1,
+    });
+    const loops = contiguousCutLoops([
+      cutStep([first, second, third]),
+      cutStep([third, fourth, first]),
+    ]);
+    expect(loops).toHaveLength(1);
+    const [loop] = loops;
+    if (loop === undefined) throw new Error(EXPECTED_SAMPLED_LOOP_ERROR);
+    expect(loop.points).toEqual([first, second, third, fourth, first]);
+  });
+});
 
 describe('emitGcode CNC hole direction', () => {
   for (const direction of CUT_DIRECTIONS) {
