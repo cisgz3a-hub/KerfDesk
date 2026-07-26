@@ -16,8 +16,6 @@ import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyTransform,
   assertNever,
-  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  flattenColoredPathCurves,
   type ColoredPath,
   type Layer,
   layerOperationSettingsEqual,
@@ -35,28 +33,13 @@ import {
   layerWithObjectOverride,
   sharedObjectPowerScalePercent,
 } from './compile-job-object-policy';
+import { compilationPolylines } from './compilation-polylines';
 import { contourEntryRunwayMm } from './contour-entry';
 import { buildFillGroup } from './fill-group-build';
-import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
-import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
-import { fillRunwayPolicyForDevice } from './fill-runway-policy';
-import { groupFillContoursIntoIslands } from './island-fill';
-import { islandFillMotionPolicyForDevice } from './island-fill-motion';
-import { offsetFillContours } from './offset-fill';
-import type { CutSegment, FillSegment, Group, Job } from './job';
+import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
+import type { CutSegment, Group, Job } from './job';
 import { commonVectorGroupFields } from './vector-group-fields';
-import { resolveFillScanDirection, resolveIslandFillScanDirection } from './scan-direction-policy';
-import { validatedScanOffsetMm } from './scan-offset';
-
-const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
-
-// Allowed module-level cache (narrow exception to "no module-level mutable") —
-// see ADR-050. Identity-keyed via WeakMap (GC-bounded), output-invariant, inner
-// map capped at MAX_LAYER_FILL_CACHE_ENTRIES, pinned by compile-job-fill-cache.test.ts.
-const layerFillCache = new WeakMap<
-  ReadonlyArray<SceneObject>,
-  Map<string, ReadonlyArray<FillSegmentAsPolyline>>
->();
+import { resolveFillScanDirection } from './scan-direction-policy';
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
@@ -186,49 +169,6 @@ function vectorGroupsForLayer(
   ];
 }
 
-function islandFillGroupsForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-  powerSource: SceneObject | { readonly powerScale: number },
-  sourceObjectId?: string,
-): Group[] {
-  const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
-  const fillRule = fillRuleForLayer(objects, layer);
-  const contours = collectFillContoursForLayer(objects, layer, device);
-  const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
-  const sensitiveIslandFill = islandMotionPolicy === 'sensitive';
-  const scanDirection = resolveIslandFillScanDirection(device, layer, sensitiveIslandFill);
-  const hatchingLayer = { ...layer, fillBidirectional: scanDirection.bidirectional };
-  const bidirectionalScanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
-  const fillRunwayPolicy = fillRunwayPolicyForDevice(device, 'island');
-  return groupFillContoursIntoIslands(contours, {
-    clusterMicroIslands: sensitiveIslandFill,
-  }).flatMap((island): Group[] => {
-    const segments = memoizedFillHatchingWithMetadata(island, hatchingLayer, fillRule).map(
-      (polyline) => ({
-        polyline: polyline.points,
-        closed: polyline.closed,
-        reverse: polyline.reverse,
-      }),
-    );
-    if (segments.length === 0) return [];
-    return [
-      {
-        ...common,
-        kind: 'fill',
-        fillStyle: 'island',
-        ...(sensitiveIslandFill ? { islandMotionPolicy } : {}),
-        ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
-        scanDirection,
-        ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
-        overscanMm: Math.max(0, layer.fillOverscanMm),
-        segments,
-      },
-    ];
-  });
-}
-
 function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
   switch (obj.kind) {
     case 'imported-svg':
@@ -258,64 +198,6 @@ function collectLineSegmentsForLayer(
     out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
     layer,
   ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }));
-}
-
-function collectFillSegmentsForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): FillSegment[] {
-  const polylines =
-    layer.fillStyle === 'offset'
-      ? offsetFillContours({
-          polylines: collectFillContoursForLayer(objects, layer, device),
-          spacingMm: layer.hatchSpacingMm,
-        }).contours.map((polyline) => ({ ...polyline, reverse: false }))
-      : memoizedLayerFillHatching(objects, layer, device);
-  return polylines.map((polyline) => ({
-    polyline: polyline.points,
-    closed: polyline.closed,
-    reverse: polyline.reverse,
-  }));
-}
-
-function memoizedLayerFillHatching(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): ReadonlyArray<FillSegmentAsPolyline> {
-  const fillRule = fillRuleForLayer(objects, layer);
-  const cacheKey = layerFillCacheKey(layer, device, fillRule);
-  let bySettings = layerFillCache.get(objects);
-  if (bySettings === undefined) {
-    bySettings = new Map<string, ReadonlyArray<FillSegmentAsPolyline>>();
-    layerFillCache.set(objects, bySettings);
-  }
-  const cached = bySettings.get(cacheKey);
-  if (cached !== undefined) return cached;
-
-  const contours = collectFillContoursForLayer(objects, layer, device);
-  const hatches = memoizedFillHatchingWithMetadata(contours, layer, fillRule);
-  if (bySettings.size >= MAX_LAYER_FILL_CACHE_ENTRIES) {
-    const oldestKey = bySettings.keys().next().value;
-    if (oldestKey !== undefined) bySettings.delete(oldestKey);
-  }
-  bySettings.set(cacheKey, hatches);
-  return hatches;
-}
-
-type FillSegmentAsPolyline = Polyline & { readonly reverse: boolean };
-
-function collectFillContoursForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): Polyline[] {
-  const out: Polyline[] = [];
-  for (const obj of objects) {
-    appendFillContoursFromObject(obj, layer, device, out);
-  }
-  return out;
 }
 
 function appendSegmentsFromObject(
@@ -357,52 +239,6 @@ function appendSegmentsFromObject(
   }
 }
 
-function appendFillContoursFromObject(
-  obj: SceneObject,
-  layer: Layer,
-  device: DeviceProfile,
-  out: Polyline[],
-): void {
-  switch (obj.kind) {
-    case 'imported-svg':
-      appendFillPathContours(obj, layer, device, out);
-      return;
-    case 'text':
-      appendFillPathContours(obj, layer, device, out);
-      return;
-    case 'traced-image':
-      appendFillPathContours(obj, layer, device, out);
-      return;
-    case 'shape':
-      appendFillPathContours(obj, layer, device, out);
-      return;
-    case 'raster-image':
-    case 'relief':
-      return;
-    default:
-      assertNever(obj, 'SceneObject');
-  }
-}
-
-function appendFillPathContours(
-  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
-  layer: Layer,
-  device: DeviceProfile,
-  out: Polyline[],
-): void {
-  for (const path of object.paths) {
-    if (!pathUsesOperation(object, path, layer)) continue;
-    for (const polyline of compilationPolylines(path)) {
-      out.push({
-        points: polyline.points.map((p) =>
-          toMachineCoords(applyTransform(p, object.transform), device),
-        ),
-        closed: polyline.closed,
-      });
-    }
-  }
-}
-
 // Shared materializer for any SceneObject whose paths are already
 // available as ColoredPath polylines (ImportedSvg, TextObject,
 // TracedImage). The switch above stays one-arm-per-kind for
@@ -439,16 +275,6 @@ function appendPathSegments(
       out.push({ polyline: offset.points, closed: true });
     }
   }
-}
-
-function compilationPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
-  const flattened = flattenColoredPathCurves(path, {
-    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-    segmentBudget: 100_000,
-  });
-  // Normal output reaches this only after the matching pre-emit budget check.
-  // Direct pure-core callers retain the compatibility view on over-budget data.
-  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
