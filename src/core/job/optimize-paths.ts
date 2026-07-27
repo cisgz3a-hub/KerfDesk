@@ -3,7 +3,10 @@
 // PROJECT.md Phase C item: "path optimization (2-opt)". Ships as a
 // nearest-neighbor heuristic, NOT full 2-opt:
 //
-//   * Nearest-neighbor is O(n²) total; pure greedy from a fixed start.
+//   * Nearest-neighbor is pure greedy from a fixed start. The naive form is
+//     O(n²); the entry lookup and the containment-depth pass are both indexed
+//     (segment-entry-index, containment-depth), so there is no size ceiling on
+//     the per-segment paths.
 //   * Full 2-opt with proper delta-computation is O(n²) per pass and
 //     several passes — adds several hundred lines of edge-case logic
 //     (slice reversal, segment-direction flipping, convergence loop).
@@ -50,7 +53,12 @@ import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
-export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
+// Island fill GROUPS are still ordered by an exhaustive scan
+// (pickBestIslandGroup), so they keep a ceiling. The per-segment paths no
+// longer need one: both of the O(n^2) costs that justified it are indexed —
+// the nearest-entry lookup (segment-entry-index) and containment depth
+// (containment-depth).
+export const MAX_ISLAND_FILL_GROUP_REORDER = 2_000;
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
@@ -152,11 +160,9 @@ function optimizeGroupAny(group: Group, settings: PathOptimizationSettings): Gro
 
 function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): CutGroup {
   if (group.segments.length === 0) return group;
-  // Nearest-neighbor is O(n^2). Large traces can produce tens of
-  // thousands of cut/hatch segments, and optimizing them synchronously
-  // pins the UI. Keep deterministic source order once the optimizer
-  // would do more harm than good.
-  if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
+  // No size ceiling: traced artwork routinely runs to tens of thousands of
+  // segments, and those are the jobs with the most travel to recover. The
+  // former 2,000 cap silently returned them unoptimized.
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
   const ordered = configuredSegmentOrder(group.segments, settings);
@@ -165,7 +171,6 @@ function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): Cut
 
 function optimizeOffsetFillGroup(group: FillGroup, settings: PathOptimizationSettings): FillGroup {
   if (group.segments.length === 0) return group;
-  if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
   return { ...group, segments: configuredSegmentOrder(group.segments, settings) };
 }
 
@@ -174,7 +179,7 @@ function optimizeIslandFillGroups(
   settings: PathOptimizationSettings,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): FillGroup[] {
-  if (groups.length <= 1 || groups.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return [...groups];
+  if (groups.length <= 1 || groups.length > MAX_ISLAND_FILL_GROUP_REORDER) return [...groups];
   const endpoints = groups.map((group) => islandGroupEndpoints(group, scanningOffsets));
   if (endpoints.some((entry) => entry === null)) return [...groups];
 
