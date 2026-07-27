@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import {
   addLayer,
   addObject,
@@ -9,6 +10,19 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { emitGcode, materializeProgram } from './emit-gcode';
+
+// The ADR-243 raster case below compiles a 6.25M-pixel error-diffusion sweep.
+// Measured: 2590ms isolated and 2422ms inside a full parallel run on an idle dev
+// box — against vitest's DEFAULT 5s testTimeout (`resolved.testTimeout ??= 5e3`),
+// a limit nobody chose for it. ~2x headroom is inside the host-load band, and the
+// test has been observed timing out in a parallel run and then passing in
+// isolation, so a red run said nothing about the code.
+//
+// Nothing about this test is a wall-clock claim — its value is that a raster this
+// size COMPILES AT ALL instead of being refused, which the assertions state
+// directly. So the clock is set far enough out that only a genuine hang or a
+// pathological blow-up trips it, and the assertions decide the verdict.
+const RASTER_COMPILES_AT_ALL_MS = ciBudgetMs(30_000, 90_000);
 
 const sampleObject: SceneObject = {
   kind: 'imported-svg',
@@ -77,46 +91,50 @@ describe('emitGcode', () => {
     expect(withMeta.preflight.ok).toBe(withoutMeta.preflight.ok);
   });
 
-  it('emits an error-diffusion raster above the former working-set budget (ADR-243)', () => {
-    // 2500x2500 pass-through floyd-steinberg was refused pre-ADR-243
-    // ("materialized working set exceeds the 64 MB budget"). It now streams.
-    // The source is white except one dark pixel, so the emit stays fast while
-    // still proving a burn move is produced.
-    const base = createProject();
-    const color = '#808080';
-    const side = 2500;
-    const luma = new Uint8Array(side * side).fill(255);
-    // Center pixel, so the sweep's overscan runways stay inside the bed.
-    luma[(side / 2) * side + side / 2] = 0;
-    const raster: SceneObject = {
-      kind: 'raster-image',
-      id: 'R1',
-      color,
-      source: 'x.png',
-      dataUrl: 'data:image/png;base64,unused',
-      lumaBase64: Buffer.from(luma).toString('base64'),
-      pixelWidth: side,
-      pixelHeight: side,
-      dither: 'floyd-steinberg',
-      linesPerMm: 10,
-      bounds: { minX: 0, minY: 0, maxX: 250, maxY: 250 },
-      transform: IDENTITY_TRANSFORM,
-    };
-    const project = {
-      ...base,
-      scene: addLayer(addObject(base.scene, raster), {
-        ...createLayer({ id: color, color, mode: 'image' }),
-        passThrough: true,
-        ditherAlgorithm: 'floyd-steinberg' as const,
+  it(
+    'emits an error-diffusion raster above the former working-set budget (ADR-243)',
+    { timeout: RASTER_COMPILES_AT_ALL_MS },
+    () => {
+      // 2500x2500 pass-through floyd-steinberg was refused pre-ADR-243
+      // ("materialized working set exceeds the 64 MB budget"). It now streams.
+      // The source is white except one dark pixel, so the emit stays fast while
+      // still proving a burn move is produced.
+      const base = createProject();
+      const color = '#808080';
+      const side = 2500;
+      const luma = new Uint8Array(side * side).fill(255);
+      // Center pixel, so the sweep's overscan runways stay inside the bed.
+      luma[(side / 2) * side + side / 2] = 0;
+      const raster: SceneObject = {
+        kind: 'raster-image',
+        id: 'R1',
+        color,
+        source: 'x.png',
+        dataUrl: 'data:image/png;base64,unused',
+        lumaBase64: Buffer.from(luma).toString('base64'),
+        pixelWidth: side,
+        pixelHeight: side,
+        dither: 'floyd-steinberg',
         linesPerMm: 10,
-      }),
-    };
-    const { gcode, preflight } = emitGcode(project);
-    expect(preflight.issues).toEqual([]);
-    expect(gcode).toContain('M4 S0');
-    // The dark pixel produced a powered run somewhere in the sweep.
-    expect(gcode).toMatch(/G1 X[\d.]+ F\d+ S\d+/);
-  });
+        bounds: { minX: 0, minY: 0, maxX: 250, maxY: 250 },
+        transform: IDENTITY_TRANSFORM,
+      };
+      const project = {
+        ...base,
+        scene: addLayer(addObject(base.scene, raster), {
+          ...createLayer({ id: color, color, mode: 'image' }),
+          passThrough: true,
+          ditherAlgorithm: 'floyd-steinberg' as const,
+          linesPerMm: 10,
+        }),
+      };
+      const { gcode, preflight } = emitGcode(project);
+      expect(preflight.issues).toEqual([]);
+      expect(gcode).toContain('M4 S0');
+      // The dark pixel produced a powered run somewhere in the sweep.
+      expect(gcode).toMatch(/G1 X[\d.]+ F\d+ S\d+/);
+    },
+  );
 
   it('emits only selected artwork when Cut Selected Graphics is enabled', () => {
     const base = createProject();
