@@ -303,6 +303,16 @@ ADR-228's scope. **It is the maintainer's call, and this audit changes nothing a
    separately (`emit-rd.ts:32-36`).
 3. **`no-go-zones.ts` is clean.** `firstZoneCrossedBySegment` (`:35-45`) feeds only the jog guard —
    a non-Start surface the 2026-07-18 inventory §5 records as UNCHANGED.
+4. **A non-finite scan offset only warns.** `pre-emit.ts:25` collects scan-offset issues with
+   `{ nonFiniteOnly: true }`, so the only code it can raise there is `scan-offset-out-of-range`
+   (`scan-offset-policy.ts:49-50`) — and that code is **not** in
+   `COMPILE_INTEGRITY_PREFLIGHT_CODES`, so `prepare-output.ts:96-102` files it as an *advisory*,
+   not a refusal. A NaN/Infinity scan offset is arguably as unstreamable as a NaN coordinate, so
+   this is a **narrower** refusal surface than rule 7 would permit. Narrowing is explicitly normal
+   work under rule 7, so **this is not a violation and needs no action** — it is recorded only so
+   the next reader does not mistake it for an oversight. **Not verified:** whether such an offset
+   later materialises as a NaN coordinate in the emitted body and is caught by the blocking
+   `non-finite-coordinate` check at `preflight.ts:431`. That causal chain was not traced.
 
 ---
 
