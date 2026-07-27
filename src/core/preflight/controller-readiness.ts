@@ -83,9 +83,11 @@ export function runControllerReadiness(
   // A read-only compat dump (FluidNC's legacy $$ emulation) is not
   // guaranteed to include every setting and cannot be fixed from the app,
   // so ABSENT values downgrade to warnings instead of blocking Start.
-  // Values that WERE reported are still verified strictly — a mismatch or
-  // a provably wrong $32 blocks either way. grbl-dollar keeps absent =
-  // error: a real GRBL $$ always reports $30/$31/$32.
+  // Values that WERE reported are still verified strictly and returned as
+  // errors. Those errors do NOT refuse Start: since #291 the Start path maps
+  // them to Job Review warnings (start-job-controller-policy.ts). They bite
+  // only on Save/export (confirm-controller-readiness.ts). grbl-dollar keeps
+  // absent = error: a real GRBL $$ always reports $30/$31/$32.
   const absentPolicy: AbsentSettingPolicy =
     settingsCapability === 'readonly-dump' ? 'warn' : 'error';
 
@@ -96,8 +98,9 @@ export function runControllerReadiness(
     return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy);
   }
   // Missing laser settings are review warnings; known mismatches are still
-  // errors inside laserReadiness. This prevents a partial/failed $$ response
-  // from becoming a dead Start button while preserving proven hazard blocks.
+  // errors inside laserReadiness. Neither refuses Start — the Start path
+  // demotes every error returned here to a Job Review warning (#291), so the
+  // errors matter only on the Save/export path.
   return laserReadiness(project, controller, 'warn');
 }
 

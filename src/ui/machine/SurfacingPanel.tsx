@@ -16,10 +16,11 @@ import { emitStandaloneCncGcode } from '../../io/gcode/standalone-cnc-gcode';
 import { buildGcodeMetadata } from '../app/build-info';
 import { confirmControllerReadiness } from '../app/confirm-controller-readiness';
 import { usePlatform } from '../app/platform-context';
+import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
-import { useToastStore } from '../state/toast-store';
+import { useToastStore, type ToastVariant } from '../state/toast-store';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 const DEFAULT_FEED_MM_PER_MIN = 2500;
@@ -95,7 +96,7 @@ type SurfacingInputs = {
 
 async function saveSurfacingProgram(
   platform: ReturnType<typeof usePlatform>,
-  pushToast: (message: string, variant?: 'success' | 'error') => void,
+  pushToast: (message: string, variant?: ToastVariant) => void,
   project: Project,
   machine: CncMachineConfig,
   controllerSettings: ControllerSettingsSnapshot | null,
@@ -118,8 +119,14 @@ async function saveSurfacingProgram(
   }
   const { program } = result;
   const emitted = emitStandaloneCncGcode(project, program.lines.join('\n'), buildGcodeMetadata());
-  if (!emitted.preflight.ok) {
-    const reasons = emitted.preflight.issues.map((issue) => issue.message).join(' ');
+  // Rule 7 / ADR-228: only compile-integrity findings may refuse a save. Reading
+  // preflight.ok raw refused on out-of-bed and no-go-zone collisions — the two
+  // policy findings rule 7 names by name — because ok is issues.length === 0,
+  // not an integrity predicate. Surfacing bypasses Job Review, so the demoted
+  // findings become post-save warning toasts instead of vanishing.
+  const { blocking, advisories } = partitionSavePreflight(emitted.preflight.issues);
+  if (blocking.length > 0) {
+    const reasons = blocking.map((issue) => issue.message).join(' ');
     pushToast(`Could not save the surfacing program: ${reasons}`, 'error');
     return;
   }
@@ -135,6 +142,7 @@ async function saveSurfacingProgram(
       `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
       'success',
     );
+    for (const advisory of advisories) pushToast(advisory.message, 'warning');
   } catch (err) {
     pushToast(
       `Could not save the surfacing program: ${err instanceof Error ? err.message : String(err)}`,
