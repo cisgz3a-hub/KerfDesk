@@ -18,7 +18,7 @@ import {
   type TraceBoundary,
   type TraceOptions,
 } from '../../core/trace';
-import { useStore } from '../state';
+import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { Dialog } from '../kit';
@@ -352,11 +352,6 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     // pixel-for-pixel over the features they came from (ADR-026).
     const traceMode = traceModeForOptions(args.options);
     const operationOverride = operationOverrideForTrace(traceMode, args.traceFillStyle);
-    // CNC commits machinable geometry (cnc-trace-fairing.ts); the live
-    // machine kind decides, mirroring the raster path's mid-dialog-switch
-    // handling. Laser keeps the tracer's output untouched.
-    const cncProject = ctx.getCurrentProject().machine?.kind === 'cnc';
-    const commitPaths = cncProject ? fairTracedPathsForCnc(paths, args.seed, width) : paths;
     const traced: TracedImage = {
       kind: 'traced-image',
       id: args.replaceTraceId ?? crypto.randomUUID(),
@@ -367,7 +362,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       tracePixelHeight: height,
       bounds,
       transform: IDENTITY_TRANSFORM,
-      paths: commitPaths,
+      paths,
       ...(operationOverride === undefined ? {} : { operationOverride }),
     };
     const liveProject = ctx.getCurrentProject();
@@ -383,7 +378,20 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       );
       return;
     }
-    if (await commitTraceOutput(args, ctx, traced, liveProject)) ctx.close();
+    // CNC conditioning uses the exact live placement that the store will
+    // apply. Transform-only source changes are intentionally accepted, so
+    // fairing before this point would use stale physical units.
+    const commitTraced =
+      liveProject.machine?.kind === 'cnc'
+        ? {
+            ...traced,
+            paths: fairTracedPathsForCnc(
+              paths,
+              positionTraceOverRasterSource(liveSource, traced).transform,
+            ),
+          }
+        : traced;
+    if (await commitTraceOutput(args, ctx, commitTraced, liveProject)) ctx.close();
   } catch (err) {
     ctx.pushToast(
       `Could not trace ${args.seed.source}: ${err instanceof Error ? err.message : String(err)}`,
@@ -394,11 +402,13 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
   }
 }
 
-// True when the live object is still the same raster the trace was computed from
-// — same kind, image content (dataUrl), and pixel grid. A transform-only change
-// is allowed (the overlay registers to the live transform). Used to refuse a
-// commit whose source changed or was removed mid-dialog (P2-A).
-export function sameTraceSource(live: SceneObject | undefined, seed: RasterImage): boolean {
+/** Compare trace-source content and pixel grids while intentionally allowing a
+ * transform-only change. A true result narrows `live` to the current
+ * `RasterImage`, whose transform can then register the trace at commit. */
+export function sameTraceSource(
+  live: SceneObject | undefined,
+  seed: RasterImage,
+): live is RasterImage {
   return (
     live !== undefined &&
     live.kind === 'raster-image' &&

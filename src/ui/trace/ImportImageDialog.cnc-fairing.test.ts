@@ -1,22 +1,38 @@
 // Commit-level pin for the CNC trace fairing pass (chatter audit 2026-07-25):
-// a CNC vector trace must commit machinable geometry — no sub-minimum G1
-// segments, no 15-25deg heading-jitter train — while a laser commit passes the
-// tracer's output through untouched. The dense jittery ring below reproduces
-// the measured chatter class (audit: ~0.6px segments, p95 turn ~20deg).
+// A CNC vector trace conditions geometry toward a practical chord target
+// without exceeding its boundary-deviation budget. Boundary fidelity wins when
+// the constraints are incompatible. Laser commits pass the tracer's output
+// through untouched. The dense jittery ring below reproduces the measured
+// chatter class (audit: ~0.6px segments, p95 turn ~20deg).
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('./trace-commit-result', () => ({
   resolveTraceCommitResult: vi.fn(),
 }));
 
 import {
+  applyTransform,
+  createLayer,
+  createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
+  LASER_MACHINE_CONFIG,
+  polylineToCurveSubpath,
+  type ColoredPath,
+  type Layer,
+  type MachineConfig,
   type Polyline,
+  type Project,
   type RasterImage,
   type TracedImage,
 } from '../../core/scene';
+import { polylineDeviationBounds } from '../../__fixtures__/polyline-deviation-bounds';
+import { polylineSegmentLengths } from '../../__fixtures__/polyline-distance';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { compileCncJob } from '../../core/cnc';
+import { positionTraceOverRasterSource } from '../state';
 import { commit } from './ImportImageDialog';
 import { TRACE_PRESETS } from '../../core/trace';
 import type { TraceOptions } from '../../core/trace';
@@ -28,9 +44,26 @@ const RING_R_PX = 200;
 const RING_VERTS = 500;
 const JITTER_AMPLITUDE_PX = 0.45;
 const MIN_SEGMENT_MM = 0.4;
-const MM_PER_PX = SEED_MM / SEED_PX;
+const MAX_DEVIATION_MM = 0.05;
+const DEVIATION_ORACLE_ERROR_MM = 0.005;
+const MIN_SEGMENT_TOLERANCE = 0.95;
+const FLOAT_TOLERANCE_MM = 1e-6;
+const COMPILED_LENGTH_PRECISION = 8;
+const TRACE_COLOR = '#000000';
+const JITTER_REDUCTION_SCALE = 0.2;
+const TRANSFORM_CASES: ReadonlyArray<{
+  readonly name: string;
+  readonly scaleX: number;
+  readonly scaleY: number;
+  readonly shouldMeetChordTarget: boolean;
+}> = [
+  { name: '0.1x uniform', scaleX: 0.1, scaleY: 0.1, shouldMeetChordTarget: true },
+  { name: '1x uniform', scaleX: 1, scaleY: 1, shouldMeetChordTarget: false },
+  { name: '10x uniform', scaleX: 10, scaleY: 10, shouldMeetChordTarget: true },
+  { name: 'anisotropic', scaleX: 0.1, scaleY: 0.2, shouldMeetChordTarget: true },
+];
 
-function seedRaster(): RasterImage {
+function seedRaster(scaleX = 1, scaleY = 1): RasterImage {
   return {
     kind: 'raster-image',
     id: 'src-1',
@@ -39,7 +72,7 @@ function seedRaster(): RasterImage {
     pixelWidth: SEED_PX,
     pixelHeight: SEED_PX,
     bounds: { minX: 0, minY: 0, maxX: SEED_MM, maxY: SEED_MM },
-    transform: IDENTITY_TRANSFORM,
+    transform: { ...IDENTITY_TRANSFORM, scaleX, scaleY },
     color: '#808080',
     dither: 'floyd-steinberg',
     linesPerMm: 10,
@@ -56,74 +89,119 @@ function jitteredRing(): Polyline {
     const r = RING_R_PX + (noise - Math.floor(noise) - 0.5) * 2 * JITTER_AMPLITUDE_PX;
     points.push({ x: 250 + r * Math.cos(theta), y: 250 + r * Math.sin(theta) });
   }
-  points.push({ ...(points[0] as { x: number; y: number }) });
+  const first = points[0];
+  if (first === undefined) throw new Error('expected a nonempty jittered ring');
+  points.push({ ...first });
   return { points, closed: true };
 }
 
-function mockTraceResult(): void {
+function mockTraceResult(): ColoredPath[] {
+  const polyline = jitteredRing();
+  const paths: ColoredPath[] = [
+    {
+      color: TRACE_COLOR,
+      polylines: [polyline],
+      curves: [polylineToCurveSubpath(polyline)],
+    },
+  ];
   vi.mocked(resolveTraceCommitResult).mockResolvedValue({
-    paths: [{ color: '#000000', polylines: [jitteredRing()] }],
+    paths,
     bounds: { minX: 49, minY: 49, maxX: 451, maxY: 451 },
     width: SEED_PX,
     height: SEED_PX,
   });
+  return paths;
 }
 
-function ctxWith(machine: { kind: 'laser' } | typeof DEFAULT_CNC_MACHINE_CONFIG): {
-  readonly traceExistingImage: ReturnType<typeof vi.fn>;
-  readonly commitRasterizedTrace: ReturnType<typeof vi.fn>;
-  readonly pushToast: ReturnType<typeof vi.fn>;
-  readonly close: ReturnType<typeof vi.fn>;
-  readonly setBusy: ReturnType<typeof vi.fn>;
-  readonly getCurrentProject: () => {
-    readonly machine: typeof machine;
-    readonly scene: { readonly objects: ReadonlyArray<RasterImage> };
+type CommitContext = Parameters<typeof commit>[1];
+type TestCommitContext = CommitContext & {
+  readonly traceExistingImage: Mock<CommitContext['traceExistingImage']>;
+  readonly commitRasterizedTrace: Mock<CommitContext['commitRasterizedTrace']>;
+  readonly pushToast: Mock<CommitContext['pushToast']>;
+  readonly close: Mock<CommitContext['close']>;
+  readonly setBusy: Mock<CommitContext['setBusy']>;
+};
+
+function ctxWith(machine: MachineConfig, source = seedRaster()): TestCommitContext {
+  const base = createProject();
+  const project: Project = {
+    ...base,
+    machine,
+    scene: { ...base.scene, objects: [source] },
   };
-} {
-  const source = seedRaster();
   return {
-    traceExistingImage: vi.fn(),
-    commitRasterizedTrace: vi.fn(),
-    pushToast: vi.fn(),
-    close: vi.fn(),
-    setBusy: vi.fn(),
-    getCurrentProject: () => ({ machine, scene: { objects: [source] } }),
+    traceExistingImage: vi.fn<CommitContext['traceExistingImage']>(),
+    commitRasterizedTrace: vi.fn<CommitContext['commitRasterizedTrace']>(),
+    pushToast: vi.fn<CommitContext['pushToast']>(),
+    close: vi.fn<CommitContext['close']>(),
+    setBusy: vi.fn<CommitContext['setBusy']>(),
+    getCurrentProject: () => project,
   };
 }
 
 function commitArgs(seed: RasterImage): Parameters<typeof commit>[0] {
+  const options: TraceOptions | undefined = TRACE_PRESETS['Smooth'];
+  if (options === undefined) throw new Error('expected the Smooth trace preset');
   return {
     file: new File(['x'], 'ring.png', { type: 'image/png' }),
-    options: TRACE_PRESETS['Smooth'] as TraceOptions,
+    options,
     seed,
     traceOutput: 'vector',
-  } as Parameters<typeof commit>[0];
+  };
 }
 
-function committedPolyline(ctx: ReturnType<typeof ctxWith>): Polyline {
-  const traced = ctx.traceExistingImage.mock.calls[0]?.[1] as TracedImage;
+function committedTrace(ctx: TestCommitContext): TracedImage {
+  const traced = ctx.traceExistingImage.mock.calls[0]?.[1];
+  if (traced === undefined) throw new Error('expected one committed trace');
+  return traced;
+}
+
+function committedPolyline(ctx: TestCommitContext): Polyline {
+  const traced = committedTrace(ctx);
   const polyline = traced.paths[0]?.polylines[0];
-  expect(polyline).toBeDefined();
-  return polyline as Polyline;
+  if (polyline === undefined) throw new Error('expected one committed trace polyline');
+  return polyline;
 }
 
-function segmentLengths(polyline: Polyline): number[] {
-  const out: number[] = [];
-  for (let i = 1; i < polyline.points.length; i += 1) {
-    const a = polyline.points[i - 1] as { x: number; y: number };
-    const b = polyline.points[i] as { x: number; y: number };
-    out.push(Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  return out;
+function positionedPolyline(source: RasterImage, traced: TracedImage): Polyline {
+  const positioned = positionTraceOverRasterSource(source, traced);
+  const local = positioned.paths[0]?.polylines[0];
+  if (local === undefined) throw new Error('expected one committed trace polyline');
+  return {
+    closed: local.closed,
+    points: local.points.map((point) => applyTransform(point, positioned.transform)),
+  };
+}
+
+function compiledContourLengths(source: RasterImage, traced: TracedImage): number[] {
+  const positioned = positionTraceOverRasterSource(source, traced);
+  const layer: Layer = {
+    ...createLayer({ id: 'cnc-trace', color: TRACE_COLOR }),
+    cnc: {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'engrave',
+      tabsEnabled: false,
+    },
+  };
+  const group = compileCncJob(
+    { objects: [positioned], layers: [layer] },
+    DEFAULT_DEVICE_PROFILE,
+    DEFAULT_CNC_MACHINE_CONFIG,
+  ).groups[0];
+  if (group?.kind !== 'cnc') throw new Error('expected one compiled CNC group');
+  const pass = group.passes.find((candidate) => candidate.kind === 'contour');
+  if (pass?.kind !== 'contour') throw new Error('expected one compiled contour pass');
+  return polylineSegmentLengths({ closed: pass.closed, points: pass.polyline });
 }
 
 function turnAnglesDeg(polyline: Polyline): number[] {
   const out: number[] = [];
   const pts = polyline.points;
   for (let i = 1; i < pts.length - 1; i += 1) {
-    const a = pts[i - 1] as { x: number; y: number };
-    const b = pts[i] as { x: number; y: number };
-    const c = pts[i + 1] as { x: number; y: number };
+    const a = pts[i - 1];
+    const b = pts[i];
+    const c = pts[i + 1];
+    if (a === undefined || b === undefined || c === undefined) continue;
     const inLen = Math.hypot(b.x - a.x, b.y - a.y);
     const outLen = Math.hypot(c.x - b.x, c.y - b.y);
     if (inLen < 1e-9 || outLen < 1e-9) continue;
@@ -134,17 +212,80 @@ function turnAnglesDeg(polyline: Polyline): number[] {
 }
 
 describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
-  it('commits machinable geometry on CNC: min segment and even headings', async () => {
-    mockTraceResult();
-    const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
-    await commit(commitArgs(seedRaster()), ctx as never);
+  it.each(TRANSFORM_CASES)(
+    'preserves the physical trace contract through $name placement and compilation',
+    async ({ scaleX, scaleY, shouldMeetChordTarget }) => {
+      const rawPaths = mockTraceResult();
+      const seed = seedRaster();
+      const liveSource = seedRaster(scaleX, scaleY);
+      const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG, liveSource);
+
+      await commit(commitArgs(seed), ctx);
+
+      const traced = committedTrace(ctx);
+      const committedPointCount = traced.paths[0]?.polylines[0]?.points.length;
+      if (committedPointCount === undefined) throw new Error('expected committed trace points');
+      expect(committedPointCount).toBeGreaterThan(1);
+      expect(committedPointCount).toBeLessThanOrEqual(RING_VERTS + 1);
+      const minimumPhysicalChord = MIN_SEGMENT_MM * MIN_SEGMENT_TOLERANCE;
+      const positioned = positionedPolyline(liveSource, traced);
+      const positionedLengths = polylineSegmentLengths(positioned);
+      const compiledLengths = compiledContourLengths(liveSource, traced);
+      const rawPolyline = rawPaths[0]?.polylines[0];
+      if (rawPolyline === undefined) throw new Error('expected raw trace geometry');
+      const placement = positionTraceOverRasterSource(liveSource, traced).transform;
+      const rawWorldPoints = rawPolyline.points.map((point) => applyTransform(point, placement));
+      const deviation = polylineDeviationBounds(
+        positioned.points,
+        rawWorldPoints,
+        DEVIATION_ORACLE_ERROR_MM,
+      );
+      expect(deviation.upperBound).toBeLessThanOrEqual(
+        MAX_DEVIATION_MM + DEVIATION_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+      );
+      expect(positionedLengths.length).toBeGreaterThan(1);
+      expect(compiledLengths.length).toBeGreaterThan(1);
+      expect(positionedLengths.every(Number.isFinite)).toBe(true);
+      expect(compiledLengths.every(Number.isFinite)).toBe(true);
+      if (shouldMeetChordTarget) {
+        const positionedInteriorLengths = positionedLengths.slice(0, -1);
+        const compiledInteriorLengths = compiledLengths.slice(0, -1);
+        if (positionedInteriorLengths.length === 0 || compiledInteriorLengths.length === 0) {
+          throw new Error('expected interior trace chords');
+        }
+        expect(Math.min(...positionedInteriorLengths)).toBeGreaterThanOrEqual(minimumPhysicalChord);
+        expect(Math.min(...compiledInteriorLengths)).toBeGreaterThanOrEqual(minimumPhysicalChord);
+      }
+      expect(compiledLengths).toHaveLength(positionedLengths.length);
+      for (const [index, positionedLength] of positionedLengths.entries()) {
+        expect(compiledLengths[index]).toBeCloseTo(positionedLength, COMPILED_LENGTH_PRECISION);
+      }
+    },
+  );
+
+  it('reduces CNC trace jitter while preserving deviation, headings, and closure', async () => {
+    const rawPaths = mockTraceResult();
+    const source = seedRaster(JITTER_REDUCTION_SCALE, JITTER_REDUCTION_SCALE);
+    const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG, source);
+    await commit(commitArgs(source), ctx);
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
+    const traced = committedTrace(ctx);
     const polyline = committedPolyline(ctx);
-    const minSegPx = MIN_SEGMENT_MM / MM_PER_PX;
-    const segs = segmentLengths(polyline);
-    // Closing segment may be shorter; every other chord respects the floor.
-    const interior = segs.slice(0, -1);
-    expect(Math.min(...interior)).toBeGreaterThanOrEqual(minSegPx * 0.95);
+    const rawPolyline = rawPaths[0]?.polylines[0];
+    if (rawPolyline === undefined) throw new Error('expected raw trace geometry');
+    expect(polyline.points.length).toBeGreaterThan(1);
+    expect(polyline.points.length).toBeLessThan(rawPolyline.points.length);
+    const positioned = positionedPolyline(source, traced);
+    const placement = positionTraceOverRasterSource(source, traced).transform;
+    const rawWorldPoints = rawPolyline.points.map((point) => applyTransform(point, placement));
+    const deviation = polylineDeviationBounds(
+      positioned.points,
+      rawWorldPoints,
+      DEVIATION_ORACLE_ERROR_MM,
+    );
+    expect(deviation.upperBound).toBeLessThanOrEqual(
+      MAX_DEVIATION_MM + DEVIATION_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+    );
     const turns = turnAnglesDeg(polyline).sort((a, b) => a - b);
     const p95 = turns[Math.floor(turns.length * 0.95)] ?? 0;
     expect(p95).toBeLessThanOrEqual(10);
@@ -155,8 +296,9 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
       expect(Math.abs(r - RING_R_PX)).toBeLessThanOrEqual(1.2);
     }
     // Ring invariant (ADR-100 third amendment): explicit return to start.
-    const first = polyline.points[0] as { x: number; y: number };
-    const last = polyline.points[polyline.points.length - 1] as { x: number; y: number };
+    const first = polyline.points[0];
+    const last = polyline.points.at(-1);
+    if (first === undefined || last === undefined) throw new Error('expected a nonempty ring');
     expect(Math.hypot(last.x - first.x, last.y - first.y)).toBeLessThanOrEqual(1e-6);
     expect(polyline.closed).toBe(true);
   });
@@ -164,9 +306,10 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
   it('rebuilds curves from the faired polylines so the CNC compiler cuts them', async () => {
     mockTraceResult();
     const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
-    await commit(commitArgs(seedRaster()), ctx as never);
-    const traced = ctx.traceExistingImage.mock.calls[0]?.[1] as TracedImage;
-    const polyline = traced.paths[0]?.polylines[0] as Polyline;
+    await commit(commitArgs(seedRaster()), ctx);
+    const traced = committedTrace(ctx);
+    const polyline = traced.paths[0]?.polylines[0];
+    if (polyline === undefined) throw new Error('expected one committed polyline');
     const curve = traced.paths[0]?.curves?.[0];
     expect(curve).toBeDefined();
     // collect-cnc-contours flattens curves, not polylines — stale curves would
@@ -198,15 +341,16 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
       height: SEED_PX,
     });
     const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
-    await commit(commitArgs(seedRaster()), ctx as never);
-    const traced = ctx.traceExistingImage.mock.calls[0]?.[1] as TracedImage;
+    await commit(commitArgs(seedRaster()), ctx);
+    const traced = committedTrace(ctx);
     const polylines = traced.paths[0]?.polylines ?? [];
     // 4 pecks become 1 closed cut.
     expect(polylines.length).toBe(1);
     expect(polylines[0]?.closed).toBe(true);
     const pts = polylines[0]?.points ?? [];
-    const first = pts[0] as { x: number; y: number };
-    const last = pts[pts.length - 1] as { x: number; y: number };
+    const first = pts[0];
+    const last = pts.at(-1);
+    if (first === undefined || last === undefined) throw new Error('expected a welded ring');
     expect(Math.hypot(last.x - first.x, last.y - first.y)).toBeLessThanOrEqual(1e-6);
     // Fidelity: still the same circle.
     for (const p of pts) {
@@ -229,20 +373,16 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
       height: SEED_PX,
     });
     const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
-    await commit(commitArgs(seedRaster()), ctx as never);
-    const traced = ctx.traceExistingImage.mock.calls[0]?.[1] as TracedImage;
+    await commit(commitArgs(seedRaster()), ctx);
+    const traced = committedTrace(ctx);
     expect(traced.paths[0]?.polylines.length).toBe(3);
   });
 
   it('passes laser commits through untouched', async () => {
-    mockTraceResult();
-    const ctx = ctxWith({ kind: 'laser' });
-    await commit(
-      { ...commitArgs(seedRaster()), traceFillStyle: 'scanline' } as never,
-      ctx as never,
-    );
-    const polyline = committedPolyline(ctx);
-    // The tracer's dense polyline is committed as-is on laser.
-    expect(polyline.points.length).toBe(RING_VERTS + 1);
+    const rawPaths = mockTraceResult();
+    const ctx = ctxWith(LASER_MACHINE_CONFIG);
+    await commit({ ...commitArgs(seedRaster()), traceFillStyle: 'scanline' }, ctx);
+
+    expect(committedTrace(ctx).paths).toEqual(rawPaths);
   });
 });

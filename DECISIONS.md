@@ -12468,6 +12468,25 @@ stopped being true.
 - The pass runs in the import dialog's commit path, today's only TracedImage
   creation site; a future creation site must call it or document why not.
 
+### Amendment — live placement metric and continuous fidelity (2026-07-27)
+
+- CNC trace conditioning uses the exact live placement that will be committed,
+  including uniform or nonuniform source scale. Geometry is mapped through an
+  anisotropic physical metric before welding and fairing, then mapped back and
+  used to rebuild `curves`. Rotation, translation, and mirrors remain
+  isometries.
+- The `0.4 mm` chord is a simplification target, not an unconditional floor.
+  Adaptive resampling raises resolution, without exceeding source density, when
+  a target-length chord would violate the authoritative `0.05 mm` continuous
+  symmetric boundary-deviation budget. Boundary fidelity and pinned corners
+  take precedence.
+- The earlier consequence claiming every non-corner chord is at least
+  `0.38 mm` is superseded. That lower bound remains covered where compatible
+  with the source boundary; a shorter chord is retained when the two contracts
+  cannot coexist.
+- This amendment covers placement at trace commit. Scaling an already committed
+  `TracedImage` does not yet recondition its frozen local paths and curves.
+
 ## ADR-261 - CNC 3D viewport: import boundary, world frame, and display-only status
 
 > Renumbered from ADR-257 on 2026-07-25. Three ADRs raced onto 257 while their branches were in flight; the earliest to land (M4 dynamic power) keeps it.
