@@ -89,6 +89,16 @@ export function streamStalledNotice(): LaserSafetyNotice {
   return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };
 }
 
+export const CNC_PAUSE_RESUME_STALLED_MESSAGE =
+  'The controller did not confirm CNC Pause or Resume within the live-transition deadline. ' +
+  'KerfDesk froze the host stream and kept the job; no controller reset was requested. Check the ' +
+  'machine state, then retry Resume or request ABORT JOB. Use the physical E-stop or power cutoff ' +
+  'if the spindle or cutter is unsafe.';
+
+export function cncPauseResumeStalledNotice(): LaserSafetyNotice {
+  return { kind: 'stream-stalled', message: CNC_PAUSE_RESUME_STALLED_MESSAGE };
+}
+
 // Audit F2: a welcome banner while the stream was still live means the
 // controller rebooted UNCOMMANDED (every commanded reset cancels the streamer
 // before its banner can arrive). The reboot discarded all buffered motion, so

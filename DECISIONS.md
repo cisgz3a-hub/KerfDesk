@@ -144,7 +144,7 @@
 | ADR-172 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Missing qualified work Z blocks CNC Start |
 | ADR-173 | 2026-07-13 | Superseded in part (ADR-228: mismatch warns, not blocks) | Bind work-Z evidence to the compiled CNC tool plan |
 | ADR-179 | 2026-07-13 | Superseded by ADR-228 (demoted to Job Review warning) | Block controller-reported active spindle/coolant before CNC Start |
-| ADR-180 | 2026-07-13 | Amended 2026-07-24 | Generic same-session CNC Resume is manual-recovery-only — resume refusal withdrawn, one-click resume enabled |
+| ADR-180 | 2026-07-13 | Amended through 2026-07-27 | Generic same-session CNC Resume is one-click, door-confirmed, and progress-bounded |
 | ADR-181 | 2026-07-13 | Accepted | CNC Start requires epoch-bound exclusive-access attestation |
 | ADR-182 | 2026-07-13 | Accepted | grblHAL MPG ownership is a latched CNC Start blocker |
 | ADR-183 | 2026-07-13 | Accepted | Unexpected GRBL terminal responses invalidate controller ownership |
@@ -7827,6 +7827,41 @@ precondition, compile integrity, handoff consistency), so rule 7 supersedes it.
 - Not hardware-verified on a spindle machine at amendment time; the GRBL
   feed-hold/cycle-start behavior is documented and sender-standard, but an
   air-cut coupon on the router remains the real proof.
+
+### Amendment 3 (2026-07-25) — CNC confirmation timeout preserves the paused job
+
+A missed CNC Pause/Resume confirmation no longer requests a controller reset.
+The streamer stays frozen and recoverable, and the operator may retry Resume,
+request ABORT JOB, or use the physical E-stop. The laser branch retains its
+existing fail-dark reset because an unconfirmed beam-off transition is a
+different hazard.
+
+### Amendment 4 (2026-07-27) — live Door progress has silence and absolute deadlines
+
+The previous owner used the active-stream heartbeat's 2-second interval as one
+absolute deadline. That is shorter than GRBL's 3-second 5 mm pullout at
+100 mm/min when `PARKING_ENABLE` is compiled in and its stock 4-second spindle
+restore delay, so compliant `Door:2` and `Door:3` sequences falsely timed out.
+
+- The 2-second interval remains the transport/status-silence watchdog.
+- Successful owned writes begin the next silence window. Within the status
+  wait, only fresh post-command same-session CNC `Door:2` Pause, `Door:3`
+  Resume, or the existing terminal proof refreshes silence. Door progress
+  never proves completion or releases the stream.
+- A non-resettable 30-second maximum prevents continuous progress from owning
+  the controller transition forever. Custom builds beyond that envelope remain
+  unqualified.
+- The UI remains explicitly **JOB PAUSING**/**JOB RESUMING** while ownership is
+  pending. Pause still requires its settled Door/Hold proof; Resume releases
+  host refill only after fresh `Run`/`Idle`, and publishes running only after
+  every immediately stageable owned stream write settles. A timed-out but
+  unresolved Pause/Resume transport write retains token- and session-scoped
+  ownership, so a retry cannot overlap it; settlement or session replacement
+  retires that ownership. An actual transport rejection remains the existing
+  active-stream fail-dark/quarantine case, distinct from a confirmation timeout's
+  CNC no-reset behavior.
+- Laser timing/fail-dark behavior, non-Door controller families, Start, Frame,
+  recovery, settings, and emitted G-code are unchanged.
 
 ---
 

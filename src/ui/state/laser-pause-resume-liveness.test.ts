@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PAUSE_RESUME_TRANSITION_TIMEOUT_MS } from './laser-pause-resume-transition';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
@@ -8,6 +8,10 @@ import { startTestLaserJob } from './laser-test-start-helpers';
 const GRBL_SAFETY_DOOR = '\x84';
 const GRBL_SOFT_RESET = '\x18';
 const STATUS_QUERY = '?';
+const EXPECTED_TRANSITION_TIMEOUT_MS = 2_000;
+const PROGRESS_REPORT_INTERVAL_MS = 500;
+const BEFORE_TIMEOUT_MS = 1;
+const LASER_PARKING_STATUS = '<Door:2|MPos:4.000,0.000,0.000|FS:0,0|Ov:100,100,100>';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -123,9 +127,11 @@ describe('Pause and Resume transition liveness', () => {
     const pause = useLaserStore.getState().pauseJob();
     const rejected = expect(pause).rejects.toThrow(/controller operation was cancelled/i);
     await flushPromises();
+    expect(useLaserStore.getState().pauseResumeTransition).toMatchObject({ action: 'pause' });
     connection.emitClose();
     await rejected;
 
+    expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
     expect(useLaserStore.getState().streamer?.status).toBe('disconnected');
     expect(writes).toContain(GRBL_SAFETY_DOOR);
     expect(writes).not.toContain(GRBL_SOFT_RESET);
@@ -159,5 +165,51 @@ describe('Pause and Resume transition liveness', () => {
     connection.emitLine('<Door:0|MPos:4.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
     await pause;
     expect(settled).toBe(true);
+  });
+
+  it('does not extend laser Pause for repeated Door:2 progress reports', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes, async (data) => {
+      if (data === GRBL_SOFT_RESET) connection.emitLine('Grbl 1.1f');
+    });
+    await connectWith(connection);
+    await startTestLaserJob(['G21', 'G90', 'M4 S0', 'G1 X1 S100', 'M5'].join('\n'));
+    writes.length = 0;
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const pause = useLaserStore
+        .getState()
+        .pauseJob()
+        .finally(() => {
+          settled = true;
+        });
+      const rejected = expect(pause).rejects.toThrow();
+      await flushPromises();
+      let elapsedMs = 0;
+      while (
+        elapsedMs + PROGRESS_REPORT_INTERVAL_MS <
+        EXPECTED_TRANSITION_TIMEOUT_MS - BEFORE_TIMEOUT_MS
+      ) {
+        await vi.advanceTimersByTimeAsync(PROGRESS_REPORT_INTERVAL_MS);
+        elapsedMs += PROGRESS_REPORT_INTERVAL_MS;
+        connection.emitLine(LASER_PARKING_STATUS);
+        await flushPromises();
+      }
+      const finalAdvanceMs = EXPECTED_TRANSITION_TIMEOUT_MS - elapsedMs - BEFORE_TIMEOUT_MS;
+      await vi.advanceTimersByTimeAsync(finalAdvanceMs);
+      connection.emitLine(LASER_PARKING_STATUS);
+      await flushPromises();
+
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(BEFORE_TIMEOUT_MS);
+      await rejected;
+
+      expect(writes).toContain(GRBL_SOFT_RESET);
+      expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
+      expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

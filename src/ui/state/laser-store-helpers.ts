@@ -318,6 +318,7 @@ type InitialLaserState = Pick<
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
+  | 'pauseResumeTransition'
   | 'activeRunId'
   | 'liveCanvasRun'
   | 'activeJobMachineKind'

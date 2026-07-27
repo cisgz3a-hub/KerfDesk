@@ -269,7 +269,7 @@ describe('laser-store serial write failures', () => {
     );
   });
 
-  it('terminalizes the host stream and requests fail-dark reset when Safety Door fails', async () => {
+  it('terminalizes and quarantines when Safety Door and fail-dark writes reject', async () => {
     let shouldFail = false;
     const write = vi.fn(async (_data: string) => {
       if (shouldFail) throw new Error('write rejected');
@@ -283,14 +283,14 @@ describe('laser-store serial write failures', () => {
     shouldFail = true;
     await expect(useLaserStore.getState().pauseJob()).rejects.toThrow('write rejected');
 
-    expect(useLaserStore.getState().streamer?.status).toBe('errored');
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
     expect(write).toHaveBeenCalledWith('\x18');
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: write rejected',
     );
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'write-failed',
-      action: 'stop',
+      action: 'disconnect',
     });
     shouldFail = false;
   });

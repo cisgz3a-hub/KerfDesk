@@ -1,6 +1,7 @@
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 
 export type PauseResumeTransitionAction = 'pause' | 'resume';
+export type PauseResumeLivenessPolicy = 'none' | 'cnc-door';
 
 export type PauseResumeTransitionToken = {
   readonly id: symbol;
@@ -8,15 +9,24 @@ export type PauseResumeTransitionToken = {
   readonly failDarkWasExternallyOwned: () => boolean;
 };
 
+export type PauseResumeTransitionState = {
+  readonly token: symbol;
+  readonly action: PauseResumeTransitionAction;
+};
+
 export type PauseResumeTransitionRequest = {
   readonly token: PauseResumeTransitionToken;
   readonly markFailDarkExternallyOwned: () => void;
   readonly reject: (error: Error) => void;
-  readonly timer: ReturnType<typeof setTimeout>;
+  readonly timeoutMessage: string;
+  readonly livenessTimeoutMs: number;
+  livenessTimer: ReturnType<typeof setTimeout> | null;
+  maximumTimer: ReturnType<typeof setTimeout> | null;
 };
 
 export type PauseResumeTransitionRefs = {
   pauseResumeTransition?: PauseResumeTransitionRequest | null;
+  pauseResumePendingWrites?: Map<symbol, PauseResumePendingWrite>;
 };
 
 export type PauseResumeTransitionOwner = {
@@ -24,9 +34,22 @@ export type PauseResumeTransitionOwner = {
   readonly deadline: Promise<never>;
 };
 
+type PauseResumePendingWrite = {
+  writeEpoch: number;
+  count: number;
+  isRejected: boolean;
+};
+
+export type PauseResumeTransportFenceState = 'settling' | 'rejected';
+
 // Pausing removes the streamer from the active-stream heartbeat's monitored
-// states, so this transition owner must take over with no weaker deadline.
+// states, so this transition owner takes over the same silence deadline.
 export const PAUSE_RESUME_TRANSITION_TIMEOUT_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS;
+// Fresh CNC Door progress may outlast the heartbeat, but it must not keep
+// ownership forever. Thirty seconds covers the documented parking defaults
+// when compiled in and stock accessory delays with margin; longer physical
+// parking remains unqualified.
+export const PAUSE_RESUME_TRANSITION_MAX_TIMEOUT_MS = 30_000;
 
 export class PauseResumeTransitionError extends Error {
   public readonly failDarkAlreadyRequested: boolean;
@@ -54,22 +77,23 @@ export function beginPauseResumeTransition(
     action,
     failDarkWasExternallyOwned: () => isFailDarkExternallyOwned,
   };
-  let request: PauseResumeTransitionRequest;
   const deadline = new Promise<never>((_resolve, reject) => {
-    request = {
+    const request: PauseResumeTransitionRequest = {
       token,
       markFailDarkExternallyOwned: () => {
         isFailDarkExternallyOwned = true;
       },
       reject,
-      timer: setTimeout(() => {
-        rejectPauseResumeTransition(
-          refs,
-          request,
-          new PauseResumeTransitionError(timeoutMessage, false),
-        );
-      }, timeoutMs),
+      timeoutMessage,
+      livenessTimeoutMs: timeoutMs,
+      livenessTimer: null,
+      maximumTimer: null,
     };
+    request.livenessTimer = scheduleLivenessTimeout(refs, request);
+    request.maximumTimer = setTimeout(
+      () => rejectForTimeout(refs, request),
+      PAUSE_RESUME_TRANSITION_MAX_TIMEOUT_MS,
+    );
     refs.pauseResumeTransition = request;
   });
   return { token, deadline };
@@ -93,13 +117,83 @@ export function ownsPauseResumeTransition(
   return refs.pauseResumeTransition?.token === token;
 }
 
+export function reservePauseResumeTransportWrite(
+  refs: PauseResumeTransitionRefs & { readonly writeEpoch?: number },
+  token: PauseResumeTransitionToken,
+): void {
+  const pendingWrites = refs.pauseResumePendingWrites ?? new Map<symbol, PauseResumePendingWrite>();
+  refs.pauseResumePendingWrites = pendingWrites;
+  const pending = pendingWrites.get(token.id);
+  if (pending === undefined) {
+    pendingWrites.set(token.id, {
+      writeEpoch: refs.writeEpoch ?? 0,
+      count: 1,
+      isRejected: false,
+    });
+    return;
+  }
+  pending.count += 1;
+}
+
+export function markPauseResumeTransportWriteRejected(
+  refs: PauseResumeTransitionRefs & { readonly writeEpoch?: number },
+  token: PauseResumeTransitionToken,
+): void {
+  const pending = refs.pauseResumePendingWrites?.get(token.id);
+  if (pending === undefined) return;
+  pending.writeEpoch = refs.writeEpoch ?? 0;
+  pending.isRejected = true;
+}
+
+export function releasePauseResumeTransportWrite(
+  refs: PauseResumeTransitionRefs,
+  token: PauseResumeTransitionToken,
+): void {
+  const pendingWrites = refs.pauseResumePendingWrites;
+  const pending = pendingWrites?.get(token.id);
+  if (pending === undefined) return;
+  if (pending.count > 1) {
+    pending.count -= 1;
+    return;
+  }
+  pending.count = 0;
+  if (!pending.isRejected) pendingWrites?.delete(token.id);
+}
+
+export function currentPauseResumeTransportFence(
+  refs: PauseResumeTransitionRefs & { readonly writeEpoch?: number },
+): PauseResumeTransportFenceState | null {
+  const pendingWrites = refs.pauseResumePendingWrites;
+  if (pendingWrites === undefined) return null;
+  const currentWriteEpoch = refs.writeEpoch ?? 0;
+  for (const [tokenId, pending] of pendingWrites) {
+    if (pending.writeEpoch === currentWriteEpoch) {
+      return pending.isRejected ? 'rejected' : 'settling';
+    }
+    pendingWrites.delete(tokenId);
+  }
+  return null;
+}
+
+/** Refreshes silence liveness without moving the absolute transition maximum. */
+export function refreshPauseResumeTransitionLiveness(
+  refs: PauseResumeTransitionRefs,
+  token: PauseResumeTransitionToken,
+): boolean {
+  const request = refs.pauseResumeTransition;
+  if (request?.token !== token) return false;
+  if (request.livenessTimer !== null) clearTimeout(request.livenessTimer);
+  request.livenessTimer = scheduleLivenessTimeout(refs, request);
+  return true;
+}
+
 export function completePauseResumeTransition(
   refs: PauseResumeTransitionRefs,
   token: PauseResumeTransitionToken,
 ): void {
   const request = refs.pauseResumeTransition;
   if (request?.token !== token) return;
-  clearTimeout(request.timer);
+  clearTransitionTimers(request);
   refs.pauseResumeTransition = null;
 }
 
@@ -130,9 +224,34 @@ function rejectPauseResumeTransition(
   error: Error,
 ): void {
   if (refs.pauseResumeTransition !== request) return;
-  clearTimeout(request.timer);
+  clearTransitionTimers(request);
   refs.pauseResumeTransition = null;
   request.reject(error);
+}
+
+function scheduleLivenessTimeout(
+  refs: PauseResumeTransitionRefs,
+  request: PauseResumeTransitionRequest,
+): ReturnType<typeof setTimeout> {
+  return setTimeout(() => rejectForTimeout(refs, request), request.livenessTimeoutMs);
+}
+
+function rejectForTimeout(
+  refs: PauseResumeTransitionRefs,
+  request: PauseResumeTransitionRequest,
+): void {
+  rejectPauseResumeTransition(
+    refs,
+    request,
+    new PauseResumeTransitionError(request.timeoutMessage, false),
+  );
+}
+
+function clearTransitionTimers(request: PauseResumeTransitionRequest): void {
+  if (request.livenessTimer !== null) clearTimeout(request.livenessTimer);
+  if (request.maximumTimer !== null) clearTimeout(request.maximumTimer);
+  request.livenessTimer = null;
+  request.maximumTimer = null;
 }
 
 function transitionLabel(action: PauseResumeTransitionAction): string {

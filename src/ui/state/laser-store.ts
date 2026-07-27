@@ -44,6 +44,7 @@ import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
+import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
 import { overrideActions } from './override-actions';
 import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
@@ -119,6 +120,7 @@ export type LaserState = LaserStoreActions &
     readonly motionOperation: LaserMotionOperation | null;
     readonly controllerOperation: LaserControllerOperation | null;
     readonly streamer: StreamerState | null;
+    readonly pauseResumeTransition: PauseResumeTransitionState | null;
     /** Immutable recovery/replay ownership for the current streamer. */
     readonly activeRunId: RunId | null;
     /** Controller-reported canvas truth for the active or most recently

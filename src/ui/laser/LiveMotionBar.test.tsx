@@ -20,9 +20,34 @@ const realActions = {
   setFireActive: useLaserStore.getState().setFireActive,
 };
 
+type PendingPauseResumeCase = {
+  readonly action: 'pause' | 'resume';
+  readonly buttonLabel: 'Pausing…' | 'Resuming…';
+  readonly duplicateLabel: 'Pause' | 'Resume';
+  readonly heading: 'JOB PAUSING' | 'JOB RESUMING';
+  readonly streamer: () => NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']>;
+};
+
 function streamingStreamer(): NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']> {
   return step(createStreamer('G1 X1 S100\nG1 X2 S100\nG1 X3 S100')).state;
 }
+
+const PENDING_PAUSE_RESUME_CASES: ReadonlyArray<PendingPauseResumeCase> = [
+  {
+    action: 'pause',
+    buttonLabel: 'Pausing…',
+    duplicateLabel: 'Pause',
+    heading: 'JOB PAUSING',
+    streamer: streamingStreamer,
+  },
+  {
+    action: 'resume',
+    buttonLabel: 'Resuming…',
+    duplicateLabel: 'Resume',
+    heading: 'JOB RESUMING',
+    streamer: () => pause(streamingStreamer()),
+  },
+];
 
 function readyToolChangeStreamer() {
   let streamer = step(
@@ -60,6 +85,7 @@ afterEach(() => {
     pendingToolId: null,
     workZZeroEvidence: null,
     fireActive: false,
+    pauseResumeTransition: null,
     ...realActions,
   });
   document.body.innerHTML = '';
@@ -105,6 +131,30 @@ describe('LiveMotionBar', () => {
       await act(async () => root.unmount());
     }
   });
+
+  it.each(PENDING_PAUSE_RESUME_CASES)(
+    'shows token-bound $heading state and disables duplicate $duplicateLabel',
+    async ({ action, buttonLabel, duplicateLabel, heading, streamer }) => {
+      const duplicateAction = vi.fn(async () => undefined);
+      useLaserStore.setState({
+        streamer: streamer(),
+        pauseResumeTransition: { token: Symbol(action), action },
+        ...(action === 'pause' ? { pauseJob: duplicateAction } : { resumeJob: duplicateAction }),
+      });
+      const { host, root } = await render(<LiveMotionBar />);
+      try {
+        expect(host.textContent).toContain(heading);
+        const pendingButton = buttonByText(host, buttonLabel);
+        expect(pendingButton?.disabled).toBe(true);
+        expect(buttonByText(host, duplicateLabel)).toBeUndefined();
+        expect(buttonByText(host, 'ABORT JOB')?.disabled).toBe(false);
+        await act(async () => pendingButton?.click());
+        expect(duplicateAction).not.toHaveBeenCalled();
+      } finally {
+        await act(async () => root.unmount());
+      }
+    },
+  );
 
   it('keeps Pause available after every line is acknowledged while the machine still runs', async () => {
     const pauseJob = vi.fn(async () => undefined);
