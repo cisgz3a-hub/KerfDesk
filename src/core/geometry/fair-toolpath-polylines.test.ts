@@ -3,6 +3,7 @@ import type { Polyline, Vec2 } from '../scene';
 import { fairToolpathPolylines } from './fair-toolpath-polylines';
 
 const MM_PER_PX = 0.1; // the 254-DPI import default
+const ENLARGED_MM_PER_PX = 1000;
 const OPTIONS = {
   mmPerPx: MM_PER_PX,
   minSegmentMm: 0.4,
@@ -10,6 +11,15 @@ const OPTIONS = {
   cornerAngleDeg: 60,
 };
 const MIN_SEG_PX = OPTIONS.minSegmentMm / MM_PER_PX;
+const COARSE_POLYLINE: Polyline = {
+  points: [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 20, y: 0 },
+    { x: 30, y: 0 },
+  ],
+  closed: false,
+};
 
 // Deterministic jitter in [-amp, amp] without any PRNG state.
 function jitter(i: number, amp: number): number {
@@ -93,6 +103,16 @@ describe('fairToolpathPolylines', () => {
     expect(out[0]).toEqual(points[0]);
     expect(out[out.length - 1]).toEqual(points[points.length - 1]);
     expect((faired as Polyline).closed).toBe(false);
+  });
+
+  it('never densifies a chain whose source chords already exceed the floor', () => {
+    const [faired] = fairToolpathPolylines([COARSE_POLYLINE], {
+      ...OPTIONS,
+      mmPerPx: ENLARGED_MM_PER_PX,
+    });
+    if (faired === undefined) throw new Error('expected one faired chain');
+
+    expect(faired.points.length).toBeLessThanOrEqual(COARSE_POLYLINE.points.length);
   });
 
   it('lets nearby corners undershoot the segment floor rather than dropping them', () => {

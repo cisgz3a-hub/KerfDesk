@@ -238,10 +238,11 @@ function chainForSpan(points: ReadonlyArray<Vec2>, span: Span): Vec2[] {
   return chain;
 }
 
-// Even-arclength resample ON the original chain: endpoints exact, interior
-// vertices linearly interpolated along the source polyline, chord length in
-// [step, 2*step). A span shorter than one step keeps only its endpoints —
-// that is the micro-fragment merge.
+// Even-arclength resample ON the original chain: endpoints exact and interior
+// vertices linearly interpolated along the source polyline. A span shorter
+// than one step keeps only its endpoints — that is the micro-fragment merge.
+// Fairing never inserts more segments than the source span: the floor is a
+// simplification target, not a densifier of already-coarse geometry.
 function resampleChain(chain: ReadonlyArray<Vec2>, step: number): Vec2[] {
   const cumulative: number[] = [0];
   for (let i = 1; i < chain.length; i += 1) {
@@ -252,7 +253,8 @@ function resampleChain(chain: ReadonlyArray<Vec2>, step: number): Vec2[] {
   const total = cumulative[cumulative.length - 1] as number;
   const first = chain[0] as Vec2;
   const last = chain[chain.length - 1] as Vec2;
-  const segments = Math.max(1, Math.floor(total / step));
+  const sourceSegmentCount = chain.length - 1;
+  const segments = Math.max(1, Math.min(sourceSegmentCount, Math.floor(total / step)));
   const out: Vec2[] = [{ x: first.x, y: first.y }];
   let cursor = 1;
   for (let k = 1; k < segments; k += 1) {
