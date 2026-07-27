@@ -38,6 +38,7 @@ import {
   type JobReviewModel,
   type PreparedCurrentStart,
 } from './job-review-model';
+import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
 import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 
@@ -104,20 +105,33 @@ export async function runJobReviewGate(args: {
 
 function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
   const liveLaser = useLaserStore.getState();
+  const configured = bundle.project.device.controllerKind ?? 'grbl-v1.1';
   const baseModel = buildJobReviewModel({
     project: bundle.project,
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
   });
+  // FluidNC disclosures need the live identities, not just the profile, so
+  // they join here rather than inside buildJobReviewModel. Advisory only.
+  const fluidnc = detectFluidncDivergenceWarnings({
+    configured,
+    active: liveLaser.activeControllerKind,
+    detected: liveLaser.detectedControllerKind,
+    gcode: bundle.prepared.gcode,
+  });
+  const disclosed =
+    fluidnc.length === 0
+      ? baseModel
+      : { ...baseModel, warnings: [...baseModel.warnings, ...fluidnc] };
   const warning = bundle.frameWcsNormalizationWarning;
   const model =
-    warning === undefined || baseModel.warnings.includes(warning)
-      ? baseModel
-      : { ...baseModel, warnings: [warning, ...baseModel.warnings] };
+    warning === undefined || disclosed.warnings.includes(warning)
+      ? disclosed
+      : { ...disclosed, warnings: [warning, ...disclosed.warnings] };
   return refreshControllerIdentityWarnings(
     model,
-    bundle.project.device.controllerKind ?? 'grbl-v1.1',
+    configured,
     liveLaser.activeControllerKind,
     liveLaser.detectedControllerKind,
   );
