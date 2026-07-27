@@ -97,6 +97,7 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(builder).toContain('artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}');
     expect(builder).toContain('shortcutName: KerfDesk');
     expect(builder).toContain('appId: dev.laserforge.app');
+    expect(builder).toMatch(/win:\s*\n\s*icon: public\/favicon\.svg/);
     expect(workflow).toContain('KerfDesk-$env:VERSION-windows-x64-setup.exe');
     expect(workflow).toContain('KerfDesk-${VERSION}-windows-x64-setup.exe');
     expect(workflow).not.toContain('LaserForge-2.0-${VERSION}-x64-setup.exe');

@@ -29,6 +29,7 @@ extraMetadata:
 afterPack: scripts/electron-builder-preview-after-pack.mjs
 
 win:
+  icon: public/favicon.svg
   target:
     - target: nsis
       arch:
@@ -45,6 +46,7 @@ nsis:
 
 mac:
   appId: com.kerfdesk.app
+  icon: public/favicon.svg
   target:
     - dmg
   artifactName: KerfDesk-${version}-macos-${arch}.${ext}
