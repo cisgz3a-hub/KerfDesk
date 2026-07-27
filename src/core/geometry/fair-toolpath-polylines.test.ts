@@ -1,15 +1,32 @@
 import { describe, expect, it } from 'vitest';
+import { polylineDeviationBounds } from '../../__fixtures__/polyline-deviation-bounds';
 import type { Polyline, Vec2 } from '../scene';
 import { fairToolpathPolylines } from './fair-toolpath-polylines';
 
 const MM_PER_PX = 0.1; // the 254-DPI import default
+const ENLARGED_MM_PER_PX = 1000;
+const DEVIATION_ORACLE_ERROR_MM = 0.005;
+const FLOAT_TOLERANCE_MM = 1e-6;
+const TINY_RING_SIDE_PX = 0.01;
 const OPTIONS = {
   mmPerPx: MM_PER_PX,
   minSegmentMm: 0.4,
   maxDeviationMm: 0.05,
   cornerAngleDeg: 60,
 };
-const MIN_SEG_PX = OPTIONS.minSegmentMm / MM_PER_PX;
+const COARSE_POLYLINE: Polyline = {
+  points: [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 20, y: 0 },
+    { x: 30, y: 0 },
+  ],
+  closed: false,
+};
+
+function pointsInMm(points: ReadonlyArray<Vec2>, mmPerPx: number): Vec2[] {
+  return points.map((point) => ({ x: point.x * mmPerPx, y: point.y * mmPerPx }));
+}
 
 // Deterministic jitter in [-amp, amp] without any PRNG state.
 function jitter(i: number, amp: number): number {
@@ -30,24 +47,18 @@ function jitteredSquare(): Polyline {
   for (let k = 0; k < perSide; k += 1, i += 1)
     push(side - (k / perSide) * side, side + jitter(i, 0.45));
   for (let k = 0; k < perSide; k += 1, i += 1) push(jitter(i, 0.45), side - (k / perSide) * side);
-  points.push({ ...(points[0] as Vec2) });
+  const first = points[0];
+  if (first === undefined) throw new Error('expected a jittered square start point');
+  points.push({ ...first });
   return { points, closed: true };
-}
-
-function segmentLengths(polyline: Polyline): number[] {
-  const out: number[] = [];
-  for (let i = 1; i < polyline.points.length; i += 1) {
-    const a = polyline.points[i - 1] as Vec2;
-    const b = polyline.points[i] as Vec2;
-    out.push(Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  return out;
 }
 
 describe('fairToolpathPolylines', () => {
   it('pins the four drawn corners of a jittered square and flattens its sides', () => {
-    const [faired] = fairToolpathPolylines([jitteredSquare()], OPTIONS);
-    const points = (faired as Polyline).points;
+    const source = jitteredSquare();
+    const [faired] = fairToolpathPolylines([source], OPTIONS);
+    if (faired === undefined) throw new Error('expected one faired square');
+    const points = faired.points;
     // Every true corner survives within the jitter envelope.
     for (const corner of [
       { x: 0, y: 0 },
@@ -65,34 +76,56 @@ describe('fairToolpathPolylines', () => {
     for (const p of bottom) {
       expect(Math.abs(p.y)).toBeLessThanOrEqual(0.5);
     }
-    // Chords respect the physical floor AWAY from corners — corner-adjacent
-    // chords may be short by design (corners win over the floor).
-    const corners = [
-      { x: 0, y: 0 },
-      { x: 200, y: 0 },
-      { x: 200, y: 200 },
-      { x: 0, y: 200 },
-    ];
-    const segs = segmentLengths(faired as Polyline);
-    for (let i = 0; i < segs.length; i += 1) {
-      const a = points[i] as Vec2;
-      const b = points[i + 1] as Vec2;
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const nearCorner = corners.some((c) => Math.hypot(mid.x - c.x, mid.y - c.y) < 5);
-      if (!nearCorner) {
-        expect(segs[i]).toBeGreaterThanOrEqual(MIN_SEG_PX * 0.95);
-      }
-    }
+    // The chord target yields when simplification conflicts with the boundary
+    // budget, while the dense source still loses redundant points.
+    const deviation = polylineDeviationBounds(
+      pointsInMm(source.points, MM_PER_PX),
+      pointsInMm(points, MM_PER_PX),
+      DEVIATION_ORACLE_ERROR_MM,
+    );
+    expect(deviation.upperBound).toBeLessThanOrEqual(
+      OPTIONS.maxDeviationMm + DEVIATION_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+    );
+    expect(points.length).toBeLessThan(source.points.length);
   });
 
   it('keeps open-chain endpoints exact', () => {
     const points: Vec2[] = [];
     for (let i = 0; i <= 300; i += 1) points.push({ x: i, y: jitter(i, 0.45) });
     const [faired] = fairToolpathPolylines([{ points, closed: false }], OPTIONS);
-    const out = (faired as Polyline).points;
+    if (faired === undefined) throw new Error('expected one faired open chain');
+    const out = faired.points;
     expect(out[0]).toEqual(points[0]);
     expect(out[out.length - 1]).toEqual(points[points.length - 1]);
-    expect((faired as Polyline).closed).toBe(false);
+    expect(faired.closed).toBe(false);
+  });
+
+  it('never densifies a chain whose source chords already exceed the floor', () => {
+    const [faired] = fairToolpathPolylines([COARSE_POLYLINE], {
+      ...OPTIONS,
+      mmPerPx: ENLARGED_MM_PER_PX,
+    });
+    if (faired === undefined) throw new Error('expected one faired chain');
+
+    expect(faired.points.length).toBeLessThanOrEqual(COARSE_POLYLINE.points.length);
+  });
+
+  it('bounds the cyclic corner window for a sub-pixel closed ring', () => {
+    const points: Vec2[] = [
+      { x: 0, y: 0 },
+      { x: TINY_RING_SIDE_PX, y: 0 },
+      { x: TINY_RING_SIDE_PX, y: TINY_RING_SIDE_PX },
+      { x: 0, y: TINY_RING_SIDE_PX },
+      { x: 0, y: 0 },
+    ];
+    const [faired] = fairToolpathPolylines([{ points, closed: true }], OPTIONS);
+    if (faired === undefined) throw new Error('expected one tiny faired ring');
+
+    expect(faired.closed).toBe(true);
+    expect(faired.points.length).toBeGreaterThan(1);
+    expect(
+      faired.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+    ).toBe(true);
   });
 
   it('lets nearby corners undershoot the segment floor rather than dropping them', () => {
@@ -102,7 +135,8 @@ describe('fairToolpathPolylines', () => {
     points.push({ x: 100, y: 30 }, { x: 102, y: 30 }, { x: 102, y: 0 });
     for (let x = 103; x <= 200; x += 1) points.push({ x, y: 0 });
     const [faired] = fairToolpathPolylines([{ points, closed: false }], OPTIONS);
-    const out = (faired as Polyline).points;
+    if (faired === undefined) throw new Error('expected one faired notched chain');
+    const out = faired.points;
     for (const corner of [
       { x: 100, y: 30 },
       { x: 102, y: 30 },

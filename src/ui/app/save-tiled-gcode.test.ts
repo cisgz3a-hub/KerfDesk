@@ -189,40 +189,57 @@ describe('handleSaveTiledGcode', () => {
     }
   });
 
-  // GCO-02 (Codex M-04): the tiled path must run the same controller-readiness
-  // gate as single-file Save. $32=1 (laser mode) on a CNC controller is a
-  // blocking plunge hazard; declining the confirm must write NO tiles.
-  it('writes no tiles when controller readiness fails and the user declines', async () => {
+  // GCO-02 (Codex M-04) asserted the opposite: that declining a
+  // controller-readiness confirm wrote NO tiles. Rule 7 / ADR-228 names
+  // "save … export" and "adds confirmation before an otherwise available
+  // action" in the guard definition, and names controller-setting policy as
+  // warn-only — so $32=1 on a CNC controller is stated, once for the whole
+  // set, and every tile is still written. The plunge hazard it describes is
+  // real; refusing the export is not what protects against it.
+  it('writes every tile and warns when the controller reports laser mode', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const written: string[] = [];
+    const toasts: Array<{ readonly message: string; readonly variant?: string }> = [];
     const handled = await handleSaveTiledGcode({
       platform: capturingPlatform(written),
       project: tiledCncProject(),
       savedName: 'job',
-      // $30 matches spindle max (12000) but $32=1 → cncReadiness blocking error.
+      // $30 matches spindle max (12000) but $32=1 → cncReadiness error.
       controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: true },
-      pushToast: () => undefined,
+      pushToast: (message, variant) => {
+        toasts.push(variant === undefined ? { message } : { message, variant });
+      },
     });
 
     expect(handled).toBe(true);
-    expect(written).toHaveLength(0);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(written.length).toBeGreaterThan(0);
+    // Stated ONCE for the set, naming the setting and the hazard.
+    const laserModeWarnings = toasts.filter(
+      (toast) =>
+        toast.variant === 'warning' &&
+        toast.message.includes('Controller reports $32=1 (laser mode). Set $32=0 for spindle work'),
+    );
+    expect(laserModeWarnings).toHaveLength(1);
     confirmSpy.mockRestore();
   });
 
-  it('writes tiles when the connected controller passes readiness', async () => {
+  it('writes tiles and raises no readiness warning when the controller passes', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const written: string[] = [];
+    const toasts: string[] = [];
     await handleSaveTiledGcode({
       platform: capturingPlatform(written),
       project: tiledCncProject(),
       savedName: 'job',
-      // Router mode ($32=0) + matching $30 → readiness ok, confirm never asked.
+      // Router mode ($32=0) + matching $30 → readiness ok, nothing to report.
       controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
-      pushToast: () => undefined,
+      pushToast: (message) => toasts.push(message),
     });
 
     expect(written.length).toBeGreaterThan(0);
     expect(confirmSpy).not.toHaveBeenCalled();
+    expect(toasts.some((message) => message.includes('connected controller'))).toBe(false);
     confirmSpy.mockRestore();
   });
 });

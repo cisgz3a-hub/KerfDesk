@@ -14,7 +14,7 @@ import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
 import { emitStandaloneCncGcode } from '../../io/gcode/standalone-cnc-gcode';
 import { buildGcodeMetadata } from '../app/build-info';
-import { confirmControllerReadiness } from '../app/confirm-controller-readiness';
+import { controllerReadinessAdvisories } from '../app/controller-readiness-advisories';
 import { usePlatform } from '../app/platform-context';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
@@ -119,18 +119,28 @@ async function saveSurfacingProgram(
   }
   const { program } = result;
   const emitted = emitStandaloneCncGcode(project, program.lines.join('\n'), buildGcodeMetadata());
-  // Rule 7 / ADR-228: only compile-integrity findings may refuse a save. Reading
-  // preflight.ok raw refused on out-of-bed and no-go-zone collisions — the two
-  // policy findings rule 7 names by name — because ok is issues.length === 0,
-  // not an integrity predicate. Surfacing bypasses Job Review, so the demoted
-  // findings become post-save warning toasts instead of vanishing.
+  // Rule 7 / ADR-228: this read `preflight.ok`, which is false for ANY issue,
+  // so runStandaloneCncPreflight's heuristic findings — out-of-bed and
+  // no-go-zone-collision, the two rule 7 names by name as warn-only, plus
+  // plunged-travel and cnc-settings-invalid — refused the export. Enabling any
+  // no-go zone made the wizard permanently unable to save, because the zone
+  // uncertainty is raised unconditionally. Split against the same canonical
+  // compile-integrity set the Start, Save and tiled paths key off.
   const { blocking, advisories } = partitionSavePreflight(emitted.preflight.issues);
+  // Surfacing never opens Job Review, so this toast list IS the operator's
+  // warnings surface — every demoted finding has to arrive here or the signal
+  // is lost outright. Emitted BEFORE the blocking check and before the picker:
+  // the refusal this replaced joined every message into one toast on every
+  // attempt, so reporting only after a successful write would say less.
+  for (const advisory of advisories) pushToast(advisory.message, 'warning');
+  for (const advisory of controllerReadinessAdvisories(project, controllerSettings)) {
+    pushToast(advisory, 'warning');
+  }
   if (blocking.length > 0) {
     const reasons = blocking.map((issue) => issue.message).join(' ');
     pushToast(`Could not save the surfacing program: ${reasons}`, 'error');
     return;
   }
-  if (!confirmControllerReadiness(project, controllerSettings)) return;
   try {
     const target = await platform.pickFileForSave({
       suggestedName: 'surfacing.nc',
@@ -142,7 +152,6 @@ async function saveSurfacingProgram(
       `Saved preflighted surfacing program: ${program.passes} pass(es) × ${program.rowsPerPass} rows with the ${tool.name}. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,
       'success',
     );
-    for (const advisory of advisories) pushToast(advisory.message, 'warning');
   } catch (err) {
     pushToast(
       `Could not save the surfacing program: ${err instanceof Error ? err.message : String(err)}`,

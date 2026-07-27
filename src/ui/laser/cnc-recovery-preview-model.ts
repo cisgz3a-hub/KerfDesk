@@ -18,14 +18,18 @@ import { cncSupervisedRecoveryRunwayProfile } from '../../core/recovery/cnc-supe
 import type { Project } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import type { RecoveryCapsule } from '../state/recovery';
+import {
+  exactEvidenceChecks,
+  legacyEvidenceChecks,
+  legacyProgramIdentityCheck,
+  preflightAdvisoryChecks,
+  type CncRecoveryEvidenceCheck,
+} from './cnc-recovery-evidence-checks';
 import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-binding';
+import { partitionEmitPreflight } from './start-job-readiness-policy';
 
-export type CncRecoveryEvidenceCheck = {
-  readonly id: string;
-  readonly label: string;
-  readonly status: 'matched' | 'diagnostic' | 'missing' | 'mismatch';
-  readonly detail: string;
-};
+// Re-exported so the wizard keeps one import for the whole preview contract.
+export type { CncRecoveryEvidenceCheck };
 
 export type CncRecoveryPreviewEvent = {
   readonly id: string;
@@ -46,7 +50,6 @@ type LegacyPreviewRecord = Pick<
   JobCheckpoint,
   'fingerprint' | 'machineKind' | 'outputScope' | 'jobOrigin' | 'ackedLines' | 'sendableLines'
 >;
-type EvidenceStatus = CncRecoveryEvidenceCheck['status'];
 
 /** Exact capsules are reviewed only from their sealed execution artifact. */
 export function buildCncRecoveryPreviewModel(
@@ -180,11 +183,25 @@ function buildLegacyPreview(
     outputScope: checkpoint.outputScope,
     ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
   });
-  if (!emitted.preflight.ok) {
-    return unavailable(base, 'The current project fails CNC preflight.', parameters);
+  // Rule 7 / ADR-228: only a compile-integrity failure may refuse recovery.
+  // `preflight.ok` is false for ANY issue (core/preflight/preflight.ts), so
+  // reading it directly refused recovery over heuristic policy findings —
+  // out-of-bed, no-go-zone, plunged travel, speed range — behind a generic
+  // "fails CNC preflight" that named none of them, and stranded a partially
+  // cut workpiece. Both sibling flows were migrated (cnc-pass-recovery-flow,
+  // cnc-supervised-recovery-flow); this was the third. Demoted findings are
+  // named in the evidence list the wizard already renders.
+  const emitSplit = partitionEmitPreflight(emitted.preflight);
+  const advisories = preflightAdvisoryChecks(emitSplit.warnings);
+  if (emitSplit.blocking.length > 0) {
+    return unavailable(
+      [...advisories, ...base],
+      `The current project cannot emit this legacy record: ${emitSplit.blocking.join(' ')}`,
+      parameters,
+    );
   }
   const programMatches = fingerprintsEqual(fingerprintGcode(emitted.gcode), checkpoint.fingerprint);
-  const checks = [legacyProgramIdentityCheck(programMatches), ...base];
+  const checks = [legacyProgramIdentityCheck(programMatches), ...advisories, ...base];
   if (!programMatches) {
     return unavailable(
       checks,
@@ -230,118 +247,6 @@ function buildSemanticPreview(
     selectedEventId,
     geometry,
   };
-}
-
-function exactEvidenceChecks(
-  capsule: RecoveryCapsule,
-  identityMatches: boolean,
-  preparedProgramMatches: boolean,
-  manifestPresent: boolean,
-  manifestMatches: boolean,
-): ReadonlyArray<CncRecoveryEvidenceCheck> {
-  const manifestStatus = !manifestPresent
-    ? 'missing'
-    : preparedProgramMatches && manifestMatches
-      ? 'matched'
-      : 'mismatch';
-  const manifestDescription = !manifestPresent
-    ? 'The exact capsule has no CNC recovery manifest.'
-    : !preparedProgramMatches
-      ? 'The archived prepared job does not reproduce the sealed exact G-code.'
-      : manifestMatches
-        ? 'The emitter-owned semantic job and recovery manifest are sealed together in the capsule.'
-        : 'The archived manifest does not match the archived prepared semantic job.';
-  return [
-    evidence(
-      'program-identity',
-      'Saved execution artifact identity',
-      identityMatches ? 'matched' : 'mismatch',
-      identityMatches
-        ? 'The exact emitted G-code and immutable run identity are retained in the capsule.'
-        : 'The capsule run identity, progress total, or archived G-code fingerprint is inconsistent.',
-    ),
-    acknowledgementCheck(capsule),
-    evidence(
-      'semantic-line-map',
-      'Archived prepared job and recovery manifest',
-      manifestStatus,
-      manifestDescription,
-    ),
-    executionFenceCheck,
-    evidence(
-      'machine-state',
-      'Archived controller observations',
-      'diagnostic',
-      'Retained settings, position, tool, and Work Z observations are diagnostics only; the live controller must be requalified.',
-    ),
-    runwayQualificationCheck,
-  ];
-}
-
-function legacyEvidenceChecks(
-  checkpoint: Pick<LegacyPreviewRecord, 'ackedLines' | 'sendableLines'>,
-): ReadonlyArray<CncRecoveryEvidenceCheck> {
-  return [
-    acknowledgementCheck(checkpoint),
-    evidence(
-      'semantic-line-map',
-      'Archived prepared job and recovery manifest',
-      'missing',
-      'This legacy fingerprint-only record predates the sealed semantic artifact.',
-    ),
-    executionFenceCheck,
-    evidence(
-      'machine-state',
-      'Position, spindle, tool, and workholding',
-      'missing',
-      'No retained-session physical execution proof is attached.',
-    ),
-    runwayQualificationCheck,
-  ];
-}
-
-function acknowledgementCheck(
-  progress: Pick<LegacyPreviewRecord, 'ackedLines' | 'sendableLines'>,
-): CncRecoveryEvidenceCheck {
-  return evidence(
-    'acknowledgements',
-    'Controller acknowledgements',
-    'diagnostic',
-    `${progress.ackedLines} of ${progress.sendableLines} lines were acknowledged; this does not prove physical execution.`,
-  );
-}
-
-const executionFenceCheck = evidence(
-  'execution-fence',
-  'Controller execution fence',
-  'missing',
-  'No controller-owned proof identifies the last physically completed contour segment.',
-);
-const runwayQualificationCheck = evidence(
-  'machine-profile',
-  'Hardware-qualified runway profile',
-  'missing',
-  'The displayed acceleration and margin are illustrative, not machine qualification.',
-);
-
-function legacyProgramIdentityCheck(matches: boolean): CncRecoveryEvidenceCheck {
-  return evidence(
-    'program-identity',
-    'Legacy interrupted program identity',
-    matches ? 'matched' : 'mismatch',
-    matches
-      ? 'The current project recompiles to the legacy G-code fingerprint.'
-      : 'The current project produces different G-code from the legacy record.',
-  );
-}
-
-function evidence(
-  id: string,
-  label: string,
-  status: EvidenceStatus,
-  detail: string,
-): CncRecoveryEvidenceCheck {
-  return { id, label, status, detail };
 }
 
 function exactIdentityMatches(capsule: RecoveryCapsule): boolean {
