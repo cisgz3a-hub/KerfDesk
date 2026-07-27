@@ -45,6 +45,7 @@ import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
 import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
+import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
@@ -257,53 +258,45 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
   startCursor: Vec2,
   allowReverse: boolean,
 ): { readonly segments: T[]; readonly cursor: Vec2 } {
-  const remaining = new Set<number>();
-  for (let i = 0; i < segments.length; i += 1) remaining.add(i);
+  // Indexed once, then queried n times. The previous scan re-examined every
+  // remaining segment on every step, which is the O(n²) that MAX_NEAREST_
+  // NEIGHBOR_SEGMENTS exists to cap. The index picks the same segment in the
+  // same order — see segment-entry-index.ts on tie-breaking.
+  const nearest = createNearestEntryQuery(collectSegmentEntries(segments, allowReverse));
+  const placed = new Set<number>();
+  const isAvailable = (index: number): boolean => !placed.has(index);
   const out: T[] = [];
   let cursor: Vec2 = startCursor;
-  while (remaining.size > 0) {
-    const pick = pickBestNext(segments, remaining, cursor, allowReverse);
+  for (;;) {
+    const pick = nearest(cursor, isAvailable);
     if (pick === null) break;
-    remaining.delete(pick.index);
-    const placed = pick.reverse ? reverseSegment(pick.segment) : pick.segment;
-    out.push(placed);
-    const last = placed.polyline[placed.polyline.length - 1];
+    placed.add(pick.segmentIndex);
+    const segment = segments[pick.segmentIndex];
+    if (segment === undefined) continue;
+    const next = pick.reverse ? reverseSegment(segment) : segment;
+    out.push(next);
+    const last = next.polyline[next.polyline.length - 1];
     if (last !== undefined) cursor = last;
   }
   return { segments: out, cursor };
 }
 
-type SegmentPick<T extends CutSegment> = {
-  readonly index: number;
-  readonly reverse: boolean;
-  readonly segment: T;
-};
-
-// Scan every remaining segment, return the (index, reverse-flag) pair
-// whose entry endpoint is closest to the cursor. Extracted from
-// nearestNeighborOrder to keep both functions under the cyclomatic
-// complexity cap (CLAUDE.md size limits — complexity max 12).
-function pickBestNext<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  remaining: ReadonlySet<number>,
-  cursor: Vec2,
+// A segment with no usable endpoint contributes no entry, so it is never
+// picked — preserving the prior behaviour, where such a segment was skipped by
+// the scan and dropped from the result.
+function collectSegmentEntries(
+  segments: ReadonlyArray<CutSegment>,
   allowReverse: boolean,
-): SegmentPick<T> | null {
-  let best: SegmentPick<T> | null = null;
-  let bestDistSq = Number.POSITIVE_INFINITY;
-  for (const i of remaining) {
-    const seg = segments[i];
-    if (seg === undefined) continue;
-    const entries = segmentEntries(seg, allowReverse);
-    for (const entry of entries) {
-      const d = distanceSquared(cursor, entry.point);
-      if (d < bestDistSq) {
-        bestDistSq = d;
-        best = { index: i, reverse: entry.reverse, segment: seg };
-      }
+): SegmentEntry[] {
+  const entries: SegmentEntry[] = [];
+  for (let i = 0; i < segments.length; i += 1) {
+    const segment = segments[i];
+    if (segment === undefined) continue;
+    for (const entry of segmentEntries(segment, allowReverse)) {
+      entries.push({ point: entry.point, segmentIndex: i, reverse: entry.reverse });
     }
   }
-  return best;
+  return entries;
 }
 
 // Candidate entry points for a segment: always the polyline start;
