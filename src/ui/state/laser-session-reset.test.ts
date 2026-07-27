@@ -8,6 +8,8 @@ import { disconnectedStatePatch } from './laser-disconnected-state';
 import { buildPortClosePatch, initialLaserState } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
+const PENDING_TRANSITION_TOKEN = Symbol('pending-pause-resume');
+
 // The patch builders read only scalar state fields, so a synthetic state is
 // sufficient here and no action implementations are needed.
 function dirtySessionState(): LaserState {
@@ -18,6 +20,7 @@ function dirtySessionState(): LaserState {
     activeWcs: 'G55',
     ovCache: { feed: 120, rapid: 100, spindle: 100 },
     activeJobMachineKind: 'cnc',
+    pauseResumeTransition: { token: PENDING_TRANSITION_TOKEN, action: 'resume' },
     toolChangeIdleSeen: true,
     toolChangeLabels: ['1/4in endmill'],
     toolChangeToolIds: ['tool-1'],
@@ -47,6 +50,7 @@ describe.each(teardownPaths)('$name clears session-scoped controller state', ({ 
   it('drops the finished job identity and its tool-change queue', () => {
     const after = { ...dirtySessionState(), ...patch(dirtySessionState()) };
     expect(after.activeJobMachineKind).toBeNull();
+    expect(after.pauseResumeTransition).toBeNull();
     expect(after.toolChangeIdleSeen).toBe(false);
     expect(after.toolChangeLabels).toEqual([]);
     expect(after.toolChangeToolIds).toEqual([]);

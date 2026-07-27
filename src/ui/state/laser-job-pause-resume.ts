@@ -1,27 +1,34 @@
 import type { ControllerDriver } from '../../core/controllers';
+import { pause as pauseStreamer, type StatusReport } from '../../core/controllers/grbl';
+import { cancelFreshControllerStatusWait } from './laser-controller-status-wait';
 import {
-  pause as pauseStreamer,
-  resume as resumeStreamer,
-  step,
-  type StatusReport,
-} from '../../core/controllers/grbl';
-import {
-  cancelFreshControllerStatusWait,
-  waitForFreshControllerStatus,
-} from './laser-controller-status-wait';
+  sendRealtimeAndConfirmPauseResume,
+  writeWhilePauseResumeOwner,
+} from './laser-pause-resume-confirmation';
+import { refillResumedStream } from './laser-pause-resume-refill';
 import {
   assertPauseResumeTransitionOwner,
   beginPauseResumeTransition,
   completePauseResumeTransition,
   failDarkWasAlreadyRequested,
+  hasCurrentPauseResumeTransportFence,
   type PauseResumeTransitionAction,
   type PauseResumeTransitionToken,
 } from './laser-pause-resume-transition';
+import {
+  assertNoPauseResumeTransition,
+  recordPauseResumeConfirmationFailure,
+  reportedPauseResumeFailure,
+} from './laser-pause-resume-failure';
 import { beginPostJobSettle, type PostJobSettleRefs } from './laser-post-job-settle';
-import { streamStalledNotice, type LaserSafetyAction } from './laser-safety-notice';
+import {
+  cncPauseResumeStalledNotice,
+  streamStalledNotice,
+  type LaserSafetyAction,
+} from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
-import { liveCanvasExecutionAcceptedPatch, liveCanvasLifecyclePatch } from './live-canvas-run';
+import { liveCanvasLifecyclePatch } from './live-canvas-run';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -66,6 +73,9 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   const safetyDoor = activeDriver.realtime.safetyDoor;
   const pauseByte = safetyDoor ?? activeDriver.realtime.hold;
   const controlSession = context.get().controllerSessionEpoch;
+  const timeoutMessage = laserJob
+    ? PAUSE_CONFIRMATION_TIMEOUT_MESSAGE
+    : CNC_PAUSE_CONFIRMATION_TIMEOUT_MESSAGE;
 
   if (
     laserJob &&
@@ -80,28 +90,27 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
     context.get().pushSystemNotice(`[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`);
     return;
   }
-  await runOwnedPauseResumeTransition(
-    context,
-    'pause',
-    laserJob ? PAUSE_CONFIRMATION_TIMEOUT_MESSAGE : CNC_PAUSE_CONFIRMATION_TIMEOUT_MESSAGE,
-    async (token) => {
-      freezeStreamer(context);
-      if (safetyDoor !== null) {
-        await sendRealtimeAndConfirm(
-          context,
-          token,
-          pauseByte,
-          controlSession,
-          (report) => isSettledWithAccessoriesOff(report, laserJob),
-          PAUSE_CONFIRMATION_TIMEOUT_MESSAGE,
-          'pause',
-        );
-        assertCurrentPauseConfirmation(context, laserJob);
-      } else {
-        await writeWhileTransitionOwner(context, token, pauseByte, 'pause');
-      }
-    },
-  );
+  await runOwnedPauseResumeTransition(context, 'pause', timeoutMessage, async (token) => {
+    freezeStreamer(context);
+    if (safetyDoor !== null) {
+      await sendRealtimeAndConfirmPauseResume(context, {
+        token,
+        command: pauseByte,
+        expectedSession: controlSession,
+        accept: (report) => isSettledWithAccessoriesOff(report, laserJob),
+        timeoutMessage,
+        action: 'pause',
+        liveness: laserJob ? 'none' : 'cnc-door',
+      });
+      assertCurrentPauseConfirmation(context, laserJob);
+    } else {
+      await writeWhilePauseResumeOwner(context, {
+        token,
+        command: pauseByte,
+        action: 'pause',
+      });
+    }
+  });
 }
 
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
@@ -117,44 +126,50 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   const confirmedDoorResume = activeDriver.realtime.safetyDoor !== null;
   const controlSession = context.get().controllerSessionEpoch;
   const resumeByte = activeDriver.realtime.resume;
+  const timeoutMessage = laserJob
+    ? RESUME_CONFIRMATION_TIMEOUT_MESSAGE
+    : CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE;
   let finishedWithoutRefill = false;
 
-  await runOwnedPauseResumeTransition(
-    context,
-    'resume',
-    laserJob ? RESUME_CONFIRMATION_TIMEOUT_MESSAGE : CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE,
-    async (token) => {
-      if (resumeByte !== null && confirmedDoorResume) {
-        await sendRealtimeAndConfirm(
-          context,
-          token,
-          resumeByte,
-          controlSession,
-          (report) => report.state === 'Run' || report.state === 'Idle',
-          RESUME_CONFIRMATION_TIMEOUT_MESSAGE,
-          'resume',
-        );
-        assertCurrentResumeConfirmation(context);
-      } else if (resumeByte !== null) {
-        await writeWhileTransitionOwner(context, token, resumeByte, 'resume');
-      }
-      finishedWithoutRefill = await refillResumedStream(context, token);
-    },
-  );
+  await runOwnedPauseResumeTransition(context, 'resume', timeoutMessage, async (token) => {
+    if (resumeByte !== null && confirmedDoorResume) {
+      await sendRealtimeAndConfirmPauseResume(context, {
+        token,
+        command: resumeByte,
+        expectedSession: controlSession,
+        accept: (report) => report.state === 'Run' || report.state === 'Idle',
+        timeoutMessage,
+        action: 'resume',
+        liveness: laserJob ? 'none' : 'cnc-door',
+      });
+      assertCurrentResumeConfirmation(context);
+    } else if (resumeByte !== null) {
+      await writeWhilePauseResumeOwner(context, {
+        token,
+        command: resumeByte,
+        action: 'resume',
+      });
+    }
+    finishedWithoutRefill = await refillResumedStream(context, {
+      token,
+      liveness: !laserJob && confirmedDoorResume ? 'cnc-door' : 'none',
+    });
+  });
   if (finishedWithoutRefill) {
     beginPostJobSettle(context.set, context.get, context.refs, context.safeWrite);
   }
 }
 
 function freezeStreamer(context: PauseResumeContext): void {
-  context.set((state) =>
-    state.streamer === null
-      ? {}
-      : {
-          streamer: pauseStreamer(state.streamer),
-          ...liveCanvasLifecyclePatch(state, 'paused'),
-        },
-  );
+  context.set((state) => {
+    if (state.streamer === null) return {};
+    const pausedStreamer = pauseStreamer(state.streamer);
+    if (pausedStreamer === state.streamer && state.streamer.status !== 'paused') return {};
+    return {
+      streamer: pausedStreamer,
+      ...liveCanvasLifecyclePatch(state, 'paused'),
+    };
+  });
 }
 
 async function runOwnedPauseResumeTransition(
@@ -164,6 +179,9 @@ async function runOwnedPauseResumeTransition(
   work: (token: PauseResumeTransitionToken) => Promise<void>,
 ): Promise<void> {
   const owner = beginPauseResumeTransition(context.refs, action, timeoutMessage);
+  context.set({
+    pauseResumeTransition: { token: owner.token.id, action },
+  });
   const transitionWork = work(owner.token);
   try {
     await Promise.race([transitionWork, owner.deadline]);
@@ -172,7 +190,15 @@ async function runOwnedPauseResumeTransition(
   } catch (error) {
     const failDarkAlreadyOwned = failDarkWasAlreadyRequested(error, owner.token);
     completePauseResumeTransition(context.refs, owner.token);
-    const failure = recordConfirmationFailure(context, error);
+    // A Resume can fail while its first post-confirmation stream write is still
+    // pending. Keep its staged queue/in-flight accounting, but make the host
+    // sender paused again before surfacing the failure so an early or late ack
+    // cannot refill beyond the failed transition.
+    freezeStreamer(context);
+    const failure = recordPauseResumeConfirmationFailure(
+      context,
+      reportedPauseResumeFailure(context, error),
+    );
     cancelFreshControllerStatusWait(context.refs, failure.message);
     // ADR-180 amendment 3 (2026-07-25): only a laser escalates to a fail-dark
     // reset. On a laser a stuck-on beam is the hazard, so resetting the
@@ -182,61 +208,19 @@ async function runOwnedPauseResumeTransition(
     // The notice still surfaces; the stream stays frozen; the operator decides.
     if (!failDarkAlreadyOwned) recordPauseResumeStall(context);
     throw failure;
+  } finally {
+    clearPauseResumeTransitionState(context, owner.token);
   }
-}
-
-async function writeWhileTransitionOwner(
-  context: PauseResumeContext,
-  token: PauseResumeTransitionToken,
-  command: string,
-  action: PauseResumeTransitionAction,
-): Promise<void> {
-  await context.safeWrite(command, action);
-  assertPauseResumeTransitionOwner(context.refs, token);
 }
 
 function recordPauseResumeStall(context: PauseResumeContext): void {
-  context.set((state) => ({ safetyNotice: state.safetyNotice ?? streamStalledNotice() }));
-  if (context.get().activeJobMachineKind === 'cnc') return;
+  const cncJob = context.get().activeJobMachineKind === 'cnc';
+  context.set((state) => ({
+    safetyNotice:
+      state.safetyNotice ?? (cncJob ? cncPauseResumeStalledNotice() : streamStalledNotice()),
+  }));
+  if (cncJob) return;
   void context.failDarkStop().catch(() => undefined);
-}
-
-async function sendRealtimeAndConfirm(
-  context: PauseResumeContext,
-  token: PauseResumeTransitionToken,
-  command: string,
-  expectedSession: number,
-  accept: (report: StatusReport) => boolean,
-  timeoutMessage: string,
-  action: 'pause' | 'resume',
-): Promise<void> {
-  const state = context.get();
-  if (state.controllerSessionEpoch !== expectedSession) {
-    throw new Error('Controller session changed before confirmation.');
-  }
-  const statusQuery = context.driver().realtime.statusQuery;
-  if (statusQuery === null) {
-    throw new Error('Controller has no realtime status query.');
-  }
-  await writeWhileTransitionOwner(context, token, command, action);
-  const afterCommand = context.get();
-  if (afterCommand.controllerSessionEpoch !== expectedSession) {
-    throw new Error('Controller session changed before the status query.');
-  }
-  // A reply to an older background `?` can arrive while the realtime command
-  // write is pending. Only a report observed after that write settles may
-  // prove this transition; arm before our own query so its immediate reply is
-  // still captured.
-  const confirmation = waitForFreshControllerStatus(context.refs, {
-    after: { sessionEpoch: expectedSession, sequence: afterCommand.statusSequence },
-    accept,
-    timeoutMessage,
-  });
-  await Promise.all([writeWhileTransitionOwner(context, token, statusQuery, action), confirmation]);
-  assertPauseResumeTransitionOwner(context.refs, token);
-  if (context.get().controllerSessionEpoch !== expectedSession) {
-    throw new Error('Controller session changed during confirmation.');
-  }
 }
 
 function isSettledWithAccessoriesOff(report: StatusReport, requireProof: boolean): boolean {
@@ -282,12 +266,13 @@ function accessoriesAreOff(
   );
 }
 
-function assertNoPauseResumeTransition(context: PauseResumeContext): void {
-  if (context.refs.controllerStatusWait == null && context.refs.pauseResumeTransition == null)
-    return;
-  throw recordConfirmationFailure(
-    context,
-    'Pause or Resume is already waiting for controller confirmation.',
+function clearPauseResumeTransitionState(
+  context: PauseResumeContext,
+  token: PauseResumeTransitionToken,
+): void {
+  if (hasCurrentPauseResumeTransportFence(context.refs, token)) return;
+  context.set((state) =>
+    state.pauseResumeTransition?.token === token.id ? { pauseResumeTransition: null } : {},
   );
 }
 
@@ -298,39 +283,4 @@ function assertPauseSafe(context: PauseResumeContext): void {
     log: pushLog(context.get(), `[lf2] Pause blocked: ${PAUSE_REQUIRES_LASER_MODE_MESSAGE}`),
   });
   throw new Error(PAUSE_REQUIRES_LASER_MODE_MESSAGE);
-}
-
-function recordConfirmationFailure(context: PauseResumeContext, error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  context.set({
-    lastWriteError: message,
-    log: pushLog(context.get(), `[lf2] Controller status confirmation failed: ${message}`),
-  });
-  return error instanceof Error ? error : new Error(message);
-}
-
-async function refillResumedStream(
-  context: PauseResumeContext,
-  token: PauseResumeTransitionToken,
-): Promise<boolean> {
-  assertPauseResumeTransitionOwner(context.refs, token);
-  let toSend = '';
-  let finishedWithoutRefill = false;
-  context.set((state) => {
-    if (state.streamer === null) return state;
-    const stepped = step(resumeStreamer(state.streamer));
-    toSend = stepped.toSend;
-    finishedWithoutRefill = stepped.state.status === 'done';
-    return { streamer: stepped.state };
-  });
-  if (toSend.length === 0) {
-    // A completed Resume path with no stream bytes left still owns a physical
-    // execution tail. Start the clock when the lifecycle/controller snapshot
-    // permits it; completion remains gated by the driver's settle contract.
-    context.set((state) => liveCanvasExecutionAcceptedPatch(state, true));
-    return finishedWithoutRefill;
-  }
-  await writeWhileTransitionOwner(context, token, toSend, 'resume');
-  context.set((state) => liveCanvasExecutionAcceptedPatch(state, true));
-  return false;
 }

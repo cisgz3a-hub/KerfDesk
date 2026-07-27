@@ -950,7 +950,8 @@ and action groups instead of shrinking the controls below their minimum target s
 #### Success — pause (GRBL-family laser)
 1. User clicks **Pause**. The app freezes host refill before writing any controller byte.
 2. App writes resumable real-time Safety Door (`0x84`), which decelerates motion and disables the
-   laser output. The Live Motion bar shows **JOB PAUSED** and keeps **ABORT JOB** available.
+   laser output. The Live Motion bar shows **JOB PAUSING** until controller proof arrives and keeps
+   **ABORT JOB** available; it then changes to **JOB PAUSED**.
 3. Pause becomes confirmed only after a fresh same-session report shows a settled `Door` state and
    explicit controller-commanded spindle/laser-off evidence. Until then no further G-code is sent.
 4. If every G-code line has already been acknowledged but the controller still reports physical
@@ -976,23 +977,39 @@ and action groups instead of shrinking the controls below their minimum target s
 1. A CNC (router) job pauses with the **safety-door byte** (`0x84`), the same path a laser uses — not a bare feed hold. GRBL's Door state decelerates the machine **in place** and de-energizes spindle and coolant, so the spindle stops. Position is kept; nothing jogs or repositions.
 2. The `$32` proof is **not** required. It is a laser-only concern (a hold at `$32=0` can leave the beam asserted); a router runs `$32=0` and demanding the proof would block CNC pause outright.
 3. Pause holds the transition open until a fresh same-session report proves a **settled Door state**. Accessory (`A:`) proof of spindle-off is required for **laser only**: GRBL omits `A:` when nothing is energized and emits `Ov:` only periodically, so demanding the field on CNC would time out and fail-dark a job that stopped correctly. A settled Door state is itself the controller reporting spindle and coolant off.
-4. The pause copy states that motion stopped in place, the spindle is off, and the job can be resumed. ABORT JOB and the physical E-stop remain the answer when the cutter is unsafe.
+4. During CNC parking, fresh post-command same-session `Door:2` reports keep **JOB PAUSING**
+   live. Two seconds without trustworthy progress still fails the transition, and an absolute
+   30-second ceiling prevents endless ownership. Progress never confirms Pause.
+5. The pause copy states that motion stopped in place, the spindle is off, and the job can be resumed. ABORT JOB and the physical E-stop remain the answer when the cutter is unsafe.
 
 #### Degraded — controller with no realtime hold (e.g. Marlin)
 1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console directs the operator to request **ABORT**, or use the physical E-stop when unsafe.
 
-#### Success — laser / non-CNC resume
+#### Success — safety-door-capable laser resume
 1. User clicks **Resume**. App writes real-time `~` while the host streamer remains frozen.
-2. The Live Motion bar remains **JOB PAUSED** until a fresh same-session post-write report proves
+2. The Live Motion bar shows **JOB RESUMING** until a fresh same-session post-write report proves
    `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
 3. Only after that proof does the streamer resume and send more G-code.
+
+#### Success — controller without Safety Door confirmation
+1. A controller family that exposes Resume but no Safety Door byte keeps the established behavior:
+   the host stream resumes after the owned Resume transport write settles.
+2. It does not claim Door-state progress or fresh `Run`/`Idle` confirmation. The 2-second transport
+   bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
 1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits for it to reach speed, then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming.
 2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues.
-3. **No retract.** `PARKING_ENABLE` is commented out in stock GRBL, and its `PARKING_TARGET` is a *machine coordinate* — meaningless on a no-homing router. A host-side lift is deliberately not built: it would require abandoning the door hold for a drain-to-Idle pause, reintroducing a re-entry seam. If a lift is wanted, it is a firmware setting.
-4. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
-5. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
+3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
+   Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
+   fresh `Run`/`Idle` proof releases host refill. Every immediately stageable owned stream write
+   must settle before the store publishes the job as running. A timed-out but unresolved write leaves
+   the job frozen and prevents an overlapping same-session Pause/Resume; **ABORT JOB** and the physical
+   E-stop remain available. An actual write rejection uses the existing active-stream fail-dark
+   containment and transport quarantine rather than treating ambiguously staged bytes as retryable.
+4. **No retract.** `PARKING_ENABLE` is commented out in stock GRBL, and its `PARKING_TARGET` is a *machine coordinate* — meaningless on a no-homing router. A host-side lift is deliberately not built: it would require abandoning the door hold for a drain-to-Idle pause, reintroducing a re-entry seam. If a lift is wanted, it is a firmware setting.
+5. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
+6. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
 
 ### F-B8. Software Abort / Controller Reset
 
@@ -3452,6 +3469,13 @@ and lifts the command's CNC-only gate.)*
    cutter is at speed before the interrupted move continues — same G-code line, same
    point. There is **no retract**: `PARKING_ENABLE` is off in stock GRBL, so the bit
    spins back up still engaged in the cut. The paused UI says so.
+3. The Live Motion bar shows **JOB PAUSING** or **JOB RESUMING** while confirmation is
+   pending. Fresh same-session `Door:2`/`Door:3` progress keeps the corresponding CNC
+   transition alive across the strict 2-second silence watchdog, within a non-resettable
+   30-second maximum. Progress does not release the sender; fresh `Run`/`Idle` remains
+   the only Resume proof. Every immediately stageable owned refill remains host-paused until its
+   transport write settles, so early acknowledgements cannot dispatch another batch through a
+   failed transition.
 
 #### Edge - spindle may have stopped during the hold
 1. A safety-door transition, spindle-stop override, VFD fault, pendant, or other

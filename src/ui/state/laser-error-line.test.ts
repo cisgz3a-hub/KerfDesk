@@ -39,6 +39,7 @@ function makeLaserState(): LaserState {
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    pauseResumeTransition: null,
     activeRunId: null,
     activeJobMachineKind: null,
     pendingUntrackedAcks: 0,

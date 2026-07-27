@@ -246,6 +246,40 @@ describe('active-job transport write containment', () => {
     });
   });
 
+  it('terminalizes and quarantines when Safety Door and fail-dark writes reject', async () => {
+    const writes: string[] = [];
+    let rejectWrites = false;
+    const behavior: ConnectionBehavior = {
+      autoResetBanner: false,
+      reject: () => rejectWrites,
+    };
+    const connection = makeConnection(writes, behavior);
+    liveBehavior = behavior;
+    await connectReady(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
+    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    writes.length = 0;
+    rejectWrites = true;
+
+    await expect(useLaserStore.getState().pauseJob()).rejects.toThrow('job transport rejected');
+
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    expect(writes.filter((data) => data === SOFT_RESET)).toHaveLength(1);
+    await vi.waitFor(() => expect(connection.closeCount()).toBe(1));
+    expect(writes.filter((data) => data === 'M5\n')).toHaveLength(1);
+    expect(writes.filter((data) => data === 'M9\n')).toHaveLength(1);
+    expect(useLaserStore.getState().log.join('\n')).toContain(
+      'Serial write failed: job transport rejected',
+    );
+    expect(useLaserStore.getState()).toMatchObject({
+      connection: { kind: 'disconnected' },
+      safetyNotice: { kind: 'write-failed', action: 'disconnect' },
+      streamer: { status: 'cancelled' },
+    });
+    rejectWrites = false;
+  });
+
   it('quarantines a rejected tool-change Continue refill through the same reset path', async () => {
     const writes: string[] = [];
     let rejectContinue = false;
