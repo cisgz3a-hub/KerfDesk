@@ -1,130 +1,25 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  createLayer,
-  createProject,
-  IDENTITY_TRANSFORM,
-  type OutputScope,
-  type Project,
-  type SceneObject,
-} from '../../core/scene';
-import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
+  mockPlatform,
+  projectWithLine,
+  projectWithTwoLines,
+  reject,
+  SAVE_PREPARATION_FAILURE_CASES,
+  SAVE_TARGET_NAME,
+  selectedScope,
+  toasts,
+} from '../../__fixtures__/file-actions';
+import { createProject } from '../../core/scene';
+import type { SaveTarget } from '../../platform/types';
+import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import {
   handleImportSvg,
   handleOpenProject,
   handleSaveGcode,
   handleSaveProject,
 } from './file-actions';
-
-function mockPlatform(
-  args: {
-    readonly open?: () => Promise<ReadonlyArray<FileHandle>>;
-    readonly save?: () => Promise<SaveTarget | null>;
-  } = {},
-): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: args.open ?? (async () => []),
-    pickFileForSave: args.save ?? (async () => null),
-    serial: {
-      isSupported: () => false,
-      requestPort: async () => null,
-    },
-  };
-}
-
-function projectWithLine(): Project {
-  const project = createProject();
-  return {
-    ...project,
-    scene: {
-      layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
-      objects: [
-        {
-          kind: 'imported-svg',
-          id: 'line-1',
-          source: 'line.svg',
-          bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
-          transform: IDENTITY_TRANSFORM,
-          paths: [
-            {
-              color: '#000000',
-              polylines: [
-                {
-                  closed: false,
-                  points: [
-                    { x: 0, y: 0 },
-                    { x: 10, y: 0 },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  };
-}
-
-function projectWithTwoLines(): Project {
-  const project = createProject();
-  return {
-    ...project,
-    scene: {
-      layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
-      objects: [lineObject('A', 10), lineObject('B', 120)],
-    },
-  };
-}
-
-function lineObject(id: string, x: number): SceneObject {
-  return {
-    kind: 'imported-svg',
-    id,
-    source: `${id}.svg`,
-    bounds: { minX: x, minY: 0, maxX: x + 10, maxY: 0 },
-    transform: IDENTITY_TRANSFORM,
-    paths: [
-      {
-        color: '#000000',
-        polylines: [
-          {
-            closed: false,
-            points: [
-              { x, y: 0 },
-              { x: x + 10, y: 0 },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
-  return {
-    cutSelectedGraphics: true,
-    useSelectionOrigin: false,
-    selectedObjectIds,
-  };
-}
-
-function reject(message: string): Promise<never> {
-  return Promise.reject(new Error(message));
-}
-
-function toasts(): {
-  readonly pushToast: (message: string, variant?: string) => void;
-  readonly messages: ReadonlyArray<{ readonly message: string; readonly variant?: string }>;
-} {
-  const messages: Array<{ readonly message: string; readonly variant?: string }> = [];
-  return {
-    pushToast: (message, variant) => {
-      messages.push(variant === undefined ? { message } : { message, variant });
-    },
-    messages,
-  };
-}
 
 describe('file actions contextual failure handling', () => {
   it('handles import picker failures with import-specific toast copy', async () => {
@@ -414,4 +309,49 @@ describe('file actions contextual failure handling', () => {
       { message: 'Could not save project: disk full', variant: 'error' },
     ]);
   });
+});
+
+describe('handleSaveGcode preparation failures', () => {
+  beforeEach(() => {
+    useExperimentalLaserFeatures.getState().resetFeatures();
+    useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
+    usePrintCutSessionStore.getState().clear();
+  });
+
+  afterEach(() => {
+    usePrintCutSessionStore.getState().clear();
+    useExperimentalLaserFeatures.getState().resetFeatures();
+    vi.restoreAllMocks();
+  });
+
+  it.each(SAVE_PREPARATION_FAILURE_CASES)(
+    'does not create an empty successful export for $name',
+    async ({ project, message }) => {
+      const write = vi.fn(async () => undefined);
+      const target: SaveTarget = { displayName: SAVE_TARGET_NAME, write };
+      const pickFileForSave = vi.fn(async () => target);
+      const advanceVariablesAfter = vi.fn();
+      const notifications: Array<{ readonly message: string; readonly variant?: string }> = [];
+      const alert = vi.spyOn(window, 'alert').mockReturnValue(undefined);
+
+      await handleSaveGcode({
+        platform: mockPlatform({ save: pickFileForSave }),
+        project: project(),
+        savedName: null,
+        advanceVariablesAfter,
+        pushToast: (toastMessage, variant) => {
+          notifications.push(
+            variant === undefined ? { message: toastMessage } : { message: toastMessage, variant },
+          );
+        },
+      });
+
+      expect(pickFileForSave).not.toHaveBeenCalled();
+      expect(write).not.toHaveBeenCalled();
+      expect(advanceVariablesAfter).not.toHaveBeenCalled();
+      expect(notifications.some((toast) => toast.variant === 'success')).toBe(false);
+      expect(alert).toHaveBeenCalledOnce();
+      expect(alert.mock.calls[0]?.[0]).toContain(message);
+    },
+  );
 });
