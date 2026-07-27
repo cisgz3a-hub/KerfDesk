@@ -5,7 +5,17 @@
 // deterministic.
 //
 // Fidelity notes (deliberate simplifications, documented so tests don't lie):
-//  * Acks are immediate; real GRBL stops acking when the planner fills.
+//  * Acks are immediate HERE, but no longer only here: this reducer models the
+//    parser, not the serial main loop, so it still answers every line at once.
+//    Real GRBL stops acking when the planner fills, and that back-pressure is
+//    now modelled one layer out by `grbl-sim-backpressure.ts` — opt in with
+//    `createGrblSimulator({ plannerBlocks: 16 })` (ADR-265). Without that
+//    option the simulator still acks instantly and cannot reproduce a buffer
+//    overrun, so a streaming test that does not opt in is not testing flow
+//    control.
+//  * `$$`, `$I`, `$#` and `$G` are answered immediately. Real GRBL runs
+//    `protocol_buffer_synchronize()` first, which waits for the planner to
+//    drain completely — a longer stall than a full planner causes.
 //  * Motion position is applied at command time; state stays Run/Jog until the
 //    scheduled motion-finished event, then reports Idle.
 //  * Boot is unlocked by default (vendor-typical); vanilla homing-init-lock

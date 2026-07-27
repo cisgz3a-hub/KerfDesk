@@ -213,6 +213,25 @@ These are not in `package.json`; they are sources of record we rely on for proto
   - Key spec areas referenced: real-time commands (`?`, `~`, `!`, `\x18`), status report format, alarm codes, settings (`$$`, `$30`, `$32`), homing cycle.
   - When a Phase B implementation question is ambiguous (e.g., timing of position polling), this wiki + the CNCjs source code (see below) are the resolution sources, in that order.
 
+### GRBL / grblHAL firmware source — buffer, planner, and ack-timing constants
+
+- **Version / date:** gnea/grbl `master` (1.1h, archived 2019-08-30) and grblHAL `core/master`, both read 2026-07-27
+- **License:** GPL-3 (grbl) / BSD-3-Clause (grblHAL). **Neither is vendored, linked, or distributed** — these are read as documentation of wire behaviour, and no firmware code was copied.
+- **Source:** raw files read this session —
+  `gnea/grbl/grbl/serial.h`, `serial.c`, `planner.h`, `motion_control.c`, `protocol.c`, `protocol.h`, `doc/script/stream.py`; `grblHAL/core/stream.h`, `config.h`
+- **Decision affected:** ADR-265 (`src/__fixtures__/controllers/grbl-sim-{rx-window,planner,backpressure}.ts`)
+- **Evaluated:** 2026-07-27, Claude Code session
+- **Confidence:** high (constants read verbatim from source, not from the archived wiki or secondary senders)
+- **Re-verify by:** 2027-07-27 (grbl is archived and will not move; grblHAL may)
+- **Notes:**
+  - `serial.h`: `RX_BUFFER_SIZE 128`. The ring reserves one slot — `serial_get_rx_buffer_available()` returns `rtail - head - 1` when wrapped — so 127 bytes are usable, and grbl's own `doc/script/stream.py` counts against `RX_BUFFER_SIZE - 1`. Our streamer's 120 (CNCjs parity) sits safely inside that.
+  - `serial.c` `ISR(SERIAL_RX)`: realtime bytes are executed in the ISR and never stored, so they cost no ring space; a byte arriving at a full ring is dropped **silently** — no error, no notification.
+  - `planner.h`: `BLOCK_BUFFER_SIZE 16` (15 with `USE_LINE_NUMBERS`).
+  - `motion_control.c` `mc_line()`: spins on `plan_check_full_buffer()` before planning.
+  - `protocol.c` `protocol_main_loop()`: `report_status_message(gc_execute_line(line))` — **the `ok` is sent only after `gc_execute_line()` returns**, so a full planner withholds the ack and stops serial reads. This is the exact mechanism ADR-265 models.
+  - `protocol.h`: `LINE_BUFFER_SIZE 80` — shorter than the RX ring; a >80-char block is truncated. Not currently modelled by the simulator.
+  - **grblHAL differs and the difference is large:** `stream.h` `RX_BUFFER_SIZE 1024` (8× stock) and `config.h` `DEFAULT_PLANNER_BUFFER_BLOCKS 100` (`$398`, runtime-settable). Code that assumes 128/16 is wrong on grblHAL; `build-info.ts` already reads the real values from `$I`.
+
 ### CNCjs source code
 
 - **Version / date:** 1.10.x (latest stable at evaluation)
