@@ -11,15 +11,17 @@ import {
 } from '../../core/scene';
 import { emitGcode, materializeProgram } from './emit-gcode';
 
-// The ADR-243 raster case below compiles a 6.25M-pixel error-diffusion sweep and
-// measures ~2.5s on an idle dev box — against vitest's DEFAULT 5s testTimeout
-// (`resolved.testTimeout ??= 5e3`). That 2x headroom is inside the host-load band:
-// with maxWorkers 4 locally, three sibling suites on the same cores push it past
-// 5s and the run goes red for machine load, not for a defect. Nothing about this
-// test is a wall-clock claim — its value is that a raster this size COMPILES AT
-// ALL instead of being refused, which the assertions state directly. So the clock
-// is set far enough out that only a genuine hang or a pathological blow-up can
-// trip it, and the assertions are what decide the verdict.
+// The ADR-243 raster case below compiles a 6.25M-pixel error-diffusion sweep.
+// Measured: 2590ms isolated and 2422ms inside a full parallel run on an idle dev
+// box — against vitest's DEFAULT 5s testTimeout (`resolved.testTimeout ??= 5e3`),
+// a limit nobody chose for it. ~2x headroom is inside the host-load band, and the
+// test has been observed timing out in a parallel run and then passing in
+// isolation, so a red run said nothing about the code.
+//
+// Nothing about this test is a wall-clock claim — its value is that a raster this
+// size COMPILES AT ALL instead of being refused, which the assertions state
+// directly. So the clock is set far enough out that only a genuine hang or a
+// pathological blow-up trips it, and the assertions decide the verdict.
 const RASTER_COMPILES_AT_ALL_MS = ciBudgetMs(30_000, 90_000);
 
 const sampleObject: SceneObject = {
