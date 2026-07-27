@@ -22,7 +22,7 @@ fidelity**. Be specific about what that means:
 
 | Area | Status |
 |---|---|
-| GRBL v1.1 / grblHAL streaming | **Hardware-verified** — Creality Falcon A1 Pro (GrblHAL 1.1f), 2026-07-02 |
+| GRBL-family streaming | **Hardware-verified on one machine** — a Creality Falcon A1 Pro running GrblHAL 1.1f, 2026-07-02. No stock GRBL v1.1 board has been tested. |
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
 | Laser raster/image engrave | Code + tests only; never burned on a machine |
@@ -157,8 +157,8 @@ capability-gated per firmware.
 
 | Family | Transport | Verification |
 |---|---|---|
-| GRBL v1.1 | WebSerial | **Hardware-verified** |
-| grblHAL | WebSerial | **Hardware-verified** (Falcon A1 Pro, GrblHAL 1.1f) |
+| grblHAL | WebSerial | **Hardware-verified** — Falcon A1 Pro, GrblHAL 1.1f, 2026-07-02 |
+| GRBL v1.1 | WebSerial | The `grbl-v1.1` profile was driven through that same Falcon, which is what proves the driver refactor is byte-identical on real hardware — but no stock GRBL v1.1 controller has been tested |
 | FluidNC | WebSerial | Simulator only (settings read-only) |
 | Marlin | WebSerial | Simulator only |
 | Smoothieware | WebSerial | Simulator only |
@@ -361,7 +361,7 @@ A green perceptual suite rules out gross coverage regressions. It is not parity 
 A pure-function pipeline core with strict module boundaries, built as a deliberate answer to the
 1.0 codebase's shotgun-surgery problem.
 
-```
+```text
 import / draw / type / trace
             ↓
         Scene              SceneObject[] + Layer[] + run order   (the only persisted truth)
@@ -386,7 +386,7 @@ save to disk    stream to controller
 `Job`, `Plan`, `Output` and emitted G-code are pure derivations from the project and are never
 persisted — a reopened project always recompiles and cannot inherit a stale toolpath.
 
-```
+```text
 src/core/       pure: no I/O, no platform, no clock, no randomness
 src/io/         parsers and serializers (svg, dxf, stl, lightburn, gcode, rd, project)
 src/platform/   PlatformAdapter — File System Access API, WebSerial, drag-drop
@@ -448,9 +448,12 @@ machine-control issues on an energized laser or spindle.
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first, then [`CLAUDE.md`](CLAUDE.md). Two rules catch
 most newcomers:
 
-1. **Never add a guard.** Anything that blocks, refuses, caps, hides or adds a confirmation before
-   an otherwise-available operator action will be rejected on sight. Findings belong in the Job
-   Review warnings list, which informs and never refuses.
+1. **Never add a *new* guard.** Anything that blocks, refuses, caps, hides or adds a confirmation
+   before an otherwise-available operator action will be rejected on sight — and so will re-adding
+   a deleted one, widening an existing refusal, or promoting a warning into a block. Findings
+   belong in the Job Review warnings list, which informs and never refuses. A small set of
+   existing factual refusals is permitted; [`CLAUDE.md`](CLAUDE.md) rule 7 defines them exactly,
+   and widening any of them needs the maintainer's explicit prior permission.
 2. **Verify, don't guess.** Every factual claim in a PR — an API signature, a version range, a
    `$` setting, a G-code behaviour, a LightBurn behaviour — must be backed by something you
    actually read or ran, and cited so a reviewer can check it.
