@@ -10,10 +10,10 @@
 // rings recut a hair of the cleared floor, which is the safe overlap
 // direction.
 
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { insetContoursChecked } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
-import { pocketToolpathRings } from './pocket-paths';
+import { pocketRingToolpaths, type PocketToolpaths } from './pocket-paths';
 
 const MIN_CLOSED_POINTS = 3;
 const FALLBACK_TIP_ANGLE_DEG = 60;
@@ -29,12 +29,23 @@ export function vcarveClearanceToolpaths(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveClearanceOptions,
 ): ReadonlyArray<Polyline> {
-  if (!(options.maxDepthMm > 0)) return [];
+  return vcarveClearancePocket(polylines, options).toolpaths;
+}
+
+// Same toolpaths, keeping the reason the clearing pocket ended: both the
+// flat-floor inset and the pocket ladder below it return nothing on an
+// offset-engine failure, which is indistinguishable from "the shape is too
+// narrow to need a clearing stage" unless the failure is carried out.
+export function vcarveClearancePocket(
+  polylines: ReadonlyArray<Polyline>,
+  options: VCarveClearanceOptions,
+): PocketToolpaths {
+  if (!(options.maxDepthMm > 0)) return NO_CLEARANCE;
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
-  if (contours.length === 0) return [];
+  if (contours.length === 0) return NO_CLEARANCE;
   const tipAngleDeg =
     options.vBit.tipAngleDeg !== undefined && options.vBit.tipAngleDeg > 0
       ? options.vBit.tipAngleDeg
@@ -43,7 +54,15 @@ export function vcarveClearanceToolpaths(
   // The flat-floor region: everything deeper than the clamp inset. Narrow
   // shapes offset away entirely — clipper returns nothing and there is no
   // clearance stage.
-  const floorRegions = offsetClosedPolylinesForKerf(contours, -clampInsetMm);
-  if (floorRegions.length === 0) return [];
-  return pocketToolpathRings(floorRegions, options.clearTool.diameterMm, options.stepoverPercent);
+  const floorRegions = insetContoursChecked(contours, clampInsetMm);
+  if (floorRegions.contours.length === 0) {
+    return { toolpaths: [], offsetFailed: floorRegions.offsetFailed };
+  }
+  return pocketRingToolpaths(
+    floorRegions.contours,
+    options.clearTool.diameterMm,
+    options.stepoverPercent,
+  );
 }
+
+const NO_CLEARANCE: PocketToolpaths = { toolpaths: [], offsetFailed: false };

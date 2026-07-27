@@ -8,7 +8,7 @@
 //   $11   Junction deviation (mm)              → junctionDeviationMm
 //   $30   Max spindle/laser RPM (S-value top)  → maxPowerS
 //   $31   Min spindle/laser RPM (S-value floor)→ minPowerS
-//   $32   Laser mode enabled (0/1)             → laserModeEnabled
+//   $32   Mode of operation                    → machineMode + laserModeEnabled
 //   $110  Max rate X (mm/min)                  ┐
 //   $111  Max rate Y (mm/min)                  ├ taken as max of XY → maxFeed
 //   $120  Acceleration X (mm/sec²)             ┐
@@ -24,6 +24,10 @@
 //     by the slowest axis; using the slower one is a safe over-estimate for
 //     time, and the planner can pick a smaller value per-move if needed.
 //   - GRBL ships `$120`/`$121` already in mm/sec² — no unit conversion.
+//   - `$32` is three-way on grblHAL (Normal / Laser / Lathe) and boolean on
+//     grbl and FluidNC — see grbl-machine-mode.ts. `laserModeEnabled` stays
+//     the answer to "is laser mode on?", while `machineMode` carries the
+//     mode the controller actually reported.
 //   - Unknown / extra settings are ignored. The patch contains only fields
 //     we could compute, so it merges cleanly with the existing profile.
 //
@@ -31,6 +35,11 @@
 
 import type { DeviceProfile } from '../../devices/device-profile';
 import { settingsMapToRows, type GrblSettingRow } from './grbl-settings';
+import {
+  isLaserModeEnabled,
+  parseGrblMachineMode,
+  type GrblMachineMode,
+} from './grbl-machine-mode';
 import type { ControllerEvent } from '../controller-event';
 
 export type ControllerSettingsSnapshot = Partial<
@@ -61,6 +70,10 @@ export type ControllerSettingsSnapshot = Partial<
   // pair so an advisory can warn against the SLOWER axis (Codex re-audit R4).
   readonly maxFeedX?: number;
   readonly maxFeedY?: number;
+  // The mode `$32` actually reported. `laserModeEnabled` above answers only
+  // "is laser mode on?"; this distinguishes a grblHAL lathe ($32=2) from a
+  // controller that never reported $32, which the boolean alone cannot.
+  readonly machineMode?: GrblMachineMode;
 };
 
 export type SettingsCollectorState =
@@ -173,7 +186,17 @@ export function settingsMapToControllerSettings(
     ...(zAccelMmPerSec2 === undefined ? {} : { zAccelMmPerSec2 }),
     ...(maxFeedX === undefined ? {} : { maxFeedX }),
     ...(maxFeedY === undefined ? {} : { maxFeedY }),
+    ...machineModeField(map),
   };
+}
+
+// Kept out of settingsMapToControllerSettings' spread chain so that function
+// stays under the cyclomatic-complexity cap.
+function machineModeField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'machineMode'> {
+  const machineMode = parseGrblMachineMode(map.get(32));
+  return machineMode === undefined ? {} : { machineMode };
 }
 
 function parseBooleanSetting(map: ReadonlyMap<number, string>, id: number): boolean | undefined {
@@ -222,10 +245,11 @@ function pushLaserModeSetting(
   fields: Array<Partial<DeviceProfile>>,
   map: ReadonlyMap<number, string>,
 ): void {
-  const laserMode = parseFiniteNumber(map.get(32));
-  if (laserMode === 0 || laserMode === 1) {
-    fields.push({ laserModeEnabled: laserMode === 1 });
-  }
+  const mode = parseGrblMachineMode(map.get(32));
+  if (mode === undefined) return;
+  // A mode we cannot map leaves laser mode unproven rather than guessing.
+  const laserModeEnabled = isLaserModeEnabled(mode);
+  if (laserModeEnabled !== undefined) fields.push({ laserModeEnabled });
 }
 
 // `$N=value` values arrive as strings like "1000", "0.010", "2500.000".

@@ -13,7 +13,7 @@
 // object transform and the device origin. Depth-major: every ring of one
 // level before the next level down. Pure and deterministic.
 
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { kernelForTool, type ToolKernel } from '../sim';
@@ -38,11 +38,30 @@ export type ReliefRoughingOptions = {
   readonly allowanceMm?: number;
 };
 
+export type ReliefRoughingLadder = {
+  readonly passes: ReadonlyArray<CncPass>;
+  // True when any level's ring ladder stopped on an offset-engine failure
+  // rather than on running out of interior: that level is under-cleared and
+  // the finishing skim meets stock it expected gone. Advisory only (rule 7).
+  readonly offsetFailed: boolean;
+};
+
 export function reliefRoughingPasses(
   map: Heightmap,
   options: ReliefRoughingOptions,
 ): ReadonlyArray<CncPass> {
-  if (!(options.reliefDepthMm > 0) || !(options.tool.diameterMm > 0)) return [];
+  return reliefRoughingLadder(map, options).passes;
+}
+
+// Same passes as reliefRoughingPasses, keeping the reason each level's ladder
+// ended so an under-cleared level can be reported instead of shipped silently.
+export function reliefRoughingLadder(
+  map: Heightmap,
+  options: ReliefRoughingOptions,
+): ReliefRoughingLadder {
+  if (!(options.reliefDepthMm > 0) || !(options.tool.diameterMm > 0)) {
+    return { passes: [], offsetFailed: false };
+  }
   const kernel: ToolKernel = kernelForTool(options.tool, map.mmPerCell);
   const dilated = dilateHeightmapByTool(
     map,
@@ -51,11 +70,12 @@ export function reliefRoughingPasses(
   );
   const stepMm = stepoverMm(options.stepoverPercent, options.tool.diameterMm);
   const passes: CncContourPass[] = [];
+  let offsetFailed = false;
   for (const level of zPassDepths(options.reliefDepthMm, options.depthPerPassMm)) {
     const contours = levelContoursMm(map, dilated, level);
-    appendLevelRings(passes, contours, level, stepMm);
+    if (appendLevelRings(passes, contours, level, stepMm)) offsetFailed = true;
   }
-  return passes;
+  return { passes, offsetFailed };
 }
 
 function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
@@ -87,24 +107,28 @@ function levelContoursMm(
   }));
 }
 
+// Returns true when this level's ladder was cut short by an offset-engine
+// failure (see offset-ladder.ts) rather than by the region running out.
 function appendLevelRings(
   passes: CncContourPass[],
   contours: ReadonlyArray<Polyline>,
   levelZ: number,
   stepMm: number,
-): void {
+): boolean {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
-  if (usable.length === 0) return;
+  if (usable.length === 0) return false;
   // Ring 0 = the region boundary itself (tool-center-safe by construction);
-  // deeper rings shrink inward by the stepover until they vanish.
-  for (let k = 0; k < MAX_RINGS_PER_LEVEL; k += 1) {
-    const ring = k === 0 ? usable : offsetClosedPolylinesForKerf(usable, -(k * stepMm));
-    if (ring.length === 0) break;
+  // deeper rings shrink inward by the stepover until they vanish. Step 0's
+  // inset is 0, which the offset engine returns unchanged, so ring 0 is still
+  // exactly `usable`.
+  const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
+  for (const ring of ladder.rings) {
     for (const polyline of ring) {
       if (polyline.points.length < MIN_RING_POINTS) continue;
       passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
     }
   }
+  return ladder.offsetFailed;
 }
 
 function closeRing(polyline: Polyline): ReadonlyArray<{ x: number; y: number }> {

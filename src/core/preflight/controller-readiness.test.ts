@@ -67,6 +67,38 @@ describe('runControllerReadiness', () => {
     });
   });
 
+  // grblHAL reports $32=2 for Mode_Lathe. CLAUDE.md rule 7: controller-setting
+  // policy may WARN in Job Review but must NEVER refuse, so a lathe is operator
+  // information, not a Start blocker. Before the $32 fix this value was dropped
+  // by the parser and landed here as "the controller did not report $32".
+  it('warns without blocking a laser job when the controller reports lathe mode', () => {
+    const result = runControllerReadiness(createProject(), {
+      ...controllerOk,
+      laserModeEnabled: false,
+      machineMode: { kind: 'lathe' },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    const lathe = result.warnings.find((warning) => warning.code === 'lathe-mode');
+    expect(lathe?.message).toContain('$32=2');
+    // It must no longer claim the controller stayed silent about $32.
+    expect(result.warnings.map((warning) => warning.code)).not.toContain('laser-mode-unverified');
+  });
+
+  // Pinning test: the one pre-existing laser refusal must not move. Only a
+  // proven $32=0 blocks; the lathe path above must not widen it.
+  it('still blocks a laser job on a proven $32=0', () => {
+    const result = runControllerReadiness(createProject(), {
+      ...controllerOk,
+      laserModeEnabled: false,
+      machineMode: { kind: 'standard' },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map((error) => error.code)).toContain('laser-mode-disabled');
+  });
+
   it('warns, but does not block, when GRBL $31 minimum S is nonzero', () => {
     const result = runControllerReadiness(createProject(), {
       ...controllerOk,
@@ -183,6 +215,23 @@ describe('runControllerReadiness', () => {
       expect(result.errors.find((e) => e.code === 'spindle-scale-mismatch')?.message).toContain(
         '12000',
       );
+    });
+
+    // A lathe-mode controller has laser mode OFF, so the router hazard the
+    // $32 gate exists for (laser mode zeroing spindle output during rapids)
+    // does not apply. It still gets a Job Review warning: grblHAL's set_mode
+    // does not clear G7 diameter mode when Mode_Lathe is selected.
+    it('warns without blocking a router job when the controller reports lathe mode', () => {
+      const result = runControllerReadiness(cncProject, {
+        ...routerOk,
+        machineMode: { kind: 'lathe' },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(result.warnings.map((warning) => warning.code)).toContain('lathe-mode');
+      // The old behaviour reported this reported-but-unparsed value as absent.
+      expect(result.errors.map((error) => error.code)).not.toContain('laser-mode-unknown');
     });
 
     it('never demands laser mode ($32=1) for a cnc machine', () => {

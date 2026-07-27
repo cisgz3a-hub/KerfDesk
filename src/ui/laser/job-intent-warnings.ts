@@ -15,6 +15,7 @@ import {
   type Project,
   type RasterImage,
 } from '../../core/scene';
+import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
 // ADR-234's feed-matched entry runway derives its length from the layer's
@@ -25,8 +26,10 @@ const OVERSCAN_ZERO_DISABLES_4040_FILL_RUNWAY_WARNING =
 
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
   const job = compileJob(project.scene, project.device);
-  const warnings = [...detectUncalibratedJobWarnings(job, project.scene.layers)];
-  appendCompileDiagnosticWarnings(job, warnings);
+  const warnings = [
+    ...detectUncalibratedJobWarnings(job, project.scene.layers),
+    ...compileDiagnosticWarnings(job),
+  ];
   append4040FillPolicyWarning(project, job, warnings);
   appendFillHeatWarnings(job, warnings);
 
@@ -52,23 +55,6 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   }
 
   return warnings;
-}
-
-// An offset fill whose geometry engine failed produces fewer contours than the
-// artwork asks for — or none at all, in which case the layer leaves no group
-// behind and would vanish from the job unremarked. Advisory only, never a gate
-// (rule 7): the operator decides whether to run it.
-function offsetFillFailedWarning(layerName: string): string {
-  return `Offset fill on layer "${layerName}" could not be fully generated: the geometry engine failed partway, so this layer's fill is incomplete or missing from the job. The outline still cuts. Check the preview before running, and try a slightly larger fill spacing or simplify the shape.`;
-}
-
-function appendCompileDiagnosticWarnings(
-  job: ReturnType<typeof compileJob>,
-  warnings: string[],
-): void {
-  for (const diagnostic of job.diagnostics ?? []) {
-    warnings.push(offsetFillFailedWarning(diagnostic.layerName));
-  }
 }
 
 function append4040FillPolicyWarning(

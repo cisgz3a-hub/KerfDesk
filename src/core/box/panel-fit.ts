@@ -16,7 +16,7 @@
 
 import { differenceD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
 import type { Polyline, Vec2 } from '../scene';
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { pathDToPolyline, polylineToPathD, tryVectorOp } from '../geometry/vector-path-tools';
 import type { BoxRelief } from './box-spec';
 
@@ -55,11 +55,20 @@ export function applyPanelFit(rings: PanelRings, args: PanelFitArgs): PanelFitRe
 
 function offsetRings(rings: PanelRings, clearanceMm: number): PanelFitResult {
   if (clearanceMm === 0) return { kind: 'fitted', ...rings };
-  const results = offsetClosedPolylinesForKerf(
+  const operation = `clearance ${clearanceMm} mm`;
+  // Checked: the unchecked variant flattens a clipper failure to an empty list,
+  // which classifyRings can only read as "consumed the panel" — and generate-box
+  // puts that detail straight in front of the operator, so if it ever fires it
+  // sends them to edit a clearance that was never the problem. Panels are
+  // synthesised from a validated box spec, so this is defensive rather than a
+  // reachable bug today; it exists so both clipper calls in this file report a
+  // failure the same way (subtractCornerReliefs below already does).
+  const results = offsetClosedPolylinesForKerfChecked(
     [rings.outline, ...rings.cutouts],
     clearanceMm * CLEARANCE_TO_OFFSET_FACTOR,
   );
-  return classifyRings(results, rings, `clearance ${clearanceMm} mm`);
+  if (results.kind === 'error') return { kind: 'degenerate', detail: `${operation} failed` };
+  return classifyRings(results.value, rings, operation);
 }
 
 // Subtract a full-radius circle centered on every seat-critical corner —

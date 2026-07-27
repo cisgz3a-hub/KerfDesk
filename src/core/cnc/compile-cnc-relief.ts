@@ -11,12 +11,11 @@
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
-import {
-  DEFAULT_RELIEF_SCALLOP_MM,
-  meshToHeightmap,
-  reliefFinishingPasses,
-  reliefRoughingPasses,
-} from '../relief';
+import { DEFAULT_RELIEF_SCALLOP_MM, meshToHeightmap, reliefFinishingPasses } from '../relief';
+// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink, so the ladder
+// variant cannot be added to it.
+import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
 import {
   applyTransform,
   layerCncTool,
@@ -48,9 +47,7 @@ export function compileReliefGroupsForLayer(
   device: DeviceProfile,
   config: CncMachineConfig,
 ): ReadonlyArray<CncGroup> {
-  const reliefs = objects.filter(
-    (o): o is ReliefObject => o.kind === 'relief' && sceneObjectUsesOperation(o, layer),
-  );
+  const reliefs = reliefObjectsForLayer(objects, layer);
   if (reliefs.length === 0) return [];
   const tool = layerCncTool(config, settings);
   const passes: CncContourPass[] = [];
@@ -143,13 +140,25 @@ function reliefFinishingGroup(
   return reliefGroup(layer, settings, device, config, finishTool, 'relief-finish', passes);
 }
 
-function appendReliefPasses(
-  passes: CncContourPass[],
+function reliefObjectsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+): ReadonlyArray<ReliefObject> {
+  return objects.filter(
+    (o): o is ReliefObject => o.kind === 'relief' && sceneObjectUsesOperation(o, layer),
+  );
+}
+
+const NO_RELIEF_LADDER: ReliefRoughingLadder = { passes: [], offsetFailed: false };
+
+// The one place roughing geometry is produced. Both the compiler and the
+// diagnostics probe below go through it, so they can never disagree about
+// whether a level's ladder was cut short.
+function reliefLadderFor(
   relief: ReliefObject,
   settings: CncLayerSettings,
-  device: DeviceProfile,
   tool: CncTool,
-): void {
+): ReliefRoughingLadder {
   const heightmap = meshToHeightmap(
     { positions: Float32Array.from(relief.meshPositions) },
     {
@@ -159,14 +168,40 @@ function appendReliefPasses(
       mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
     },
   );
-  if (heightmap.kind === 'error') return;
-  const local = reliefRoughingPasses(heightmap.heightmap, {
+  if (heightmap.kind === 'error') return NO_RELIEF_LADDER;
+  return reliefRoughingLadder(heightmap.heightmap, {
     tool,
     reliefDepthMm: relief.reliefDepthMm,
     depthPerPassMm: settings.depthPerPassMm,
     stepoverPercent: settings.stepoverPercent,
   });
-  for (const pass of local) {
+}
+
+/**
+ * Diagnostics: did any relief on this layer have its waterline ring ladder cut
+ * short by an offset-engine failure rather than by the level running out of
+ * area? Advisory input only — the caller warns, never refuses (rule 7).
+ */
+export function reliefOffsetLadderFailed(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): boolean {
+  const reliefs = reliefObjectsForLayer(objects, layer);
+  if (reliefs.length === 0) return false;
+  const tool = layerCncTool(config, settings);
+  return reliefs.some((relief) => reliefLadderFor(relief, settings, tool).offsetFailed);
+}
+
+function appendReliefPasses(
+  passes: CncContourPass[],
+  relief: ReliefObject,
+  settings: CncLayerSettings,
+  device: DeviceProfile,
+  tool: CncTool,
+): void {
+  for (const pass of reliefLadderFor(relief, settings, tool).passes) {
     if (pass.kind !== 'contour') continue;
     passes.push({
       ...pass,
