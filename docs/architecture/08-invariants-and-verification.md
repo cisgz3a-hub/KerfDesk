@@ -85,6 +85,24 @@ premise that makes a dithered metric possible at all. `raster-burn-regression.te
 1 mm displacement. Verified by mutation: forcing `flipY = false` in `orientRasterLumaForMachine` breaks
 two fidelity tests.
 
+**Real image data and continuous tone.** The procedural ramps above are the friendliest possible input
+to a density metric, so `raster-photo-fidelity.test.ts` adds two harder ones and asserts every score as
+a ratio against the **blank baseline** — the error a program that burned nothing would score, which
+equals the truth mean. That ratio is the honest figure: the committed asset
+`arch-house-langebaan-source.png` is line art at **6.4% ink**, so its blank baseline is only 0.064 and a
+raw "error 0.005" overstates the result. `contone-luma.ts` supplies the adversarial complement — a
+deterministic multi-octave field at **39.6% ink**, full tonal range, detail down to 2 px — where
+grayscale scores 7e-5 against a 0.396 baseline (5600×) and floyd-steinberg 0.0101 (39×). Mutation-
+verified: a 10% power-scale drift in `ditherGrayscale` fails **5** tests across the two suites.
+
+**Two sharp edges, both measured.** First, `gcodeBurnDensity` assigns each scan row wholly to the cell
+row containing its midpoint, so **the cell height must be an integer multiple of the scan pitch** — at a
+1 mm pitch, 4 mm cells score 0.00012 and 4.5 mm cells score 0.04311, a 360× penalty on correct output.
+Pinned in `gcode-burn-density.test.ts`. Second, the scoring window keeps an 8 mm ring of empty bed so
+out-of-bounds ink is visible, and those cells read zero in *both* fields regardless of tone — which drags
+Pearson r positive on high-coverage artwork (**+0.52 for a fully inverted burn**). Mean absolute error,
+not correlation, is the reliable inversion detector once coverage is high.
+
 **What it does not prove.** Nothing below cell scale — each cell averages 4×4 or 8×8 source pixels, so
 any rearrangement of dots *inside* a cell that preserves the count scores identically. Dither banding,
 worming, moiré and directional artefacts are invisible to this metric by construction. It also models
