@@ -11,6 +11,10 @@ import { renderVariableText } from '../text/render-variable-text';
 import { buildGcodeMetadata } from './build-info';
 import type { SaveGcodeCtx } from './file-actions';
 
+/**
+ * Builds the ordinary Save output and preserves preparation failure in the
+ * returned discriminator. Callers must branch on `kind` before writing.
+ */
 export async function emitSaveGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,

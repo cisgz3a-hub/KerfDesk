@@ -1,5 +1,9 @@
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
 
+/**
+ * Tagged Save emission result. Callers must branch on `kind`; a
+ * `preparation-failed` result contains no program and must not be written.
+ */
 export type SaveOutputEmission =
   | {
       readonly kind: 'preparation-failed';
@@ -12,6 +16,10 @@ export type SaveOutputEmission =
       readonly preflight: ReturnType<typeof emitPreparedGcode>['preflight'];
     };
 
+/**
+ * Emits a successfully prepared output while retaining failed preparation as
+ * a distinct, non-writable result.
+ */
 export function emitSavePreparedOutput(
   prepared: PreparedOutput,
   options: EmitGcodeOptions,

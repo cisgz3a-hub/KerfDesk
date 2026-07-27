@@ -26,6 +26,10 @@ export type SaveOutputPreparationRequest = {
 
 export type OutputPreparationRequest = StartOutputPreparationRequest | SaveOutputPreparationRequest;
 
+/**
+ * One-shot worker response. Save callers must branch on `result.kind` because
+ * `preparation-failed` carries no writable G-code.
+ */
 export type OutputPreparationResponse =
   | { readonly kind: 'start'; readonly result: StartJobPreparation }
   | { readonly kind: 'save'; readonly result: SaveOutputEmission }

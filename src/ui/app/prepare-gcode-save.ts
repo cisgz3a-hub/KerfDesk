@@ -5,6 +5,10 @@ import type { SaveGcodeCtx } from './file-actions';
 import { emitSaveGcode } from './save-gcode-emission';
 import { partitionSavePreflight } from './save-preflight-policy';
 
+/**
+ * Result of preparing the ordinary Save G-code action. Callers must branch on
+ * `kind`; `failed` means no file may be selected or written.
+ */
 export type PreparedGcodeSave =
   | { readonly kind: 'failed' }
   | {
@@ -13,6 +17,10 @@ export type PreparedGcodeSave =
       readonly advisories: ReadonlyArray<PreflightIssue>;
     };
 
+/**
+ * Prepares G-code for Save while preserving factual preparation failure as a
+ * stopped action and returning only successfully emitted text as `ready`.
+ */
 export async function prepareGcodeSave(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,

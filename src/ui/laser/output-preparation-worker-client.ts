@@ -34,6 +34,11 @@ export function prepareStartOutputOffThread(
   });
 }
 
+/**
+ * Starts one-shot Save preparation when Worker support exists. Returns `null`
+ * when it does not; otherwise callers must branch on the resolved result's
+ * `kind` before writing.
+ */
 export function prepareSaveOutputOffThread(
   request: SaveOutputPreparationRequest,
 ): Promise<SaveOutputEmission> | null {
