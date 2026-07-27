@@ -41,11 +41,12 @@ const CENTERLINE_OPTIONS = TRACE_PRESETS['Centerline']!;
 // actually experiences: the trace worker is killed and the image never traces.
 const WORKER_TIMEOUT_MS = 30_000;
 // The tripwire used to be a stopwatch reading from one dev box (8s local), and
-// that is why it flaked. Measured this session on an idle Windows dev box: 3990ms;
-// under the full suite at maxWorkers 4: 4881ms. An 8s line therefore sat only
-// 1.64x above a REAL loaded run, while the host-load band on a shared or busy
-// machine is 2-4x. A threshold whose margin is narrower than the noise cannot
-// tell a regression from a busy laptop, so a red run meant nothing.
+// that is why it flaked. Measured this session on a 20-core Windows dev box:
+// 3990ms idle, 4881ms under the full suite at maxWorkers 4, and 8525ms with all
+// 20 cores saturated — that last one FAILS the old 8s line while the tracer is
+// perfectly healthy. An 8s threshold sat only 1.64x above an ordinary loaded run,
+// narrower than the host-load band itself, so it could not tell a regression from
+// a busy laptop and a red run meant nothing.
 //
 // Anchor it to the product ceiling instead of to a machine: a healthy tracer must
 // leave most of the worker's budget unused, not merely squeak under it. Half the
