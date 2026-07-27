@@ -15,9 +15,10 @@ import {
 } from '../../core/scene';
 import { weldOpenPolylines } from '../../core/toolpath';
 
-// Minimum G1 chord away from drawn corners. Audit band 0.3-0.5 mm; 0.4 mm
+// Target G1 chord away from drawn corners. Audit band 0.3-0.5 mm; 0.4 mm
 // keeps the impulse rate below ~12 Hz at the F300 default while the chord
-// sagitta on a 4 mm-radius feature stays under 5 um.
+// sagitta on a 4 mm-radius feature stays under 5 um. The continuous 0.05 mm
+// boundary-fidelity budget takes precedence when both cannot coexist.
 const CNC_TRACE_MIN_SEGMENT_MM = 0.4;
 // How far fairing may move the cut off the traced boundary. Covers the
 // +-0.045 mm quantization jitter at the 254-DPI import default and stays far

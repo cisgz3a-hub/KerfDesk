@@ -8,18 +8,20 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
-import { maximumPointDistanceToPolyline } from '../../__fixtures__/polyline-distance';
+import { polylineDeviationBounds } from '../../__fixtures__/polyline-deviation-bounds';
 import { fairTracedPathsForCnc } from './cnc-trace-fairing';
 
 const TRACE_COLOR = '#000000';
 const MAX_DEVIATION_MM = 0.05;
+const DEVIATION_ORACLE_ERROR_MM = 0.005;
 const FLOAT_TOLERANCE_MM = 1e-6;
+const HUGE_FINITE_SCALE = 1e100;
 const TINY_FINITE_SCALE = 1e-300;
 const PROPERTY_RUNS = 100;
 const PROPERTY_SEED = 410_001;
 const MIN_PROPERTY_POINT_COUNT = 5;
 const MAX_PROPERTY_POINT_COUNT = 20;
-const MIN_SCALE_EXPONENT = -12;
+const MIN_SCALE_EXPONENT = -32;
 const MAX_SCALE_EXPONENT = 12;
 const SCALE_BASE = 2;
 const SCALE_EXPONENT_DIVISOR = 4;
@@ -34,6 +36,15 @@ const MAX_RING_POINT_COUNT = 20;
 const RING_RADIUS = 10;
 const RING_JITTER_STEP = 0.02;
 const FULL_TURN_RADIANS = Math.PI * 2;
+const HUGE_SCALE_PHYSICAL_SOURCE: Polyline = {
+  closed: false,
+  points: [
+    { x: -0.15, y: 0 },
+    { x: -0.05, y: 0.1 },
+    { x: 0.05, y: 0.1 },
+    { x: 0.15, y: 0 },
+  ],
+};
 const ANISOTROPIC_PLACEMENT: Transform = {
   x: 12,
   y: -4,
@@ -156,6 +167,16 @@ function worldPoints(polyline: Polyline, transform: Transform): Vec2[] {
   return polyline.points.map((point) => applyTransform(point, transform));
 }
 
+function localPolylineAtScale(polyline: Polyline, scale: number): Polyline {
+  return {
+    ...polyline,
+    points: polyline.points.map((point) => ({
+      x: point.x / scale,
+      y: point.y / scale,
+    })),
+  };
+}
+
 describe('fairTracedPathsForCnc', () => {
   it('keeps physical output finite and within the deviation bound across transforms (property)', () => {
     fc.assert(
@@ -163,14 +184,21 @@ describe('fairTracedPathsForCnc', () => {
         const faired = onlyPolyline(fairTracedPathsForCnc([pathWith([source])], placement));
         const fairedWorld = worldPoints(faired, placement);
         const sourceWorld = worldPoints(source, placement);
-        const maximumDeviation = maximumPointDistanceToPolyline(fairedWorld, sourceWorld);
+        const deviation = polylineDeviationBounds(
+          fairedWorld,
+          sourceWorld,
+          DEVIATION_ORACLE_ERROR_MM,
+        );
 
         expect(fairedWorld.length).toBeGreaterThan(1);
+        expect(fairedWorld.length).toBeLessThanOrEqual(sourceWorld.length);
         expect(
           fairedWorld.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
         ).toBe(true);
-        expect(Number.isFinite(maximumDeviation)).toBe(true);
-        expect(maximumDeviation).toBeLessThanOrEqual(MAX_DEVIATION_MM + FLOAT_TOLERANCE_MM);
+        expect(Number.isFinite(deviation.upperBound)).toBe(true);
+        expect(deviation.upperBound).toBeLessThanOrEqual(
+          MAX_DEVIATION_MM + DEVIATION_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+        );
         expect(faired.closed).toBe(source.closed);
       }),
       { numRuns: PROPERTY_RUNS, seed: PROPERTY_SEED },
@@ -181,13 +209,16 @@ describe('fairTracedPathsForCnc', () => {
     const faired = onlyPolyline(
       fairTracedPathsForCnc([pathWith([ANISOTROPIC_DEVIATION_SOURCE])], ANISOTROPIC_PLACEMENT),
     );
-    const maximumDeviation = maximumPointDistanceToPolyline(
+    const deviation = polylineDeviationBounds(
       worldPoints(faired, ANISOTROPIC_PLACEMENT),
       worldPoints(ANISOTROPIC_DEVIATION_SOURCE, ANISOTROPIC_PLACEMENT),
+      DEVIATION_ORACLE_ERROR_MM,
     );
 
-    expect(maximumDeviation).toBeGreaterThan(0);
-    expect(maximumDeviation).toBeLessThanOrEqual(MAX_DEVIATION_MM + FLOAT_TOLERANCE_MM);
+    expect(deviation.lowerBound).toBeGreaterThan(0);
+    expect(deviation.upperBound).toBeLessThanOrEqual(
+      MAX_DEVIATION_MM + DEVIATION_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+    );
     expect(faired.closed).toBe(false);
     expect(
       fairTracedPathsForCnc([pathWith([ANISOTROPIC_DEVIATION_SOURCE])], ANISOTROPIC_PLACEMENT)[0]
@@ -241,5 +272,25 @@ describe('fairTracedPathsForCnc', () => {
     expect(
       faired.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
     ).toBe(true);
+  });
+
+  it('keeps the deviation tolerance physical at a huge finite placement scale', () => {
+    const placement: Transform = {
+      ...IDENTITY_TRANSFORM,
+      scaleX: HUGE_FINITE_SCALE,
+      scaleY: HUGE_FINITE_SCALE,
+    };
+    const source = localPolylineAtScale(HUGE_SCALE_PHYSICAL_SOURCE, HUGE_FINITE_SCALE);
+    const faired = onlyPolyline(fairTracedPathsForCnc([pathWith([source])], placement));
+    const deviation = polylineDeviationBounds(
+      worldPoints(faired, placement),
+      worldPoints(source, placement),
+      DEVIATION_ORACLE_ERROR_MM,
+    );
+
+    expect(deviation.upperBound).toBeLessThanOrEqual(
+      MAX_DEVIATION_MM + DEVIATION_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+    );
+    expect(faired.points.length).toBeLessThanOrEqual(source.points.length);
   });
 });

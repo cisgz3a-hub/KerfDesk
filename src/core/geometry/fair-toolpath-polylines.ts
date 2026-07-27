@@ -5,20 +5,22 @@
 // feed/segment-length Hz — audible chatter. GRBL's junction limiter never
 // brakes for bends that shallow (planner.c: v^2 = a*d*cos(t/2)/(1-cos(t/2))),
 // so the geometry itself must be even. This pass rebuilds each polyline in
-// PHYSICAL units: resample spans to a minimum chord length, smooth the
-// residual heading noise, and clamp total deviation — while pinning genuine
-// corners and open-chain endpoints exactly.
+// PHYSICAL units: target a minimum chord length, smooth the residual heading
+// noise, and clamp total deviation — while pinning genuine corners and
+// open-chain endpoints exactly. Fidelity wins when the chord target conflicts
+// with that deviation cap.
 
 import type { Polyline, Vec2 } from '../scene';
+import { fidelityResampleChain } from './fidelity-resample-chain';
 
 export type ToolpathFairOptions = {
   /** Physical size of one polyline unit (trace pixel), mm. Non-finite or
    *  non-positive disables the pass (input returned unchanged). */
   readonly mmPerPx: number;
-  /** Minimum output chord length away from pinned corners, mm. */
+  /** Target output chord length away from pinned corners, mm. Boundary
+   *  fidelity takes priority when both constraints cannot coexist. */
   readonly minSegmentMm: number;
-  /** Cap on smoothing displacement per vertex, mm — bounds how far the cut
-   *  may drift from the traced boundary. */
+  /** Cap on total boundary deviation and per-vertex smoothing, mm. */
   readonly maxDeviationMm: number;
   /** Turns at least this sharp are drawn corners: pinned exactly, never
    *  smoothed, and chords between two nearby corners may undershoot the
@@ -27,6 +29,7 @@ export type ToolpathFairOptions = {
 };
 
 const MIN_FAIR_POINTS = 4;
+const MAX_CYCLIC_WINDOW_FRACTION = 0.5;
 const RING_DUPLICATE_EPS = 1e-6;
 const SMOOTHING_PASSES = 2;
 // Corner detection window, px. On a ~1px-pitch jittered chain a drawn 90deg
@@ -71,7 +74,7 @@ function fairOne(
     // emits exact even chords — smoothing after resampling contracted
     // corner-adjacent chords below the floor.
     const smoothed = smoothInterior(chain, maxDeviationPx);
-    const resampled = resampleChain(smoothed, minSegmentPx);
+    const resampled = fidelityResampleChain(smoothed, chain, minSegmentPx, maxDeviationPx);
     // Spans share endpoints; skip the first vertex of every span but the
     // first so shared pins are emitted once.
     out.push(...(out.length === 0 ? resampled : resampled.slice(1)));
@@ -115,7 +118,7 @@ function pinnedIndices(
   const n = points.length;
   const prefix = prefixArclengths(points, ring);
   const total = prefix[n] as number;
-  const step = Math.max(1, Math.round((CORNER_WINDOW_PX * n) / Math.max(1e-9, total)));
+  const step = cornerWindowStep(n, total, ring);
   const turns: number[] = new Array<number>(n).fill(0);
   for (let i = 0; i < n; i += 1) {
     if (!ring && (i === 0 || i === n - 1)) continue;
@@ -139,6 +142,20 @@ function pinnedIndices(
     pins.push(0);
   }
   return [...new Set(pins)].sort((a, b) => a - b);
+}
+
+function cornerWindowStep(pointCount: number, totalLength: number, ring: boolean): number {
+  const requestedStep = Math.max(
+    1,
+    Math.round((CORNER_WINDOW_PX * pointCount) / Math.max(1e-9, totalLength)),
+  );
+  // A cyclic window must keep its previous/current/next samples distinct.
+  // Tiny rings can otherwise request more than one lap and produce a
+  // negative JavaScript remainder in turnOverStep.
+  const maximumStep = ring
+    ? Math.max(1, Math.floor((pointCount - 1) * MAX_CYCLIC_WINDOW_FRACTION))
+    : Math.max(1, pointCount - 1);
+  return Math.min(requestedStep, maximumStep);
 }
 
 // Cumulative arclength; index n holds the total (including the closing edge
@@ -236,39 +253,6 @@ function chainForSpan(points: ReadonlyArray<Vec2>, span: Span): Vec2[] {
     chain.push(points[i % n] as Vec2);
   }
   return chain;
-}
-
-// Even-arclength resample ON the original chain: endpoints exact and interior
-// vertices linearly interpolated along the source polyline. A span shorter
-// than one step keeps only its endpoints — that is the micro-fragment merge.
-// Fairing never inserts more segments than the source span: the floor is a
-// simplification target, not a densifier of already-coarse geometry.
-function resampleChain(chain: ReadonlyArray<Vec2>, step: number): Vec2[] {
-  const cumulative: number[] = [0];
-  for (let i = 1; i < chain.length; i += 1) {
-    const a = chain[i - 1] as Vec2;
-    const b = chain[i] as Vec2;
-    cumulative.push((cumulative[i - 1] as number) + Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  const total = cumulative[cumulative.length - 1] as number;
-  const first = chain[0] as Vec2;
-  const last = chain[chain.length - 1] as Vec2;
-  const sourceSegmentCount = chain.length - 1;
-  const segments = Math.max(1, Math.min(sourceSegmentCount, Math.floor(total / step)));
-  const out: Vec2[] = [{ x: first.x, y: first.y }];
-  let cursor = 1;
-  for (let k = 1; k < segments; k += 1) {
-    const target = (k * total) / segments;
-    while (cursor < cumulative.length - 1 && (cumulative[cursor] as number) < target) cursor += 1;
-    const segStart = cumulative[cursor - 1] as number;
-    const segEnd = cumulative[cursor] as number;
-    const t = segEnd > segStart ? (target - segStart) / (segEnd - segStart) : 0;
-    const a = chain[cursor - 1] as Vec2;
-    const b = chain[cursor] as Vec2;
-    out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
-  }
-  out.push({ x: last.x, y: last.y });
-  return out;
 }
 
 // Two passes of a 1/4-1/2-1/4 kernel on interior vertices, then a clamp of
