@@ -11832,6 +11832,44 @@ blocked, gated or clamped by this; it is a corrected mapping.
 **Not verified:** no coupon was cut. This rests on documentary agreement between
 four references, not on a measured chip direction from the maintainer's machine.
 
+### Amendment 2 (2026-07-25) - the direction is resolved in the operator's top view
+
+Independent of the amendment above, and composing with it: that one corrected
+WHICH winding each direction means, this one corrects the FRAME that winding is
+measured in. The original verification checked the winding of the
+machine-coordinate polyline on the DEFAULT device only, whose origin is
+`front-left`. That hid a frame bug.
+
+Climb is defined against the spindle's PHYSICAL rotation seen from above the bed
+(M3 = clockwise), but `enforceCutDirection` reads a shoelace sign over MACHINE
+coordinates. Those agree only while the machine frame is right-handed in the top
+view, and `origin-transform` does not make it so for every origin corner: rear-*
+origins leave machine +Y pointing AT the operator and right-* origins mirror +X.
+`front-right` and `rear-left` therefore produced left-handed frames in which the
+enforcement emitted the MIRROR of the selected direction — requesting climb cut
+conventional, and, the dangerous direction, requesting conventional on a
+backlash-prone machine cut climb, which is the exact grab risk this ADR's
+rationale says conventional exists to avoid. `front-left`, `rear-right`, and
+`center` were unaffected, so the shipped default profile never mis-cut.
+
+`core/cnc/machine-frame-cut-direction.ts` now translates the operator's chosen
+direction into the machine frame once, in `compileCncJob`, before any geometry
+stage runs. It derives the handedness by mapping a probe triangle through
+`toMachineCoords` rather than re-tabulating the origin corners, so it cannot
+drift from `origin-transform`. An absent direction stays absent — "Default
+direction" still means natural winding, never enforcement.
+
+ADR-250's leads are NOT affected: a loop's interior/exterior is topological, so
+leads land in the waste under either handedness.
+
+Verified: `compile-cnc-climb-frame.test.ts` compiles a profile-outside square on
+all five origins and asserts, for both climb and conventional, that the emitted
+motion has the rotation the amendment above fixed as correct — climb outside is
+CW seen from above, conventional CCW — once mapped back out of machine
+coordinates (`toSceneCoords`). It fails on `front-right` and `rear-left` without
+this fix. No G-code snapshot changed, confirming the blast radius is limited to
+the two mis-framed origins. NOT verified on hardware.
+
 ## ADR-252 - Cut-direction enforcement keeps hole windings opposite the outer
 
 **Date:** 2026-07-24

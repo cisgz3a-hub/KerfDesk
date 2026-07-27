@@ -45,6 +45,7 @@ import {
   lineArtSelectionApplies,
   selectLineArtContours,
 } from './line-art-contours';
+import { withMachineFrameCutDirection } from './machine-frame-cut-direction';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { applyProfileLeadPasses } from './profile-lead-passes';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
@@ -58,7 +59,10 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   const profileGroups: CncGroup[] = [];
   const sourceObjects = scene.objects;
   for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    // Cut direction is chosen in the operator's top view; every geometry stage
+    // below resolves winding in machine coordinates, which some origin corners
+    // make left-handed. Translate once, here.
+    const settings = withMachineFrameCutDirection(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS, device);
     // H.5/H.8: relief objects rough (and optionally finish, with their own
     // bit) as clearing groups — neither ever frees a part.
     clearingGroups.push(
