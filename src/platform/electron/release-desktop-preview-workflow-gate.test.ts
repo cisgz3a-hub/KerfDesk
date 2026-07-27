@@ -40,6 +40,8 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('needs: [build-windows, build-macos-x64, build-macos-arm64]');
     expect(builder).toMatch(/win:\s[\s\S]*target: nsis[\s\S]*- x64/);
     expect(builder).toMatch(/mac:\s[\s\S]*target:\s*\n\s*- dmg/);
+    expect(builder).toMatch(/win:\s*\n\s*icon: public\/favicon\.svg/);
+    expect(builder).toMatch(/mac:\s[\s\S]*icon: public\/favicon\.svg/);
     expect(builder).not.toMatch(/mac:\s[\s\S]*arch:\s*\n\s*- x64[\s\S]*- arm64/);
     expect(builder).not.toMatch(/^linux:/m);
   });

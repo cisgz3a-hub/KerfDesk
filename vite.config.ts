@@ -55,17 +55,44 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg'],
+      includeAssets: [
+        'favicon.svg',
+        'favicon-32x32.png',
+        'apple-touch-icon.png',
+        'app-icon-192x192.png',
+        'app-icon-512x512.png',
+        'app-icon-maskable-512x512.png',
+      ],
       manifest: {
         name: 'KerfDesk',
         short_name: 'KerfDesk',
         description:
           'GRBL CAM for laser cutters, engravers, and CNC routers — design, trace, and burn, fully offline.',
-        theme_color: '#2563eb',
+        theme_color: '#111827',
         background_color: '#f8fafc',
         display: 'standalone',
         start_url: '.',
-        icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          {
+            src: 'app-icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'app-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'app-icon-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,json,ttf,woff,woff2}'],
