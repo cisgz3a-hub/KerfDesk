@@ -65,6 +65,32 @@ obviously different.
 Practical consequence for Phase 2: **do not use IoU scores as evidence of trace parity with LightBurn.**
 Render both and look.
 
+### The raster extension
+
+The harness now also covers **image engraving**, which the IoU mask could not: a binary mask scores a
+full-power burn and a 5%-power ghost identically, and scores a dithered mid-grey as far too dark or far
+too light depending on where the dots land. `gcode-burn-density.ts` therefore accumulates **energy**
+instead of coverage — each `G1` made while armed at `S > 0` deposits `(S / sMax) × length` into a coarse
+machine-mm cell grid, normalised by the burn one cell could take at full power. `image-density-truth.ts`
+computes what the source bitmap demanded on the same grid, and `density-compare.ts` reports mean
+absolute error (tone) plus Pearson correlation (structure). Fixtures run through the real
+`compileJob` → `grblStrategy.emit` path, so the score reads the actual controller text.
+
+**What it proves.** Measured on a 32×32 fixture at 1 line/mm: a `grayscale` ramp reconstructs to
+8.9e-5 mean error (bounded at 1e-3); a threshold-dithered quadrant and a 90°-rotated one reconstruct
+exactly (≤1e-9), the rotated case scored against an analytic transpose that shares no code with
+`raster-rotated-sample.ts`; error-diffusion kernels converge on source tone as cells grow, which is the
+premise that makes a dithered metric possible at all. `raster-burn-regression.test.ts` proves the score
+*fails* on injected inversion, mirroring, unrotated placement, flattened power, dropped scan rows, and a
+1 mm displacement. Verified by mutation: forcing `flipY = false` in `orientRasterLumaForMachine` breaks
+two fidelity tests.
+
+**What it does not prove.** Nothing below cell scale — each cell averages 4×4 or 8×8 source pixels, so
+any rearrangement of dots *inside* a cell that preserves the count scores identically. Dither banding,
+worming, moiré and directional artefacts are invisible to this metric by construction. It also models
+no beam width, no spot overlap between scan lines, and no material response. It is a geometry-and-energy
+check on the program text, **not a photograph** — so it does not discharge the hardware row below.
+
 ## Hardware verification status
 
 | Area | Status |
