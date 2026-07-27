@@ -19,7 +19,7 @@
 // Pure and deterministic: fixed ring ordering (k ascending, input order
 // within a ring), no clock, no random.
 
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncPass, CncContourPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
@@ -42,10 +42,27 @@ export type VCarveOptions = {
   readonly resolutionMm: number; // 0 = auto
 };
 
+export type VCarveLadder = {
+  readonly passes: ReadonlyArray<CncPass>;
+  // True when the ring ladder stopped on an offset-engine failure rather than
+  // on reaching the medial axis: the carve is shallower and narrower than the
+  // artwork asks for. Reported to Job Review, never a refusal (rule 7).
+  readonly offsetFailed: boolean;
+};
+
 export function vcarvePasses(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveOptions,
 ): ReadonlyArray<CncPass> {
+  return vcarveLadderPasses(polylines, options).passes;
+}
+
+// Same passes as vcarvePasses, keeping the reason the ladder ended so a carve
+// truncated by the offset engine can be reported instead of shipped silently.
+export function vcarveLadderPasses(
+  polylines: ReadonlyArray<Polyline>,
+  options: VCarveOptions,
+): VCarveLadder {
   const contours = polylines.filter(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
@@ -61,17 +78,16 @@ export function vcarvePasses(
       ? options.tool.diameterMm / 2 / tanHalf
       : Number.POSITIVE_INFINITY;
   const maxDepth = Math.min(options.maxDepthMm, coneHeightMm);
-  if (contours.length === 0 || !(maxDepth > 0)) return [];
+  if (contours.length === 0 || !(maxDepth > 0)) return { passes: [], offsetFailed: false };
 
+  // Ring k (1-based in the depth law above) is ladder step k - 1.
+  const ladder = buildOffsetLadder(contours, MAX_VCARVE_RINGS, (step) => (step + 1) * delta);
   const passes: CncContourPass[] = [];
-  for (let k = 1; k <= MAX_VCARVE_RINGS; k += 1) {
-    const inset = k * delta;
-    const ring = offsetClosedPolylinesForKerf(contours, -inset);
-    if (ring.length === 0) break;
-    const ringDepth = Math.min(inset / tanHalf, maxDepth);
+  ladder.rings.forEach((ring, step) => {
+    const ringDepth = Math.min(((step + 1) * delta) / tanHalf, maxDepth);
     appendRingPasses(passes, ring, ringDepth, options.depthPerPassMm);
-  }
-  return passes;
+  });
+  return { passes, offsetFailed: ladder.offsetFailed };
 }
 
 // Ring spacing: explicit setting wins; 0 = auto at toolDiameter/8 with a
