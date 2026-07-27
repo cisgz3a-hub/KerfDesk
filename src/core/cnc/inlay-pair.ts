@@ -58,6 +58,16 @@ export function planStraightInlayPair(
   if (optionIssue !== null) return failure(optionIssue);
 
   const radius = options.toolDiameterMm / 2;
+  // Unchecked, deliberately — no checked round-joins sibling was added. The
+  // closed filter above already drops non-finite points (the documented
+  // clipper trigger), so the error arm has no reachable input. Even if it
+  // fired, the reason would not reach an operator: compileStraightInlayOperation
+  // discards StraightInlayPairPlan.reason and returns null
+  // (inlay-pair-operation.ts), and nothing in src/ui calls
+  // planStraightInlayPairForSettings — the resulting empty layer is caught only
+  // as a dropped layer by findDroppedCncLayers. A checked variant would just
+  // make a string nobody reads more accurate; route the reason to Job Review
+  // first, then converting is worth it.
   const opened = offsetClosedPolylinesWithRoundJoins(
     offsetClosedPolylinesWithRoundJoins(closed, -radius),
     radius,

@@ -12,6 +12,9 @@ vi.mock('clipper2-ts', async (importOriginal) => {
     differenceD: (): never => {
       throw new Error('clipper boom');
     },
+    inflatePathsD: (): never => {
+      throw new Error('clipper boom');
+    },
   };
 });
 
@@ -56,5 +59,35 @@ describe('applyPanelFit (R6 clipper boundary)', () => {
       relief: { kind: 'corner-overcut', toolDiameterMm: 6.35 },
     });
     expect(result.kind).toBe('degenerate');
+  });
+});
+
+// The clearance offset reaches clipper through inflatePathsD. Flattening that
+// failure to an empty list made classifyRings blame the clearance value —
+// "consumed the panel" — for an engine failure, and generate-box.ts:65 puts
+// that sentence straight in front of the operator, who then edits a number that
+// was never the problem.
+describe('applyPanelFit — clearance offset failure is reported as a failure', () => {
+  const CLEARANCE_MM = 0.4;
+
+  it('says the operation failed, not that the panel was consumed', () => {
+    const result = applyPanelFit(RINGS, {
+      clearanceMm: CLEARANCE_MM,
+      relief: { kind: 'none' },
+    });
+
+    expect(result.kind).toBe('degenerate');
+    if (result.kind !== 'degenerate') return;
+    expect(result.detail).toContain('failed');
+    expect(result.detail).not.toContain('consumed the panel');
+    // Naming the operation keeps the corner-relief precedent's wording shape.
+    expect(result.detail).toContain(`clearance ${CLEARANCE_MM} mm`);
+  });
+
+  it('still does not propagate the clipper throw', () => {
+    const run = (): unknown =>
+      applyPanelFit(RINGS, { clearanceMm: CLEARANCE_MM, relief: { kind: 'none' } });
+
+    expect(run).not.toThrow();
   });
 });

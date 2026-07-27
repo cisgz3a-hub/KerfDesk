@@ -234,10 +234,12 @@ export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 // Something the compile path noticed that the operator should know about, but
 // which must never refuse the job (rule 7). Surfaced in the Job Review warnings
 // list. Optional on Job so every existing Job literal stays valid.
-export type JobDiagnostic = {
-  readonly kind: 'offset-fill-failed';
-  readonly layerName: string;
-};
+export type JobDiagnostic =
+  | { readonly kind: 'offset-fill-failed'; readonly layerName: string }
+  // Line mode's kerf compensation failed in the geometry engine, so every
+  // closed contour on the layer was dropped from the cut. Same silent-loss
+  // shape as the offset fill, on the path that cuts the part itself.
+  | { readonly kind: 'kerf-offset-failed'; readonly layerName: string };
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;

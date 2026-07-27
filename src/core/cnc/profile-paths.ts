@@ -48,6 +48,15 @@ export function profileToolpathPolylines(
       open.push(polyline);
     }
   }
+  // Deliberately the UNCHECKED variant. The documented clipper trigger is a
+  // non-finite coordinate (see the hasFinitePoints comment above), and the
+  // filter at the top of this loop already drops those before the offset — so
+  // the error arm has no reachable input here. A failure would also not be
+  // silent: it drops every closed contour, which leaves the layer with no
+  // toolpath at all, and that is exactly the all-or-nothing case
+  // findDroppedCncLayers (compile-cnc-diagnostics.ts) already reports through
+  // CNC preflight. Converting would buy a Result nobody can produce, for a
+  // loss that is already surfaced.
   const radius = Math.max(0, toolDiameterMm) / 2;
   const magnitude = radius + Math.max(0, allowanceMm);
   const delta = side === 'outside' ? magnitude : side === 'inside' ? -magnitude : 0;
