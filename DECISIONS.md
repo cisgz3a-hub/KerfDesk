@@ -7717,9 +7717,9 @@ interlock or machine-specific supervisory protocol.
 
 ---
 
-## ADR-180 - Generic same-session CNC Resume is manual-recovery-only
+## ADR-180 - Generic same-session CNC Pause/Resume is door-confirmed and progress-bounded
 
-**Status:** Amended 2026-07-24 (the resume refusal is withdrawn; see Amendment) | **Date:** 2026-07-13
+**Status:** Amended through 2026-07-27 (the former resume refusal is withdrawn; see amendments) | **Date:** 2026-07-13
 
 ### Context
 

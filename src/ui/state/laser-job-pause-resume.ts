@@ -11,6 +11,7 @@ import {
   beginPauseResumeTransition,
   completePauseResumeTransition,
   failDarkWasAlreadyRequested,
+  hasCurrentPauseResumeTransportFence,
   type PauseResumeTransitionAction,
   type PauseResumeTransitionToken,
 } from './laser-pause-resume-transition';
@@ -269,6 +270,7 @@ function clearPauseResumeTransitionState(
   context: PauseResumeContext,
   token: PauseResumeTransitionToken,
 ): void {
+  if (hasCurrentPauseResumeTransportFence(context.refs, token)) return;
   context.set((state) =>
     state.pauseResumeTransition?.token === token.id ? { pauseResumeTransition: null } : {},
   );

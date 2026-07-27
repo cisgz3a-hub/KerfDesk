@@ -3,6 +3,7 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import { waitForFreshControllerStatus } from './laser-controller-status-wait';
 import {
   assertPauseResumeTransitionOwner,
+  hasCurrentPauseResumeTransportFence,
   PAUSE_RESUME_TRANSITION_MAX_TIMEOUT_MS,
   PAUSE_RESUME_TRANSITION_TIMEOUT_MS,
   markPauseResumeTransportWriteRejected,
@@ -73,6 +74,7 @@ export async function writeWhilePauseResumeOwner(
     assertPauseResumeTransitionOwner(context.refs, token);
   } finally {
     releasePauseResumeTransportWrite(context.refs, token);
+    clearSettledPauseResumeUiState(context, token);
   }
 }
 
@@ -135,4 +137,19 @@ function assertExpectedSession(
 function isCncDoorProgress(report: StatusReport, action: PauseResumeTransitionAction): boolean {
   if (report.state !== 'Door') return false;
   return action === 'pause' ? report.subState === 2 : report.subState === 3;
+}
+
+function clearSettledPauseResumeUiState(
+  context: PauseResumeWriteContext,
+  token: PauseResumeTransitionToken,
+): void {
+  if (
+    context.refs.pauseResumeTransition != null ||
+    hasCurrentPauseResumeTransportFence(context.refs, token)
+  ) {
+    return;
+  }
+  context.set((state) =>
+    state.pauseResumeTransition?.token === token.id ? { pauseResumeTransition: null } : {},
+  );
 }

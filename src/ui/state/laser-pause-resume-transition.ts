@@ -160,6 +160,18 @@ export function releasePauseResumeTransportWrite(
   if (!pending.isRejected) pendingWrites?.delete(token.id);
 }
 
+export function hasCurrentPauseResumeTransportFence(
+  refs: PauseResumeTransitionRefs & { readonly writeEpoch?: number },
+  token: PauseResumeTransitionToken,
+): boolean {
+  const pendingWrites = refs.pauseResumePendingWrites;
+  const pending = pendingWrites?.get(token.id);
+  if (pending === undefined) return false;
+  if (pending.writeEpoch === (refs.writeEpoch ?? 0)) return true;
+  pendingWrites?.delete(token.id);
+  return false;
+}
+
 export function currentPauseResumeTransportFence(
   refs: PauseResumeTransitionRefs & { readonly writeEpoch?: number },
 ): PauseResumeTransportFenceState | null {

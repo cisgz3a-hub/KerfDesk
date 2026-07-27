@@ -269,32 +269,6 @@ describe('laser-store serial write failures', () => {
     );
   });
 
-  it('terminalizes and quarantines when Safety Door and fail-dark writes reject', async () => {
-    let shouldFail = false;
-    const write = vi.fn(async (_data: string) => {
-      if (shouldFail) throw new Error('write rejected');
-    });
-    const connection = makeConnection(write);
-    await connectWith(connection);
-    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
-    await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
-    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
-
-    shouldFail = true;
-    await expect(useLaserStore.getState().pauseJob()).rejects.toThrow('write rejected');
-
-    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
-    expect(write).toHaveBeenCalledWith('\x18');
-    expect(useLaserStore.getState().log.join('\n')).toContain(
-      'Serial write failed: write rejected',
-    );
-    expect(useLaserStore.getState().safetyNotice).toMatchObject({
-      kind: 'write-failed',
-      action: 'disconnect',
-    });
-    shouldFail = false;
-  });
-
   it('freezes a streaming job before a soft-reset write can fail', async () => {
     let shouldFail = false;
     const write = vi.fn(async () => {

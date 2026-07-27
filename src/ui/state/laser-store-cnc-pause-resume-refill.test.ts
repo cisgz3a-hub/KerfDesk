@@ -64,7 +64,7 @@ describe('CNC Resume refill ownership', () => {
 
     expect(observed.result()).toBe('rejected');
     expect(harness.writes).not.toContain(RT_SOFT_RESET);
-    expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
+    expect(useLaserStore.getState().pauseResumeTransition).toMatchObject({ action: 'resume' });
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
     expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('paused');
 

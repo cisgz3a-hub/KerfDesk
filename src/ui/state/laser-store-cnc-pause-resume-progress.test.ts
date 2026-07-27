@@ -288,7 +288,7 @@ describe('CNC Pause and Resume progress-aware deadlines', () => {
 
     expect(observed.result()).toBe('rejected');
     expect(harness.writes).not.toContain(RT_SOFT_RESET);
-    expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
+    expect(useLaserStore.getState().pauseResumeTransition).toMatchObject({ action: 'pause' });
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
     const writesAfterTimeout = harness.writes.length;
 
@@ -298,6 +298,7 @@ describe('CNC Pause and Resume progress-aware deadlines', () => {
     statusQueryWrite.resolve();
     await flushPromises();
     expect(harness.writes).toHaveLength(writesAfterTimeout);
+    expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
   });
 });
