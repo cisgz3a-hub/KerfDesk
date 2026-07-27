@@ -52,6 +52,13 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('KerfDesk-${VERSION}-macos-arm64.dmg');
   });
 
+  it('builds every renderer with the same exact version as its packaged Preview', () => {
+    expect(
+      workflow.match(/KERFDESK_DESKTOP_VERSION: \$\{\{ steps\.version\.outputs\.version \}\}/g),
+    ).toHaveLength(3);
+    expect(workflow.match(/--config\.extraMetadata\.version=/g)).toHaveLength(3);
+  });
+
   it('preserves Windows upgrade identity and sets the Mac bundle identity', () => {
     expect(builder).toMatch(/^appId: dev\.laserforge\.app$/m);
     expect(builder).toMatch(/mac:\s[\s\S]*appId: com\.kerfdesk\.app/);

@@ -55,9 +55,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          # Full history so the web bundle's git-derived build badge is real
-          # (vite.config.ts appVersion). The installer version comes from the
-          # tag, not the commit count — see the version step below.
+          # Full history preserves deterministic build metadata. The visible
+          # renderer version and installer version both come from the tag.
           fetch-depth: 0
 
       - name: Set up pnpm
@@ -91,6 +90,8 @@ jobs:
       - name: Release verification gate
         # Same green-gate as the web CI, on Windows. Also builds dist/web and
         # dist-electron, which electron-builder then packages.
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
 
       - name: Require tag-release signing credentials

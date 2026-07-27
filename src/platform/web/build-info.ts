@@ -8,6 +8,10 @@ import { readFileSync } from 'node:fs';
 
 const DEV_SHA_FALLBACK = 'dev';
 const DEFAULT_PKG_VERSION = '0.0.0';
+const SEMVER_IDENTIFIER = String.raw`(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)`;
+const DESKTOP_RELEASE_VERSION_PATTERN = new RegExp(
+  String.raw`^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-${SEMVER_IDENTIFIER}(?:\.${SEMVER_IDENTIFIER})*)?$`,
+);
 
 /**
  * Runs a git command and returns trimmed stdout. Injected into the derivation
@@ -73,6 +77,21 @@ export function appVersion(gitExec: GitExec = runGit, readPkg: () => string = re
   if (count === null || count === '') return base;
   const [major = '0', minor = '0'] = base.split('.');
   return `${major}.${minor}.${count}`;
+}
+
+/**
+ * Uses the release workflow's exact version for a desktop renderer while
+ * preserving the git-derived version for ordinary web/PWA builds.
+ */
+export function resolveBuildAppVersion(
+  webVersion: string,
+  desktopReleaseVersion: string | undefined,
+): string {
+  if (desktopReleaseVersion === undefined) return webVersion;
+  if (!DESKTOP_RELEASE_VERSION_PATTERN.test(desktopReleaseVersion)) {
+    throw new Error(`invalid desktop release version: ${desktopReleaseVersion}`);
+  }
+  return desktopReleaseVersion;
 }
 
 function readRootPkg(): string {

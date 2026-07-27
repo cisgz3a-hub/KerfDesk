@@ -79,6 +79,10 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(buildIndex).toBeGreaterThanOrEqual(0);
     expect(repoGuardIndex).toBeLessThan(gateIndex);
     expect(gateIndex).toBeLessThan(buildIndex);
+    expect(workflow).toContain('KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}');
+    expect(dryRunWorkflow).toContain(
+      'KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}',
+    );
   });
 
   it('pins the installer version to the tag and emits the update feed locally', () => {

@@ -51,6 +51,8 @@ jobs:
         run: pnpm guard:repo
 
       - name: Release verification gate
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
 
       - name: Build unsigned installer
