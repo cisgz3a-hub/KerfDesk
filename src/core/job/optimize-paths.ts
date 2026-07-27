@@ -44,7 +44,9 @@ import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
+import { containmentDepths } from './containment-depth';
 import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
+import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
@@ -220,7 +222,9 @@ function startCursorForSegments(
   policy: PathOptimizationSettings['startPoint'],
 ): Vec2 {
   if (policy === 'machine-origin') return ORIGIN;
-  const bounds = segments.map(segmentBounds).filter((entry) => entry !== null);
+  const bounds = segments
+    .map((segment) => polylineBounds(segment.polyline))
+    .filter((entry) => entry !== null);
   if (bounds.length === 0) return ORIGIN;
   const minX = Math.min(...bounds.map((entry) => entry.minX));
   const minY = Math.min(...bounds.map((entry) => entry.minY));
@@ -396,78 +400,4 @@ function pickBestIslandGroup(
     }
   }
   return best;
-}
-
-type SegmentBounds = {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-};
-
-function containmentDepths(segments: ReadonlyArray<CutSegment>): number[] {
-  const bounds = segments.map(segmentBounds);
-  return segments.map((_, i) => {
-    const targetBounds = bounds[i] ?? null;
-    const ref = representativePoint(targetBounds);
-    if (ref === null) return 0;
-    let depth = 0;
-    for (let j = 0; j < segments.length; j += 1) {
-      if (i === j) continue;
-      const container = segments[j];
-      const containerBounds = bounds[j] ?? null;
-      if (container === undefined || !container.closed) continue;
-      if (containerBounds === null || targetBounds === null) continue;
-      if (!boundsContains(containerBounds, targetBounds)) continue;
-      if (pointInPolygon(ref, container.polyline)) depth += 1;
-    }
-    return depth;
-  });
-}
-
-function segmentBounds(seg: CutSegment): SegmentBounds | null {
-  if (seg.polyline.length === 0) return null;
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const p of seg.polyline) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
-
-function representativePoint(bounds: SegmentBounds | null): Vec2 | null {
-  if (bounds === null) return null;
-  return {
-    x: (bounds.minX + bounds.maxX) / 2,
-    y: (bounds.minY + bounds.maxY) / 2,
-  };
-}
-
-function boundsContains(container: SegmentBounds, target: SegmentBounds): boolean {
-  return (
-    target.minX >= container.minX &&
-    target.maxX <= container.maxX &&
-    target.minY >= container.minY &&
-    target.maxY <= container.maxY
-  );
-}
-
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  if (polygon.length < 3) return false;
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const pi = polygon[i];
-    const pj = polygon[j];
-    if (pi === undefined || pj === undefined) continue;
-    const crosses = pi.y > point.y !== pj.y > point.y;
-    if (!crosses) continue;
-    const xAtY = ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x;
-    if (point.x < xAtY) inside = !inside;
-  }
-  return inside;
 }
