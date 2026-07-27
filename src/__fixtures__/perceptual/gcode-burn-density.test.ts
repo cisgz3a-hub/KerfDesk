@@ -88,6 +88,41 @@ describe('gcodeBurnDensity', () => {
     expect(density(gcode, 2)).toEqual([0, 0, 0, 0.5]);
   });
 
+  it('attributes a whole scan row to one cell row, so grid alignment matters', () => {
+    // Two scan rows at Y=0.5 and Y=1.5, each burning the full 4 mm width at
+    // full power, over a 4 mm window with a 1 mm scan pitch.
+    const gcode = ['M4 S0', 'G0 X0 Y0.5 S0', 'G1 X4 S1000', 'G0 X0 Y1.5 S0', 'G1 X4 S1000'].join(
+      '\n',
+    );
+
+    // 4 cell rows = 1 mm each, aligned to the pitch: exactly one scan row per
+    // cell row, so the two burnt rows read a clean 1.0 and the rest read 0.
+    // prettier-ignore
+    expect(density(gcode, 4)).toEqual([
+      1, 1, 1, 1,
+      1, 1, 1, 1,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+    ]);
+  });
+
+  it('mis-attributes rows when the cell height does not divide the scan pitch', () => {
+    // Same two rows, but 3 cell rows = 1.333 mm each. Row Y=0.5 falls in cell
+    // row 0 and row Y=1.5 in cell row 1, yet each cell row is 1.333 pitches
+    // tall — so the normalisation expects 1.333 rows and sees 1, reading 0.75
+    // instead of 1. Pinned because it is the harness's sharpest edge, not
+    // because it is desirable: see the CALLER CONSTRAINT in gcode-burn-density.ts.
+    const gcode = ['M4 S0', 'G0 X0 Y0.5 S0', 'G1 X4 S1000', 'G0 X0 Y1.5 S0', 'G1 X4 S1000'].join(
+      '\n',
+    );
+
+    const cells = density(gcode, 3);
+
+    expect(cells[0]).toBeCloseTo(0.75, 10);
+    expect(cells[3]).toBeCloseTo(0.75, 10);
+    expect(cells[6]).toBe(0);
+  });
+
   it('rejects a grid or normalisation that would make the score meaningless', () => {
     const options = { window: WINDOW, cellsX: 1, cellsY: 1, sMax: S_MAX, lineIntervalMm: 1 };
     expect(() => gcodeBurnDensity('', { ...options, cellsX: 0 })).toThrow(/invalid grid/);

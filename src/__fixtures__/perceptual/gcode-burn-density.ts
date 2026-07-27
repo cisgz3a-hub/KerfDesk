@@ -26,6 +26,19 @@
 // instrument is for raster programs; gcode-rasterize.ts remains the one for
 // vector paths.
 //
+// CALLER CONSTRAINT — keep the cell height an integer multiple of
+// lineIntervalMm. Because a scan row is assigned WHOLLY to the cell row
+// containing its midpoint, a cell boundary that falls part-way through the
+// scan pitch attributes whole rows to the wrong side of it. The error is an
+// artefact of the grid, not of the program under test, and it is large enough
+// to swamp a real regression: measured on a continuous-tone field at a 1 mm
+// scan pitch, 4 mm cells score 0.00012 while 4.5 mm cells score 0.04311 — a
+// 360× penalty for perfectly correct output. Choose the scoring window and
+// cell count together so the division comes out whole (a suitably aligned
+// grid is pinned in gcode-burn-density.test.ts). No check enforces this; a
+// misaligned grid is a legitimate thing to ask for, it just answers a
+// different question than the one you probably meant.
+//
 // Test-only helper: lives under src/__fixtures__ (boundary- and
 // coverage-exempt per eslint.config.mjs). Pure and deterministic.
 
