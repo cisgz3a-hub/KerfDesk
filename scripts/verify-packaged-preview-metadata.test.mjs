@@ -10,8 +10,12 @@ import { verifyPackagedPreviewAsar } from './verify-packaged-preview-metadata.mj
 
 const PREVIEW_VERSION = '0.2.0-preview.14';
 const WRONG_RENDERER_VERSION = '0.1.822';
+const ABOUT_MARKER = 'Free and open-source under the MIT License';
+const BUILD_BADGE_MARKER = 'Build version';
 
-async function createPreviewArchive(rendererVersion) {
+async function createPreviewArchive(options = {}) {
+  const aboutVersion = options.aboutVersion ?? PREVIEW_VERSION;
+  const buildBadgeVersion = options.buildBadgeVersion ?? PREVIEW_VERSION;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-preview-version-'));
   const source = path.join(root, 'source');
   const assets = path.join(source, 'dist', 'web', 'assets');
@@ -27,14 +31,18 @@ async function createPreviewArchive(rendererVersion) {
   );
   fs.writeFileSync(
     path.join(assets, 'index-fixture.js'),
-    `const buildVersion = ${JSON.stringify(rendererVersion)};\n`,
+    `const about = ${JSON.stringify(`${ABOUT_MARKER} ${aboutVersion}`)};\n`,
+  );
+  fs.writeFileSync(
+    path.join(assets, 'ui-workbench-fixture.js'),
+    `const buildBadge = ${JSON.stringify(`${BUILD_BADGE_MARKER} ${buildBadgeVersion}`)};\n`,
   );
   await asar.createPackage(source, archive);
   return { archive, root };
 }
 
 test('accepts an archive whose renderer and package use the exact Preview version', async () => {
-  const fixture = await createPreviewArchive(PREVIEW_VERSION);
+  const fixture = await createPreviewArchive();
   try {
     assert.doesNotThrow(() => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION));
   } finally {
@@ -42,12 +50,24 @@ test('accepts an archive whose renderer and package use the exact Preview versio
   }
 });
 
-test('rejects an archive whose visible renderer version differs from package metadata', async () => {
-  const fixture = await createPreviewArchive(WRONG_RENDERER_VERSION);
+test('rejects an archive whose About version differs from package metadata', async () => {
+  const fixture = await createPreviewArchive({ aboutVersion: WRONG_RENDERER_VERSION });
   try {
     assert.throws(
       () => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION),
-      /renderer version mismatch/,
+      /About renderer version mismatch/,
+    );
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('rejects an archive whose Build badge version differs from package metadata', async () => {
+  const fixture = await createPreviewArchive({ buildBadgeVersion: WRONG_RENDERER_VERSION });
+  try {
+    assert.throws(
+      () => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION),
+      /Build badge renderer version mismatch/,
     );
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });

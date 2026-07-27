@@ -7,7 +7,11 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const RENDERER_INDEX_PATTERN = /^dist\/web\/assets\/index-[^/]+\.js$/;
+const RENDERER_ASSET_PATTERN = /^dist\/web\/assets\/[^/]+\.js$/;
+const RENDERER_SURFACES = [
+  { label: 'About', marker: 'Free and open-source under the MIT License' },
+  { label: 'Build badge', marker: 'Build version' },
+];
 
 export function verifyPackagedPreviewMetadata(value, expectedVersion) {
   if (typeof value !== 'object' || value === null) {
@@ -25,23 +29,27 @@ export function verifyPackagedPreviewMetadata(value, expectedVersion) {
 }
 
 export function verifyPackagedRendererVersion(archivePath, expectedVersion) {
-  const rendererEntries = asar
+  const rendererAssets = asar
     .listPackage(archivePath, { isPack: false })
     .map((entry) => ({
       archivePath: entry.replace(/^[/\\]+/, ''),
       normalizedPath: entry.replaceAll('\\', '/').replace(/^\/+/, ''),
     }))
-    .filter((entry) => RENDERER_INDEX_PATTERN.test(entry.normalizedPath));
-  if (rendererEntries.length !== 1) {
-    throw new Error(
-      `expected exactly one packaged renderer index, found ${rendererEntries.length}`,
-    );
-  }
-  const rendererSource = asar
-    .extractFile(archivePath, rendererEntries[0].archivePath)
-    .toString('utf8');
-  if (!rendererSource.includes(expectedVersion)) {
-    throw new Error(`renderer version mismatch: expected ${expectedVersion}`);
+    .filter((entry) => RENDERER_ASSET_PATTERN.test(entry.normalizedPath))
+    .map((entry) => ({
+      ...entry,
+      source: asar.extractFile(archivePath, entry.archivePath).toString('utf8'),
+    }));
+  for (const surface of RENDERER_SURFACES) {
+    const matches = rendererAssets.filter((asset) => asset.source.includes(surface.marker));
+    if (matches.length !== 1) {
+      throw new Error(
+        `expected exactly one packaged ${surface.label} renderer asset, found ${matches.length}`,
+      );
+    }
+    if (!matches[0].source.includes(expectedVersion)) {
+      throw new Error(`${surface.label} renderer version mismatch: expected ${expectedVersion}`);
+    }
   }
 }
 
