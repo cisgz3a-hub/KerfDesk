@@ -12838,3 +12838,113 @@ panel test pins no mutation on selection followed by explicit Apply. Typecheck,
 lint, format, file-size, and the full test suite remain required. Physical
 cut quality remains unverified until a scrap test records machine, cutter,
 flutes, RPM, operation, stock, and outcome.
+
+---
+
+## ADR-265 - The GRBL simulator models planner back-pressure, opt-in (2026-07-27)
+
+### Context
+
+`src/__fixtures__/controllers/grbl-sim-machine.ts` documented its own largest
+gap in a header comment: *"Acks are immediate; real GRBL stops acking when the
+planner fills."* The 2026-07-26 LFCB-1 competitive audit
+(`docs/audits/2026-07-26-lfcb1-competitive-audit.md`, section 8) called this the
+sharpest verification finding in the project. KerfDesk streams G-code by
+character counting against the controller's receive buffer, and the one
+behaviour such a sender must get right is what happens when the controller goes
+quiet because its motion planner filled. A simulator that acks instantly can
+never produce that stall, so no test in the tree exercised it: the streaming
+path was verified against a model that could not reproduce the failure mode the
+path exists to prevent.
+
+Firmware ground truth, read from source on 2026-07-27:
+
+- `gnea/grbl` `grbl/serial.h`: `#define RX_BUFFER_SIZE 128`. The ring reserves
+  one slot (`serial_get_rx_buffer_available()` returns `rtail - head - 1` on the
+  wrapped branch), so 127 bytes are usable — grbl's own `doc/script/stream.py`
+  counts against `RX_BUFFER_SIZE - 1`.
+- `grbl/serial.c` `ISR(SERIAL_RX)`: realtime bytes are executed inside the
+  interrupt and never stored, so they consume no ring space; every other byte is
+  written "unless it is full", and a byte arriving at a full ring is dropped
+  with no error and no notification.
+- `grbl/planner.h`: `#define BLOCK_BUFFER_SIZE 16` (15 with `USE_LINE_NUMBERS`).
+- `grbl/motion_control.c` `mc_line()`: opens with a spin loop that calls
+  `protocol_auto_cycle_start()` while `plan_check_full_buffer()` is true.
+- `grbl/protocol.c` `protocol_main_loop()`: `report_status_message(gc_execute_line(line))`
+  — the `ok` is transmitted only after `gc_execute_line()` returns, so the ack is
+  withheld for exactly as long as the planner stays full, and no serial is read
+  during that spin.
+- `grbl/protocol.h`: `#define LINE_BUFFER_SIZE 80` — shorter than the RX ring.
+- `grblHAL/core/stream.h`: `#define RX_BUFFER_SIZE 1024`;
+  `grblHAL/core/config.h`: `DEFAULT_PLANNER_BUFFER_BLOCKS 100` (`$398`).
+
+### Decision
+
+Two pure models join the fixture, plus a feeder that composes them:
+
+- `grbl-sim-rx-window.ts` — the receive ring: occupancy, peak, and silently
+  dropped bytes. Terminators count against it, as on hardware.
+- `grbl-sim-planner.ts` — the bounded block queue and the single `withheldAck`
+  it parks while full. One withheld line only, because grbl's main loop is
+  single threaded and is stuck inside `gc_execute_line()` for that one line.
+- `grbl-sim-backpressure.ts` — feeds host bytes to the reducer at the rate a
+  real main loop could accept them, withholds the `ok` when the planner is full,
+  retires one block per `blockRetireMs`, and releases the withheld ack on
+  retirement. It identifies a motion line by the effect the reducer schedules
+  for it, so the reducer remains the only G-code parser.
+
+`grbl-sim-machine.ts` is unchanged apart from its fidelity comment: it models
+the parser, not the serial main loop, so instant acks are correct at that layer.
+
+**Back-pressure is opt-in** via `createGrblSimulator({ plannerBlocks })`.
+Defaulting it on would re-time the 18 byte-level characterization tests in
+`src/ui/state/laser-lifecycle.simulator.test.ts`, which stream 30-40 motion
+lines while pumping 5-50 ms and exist specifically as the transcript safety net
+for the ControllerDriver seam. Silently changing a shared fixture underneath
+them would trade a known gap for an unknown one. The knob is named in the
+reducer's fidelity comment so the default cannot be mistaken for fidelity.
+
+Realtime bytes bypass the ring and keep working while the main loop is blocked,
+matching the ISR. That is what keeps a stalled job observable (`?`) and
+abortable (soft reset) — a stall must never become a trap.
+
+Nothing in `src/core/controllers/grbl/streamer.ts` changed. This ADR adds no
+guard, gate, cap, or refusal to the streaming path (rule 7, non-negotiable #21);
+it adds a measuring instrument and the tests that use it.
+
+### Consequences
+
+- The failure mode character counting exists to prevent is now reproducible on
+  demand, and the streamer is proven against it rather than assumed correct.
+- A test that forgets to opt in still gets instant acks. The meters read
+  `capacity: 0` in that case, so an un-opted-in test cannot read a zero drop
+  count and believe it proved flow control.
+- The fixture now encodes firmware constants (128/127, 16, 1024, 100) that a
+  future firmware revision could invalidate. They are pinned by assertion so a
+  change is loud.
+- `protocol_buffer_synchronize()` is still not modelled: real GRBL drains the
+  planner completely before answering `$$`, `$I`, `$#`, `$G`. That is a longer
+  stall than a full planner causes and remains a documented gap.
+
+### Verification
+
+`grbl-sim-rx-window.test.ts` (7) and `grbl-sim-planner.test.ts` (8) pin the two
+pure models, including silent overrun and the withheld-ack release rule.
+`grbl-sim-backpressure.test.ts` (7) pins the simulator: the ack is withheld at a
+full planner, queued bytes wait in the ring, `?` still answers and soft reset
+still clears while blocked, and - as a negative control - a sender that ignores
+back-pressure really does drop bytes.
+
+`src/core/controllers/grbl/streamer-planner-backpressure.test.ts` (4) drives the
+REAL streamer through the same ack-step-write loop production uses in
+`advanceStream()`, and proves across a 200-line job that it never overruns the
+ring while acks stall, makes no progress during silence and then resumes to
+`done`, and survives a 1000 ms-per-block stall delivering every line exactly
+once in order. Each proof first asserts that a stall actually occurred, so none
+of them can pass vacuously. The suite was additionally validated by mutation:
+widening the streamer's buffer bound to `rxBufferBytes * 8` makes three of the
+four fail with 536 bytes dropped.
+
+**Not verified: real hardware.** A simulator that models back-pressure is still
+a simulator. It does not prove USB-serial latency, host driver buffering, or any
+specific controller's timing, and this ADR makes no hardware claim.
