@@ -231,8 +231,17 @@ export type CncGroup = {
 
 export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 
+// Something the compile path noticed that the operator should know about, but
+// which must never refuse the job (rule 7). Surfaced in the Job Review warnings
+// list. Optional on Job so every existing Job literal stays valid.
+export type JobDiagnostic = {
+  readonly kind: 'offset-fill-failed';
+  readonly layerName: string;
+};
+
 export type Job = {
   readonly groups: ReadonlyArray<Group>;
+  readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
 };
 
 export const EMPTY_JOB: Job = { groups: [] };
