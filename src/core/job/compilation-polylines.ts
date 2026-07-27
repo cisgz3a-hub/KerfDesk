@@ -9,10 +9,14 @@ import {
   type Polyline,
 } from '../scene';
 
+// Matches the raw-vector budget the preparation gate uses, so flattening here
+// cannot exceed what preparation already accepted for the same scene.
+const COMPILATION_SEGMENT_BUDGET = 100_000;
+
 export function compilationPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
   const flattened = flattenColoredPathCurves(path, {
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-    segmentBudget: 100_000,
+    segmentBudget: COMPILATION_SEGMENT_BUDGET,
   });
   // Normal output reaches this only after the matching pre-emit budget check.
   // Direct pure-core callers retain the compatibility view on over-budget data.
