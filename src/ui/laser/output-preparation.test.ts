@@ -23,8 +23,33 @@ const IDLE: StatusReport = {
   spindle: 0,
   wco: null,
 };
+const MISSING_OBJECT_ID = 'missing-object';
 
 describe('output preparation worker payload', () => {
+  it('preserves a failed Save preparation as a distinct worker result', () => {
+    const response = prepareOutputRequest({
+      kind: 'save',
+      project: createProject(),
+      options: {
+        outputScope: {
+          cutSelectedGraphics: true,
+          useSelectionOrigin: false,
+          selectedObjectIds: [MISSING_OBJECT_ID],
+        },
+      },
+    });
+
+    expect(response).toMatchObject({
+      kind: 'save',
+      result: {
+        kind: 'preparation-failed',
+        gcode: '',
+        preflight: { issues: [{ code: 'selected-output-empty' }] },
+      },
+    });
+    expect(() => structuredClone(response)).not.toThrow();
+  });
+
   it('returns an exact cloneable large Start result without a function-valued raster', () => {
     const project = streamedProject();
     const response = prepareOutputRequest({

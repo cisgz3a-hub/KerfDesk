@@ -32,12 +32,11 @@ import {
 } from './import-toasts';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
-import { partitionSavePreflight } from './save-preflight-policy';
 import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 import { importSourceSizeIssue } from './import-source-limits';
-import { emitSaveGcode } from './save-gcode-emission';
+import { prepareGcodeSave } from './prepare-gcode-save';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -171,16 +170,8 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
-  const { gcode, preflight } = await emitSaveGcode(ctx, placement);
-  // Rule 7 / ADR-228: advisory preflight findings (the scan-offset magnitude
-  // cap) warn after the save instead of refusing it — mirrors the Start
-  // path's partitionEmitPreflight split.
-  const { blocking, advisories } = partitionSavePreflight(preflight.issues);
-  if (blocking.length > 0) {
-    const lines = blocking.map((i) => `• ${i.message}`).join('\n');
-    jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
-    return;
-  }
+  const prepared = await prepareGcodeSave(ctx, placement);
+  if (prepared.kind === 'failed') return;
   if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return;
   let target: SaveTarget | null;
   try {
@@ -194,10 +185,10 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   }
   if (target === null) return;
   try {
-    await target.write(gcode);
+    await target.write(prepared.gcode);
     advanceExportVariables(ctx);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
-    pushPostSaveAdvisories(ctx, advisories);
+    pushPostSaveAdvisories(ctx, prepared.advisories);
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }

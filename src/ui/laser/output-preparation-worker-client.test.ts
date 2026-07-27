@@ -17,6 +17,8 @@ import type {
   OutputPreparationResponse,
 } from './output-preparation-protocol';
 
+const PREPARATION_FAILURE_MESSAGE = 'The output snapshot could not be prepared.';
+
 class FakeWorker {
   static instances: FakeWorker[] = [];
   onmessage: ((event: MessageEvent<OutputPreparationResponse>) => void) | null = null;
@@ -92,12 +94,55 @@ describe('output preparation worker client', () => {
     if (worker === undefined) throw new Error('worker missing');
     worker.respond({
       kind: 'save',
-      result: { gcode: 'G21\n', preflight: { ok: true, issues: [] } },
+      result: { kind: 'emitted', gcode: 'G21\n', preflight: { ok: true, issues: [] } },
     });
 
     await expect(pending).resolves.toEqual({
+      kind: 'emitted',
       gcode: 'G21\n',
       preflight: { ok: true, issues: [] },
+    });
+    expect(worker.terminated).toBe(true);
+  });
+
+  it('preserves a failed Save result and terminates the one-shot worker', async () => {
+    const pending = prepareSaveOutputOffThread({
+      kind: 'save',
+      project: createProject(),
+      options: {},
+    });
+    if (pending === null) throw new Error('worker unavailable');
+    const worker = FakeWorker.instances.at(-1);
+    if (worker === undefined) throw new Error('worker missing');
+    worker.respond({
+      kind: 'save',
+      result: {
+        kind: 'preparation-failed',
+        gcode: '',
+        preflight: {
+          ok: false,
+          issues: [
+            {
+              code: 'variable-evaluation-failed',
+              message: PREPARATION_FAILURE_MESSAGE,
+            },
+          ],
+        },
+      },
+    });
+
+    await expect(pending).resolves.toEqual({
+      kind: 'preparation-failed',
+      gcode: '',
+      preflight: {
+        ok: false,
+        issues: [
+          {
+            code: 'variable-evaluation-failed',
+            message: PREPARATION_FAILURE_MESSAGE,
+          },
+        ],
+      },
     });
     expect(worker.terminated).toBe(true);
   });

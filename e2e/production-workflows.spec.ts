@@ -214,6 +214,9 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   expect(gcode).toContain('Y260.000');
 
   await page.getByRole('button', { name: /^Disconnect/ }).click();
+  await expect(
+    page.getByTitle('Print-and-Cut registration is not valid. Capture both machine points again.'),
+  ).toBeVisible();
   const savedBefore = fileSavedCount(await kerfdesk.events());
   let blockedMessage = '';
   page.once('dialog', (dialog) => {
