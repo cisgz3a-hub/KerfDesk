@@ -3,6 +3,7 @@ import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
 import { tabFractionsFromReference, tabRampedPoints } from './cnc-tab-ramp';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import type { FrameHandedness } from './machine-frame-handedness';
 import { enforceCutDirection } from './motion-polish';
 import { orderInnerFirst } from './profile-ordering';
 import { profileToolpathPolylines } from './profile-paths';
@@ -25,6 +26,7 @@ export function finishingProfilePasses(
   settings: CncLayerSettings,
   toolDiameterMm: number,
   roughingToolpaths: ReadonlyArray<Polyline>,
+  handedness: FrameHandedness,
   tabSources: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const side = settings.cutType === 'profile-inside' ? 'inside' : 'outside';
@@ -32,7 +34,7 @@ export function finishingProfilePasses(
   const toolpaths =
     settings.cutDirection === undefined
       ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
+      : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
   const zMm = -settings.depthMm;
   const manualTabCenters = manualTabCentersForToolpaths(toolpaths, tabSources);
   const passes: CncPass[] = [];

@@ -30,6 +30,11 @@ const CCW_SQUARE: Polyline = {
   ],
 };
 
+// front-left / rear-right / center: machine numbers keep the physical sense of
+// a shoelace sign. front-right / rear-left mirror one axis and invert it.
+const RIGHT_HANDED = 1;
+const MIRRORED = -1;
+
 const OUTER_AND_HOLE_CONTOUR_COUNT = 2;
 const MISSING_ORIENTED_CONTOURS_ERROR = 'expected an oriented outer and hole';
 
@@ -39,29 +44,50 @@ describe('enforceCutDirection', () => {
   // it directly ("Outside … Climb (CW)"), and Fusion points its outer-contour
   // arrows clockwise to maintain a climb cut.
   it('outside-profile climb wants clockwise; conventional reverses', () => {
-    const climb = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-outside');
+    const climb = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-outside', RIGHT_HANDED);
     expect(isCounterClockwise(climb[0] as Polyline)).toBe(false);
-    const conventional = enforceCutDirection([CCW_SQUARE], 'conventional', 'profile-outside');
+    const conventional = enforceCutDirection(
+      [CCW_SQUARE],
+      'conventional',
+      'profile-outside',
+      RIGHT_HANDED,
+    );
     expect(isCounterClockwise(conventional[0] as Polyline)).toBe(true);
   });
 
   // A hole's material lies outside its boundary, so its climb direction is the
   // mirror of the exterior case ("Inside … Climb (CCW)").
   it('inside/pocket climb wants counter-clockwise (material lies outside the boundary)', () => {
-    const inside = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-inside');
+    const inside = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-inside', RIGHT_HANDED);
     expect(isCounterClockwise(inside[0] as Polyline)).toBe(true);
-    const pocket = enforceCutDirection([CCW_SQUARE], 'climb', 'pocket');
+    const pocket = enforceCutDirection([CCW_SQUARE], 'climb', 'pocket', RIGHT_HANDED);
     expect(isCounterClockwise(pocket[0] as Polyline)).toBe(true);
+  });
+
+  // On a mirrored machine frame the SAME physical climb cut has to be emitted
+  // with the opposite numeric winding, or the operator gets conventional
+  // motion. Contours reach here already in machine coords, so this function is
+  // the only place that can know.
+  it('inverts the target winding on a mirrored machine frame', () => {
+    const climb = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-outside', MIRRORED);
+    expect(isCounterClockwise(climb[0] as Polyline)).toBe(true);
+    const inside = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-inside', MIRRORED);
+    expect(isCounterClockwise(inside[0] as Polyline)).toBe(false);
   });
 
   it('leaves engraves and open paths untouched', () => {
     const open: Polyline = { closed: false, points: CCW_SQUARE.points };
-    expect(enforceCutDirection([open], 'climb', 'profile-outside')[0]).toBe(open);
-    expect(enforceCutDirection([CCW_SQUARE], 'climb', 'engrave')[0]).toBe(CCW_SQUARE);
+    expect(enforceCutDirection([open], 'climb', 'profile-outside', RIGHT_HANDED)[0]).toBe(open);
+    expect(enforceCutDirection([CCW_SQUARE], 'climb', 'engrave', RIGHT_HANDED)[0]).toBe(CCW_SQUARE);
   });
 
   it('preserves the enclosed area when reversing and rotating', () => {
-    const result = enforceCutDirection([CCW_SQUARE], 'conventional', 'profile-outside');
+    const result = enforceCutDirection(
+      [CCW_SQUARE],
+      'conventional',
+      'profile-outside',
+      RIGHT_HANDED,
+    );
     expect(Math.abs(signedAreaMm2((result[0] as Polyline).points))).toBeCloseTo(100, 6);
   });
 
@@ -89,7 +115,7 @@ describe('enforceCutDirection', () => {
       ],
     }; // CW, area -400 (wound opposite the outer, as the kerf offset produces)
     for (const direction of ['climb', 'conventional'] as const) {
-      const result = enforceCutDirection([outer, hole], direction, 'profile-outside');
+      const result = enforceCutDirection([outer, hole], direction, 'profile-outside', RIGHT_HANDED);
       expect(result).toHaveLength(OUTER_AND_HOLE_CONTOUR_COUNT);
       const [orientedOuter, orientedHole] = result;
       if (orientedOuter === undefined || orientedHole === undefined) {

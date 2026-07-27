@@ -45,6 +45,7 @@ import {
   lineArtSelectionApplies,
   selectLineArtContours,
 } from './line-art-contours';
+import { machineFrameHandedness, type FrameHandedness } from './machine-frame-handedness';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { applyProfileLeadPasses } from './profile-lead-passes';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
@@ -130,7 +131,10 @@ export function cncGroupForLayer(
   tabSources?: ReadonlyArray<CollectedCncContour>,
 ): CncGroup | null {
   const tool = layerCncTool(config, settings);
-  const passes = passesForLayer(polylines, settings, tool, config, tabSources);
+  // Cut direction is a physical rule applied to machine numbers, and
+  // front-right / rear-left mirror the frame — see machine-frame-handedness.
+  const handedness = machineFrameHandedness(device.origin);
+  const passes = passesForLayer(polylines, settings, tool, config, handedness, tabSources);
   // ADR-250: bake profile lead-in/out into closed profile passes (default-on
   // for profile-outside/inside; a no-op for other cut types and shape 'none').
   const led = applyProfileLeadPasses(
@@ -237,6 +241,7 @@ function passesForLayer(
   settings: CncLayerSettings,
   tool: CncTool,
   config: CncMachineConfig,
+  handedness: FrameHandedness,
   tabSources: ReadonlyArray<CollectedCncContour> = [],
 ): ReadonlyArray<CncPass> {
   const specialized = specializedPassesForLayer(polylines, settings, tool);
@@ -256,7 +261,7 @@ function passesForLayer(
   const toolpaths =
     settings.cutDirection === undefined
       ? raw
-      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
+      : enforceCutDirection(raw, settings.cutDirection, settings.cutType, handedness);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return [];
   const helicalPasses = helicalPocketPasses(settings, toolpaths, depths);
@@ -276,7 +281,14 @@ function passesForLayer(
     allowanceMm > 0
       ? [
           ...roughing,
-          ...finishingProfilePasses(contours, settings, tool.diameterMm, toolpaths, tabSources),
+          ...finishingProfilePasses(
+            contours,
+            settings,
+            tool.diameterMm,
+            toolpaths,
+            handedness,
+            tabSources,
+          ),
         ]
       : roughing;
   // H.9 (opt-in): plunges become along-path ramps at the configured angle.

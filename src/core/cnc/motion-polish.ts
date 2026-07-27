@@ -36,6 +36,7 @@ import {
   signedAreaMm2,
 } from '../geometry/polyline-orientation';
 import type { Vec3 } from '../geometry/vec3';
+import type { FrameHandedness } from './machine-frame-handedness';
 import type { CncCutDirection, CncCutType, CncMachineConfig, Polyline, Vec2 } from '../scene';
 
 const MIN_CLOSED_POINTS = 3;
@@ -43,12 +44,18 @@ const MAX_RAMP_ANGLE_DEG = 45;
 
 // The material side flips between outside profiles and inside/pocket work;
 // engraves and on-path cuts have no defined material side.
+//
+// `toolpaths` are already in MACHINE coordinates (collect-cnc-contours.ts runs
+// toMachineCoords before compile), and front-right / rear-left mirror one axis,
+// so `handedness` says whether a shoelace sign in those numbers still means the
+// physical rotation the climb/conventional convention is stated in.
 export function enforceCutDirection(
   toolpaths: ReadonlyArray<Polyline>,
   direction: CncCutDirection,
   cutType: CncCutType,
+  handedness: FrameHandedness,
 ): ReadonlyArray<Polyline> {
-  const wantCcw = wantsCounterClockwise(direction, cutType);
+  const wantCcw = wantsCounterClockwise(direction, cutType, handedness);
   if (wantCcw === null) return toolpaths;
   // ADR-252: a hole's material lies OUTSIDE its boundary, so its climb direction
   // is the mirror of the outer boundary's. Forcing one winding on every contour
@@ -83,7 +90,23 @@ function dominantWindingSign(toolpaths: ReadonlyArray<Polyline>): number {
   return sign;
 }
 
-function wantsCounterClockwise(direction: CncCutDirection, cutType: CncCutType): boolean | null {
+// The CW/CCW half of this mapping is stated for the operator's view from above.
+// On a mirrored machine frame the emitted numbers run the other way round, so
+// the target winding inverts to keep the PHYSICAL travel direction the same.
+function wantsCounterClockwise(
+  direction: CncCutDirection,
+  cutType: CncCutType,
+  handedness: FrameHandedness,
+): boolean | null {
+  const wantCcw = wantsCounterClockwiseInPhysicalFrame(direction, cutType);
+  if (wantCcw === null) return null;
+  return handedness === 1 ? wantCcw : !wantCcw;
+}
+
+function wantsCounterClockwiseInPhysicalFrame(
+  direction: CncCutDirection,
+  cutType: CncCutType,
+): boolean | null {
   if (cutType === 'profile-outside') return direction === 'conventional';
   if (cutType === 'profile-inside' || cutType === 'pocket') return direction === 'climb';
   return null;

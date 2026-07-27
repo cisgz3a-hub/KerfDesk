@@ -11867,6 +11867,65 @@ blocked, gated or clamped by this; it is a corrected mapping.
 **Not verified:** no coupon was cut. This rests on documentary agreement between
 four references, not on a measured chip direction from the maintainer's machine.
 
+### Amendment 2026-07-27 - the mapping is stated in the operator's frame but applied to machine numbers
+
+**Status:** Accepted. Corrects the frame the amendment above is evaluated in;
+the CW/CCW convention itself is unchanged and still stands.
+
+"Outside climb = CW" is a claim about the tool seen from above the bed. The code
+applies it to a shoelace sign computed on toolpaths that are already in MACHINE
+coordinates: `collect-cnc-contours.ts:74` runs every contour through
+`toMachineCoords` while collecting it, long before `compile-cnc-job.ts:259`
+calls `enforceCutDirection`, and nothing mirrors afterwards — the CNC emitter
+takes the device parameter but never reads it (`cnc-grbl-strategy.ts:88`).
+
+Two of the five origins mirror exactly one axis, so their machine numbers are a
+reflection of the bed and a numeric CW is a physical CCW. The tree already
+carries the handedness: `jogAxisSignsForOrigin` maps "operator's right" and
+"away from the operator" onto machine axis signs, and `jog-direction.test.ts`
+pins those signs to `origin-transform`'s linear part. The determinant is:
+
+| Origin | jog signs (x, y) | determinant | machine frame |
+|---|---|---|---|
+| `front-left` | (+1, +1) | +1 | matches the physical top view |
+| `front-right` | (-1, +1) | **-1** | **mirrored** |
+| `rear-left` | (+1, -1) | **-1** | **mirrored** |
+| `rear-right` | (-1, -1) | +1 | matches the physical top view |
+| `center` | (+1, +1) | +1 | matches the physical top view |
+
+So on **`front-right` and `rear-left` machines only**, selecting Climb produced
+conventional motion and selecting Conventional produced climb, on
+`profile-outside`, `profile-inside` and `pocket` layers. Measured by compiling
+one square under all five origins: the emitted signed area is identical on every
+origin (-537.08 mm² for outside climb), which is precisely the defect — the same
+numbers on a mirrored bed are the opposite physical rotation. `front-left`
+(the shipped default), `rear-right` and `center` were always correct, as was any
+layer left on the default `profile-on-path` cut type, for which
+`wantsCounterClockwise` returns `null` and enforcement is inert.
+
+### Decision
+
+`machineFrameHandedness(origin)` (new, `src/core/cnc/machine-frame-handedness.ts`)
+derives the determinant from `jogAxisSignsForOrigin` rather than from a second
+hand-maintained table that could drift from the transform.
+`enforceCutDirection` takes it as a required parameter — required so the
+compiler locates every call site — and inverts the target winding on a mirrored
+frame, which is exactly equivalent to flipping the requested direction.
+
+ADR-252's hole mirror needed no change: `dominantWindingSign` and `isHole`
+compare contour windings against EACH OTHER, and a global reflection flips every
+sign together, so that comparison is already mirror-invariant. Only the step
+that compares against an ABSOLUTE convention needed the frame.
+
+The rule-7 surface is unchanged: nothing is blocked, gated, clamped or refused
+by this. It is a corrected mapping, and a wrong-origin job still compiles,
+frames and runs exactly as before — it simply now travels the direction the
+operator asked for.
+
+**Not verified:** no coupon was cut and no hardware was available this session.
+The correction rests on the tree's own jog/origin handedness contract and on
+compiled-output measurement, not on an observed chip load or edge finish.
+
 ## ADR-252 - Cut-direction enforcement keeps hole windings opposite the outer
 
 **Date:** 2026-07-24
