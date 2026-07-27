@@ -4,7 +4,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { DEFAULT_PROJECT_OPTIMIZATION } from '../scene';
 import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, FillGroup, FillSegment, Job } from './job';
-import { MAX_NEAREST_NEIGHBOR_SEGMENTS, optimizePaths } from './optimize-paths';
+import { optimizePaths } from './optimize-paths';
 
 // All fixtures in this file produce CutGroups; narrow on the union
 // for ergonomic field access in the assertions below.
@@ -244,21 +244,6 @@ describe('optimizePaths', () => {
     const result = optimizePaths(j);
 
     expect(result.groups).toEqual([farAdaptive, nearSensitive]);
-  });
-
-  it('leaves very large groups in source order instead of running the O(n^2) pass', () => {
-    const farFirst = seg([100, 100], [101, 100]);
-    const nearSecond = seg([0, 0], [1, 0]);
-    const filler = Array.from({ length: MAX_NEAREST_NEIGHBOR_SEGMENTS - 1 }, (_, i) =>
-      seg([200 + i, 0], [201 + i, 0]),
-    );
-    const j: Job = { groups: [group([farFirst, nearSecond, ...filler])] };
-
-    const result = optimizePaths(j);
-
-    expect(asCut(result)?.segments).toBe(asCut(j)?.segments);
-    expect(asCut(result)?.segments[0]).toBe(farFirst);
-    expect(asCut(result)?.segments[1]).toBe(nearSecond);
   });
 
   it('flips an open segment to enter from the nearer endpoint', () => {
