@@ -11,7 +11,7 @@
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
-import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyTransform,
@@ -47,6 +47,15 @@ import { resolveFillScanDirection } from './scan-direction-policy';
 type VectorCompilation = {
   readonly groups: ReadonlyArray<Group>;
   readonly diagnostics: ReadonlyArray<JobDiagnostic>;
+};
+
+// Line-mode segments plus whether the kerf offset lost any of them. A failed
+// offset and a layer with no closed contours both yield fewer segments, so
+// without the flag a dropped cut is indistinguishable from a layer that never
+// had one.
+type LineSegmentCollection = {
+  readonly segments: ReadonlyArray<CutSegment>;
+  readonly kerfOffsetFailed: boolean;
 };
 
 const NO_DIAGNOSTICS: ReadonlyArray<JobDiagnostic> = [];
@@ -169,8 +178,14 @@ function vectorGroupsForLayer(
     }
     return offsetOrHatchFillGroups(objects, layer, device, powerSource, sourceObjectId);
   }
-  const segments = collectLineSegmentsForLayer(objects, layer, device);
-  if (segments.length === 0) return { groups: [], diagnostics: NO_DIAGNOSTICS };
+  const line = collectLineSegmentsForLayer(objects, layer, device);
+  // Reported even when no segments survived: a failed kerf offset takes every
+  // closed contour on the layer with it, which is precisely the case where the
+  // layer would otherwise vanish from the job without a trace.
+  const diagnostics: ReadonlyArray<JobDiagnostic> = line.kerfOffsetFailed
+    ? [{ kind: 'kerf-offset-failed', layerName: layer.name }]
+    : NO_DIAGNOSTICS;
+  if (line.segments.length === 0) return { groups: [], diagnostics };
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const entryRunwayMm = contourEntryRunwayMm(device, layer.fillOverscanMm);
   return {
@@ -179,10 +194,10 @@ function vectorGroupsForLayer(
         ...common,
         kind: 'cut' as const,
         ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
-        segments,
+        segments: line.segments,
       },
     ],
-    diagnostics: NO_DIAGNOSTICS,
+    diagnostics,
   };
 }
 
@@ -231,41 +246,43 @@ function collectLineSegmentsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-): CutSegment[] {
+): LineSegmentCollection {
   const out: CutSegment[] = [];
+  let kerfOffsetFailed = false;
   for (const obj of objects) {
-    appendSegmentsFromObject(obj, layer, device, out);
+    if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
   }
-  if (!layer.tabsEnabled) return out;
-  return applyAutomaticTabsToPolylines(
-    out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
-    layer,
-  ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }));
+  if (!layer.tabsEnabled) return { segments: out, kerfOffsetFailed };
+  return {
+    segments: applyAutomaticTabsToPolylines(
+      out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
+      layer,
+    ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed })),
+    kerfOffsetFailed,
+  };
 }
 
+// Returns true when the kerf offset failed for this object, so the caller can
+// report the loss instead of emitting a job that is quietly missing a cut.
 function appendSegmentsFromObject(
   obj: SceneObject,
   layer: Layer,
   device: DeviceProfile,
   out: CutSegment[],
-): void {
+): boolean {
   // Exhaustive over SceneObject.kind — enforced by
   // `@typescript-eslint/switch-exhaustiveness-check`. The default arm's
   // assertNever turns missing arms into compile errors when a new
   // variant lands (per ADR-014).
   switch (obj.kind) {
     case 'imported-svg':
-      appendPathSegments(obj, layer, device, out);
-      return;
+      return appendPathSegments(obj, layer, device, out);
     case 'text':
-      appendPathSegments(obj, layer, device, out);
-      return;
+      return appendPathSegments(obj, layer, device, out);
     case 'traced-image':
-      appendPathSegments(obj, layer, device, out);
-      return;
+      return appendPathSegments(obj, layer, device, out);
     case 'shape':
-      appendPathSegments(obj, layer, device, out);
-      return;
+      return appendPathSegments(obj, layer, device, out);
     case 'raster-image':
       // F.2.c: SceneObject union now includes raster-image. The
       // dedicated raster emit path (compileRasterGroup → emitRaster)
@@ -273,10 +290,10 @@ function appendSegmentsFromObject(
       // contribute polyline segments and the compile path skips
       // them. Behaviour parity with the F.2.b standalone emit-raster
       // tests preserved.
-      return;
+      return false;
     case 'relief':
       // CNC-only geometry — the laser compiler never emits it.
-      return;
+      return false;
     default:
       assertNever(obj, 'SceneObject');
   }
@@ -296,7 +313,8 @@ function appendPathSegments(
   layer: Layer,
   device: DeviceProfile,
   out: CutSegment[],
-): void {
+): boolean {
+  let kerfOffsetFailed = false;
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
@@ -314,10 +332,19 @@ function appendPathSegments(
         out.push({ polyline: withClosingPoint(points, polyline.closed), closed: polyline.closed });
       }
     }
-    for (const offset of offsetClosedPolylinesForKerf(closedForKerf, layer.kerfOffsetMm)) {
-      out.push({ polyline: offset.points, closed: true });
+    // Checked: the unchecked variant flattens a clipper2 failure to an empty
+    // list, which reads identically to "this path had no closed contours" — so
+    // a failed kerf offset silently deleted the cut instead of reporting it.
+    const offset = offsetClosedPolylinesForKerfChecked(closedForKerf, layer.kerfOffsetMm);
+    if (offset.kind === 'error') {
+      kerfOffsetFailed = true;
+      continue;
+    }
+    for (const polyline of offset.value) {
+      out.push({ polyline: polyline.points, closed: true });
     }
   }
+  return kerfOffsetFailed;
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
