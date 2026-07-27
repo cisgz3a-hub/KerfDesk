@@ -36,6 +36,7 @@ import { useStartBlockerStore } from '../start-blocker-store';
 import { runStartJobFlow } from '../start-job-flow';
 import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
+import { FLUIDNC_READ_ONLY_SETTING_WARNING_PREFIX } from './fluidnc-divergence-warnings';
 import { captureJobReviewModels } from './testing';
 
 vi.mock('../../state/job-aware-dialogs', () => ({
@@ -223,6 +224,34 @@ describe('runJobReviewGate through runStartJobFlow', () => {
 
     expect(capture.models[0]?.warnings.join('\n')).toContain('Controller identity mismatch:');
     expect(capture.models[0]?.warnings.join('\n')).toContain('firmware banner identifies Marlin');
+    useJobReviewStore.getState().cancel();
+    await review;
+    capture.stop();
+  });
+
+  it('discloses the FluidNC read-only settings divergence without gating the review', async () => {
+    useLaserStore.setState({
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
+    });
+    const initial = await unframedReviewBundle();
+    const capture = captureJobReviewModels();
+
+    useLaserStore.setState({ detectedControllerKind: 'fluidnc' });
+    const review = runJobReviewGate({
+      initial,
+      checkpointToReplace: null,
+      completedReceipt: null,
+      purpose: 'frame',
+    });
+    await vi.waitFor(() => expect(capture.models).toHaveLength(1));
+
+    const warnings = capture.models[0]?.warnings.join('\n') ?? '';
+    expect(warnings).toContain(FLUIDNC_READ_ONLY_SETTING_WARNING_PREFIX);
+    expect(warnings).toContain('error:162');
+    // Rule 7: the disclosure informs only — the review stays open and
+    // confirmable rather than refusing the job.
+    expect(useJobReviewStore.getState().state.kind).toBe('open');
     useJobReviewStore.getState().cancel();
     await review;
     capture.stop();
