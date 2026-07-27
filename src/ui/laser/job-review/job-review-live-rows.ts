@@ -295,6 +295,11 @@ function laserModeFact(
   settings: ControllerSettingsSnapshot,
   machineKind: MachineKind,
 ): JobReviewFact {
+  // grblHAL reports $32=2 for lathe mode. Showing that as a plain "Off" would
+  // hide which of the two not-laser modes the controller is actually in.
+  if (settings.machineMode?.kind === 'lathe') {
+    return fact('Laser mode $32', 'Lathe mode ($32=2)', 'warning');
+  }
   const expected = machineKind === 'laser';
   const tone: JobReviewFact['tone'] =
     settings.laserModeEnabled === undefined || settings.laserModeEnabled !== expected

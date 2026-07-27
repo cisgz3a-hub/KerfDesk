@@ -202,8 +202,9 @@ const SETTING_DEFINITIONS: ReadonlyMap<number, GrblSettingDefinition> = new Map(
     32,
     {
       name: 'Laser mode',
-      unit: '0/1',
-      description: 'Enables GRBL laser mode for motion-linked laser power changes.',
+      unit: '0/1/2',
+      description:
+        'Mode of operation. grbl and FluidNC: 0 off, 1 enables motion-linked laser power. grblHAL: 0 Normal, 1 Laser, 2 Lathe.',
       category: 'laser',
       writeRisk: 'common',
     },
