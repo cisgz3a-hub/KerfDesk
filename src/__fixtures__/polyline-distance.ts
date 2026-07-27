@@ -9,7 +9,11 @@ export function maximumPointDistanceToPolyline(
 ): number {
   if (points.length === 0) throw new Error('expected at least one point');
   if (polyline.length < 2) throw new Error('expected at least one polyline segment');
-  return Math.max(...points.map((point) => distanceToPolyline(point, polyline)));
+  let maximumDistance = 0;
+  for (const point of points) {
+    maximumDistance = Math.max(maximumDistance, distanceToPolyline(point, polyline));
+  }
+  return maximumDistance;
 }
 
 /** Length of each consecutive segment in a geometry-test polyline. */
