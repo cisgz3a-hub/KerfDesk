@@ -2,9 +2,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../../core/devices';
+import { runStandaloneCncPreflight } from '../../core/preflight';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
+import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
@@ -147,5 +149,23 @@ describe('SurfacingPanel save path', () => {
             toast.message.includes('cannot prove clearance from enabled machine no-go zones'),
         ),
     ).toBe(true);
+  });
+
+  // Pins the exact pre/post delta without needing the old code present: for this
+  // input runStandaloneCncPreflight reports ok === false, yet contributes no
+  // compile-integrity issue at all. The old `if (!emitted.preflight.ok)` refusal
+  // therefore fired on it; the partition does not. Revert the panel to reading
+  // `.ok` raw and the two tests above go red while this one stays green —
+  // together they pin why the partition is required.
+  it('reports ok===false for a finding that is advisory, not compile integrity', () => {
+    const preflight = runStandaloneCncPreflight(
+      { ...DEFAULT_DEVICE_PROFILE, noGoZones: [ENABLED_NO_GO_ZONE] },
+      DEFAULT_CNC_MACHINE_CONFIG,
+      'G1 X1 Y1 F100',
+    );
+
+    expect(preflight.ok).toBe(false);
+    expect(preflight.issues.some((issue) => issue.code === 'no-go-zone-collision')).toBe(true);
+    expect(partitionSavePreflight(preflight.issues).blocking).toEqual([]);
   });
 });
