@@ -17,6 +17,10 @@ export type CncRestPocketOperation =
       readonly finishTool: CncTool;
       readonly roughToolpaths: ReadonlyArray<Polyline>;
       readonly restToolpaths: ReadonlyArray<Polyline>;
+      // True when the rest region's ring ladder was cut short by a clipper
+      // failure rather than by running out of interior — the finishing pass is
+      // truncated and stock rest machining was meant to remove is still there.
+      readonly offsetFailed: boolean;
     };
 
 export function resolveRestPocketOperation(
@@ -53,6 +57,7 @@ export function resolveRestPocketOperation(
     finishTool,
     roughToolpaths,
     restToolpaths: rest.toolpaths,
+    offsetFailed: rest.offsetFailed,
   };
 }
 

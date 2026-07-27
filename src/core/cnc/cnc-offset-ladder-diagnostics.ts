@@ -33,6 +33,7 @@ import {
   type Scene,
 } from '../scene';
 import { collectLayerPolylines } from './collect-cnc-contours';
+import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { reliefOffsetLadderFailed } from './compile-cnc-relief';
 import { pocketRasterToolpaths, pocketRingToolpaths } from './pocket-paths';
 import { vcarveClearancePocket } from './vcarve-clearance';
@@ -79,7 +80,11 @@ function pocketLadderFailed(
   tool: CncTool,
 ): boolean {
   // Rest machining roughs with a second, larger bit through the same pocket
-  // engine, and its ladder can fail where the finishing bit's does not.
+  // engine, and its ladder can fail where the finishing bit's does not. It also
+  // runs a THIRD ladder of its own over the leftover stock region
+  // (rest-pocket.ts), on raw clipper paths rather than the kerf-offset wrapper.
+  const rest = resolveRestPocketOperation(polylines, settings, config);
+  if (rest.kind === 'ok' && rest.offsetFailed) return true;
   const roughTool = toolById(config, settings.pocketRoughToolId);
   const diameters = [tool.diameterMm, ...(roughTool === null ? [] : [roughTool.diameterMm])];
   return diameters.some((diameterMm) => pocketStrategyFailed(polylines, settings, diameterMm));
