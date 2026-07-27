@@ -9,6 +9,7 @@ import asar from '@electron/asar';
 import { verifyPackagedPreviewAsar } from './verify-packaged-preview-metadata.mjs';
 
 const PREVIEW_VERSION = '0.2.0-preview.14';
+const NEAR_COLLISION_RENDERER_VERSION = '0.2.0-preview.140';
 const WRONG_RENDERER_VERSION = '0.1.822';
 const ABOUT_MARKER = 'Free and open-source under the MIT License';
 const BUILD_BADGE_MARKER = 'Build version';
@@ -64,6 +65,20 @@ test('rejects an archive whose About version differs from package metadata', asy
 
 test('rejects an archive whose Build badge version differs from package metadata', async () => {
   const fixture = await createPreviewArchive({ buildBadgeVersion: WRONG_RENDERER_VERSION });
+  try {
+    assert.throws(
+      () => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION),
+      /Build badge renderer version mismatch/,
+    );
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('rejects a longer renderer version that only contains the expected version as a prefix', async () => {
+  const fixture = await createPreviewArchive({
+    buildBadgeVersion: NEAR_COLLISION_RENDERER_VERSION,
+  });
   try {
     assert.throws(
       () => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION),

@@ -12,6 +12,8 @@ const RENDERER_SURFACES = [
   { label: 'About', marker: 'Free and open-source under the MIT License' },
   { label: 'Build badge', marker: 'Build version' },
 ];
+const SURFACE_VERSION_RADIUS = 512;
+const VERSION_TOKEN_CHARACTER = /[0-9A-Za-z.-]/;
 
 export function verifyPackagedPreviewMetadata(value, expectedVersion) {
   if (typeof value !== 'object' || value === null) {
@@ -47,10 +49,28 @@ export function verifyPackagedRendererVersion(archivePath, expectedVersion) {
         `expected exactly one packaged ${surface.label} renderer asset, found ${matches.length}`,
       );
     }
-    if (!matches[0].source.includes(expectedVersion)) {
+    const markerIndex = matches[0].source.indexOf(surface.marker);
+    const nearbySource = matches[0].source.slice(
+      Math.max(0, markerIndex - SURFACE_VERSION_RADIUS),
+      markerIndex + surface.marker.length + SURFACE_VERSION_RADIUS,
+    );
+    if (!containsExactVersion(nearbySource, expectedVersion)) {
       throw new Error(`${surface.label} renderer version mismatch: expected ${expectedVersion}`);
     }
   }
+}
+
+function containsExactVersion(source, expectedVersion) {
+  let index = source.indexOf(expectedVersion);
+  while (index >= 0) {
+    const before = source[index - 1];
+    const after = source[index + expectedVersion.length];
+    const hasTokenBefore = before !== undefined && VERSION_TOKEN_CHARACTER.test(before);
+    const hasTokenAfter = after !== undefined && VERSION_TOKEN_CHARACTER.test(after);
+    if (!hasTokenBefore && !hasTokenAfter) return true;
+    index = source.indexOf(expectedVersion, index + 1);
+  }
+  return false;
 }
 
 export function verifyPackagedPreviewAsar(archivePath, expectedVersion) {
