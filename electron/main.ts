@@ -5,6 +5,8 @@
 //   * nodeIntegration: false
 //   * sandbox: true
 //   * webSecurity: true
+//   * packaged BrowserWindows disable DevTools at creation
+//   * the native application menu is explicit on every platform
 //   * permission handlers allow only serial, File System Access, screen
 //     wake lock, and video-only media from the trusted renderer origin
 //   * navigation and renderer-created windows are locked to the trusted
@@ -32,6 +34,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  Menu,
   net,
   protocol,
   session,
@@ -43,6 +46,10 @@ import {
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import electronUpdater from 'electron-updater';
+import {
+  desktopApplicationMenuTemplate,
+  shouldEnableDesktopDevTools,
+} from './application-menu-policy.js';
 import {
   serialPortDialogButtons,
   serialPortIdForDialogResponse,
@@ -88,6 +95,13 @@ const LEGACY_DESKTOP_DATA_PATH = legacyDesktopDataPath(app.getPath('appData'));
 app.setName(DESKTOP_PRODUCT_NAME);
 app.setPath('userData', LEGACY_DESKTOP_DATA_PATH);
 app.setPath('sessionData', LEGACY_DESKTOP_DATA_PATH);
+
+function installApplicationMenu(): void {
+  const template = desktopApplicationMenuTemplate(process.platform);
+  Menu.setApplicationMenu(template === null ? null : Menu.buildFromTemplate(template));
+}
+
+installApplicationMenu();
 
 // electron-updater is CommonJS; under Node16 ESM the reliable interop is a
 // default import + destructure (a named ESM import isn't statically detectable).
@@ -197,6 +211,7 @@ function createMainWindow(): BrowserWindow {
     title: DESKTOP_PRODUCT_NAME,
     webPreferences: {
       contextIsolation: true,
+      devTools: shouldEnableDesktopDevTools(app.isPackaged),
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
