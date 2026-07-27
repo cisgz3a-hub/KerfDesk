@@ -4,9 +4,10 @@
 // nearest-neighbor heuristic, NOT full 2-opt:
 //
 //   * Nearest-neighbor is pure greedy from a fixed start. The naive form is
-//     O(n²); the entry lookup and the containment-depth pass are both indexed
-//     (segment-entry-index, containment-depth), so there is no size ceiling on
-//     the per-segment paths.
+//     O(n²); every nearest-pick here is indexed instead — segment entries and
+//     island-fill group entries both through segment-entry-index, containment
+//     depth through containment-depth — so there is no size ceiling anywhere
+//     in this module.
 //   * Full 2-opt with proper delta-computation is O(n²) per pass and
 //     several passes — adds several hundred lines of edge-case logic
 //     (slice reversal, segment-direction flipping, convergence loop).
@@ -53,12 +54,6 @@ import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
-// Island fill GROUPS are still ordered by an exhaustive scan
-// (pickBestIslandGroup), so they keep a ceiling. The per-segment paths no
-// longer need one: both of the O(n^2) costs that justified it are indexed —
-// the nearest-entry lookup (segment-entry-index) and containment depth
-// (containment-depth).
-export const MAX_ISLAND_FILL_GROUP_REORDER = 2_000;
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
@@ -179,23 +174,28 @@ function optimizeIslandFillGroups(
   settings: PathOptimizationSettings,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): FillGroup[] {
-  if (groups.length <= 1 || groups.length > MAX_ISLAND_FILL_GROUP_REORDER) return [...groups];
+  // No size ceiling. The former MAX_ISLAND_FILL_GROUP_REORDER existed only
+  // because this loop rescanned every remaining group on every step, and above
+  // it the groups came back in source order with no travel recovered at all.
+  if (groups.length <= 1) return [...groups];
   const endpoints = groups.map((group) => islandGroupEndpoints(group, scanningOffsets));
   if (endpoints.some((entry) => entry === null)) return [...groups];
 
+  const nearest = createNearestEntryQuery(islandGroupEntries(endpoints));
   const remaining = new Set<number>();
   for (let i = 0; i < groups.length; i += 1) remaining.add(i);
+  const isAvailable = (index: number): boolean => remaining.has(index);
   const out: FillGroup[] = [];
   let cursor = startCursorForSegments(
     groups.flatMap((group) => group.segments),
     settings.startPoint,
   );
   while (remaining.size > 0) {
-    const pick = pickBestIslandGroup(endpoints, remaining, cursor);
+    const pick = nearest(cursor, isAvailable);
     if (pick === null) break;
-    remaining.delete(pick);
-    const group = groups[pick];
-    const endpoint = endpoints[pick];
+    remaining.delete(pick.segmentIndex);
+    const group = groups[pick.segmentIndex];
+    const endpoint = endpoints[pick.segmentIndex];
     if (group === undefined || endpoint === undefined || endpoint === null) continue;
     out.push(group);
     cursor = endpoint.exit;
@@ -330,14 +330,6 @@ function reverseSegment<T extends CutSegment>(seg: T): T {
   return { ...seg, polyline: [...seg.polyline].reverse(), closed: seg.closed };
 }
 
-// Squared distance only — we compare distances, never need the sqrt.
-// Saves a Math.sqrt call per candidate per step.
-function distanceSquared(a: Vec2, b: Vec2): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  return dx * dx + dy * dy;
-}
-
 type RouteEndpoints = { readonly entry: Vec2; readonly exit: Vec2 };
 
 function isOffsetFillGroup(group: Group): group is FillGroup {
@@ -388,21 +380,30 @@ function islandGroupEndpoints(
   return entry === null || exit === null ? null : { entry, exit };
 }
 
-function pickBestIslandGroup(
-  endpoints: ReadonlyArray<RouteEndpoints | null>,
-  remaining: ReadonlySet<number>,
-  cursor: Vec2,
-): number | null {
-  let best: number | null = null;
-  let bestDistSq = Number.POSITIVE_INFINITY;
-  for (const i of remaining) {
+// One entry per group, reversed never — a group is entered at exactly one
+// point, unlike a segment, which an open polyline lets us enter from either
+// end. So the index's third tie-break key (forward before reversed) can never
+// fire here, and its comparator reduces to the lexicographic minimum over
+// (distanceSquared, groupIndex).
+//
+// DETERMINISM (PROJECT.md non-negotiable #5): that is exactly what the scan
+// this replaces computed. It walked `remaining`, a Set filled with 0..n-1 in
+// ascending order and only ever deleted from — so iteration was ascending
+// index — and kept the first candidate with a strictly smaller squared
+// distance. A non-finite distance never won there either: `d < bestDistSq` is
+// false for NaN in both directions, and Infinity never beats the Infinity the
+// scan started from. So the index returns the SAME group, not merely an
+// equally-near one, and G-code stays byte-identical.
+//
+// A group whose endpoints could not be computed contributes no entry, so it is
+// never picked. The loop then ends early with a short `out`, and the caller
+// falls back to source order — the same outcome as the scan's `continue`.
+function islandGroupEntries(endpoints: ReadonlyArray<RouteEndpoints | null>): SegmentEntry[] {
+  const entries: SegmentEntry[] = [];
+  for (let i = 0; i < endpoints.length; i += 1) {
     const endpoint = endpoints[i];
     if (endpoint === undefined || endpoint === null) continue;
-    const d = distanceSquared(cursor, endpoint.entry);
-    if (d < bestDistSq) {
-      best = i;
-      bestDistSq = d;
-    }
+    entries.push({ point: endpoint.entry, segmentIndex: i, reverse: false });
   }
-  return best;
+  return entries;
 }
