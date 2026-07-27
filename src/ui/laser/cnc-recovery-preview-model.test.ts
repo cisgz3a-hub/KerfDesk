@@ -176,6 +176,26 @@ describe('buildCncRecoveryPreviewModel', () => {
       expect.objectContaining({ id: 'program-identity', status: 'matched' }),
     );
   });
+
+  // Rule 7 / ADR-228: only a compile-integrity failure may refuse recovery.
+  // This path read `preflight.ok`, which is false for ANY issue, so a heuristic
+  // policy finding — here `out-of-bed` — stranded a partially-cut workpiece
+  // behind a generic "fails CNC preflight" that named nothing. Its two sibling
+  // recovery flows were migrated; this one was left behind.
+  it('previews a legacy record with an out-of-bed advisory instead of refusing it', () => {
+    const project = outOfBedCncProject();
+    const model = buildCncRecoveryPreviewModel(project, advisoryCheckpoint(project));
+
+    expect(model.unavailableReason).toBeNull();
+    expect(model.events.length).toBeGreaterThan(0);
+    expect(model.checks).toContainEqual(
+      expect.objectContaining({ id: 'program-identity', status: 'matched' }),
+    );
+    // The finding the refusal used to swallow, now named in the evidence list.
+    const advisory = model.checks.find((check) => check.id === 'preflight-advisories');
+    expect(advisory).toMatchObject({ status: 'diagnostic' });
+    expect(advisory?.detail).toContain('out of bed');
+  });
 });
 
 type ExactCapsule = RecoveryCapsule & {
@@ -254,6 +274,40 @@ function exactCapsule(project: Project): ExactCapsule {
     updatedAtIso: NOW,
     artifact,
   };
+}
+
+// A bed too small for the fixture path, so emission raises `out-of-bed` — a
+// heuristic policy finding, not compile integrity. Everything else (device
+// acceleration, machine kind, fingerprint) stays valid so the advisory is the
+// only thing under test.
+const TINY_BED_MM = 40;
+
+function outOfBedCncProject(): Project {
+  const project = cncProject();
+  return {
+    ...project,
+    device: { ...project.device, bedWidth: TINY_BED_MM, bedHeight: TINY_BED_MM },
+  };
+}
+
+// The twin of matchingCheckpoint that deliberately tolerates a non-ok
+// preflight — asserting `ok` here would refuse to build the very fixture the
+// rule-7 case needs.
+function advisoryCheckpoint(project: Project): JobCheckpoint {
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) throw new Error('Expected prepared CNC output.');
+  const emitted = emitPreparedGcode(prepared);
+  if (emitted.preflight.ok) throw new Error('Expected an advisory CNC preflight finding.');
+  return advanceJobCheckpoint(
+    createJobCheckpoint({
+      gcode: emitted.gcode,
+      machineKind: 'cnc',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      nowIso: NOW,
+    }),
+    3,
+    NOW,
+  );
 }
 
 function matchingCheckpoint(project: Project): JobCheckpoint {

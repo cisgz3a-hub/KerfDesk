@@ -12,7 +12,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
-import { confirmControllerReadiness } from './confirm-controller-readiness';
+import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { emitTileFiles, pushAdvisoryToasts, type TileFile } from './tile-emission';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
@@ -25,7 +25,8 @@ export type SaveTiledGcodeCtx = {
   // silently tile the whole scene.
   readonly outputScope?: OutputScope;
   // The connected controller's live $$ snapshot, for the same $30/$32 readiness
-  // gate the single-file Save runs (GCO-02). null/undefined = nothing to prove.
+  // REPORT the single-file Save makes (GCO-02, demoted from a gate by rule 7 /
+  // ADR-228). null/undefined = nothing to prove.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
@@ -53,10 +54,14 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   const emitted = emitTileFiles(ctx.project, machine, tiles, ctx.savedName);
   if (emitted === null) return true;
   const files = emitted.files;
-  // Every tile has passed preflight and nothing is written yet — run the
-  // controller-readiness gate ONCE for the whole set (a bad $30/$32 is the
-  // same hazard whether the job is tiled or not). Declining writes no tiles.
-  if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return true;
+  // Rule 7 / ADR-228: a disagreeing $30/$32 is the same hazard whether the job
+  // is tiled or not, so it is stated ONCE for the whole set. Reported here,
+  // where the deleted confirm stood — the confirm fired before any tile was
+  // written, so reporting only after a successful run would say less than the
+  // refusal did when the operator cancels part-way through the pickers.
+  for (const advisory of controllerReadinessAdvisories(ctx.project, ctx.controllerSettings)) {
+    ctx.pushToast(advisory, 'warning');
+  }
   const saved = await saveTileFiles(ctx, files);
   ctx.pushToast(
     saved === files.length

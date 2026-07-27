@@ -110,10 +110,15 @@ describe('file actions contextual failure handling', () => {
     ]);
   });
 
-  // M11 (AUDIT-2026-06-10): the $30 power-scale check used to protect only
-  // the streamed Start path — a project max S of 1000 saved for a $30=255
-  // machine clamps every S>255 to 100% beam power from the saved file.
-  it('gates the export behind a confirm when the connected controller $30 disagrees', async () => {
+  // M11 (AUDIT-2026-06-10) added a confirm here: a project max S of 1000 saved
+  // for a $30=255 machine clamps every S>255 to 100% beam power from the saved
+  // file. The hazard is real, but rule 7 / ADR-228 names "save … export" and
+  // "adds confirmation before an otherwise available action" in the guard
+  // definition and makes controller-setting policy warn-only — so the export
+  // proceeds to the picker unasked, and the $30 mismatch is stated as a
+  // post-save warning instead. The warning text itself is pinned end-to-end in
+  // file-actions.controller-readiness.test.ts.
+  it('reaches the file picker unasked when the connected controller $30 disagrees', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const save = vi.fn(async () => null);
     const toast = toasts();
@@ -126,26 +131,7 @@ describe('file actions contextual failure handling', () => {
       pushToast: toast.pushToast,
     });
 
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(confirm.mock.calls[0]?.[0]).toContain('$30 is 255');
-    expect(save).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
-  });
-
-  it('saves anyway when the operator confirms the controller mismatch', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const save = vi.fn(async () => null);
-    const toast = toasts();
-
-    await handleSaveGcode({
-      platform: mockPlatform({ save }),
-      project: projectWithLine(),
-      savedName: null,
-      controllerSettings: { maxPowerS: 255, laserModeEnabled: true },
-      pushToast: toast.pushToast,
-    });
-
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
   });
