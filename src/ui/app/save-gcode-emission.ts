@@ -1,11 +1,12 @@
 import type { Project } from '../../core/scene';
-import { emitGcodeSnapshot, type EmitGcodeOptions, type EmitGcodeResult } from '../../io/gcode';
+import { prepareOutputSnapshot, type EmitGcodeOptions } from '../../io/gcode';
 import { trustedMotionOffsetForPreflight, type ResolvedJobPlacement } from '../job-placement';
 import {
   outputPreparationShouldRunOffThread,
   prepareSaveOutputOffThread,
 } from '../laser/output-preparation-worker-client';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
+import { emitSavePreparedOutput, type SaveOutputEmission } from '../laser/save-output-emission';
 import { renderVariableText } from '../text/render-variable-text';
 import { buildGcodeMetadata } from './build-info';
 import type { SaveGcodeCtx } from './file-actions';
@@ -13,7 +14,7 @@ import type { SaveGcodeCtx } from './file-actions';
 export async function emitSaveGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
-): Promise<EmitGcodeResult> {
+): Promise<SaveOutputEmission> {
   const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
   const registration = currentPrintCutOutputRegistration(ctx.project);
   const options: EmitGcodeOptions = {
@@ -37,12 +38,13 @@ export async function emitSaveGcode(
       }
     }
   }
-  return emitGcodeSnapshot(ctx.project, {
+  const prepared = await prepareOutputSnapshot(ctx.project, {
     clock: () => new Date(),
     renderVariableText,
     ...(registration === undefined ? {} : { registration }),
     ...options,
   });
+  return emitSavePreparedOutput(prepared, options);
 }
 
 function hasVariableText(project: Project): boolean {

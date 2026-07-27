@@ -1,5 +1,6 @@
-import { emitGcode } from '../../io/gcode';
+import { prepareOutput } from '../../io/gcode';
 import { prepareOutputForStructuredClone } from '../../io/gcode/prepared-output-persistence';
+import { emitSavePreparedOutput } from './save-output-emission';
 import { prepareStartJob } from './start-job-readiness';
 import type {
   OutputPreparationRequest,
@@ -9,7 +10,8 @@ import type {
 
 export function prepareOutputRequest(request: OutputPreparationRequest): OutputPreparationResponse {
   if (request.kind === 'save') {
-    return { kind: 'save', result: emitGcode(request.project, request.options) };
+    const prepared = prepareOutput(request.project, request.options);
+    return { kind: 'save', result: emitSavePreparedOutput(prepared, request.options) };
   }
   return { kind: 'start', result: prepareStartOutput(request) };
 }

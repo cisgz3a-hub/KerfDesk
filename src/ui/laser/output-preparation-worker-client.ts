@@ -1,4 +1,3 @@
-import type { EmitGcodeResult } from '../../io/gcode';
 import { outputVectorPreparationTooComplex } from '../../core/job/preparation-complexity';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
@@ -9,6 +8,7 @@ import type {
   SaveOutputPreparationRequest,
   StartOutputPreparationRequest,
 } from './output-preparation-protocol';
+import type { SaveOutputEmission } from './save-output-emission';
 
 export function outputPreparationShouldRunOffThread(
   project: Project,
@@ -36,7 +36,7 @@ export function prepareStartOutputOffThread(
 
 export function prepareSaveOutputOffThread(
   request: SaveOutputPreparationRequest,
-): Promise<EmitGcodeResult> | null {
+): Promise<SaveOutputEmission> | null {
   const pending = runWorker(request);
   if (pending === null) return null;
   return pending.then((response) => {

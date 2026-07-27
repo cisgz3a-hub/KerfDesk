@@ -92,10 +92,11 @@ describe('output preparation worker client', () => {
     if (worker === undefined) throw new Error('worker missing');
     worker.respond({
       kind: 'save',
-      result: { gcode: 'G21\n', preflight: { ok: true, issues: [] } },
+      result: { kind: 'emitted', gcode: 'G21\n', preflight: { ok: true, issues: [] } },
     });
 
     await expect(pending).resolves.toEqual({
+      kind: 'emitted',
       gcode: 'G21\n',
       preflight: { ok: true, issues: [] },
     });
