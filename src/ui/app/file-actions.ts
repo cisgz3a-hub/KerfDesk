@@ -33,7 +33,7 @@ import {
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { partitionSavePreflight } from './save-preflight-policy';
-import { confirmControllerReadiness } from './confirm-controller-readiness';
+import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 import { importSourceSizeIssue } from './import-source-limits';
@@ -115,8 +115,9 @@ export type SaveGcodeCtx = {
   readonly jobPlacement?: JobPlacementSettings;
   readonly outputScope?: OutputScope;
   readonly machine?: MachinePlacementSnapshot;
-  // null = never connected this session; a snapshot = run the $30/$32
-  // comparison before saving (M11). Omitted = caller doesn't track it.
+  // null = never connected this session; a snapshot = report any $30/$32
+  // disagreement as a warning before the picker opens (M11, demoted from a
+  // confirm by rule 7 / ADR-228). Omitted = caller doesn't track it.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   // Operator-selected active WCS (C6): a non-G54 value warns the saved job's
   // G54 emission will mismatch a placement measured from the active offset.
@@ -181,7 +182,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
-  if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return;
+  // Rule 7 / ADR-228: stated HERE, where the deleted confirm stood, rather than
+  // with the post-save advisories. The confirm was raised on every save
+  // ATTEMPT, so reporting it only after a successful write would tell the
+  // operator less than the refusal did whenever the picker is cancelled.
+  for (const advisory of controllerReadinessAdvisories(ctx.project, ctx.controllerSettings)) {
+    ctx.pushToast(advisory, 'warning');
+  }
   let target: SaveTarget | null;
   try {
     target = await ctx.platform.pickFileForSave({
