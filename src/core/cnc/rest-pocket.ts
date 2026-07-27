@@ -17,6 +17,12 @@ export type RestPocketPlan =
       readonly ok: true;
       readonly toolpaths: ReadonlyArray<Polyline>;
       readonly restRegions: ReadonlyArray<Polyline>;
+      // True when the ring ladder below stopped because clipper FAILED rather
+      // than because the rest region ran out of interior. Both endings return
+      // no ring, but only this one leaves stock standing where the finishing
+      // pass believes it has already been cleared. Reported to Job Review,
+      // never used to refuse the job (rule 7).
+      readonly offsetFailed: boolean;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -37,13 +43,17 @@ export function planRestPocketToolpaths(
   if (issue !== null) return { ok: false, reason: issue };
   const stock = remainingStock(contours, roughToolDiameterMm);
   if (!stock.ok) return stock;
-  if (stock.rest.length === 0) return { ok: true, toolpaths: [], restRegions: [] };
+  if (stock.rest.length === 0) {
+    return { ok: true, toolpaths: [], restRegions: [], offsetFailed: false };
+  }
   const target = finishTarget(stock.original, stock.rest, finishToolDiameterMm);
   if (target === null) return clipperFailure();
+  const rings = centerRegionRings(target, finishToolDiameterMm, stepoverPercent);
   return {
     ok: true,
-    toolpaths: centerRegionRings(target, finishToolDiameterMm, stepoverPercent),
+    toolpaths: rings.toolpaths,
     restRegions: stock.rest.map(toPolyline),
+    offsetFailed: rings.offsetFailed,
   };
 }
 
@@ -95,18 +105,34 @@ function requestIssue(
     : null;
 }
 
+type CenterRegionRings = {
+  readonly toolpaths: ReadonlyArray<Polyline>;
+  readonly offsetFailed: boolean;
+};
+
+// The rest region's own offset ladder. It works on raw clipper PathsD rather
+// than through geometry/kerf-offset, so it cannot use buildOffsetLadder — but
+// it draws the same distinction that module exists to draw: a null result is
+// clipper FAILING, an empty result is the region running out of interior.
+// Conflating them truncates the finishing pass and leaves the very stock rest
+// machining exists to remove.
 function centerRegionRings(
   target: PathsD,
   toolDiameterMm: number,
   stepoverPercent: number,
-): ReadonlyArray<Polyline> {
+): CenterRegionRings {
   const stepMm =
     (Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent)) / 100) *
     toolDiameterMm;
   const levels: PathsD[] = [];
+  let offsetFailed = false;
   for (let index = 0; index < MAX_RINGS; index += 1) {
     const paths = index === 0 ? target : offset(target, -index * stepMm, JoinType.Miter);
-    if (paths === null || paths.length === 0) break;
+    if (paths === null) {
+      offsetFailed = true;
+      break;
+    }
+    if (paths.length === 0) break;
     levels.push(paths);
   }
   const out: Polyline[] = [];
@@ -114,7 +140,7 @@ function centerRegionRings(
     const level = levels[index];
     if (level !== undefined) out.push(...level.map(toPolyline));
   }
-  return out;
+  return { toolpaths: out, offsetFailed };
 }
 
 function offset(paths: PathsD, deltaMm: number, joinType: JoinType): PathsD | null {
