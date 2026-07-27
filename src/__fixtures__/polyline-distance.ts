@@ -1,4 +1,4 @@
-import type { Vec2 } from '../core/scene';
+import type { Polyline, Vec2 } from '../core/scene';
 
 const DEGENERATE_SEGMENT_EPSILON_SQUARED = 1e-18;
 
@@ -7,7 +7,22 @@ export function maximumPointDistanceToPolyline(
   points: ReadonlyArray<Vec2>,
   polyline: ReadonlyArray<Vec2>,
 ): number {
+  if (points.length === 0) throw new Error('expected at least one point');
+  if (polyline.length < 2) throw new Error('expected at least one polyline segment');
   return Math.max(...points.map((point) => distanceToPolyline(point, polyline)));
+}
+
+/** Length of each consecutive segment in a geometry-test polyline. */
+export function polylineSegmentLengths(polyline: Polyline): number[] {
+  const lengths: number[] = [];
+  for (let index = 1; index < polyline.points.length; index += 1) {
+    const start = polyline.points[index - 1];
+    const end = polyline.points[index];
+    if (start !== undefined && end !== undefined) {
+      lengths.push(Math.hypot(end.x - start.x, end.y - start.y));
+    }
+  }
+  return lengths;
 }
 
 function distanceToPolyline(point: Vec2, polyline: ReadonlyArray<Vec2>): number {

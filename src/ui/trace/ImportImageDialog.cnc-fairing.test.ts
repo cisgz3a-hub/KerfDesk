@@ -27,10 +27,13 @@ import {
   type RasterImage,
   type TracedImage,
 } from '../../core/scene';
-import { maximumPointDistanceToPolyline } from '../../__fixtures__/polyline-distance';
+import {
+  maximumPointDistanceToPolyline,
+  polylineSegmentLengths,
+} from '../../__fixtures__/polyline-distance';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { compileCncJob } from '../../core/cnc';
-import { positionTraceOverRasterSource } from '../state/trace-placement';
+import { positionTraceOverRasterSource } from '../state';
 import { commit } from './ImportImageDialog';
 import { TRACE_PRESETS } from '../../core/trace';
 import type { TraceOptions } from '../../core/trace';
@@ -159,18 +162,6 @@ function committedPolyline(ctx: TestCommitContext): Polyline {
   return polyline;
 }
 
-function segmentLengths(polyline: Polyline): number[] {
-  const out: number[] = [];
-  for (let i = 1; i < polyline.points.length; i += 1) {
-    const a = polyline.points[i - 1];
-    const b = polyline.points[i];
-    if (a !== undefined && b !== undefined) {
-      out.push(Math.hypot(b.x - a.x, b.y - a.y));
-    }
-  }
-  return out;
-}
-
 function positionedPolyline(source: RasterImage, traced: TracedImage): Polyline {
   const positioned = positionTraceOverRasterSource(source, traced);
   const local = positioned.paths[0]?.polylines[0];
@@ -199,7 +190,7 @@ function compiledContourLengths(source: RasterImage, traced: TracedImage): numbe
   if (group?.kind !== 'cnc') throw new Error('expected one compiled CNC group');
   const pass = group.passes.find((candidate) => candidate.kind === 'contour');
   if (pass?.kind !== 'contour') throw new Error('expected one compiled contour pass');
-  return segmentLengths({ closed: pass.closed, points: pass.polyline });
+  return polylineSegmentLengths({ closed: pass.closed, points: pass.polyline });
 }
 
 function turnAnglesDeg(polyline: Polyline): number[] {
@@ -236,7 +227,7 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
       expect(committedPointCount).toBeLessThanOrEqual(RING_VERTS + 1);
       const minimumPhysicalChord = MIN_SEGMENT_MM * MIN_SEGMENT_TOLERANCE;
       const positioned = positionedPolyline(liveSource, traced);
-      const positionedLengths = segmentLengths(positioned);
+      const positionedLengths = polylineSegmentLengths(positioned);
       const compiledLengths = compiledContourLengths(liveSource, traced);
       const rawPolyline = rawPaths[0]?.polylines[0];
       if (rawPolyline === undefined) throw new Error('expected raw trace geometry');
@@ -245,6 +236,8 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
       expect(maximumPointDistanceToPolyline(positioned.points, rawWorldPoints)).toBeLessThanOrEqual(
         MAX_DEVIATION_MM + FLOAT_TOLERANCE_MM,
       );
+      expect(positionedLengths.length).toBeGreaterThan(1);
+      expect(compiledLengths.length).toBeGreaterThan(1);
       expect(Math.min(...positionedLengths.slice(0, -1))).toBeGreaterThanOrEqual(
         minimumPhysicalChord,
       );
@@ -265,9 +258,10 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
     const polyline = committedPolyline(ctx);
     const minSegPx = MIN_SEGMENT_MM / MM_PER_PX;
-    const segs = segmentLengths(polyline);
+    const segs = polylineSegmentLengths(polyline);
     // Closing segment may be shorter; every other chord respects the floor.
     const interior = segs.slice(0, -1);
+    expect(interior.length).toBeGreaterThan(0);
     expect(Math.min(...interior)).toBeGreaterThanOrEqual(minSegPx * 0.95);
     const turns = turnAnglesDeg(polyline).sort((a, b) => a - b);
     const p95 = turns[Math.floor(turns.length * 0.95)] ?? 0;

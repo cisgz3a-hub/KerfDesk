@@ -18,8 +18,7 @@ import {
   type TraceBoundary,
   type TraceOptions,
 } from '../../core/trace';
-import { useStore } from '../state';
-import { positionTraceOverRasterSource } from '../state/trace-placement';
+import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { Dialog } from '../kit';
@@ -403,10 +402,9 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
   }
 }
 
-// True when the live object is still the same raster the trace was computed from
-// — same kind, image content (dataUrl), and pixel grid. A transform-only change
-// is allowed (the overlay registers to the live transform). Used to refuse a
-// commit whose source changed or was removed mid-dialog (P2-A).
+/** Compare trace-source content and pixel grids while intentionally allowing a
+ * transform-only change. A true result narrows `live` to the current
+ * `RasterImage`, whose transform can then register the trace at commit. */
 export function sameTraceSource(
   live: SceneObject | undefined,
   seed: RasterImage,

@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   applyTransform,
@@ -14,6 +15,25 @@ const TRACE_COLOR = '#000000';
 const MAX_DEVIATION_MM = 0.05;
 const FLOAT_TOLERANCE_MM = 1e-6;
 const TINY_FINITE_SCALE = 1e-300;
+const PROPERTY_RUNS = 100;
+const PROPERTY_SEED = 410_001;
+const MIN_PROPERTY_POINT_COUNT = 5;
+const MAX_PROPERTY_POINT_COUNT = 20;
+const MIN_SCALE_EXPONENT = -12;
+const MAX_SCALE_EXPONENT = 12;
+const SCALE_BASE = 2;
+const SCALE_EXPONENT_DIVISOR = 4;
+const MIN_ROTATION_DEG = -180;
+const MAX_ROTATION_DEG = 180;
+const OPEN_CHAIN_RISE = 0.25;
+const OPEN_CHAIN_JITTER_STEP = 0.01;
+const MIN_JITTER_STEP = -10;
+const MAX_JITTER_STEP = 10;
+const MIN_RING_POINT_COUNT = 8;
+const MAX_RING_POINT_COUNT = 20;
+const RING_RADIUS = 10;
+const RING_JITTER_STEP = 0.02;
+const FULL_TURN_RADIANS = Math.PI * 2;
 const ANISOTROPIC_PLACEMENT: Transform = {
   x: 12,
   y: -4,
@@ -69,6 +89,58 @@ const VERTICAL_WELD_CHAINS: ReadonlyArray<Polyline> = [
     ],
   },
 ];
+const POSITIVE_SCALE_ARBITRARY = fc
+  .integer({ min: MIN_SCALE_EXPONENT, max: MAX_SCALE_EXPONENT })
+  .map((exponent) => SCALE_BASE ** (exponent / SCALE_EXPONENT_DIVISOR));
+const PLACEMENT_ARBITRARY: fc.Arbitrary<Transform> = fc
+  .tuple(
+    POSITIVE_SCALE_ARBITRARY,
+    POSITIVE_SCALE_ARBITRARY,
+    fc.integer({ min: MIN_ROTATION_DEG, max: MAX_ROTATION_DEG }),
+    fc.boolean(),
+    fc.boolean(),
+  )
+  .filter(([scaleX, scaleY]) => scaleX !== scaleY)
+  .map(([scaleX, scaleY, rotationDeg, mirrorX, mirrorY]) => ({
+    ...IDENTITY_TRANSFORM,
+    scaleX,
+    scaleY,
+    rotationDeg,
+    mirrorX,
+    mirrorY,
+  }));
+const OPEN_POLYLINE_ARBITRARY: fc.Arbitrary<Polyline> = fc
+  .array(fc.integer({ min: MIN_JITTER_STEP, max: MAX_JITTER_STEP }), {
+    minLength: MIN_PROPERTY_POINT_COUNT,
+    maxLength: MAX_PROPERTY_POINT_COUNT,
+  })
+  .map((jitters) => ({
+    closed: false,
+    points: jitters.map((jitter, index) => ({
+      x: index,
+      y: index * OPEN_CHAIN_RISE + jitter * OPEN_CHAIN_JITTER_STEP,
+    })),
+  }));
+const CLOSED_POLYLINE_ARBITRARY: fc.Arbitrary<Polyline> = fc
+  .integer({ min: MIN_RING_POINT_COUNT, max: MAX_RING_POINT_COUNT })
+  .chain((pointCount) =>
+    fc
+      .array(fc.integer({ min: MIN_JITTER_STEP, max: MAX_JITTER_STEP }), {
+        minLength: pointCount,
+        maxLength: pointCount,
+      })
+      .map((jitters): Polyline => {
+        const points = jitters.map((jitter, index) => {
+          const angle = (index / pointCount) * FULL_TURN_RADIANS;
+          const radius = RING_RADIUS + jitter * RING_JITTER_STEP;
+          return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+        });
+        const first = points[0];
+        if (first === undefined) throw new Error('expected a generated ring point');
+        return { closed: true, points: [...points, { ...first }] };
+      }),
+  );
+const POLYLINE_ARBITRARY = fc.oneof(OPEN_POLYLINE_ARBITRARY, CLOSED_POLYLINE_ARBITRARY);
 
 function pathWith(polylines: ReadonlyArray<Polyline>): ColoredPath {
   return { color: TRACE_COLOR, polylines };
@@ -85,6 +157,26 @@ function worldPoints(polyline: Polyline, transform: Transform): Vec2[] {
 }
 
 describe('fairTracedPathsForCnc', () => {
+  it('keeps physical output finite and within the deviation bound across transforms (property)', () => {
+    fc.assert(
+      fc.property(PLACEMENT_ARBITRARY, POLYLINE_ARBITRARY, (placement, source) => {
+        const faired = onlyPolyline(fairTracedPathsForCnc([pathWith([source])], placement));
+        const fairedWorld = worldPoints(faired, placement);
+        const sourceWorld = worldPoints(source, placement);
+        const maximumDeviation = maximumPointDistanceToPolyline(fairedWorld, sourceWorld);
+
+        expect(fairedWorld.length).toBeGreaterThan(1);
+        expect(
+          fairedWorld.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+        ).toBe(true);
+        expect(Number.isFinite(maximumDeviation)).toBe(true);
+        expect(maximumDeviation).toBeLessThanOrEqual(MAX_DEVIATION_MM + FLOAT_TOLERANCE_MM);
+        expect(faired.closed).toBe(source.closed);
+      }),
+      { numRuns: PROPERTY_RUNS, seed: PROPERTY_SEED },
+    );
+  });
+
   it('caps physical displacement after anisotropic mirror and rotation', () => {
     const faired = onlyPolyline(
       fairTracedPathsForCnc([pathWith([ANISOTROPIC_DEVIATION_SOURCE])], ANISOTROPIC_PLACEMENT),

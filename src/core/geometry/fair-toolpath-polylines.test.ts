@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { polylineSegmentLengths } from '../../__fixtures__/polyline-distance';
 import type { Polyline, Vec2 } from '../scene';
 import { fairToolpathPolylines } from './fair-toolpath-polylines';
 
@@ -44,16 +45,6 @@ function jitteredSquare(): Polyline {
   return { points, closed: true };
 }
 
-function segmentLengths(polyline: Polyline): number[] {
-  const out: number[] = [];
-  for (let i = 1; i < polyline.points.length; i += 1) {
-    const a = polyline.points[i - 1] as Vec2;
-    const b = polyline.points[i] as Vec2;
-    out.push(Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  return out;
-}
-
 describe('fairToolpathPolylines', () => {
   it('pins the four drawn corners of a jittered square and flattens its sides', () => {
     const [faired] = fairToolpathPolylines([jitteredSquare()], OPTIONS);
@@ -83,7 +74,7 @@ describe('fairToolpathPolylines', () => {
       { x: 200, y: 200 },
       { x: 0, y: 200 },
     ];
-    const segs = segmentLengths(faired as Polyline);
+    const segs = polylineSegmentLengths(faired as Polyline);
     for (let i = 0; i < segs.length; i += 1) {
       const a = points[i] as Vec2;
       const b = points[i + 1] as Vec2;
