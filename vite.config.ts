@@ -5,9 +5,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-import { appVersion, buildTimeIso, gitShortSha } from './src/platform/web/build-info';
+import {
+  appVersion,
+  buildTimeIso,
+  gitShortSha,
+  resolveBuildAppVersion,
+} from './src/platform/web/build-info';
 
 const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
+const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
+const BUILD_APP_VERSION = resolveBuildAppVersion(
+  appVersion(),
+  process.env[DESKTOP_RELEASE_VERSION_ENV],
+);
 
 /**
  * Directories Vite's dev and test transforms may read from.
@@ -81,7 +91,7 @@ export default defineConfig({
   define: {
     __BUILD_TIME__: JSON.stringify(buildTimeIso()),
     __GIT_SHA__: JSON.stringify(gitShortSha()),
-    __APP_VERSION__: JSON.stringify(appVersion()),
+    __APP_VERSION__: JSON.stringify(BUILD_APP_VERSION),
   },
   build: {
     outDir: 'dist/web',

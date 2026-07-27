@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { appVersion, buildTimeIso, gitShortSha, type GitExec } from './build-info';
+import {
+  appVersion,
+  buildTimeIso,
+  gitShortSha,
+  resolveBuildAppVersion,
+  type GitExec,
+} from './build-info';
 
 // D-S02-001: prove build-time metadata is derived from commit data (git %cI),
 // NOT wall-clock — so re-deploying the same commit yields a byte-identical
@@ -91,5 +97,26 @@ describe('appVersion', () => {
     };
 
     expect(appVersion(gitExec, readPkg)).toBe('2.5.9');
+  });
+});
+
+describe('resolveBuildAppVersion', () => {
+  it('uses the exact desktop release version instead of the web commit-count version', () => {
+    expect(resolveBuildAppVersion('0.1.822', '1.2.3')).toBe('1.2.3');
+    expect(resolveBuildAppVersion('0.1.822', '0.2.0-preview.14')).toBe('0.2.0-preview.14');
+    expect(resolveBuildAppVersion('0.1.822', '0.0.0-dispatch.302')).toBe('0.0.0-dispatch.302');
+  });
+
+  it('preserves the deterministic web version when no desktop release version is supplied', () => {
+    expect(resolveBuildAppVersion('0.1.822', undefined)).toBe('0.1.822');
+  });
+
+  it('rejects malformed desktop release versions instead of shipping ambiguous identity', () => {
+    expect(() => resolveBuildAppVersion('0.1.822', 'v0.2.0-preview.14')).toThrow(
+      /desktop release version/,
+    );
+    expect(() => resolveBuildAppVersion('0.1.822', '0.2.0-preview.01')).toThrow(
+      /desktop release version/,
+    );
   });
 });

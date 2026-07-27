@@ -79,6 +79,8 @@ jobs:
         run: pnpm guard:repo
 
       - name: Release verification and legal-closure gate
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
 
       - name: Build unsigned Windows Preview
@@ -207,6 +209,8 @@ jobs:
         run: pnpm guard:repo
 
       - name: Release verification and legal-closure gate
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
 
       - name: Build unsigned and unnotarized macOS x64 Preview
@@ -280,6 +284,8 @@ jobs:
         run: pnpm guard:repo
 
       - name: Release verification and legal-closure gate
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
 
       - name: Build unsigned and unnotarized macOS arm64 Preview
