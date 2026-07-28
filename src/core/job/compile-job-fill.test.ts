@@ -156,7 +156,12 @@ describe('compileJob fill hatching', () => {
   });
 
   it('preserves reverse metadata for bidirectional and cross-hatch fill segments', () => {
-    const layer = { ...fillLayer(), hatchSpacingMm: 1, fillCrossHatch: true };
+    const layer = {
+      ...fillLayer(),
+      hatchSpacingMm: 1,
+      fillBidirectional: true,
+      fillCrossHatch: true,
+    };
     const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
 
     const fill = firstFillGroup(compileJob({ objects: [square], layers: [layer] }, dev));
@@ -168,7 +173,7 @@ describe('compileJob fill hatching', () => {
     expect(segments.filter(isVerticalSegment).some((segment) => segment.reverse)).toBe(true);
   });
 
-  it('selects feed-matched scanline entries only for the 4040-safe profile', () => {
+  it('selects feed-matched scanline entry and exit motion for generic and 4040 profiles', () => {
     const layer = fillLayer();
     const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
     const generic = firstFillGroup(compileJob({ objects: [square], layers: [layer] }, dev));
@@ -176,13 +181,13 @@ describe('compileJob fill hatching', () => {
       compileJob({ objects: [square], layers: [layer] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
     );
 
-    expect(generic?.fillRunwayPolicy).toBeUndefined();
+    expect(generic?.fillRunwayPolicy).toBe('feed-matched-every-sweep');
     expect(safe4040?.fillRunwayPolicy).toBe('feed-matched-entry');
   });
 
   it('applies 4040 one-way fallback and bounded entry runway, then permits calibrated or expert bidirectional fill', () => {
     const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
-    const requested = fillLayer();
+    const requested = { ...fillLayer(), fillBidirectional: true };
     const fallback = firstFillGroup(
       compileJob({ objects: [square], layers: [requested] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
     );
@@ -265,7 +270,11 @@ describe('compileJob fill hatching', () => {
 
   it('does not let calibration or an expert override overturn sensitive 4040 Island Fill one-way motion', () => {
     const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 6 });
-    const requested = { ...fillLayer(), fillStyle: 'island' as never };
+    const requested = {
+      ...fillLayer(),
+      fillStyle: 'island' as never,
+      fillBidirectional: true,
+    };
     const calibrated = firstFillGroup(
       compileJob(
         { objects: [square], layers: [requested] },

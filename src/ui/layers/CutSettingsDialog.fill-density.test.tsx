@@ -119,6 +119,42 @@ describe('CutSettingsDialog fill density controls', () => {
     }
   });
 
+  it('discloses the generic effective runway when stored Scanline overscan is zero', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={fillLayer({ fillOverscanMm: 0 })}
+            onCancel={() => undefined}
+            onApply={() => undefined}
+          />,
+        );
+      });
+
+      expect(host.textContent).toContain('stored 0; generic effective target 5 mm');
+      const overscan = host.querySelector('input[name="fillOverscanMm"]');
+      if (!(overscan instanceof HTMLInputElement)) throw new Error('fill overscan input missing');
+      await act(async () => {
+        overscan.value = '-2';
+        Simulate.change(overscan);
+      });
+      expect(host.textContent).toContain('stored -2; generic effective target 5 mm');
+      expect(host.textContent).not.toContain('stored 0; generic effective target 5 mm');
+      await act(async () => {
+        overscan.value = '1';
+        Simulate.change(overscan);
+      });
+      expect(host.textContent).not.toContain('stored 0; generic effective target 5 mm');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('saves fill line interval edits to hatchSpacingMm', async () => {
     let applied: Partial<Layer> | null = null;
     const host = document.createElement('div');

@@ -105,7 +105,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
     expect(emit(job)).toContain('M5\nM4 S0\n; fill layer fill color #ff0000');
   });
 
-  it('annotates the fill header overscan with the ADR-033 short-run skip threshold', () => {
+  it('annotates an untagged legacy fill header with the ADR-033 skip threshold', () => {
     // The header used to print the configured setting verbatim, which read as
     // "every run gets this runway" — ADR-033 zeroes it on short runs, and in a
     // real traced-lettering job most runs got none (audit 2026-07-18).

@@ -85,14 +85,13 @@ function perpDistance(origin: Vec2, dx: number, dy: number, len: number, p: Vec2
   return Math.abs(cross) / len;
 }
 
-// Below this gap width, consecutive ink spans on one scanline stay in a single
-// continuous sweep (the emitter blanks the hole with a fast S0 feed move). A
-// WIDER gap splits into separate sweeps so the emitter crosses it with a G0
-// rapid instead — a hard laser-off (forced off in GRBL laser mode) and faster
-// than feeding across empty space. The 2026-06-03 audit found inter-region gaps
-// up to ~21mm crossed at cutting feed — the "move to a second part" that left a
-// stray line (ADR-035). 5mm sits above the speed break-even (~3.3mm at the
-// default feed) and cleanly separates an inter-region gap from a small hole.
+/**
+ * Gap width below which adjacent ink spans remain one laser-blanked sweep.
+ *
+ * Wider gaps split into independently planned sweeps so each boundary gets its
+ * policy-owned runway. The 5 mm threshold separates small holes from the
+ * inter-region gaps implicated by ADR-035.
+ */
 export const FILL_GAP_RAPID_THRESHOLD_MM = 5;
 
 // Order a group's runs along the sweep direction (the first run's start->end),

@@ -212,8 +212,8 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
   });
 });
 
-describe('grblStrategy fill hatch overscan', () => {
-  it('emits the overscan lead-in/out as laser-off G0 rapids (not cutting-feed moves)', () => {
+describe('grblStrategy legacy fill hatch overscan', () => {
+  it('emits untagged legacy lead-in/out as laser-off G0 rapids', () => {
     const job: Job = {
       groups: [
         {
@@ -261,7 +261,7 @@ describe('grblStrategy fill hatch overscan', () => {
     expect(out).not.toMatch(/^M[34] S[1-9]/m);
   });
 
-  it('skips the overscan runway on short runs but keeps it on long runs', () => {
+  it('skips untagged legacy runway on short runs but keeps it on long runs', () => {
     const job: Job = {
       groups: [
         {

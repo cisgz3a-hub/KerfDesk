@@ -43,7 +43,8 @@ describe('buildOutputQualityReviewFacts', () => {
     expect(buildOutputQualityReviewFacts(job, [layer])).toEqual([
       {
         label: 'Fill runway coverage',
-        value: 'requested 5 mm · 2 full · 0 partial · 0 skipped · 0 disabled (2 emitted sweeps)',
+        value:
+          'effective target 5 mm · 2 full · 0 partial · 0 skipped · 0 disabled (2 emitted sweeps)',
         tone: 'default',
       },
       {

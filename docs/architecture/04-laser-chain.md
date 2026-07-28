@@ -94,18 +94,21 @@ Four fill styles resolve in `vectorGroupsForLayer` (`compile-job.ts:161-187`):
 | `island` | Contours grouped into islands, each its own group (`compile-job.ts:189-230`) |
 | cross-hatch | Second pass at 90° (per-layer `fillCrossHatch`) |
 
-The scanline emitter is the most heavily evolved code in the repo — the accumulation of five ADRs:
+The scanline emitter is the most heavily evolved code in the repo:
 
 - **ADR-031** overscan lead-in/out: hatch runway outside the ink so acceleration happens off-part.
-- **ADR-033** skip overscan on short runs; emit the runway as a rapid instead.
+- **ADR-033** introduced the historical short-run overscan skip, retained by explicit legacy
+  groups and separate policies.
 - **ADR-034** continuous sweep: **one `G1` chain per scanline**, gaps blanked with `S0` rather
   than lifting into separate moves.
-- **ADR-035** split a scanline at *large* gaps so the emitter rapids across them.
+- **ADR-035** split a scanline at *large* gaps into independent sweeps.
 - **ADR-052** scanning offset compensation: a per-speed table cancels the bidirectional zipper
-  (`scanOffsetSpans`, `grbl-strategy.ts:317-323`, applied only on reverse sweeps).
+  by translating reverse sweeps before emit-precision filtering.
+- **ADR-238 amendment** gives every generic Scan Line sweep bounded feed-matched `S0` entry and
+  exit motion; adjacent split sweeps share the blank gap and rapid only across an unused center.
 
-`planFillSweeps` (`grbl-strategy.ts:231`) plans; `emitFillSweep` (line 284) emits. `S` is modal in
-G-code, so every span re-asserts its value (lines 274-275).
+`planFillSweeps` owns shifted, emit-precision-filtered geometry used by G-code, Frame bounds,
+duration, optimization, and preview. `emitFillSweep` turns that plan into modal-power G-code.
 
 ADR-038 made unidirectional fill a **per-layer option** — snake was previously hard-coded.
 
@@ -149,8 +152,8 @@ transitions, but this was **not re-verified end-to-end in this session — UNVER
 
 1. **Preamble.** Confirm LightBurn's actual stock-GRBL header and per-layer `M3`/`M4` placement.
    Our `M3 S0` pre-arm is a divergence with a missing ledger entry — is it *right*?
-2. **Fill overscan.** How much runway does LightBurn add, and does it scale with speed? Ours is
-   per-layer `fillOverscanMm` with a short-run bypass (ADR-033).
+2. **Fill overscan.** How much runway does LightBurn add, and does it scale with speed? Generic
+   Scan Line uses per-layer bounded every-sweep runways; explicit legacy policies retain ADR-033.
 3. **Scanning offset.** Does LightBurn's per-speed interpolation match ours (`offsetForSpeed`)? A
    different interpolation shows as a visible zipper at intermediate speeds.
 4. **Dither count.** `DECISIONS.md:1283` records **3 dither algorithms vs LightBurn's ten**. Which

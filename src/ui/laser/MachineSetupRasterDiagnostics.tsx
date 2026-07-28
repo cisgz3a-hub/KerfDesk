@@ -124,7 +124,10 @@ function buildRasterDiagnostics(
   const sMax = settingSummary(rows, 30, lastSettingsReadAt);
   const laserMode = settingSummary(rows, 32, lastSettingsReadAt);
   const scanOffsetStatus = effectiveScanOffsetCalibrationStatus(project.device);
-  const fillHeatRisk = analyzeFillHeatRisk(compileJob(project.scene, project.device));
+  const fillHeatRisk = analyzeFillHeatRisk(
+    compileJob(project.scene, project.device),
+    project.device.scanningOffsets,
+  );
   const warnings = rasterWarnings({
     project,
     bidirectionalLayers,

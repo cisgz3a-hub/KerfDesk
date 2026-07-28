@@ -1,5 +1,6 @@
 import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { useStore } from '../state';
+import { genericRunwayFallbackText } from './fill-overscan-fallback';
 import { LayerImageFields } from './LayerImageFields';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -23,6 +24,10 @@ const fieldValueStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
 const wideInputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
+const FALLBACK_TEXT_STYLE: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+};
 
 export type LayerOperationControlTarget = {
   readonly settings: LayerOperationSettings;
@@ -93,6 +98,12 @@ function FillFields(props: {
       <FieldRow label="Overscan">
         <FillOverscanInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>mm</span>
+        {operationTarget.settings.fillStyle === 'scanline' &&
+        operationTarget.settings.fillOverscanMm <= 0 ? (
+          <span style={FALLBACK_TEXT_STYLE}>
+            {genericRunwayFallbackText(operationTarget.settings.fillOverscanMm)}
+          </span>
+        ) : null}
       </FieldRow>
       <FieldRow label="Bidirectional">
         <BidirectionalInput layer={layer} operationTarget={operationTarget} />

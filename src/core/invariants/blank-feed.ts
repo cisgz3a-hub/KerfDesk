@@ -10,8 +10,9 @@
 //     invariant: the head crawls across empty space at cutting feed with the
 //     beam nominally off, and a diode's turn-off lag can paint a faint line over
 //     that distance (the 2026-06-03 "moved to the second part and left a stray
-//     line" class). ADR-035 split fill gaps > 5 mm into G0 rapids, so FRESH
-//     output has no long blank feed; if one appears, the g-code is either a
+//     line" class). ADR-035 split fill gaps > 5 mm into independent sweeps.
+//     Current generic policy may use bounded S0 feed runways at each edge, but
+//     no individual blank feed exceeds this threshold; any longer one is a
 //     regression or a stale export that predates the fix. Either way, block it.
 //
 // Tracks modal X/Y/S exactly as the controller would. Pure-core: no clock, no

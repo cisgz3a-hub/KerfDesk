@@ -1610,18 +1610,24 @@ or traced image) with at least one closed polyline.
 - *Tiny shapes* (cap height < ~2× hatchSpacing): produce only 1–2 hatch
   lines, which engraves as a near-line. Acceptable; no minimum-size
   guard. The user can lower `hatchSpacingMm` or switch to Line mode.
-- *4040-safe scaled lettering*: ordinary scanline fragments separated by more than 5 mm retain a
-  controlled F800/S0 gap remainder, then receive up to 5 mm of feed-matched G1/S0 entry before each
-  burn. This preserves ADR-234's non-overlapping split geometry while ADR-235 replaces only the 4040
-  transport; Default/Falcon and Offset Fill behavior remain unchanged. Sensitive 4040 Island Fill
-  remains one-way and uses full-where-safe feed-matched runway.
+- *Fragmented Scan Line lettering*: generic/default Scan Line gives every independent sweep bounded
+  feed-matched laser-off entry and exit motion. A split gap shares its available distance between
+  the preceding exit and next entry without overlap; gaps wider than two full runways retain a
+  laser-off rapid only across the unused center. Close gaps remain one continuous `S0`-bridged
+  sweep. Newly committed generic traced Scan Line operations default one-way when no direction was
+  explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
+  ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
+  The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
+  Scan Line, a stored Overscan value of zero uses the bounded 5 mm generic runway default rather
+  than allowing a rapid-to-powered start; Frame includes that effective motion.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before
-  and after each hatch line. The framed burn area does not grow, but
-  preflight checks the emitted G-code. An outside-bed runway is a Job Review
-  warning before Frame, not an ordinary Frame/Start block; Save G-code may
-  still require moving the artwork inward or lowering Overscan.
+  and after each hatch line. The ink/burn AABB does not grow, while Job Review
+  reports the larger motion size and Frame traces the exact compiled runway
+  envelope. If that physical trace does not fit the intended usable area, the
+  operator moves the artwork inward or lowers Overscan and frames again. There
+  is no separate computed-bounds Start guard.
 
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
@@ -1708,8 +1714,9 @@ Hardware burn on the Falcon (must be confirmed by user):
    right group boundaries (`M5` between groups; no laser-on travel
    between groups).
 4. **Frame works on an image layer**: clicking Frame on a scene
-   with only a RasterImage traces the 4 corners of the image's
-   mm-bounds (not the overscan-extended rectangle).
+   with only a RasterImage traces the 4 corners of the exact compiled
+   motion envelope, including row overscan and any active reverse-row
+   scan-offset shift.
 5. **No "burn-line on travel" artefacts**: between rows, the head
    moves at S=0 — verify by looking at the row-end overscan zone
    for any unintended burn marks.

@@ -38,10 +38,10 @@ export function ProfileRows(props: DeviceRowsProps): JSX.Element {
       <Row label="Laser">
         <span style={profileTextStyle}>
           {active
-            ? '4040 fill-quality policy active'
+            ? 'Neotronics-qualified 4040 fill policy active'
             : needsReview
-              ? '4040 fill-quality policy inactive'
-              : 'Current profile fill behavior unchanged'}{' '}
+              ? 'Generic Scan Line runways active; Neotronics-qualified policy not selected'
+              : 'Generic Scan Line feed-matched runways active'}{' '}
           — {laserLabel}
         </span>
       </Row>

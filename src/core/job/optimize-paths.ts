@@ -49,7 +49,7 @@ import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
 import { containmentDepths } from './containment-depth';
-import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
+import { offsetForSpeed } from './scan-offset';
 import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 
@@ -361,9 +361,9 @@ function islandGroupEndpoints(
   group: FillGroup,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): RouteEndpoints | null {
-  const plans = planFillSweeps(group);
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+  const plans = planFillSweeps(group, scanOffsetMm);
   let entry: Vec2 | null = null;
   let exit: Vec2 | null = null;
   for (const plan of plans) {
@@ -371,8 +371,7 @@ function islandGroupEndpoints(
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
     if (first === undefined || last === undefined) continue;
-    const burn = shiftedScanSweepEndpoints(first, last, sweep.reverse, scanOffsetMm);
-    const run = expandFillHatchWithRunways([burn.start, burn.end], plan);
+    const run = expandFillHatchWithRunways([first.start, last.end], plan);
     if (run === null) continue;
     if (entry === null) entry = run.leadStart;
     exit = run.leadEnd;

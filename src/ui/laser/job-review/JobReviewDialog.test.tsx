@@ -26,7 +26,7 @@ const model: JobReviewModel = {
     {
       label: 'Fill runway',
       value: '8 / 8 full',
-      detail: 'Requested 5 mm · 0 partial · 0 skipped · 0 disabled',
+      detail: 'Effective target 5 mm · 0 partial · 0 skipped · 0 disabled',
     },
     { label: 'G-code', value: '12 lines', detail: '1.2 KB' },
     { label: 'Origin', value: 'User origin', detail: 'Anchor front left', emphasis: 'text' },

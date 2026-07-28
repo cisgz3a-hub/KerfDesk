@@ -47,12 +47,12 @@ describe('DeviceSettings disclosure', () => {
     }
   });
 
-  it('keeps the profile status neutral for Falcon instead of calling 4040 policy inactive', async () => {
+  it('names generic runways for Falcon without claiming Neotronics qualification', async () => {
     useStore.getState().replaceDeviceProfile(FALCON_COMPATIBLE_PROFILE);
     const { host, unmount } = await renderDeviceSettings();
     try {
-      expect(host.textContent).toContain('Current profile fill behavior unchanged');
-      expect(host.textContent).not.toContain('4040 fill-quality policy inactive');
+      expect(host.textContent).toContain('Generic Scan Line feed-matched runways active');
+      expect(host.textContent).not.toContain('Neotronics-qualified policy not selected');
     } finally {
       await unmount();
     }

@@ -7,7 +7,7 @@ import {
 } from './fill-runway-policy';
 
 describe('fillRunwayPolicyForDevice', () => {
-  it('keeps the generic/Falcon-compatible scanline policy unchanged', () => {
+  it('leaves generic and Falcon Scan Line selection to the fill-group builder', () => {
     expect(fillRunwayPolicyForDevice(DEFAULT_DEVICE_PROFILE)).toBeUndefined();
   });
 

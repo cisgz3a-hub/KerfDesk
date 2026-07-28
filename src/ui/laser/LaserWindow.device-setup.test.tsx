@@ -179,7 +179,9 @@ describe('LaserWindow device-setup nudge', () => {
       useStore.getState().replaceDeviceProfile(profile);
       const { host, unmount } = await renderLaserWindow();
       try {
-        expect(host.textContent).not.toContain('4040 fill-quality policy is inactive');
+        expect(host.textContent).not.toContain(
+          'Neotronics-qualified 4040 fill policy is not selected',
+        );
       } finally {
         await unmount();
       }

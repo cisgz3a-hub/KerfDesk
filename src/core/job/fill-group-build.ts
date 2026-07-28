@@ -22,7 +22,11 @@ export function buildFillGroup(args: {
   const { layer, device } = args;
   const isOffset = layer.fillStyle === 'offset';
   const scanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
-  const fillRunwayPolicy = isOffset ? undefined : fillRunwayPolicyForDevice(device);
+  const qualifiedPolicy = fillRunwayPolicyForDevice(device);
+  const fillRunwayPolicy = isOffset
+    ? undefined
+    : (qualifiedPolicy ??
+      (layer.fillStyle === 'scanline' ? 'feed-matched-every-sweep' : undefined));
   // ADR-239: Follow Shape loops get tangential feed-matched entries on the
   // 4040-safe profile; scanline/island sweeps use fillRunwayPolicy instead.
   const entryRunwayMm = isOffset ? contourEntryRunwayMm(device, layer.fillOverscanMm) : undefined;

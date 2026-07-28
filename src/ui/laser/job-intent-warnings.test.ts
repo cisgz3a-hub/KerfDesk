@@ -13,6 +13,8 @@ import {
 } from '../../core/scene';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 
+const NEOTRONICS_POLICY_NOT_SELECTED_TEXT = 'Neotronics-qualified 4040 fill policy is not selected';
+
 const traced: SceneObject = {
   kind: 'traced-image',
   id: 'trace-1',
@@ -175,8 +177,9 @@ const largeIsland: SceneObject = {
 describe('detectJobIntentWarnings', () => {
   it('warns before generic-profile Scanline Fill without claiming the machine was identified', () => {
     const warnings = detectJobIntentWarnings(projectWith(closedTraced, 'fill'));
-    const warning = warnings.find((item) => item.includes('4040 fill-quality policy is inactive'));
+    const warning = warnings.find((item) => item.includes(NEOTRONICS_POLICY_NOT_SELECTED_TEXT));
 
+    expect(warning).toContain('Generic Scan Line feed-matched entry and exit runways are active');
     expect(warning).toContain('Default 400');
     expect(warning).toContain('cannot identify a Neotronics 4040');
     expect(warning).toContain('Machine Setup');
@@ -187,7 +190,7 @@ describe('detectJobIntentWarnings', () => {
       const project = { ...projectWith(closedTraced, 'fill'), device };
       expect(
         detectJobIntentWarnings(project).some((item) =>
-          item.includes('4040 fill-quality policy is inactive'),
+          item.includes(NEOTRONICS_POLICY_NOT_SELECTED_TEXT),
         ),
       ).toBe(false);
     }
@@ -208,7 +211,7 @@ describe('detectJobIntentWarnings', () => {
     for (const project of [line, image, islandFill]) {
       expect(
         detectJobIntentWarnings(project).some((item) =>
-          item.includes('4040 fill-quality policy is inactive'),
+          item.includes(NEOTRONICS_POLICY_NOT_SELECTED_TEXT),
         ),
       ).toBe(false);
     }
@@ -222,7 +225,7 @@ describe('detectJobIntentWarnings', () => {
 
     expect(
       detectJobIntentWarnings(project).some((item) =>
-        item.includes('4040 fill-quality policy is inactive'),
+        item.includes(NEOTRONICS_POLICY_NOT_SELECTED_TEXT),
       ),
     ).toBe(false);
   });

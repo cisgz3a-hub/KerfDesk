@@ -132,7 +132,7 @@ Fill one row per subsystem. Verdicts per [README.md](README.md).
 |---|---|---|---|---|---|
 | Preamble / postamble | `M3 S0` pre-arm, `G21 G90 G54 G94` (`grbl-strategy.ts:94`) | | n/a | | |
 | Layer identity | Explicit operation IDs (ADR-211) | colour-as-layer | | | |
-| Fill overscan | per-layer, short-run bypass (ADR-033) | | n/a | | |
+| Fill overscan | per-layer generic every-sweep runway; legacy ADR-033 bypass retained | | n/a | | |
 | Scanning offset | per-speed table (ADR-052) | has equivalent | n/a | | |
 | Dither algorithms | 3 (`DECISIONS.md:1283`) | 10 | n/a | | |
 | Image overscan | fixed 5 mm | | n/a | | |
