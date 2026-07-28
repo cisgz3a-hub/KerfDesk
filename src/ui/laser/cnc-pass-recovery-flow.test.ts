@@ -10,7 +10,6 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
-import { emitPreparedGcode } from '../../io/gcode';
 import type * as GcodeModule from '../../io/gcode';
 import { useCameraStore } from '../state/camera-store';
 import {
@@ -23,14 +22,20 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
 import {
+  createCurrentTestExecutionArtifact,
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
-import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
-import { configureReadyCncRecovery, injectPreflightIssue } from './cnc-recovery-flow-testing';
+import {
+  configureReadyCncRecovery,
+  expectRecoveryWarningEvidence,
+  injectPreflightIssues,
+  injectRecoveryJobCompileIntegrityFailure,
+  recoveryWarningFixtureIssues,
+} from './cnc-recovery-flow-testing';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import { expectCncPassRecoveryProvenance } from './cnc-pass-recovery-provenance-testing';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
@@ -420,22 +425,24 @@ describe('runCncPassRecoveryFlow', () => {
   // Rule 7 / ADR-228 regression pin. `preflight.ok` is false for ANY issue, so
   // checking it directly refused recovery over heuristic policy findings and
   // stranded a partially-cut workpiece. Only compile integrity may refuse.
-  it('starts recovery despite a policy-only preflight finding, showing it as a warning', async () => {
+  it('starts recovery with one copy of more than 128 repeated policy advisories', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    await injectPreflightIssue({ code: 'out-of-bed', message: 'X exceeds the bed.' });
+    const issues = recoveryWarningFixtureIssues();
+    await injectPreflightIssues(issues);
 
     const started = await runCncPassRecoveryFlow(capsule, baseReview, repo);
 
-    console.log('EMIT_CALLS=' + vi.mocked(emitPreparedGcode).mock.calls.length);
     expect(started).toBe(true);
     expect(startJob).toHaveBeenCalledTimes(1);
     expect(vi.mocked(jobAwareAlert)).not.toHaveBeenCalled();
-    // The demoted finding must reach the operator, not vanish.
-    const confirmed = vi.mocked(jobAwareConfirm).mock.calls.map(([m]) => String(m));
-    expect(confirmed.some((m) => m.includes('X exceeds the bed.'))).toBe(true);
+    expectRecoveryWarningEvidence(
+      vi.mocked(jobAwareConfirm).mock.calls.map(([message]) => String(message)),
+      issues,
+      repo.getSnapshot().activeRun?.artifact.provenance?.review?.warningsShown,
+    );
   });
 
   it('still refuses recovery on a compile-integrity failure', async () => {
@@ -443,12 +450,14 @@ describe('runCncPassRecoveryFlow', () => {
     const capsule = await saveInterruptedRun(repo);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    await injectPreflightIssue({ code: 'empty-output', message: 'No cuts.' });
+    const injection = await injectRecoveryJobCompileIntegrityFailure();
 
     const started = await runCncPassRecoveryFlow(capsule, baseReview, repo);
 
-    expect(started).toBe(false);
-    expect(startJob).not.toHaveBeenCalled();
-    expect(vi.mocked(jobAwareAlert).mock.calls[0]?.[0] ?? '').toContain('No cuts.');
+    injection.assertRefusal(
+      started,
+      startJob.mock.calls.length,
+      vi.mocked(jobAwareAlert).mock.calls.map(([message]) => String(message)),
+    );
   });
 });
