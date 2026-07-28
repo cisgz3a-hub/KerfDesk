@@ -11,6 +11,7 @@
 
 import type { Polyline, Vec2 } from '../scene';
 import { isWeldEndpointContinuous } from './is-weld-endpoint-continuous';
+import { WELD_COINCIDENT_EPS, weldPairs, type WeldWorkChain } from './weld-pairs';
 
 export type WeldOpenPolylinesOptions = {
   /** Physical size of one polyline unit (trace pixel), mm. Non-finite or
@@ -24,23 +25,15 @@ export type WeldOpenPolylinesOptions = {
 // the loop itself — the same proportionality idea as the tracer's loop
 // closure; a short open arc must not be stapled into a sliver ring.
 const MAX_CLOSE_GAP_FRACTION = 0.25;
-const COINCIDENT_EPS = 1e-9;
+const MIN_WELDABLE_POINTS = 2;
 // Match the established Centerline 35-degree continuity convention over a
 // fixed physical neighborhood instead of a transform-dependent pixel count.
 const WELD_TANGENT_SAMPLE_MM = 0.3;
 
-type PolylineEnd = 'start' | 'end';
-const POLYLINE_ENDS: ReadonlyArray<PolylineEnd> = ['start', 'end'];
-
-type WorkChain = {
-  points: Vec2[];
-  /** Smallest original index among merged members — keeps output order
-   *  stable and deterministic. */
-  order: number;
-  hasMerged: boolean;
+type OrderedPolyline = {
+  readonly polyline: Polyline;
+  readonly order: number;
 };
-
-type ChainPair = readonly [WorkChain, WorkChain];
 
 /** Weld fragmented open polylines for machine execution. Pure and
  *  deterministic; closed rings and degenerate chains pass through. */
@@ -50,146 +43,40 @@ export function weldOpenPolylines(
 ): Polyline[] {
   if (!Number.isFinite(options.mmPerPx) || options.mmPerPx <= 0) return [...polylines];
   const maxGapPx = options.maxGapMm / options.mmPerPx;
-  const passthrough: Array<{ readonly polyline: Polyline; readonly order: number }> = [];
-  const open: WorkChain[] = [];
-  polylines.forEach((polyline, index) => {
-    if (polyline.closed || polyline.points.length < 2) {
-      passthrough.push({ polyline, order: index });
-      return;
-    }
-    open.push({ points: [...polyline.points], order: index, hasMerged: false });
-  });
-  weldPairs(open, maxGapPx, WELD_TANGENT_SAMPLE_MM / options.mmPerPx);
-  const welded = open.map((chain) => ({
-    polyline: selfClose(chain, maxGapPx, WELD_TANGENT_SAMPLE_MM / options.mmPerPx),
+  const tangentSamplePx = WELD_TANGENT_SAMPLE_MM / options.mmPerPx;
+  const classified = polylines.map((polyline, order) => ({
+    polyline,
+    order,
+    isWeldable: isWeldableOpenPolyline(polyline),
+  }));
+  const passthrough = classified.flatMap(({ polyline, order, isWeldable }) =>
+    isWeldable ? [] : [{ polyline, order }],
+  );
+  const open = classified.flatMap<WeldWorkChain>(({ polyline, order, isWeldable }) =>
+    isWeldable ? [{ points: [...polyline.points], order, hasMerged: false }] : [],
+  );
+  const pairing = weldPairs(open, maxGapPx, tangentSamplePx);
+  const welded = pairing.chains.map((chain) => ({
+    polyline: selfClose(chain, maxGapPx, tangentSamplePx),
     order: chain.order,
   }));
-  return [...passthrough, ...welded]
-    .sort((a, b) => a.order - b.order)
-    .map((entry) => entry.polyline);
-}
-
-// Greedy nearest-pair welding: repeatedly join the two chains with the
-// smallest continuous endpoint gap at or under the threshold. Ties break on
-// the lower chain indices, then on the pairing order — fully deterministic.
-function weldPairs(chains: WorkChain[], maxGapPx: number, tangentSamplePx: number): void {
-  for (;;) {
-    const best = bestPair(chains, maxGapPx, tangentSamplePx);
-    if (best === null) return;
-    const a = chains[best.i];
-    const b = chains[best.j];
-    if (a === undefined || b === undefined) return;
-    // Orient A to END at the matched endpoint and B to START at it.
-    if (best.aEnd === 'start') a.points.reverse();
-    if (best.bEnd === 'end') b.points.reverse();
-    const tail = a.points.at(-1);
-    const head = b.points[0];
-    if (tail === undefined || head === undefined) return;
-    const coincident = Math.hypot(tail.x - head.x, tail.y - head.y) <= COINCIDENT_EPS;
-    a.points.push(...(coincident ? b.points.slice(1) : b.points));
-    a.order = Math.min(a.order, b.order);
-    a.hasMerged = true;
-    chains.splice(best.j, 1);
-  }
-}
-
-type PairMatch = {
-  readonly i: number;
-  readonly j: number;
-  readonly aEnd: PolylineEnd;
-  readonly bEnd: PolylineEnd;
-  readonly dist: number;
-};
-
-type EndpointMatch = Omit<PairMatch, 'i' | 'j'>;
-
-type EndpointMatchInput = {
-  readonly a: WorkChain;
-  readonly b: WorkChain;
-  readonly aEnd: PolylineEnd;
-  readonly bEnd: PolylineEnd;
-  readonly maxGapPx: number;
-  readonly tangentSamplePx: number;
-};
-
-function endpointMatch(input: EndpointMatchInput): EndpointMatch | null {
-  const pa = endpointOf(input.a, input.aEnd);
-  const pb = endpointOf(input.b, input.bEnd);
-  if (pa === undefined || pb === undefined) return null;
-  const dist = Math.hypot(pa.x - pb.x, pa.y - pb.y);
-  if (dist > input.maxGapPx) return null;
-  if (
-    !isWeldEndpointContinuous({
-      aPoints: input.a.points,
-      aEnd: input.aEnd,
-      bPoints: input.b.points,
-      bEnd: input.bEnd,
-      tangentSamplePx: input.tangentSamplePx,
-    })
-  ) {
-    return null;
-  }
-  return { aEnd: input.aEnd, bEnd: input.bEnd, dist };
-}
-
-function bestPair(
-  chains: ReadonlyArray<WorkChain>,
-  maxGapPx: number,
-  tangentSamplePx: number,
-): PairMatch | null {
-  let best: PairMatch | null = null;
-  for (let i = 0; i < chains.length; i += 1) {
-    for (let j = i + 1; j < chains.length; j += 1) {
-      const pair = chainPairAt(chains, i, j);
-      if (pair === null) continue;
-      const [a, b] = pair;
-      for (const aEnd of POLYLINE_ENDS) {
-        for (const bEnd of POLYLINE_ENDS) {
-          const match = endpointMatch({
-            a,
-            b,
-            aEnd,
-            bEnd,
-            maxGapPx,
-            tangentSamplePx,
-          });
-          if (match !== null && (best === null || match.dist < best.dist)) {
-            best = { i, j, ...match };
-          }
-        }
-      }
-    }
-  }
-  return best;
-}
-
-function chainPairAt(
-  chains: ReadonlyArray<WorkChain>,
-  firstIndex: number,
-  secondIndex: number,
-): ChainPair | null {
-  const first = chains[firstIndex];
-  const second = chains[secondIndex];
-  return first === undefined || second === undefined ? null : [first, second];
-}
-
-function endpointOf(chain: WorkChain, end: PolylineEnd): Vec2 | undefined {
-  return end === 'start' ? chain.points[0] : chain.points.at(-1);
+  const ordered = mergeOrderedPolylines(passthrough, welded);
+  return ordered.map((entry) => entry.polyline);
 }
 
 // Close a welded chain whose ends meet: gap within the weld threshold AND
 // small next to the chain length. The closure appends an exact copy of the
 // start so the ring conforms to the explicit-return convention (renderers
 // and emitters draw points as given).
-function selfClose(chain: WorkChain, maxGapPx: number, tangentSamplePx: number): Polyline {
+function selfClose(chain: WeldWorkChain, maxGapPx: number, tangentSamplePx: number): Polyline {
   if (!chain.hasMerged) return { points: chain.points, closed: false };
-  const first = endpointOf(chain, 'start');
-  const last = endpointOf(chain, 'end');
+  const first = chain.points[0];
+  const last = chain.points.at(-1);
   if (first === undefined || last === undefined) return { points: chain.points, closed: false };
   const gap = Math.hypot(last.x - first.x, last.y - first.y);
   const length = chainLength(chain.points);
   const hasContinuousClosure =
-    gap <= COINCIDENT_EPS ||
+    gap <= WELD_COINCIDENT_EPS ||
     isWeldEndpointContinuous({
       aPoints: chain.points,
       aEnd: 'end',
@@ -201,7 +88,7 @@ function selfClose(chain: WorkChain, maxGapPx: number, tangentSamplePx: number):
     return { points: chain.points, closed: false };
   }
   const points =
-    gap <= COINCIDENT_EPS ? chain.points : [...chain.points, { x: first.x, y: first.y }];
+    gap <= WELD_COINCIDENT_EPS ? chain.points : [...chain.points, { x: first.x, y: first.y }];
   return { points, closed: true };
 }
 
@@ -214,4 +101,32 @@ function chainLength(points: ReadonlyArray<Vec2>): number {
     length += Math.hypot(b.x - a.x, b.y - a.y);
   }
   return length;
+}
+
+function isWeldableOpenPolyline(polyline: Polyline): boolean {
+  return !polyline.closed && polyline.points.length >= MIN_WELDABLE_POINTS;
+}
+
+function mergeOrderedPolylines(
+  first: ReadonlyArray<OrderedPolyline>,
+  second: ReadonlyArray<OrderedPolyline>,
+): ReadonlyArray<OrderedPolyline> {
+  let firstIndex = 0;
+  let secondIndex = 0;
+  return Array.from({ length: first.length + second.length }, () => {
+    const firstEntry = first[firstIndex];
+    const secondEntry = second[secondIndex];
+    if (
+      firstEntry !== undefined &&
+      (secondEntry === undefined || firstEntry.order <= secondEntry.order)
+    ) {
+      firstIndex += 1;
+      return firstEntry;
+    }
+    if (secondEntry !== undefined) {
+      secondIndex += 1;
+      return secondEntry;
+    }
+    throw new Error('Ordered weld output ended before its declared length.');
+  });
 }
