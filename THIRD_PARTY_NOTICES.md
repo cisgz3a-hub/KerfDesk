@@ -48,6 +48,7 @@ copyright notice and license to accompany the font in any distribution.
 | Font | License | Copyright / source attribution |
 |---|---|---|
 | Roboto Regular | Apache-2.0 | Copyright 2011 Google Inc. |
+| Tinos Regular | OFL-1.1 | Copyright 2026 The Tinos Project Authors (https://github.com/googlefonts/tinos); designed by Steve Matteson, Monotype Imaging Inc. |
 | Inconsolata Regular | OFL-1.1 | Copyright The Inconsolata Project Authors (Raph Levien) |
 | Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
 | Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
@@ -58,7 +59,7 @@ copyright notice and license to accompany the font in any distribution.
 
 - **Apache-2.0** (Roboto): full text at https://www.apache.org/licenses/LICENSE-2.0 —
   the license and any `NOTICE` file must accompany the distribution.
-- **SIL Open Font License 1.1** (the seven OFL fonts): full text at
+- **SIL Open Font License 1.1** (the eight OFL fonts): full text at
   https://openfontlicense.org — the above copyright/source notices and this
   license must be bundled with the fonts; the fonts may be redistributed but
   not sold on their own, and Reserved Font Names must not be reused for

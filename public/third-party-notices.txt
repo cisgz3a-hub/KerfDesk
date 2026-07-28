@@ -22,6 +22,13 @@ Licensed under the Apache License, Version 2.0
 License URL: http://www.apache.org/licenses/LICENSE-2.0
 Full license text: see the Apache-2.0 section at the end of this file.
 
+--- Font: Tinos (OFL-1.1) ---
+Bundled file: src/ui/text/fonts/Tinos-Regular.ttf
+Copyright 2026 The Tinos Project Authors (https://github.com/googlefonts/tinos)
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://openfontlicense.org
+License URL: https://openfontlicense.org
+Full license text: see the OFL-1.1 section at the end of this file.
+
 --- Font: Inconsolata (OFL-1.1) ---
 Bundled file: src/ui/text/fonts/Inconsolata-Regular.ttf
 Copyright 2006 The Inconsolata Project Authors (https://github.com/cyrealtype/Inconsolata)

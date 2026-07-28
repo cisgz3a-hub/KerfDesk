@@ -2,13 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { FONT_REGISTRY } from './font-registry';
 
 describe('bundled font registry', () => {
-  it('contains four outline fonts and the four approved OFL CNC stroke fonts', () => {
+  it('contains five outline fonts and the four approved OFL CNC stroke fonts', () => {
     expect(FONT_REGISTRY).toEqual([
       {
         key: 'roboto-regular',
         displayName: 'Roboto',
         license: 'Apache-2.0',
         styleClass: 'sans',
+        geometry: 'outline',
+      },
+      {
+        key: 'tinos-regular',
+        displayName: 'Tinos',
+        license: 'OFL-1.1',
+        styleClass: 'serif',
         geometry: 'outline',
       },
       {

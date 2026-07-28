@@ -11,7 +11,9 @@ import {
   parseArgs as parseReleaseArgs,
 } from './generate-release-integrity.mjs';
 import {
+  CNC_STROKE_FONTS,
   OPENCLIPART_ASSETS,
+  OUTLINE_FONTS,
   REPO_ROOT,
   collectElectronPackage,
   collectProductionPackages,
@@ -152,7 +154,12 @@ test('writes deterministic checksums, manifest, and CycloneDX SBOM', () => {
     const sbom = JSON.parse(fs.readFileSync(path.join(outDir, second.names.sbom), 'utf8'));
     assert.equal(sbom.bomFormat, 'CycloneDX');
     assert.equal(sbom.specVersion, '1.6');
-    assert.equal(sbom.components.length, packages.length + 17);
+    // Derived, not a constant: the SBOM carries every production npm package
+    // plus electron, both bundled font sets, and the pinned artwork. A literal
+    // here has to be re-derived by hand every time an asset is added.
+    const nonNpmComponents =
+      1 + OUTLINE_FONTS.length + CNC_STROKE_FONTS.length + OPENCLIPART_ASSETS.length;
+    assert.equal(sbom.components.length, packages.length + nonNpmComponents);
 
     const checksumLines = fs
       .readFileSync(path.join(outDir, second.names.checksums), 'utf8')

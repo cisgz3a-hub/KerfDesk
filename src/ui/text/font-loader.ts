@@ -12,12 +12,14 @@
 import { embeddedFontBuffer, findFontEntry, type FontEntry } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import robotoUrl from './fonts/Roboto-Regular.ttf?url';
+import tinosUrl from './fonts/Tinos-Regular.ttf?url';
 import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
 import dancingScriptUrl from './fonts/DancingScript-Regular.ttf?url';
 
 const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
   'roboto-regular': robotoUrl,
+  'tinos-regular': tinosUrl,
   'inconsolata-regular': inconsolataUrl,
   'pacifico-regular': pacificoUrl,
   'dancing-script-regular': dancingScriptUrl,
