@@ -1,16 +1,13 @@
-// Job Review disclosures for two FluidNC behaviours KerfDesk does not
-// otherwise model: silent long-line truncation, and numeric $ settings that
-// are read-only mirrors of the YAML config.
+// Job Review disclosures for FluidNC's direct-channel/parser boundary and
+// numeric $ settings that are read-only YAML configuration mirrors.
 //
-// Advisory only, never a gate (rule 7). KerfDesk still compiles and streams
-// every line exactly as emitted, and still sends any $ write the operator
-// asks for; these strings only tell the operator what the firmware will do
-// with them. Neither is a transport precondition — a truncated line is a
-// fidelity problem, not a channel that cannot accept the stream.
+// Advisory only, never a gate (rule 7). The active driver owns numeric-write
+// behavior, and these strings only make current identity evidence explicit.
 
 import {
-  findFluidncOverlongLines,
-  FLUIDNC_MAX_LINE_CHARS,
+  findFluidncNonExecutableLines,
+  FLUIDNC_GCODE_MAX_PAYLOAD_BYTES,
+  FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS,
 } from '../../../core/controllers/fluidnc/fluidnc-line-limit';
 import {
   FLUIDNC_READ_ONLY_SETTING_ERROR_CODE,
@@ -18,8 +15,9 @@ import {
 } from '../../../core/controllers/fluidnc/fluidnc-read-only-settings';
 import type { ControllerKind } from '../../../core/devices';
 
-export const FLUIDNC_LINE_TRUNCATION_WARNING_PREFIX = 'FluidNC line-length divergence:';
+export const FLUIDNC_LINE_BOUNDARY_WARNING_PREFIX = 'FluidNC line-length boundary:';
 export const FLUIDNC_READ_ONLY_SETTING_WARNING_PREFIX = 'FluidNC read-only settings:';
+export const FLUIDNC_IDENTITY_MISMATCH_WARNING_PREFIX = 'FluidNC identity mismatch:';
 
 export type FluidncDivergenceInput = {
   readonly configured: ControllerKind;
@@ -30,7 +28,7 @@ export type FluidncDivergenceInput = {
 };
 
 /**
- * Builds the non-blocking FluidNC divergence disclosures for one prepared job.
+ * Builds non-blocking FluidNC evidence disclosures for one prepared job.
  * @param input Controller identities for this Start plus the exact prepared program.
  * @returns Job Review warning strings, job-specific first; empty for non-FluidNC targets.
  */
@@ -38,43 +36,66 @@ export function detectFluidncDivergenceWarnings(
   input: FluidncDivergenceInput,
 ): ReadonlyArray<string> {
   if (!targetsFluidnc(input)) return [];
-  return [...lineTruncationWarnings(input.gcode), readOnlySettingWarning()];
+  return [...lineBoundaryWarnings(input), ...settingWarnings(input)];
 }
 
-// Any FluidNC signal is enough. A mismatch between these identities is
-// separately disclosed by controllerIdentityWarnings; here a false positive
-// costs one collapsed line, while a miss lets a silently different job run.
 function targetsFluidnc(input: FluidncDivergenceInput): boolean {
   return (
     input.configured === 'fluidnc' || input.active === 'fluidnc' || input.detected === 'fluidnc'
   );
 }
 
-function lineTruncationWarnings(gcode: string): ReadonlyArray<string> {
-  const overlong = findFluidncOverlongLines(gcode);
-  const first = overlong[0];
+function lineBoundaryWarnings(input: FluidncDivergenceInput): ReadonlyArray<string> {
+  if (input.active !== 'fluidnc' && input.detected !== 'fluidnc') return [];
+  const nonExecutable = findFluidncNonExecutableLines(input.gcode);
+  const first = nonExecutable[0];
   if (first === undefined) return [];
-  const longest = overlong.reduce((worst, line) => (line.length > worst.length ? line : worst));
+  const longest = nonExecutable.reduce((worst, line) =>
+    line.length > worst.length ? line : worst,
+  );
   return [
-    `${FLUIDNC_LINE_TRUNCATION_WARNING_PREFIX} ${overlong.length} line(s) in this program are ` +
-      `longer than the ${FLUIDNC_MAX_LINE_CHARS} characters FluidNC keeps per line ` +
+    `${FLUIDNC_LINE_BOUNDARY_WARNING_PREFIX} ${nonExecutable.length} ordinary G-code line(s) ` +
+      `exceed FluidNC's ${FLUIDNC_GCODE_MAX_PAYLOAD_BYTES}-byte parser limit ` +
       `(first: line ${first.lineNumber} at ${first.length} characters; ` +
       `longest: line ${longest.lineNumber} at ${longest.length} characters). ` +
-      `FluidNC stores the first ${FLUIDNC_MAX_LINE_CHARS} characters, discards the rest, and ` +
-      'returns no error, so the controller would run a different move than the one prepared here. ' +
-      'KerfDesk streams every line exactly as compiled and never shortens, splits, or drops one — ' +
-      'simplify the geometry at the source if this job depends on those moves.',
+      `FluidNC returns error:14 for ordinary G-code above that parser limit. Its direct Lineedit ` +
+      `collector can retain up to ${FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS} printable characters, ` +
+      'but that does not raise executable G-code capacity. CurveDesk does not shorten, split, or ' +
+      'drop the prepared line.',
   ];
 }
 
-function readOnlySettingWarning(): string {
+function settingWarnings(input: FluidncDivergenceInput): ReadonlyArray<string> {
+  if (input.active === 'fluidnc') return [activeFluidncSettingWarning()];
+  if (input.detected === 'fluidnc') return [detectedFluidncMismatchWarning(input.active)];
+  return [configuredFluidncSettingWarning(input.active)];
+}
+
+function activeFluidncSettingWarning(): string {
   return (
     `${FLUIDNC_READ_ONLY_SETTING_WARNING_PREFIX} FluidNC exposes ${settingList()} as read-only ` +
     'mirrors of its YAML configuration. A write such as $32=1 answers ' +
     `error:${FLUIDNC_READ_ONLY_SETTING_ERROR_CODE} (ReadOnlySetting) and changes nothing, so the ` +
-    '$30/$32 remedy named in the laser-mode acknowledgement cannot be applied from KerfDesk — set ' +
-    'laser mode and max spindle speed in the FluidNC YAML config instead, then re-read the ' +
-    'controller. KerfDesk still sends any $ write you ask for.'
+    '$30/$32 remedy named in the laser-mode acknowledgement cannot be applied from CurveDesk. ' +
+    'Set laser mode and max spindle speed in the FluidNC YAML config, then re-read the controller. ' +
+    'With FluidNC active, CurveDesk does not send numeric $ setting writes.'
+  );
+}
+
+function detectedFluidncMismatchWarning(active: ControllerKind): string {
+  return (
+    `${FLUIDNC_IDENTITY_MISMATCH_WARNING_PREFIX} The connected banner looks like FluidNC, but the ` +
+    `active ${active} driver remains authoritative and CurveDesk does not switch it automatically. ` +
+    'Numeric $ setting-write behavior therefore follows the active driver; verify the selected ' +
+    'controller profile before sending a setting command.'
+  );
+}
+
+function configuredFluidncSettingWarning(active: ControllerKind): string {
+  return (
+    `${FLUIDNC_READ_ONLY_SETTING_WARNING_PREFIX} The configured profile is FluidNC, but the active ` +
+    `${active} driver owns this session. Numeric $ setting-write behavior follows the active driver; ` +
+    'verify the selected controller profile before sending a setting command.'
   );
 }
 

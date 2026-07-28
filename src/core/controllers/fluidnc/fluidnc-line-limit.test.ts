@@ -1,45 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { FLUIDNC_MAX_LINE_CHARS, findFluidncOverlongLines } from './fluidnc-line-limit';
+import {
+  findFluidncNonExecutableLines,
+  FLUIDNC_GCODE_MAX_PAYLOAD_BYTES,
+  FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS,
+  fluidncLineBoundary,
+} from './fluidnc-line-limit';
+import { FLUIDNC_V403_LINEEDIT_FIXTURES } from '../../../__fixtures__/controllers/fluidnc-v403-lineedit-fixtures';
 
 function lineOf(length: number): string {
   return 'G1 X'.padEnd(length, '0');
 }
 
-describe('findFluidncOverlongLines', () => {
-  it('uses the 254 retained characters FluidNC keeps per line', () => {
-    expect(FLUIDNC_MAX_LINE_CHARS).toBe(254);
+describe('fluidncLineBoundary', () => {
+  it('matches the independent v4.0.3 ASCII Lineedit fixture baseline', () => {
+    expect(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES).toBe(127);
+    expect(FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS).toBe(254);
+    expect(
+      FLUIDNC_V403_LINEEDIT_FIXTURES.map(({ payloadBytes }) =>
+        fluidncLineBoundary(1, payloadBytes),
+      ),
+    ).toEqual(
+      FLUIDNC_V403_LINEEDIT_FIXTURES.map(({ payloadBytes, retainedBytes, parserResult }) => ({
+        lineNumber: 1,
+        length: payloadBytes,
+        retainedLength: retainedBytes,
+        parserResult,
+      })),
+    );
   });
 
-  it('stays silent for an empty program and for lines at the limit', () => {
-    expect(findFluidncOverlongLines('')).toEqual([]);
-    expect(findFluidncOverlongLines('G21\nG90\nM5\n')).toEqual([]);
-    expect(findFluidncOverlongLines(`${lineOf(FLUIDNC_MAX_LINE_CHARS)}\n`)).toEqual([]);
-  });
-
-  it('reports the first character past the limit, where truncation starts', () => {
-    const overlong = findFluidncOverlongLines(`${lineOf(FLUIDNC_MAX_LINE_CHARS + 1)}\n`);
-    expect(overlong).toEqual([{ lineNumber: 1, length: FLUIDNC_MAX_LINE_CHARS + 1 }]);
-  });
-
-  it('numbers offending lines from 1 within the emitted program', () => {
-    const gcode = `G21\n${lineOf(300)}\nG90\n${lineOf(260)}\n`;
-    expect(findFluidncOverlongLines(gcode)).toEqual([
-      { lineNumber: 2, length: 300 },
-      { lineNumber: 4, length: 260 },
+  it('reports only ordinary G-code that FluidNC rejects at the parser boundary', () => {
+    expect(findFluidncNonExecutableLines('')).toEqual([]);
+    expect(findFluidncNonExecutableLines(`${lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES)}\n`)).toEqual(
+      [],
+    );
+    expect(
+      findFluidncNonExecutableLines(`${lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1)}\n`),
+    ).toEqual([
+      {
+        lineNumber: 1,
+        length: FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1,
+        retainedLength: FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1,
+        parserResult: 'error:14',
+      },
     ]);
   });
 
-  it('excludes the line terminator, which completes the line instead of being stored', () => {
-    // A CRLF program carries a trailing '\r' on every split line. FluidNC
-    // completes the line on '\r' rather than storing it, so a line whose
-    // payload is exactly at the limit must not be reported.
-    expect(findFluidncOverlongLines(`${lineOf(FLUIDNC_MAX_LINE_CHARS)}\r\n`)).toEqual([]);
-    expect(findFluidncOverlongLines(`${lineOf(FLUIDNC_MAX_LINE_CHARS + 1)}\r\n`)).toEqual([
-      { lineNumber: 1, length: FLUIDNC_MAX_LINE_CHARS + 1 },
-    ]);
+  it('keeps CRLF terminators outside the current payload accounting', () => {
+    expect(findFluidncNonExecutableLines(`${lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES)}\r\n`)).toEqual(
+      [],
+    );
   });
 
-  it('reports a trailing unterminated line', () => {
-    expect(findFluidncOverlongLines(lineOf(400))).toEqual([{ lineNumber: 1, length: 400 }]);
+  it('uses the same sendable-line predicate as streaming while preserving raw source numbers', () => {
+    const comment = `;${'comment'.repeat(60)}`;
+    expect(findFluidncNonExecutableLines(`${comment}\n${lineOf(128)}\n`)).toEqual([
+      { lineNumber: 2, length: 128, retainedLength: 128, parserResult: 'error:14' },
+    ]);
   });
 });
