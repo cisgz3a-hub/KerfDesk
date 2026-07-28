@@ -109,7 +109,14 @@ export function pickHandleDrag(args: {
     // Capture the pivot, the pointer angle, and the object's transform AT the
     // grab so the rotate is relative to where the drag started — no jump on a
     // pre-rotated object (audit C2).
-    const anchor = objectRotateAnchor(selectedObj, args.selectionAnchor ?? 'c');
+    //
+    // The pivot is ALWAYS the object's centre, deliberately ignoring the
+    // numeric bar's 9-dot anchor: dragging the handle is direct manipulation
+    // and must spin the art in place. The shared anchor defaults to 'nw', so
+    // honouring it here made every default rotate swing the object around its
+    // top-left corner. Rotating about a chosen corner is still available
+    // through the numeric rotate field, where the 9-dot is visible.
+    const anchor = objectRotateAnchor(selectedObj, 'c');
     return {
       kind: 'rotate',
       objectId: selectedObj.id,
@@ -392,19 +399,20 @@ export function nextTransformForDrag(
       ...(useCenterAnchor || selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
     });
   }
-  return rotateTransformForDrag(drag, obj, point, e.shiftKey, selectionAnchor);
+  return rotateTransformForDrag(drag, obj, point, e.shiftKey);
 }
 
 // Relative rotate when the grab reference was captured (audit C2): apply the
 // pointer-angle delta since grab to the grab-time transform. The legacy
 // absolute path stays as a fallback for callers/tests that don't pass one.
 // (path-node drags never reach here — they're handled in the mouse layer.)
+// Neither path takes the 9-dot anchor: the rotate handle always spins about
+// the centre (see pickHandleDrag).
 function rotateTransformForDrag(
   drag: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' | 'measure' }>,
   obj: SceneObject,
   point: Vec2,
   snap: boolean,
-  selectionAnchor?: SelectionAnchor,
 ): Transform {
   if (drag.kind === 'rotate') {
     const start = drag.selectionStartTransforms?.[0];
@@ -422,10 +430,7 @@ function rotateTransformForDrag(
       });
     }
   }
-  return rotateObjectByDrag({
-    object: obj,
-    dragTo: point,
-    snap,
-    ...(selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
-  });
+  // Legacy absolute fallback (callers/tests that captured no grab reference).
+  // Centre pivot here too, for the same reason the grab path uses it.
+  return rotateObjectByDrag({ object: obj, dragTo: point, snap });
 }
