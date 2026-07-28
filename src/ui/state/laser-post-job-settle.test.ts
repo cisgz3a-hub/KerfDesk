@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { laserCountdownTestHandoff } from './laser-countdown-test-handoff';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
-import { useLaserStore } from './laser-store';
+import { type LaserState, useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
@@ -78,6 +78,15 @@ function controllerOperation(): ControllerOperationSnapshot {
 // 'done' and the post-job settle begins.
 const JOB_GCODE = 'G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n';
 const POST_JOB_COUNTDOWN_RETENTION_KEY = 'post-job-settle-countdown';
+const STALE_FINISHED_JOB_STATE = {
+  activeJobMachineKind: 'laser',
+  pauseResumeTransition: { token: Symbol('stale-pause-resume'), action: 'resume' },
+  toolChangeIdleSeen: true,
+  toolChangeLabels: ['stale tool'],
+  toolChangeToolIds: ['stale-tool'],
+  pendingToolLabel: 'pending tool',
+  pendingToolId: 'pending-tool',
+} satisfies Partial<LaserState>;
 
 // Mirrors DEFAULT_IDLE_TIMEOUT_MS in laser-interactive-command.ts.
 const IDLE_WAIT_TIMEOUT_MS = 8_000;
@@ -142,6 +151,8 @@ describe('post-job settle failure handling', () => {
     await connectWith(connection);
     await runJobUntilSettleAwaitsIdle(connection);
 
+    useLaserStore.setState(STALE_FINISHED_JOB_STATE);
+
     expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('finishing');
 
     connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
@@ -152,6 +163,7 @@ describe('post-job settle failure handling', () => {
         kind: 'post-job-settle',
         phase: 'awaiting-idle',
       },
+      ...STALE_FINISHED_JOB_STATE,
       liveCanvasRun: { timing: { kind: 'finishing' } },
     });
 
@@ -160,6 +172,13 @@ describe('post-job settle failure handling', () => {
     expect(useLaserStore.getState()).toMatchObject({
       streamer: null,
       controllerOperation: null,
+      activeJobMachineKind: null,
+      pauseResumeTransition: null,
+      toolChangeIdleSeen: false,
+      toolChangeLabels: [],
+      toolChangeToolIds: [],
+      pendingToolLabel: null,
+      pendingToolId: null,
       liveCanvasRun: { timing: { kind: 'complete' } },
     });
   });

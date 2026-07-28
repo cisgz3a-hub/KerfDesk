@@ -2,6 +2,7 @@ import type { ControllerDriver } from '../../core/controllers';
 import { startControllerCommand, waitForFreshIdle } from './laser-interactive-command';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { finishedJobStateReset } from './laser-session-reset';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
@@ -94,6 +95,7 @@ async function runPostJobSettle(
         ? {
             controllerOperation: null,
             streamer: null,
+            ...finishedJobStateReset(),
             liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
             log: pushLog(state, '[lf2] Controller settled after job.'),
           }
