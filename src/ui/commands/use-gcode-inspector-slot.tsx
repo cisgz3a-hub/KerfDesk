@@ -3,7 +3,7 @@
 // command layer plus the mounted element (null when closed), and wires the
 // CNC-only handoff back to the retained F-CNC10 2D simulator (ADR-255).
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { open2dSimulatorFromText } from '../app/gcode-open-action';
 import { GcodeInspectorDialog } from '../gcode-inspector';
 import { useStore } from '../state';
@@ -16,9 +16,10 @@ export function useGcodeInspectorSlot(): {
   readonly element: JSX.Element | null;
 } {
   const [program, setProgram] = useState<InspectorProgram | null>(null);
+  const open = useCallback((name: string, text: string) => setProgram({ name, text }), []);
   const element =
     program === null ? null : <InspectorHost program={program} onClose={() => setProgram(null)} />;
-  return { open: (name, text) => setProgram({ name, text }), element };
+  return { open, element };
 }
 
 function InspectorHost(props: {

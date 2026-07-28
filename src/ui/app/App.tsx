@@ -22,7 +22,6 @@ import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useCompactRailDefaults } from './use-compact-rail-defaults';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
-import { useImportDragDrop } from './use-import-drag-drop';
 import { useJobCheckpoint } from './use-job-checkpoint';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
@@ -49,7 +48,6 @@ export function App(): JSX.Element {
   useCompactRailDefaults();
   useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
-  useImportDragDrop();
   useJobShortcuts();
   useShortcuts();
   useSpacePan();
