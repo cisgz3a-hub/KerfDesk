@@ -17,6 +17,7 @@ import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
+import { isGcodeFile, openGcodeFileInInspector } from './gcode-open-action';
 import { confirmOversizeImport } from './import-size-guard';
 import { importStlFiles, isStlFile } from './stl-import-action';
 import { useStore } from '../state';
@@ -29,7 +30,7 @@ import {
   describeReimportOutcome,
 } from './import-toasts';
 
-export function useImportDragDrop(): void {
+export function useImportDragDrop(openGcodeInspector: (name: string, text: string) => void): void {
   const importSvgObject = useStore((s) => s.importSvgObject);
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -60,34 +61,10 @@ export function useImportDragDrop(): void {
       depth.current = 0;
       setDragOverlay(false);
       if (e.dataTransfer === null) return;
-      const svgFiles = pickSvgFiles(e.dataTransfer);
-      const imageFiles = pickImageFiles(e.dataTransfer);
-      const stlFiles = [...e.dataTransfer.files].filter(isStlFile);
-      const dxfFiles = [...e.dataTransfer.files].filter(isDxfFile);
-      const recognized = svgFiles.length + imageFiles.length + stlFiles.length + dxfFiles.length;
-      const ignored = e.dataTransfer.files.length - recognized;
-      if (e.dataTransfer.files.length > 0 && recognized === 0) {
-        pushToast(
-          'Drop ignored — no SVG, DXF, image (PNG/JPG), or STL files in the selection',
-          'warning',
-        );
-        return;
-      }
-      // Mixed drops used to discard non-SVG files SILENTLY (M26) — name them.
-      if (ignored > 0) {
-        pushToast(
-          `Ignored ${ignored} file(s) — only SVG, DXF, PNG, JPG, and STL import`,
-          'warning',
-        );
-      }
-      void importMany(svgFiles, importSvgObject, pushToast);
-      // H.6a: DXF → imported vector (both machine modes).
-      void importDxfFiles(dxfFiles, { importObject: importSvgObject, pushToast });
-      void importImagesInOrder(imageFiles, importRasterImage, pushToast);
-      // H.4: STL → relief (CNC mode only; the action toasts the laser-mode case).
-      void importStlFiles(stlFiles, {
-        project: useStore.getState().project,
-        importObject: importSvgObject,
+      routeDroppedFiles(e.dataTransfer, {
+        importSvgObject,
+        importRasterImage,
+        openGcodeInspector,
         pushToast,
       });
     };
@@ -101,7 +78,63 @@ export function useImportDragDrop(): void {
       window.removeEventListener('dragleave', onDragLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [importSvgObject, importRasterImage, pushToast, setDragOverlay]);
+  }, [importSvgObject, importRasterImage, openGcodeInspector, pushToast, setDragOverlay]);
+}
+
+type DropImportActions = {
+  readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
+  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
+  readonly openGcodeInspector: (name: string, text: string) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+};
+
+function routeDroppedFiles(dt: DataTransfer, actions: DropImportActions): void {
+  const svgFiles = pickSvgFiles(dt);
+  const imageFiles = pickImageFiles(dt);
+  const stlFiles = [...dt.files].filter(isStlFile);
+  const dxfFiles = [...dt.files].filter(isDxfFile);
+  const gcodeFiles = [...dt.files].filter(isGcodeFile);
+  const recognized =
+    svgFiles.length + imageFiles.length + stlFiles.length + dxfFiles.length + gcodeFiles.length;
+  const ignored = dt.files.length - recognized;
+  if (dt.files.length > 0 && recognized === 0) {
+    actions.pushToast(
+      'Drop ignored — no SVG, DXF, image (PNG/JPG), STL, or G-code files in the selection',
+      'warning',
+    );
+    return;
+  }
+  // Mixed drops used to discard non-SVG files SILENTLY (M26) — name them.
+  if (ignored > 0) {
+    actions.pushToast(
+      `Ignored ${ignored} file(s) — only SVG, DXF, PNG, JPG, STL, and G-code import`,
+      'warning',
+    );
+  }
+  const firstGcodeFile = gcodeFiles[0];
+  if (firstGcodeFile !== undefined) {
+    void openGcodeFileInInspector(firstGcodeFile, actions.openGcodeInspector, actions.pushToast);
+  }
+  if (gcodeFiles.length > 1) {
+    const additionalNames = gcodeFiles.slice(1).map((file) => file.name);
+    actions.pushToast(
+      `Ignored ${additionalNames.length} additional G-code files: ${additionalNames.join(', ')}`,
+      'warning',
+    );
+  }
+  void importMany(svgFiles, actions.importSvgObject, actions.pushToast);
+  // H.6a: DXF → imported vector (both machine modes).
+  void importDxfFiles(dxfFiles, {
+    importObject: actions.importSvgObject,
+    pushToast: actions.pushToast,
+  });
+  void importImagesInOrder(imageFiles, actions.importRasterImage, actions.pushToast);
+  // H.4: STL → relief (CNC mode only; the action toasts the laser-mode case).
+  void importStlFiles(stlFiles, {
+    project: useStore.getState().project,
+    importObject: actions.importSvgObject,
+    pushToast: actions.pushToast,
+  });
 }
 
 function hasFiles(e: DragEvent): boolean {

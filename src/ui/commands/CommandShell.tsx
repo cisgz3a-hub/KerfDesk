@@ -32,6 +32,7 @@ import {
   type ConvertibleVector,
 } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
+import { useImportDragDrop } from '../app/use-import-drag-drop';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
@@ -75,6 +76,7 @@ export function CommandShell(): JSX.Element {
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
   const gcodeInspector = useGcodeInspectorSlot();
+  useImportDragDrop(gcodeInspector.open);
   const selectedConvertibles = useSelectedConvertibles();
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();

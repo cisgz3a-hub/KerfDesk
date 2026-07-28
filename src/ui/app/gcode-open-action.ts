@@ -10,15 +10,24 @@ import type { ToastVariant } from '../state/toast-store';
 import { importSourceSizeIssue } from './import-source-limits';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
-type PickedFile = { readonly name: string; readonly text: () => Promise<string> };
+type GcodeSourceFile = {
+  readonly name: string;
+  readonly size?: number;
+  readonly text: () => Promise<string>;
+};
 
 const GCODE_ACCEPT = ['.nc', '.gcode', '.tap'];
+
+export function isGcodeFile(file: Pick<GcodeSourceFile, 'name'>): boolean {
+  const name = file.name.toLowerCase();
+  return GCODE_ACCEPT.some((extension) => name.endsWith(extension));
+}
 
 async function pickGcodeFile(
   platform: PlatformAdapter,
   pushToast: PushToast,
-): Promise<PickedFile | null> {
-  let files: ReadonlyArray<PickedFile>;
+): Promise<GcodeSourceFile | null> {
+  let files: ReadonlyArray<GcodeSourceFile>;
   try {
     files = await platform.pickFilesForOpen({ accept: GCODE_ACCEPT, multiple: false });
   } catch (err) {
@@ -29,13 +38,30 @@ async function pickGcodeFile(
     return null;
   }
   const file = files[0];
-  if (file === undefined) return null;
+  return file ?? null;
+}
+
+async function readGcodeFile(file: GcodeSourceFile, pushToast: PushToast): Promise<string | null> {
   const sizeIssue = importSourceSizeIssue(file, 'gcode');
   if (sizeIssue !== null) {
     pushToast(sizeIssue, 'error');
     return null;
   }
-  return file;
+  try {
+    return await file.text();
+  } catch (err) {
+    pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    return null;
+  }
+}
+
+export async function openGcodeFileInInspector(
+  file: GcodeSourceFile,
+  openInspector: (name: string, text: string) => void,
+  pushToast: PushToast,
+): Promise<void> {
+  const text = await readGcodeFile(file, pushToast);
+  if (text !== null) openInspector(file.name, text);
 }
 
 export async function handleOpenGcodeInspector(
@@ -45,11 +71,7 @@ export async function handleOpenGcodeInspector(
 ): Promise<void> {
   const file = await pickGcodeFile(platform, pushToast);
   if (file === null) return;
-  try {
-    openInspector(file.name, await file.text());
-  } catch (err) {
-    pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
-  }
+  await openGcodeFileInInspector(file, openInspector, pushToast);
 }
 
 export async function handleOpenGcodePreview(
@@ -59,11 +81,8 @@ export async function handleOpenGcodePreview(
 ): Promise<void> {
   const file = await pickGcodeFile(platform, pushToast);
   if (file === null) return;
-  try {
-    open2dSimulatorFromText(file.name, await file.text(), openPreview, pushToast);
-  } catch (err) {
-    pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
-  }
+  const text = await readGcodeFile(file, pushToast);
+  if (text !== null) open2dSimulatorFromText(file.name, text, openPreview, pushToast);
 }
 
 // The F-CNC10 2D-simulator body, callable from the Inspector's handoff button
