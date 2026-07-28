@@ -1,16 +1,18 @@
 // Selected-area operations on the working document (ADR-242, flow F-L2).
 //
 // Delete = fill white (white neither burns nor traces), Fill = fill colour,
-// Move = extract a floating region, white-fill the source, blit at the drop
-// offset — the UI composes those three primitives around its history
-// captures. All blends weight by mask alpha / 255 so feathered selections
-// composite correctly when they arrive.
+// Move = extract a floating region, clear the source according to its layer,
+// then blit at the drop offset — the UI composes those primitives around
+// its history captures. All blends weight by mask alpha / 255 so feathered
+// selections composite correctly when they arrive.
 
 import type { PaintColor, PixelRect, RgbaBuffer } from '../image-edit';
 import { RGBA_CHANNELS } from '../image-edit';
+import { sourceOverPixelInPlace } from '../image-composite';
 import { MASK_SOLID, maskBounds, type SelectionMask } from './selection-mask';
 
 const EMPTY_RECT: PixelRect = { x: 0, y: 0, width: 0, height: 0 };
+const ALPHA_CHANNEL = 3;
 
 /** A cut-out selection travelling with the pointer during a move. */
 export type FloatingRegion = {
@@ -94,14 +96,18 @@ export function blitFloatingInPlace(
     const row = y - destY;
     for (let x = left; x < right; x += 1) {
       const local = row * floating.rect.width + (x - destX);
-      const alpha = (floating.alpha[local] ?? 0) / MASK_SOLID;
-      if (alpha === 0) continue;
       const src = local * RGBA_CHANNELS;
+      const pixelAlpha = (floating.pixels[src + ALPHA_CHANNEL] ?? 0) / MASK_SOLID;
+      const maskAlpha = (floating.alpha[local] ?? 0) / MASK_SOLID;
+      const alpha = pixelAlpha * maskAlpha;
+      if (alpha === 0) continue;
       const dest = (y * buffer.width + x) * RGBA_CHANNELS;
-      blend(buffer, dest, floating.pixels[src] ?? 0, alpha);
-      blend(buffer, dest + 1, floating.pixels[src + 1] ?? 0, alpha);
-      blend(buffer, dest + 2, floating.pixels[src + 2] ?? 0, alpha);
-      buffer.data[dest + 3] = 255;
+      sourceOverPixelInPlace(buffer.data, dest, {
+        r: floating.pixels[src] ?? 0,
+        g: floating.pixels[src + 1] ?? 0,
+        b: floating.pixels[src + 2] ?? 0,
+        alpha,
+      });
     }
   }
   return { x: left, y: top, width: right - left, height: bottom - top };

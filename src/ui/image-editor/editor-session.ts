@@ -35,8 +35,9 @@ import {
   smoothMask,
   type SelectionMask,
 } from '../../core/image-select';
+import { BACKGROUND_LAYER_ID, clearEditorLayerInPlace } from './editor-layer-clear';
 
-export const BACKGROUND_LAYER_ID = 'background';
+export { BACKGROUND_LAYER_ID } from './editor-layer-clear';
 
 export type SelectionModifyKind = 'expand' | 'contract' | 'border' | 'smooth' | 'feather';
 
@@ -340,26 +341,29 @@ export function commitFillSelection(
   return committed(session, pushHistoryEntry(session.history, entry), bounds);
 }
 
-/** Move the selected pixels by (dx, dy): extract → white-fill → blit. */
+/** Move selected pixels by (dx, dy): extract, layer-aware clear, then blit. */
 export function commitMoveSelection(session: EditorSession, dx: number, dy: number): EditorSession {
   if (session.selection === null) return session;
+  const roundedDx = Math.round(dx);
+  const roundedDy = Math.round(dy);
+  if (roundedDx === 0 && roundedDy === 0) return session;
   const floating = extractFloatingRegion(session.doc, session.selection);
   if (floating === null) return session;
   const target: PixelRect = {
-    x: floating.rect.x + Math.round(dx),
-    y: floating.rect.y + Math.round(dy),
+    x: floating.rect.x + roundedDx,
+    y: floating.rect.y + roundedDy,
     width: floating.rect.width,
     height: floating.rect.height,
   };
   const touched = unionRects(floating.rect, target);
   const entry = captureScoped(session, touched, 'Move selection');
-  fillMaskedInPlace(session.doc, session.selection, WHITE);
-  blitFloatingInPlace(session.doc, floating, dx, dy);
+  clearEditorLayerInPlace(session.doc, session.activeLayerId, session.selection);
+  blitFloatingInPlace(session.doc, floating, roundedDx, roundedDy);
   // The selection travels with its contents; a shifted mask keeps later ops
   // (delete/fill/second move) anchored on the moved pixels.
   return {
     ...committed(session, pushHistoryEntry(session.history, entry), touched),
-    selection: shiftMask(session.selection, Math.round(dx), Math.round(dy)),
+    selection: shiftMask(session.selection, roundedDx, roundedDy),
   };
 }
 
