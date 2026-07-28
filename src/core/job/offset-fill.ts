@@ -1,31 +1,29 @@
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { isClosedEnough, type Polyline } from '../scene';
+import type { OffsetFillTermination } from './offset-fill-termination';
 
 const MIN_OFFSET_FILL_SPACING_MM = 0.05;
 const MIN_CONTOUR_AREA_MM2 = 1e-6;
 const MAX_OFFSET_FILL_PASSES = 2000;
 
+/** Geometry and physical spacing used to produce a Follow Shape fill. */
 export type OffsetFillInput = {
   readonly polylines: ReadonlyArray<Polyline>;
   readonly spacingMm: number;
 };
 
+/** Generated contours plus the factual reason contour production stopped. */
 export type OffsetFillResult = {
   readonly contours: ReadonlyArray<Polyline>;
   readonly termination: OffsetFillTermination;
 };
-
-/** Why Follow Shape stopped producing inward-offset contours. */
-export type OffsetFillTermination =
-  | { readonly kind: 'complete' }
-  | { readonly kind: 'offset-failed' }
-  | { readonly kind: 'pass-limit'; readonly passLimit: number };
 
 type OffsetPass = {
   readonly contours: ReadonlyArray<Polyline>;
   readonly isFailed: boolean;
 };
 
+/** Generate successive inward contours without hiding failure or budget exhaustion. */
 export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const spacing = Math.max(MIN_OFFSET_FILL_SPACING_MM, input.spacingMm);
   const source = input.polylines.filter(isUsableClosedContour);
