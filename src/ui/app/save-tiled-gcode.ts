@@ -6,7 +6,7 @@
 // tiling — and each tile's G-code preflights individually instead.
 
 import { tileJobs } from '../../core/cnc';
-import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
@@ -29,6 +29,7 @@ export type SaveTiledGcodeCtx = {
   // REPORT the single-file Save makes (GCO-02, demoted from a gate by rule 7 /
   // ADR-228). null/undefined = nothing to prove.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  readonly settingsCapability?: ReadinessSettingsCapability;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -64,7 +65,11 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   // where the deleted confirm stood — the confirm fired before any tile was
   // written, so reporting only after a successful run would say less than the
   // refusal did when the operator cancels part-way through the pickers.
-  for (const advisory of controllerReadinessAdvisories(ctx.project, ctx.controllerSettings)) {
+  for (const advisory of controllerReadinessAdvisories(
+    ctx.project,
+    ctx.controllerSettings,
+    ctx.settingsCapability,
+  )) {
     ctx.pushToast(advisory, 'warning');
   }
   const saved = await saveTileFiles(ctx, files);

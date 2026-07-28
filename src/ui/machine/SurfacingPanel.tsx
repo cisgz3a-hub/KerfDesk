@@ -10,7 +10,7 @@ import {
   SURFACING_DEFAULT_STEPOVER_PCT,
   SURFACING_DEFAULT_TOTAL_DEPTH_MM,
 } from '../../core/cnc';
-import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
 import { emitStandaloneCncGcode } from '../../io/gcode/standalone-cnc-gcode';
 import { buildGcodeMetadata } from '../app/build-info';
@@ -31,19 +31,34 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const pushToast = useToastStore((s) => s.pushToast);
   const project = useStore((s) => s.project);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const settingsCapability = useLaserStore((s) => s.capabilities.settings);
   const { machine } = props;
   const [widthMm, setWidthMm] = useState(machine.stock.widthMm);
   const [heightMm, setHeightMm] = useState(machine.stock.heightMm);
   const [stepoverPct, setStepoverPct] = useState(SURFACING_DEFAULT_STEPOVER_PCT);
   const [totalDepthMm, setTotalDepthMm] = useState(SURFACING_DEFAULT_TOTAL_DEPTH_MM);
 
-  const save = (): void =>
-    void saveSurfacingProgram(platform, pushToast, project, machine, controllerSettings, {
-      widthMm,
-      heightMm,
-      stepoverPct,
-      totalDepthMm,
+  const save = (): void => {
+    void saveSurfacingProgram({
+      platform,
+      pushToast,
+      project,
+      machine,
+      controllerSettings,
+      settingsCapability,
+      inputs: {
+        widthMm,
+        heightMm,
+        stepoverPct,
+        totalDepthMm,
+      },
+    }).catch((err: unknown) => {
+      pushToast(
+        `Could not save the surfacing program: ${err instanceof Error ? err.message : String(err)}`,
+        'error',
+      );
     });
+  };
 
   return (
     <details style={boxStyle}>
@@ -94,14 +109,25 @@ type SurfacingInputs = {
   readonly totalDepthMm: number;
 };
 
-async function saveSurfacingProgram(
-  platform: ReturnType<typeof usePlatform>,
-  pushToast: (message: string, variant?: ToastVariant) => void,
-  project: Project,
-  machine: CncMachineConfig,
-  controllerSettings: ControllerSettingsSnapshot | null,
-  inputs: SurfacingInputs,
-): Promise<void> {
+type SaveSurfacingProgramOptions = {
+  readonly platform: ReturnType<typeof usePlatform>;
+  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly project: Project;
+  readonly machine: CncMachineConfig;
+  readonly controllerSettings: ControllerSettingsSnapshot | null;
+  readonly settingsCapability: ReadinessSettingsCapability;
+  readonly inputs: SurfacingInputs;
+};
+
+async function saveSurfacingProgram({
+  platform,
+  pushToast,
+  project,
+  machine,
+  controllerSettings,
+  settingsCapability,
+  inputs,
+}: SaveSurfacingProgramOptions): Promise<void> {
   const tool = activeCncTool(machine);
   const result = buildSurfacingProgram({
     ...inputs,
@@ -133,7 +159,11 @@ async function saveSurfacingProgram(
   // the refusal this replaced joined every message into one toast on every
   // attempt, so reporting only after a successful write would say less.
   for (const advisory of advisories) pushToast(advisory.message, 'warning');
-  for (const advisory of controllerReadinessAdvisories(project, controllerSettings)) {
+  for (const advisory of controllerReadinessAdvisories(
+    project,
+    controllerSettings,
+    settingsCapability,
+  )) {
     pushToast(advisory, 'warning');
   }
   if (blocking.length > 0) {

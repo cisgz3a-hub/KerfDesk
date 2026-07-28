@@ -17,21 +17,28 @@
 // asking while a job streams, so a mid-job export was silently refused under a
 // toast about discarding work; and declining aborted a save that Start allows.
 
-import { runControllerReadiness, type ControllerSettingsSnapshot } from '../../core/preflight';
+import {
+  runControllerReadiness,
+  type ControllerSettingsSnapshot,
+  type ReadinessSettingsCapability,
+} from '../../core/preflight';
 import type { Project } from '../../core/scene';
 
 // Keeps the wording of the refusal this replaced, so the operator still reads
 // the same sentence about the exported file alongside the specific finding.
 const EXPORT_ADVISORY_PREFIX = 'The exported file may not run safely on the connected controller';
 
-// undefined/null settings mean nothing was connected this session, so there is
-// nothing to prove against — no advisory.
+// Omitted settings mean the caller does not track controller state at all.
+// A null dump from a no-dump firmware still carries a profile-only advisory.
 export function controllerReadinessAdvisories(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null | undefined,
+  settingsCapability: ReadinessSettingsCapability = 'grbl-dollar',
 ): ReadonlyArray<string> {
-  if (controllerSettings === undefined || controllerSettings === null) return [];
-  return runControllerReadiness(project, controllerSettings).errors.map(
+  if (controllerSettings === undefined) return [];
+  if (controllerSettings === null && settingsCapability !== 'none') return [];
+  const readiness = runControllerReadiness(project, controllerSettings, settingsCapability);
+  return [...readiness.errors, ...readiness.warnings].map(
     (issue) => `${EXPORT_ADVISORY_PREFIX}: ${issue.message}`,
   );
 }

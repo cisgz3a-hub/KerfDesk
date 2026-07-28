@@ -23,6 +23,21 @@ import {
 } from './file-actions';
 
 describe('file actions contextual failure handling', () => {
+  it('keeps a no-dump controller readiness advisory non-blocking', async () => {
+    const toast = toasts();
+    const pickFileForSave = vi.fn(async () => null);
+    await handleSaveGcode({
+      platform: mockPlatform({ save: pickFileForSave }),
+      project: projectWithLine(),
+      savedName: null,
+      controllerSettings: null,
+      settingsCapability: 'none',
+      pushToast: toast.pushToast,
+    });
+    expect(pickFileForSave).toHaveBeenCalledOnce();
+    expect(toast.messages).toContainEqual(expect.objectContaining({ variant: 'warning' }));
+  });
+
   it('handles import picker failures with import-specific toast copy', async () => {
     const toast = toasts();
 

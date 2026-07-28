@@ -8,7 +8,7 @@
 //   * View: P (preview toggle)
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type {
   OutputScope,
   Project,
@@ -47,6 +47,7 @@ export type FileCtx = {
   readonly outputScope: OutputScope;
   readonly machine: MachinePlacementSnapshot;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
+  readonly settingsCapability: ReadinessSettingsCapability;
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly lastSaveTarget: SaveTarget | null;
   readonly markSaved: (target: SaveTarget) => void;
@@ -170,6 +171,7 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
       outputScope: ctx.outputScope,
       machine: ctx.machine,
       controllerSettings: ctx.controllerSettings,
+      settingsCapability: ctx.settingsCapability,
       activeWcs: ctx.activeWcs ?? null,
       ...(ctx.advanceVariablesAfter === undefined
         ? {}
