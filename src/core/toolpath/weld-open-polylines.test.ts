@@ -219,6 +219,28 @@ describe('weldOpenPolylines', () => {
     expect(out.length).toBe(2);
   });
 
+  it('preserves mixed passthrough and welded output order', () => {
+    const ring: Polyline = {
+      points: [
+        { x: -20, y: 0 },
+        { x: -10, y: 0 },
+        { x: -20, y: 0 },
+      ],
+      closed: true,
+    };
+    const degenerate: Polyline = { points: [{ x: 200, y: 200 }], closed: false };
+    const out = weldOpenPolylines(
+      [ring, line(0, BASE_STROKE_LENGTH_PX, 0), degenerate, line(24, 44, 0)],
+      OPTIONS,
+    );
+
+    expect(out).toHaveLength(3);
+    expect(out[0]).toBe(ring);
+    expect(out[1]?.points[0]).toEqual({ x: 0, y: 0 });
+    expect(out[1]?.points.at(-1)).toEqual({ x: 44, y: 0 });
+    expect(out[2]).toBe(degenerate);
+  });
+
   it('returns input unchanged when the scale is unusable', () => {
     const input = [line(0, 20, 0), line(24, 44, 0)];
     for (const mmPerPx of [0, -1, Number.NaN]) {

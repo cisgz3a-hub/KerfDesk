@@ -25,9 +25,15 @@ export type WeldOpenPolylinesOptions = {
 // the loop itself — the same proportionality idea as the tracer's loop
 // closure; a short open arc must not be stapled into a sliver ring.
 const MAX_CLOSE_GAP_FRACTION = 0.25;
+const MIN_WELDABLE_POINTS = 2;
 // Match the established Centerline 35-degree continuity convention over a
 // fixed physical neighborhood instead of a transform-dependent pixel count.
 const WELD_TANGENT_SAMPLE_MM = 0.3;
+
+type OrderedPolyline = {
+  readonly polyline: Polyline;
+  readonly order: number;
+};
 
 /** Weld fragmented open polylines for machine execution. Pure and
  *  deterministic; closed rings and degenerate chains pass through. */
@@ -38,22 +44,23 @@ export function weldOpenPolylines(
   if (!Number.isFinite(options.mmPerPx) || options.mmPerPx <= 0) return [...polylines];
   const maxGapPx = options.maxGapMm / options.mmPerPx;
   const tangentSamplePx = WELD_TANGENT_SAMPLE_MM / options.mmPerPx;
-  const passthrough = polylines.flatMap((polyline, order) =>
-    polyline.closed || polyline.points.length < 2 ? [{ polyline, order }] : [],
+  const classified = polylines.map((polyline, order) => ({
+    polyline,
+    order,
+    isWeldable: isWeldableOpenPolyline(polyline),
+  }));
+  const passthrough = classified.flatMap(({ polyline, order, isWeldable }) =>
+    isWeldable ? [] : [{ polyline, order }],
   );
-  const open = polylines.flatMap<WeldWorkChain>((polyline, order) =>
-    polyline.closed || polyline.points.length < 2
-      ? []
-      : [{ points: [...polyline.points], order, hasMerged: false }],
+  const open = classified.flatMap<WeldWorkChain>(({ polyline, order, isWeldable }) =>
+    isWeldable ? [{ points: [...polyline.points], order, hasMerged: false }] : [],
   );
   const pairing = weldPairs(open, maxGapPx, tangentSamplePx);
   const welded = pairing.chains.map((chain) => ({
     polyline: selfClose(chain, maxGapPx, tangentSamplePx),
     order: chain.order,
   }));
-  const ordered = [...passthrough, ...welded].reduce<
-    ReadonlyArray<{ readonly polyline: Polyline; readonly order: number }>
-  >((entries, entry) => insertByOrder(entries, entry), []);
+  const ordered = mergeOrderedPolylines(passthrough, welded);
   return ordered.map((entry) => entry.polyline);
 }
 
@@ -96,12 +103,30 @@ function chainLength(points: ReadonlyArray<Vec2>): number {
   return length;
 }
 
-function insertByOrder<Entry extends { readonly order: number }>(
-  entries: ReadonlyArray<Entry>,
-  entry: Entry,
-): ReadonlyArray<Entry> {
-  const index = entries.findIndex((candidate) => entry.order < candidate.order);
-  return index < 0
-    ? [...entries, entry]
-    : [...entries.slice(0, index), entry, ...entries.slice(index)];
+function isWeldableOpenPolyline(polyline: Polyline): boolean {
+  return !polyline.closed && polyline.points.length >= MIN_WELDABLE_POINTS;
+}
+
+function mergeOrderedPolylines(
+  first: ReadonlyArray<OrderedPolyline>,
+  second: ReadonlyArray<OrderedPolyline>,
+): ReadonlyArray<OrderedPolyline> {
+  let firstIndex = 0;
+  let secondIndex = 0;
+  return Array.from({ length: first.length + second.length }, () => {
+    const firstEntry = first[firstIndex];
+    const secondEntry = second[secondIndex];
+    if (
+      firstEntry !== undefined &&
+      (secondEntry === undefined || firstEntry.order <= secondEntry.order)
+    ) {
+      firstIndex += 1;
+      return firstEntry;
+    }
+    if (secondEntry !== undefined) {
+      secondIndex += 1;
+      return secondEntry;
+    }
+    throw new Error('Ordered weld output ended before its declared length.');
+  });
 }

@@ -46,7 +46,7 @@ export function weldPairs(
     state = taken.state;
     if (taken.candidate === null) return pairingResult(activeChains, state.stats);
     const merged = mergeSelectedChains(activeChains, taken.candidate);
-    if (merged === null) return pairingResult(activeChains, state.stats);
+    if (merged === null) continue;
     activeChains = merged.chains;
     state = replaceWeldPairAfterMerge(state, taken.candidate, merged.survivor);
   }
