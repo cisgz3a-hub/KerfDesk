@@ -13,6 +13,11 @@ export const OUTLINE_FONTS = [
     spdx: 'Apache-2.0',
   },
   {
+    file: 'src/ui/text/fonts/Tinos-Regular.ttf',
+    name: 'Tinos',
+    spdx: 'OFL-1.1',
+  },
+  {
     file: 'src/ui/text/fonts/Inconsolata-Regular.ttf',
     name: 'Inconsolata',
     spdx: 'OFL-1.1',

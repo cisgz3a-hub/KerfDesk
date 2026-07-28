@@ -5,9 +5,10 @@
 // the registry; the keys themselves never change so a 3-year-old .lf2
 // still resolves.
 //
-// Phase D bundles four outline fonts and four native CNC stroke fonts.
-// All are redistributable under ADR-017 / ADR-226:
+// Phase D bundles five outline fonts and four native CNC stroke fonts.
+// All are redistributable under ADR-017 / ADR-226 / ADR-266:
 //   - Roboto Regular          Apache-2.0     sans
+//   - Tinos Regular           OFL-1.1        serif (Times-metric)
 //   - Inconsolata Regular     OFL-1.1        mono
 //   - Pacifico Regular        OFL-1.1        script (handwritten)
 //   - Dancing Script Regular  OFL-1.1        script (calligraphic)
@@ -27,6 +28,7 @@
 // the registry constrains its keys to.
 export type KnownFontKey =
   | 'roboto-regular'
+  | 'tinos-regular'
   | 'inconsolata-regular'
   | 'pacifico-regular'
   | 'dancing-script-regular'
@@ -40,7 +42,7 @@ type SingleLineFontKey = Extract<KnownFontKey, 'relief-single-line' | `ems-${str
 type FontEntryBase = {
   readonly displayName: string;
   readonly license: string;
-  readonly styleClass: 'sans' | 'mono' | 'script' | 'single-line';
+  readonly styleClass: 'sans' | 'serif' | 'mono' | 'script' | 'single-line';
 };
 
 export type FontEntry =
@@ -59,6 +61,13 @@ export const FONT_REGISTRY: ReadonlyArray<FontEntry> = [
     displayName: 'Roboto',
     license: 'Apache-2.0',
     styleClass: 'sans',
+    geometry: 'outline',
+  },
+  {
+    key: 'tinos-regular',
+    displayName: 'Tinos',
+    license: 'OFL-1.1',
+    styleClass: 'serif',
     geometry: 'outline',
   },
   {

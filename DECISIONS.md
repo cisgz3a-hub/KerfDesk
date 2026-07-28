@@ -13027,3 +13027,96 @@ four fail with 536 bytes dropped.
 **Not verified: real hardware.** A simulator that models back-pressure is still
 a simulator. It does not prove USB-serial latency, host driver buffering, or any
 specific controller's timing, and this ADR makes no hardware claim.
+
+---
+
+## ADR-266 - Bundle Tinos as the first serif outline font (2026-07-28)
+
+### Context
+
+The maintainer supplied a reference image - a split-band name plate reading
+"Your Text Here" - and asked for that style of text in KerfDesk. The image is
+set in Times New Roman.
+
+We could not approach it. The bundle had no serif at all: Roboto (sans),
+Inconsolata (mono), Pacifico and Dancing Script (script), and the four
+single-line CNC faces from ADR-226. Every serif job - the single most common
+request for engraved signage, plaques, and monograms - had to arrive as an
+imported SVG or a project-embedded font, neither of which the operator can
+retype or re-kern inside the app.
+
+ADR-213 is the cautionary half of this. It removed an entire bundled font set
+after the fact because the rendered writing quality was wrong. ADR-226 drew the
+lesson: a face is approved from its own rendered output, through our engine,
+before it ships.
+
+### Decision
+
+- Bundle **Tinos Regular** from `googlefonts/tinos` commit
+  `3b4482a99b80ea5fc75f187b1be3120a3f5905b3`, path `fonts/ttf/Tinos-Regular.ttf`
+  - the exact commit `google/fonts` `ofl/tinos/METADATA.pb` names as its source.
+  Canonical bytes: 521,588, SHA-256
+  `60a0e8ef0c04dd5dd69ffe91025fa2ae5836cbd35600a82ba031977557e2cb61`.
+- Record it as **OFL-1.1, not Apache-2.0.** The widely repeated Apache-2.0
+  attribution is the historical Croscore grant. Current upstream ships `OFL.txt`
+  and `METADATA.pb` states `license: "OFL"`; the font's own `name` table carries
+  the SIL text and `https://openfontlicense.org`. **No Reserved Font Name is
+  declared**, so the family ships under the name "Tinos".
+- Add a `serif` style class. The font picker falls back to the CSS generic
+  `serif` while the FontFace loads, so a row never previews a serif face in a
+  sans shape. Other classes keep their existing fallbacks unchanged.
+- Key the entry `tinos-regular` and order it directly after Roboto, so the
+  picker reads sans, serif, mono, script, then the single-line faces.
+- Add no runtime dependency and no project migration. `TextObject.fontKey` is
+  already an open `string` and geometry is materialized onto the object, so a
+  new key needs no schema change and old `.lf2` files are unaffected.
+
+### Consequences
+
+KerfDesk can set Times-metric serif text natively. Because Tinos is metrically
+compatible with Times New Roman, a layout authored against Times elsewhere keeps
+its measure here.
+
+The asset is 521,588 bytes, within a whisker of the already-bundled Roboto
+(515,100). It is a separate `?url` asset, so it stays out of the initial JS
+bundle and a browser visitor who never opens Add Text never fetches it. **The
+PWA is the exception and it was measured, not assumed:** `globPatterns` in
+`vite.config.ts` includes `ttf`, and the built `sw.js` precache manifest lists
+all five outline fonts, so an installed PWA downloads this font up front. Offline
+install size grows by ~509 KiB. That is how every bundled font has always
+behaved; it is recorded here because the lazy-fetch story is only half true.
+
+It is a static TTF. The obvious OFL alternatives - EB Garamond, Playfair
+Display, Libre Baskerville - are now published upstream as **variable** fonts,
+and opentype.js's handling of variation deltas is unverified in this tree. That
+unknown is deliberately avoided rather than taken on, and it is the reason this
+ADR does not simply pick the prettier display serif.
+
+The OFL notice obligation is met by the existing generated pipeline:
+`scripts/third-party-closure.mjs` lists the file, and
+`generate-third-party-notices.mjs` reads the copyright, license, and licenseURL
+records out of the font's own `name` table into `public/third-party-notices.txt`,
+failing the build if any are absent.
+
+`*.ttf binary` in `.gitattributes` already protects the committed bytes. That
+rule exists because a previous Dancing Script download was an HTML error page
+committed under a `.ttf` name and CRLF-normalized into corruption. This download
+is checked against exactly that failure: the byte count matches upstream, the
+file parses, and it renders real outlines.
+
+### Verification
+
+Rendered through the real `textToPolylines` engine before the file entered the
+tree, and reviewed by the maintainer as pixels rather than as a passing test.
+"Your Text Here" at 20 mm produces 121.9 x 13.3 mm of geometry as **16 closed
+loops** - 12 glyphs plus the four counters in `o` and the three `e` - so nothing
+is dropped or doubled, and counters resolve correctly under nonzero fill. The
+same string in Roboto measures 130.4 mm, confirming the narrower Times metric.
+The font's `name` table reports family Tinos, subfamily Regular, version 1.340,
+designer Steve Matteson, 3285 glyphs at 2048 units/em.
+
+**Not verified: no hardware cut.** Nothing here has been engraved or cut on a
+machine, and this ADR makes no claim about how the hairline serifs survive at
+small sizes in a real material. Nor was the running app driven - the dev-server
+preview shares the maintainer's live scene, so verification was done against the
+engine in isolation.
