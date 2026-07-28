@@ -1,7 +1,8 @@
 // Save G-code preflight policy (rule 7 / ADR-228): the scan-offset magnitude
 // cap is a heuristic — it must warn on Save exactly as Job Review warns on
-// Start, never refuse the export. Split from file-actions.test.ts for the
-// file-size cap.
+// Start. It adds no extra policy gate; factual compile-integrity and dispatch
+// preconditions still apply. Split from file-actions.test.ts for the file-size
+// cap.
 
 import { describe, expect, it, vi } from 'vitest';
 

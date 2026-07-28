@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitSavePreparedOutput > emits rotary raster bytes when the Labs permission is explicit 1`] = `
+"G21
+G90
+G54
+G94
+M4 S0
+; image layer rotary-image color #808080 power 30%
+; 10 × 10 px, 1.000 × 1.910 mm
+; feed 1500 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
+M5
+M4 S0
+G0 X5.000 Y0.095 S0
+G1 X10.000 F1500 S0
+G1 X11.000 S300
+G1 X16.000 S0
+G0 X16.000 Y0.286 S0
+G1 X11.000 S0
+G1 X10.000 S300
+G1 X5.000 S0
+G0 X5.000 Y0.477 S0
+G1 X10.000 S0
+G1 X11.000 S300
+G1 X16.000 S0
+G0 X16.000 Y0.668 S0
+G1 X11.000 S0
+G1 X10.000 S300
+G1 X5.000 S0
+G0 X5.000 Y0.859 S0
+G1 X10.000 S0
+G1 X11.000 S300
+G1 X16.000 S0
+G0 X16.000 Y1.050 S0
+G1 X11.000 S0
+G1 X10.000 S300
+G1 X5.000 S0
+G0 X5.000 Y1.241 S0
+G1 X10.000 S0
+G1 X11.000 S300
+G1 X16.000 S0
+G0 X16.000 Y1.432 S0
+G1 X11.000 S0
+G1 X10.000 S300
+G1 X5.000 S0
+G0 X5.000 Y1.623 S0
+G1 X10.000 S0
+G1 X11.000 S300
+G1 X16.000 S0
+G0 X16.000 Y1.814 S0
+G1 X11.000 S0
+G1 X10.000 S300
+G1 X5.000 S0
+M5
+G0 X0.000 Y0.000 S0
+"
+`;

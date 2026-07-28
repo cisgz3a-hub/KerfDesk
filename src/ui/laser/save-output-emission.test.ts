@@ -49,7 +49,7 @@ describe('emitSavePreparedOutput', () => {
     });
 
     expect(result.kind).toBe('emitted');
-    expect(result.gcode).not.toBe('');
     expect(result.preflight.issues).toEqual([]);
+    expect(result.gcode).toMatchSnapshot();
   });
 });
