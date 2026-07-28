@@ -1,8 +1,24 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Polyline, Vec2 } from '../scene';
 import { weldOpenPolylines } from './weld-open-polylines';
 
 const OPTIONS = { mmPerPx: 0.1, maxGapMm: 0.5 }; // gap threshold = 5 px
+const NEAR_LOOP_EDGE_PX = 10;
+const NEAR_LOOP_RETURN_GAP_PX = 4;
+const PARALLEL_STROKE_LENGTH_PX = 100;
+const PARALLEL_STROKE_SEPARATION_PX = 4;
+const MAX_WELD_GAP_PX = 5;
+const BASE_STROKE_LENGTH_PX = 20;
+const JOINED_STROKE_END_PX = 40;
+const INVALID_NEIGHBOR_Y_PX = 1;
+const CONTINUATION_END_PX = 45;
+const RETURNING_START_X_PX = 24;
+const RETURNING_CORNER_X_PX = 30;
+const RETURNING_TOP_Y_PX = 10;
+const EXPECTED_COINCIDENT_JOIN_POINTS = JOINED_STROKE_END_PX + 1;
+const PROPERTY_RUNS = 50;
+const PROPERTY_SEED = 20_260_728;
 
 function line(x0: number, x1: number, y: number): Polyline {
   const points: Vec2[] = [];
@@ -77,6 +93,115 @@ describe('weldOpenPolylines', () => {
     }
     const out = weldOpenPolylines([{ points, closed: false }], OPTIONS);
     expect((out[0] as Polyline).closed).toBe(false);
+  });
+
+  it('does not close an untouched open chain whose endpoints happen to be nearby', () => {
+    const nearLoop: Polyline = {
+      points: [
+        { x: 0, y: 0 },
+        { x: NEAR_LOOP_EDGE_PX, y: 0 },
+        { x: NEAR_LOOP_EDGE_PX, y: NEAR_LOOP_EDGE_PX },
+        { x: 0, y: NEAR_LOOP_EDGE_PX },
+        { x: 0, y: NEAR_LOOP_RETURN_GAP_PX },
+      ],
+      closed: false,
+    };
+
+    expect(weldOpenPolylines([nearLoop], OPTIONS)).toEqual([nearLoop]);
+  });
+
+  it('never closes an untouched chain for any return gap inside the weld threshold (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: NEAR_LOOP_EDGE_PX, max: PARALLEL_STROKE_LENGTH_PX }),
+        fc.double({
+          min: 0,
+          max: MAX_WELD_GAP_PX,
+          noNaN: true,
+          noDefaultInfinity: true,
+        }),
+        (edgePx, returnGapPx) => {
+          const nearLoop: Polyline = {
+            points: [
+              { x: 0, y: 0 },
+              { x: edgePx, y: 0 },
+              { x: edgePx, y: edgePx },
+              { x: 0, y: edgePx },
+              { x: 0, y: returnGapPx },
+            ],
+            closed: false,
+          };
+
+          expect(weldOpenPolylines([nearLoop], OPTIONS)).toEqual([nearLoop]);
+        },
+      ),
+      { numRuns: PROPERTY_RUNS, seed: PROPERTY_SEED },
+    );
+  });
+
+  it('does not weld nearby independent parallel strokes', () => {
+    const strokes = [
+      line(0, PARALLEL_STROKE_LENGTH_PX, 0),
+      line(0, PARALLEL_STROKE_LENGTH_PX, PARALLEL_STROKE_SEPARATION_PX),
+    ];
+
+    expect(weldOpenPolylines(strokes, OPTIONS)).toEqual(strokes);
+  });
+
+  it('joins coincident collinear ends without duplicating the shared point', () => {
+    const out = weldOpenPolylines(
+      [line(0, BASE_STROKE_LENGTH_PX, 0), line(BASE_STROKE_LENGTH_PX, JOINED_STROKE_END_PX, 0)],
+      OPTIONS,
+    );
+
+    expect(out).toHaveLength(1);
+    expect(out[0]?.closed).toBe(false);
+    expect(out[0]?.points).toHaveLength(EXPECTED_COINCIDENT_JOIN_POINTS);
+  });
+
+  it('keeps coincident perpendicular strokes separate', () => {
+    const horizontal = line(0, BASE_STROKE_LENGTH_PX, 0);
+    const vertical: Polyline = {
+      points: [
+        { x: BASE_STROKE_LENGTH_PX, y: 0 },
+        { x: BASE_STROKE_LENGTH_PX, y: BASE_STROKE_LENGTH_PX },
+      ],
+      closed: false,
+    };
+
+    expect(weldOpenPolylines([horizontal, vertical], OPTIONS)).toEqual([horizontal, vertical]);
+  });
+
+  it('skips a closer invalid pair and still joins the farther valid continuation', () => {
+    const source = line(0, BASE_STROKE_LENGTH_PX, 0);
+    const parallel = line(0, BASE_STROKE_LENGTH_PX, INVALID_NEIGHBOR_Y_PX);
+    const continuation = line(BASE_STROKE_LENGTH_PX + MAX_WELD_GAP_PX, CONTINUATION_END_PX, 0);
+    const out = weldOpenPolylines([source, parallel, continuation], OPTIONS);
+
+    expect(out).toHaveLength(2);
+    expect(out[0]?.points[0]).toEqual({ x: 0, y: 0 });
+    expect(out[0]?.points.at(-1)).toEqual({ x: CONTINUATION_END_PX, y: 0 });
+    expect(out[1]).toEqual(parallel);
+  });
+
+  it('does not close a merged chain across a non-continuous final gap', () => {
+    const start = line(0, BASE_STROKE_LENGTH_PX, 0);
+    const returning: Polyline = {
+      points: [
+        { x: RETURNING_START_X_PX, y: 0 },
+        { x: RETURNING_CORNER_X_PX, y: 0 },
+        { x: RETURNING_CORNER_X_PX, y: RETURNING_TOP_Y_PX },
+        { x: 0, y: RETURNING_TOP_Y_PX },
+        { x: 0, y: NEAR_LOOP_RETURN_GAP_PX },
+      ],
+      closed: false,
+    };
+    const out = weldOpenPolylines([start, returning], OPTIONS);
+
+    expect(out).toHaveLength(1);
+    expect(out[0]?.closed).toBe(false);
+    expect(out[0]?.points[0]).toEqual({ x: 0, y: 0 });
+    expect(out[0]?.points.at(-1)).toEqual({ x: 0, y: NEAR_LOOP_RETURN_GAP_PX });
   });
 
   it('passes closed rings through by reference and preserves order', () => {
