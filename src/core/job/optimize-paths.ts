@@ -73,6 +73,7 @@ export function optimizePaths(
 ): Job {
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
   return {
+    ...job,
     groups:
       settings.travelPolicy === 'source-order'
         ? prioritized

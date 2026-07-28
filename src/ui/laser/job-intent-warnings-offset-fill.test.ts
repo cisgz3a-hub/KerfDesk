@@ -78,20 +78,27 @@ function failOffset(): void {
 }
 
 function succeedOffset(): void {
-  offsetCheckedMock.mockImplementation(() => ({
-    kind: 'ok',
-    value: [
-      {
-        points: [
-          { x: 5, y: 5 },
-          { x: 15, y: 5 },
-          { x: 15, y: 15 },
-          { x: 5, y: 15 },
-        ],
-        closed: true,
-      },
-    ],
-  }));
+  let calls = 0;
+  offsetCheckedMock.mockImplementation(() => {
+    calls += 1;
+    return {
+      kind: 'ok',
+      value:
+        calls === 1
+          ? [
+              {
+                points: [
+                  { x: 5, y: 5 },
+                  { x: 15, y: 5 },
+                  { x: 15, y: 15 },
+                  { x: 5, y: 15 },
+                ],
+                closed: true,
+              },
+            ]
+          : [],
+    };
+  });
 }
 
 describe('detectJobIntentWarnings offset-fill diagnostics', () => {
@@ -103,9 +110,8 @@ describe('detectJobIntentWarnings offset-fill diagnostics', () => {
     const offsetWarning = warnings.find((warning) => warning.includes(LAYER_NAME));
     expect(offsetWarning).toBeDefined();
     expect(offsetWarning).toContain('could not be fully generated');
-    // The operator needs to know the outline is unaffected, or they will assume
-    // the whole layer is lost and re-cut work that was fine.
-    expect(offsetWarning).toContain('The outline still cuts');
+    expect(offsetWarning).not.toContain('The outline still cuts');
+    expect(offsetWarning).toContain('configure it as a separate Line operation');
   });
 
   it('warns without refusing - the warning is advisory, never a gate (rule 7)', () => {
@@ -125,8 +131,20 @@ describe('detectJobIntentWarnings offset-fill diagnostics', () => {
 
     const warnings = detectJobIntentWarnings(offsetFillProject());
 
-    expect(warnings.some((warning) => warning.includes('could not be fully generated'))).toBe(
-      false,
+    expect(
+      warnings.some((warning) => warning.includes(`Follow Shape on layer "${LAYER_NAME}"`)),
+    ).toBe(false);
+  });
+
+  it('reports pass-limit loss as an advisory without promising an outline', () => {
+    offsetCheckedMock.mockImplementation((polylines) => ({ kind: 'ok', value: polylines }));
+
+    const warning = detectJobIntentWarnings(offsetFillProject()).find((message) =>
+      message.includes('usable interior remained'),
     );
+
+    expect(warning).toContain('22 inward-offset levels');
+    expect(warning).toContain('some remaining interior fill is missing');
+    expect(warning).not.toContain('outline still cuts');
   });
 });

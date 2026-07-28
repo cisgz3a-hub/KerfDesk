@@ -56,6 +56,17 @@ describe('applyJobOrigin', () => {
       maxY: 95,
     });
   });
+
+  it('retains compile diagnostics while translating job geometry', () => {
+    const diagnosticJob: Job = {
+      ...centeredJob,
+      diagnostics: [{ kind: 'offset-fill-pass-limit', layerName: 'Fill', passLimit: 2000 }],
+    };
+
+    expect(applyJobOrigin(diagnosticJob, USER_ORIGIN_JOB_PLACEMENT).diagnostics).toEqual(
+      diagnosticJob.diagnostics,
+    );
+  });
 });
 
 describe('offsetJobBounds', () => {

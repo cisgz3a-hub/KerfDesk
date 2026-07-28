@@ -26,6 +26,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
   switch (diagnostic.kind) {
     case 'offset-fill-failed':
       return offsetFillFailedWarning(diagnostic.layerName);
+    case 'offset-fill-pass-limit':
+      return offsetFillPassLimitWarning(diagnostic.layerName, diagnostic.passLimit);
     case 'kerf-offset-failed':
       return kerfOffsetFailedWarning(diagnostic.layerName);
     case 'fill-collapsed-at-precision':
@@ -39,7 +41,11 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
 // artwork asks for — or none at all, in which case the layer leaves no group
 // behind and would vanish from the job unremarked.
 function offsetFillFailedWarning(layerName: string): string {
-  return `Offset fill on layer "${layerName}" could not be fully generated: the geometry engine failed partway, so this layer's fill is incomplete or missing from the job. The outline still cuts. Check the preview before running, and try a slightly larger fill spacing or simplify the shape.`;
+  return `Follow Shape on layer "${layerName}" could not be fully generated: the geometry engine failed partway, so this fill is incomplete or missing from the job. Check the preview before running, and increase Line Interval or simplify the shape. If an outline is required, configure it as a separate Line operation.`;
+}
+
+function offsetFillPassLimitWarning(layerName: string, passLimit: number): string {
+  return `Follow Shape on layer "${layerName}" stopped after ${passLimit} inward-offset levels while usable interior remained, so some remaining interior fill is missing from the job. Check the preview before running, and increase Line Interval to complete the fill with fewer levels. If an outline is required, configure it as a separate Line operation.`;
 }
 
 // Kerf compensation runs on the closed contours of a Line layer — the cut that

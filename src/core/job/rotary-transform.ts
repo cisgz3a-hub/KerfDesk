@@ -21,6 +21,7 @@ export function applyRotaryYScale(job: Job, yScale: number, reverse = false): Jo
   const extent = (range.max - range.min) * yScale;
   const map = <T extends CutSegment>(s: T): T => mapSegment(s, yScale, range.min, extent, reverse);
   return {
+    ...job,
     groups: job.groups.map((group) => {
       if (group.kind === 'cut') return { ...group, segments: group.segments.map(map) };
       if (group.kind === 'fill') {

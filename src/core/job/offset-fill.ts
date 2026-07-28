@@ -12,21 +12,24 @@ export type OffsetFillInput = {
 
 export type OffsetFillResult = {
   readonly contours: ReadonlyArray<Polyline>;
-  // True when an offset pass failed rather than legitimately running out of
-  // interior. Both cases stop the loop and both can yield no contours, so
-  // without this flag a lost fill is indistinguishable from a finished one.
-  readonly offsetFailed: boolean;
+  readonly termination: OffsetFillTermination;
 };
+
+/** Why Follow Shape stopped producing inward-offset contours. */
+export type OffsetFillTermination =
+  | { readonly kind: 'complete' }
+  | { readonly kind: 'offset-failed' }
+  | { readonly kind: 'pass-limit'; readonly passLimit: number };
 
 type OffsetPass = {
   readonly contours: ReadonlyArray<Polyline>;
-  readonly failed: boolean;
+  readonly isFailed: boolean;
 };
 
 export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const spacing = Math.max(MIN_OFFSET_FILL_SPACING_MM, input.spacingMm);
   const source = input.polylines.filter(isUsableClosedContour);
-  if (source.length === 0) return { contours: [], offsetFailed: false };
+  if (source.length === 0) return { contours: [], termination: { kind: 'complete' } };
 
   let current = offsetBy(source, -spacing / 2);
   const out: Polyline[] = [];
@@ -35,9 +38,15 @@ export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
     out.push(...current.contours);
     current = offsetBy(current.contours, -spacing);
   }
-  // Only the final pass can have failed: a failed pass yields no contours, which
-  // ends the loop immediately.
-  return { contours: out, offsetFailed: current.failed };
+  // A failure can happen on the lookahead after the final emitted contour, so
+  // it takes precedence over the budget check. A still-populated lookahead
+  // means the fixed work budget stopped a geometrically unfinished fill.
+  const termination: OffsetFillTermination = current.isFailed
+    ? { kind: 'offset-failed' }
+    : current.contours.length > 0
+      ? { kind: 'pass-limit', passLimit }
+      : { kind: 'complete' };
+  return { contours: out, termination };
 }
 
 function offsetBy(polylines: ReadonlyArray<Polyline>, offsetMm: number): OffsetPass {
@@ -46,8 +55,8 @@ function offsetBy(polylines: ReadonlyArray<Polyline>, offsetMm: number): OffsetP
   // offset is indistinguishable from a fill that legitimately ran out of
   // interior, and the pass silently disappears from the job.
   const offset = offsetClosedPolylinesForKerfChecked(polylines, offsetMm);
-  if (offset.kind === 'error') return { contours: [], failed: true };
-  return { contours: offset.value.filter(isUsableClosedContour), failed: false };
+  if (offset.kind === 'error') return { contours: [], isFailed: true };
+  return { contours: offset.value.filter(isUsableClosedContour), isFailed: false };
 }
 
 function offsetPassLimit(polylines: ReadonlyArray<Polyline>, spacing: number): number {

@@ -20,7 +20,7 @@ import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import type { FillSegment, Group } from './job';
-import { offsetFillContours } from './offset-fill';
+import { offsetFillContours, type OffsetFillTermination } from './offset-fill';
 import { resolveIslandFillScanDirection } from './scan-direction-policy';
 import { validatedScanOffsetMm } from './scan-offset';
 import { commonVectorGroupFields } from './vector-group-fields';
@@ -82,10 +82,9 @@ export function islandFillGroupsForLayer(
 
 export type LayerFillSegments = {
   readonly segments: FillSegment[];
-  // True when the offset-fill engine failed mid-ladder. The segments below are
-  // whatever was computed before that, so the fill is incomplete rather than
-  // finished — the caller reports it instead of letting it vanish silently.
-  readonly offsetFailed: boolean;
+  // Records natural completion separately from geometry-engine failure and
+  // pass-budget exhaustion. Absent for non-offset hatch fills.
+  readonly offsetFillTermination?: OffsetFillTermination;
 };
 
 export function collectFillSegmentsForLayer(
@@ -110,7 +109,7 @@ export function collectFillSegmentsForLayer(
       closed: polyline.closed,
       reverse: polyline.reverse,
     })),
-    offsetFailed: offsetFill?.offsetFailed ?? false,
+    ...(offsetFill === null ? {} : { offsetFillTermination: offsetFill.termination }),
   };
 }
 
