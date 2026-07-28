@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
 import { createProject } from '../../core/scene';
 import { prepareOutput, type PreparedOutput } from '../../io/gcode';
 import { emitSavePreparedOutput } from './save-output-emission';
@@ -23,10 +24,32 @@ describe('emitSavePreparedOutput', () => {
     });
   });
 
-  it('emits a successfully prepared output with its provenance tag', () => {
+  it('keeps ordinary empty-output in the canonical emitted-preflight partition', () => {
     const result = emitSavePreparedOutput(prepareOutput(createProject()), {});
 
     expect(result.kind).toBe('emitted');
     expect(result.preflight.issues.map((issue) => issue.code)).toContain('empty-output');
+  });
+
+  it('retains a post-prepare rotary raster refusal as non-writable', () => {
+    const project = rotaryRasterSaveProject();
+    const result = emitSavePreparedOutput(prepareOutput(project), {});
+
+    expect(result).toMatchObject({
+      kind: 'emission-refused',
+      gcode: '',
+      preflight: { issues: [{ code: 'rotary-raster-unsupported' }] },
+    });
+  });
+
+  it('emits rotary raster bytes when the Labs permission is explicit', () => {
+    const project = rotaryRasterSaveProject();
+    const result = emitSavePreparedOutput(prepareOutput(project), {
+      allowRotaryRaster: true,
+    });
+
+    expect(result.kind).toBe('emitted');
+    expect(result.gcode).not.toBe('');
+    expect(result.preflight.issues).toEqual([]);
   });
 });

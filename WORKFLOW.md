@@ -466,15 +466,21 @@ Identical to F-A3 except:
 ### F-A10. Pre-flight check (before G-code save)
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
-G-code**, any failing check surfaces the pre-flight modal and cancels the save
-until it clears. For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the only
-findings that still cancel the Start are unstreamable output (`non-finite-
-coordinate`, `empty-output`, `relief-needs-cnc`, `no-output-layer`) and compile
-failures. Calculated bed bounds, configured no-go zones, and live output-setting findings are
-carried into Job Review as warnings before the Frame trace; they do not refuse Frame. The actual
-controller outcome is authoritative: only a cleanly completed trace and return earns the exact-job
-permit. A Frame still cannot dispatch when transport cannot accept it or when the executable motion
-cannot be constructed. Start itself adds no policy gate.
+G-code**, a factual no-file outcome stops before the picker: placement cannot be
+resolved; selection, variable, registration, or output-snapshot preparation
+produces no program; the post-prepare emitter refuses the requested output (for
+example, rotary raster while its Labs permission is off); or emitted preflight
+contains one of the five codes in `COMPILE_INTEGRITY_PREFLIGHT_CODES`. Every
+other preflight finding is an advisory reported after a successful save.
+
+For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232): the same five
+compile-integrity codes cover unproducible or unstreamable output. Calculated
+bed bounds, configured no-go zones, and live output-setting findings are carried
+into Job Review as warnings before the Frame trace; they do not refuse Frame.
+The actual controller outcome is authoritative: only a cleanly completed trace
+and return earns the exact-job permit. A Frame still cannot dispatch when
+transport cannot accept it or when the executable motion cannot be constructed.
+Start itself adds no policy gate.
 
 The authoritative list is the `PreflightCode` set in
 `src/core/preflight/preflight.ts` (laser + CNC shared codes) and
@@ -515,9 +521,11 @@ grouped by what each validates:
 20. **No single pass cuts deeper than the configured maximum.**
 21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
 
-For **Save G-code**, all applicable blocking checks must pass. For the ordinary
-job flow, factual placement/compile-integrity failures stop preparation. Calculated
-bed/no-go/settings findings are confirmed in Job Review and never refuse Frame;
+For **Save G-code**, the five-code set controls the emitted-preflight partition;
+it is not an exhaustive list of reasons no file can exist. Factual
+placement/preparation failures and a post-prepare emission refusal return
+distinct non-writable outcomes before that partition. Calculated
+bed/no-go/settings findings remain advisories, and never refuse Frame or Start;
 the completed physical Frame is the spatial source of truth.
 
 ---

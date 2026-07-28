@@ -1,14 +1,23 @@
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
 
+const ROTARY_RASTER_REFUSAL_CODE = 'rotary-raster-unsupported';
+
 /**
- * Tagged Save emission result. Callers must branch on `kind`; a
- * `preparation-failed` result contains no program and must not be written.
+ * Tagged Save emission result. Callers must branch on `kind`;
+ * `preparation-failed` means no prepared program exists, while
+ * `emission-refused` means preparation succeeded but the emitter produced no
+ * writable bytes.
  */
 export type SaveOutputEmission =
   | {
       readonly kind: 'preparation-failed';
       readonly gcode: '';
       readonly preflight: Extract<PreparedOutput, { readonly ok: false }>['preflight'];
+    }
+  | {
+      readonly kind: 'emission-refused';
+      readonly gcode: '';
+      readonly preflight: ReturnType<typeof emitPreparedGcode>['preflight'];
     }
   | {
       readonly kind: 'emitted';
@@ -31,5 +40,12 @@ export function emitSavePreparedOutput(
       preflight: prepared.preflight,
     };
   }
-  return { kind: 'emitted', ...emitPreparedGcode(prepared, options) };
+  const emitted = emitPreparedGcode(prepared, options);
+  const isRotaryRasterRefusal =
+    emitted.gcode === '' &&
+    emitted.preflight.issues.some((issue) => issue.code === ROTARY_RASTER_REFUSAL_CODE);
+  if (isRotaryRasterRefusal) {
+    return { kind: 'emission-refused', ...emitted, gcode: '' };
+  }
+  return { kind: 'emitted', ...emitted };
 }
