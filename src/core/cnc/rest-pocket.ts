@@ -17,12 +17,11 @@ export type RestPocketPlan =
       readonly ok: true;
       readonly toolpaths: ReadonlyArray<Polyline>;
       readonly restRegions: ReadonlyArray<Polyline>;
-      // True when the ring ladder below stopped because clipper FAILED rather
-      // than because the rest region ran out of interior. Both endings return
-      // no ring, but only this one leaves stock standing where the finishing
-      // pass believes it has already been cleared. Reported to Job Review,
-      // never used to refuse the job (rule 7).
-      readonly offsetFailed: boolean;
+      // Why the finishing-bit ladder ended. A normal empty offset means every
+      // reachable rest region was cleared. A geometry failure or the fixed
+      // pass budget can leave rest stock standing, so callers surface an
+      // advisory without changing the emitted paths or gating the job.
+      readonly completion: RestPocketCompletion;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -32,6 +31,8 @@ const MAX_STEPOVER_PERCENT = 85;
 const MAX_RINGS = 4096;
 const PRECISION_DECIMALS = 3;
 const EPSILON = 1e-9;
+
+export type RestPocketCompletion = 'complete' | 'geometry-failed' | 'pass-limit';
 
 export function planRestPocketToolpaths(
   contours: ReadonlyArray<Polyline>,
@@ -44,7 +45,7 @@ export function planRestPocketToolpaths(
   const stock = remainingStock(contours, roughToolDiameterMm);
   if (!stock.ok) return stock;
   if (stock.rest.length === 0) {
-    return { ok: true, toolpaths: [], restRegions: [], offsetFailed: false };
+    return { ok: true, toolpaths: [], restRegions: [], completion: 'complete' };
   }
   const target = finishTarget(stock.original, stock.rest, finishToolDiameterMm);
   if (target === null) return clipperFailure();
@@ -53,7 +54,7 @@ export function planRestPocketToolpaths(
     ok: true,
     toolpaths: rings.toolpaths,
     restRegions: stock.rest.map(toPolyline),
-    offsetFailed: rings.offsetFailed,
+    completion: rings.completion,
   };
 }
 
@@ -107,7 +108,7 @@ function requestIssue(
 
 type CenterRegionRings = {
   readonly toolpaths: ReadonlyArray<Polyline>;
-  readonly offsetFailed: boolean;
+  readonly completion: RestPocketCompletion;
 };
 
 // The rest region's own offset ladder. It works on raw clipper PathsD rather
@@ -125,22 +126,32 @@ function centerRegionRings(
     (Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent)) / 100) *
     toolDiameterMm;
   const levels: PathsD[] = [];
-  let offsetFailed = false;
+  let completion: RestPocketCompletion = 'pass-limit';
   for (let index = 0; index < MAX_RINGS; index += 1) {
     const paths = index === 0 ? target : offset(target, -index * stepMm, JoinType.Miter);
     if (paths === null) {
-      offsetFailed = true;
+      completion = 'geometry-failed';
       break;
     }
-    if (paths.length === 0) break;
+    if (paths.length === 0) {
+      completion = 'complete';
+      break;
+    }
     levels.push(paths);
+  }
+  if (levels.length === MAX_RINGS) {
+    // Reaching the budget is not proof that stock remains: the next valid
+    // inset can be empty exactly at the boundary. Probe once beyond the
+    // emitted ladder so only actual remaining interior is incomplete.
+    const next = offset(target, -MAX_RINGS * stepMm, JoinType.Miter);
+    completion = next === null ? 'geometry-failed' : next.length === 0 ? 'complete' : 'pass-limit';
   }
   const out: Polyline[] = [];
   for (let index = levels.length - 1; index >= 0; index -= 1) {
     const level = levels[index];
     if (level !== undefined) out.push(...level.map(toPolyline));
   }
-  return { toolpaths: out, offsetFailed };
+  return { toolpaths: out, completion };
 }
 
 function offset(paths: PathsD, deltaMm: number, joinType: JoinType): PathsD | null {

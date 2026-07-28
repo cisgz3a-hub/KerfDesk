@@ -9,16 +9,29 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import type * as CncRestOperation from '../../core/cnc/cnc-rest-operation';
+
+type RestOperationFixture =
+  | { readonly kind: 'not-requested' }
+  | { readonly kind: 'ok'; readonly completion: 'pass-limit' };
 
 // The last hop of the CNC offset-ladder chain. Without a test here a refactor
 // could drop the final hop and every other test would still pass — which is
 // exactly how the laser-side offset-fill loss shipped in the first place.
 const offsetChecked = vi.hoisted(() => vi.fn());
+const restOperation = vi.hoisted(() =>
+  vi.fn<() => RestOperationFixture>(() => ({ kind: 'not-requested' })),
+);
 
 vi.mock('../../core/geometry/kerf-offset', () => ({
   offsetClosedPolylinesForKerf: () => [],
   offsetClosedPolylinesForKerfChecked: offsetChecked,
   offsetClosedPolylinesWithRoundJoins: () => [],
+}));
+
+vi.mock('../../core/cnc/cnc-rest-operation', async (importOriginal) => ({
+  ...(await importOriginal<typeof CncRestOperation>()),
+  resolveRestPocketOperation: restOperation,
 }));
 
 const { detectCncOffsetLadderWarnings } = await import('./cnc-offset-ladder-warnings');
@@ -93,6 +106,7 @@ const ENGINE_FAILURE: unknown = {
 
 // One good ring, then the engine gives up: the pocket is truncated, not done.
 function failAfterFirstRing(): void {
+  restOperation.mockReturnValue({ kind: 'not-requested' });
   offsetChecked.mockReset();
   offsetChecked.mockReturnValueOnce(ringAt(1.6));
   offsetChecked.mockReturnValue(ENGINE_FAILURE);
@@ -100,6 +114,7 @@ function failAfterFirstRing(): void {
 
 // One good ring, then no interior left: the pocket is genuinely finished.
 function exhaustAfterFirstRing(): void {
+  restOperation.mockReturnValue({ kind: 'not-requested' });
   offsetChecked.mockReset();
   offsetChecked.mockReturnValueOnce(ringAt(1.6));
   offsetChecked.mockReturnValue({ kind: 'ok', value: [] });
@@ -145,6 +160,17 @@ describe('detectCncOffsetLadderWarnings', () => {
     const warnings = detectMachineJobWarnings(pocketProject());
 
     expect(warnings.some((warning) => warning.includes('could not be fully generated'))).toBe(true);
+  });
+
+  it('reaches Job Review and Save when rest machining exhausts its ring budget', () => {
+    restOperation.mockReturnValue({ kind: 'ok', completion: 'pass-limit' });
+
+    const warnings = detectCncOffsetLadderWarnings(pocketProject());
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(LAYER_NAME);
+    expect(warnings[0]).toContain('4096-ring planning limit');
+    expect(warnings[0]).toContain('still cut');
   });
 
   it('returns nothing for a laser project', () => {

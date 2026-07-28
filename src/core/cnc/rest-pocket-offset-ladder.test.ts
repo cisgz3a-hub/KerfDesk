@@ -9,7 +9,11 @@ import type { Polyline } from '../scene';
 // which keeps the surrounding geometry honest. This lives beside
 // rest-pocket.test.ts rather than inside it so the module-wide clipper mock
 // cannot affect the placement tests there.
-const inflate = vi.hoisted(() => ({ calls: 0, throwOnCall: Number.POSITIVE_INFINITY }));
+const inflate = vi.hoisted(() => ({
+  calls: 0,
+  throwOnCall: Number.POSITIVE_INFINITY,
+  forceNonEmptyAtOrAfter: Number.POSITIVE_INFINITY,
+}));
 
 vi.mock('clipper2-ts', async (importOriginal) => {
   const actual = await importOriginal<typeof Clipper2>();
@@ -18,6 +22,16 @@ vi.mock('clipper2-ts', async (importOriginal) => {
     inflatePathsD: (...args: Parameters<typeof actual.inflatePathsD>) => {
       inflate.calls += 1;
       if (inflate.calls >= inflate.throwOnCall) throw new Error('clipper2: pathological geometry');
+      if (inflate.calls >= inflate.forceNonEmptyAtOrAfter) {
+        return [
+          [
+            { x: 1, y: 1 },
+            { x: 2, y: 1 },
+            { x: 2, y: 2 },
+            { x: 1, y: 2 },
+          ],
+        ];
+      }
       return actual.inflatePathsD(...args);
     },
   };
@@ -45,6 +59,7 @@ function square(x: number, y: number, size: number): Polyline {
 function planWith(throwOnCall: number): ReturnType<typeof planRestPocketToolpaths> {
   inflate.calls = 0;
   inflate.throwOnCall = throwOnCall;
+  inflate.forceNonEmptyAtOrAfter = Number.POSITIVE_INFINITY;
   return planRestPocketToolpaths(
     [square(0, 0, 20)],
     ROUGH_TOOL_MM,
@@ -60,7 +75,7 @@ describe('planRestPocketToolpaths offset-ladder failure', () => {
     expect(clean.ok).toBe(true);
     if (!clean.ok) return;
     expect(clean.toolpaths.length).toBeGreaterThan(0);
-    expect(clean.offsetFailed).toBe(false);
+    expect(clean.completion).toBe('complete');
   });
 
   // The defect: clipper failing returns null and an exhausted region returns an
@@ -77,7 +92,7 @@ describe('planRestPocketToolpaths offset-ladder failure', () => {
 
     expect(failed.ok).toBe(true);
     if (!failed.ok) return;
-    expect(failed.offsetFailed).toBe(true);
+    expect(failed.completion).toBe('geometry-failed');
     // Truncated, not void: the rings built before the failure still cut, and
     // the caller warns rather than discarding them.
     expect(failed.toolpaths.length).toBeGreaterThan(0);
@@ -92,5 +107,26 @@ describe('planRestPocketToolpaths offset-ladder failure', () => {
     // the layer's toolpaths entirely and read as a compile-integrity error.
     expect(failed.ok).toBe(true);
     expect(clean.ok).toBe(true);
+  });
+
+  it('reports the fixed ring budget when a valid rest ladder still has interior', () => {
+    inflate.calls = 0;
+    inflate.throwOnCall = Number.POSITIVE_INFINITY;
+    // Four setup inflations build the rest target. Every later ladder offset
+    // remains valid and non-empty, so this crosses the real 4096-ring limit.
+    inflate.forceNonEmptyAtOrAfter = SETUP_OFFSET_CALLS + 1;
+    const limited = planRestPocketToolpaths(
+      [square(0, 0, 20)],
+      ROUGH_TOOL_MM,
+      FINISH_TOOL_MM,
+      STEPOVER_PERCENT,
+    );
+
+    expect(limited).toMatchObject({ ok: true, completion: 'pass-limit' });
+    if (!limited.ok) return;
+    // The target can contain several disconnected rest corners, so toolpath
+    // count is not ring count. Reaching this threshold proves every one of
+    // the 4096 permitted levels produced geometry before the cap ended it.
+    expect(limited.toolpaths.length).toBeGreaterThanOrEqual(4096);
   });
 });

@@ -12,14 +12,16 @@
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink, so
 // the diagnostic cannot be added to it.
-import { findCncOffsetLadderFailures } from '../../core/cnc/cnc-offset-ladder-diagnostics';
+import { findCncOffsetLadderDiagnostics } from '../../core/cnc/cnc-offset-ladder-diagnostics';
 import type { Project } from '../../core/scene';
 
 export function detectCncOffsetLadderWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
-  return findCncOffsetLadderFailures(project.scene, project.device, machine).map((layerId) =>
-    offsetLadderWarning(layerNameFor(project, layerId)),
+  return findCncOffsetLadderDiagnostics(project.scene, project.device, machine).map((diagnostic) =>
+    diagnostic.kind === 'pass-limit'
+      ? restPocketPassLimitWarning(layerNameFor(project, diagnostic.layerId))
+      : offsetLadderWarning(layerNameFor(project, diagnostic.layerId)),
   );
 }
 
@@ -35,5 +37,14 @@ function offsetLadderWarning(layerName: string): string {
     'asks for and can leave a full-depth core or an uncut wall. The passes it did generate still ' +
     'cut. Check the preview before running, and try a slightly larger stepover, a smaller bit, or ' +
     'a simpler shape.'
+  );
+}
+
+function restPocketPassLimitWarning(layerName: string): string {
+  return (
+    `Rest machining on layer "${layerName}" reached its 4096-ring planning limit while usable ` +
+    'interior remained, so the finishing-bit pass is incomplete and can leave stock standing. ' +
+    'The generated passes still cut. Check the preview before running, and use a larger bit or ' +
+    'larger stepover, or simplify/split the pocket.'
   );
 }
