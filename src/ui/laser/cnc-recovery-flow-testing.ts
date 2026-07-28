@@ -32,6 +32,20 @@ const RECOVERY_WARNING_INDEX_WIDTH = 3;
 const RECOVERY_WARNING_MESSAGE_PREFIX = 'Recovery bed warning ';
 const WARNING_CONFIRMATION_PREFIX = 'Controller warning:';
 const WARNING_LIST_BULLET = '• ';
+const EXPECTED_RECOVERY_SOURCE_EMISSION_COUNT = 2;
+const EXPECTED_RECOVERY_JOB_EMISSION_COUNT = 1;
+const RECOVERY_COMPILE_INTEGRITY_ISSUE: PreflightIssue = {
+  code: 'empty-output',
+  message: 'No cuts.',
+};
+
+type RecoveryJobCompileIntegrityInjection = {
+  readonly assertRefusal: (
+    started: boolean,
+    startJobCallCount: number,
+    alertMessages: ReadonlyArray<string>,
+  ) => void;
+};
 
 export const IDLE_STATUS: StatusReport = {
   state: 'Idle',
@@ -93,13 +107,53 @@ export async function injectPreflightIssues(issues: ReadonlyArray<PreflightIssue
   const actual = await vi.importActual<typeof GcodeModule>('../../io/gcode');
   vi.mocked(emitPreparedGcode).mockImplementation((prepared, options) => {
     const real = actual.emitPreparedGcode(prepared, options);
-    return { ...real, preflight: { ok: false, issues: [...issues] } };
+    return emissionWithInjectedPreflightIssues(real, issues);
   });
 }
 
-/** Inject one preflight issue into every recovery emission. */
-export async function injectPreflightIssue(issue: PreflightIssue): Promise<void> {
-  return injectPreflightIssues([issue]);
+/**
+ * Inject a compile-integrity issue only into the recovery-job emission,
+ * leaving source re-preparation and sealed-artifact verification untouched.
+ */
+export async function injectRecoveryJobCompileIntegrityFailure(): Promise<RecoveryJobCompileIntegrityInjection> {
+  const actual = await vi.importActual<typeof GcodeModule>('../../io/gcode');
+  let sourceEmissionCount = 0;
+  let recoveryJobEmissionCount = 0;
+  vi.mocked(emitPreparedGcode).mockImplementation((prepared, options) => {
+    const real = actual.emitPreparedGcode(prepared, options);
+    if (options?.allowRotaryRaster !== undefined) {
+      sourceEmissionCount += 1;
+      return real;
+    }
+    recoveryJobEmissionCount += 1;
+    return emissionWithInjectedPreflightIssues(real, [RECOVERY_COMPILE_INTEGRITY_ISSUE]);
+  });
+  return {
+    assertRefusal: (started, startJobCallCount, alertMessages) => {
+      expect(sourceEmissionCount).toBe(EXPECTED_RECOVERY_SOURCE_EMISSION_COUNT);
+      expect(recoveryJobEmissionCount).toBe(EXPECTED_RECOVERY_JOB_EMISSION_COUNT);
+      expect(started).toBe(false);
+      expect(startJobCallCount).toBe(0);
+      expect(alertMessages).toHaveLength(1);
+      expect(alertMessages[0]).toContain('Cannot start CNC recovery');
+      expect(alertMessages[0]).toContain(RECOVERY_COMPILE_INTEGRITY_ISSUE.message);
+      expect(alertMessages[0]).not.toContain('Cannot resume job');
+    },
+  };
+}
+
+function emissionWithInjectedPreflightIssues(
+  real: ReturnType<typeof emitPreparedGcode>,
+  issues: ReadonlyArray<PreflightIssue>,
+): ReturnType<typeof emitPreparedGcode> {
+  const combinedIssues = [...real.preflight.issues, ...issues];
+  return {
+    ...real,
+    preflight: {
+      ok: real.preflight.ok && combinedIssues.length === 0,
+      issues: combinedIssues,
+    },
+  };
 }
 
 /** Build enough distinct policy advisories to expose duplicate provenance inflation. */

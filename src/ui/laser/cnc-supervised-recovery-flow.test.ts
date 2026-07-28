@@ -31,8 +31,8 @@ import { resetStore } from '../state/test-helpers';
 import {
   configureReadyCncRecovery,
   expectRecoveryWarningEvidence,
-  injectPreflightIssue,
   injectPreflightIssues,
+  injectRecoveryJobCompileIntegrityFailure,
   recoveryWarningFixtureIssues,
 } from './cnc-recovery-flow-testing';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
@@ -421,12 +421,14 @@ describe('runCncSupervisedRecoveryFlow', () => {
     const capsule = await saveInterruptedRun(repo);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    await injectPreflightIssue({ code: 'empty-output', message: 'No cuts.' });
+    const injection = await injectRecoveryJobCompileIntegrityFailure();
 
     const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
 
-    expect(started).toBe(false);
-    expect(startJob).not.toHaveBeenCalled();
-    expect(vi.mocked(jobAwareAlert).mock.calls[0]?.[0] ?? '').toContain('No cuts.');
+    injection.assertRefusal(
+      started,
+      startJob.mock.calls.length,
+      vi.mocked(jobAwareAlert).mock.calls.map(([message]) => String(message)),
+    );
   });
 });

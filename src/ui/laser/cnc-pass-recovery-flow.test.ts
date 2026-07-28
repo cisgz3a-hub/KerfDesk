@@ -32,8 +32,8 @@ import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
 import {
   configureReadyCncRecovery,
   expectRecoveryWarningEvidence,
-  injectPreflightIssue,
   injectPreflightIssues,
+  injectRecoveryJobCompileIntegrityFailure,
   recoveryWarningFixtureIssues,
 } from './cnc-recovery-flow-testing';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
@@ -450,12 +450,14 @@ describe('runCncPassRecoveryFlow', () => {
     const capsule = await saveInterruptedRun(repo);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    await injectPreflightIssue({ code: 'empty-output', message: 'No cuts.' });
+    const injection = await injectRecoveryJobCompileIntegrityFailure();
 
     const started = await runCncPassRecoveryFlow(capsule, baseReview, repo);
 
-    expect(started).toBe(false);
-    expect(startJob).not.toHaveBeenCalled();
-    expect(vi.mocked(jobAwareAlert).mock.calls[0]?.[0] ?? '').toContain('No cuts.');
+    injection.assertRefusal(
+      started,
+      startJob.mock.calls.length,
+      vi.mocked(jobAwareAlert).mock.calls.map(([message]) => String(message)),
+    );
   });
 });
