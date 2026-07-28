@@ -26,6 +26,12 @@ export type ArrayPlacement = {
   readonly dx: number;
   readonly dy: number;
   readonly rotationDeg: number;
+  // Scene-space point the copy must rotate ABOUT — its destination ring point.
+  // applyTransform rotates about the object's local origin, so a caller that
+  // only adds rotationDeg swings the copy off the ring; rotating its origin
+  // about this pivot keeps the copy centred where dx/dy put it. Present only
+  // when rotationDeg is non-zero.
+  readonly pivot?: { readonly x: number; readonly y: number };
 };
 
 export function arrayPlacements(bounds: Bounds, spec: ArraySpec): ReadonlyArray<ArrayPlacement> {
@@ -60,10 +66,15 @@ function circularPlacements(
   return Array.from({ length: count }, (_, index) => {
     const angle = start + (index * Math.PI * 2) / count;
     const angleDeg = (angle * 180) / Math.PI;
+    const target = {
+      x: finite(spec.centerX) + Math.cos(angle) * radius,
+      y: finite(spec.centerY) + Math.sin(angle) * radius,
+    };
     return {
-      dx: finite(spec.centerX) + Math.cos(angle) * radius - sourceCenter.x,
-      dy: finite(spec.centerY) + Math.sin(angle) * radius - sourceCenter.y,
+      dx: target.x - sourceCenter.x,
+      dy: target.y - sourceCenter.y,
       rotationDeg: spec.rotateCopies ? angleDeg + 90 : 0,
+      ...(spec.rotateCopies ? { pivot: target } : {}),
     };
   });
 }
