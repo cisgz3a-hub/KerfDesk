@@ -17,12 +17,15 @@ export type GcodeMetadata = {
   readonly emitterRevision: string;
 };
 
-// Bump when the emitter's G-code-shaping behavior changes. Currently covers the
-// continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
-// dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
-// standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
-// 4040 Fill entry geometry, and ADR-236's controlled seeks/scan-quality policy.
-export const EMITTER_REVISION = 'adr-235-4040-quality-controlled-v2';
+/**
+ * Bump when the emitter's G-code-shaping behavior changes. Currently covers the
+ * continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
+ * dynamic power for fill (ADR-036), raster gap-rapid splitting (ADR-039), and
+ * standalone surfacing safe-Z-before-M3 ordering (ADR-103), ADR-234's bounded
+ * 4040 Fill entry geometry, ADR-236's controlled seeks/scan-quality policy,
+ * and ADR-238's generic Scan Line entry/exit runway geometry.
+ */
+export const EMITTER_REVISION = 'adr-238-generic-scanline-runway-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
@@ -71,7 +74,7 @@ function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string>
   }
   return [
     `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
-    '; safety: laser-off travel is explicit S0; ordinary split-fill entry <=5mm; fill+raster dynamic power (M4)',
+    '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side; fill+raster dynamic power (M4)',
   ];
 }
 

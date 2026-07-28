@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-235-4040-quality-controlled-v2');
+    expect(EMITTER_REVISION).toBe('adr-238-generic-scanline-runway-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
@@ -36,7 +36,7 @@ describe('gcodeMetadataHeader', () => {
     const header = gcodeMetadataHeader(META, { kind: 'laser', maxPowerS: 255 });
     expect(header).toContain('; assumes: GRBL $30=255 (max S), $32=1 (laser mode)');
     expect(header).toContain(
-      '; safety: laser-off travel is explicit S0; ordinary split-fill entry <=5mm',
+      '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side',
     );
   });
 

@@ -5,7 +5,12 @@
 // controller/machine facts) read the stores directly instead.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
-import { analyzeFillHeatRisk, formatDuration, type Job } from '../../../core/job';
+import {
+  analyzeFillHeatRisk,
+  formatDuration,
+  type Job,
+  type ScanOffsetPoint,
+} from '../../../core/job';
 import { machineKindOf, type MachineKind, type Project } from '../../../core/scene';
 import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
@@ -67,7 +72,7 @@ export function buildJobReviewModel(args: {
   const machineKind = machineKindOf(args.project.machine);
   return {
     machineKind,
-    stats: buildStatTiles(args.prepared, machineKind),
+    stats: buildStatTiles(args.prepared, machineKind, args.project.device.scanningOffsets),
     // prepared.warnings already carries controller/readiness/WCS/override
     // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
     // was previously only a transient toast, so it joins the review here.
@@ -92,6 +97,7 @@ export function buildJobReviewModel(args: {
     outputQualityFacts: buildOutputQualityReviewFacts(
       args.prepared.prepared.job,
       args.project.scene.layers,
+      args.project.device.scanningOffsets,
     ),
   };
 }
@@ -106,20 +112,24 @@ function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolea
 function buildStatTiles(
   prepared: PreparedCurrentStart,
   machineKind: MachineKind,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): ReadonlyArray<JobReviewStatTile> {
   const job = prepared.prepared.job;
   return [
     timeTile(prepared.metrics.duration),
     sizeTile(prepared.metrics.jobBounds, prepared.metrics.motionBounds),
     operationsTile(job, machineKind, prepared.cncToolPlan),
-    ...fillRunwayTiles(job),
+    ...fillRunwayTiles(job, scanningOffsets),
     gcodeTile(prepared.gcode),
     originTile(prepared.jobOrigin),
   ];
 }
 
-function fillRunwayTiles(job: Job): ReadonlyArray<JobReviewStatTile> {
-  const coverage = analyzeFillHeatRisk(job);
+function fillRunwayTiles(
+  job: Job,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): ReadonlyArray<JobReviewStatTile> {
+  const coverage = analyzeFillHeatRisk(job, scanningOffsets);
   if (coverage.fillSweepCount === 0) return [];
   const requested = coverage.fillRequestedRunwayValuesMm.join(' / ');
   return [
@@ -127,7 +137,7 @@ function fillRunwayTiles(job: Job): ReadonlyArray<JobReviewStatTile> {
       label: 'Fill runway',
       value: `${formatCount(coverage.fillFullRunwaySweepCount)} / ${formatCount(coverage.fillSweepCount)} full`,
       detail:
-        `Requested ${requested} mm · ` +
+        `Effective target ${requested} mm · ` +
         `${formatCount(coverage.fillPartialRunwaySweepCount)} partial · ` +
         `${formatCount(coverage.fillNoRunwaySweepCount)} skipped · ` +
         `${formatCount(coverage.fillDisabledRunwaySweepCount)} disabled`,

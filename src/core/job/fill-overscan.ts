@@ -42,10 +42,11 @@ export function expandFillHatchWithOverscan(
 // speed/quality tradeoff (DECISIONS.md ADR-033).
 const OVERSCAN_MIN_BURN_RATIO = 2;
 
-// The legacy scanline overscan to actually apply to a hatch run: the configured
-// value when the burn is long enough to be worth a runway, otherwise 0 (skip).
-// Kept byte-stable for normal scanline fill; effectiveFillOverscanMm adds the
-// Island Fill policy without changing that older behavior.
+// The explicitly retained legacy scanline overscan: the configured value when
+// the burn is long enough to be worth a runway, otherwise 0 (skip). Compiled
+// generic Scan Line groups now carry feed-matched-every-sweep instead;
+// effectiveOverscanMm keeps this branch for legacy fixtures/artifacts and
+// for the separate Island Fill policy.
 export function effectiveOverscanMm(polyline: ReadonlyArray<Vec2>, overscanMm: number): number {
   if (overscanMm <= 0) return 0;
   const a = polyline[0];
@@ -59,11 +60,12 @@ export function effectiveOverscanMm(polyline: ReadonlyArray<Vec2>, overscanMm: n
 /**
  * The `overscan … mm` phrase for the fill-group G-code header comment. Printing
  * the configured setting verbatim misled a hardware debugging session into
- * assuming every run got the runway, when ADR-033 zeroes it (scanline) or caps
- * it (Island Fill) on runs shorter than OVERSCAN_MIN_BURN_RATIO × the setting —
- * in a real traced-lettering job most runs got none. The suffix states that
- * per-run threshold so the header is honest; sensitive Island Fill always
- * applies the full setting, so it keeps the plain phrase.
+ * assuming every run got the runway, when retained ADR-033 legacy groups zero
+ * it and ordinary Island Fill caps it on runs shorter than
+ * OVERSCAN_MIN_BURN_RATIO × the setting. Generic Scan Line groups use the
+ * separate `feed-matched-every-sweep` comment path. The suffix states the
+ * per-run threshold so legacy headers stay honest; sensitive Island Fill
+ * always applies the full setting, so it keeps the plain phrase.
  */
 export function fillOverscanCommentText(
   overscanMm: number,

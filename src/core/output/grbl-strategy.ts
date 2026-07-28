@@ -22,23 +22,19 @@ import {
 import { contourEntryPoint } from '../job/contour-entry';
 import { expandFillHatchWithRunways } from '../job/fill-runway';
 import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
-import type { FillSpan, FillSweep } from '../job/fill-sweeps';
-import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
+import type { FillSpan } from '../job/fill-sweeps';
+import { offsetForSpeed } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
+import { formatGcodeCoordinateMm } from '../gcode';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { fillRunwayCommentText } from './fill-runway-comment';
 import { laserParkTarget } from './job-park-target';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 
-const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
 type CoolantMode = 'off' | 'M7' | 'M8';
-
-function fmt(n: number): string {
-  return n.toFixed(DECIMAL_PLACES);
-}
 
 function scaleS(powerPercent: number, maxPowerS: number): number {
   return Math.round((powerPercent / 100) * maxPowerS);
@@ -59,14 +55,14 @@ function laserOffSeekLine(
       device.controlledLaserOffTravelFeedMmPerMin,
       'Controlled laser-off travel',
     );
-    return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+    return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
   }
-  const base = `G0 X${fmt(x)} Y${fmt(y)}`;
+  const base = `G0 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)}`;
   return dialect.requiresS0OnRapid ? `${base} S0` : base;
 }
 
 function laserOffRunwayLine(x: number, y: number, feed: number): string {
-  return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+  return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${feed} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
 }
 
 function roundedPositiveFeed(speed: number, context: string): number {
@@ -135,14 +131,14 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
     return '';
   }
   const burnLines: string[] = [];
-  let headX = fmt(first.x);
-  let headY = fmt(first.y);
+  let headX = formatGcodeCoordinateMm(first.x);
+  let headY = formatGcodeCoordinateMm(first.y);
   let burnEmitted = false;
   for (let i = 1; i < seg.polyline.length; i += 1) {
     const pt = seg.polyline[i];
     if (pt === undefined) continue;
-    const targetX = fmt(pt.x);
-    const targetY = fmt(pt.y);
+    const targetX = formatGcodeCoordinateMm(pt.x);
+    const targetY = formatGcodeCoordinateMm(pt.y);
     // Formatting is part of the executable artifact: points that differ in
     // memory can collapse to one machine coordinate at 3 dp. Never emit a
     // stationary positive-power G1, and keep F/S for the first real move.
@@ -220,18 +216,18 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   const s = scaleS(group.power, device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
-  const overscanText = fillRunwayCommentText(group, fmt);
+  const overscanText = fillRunwayCommentText(group, formatGcodeCoordinateMm);
   chunks.push(
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} ${overscanText}`,
   );
   // Each scanline's nearby runs become continuous G1 sweeps with S0 gaps
   // (ADR-034); wide gaps split into independently planned sweeps (ADR-035).
-  // Legacy profiles preserve short-run runway behavior. The 4040 plan gives
-  // every sweep a bounded feed-matched entry without crossing its neighbor.
-  const sweepPlans = planFillSweeps(group);
+  // Generic Scan Line gives every sweep bounded feed-matched laser-off entry
+  // and exit motion. The 4040 plan retains its qualified bounded-entry policy.
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, group.speed);
-  const context = { s, feed, scanOffsetMm, device, dialect };
+  const sweepPlans = planFillSweeps(group, scanOffsetMm);
+  const context = { s, feed, device, dialect };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const plan of sweepPlans) {
@@ -276,13 +272,12 @@ function emitOffsetFillGroup(
 type FillSweepEmissionContext = {
   readonly s: number;
   readonly feed: number;
-  readonly scanOffsetMm: number;
   readonly device: DeviceProfile;
   readonly dialect: GrblGcodeDialect;
 };
 
 function emitFillSweep(plan: FillSweepPlan, context: FillSweepEmissionContext): string {
-  const spans = scanOffsetSpans(plan.sweep, context.scanOffsetMm);
+  const spans = plan.sweep.spans;
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return '';
@@ -314,14 +309,6 @@ function runwayLine(
   return laserOffRunwayLine(target.x, target.y, context.feed);
 }
 
-function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<FillSpan> {
-  if (!sweep.reverse || scanOffsetMm === 0) return sweep.spans;
-  return sweep.spans.map((span) => {
-    const shifted = shiftAlongTravel(span.start, span.end, scanOffsetMm);
-    return { start: shifted.from, end: shifted.to };
-  });
-}
-
 // The G1 chain for one sweep: burn each ink span (S{s}), blank each interior
 // gap (S0). F rides only the first emitted G1 (modal). A head tracker skips any
 // move whose target equals the current position at emit precision (3 dp), so a
@@ -340,12 +327,12 @@ function sweepSpanLines(
   if (first === undefined) return [];
   const lines: string[] = [];
   // Head starts where the planned runway move left it: the first span's start.
-  let headX = fmt(first.start.x);
-  let headY = fmt(first.start.y);
+  let headX = formatGcodeCoordinateMm(first.start.x);
+  let headY = formatGcodeCoordinateMm(first.start.y);
   let feedEmitted = false;
   const moveTo = (x: number, y: number, sWord: string): void => {
-    const fx = fmt(x);
-    const fy = fmt(y);
+    const fx = formatGcodeCoordinateMm(x);
+    const fy = formatGcodeCoordinateMm(y);
     if (fx === headX && fy === headY) return; // zero-length at emit precision — skip
     const feedWord = feedEmitted && dialect.modalFeedrate ? '' : ` F${feed}`;
     feedEmitted = true;

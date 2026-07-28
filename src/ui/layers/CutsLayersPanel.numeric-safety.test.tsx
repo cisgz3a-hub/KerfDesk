@@ -75,6 +75,27 @@ describe('CutsLayersPanel numeric safety', () => {
     }
   });
 
+  it('shows the generic effective runway without mislabeling a negative stored value', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const operationId = requireOperationId();
+    useStore.getState().setLayerParam(operationId, {
+      mode: 'fill',
+      fillStyle: 'scanline',
+      fillOverscanMm: 0,
+    });
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.textContent).toContain('stored 0; generic effective target 5 mm');
+      act(() => {
+        useStore.getState().setLayerParam(operationId, { fillOverscanMm: -2 });
+      });
+      expect(host.textContent).toContain('stored -2; generic effective target 5 mm');
+      expect(host.textContent).not.toContain('stored 0; generic effective target 5 mm');
+    } finally {
+      await unmount();
+    }
+  });
+
   it('does not commit maximum raster density when visible image density fields are blanked', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam(requireOperationId(), { mode: 'image', linesPerMm: 10 });

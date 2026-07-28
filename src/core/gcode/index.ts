@@ -23,3 +23,8 @@ export {
   type RArcGeometry,
   type XyPoint,
 } from './arc-solve';
+export {
+  formatGcodeCoordinateMm,
+  GCODE_COORDINATE_DECIMAL_PLACES,
+  hasGcodeXyMotionAtEmitPrecision,
+} from './coordinate-format';

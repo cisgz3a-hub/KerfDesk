@@ -41,10 +41,10 @@ describe('groupFillSweeps', () => {
     ]);
   });
 
-  it('splits a scanline at a large gap so the emitter rapids across it (ADR-035)', () => {
+  it('splits a scanline at a large gap for policy-owned boundary motion (ADR-035)', () => {
     // Two regions 15mm apart on one scanline — above the 5mm threshold — become
-    // SEPARATE sweeps. The emitter then crosses the gap with a G0 rapid (hard
-    // laser-off) instead of a slow G1 S0 feed move (the stray-line audit fix).
+    // SEPARATE sweeps. The motion policy can then use bounded edge runways and
+    // rapid only across any unused center instead of one long G1 S0 gap move.
     const sweeps = groupFillSweeps([seg(0, 0, 5, 0), seg(20, 0, 25, 0)]);
     expect(sweeps).toHaveLength(2);
     expect(sweeps[0]).toEqual({

@@ -64,7 +64,7 @@ function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): b
   const scopedProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
   const job = compileJob(scopedProject.scene, scopedProject.device);
-  const heatRisk = analyzeFillHeatRisk(job);
+  const heatRisk = analyzeFillHeatRisk(job, scopedProject.device.scanningOffsets);
   return (
     heatRisk.sensitiveIslandShortSweepCount > 0 ||
     heatRisk.islandNoRunwayShortSweepCount > 0 ||

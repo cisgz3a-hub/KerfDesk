@@ -239,7 +239,11 @@ export type JobDiagnostic =
   // Line mode's kerf compensation failed in the geometry engine, so every
   // closed contour on the layer was dropped from the cut. Same silent-loss
   // shape as the offset fill, on the path that cuts the part itself.
-  | { readonly kind: 'kerf-offset-failed'; readonly layerName: string };
+  | { readonly kind: 'kerf-offset-failed'; readonly layerName: string }
+  // Hatch geometry existed, but every sweep rounded to a stationary point at
+  // emitted G-code precision. Keep this advisory so microscopic fill loss is
+  // visible without turning it into a Start, Frame, or export refusal.
+  | { readonly kind: 'fill-collapsed-at-precision'; readonly layerName: string };
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;

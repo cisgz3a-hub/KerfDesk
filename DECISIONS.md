@@ -2131,6 +2131,18 @@ calibration-free lever and the right first step.
   effect at 1500 mm/min (the zipper is small at this feed); the bigger small-text
   wins are ADR-036 (density) and ADR-037 (trace fidelity).
 
+### Amendment (2026-07-28) - generic traced Scan Line starts one-way
+
+The original `default true` and `new layers default to snake` statements above
+remain authoritative for ordinary vector Fill layers. A newly committed traced
+image is narrower: when it creates a generic/default Scan Line operation with no
+explicit direction and no verified or legacy-verified scan-offset calibration,
+that operation starts one-way so the uncalibrated trace workflow does not
+alternate direction by default. An explicitly requested direction or qualifying
+calibration remains authoritative. Island Fill, Raster Image, ordinary vector
+operations, and the qualified 4040 direction policy retain their existing
+defaults; opening an old project does not rewrite its scan direction.
+
 ---
 
 ## ADR-039 - Split a raster row at wide white gaps so the emitter rapids across them
@@ -10413,9 +10425,10 @@ transitions untouched, especially on alternating reverse rows.
 ### Decision
 
 1. Ordinary scanline Fill compiled for the `neotronics-4040-safe` dialect carries a
-   `feed-matched-entry` runway policy. Default/Falcon-compatible motion bodies remain
-   byte-compatible; exported metadata intentionally advances to the new emitter revision. Offset
-   Fill and Island Fill keep their existing policies.
+   `feed-matched-entry` runway policy. At this decision's acceptance,
+   Default/Falcon-compatible motion bodies remained byte-compatible; the 2026-07-28 ADR-238
+   amendment supersedes that generic-motion statement. Offset Fill and Island Fill keep their
+   existing policies.
 2. ADR-035's 5 mm split threshold remains unchanged. At every internal split, the preceding sweep
    owns no trailing runway. The next sweep starts with G0/S0 over the gap remainder, followed by up
    to `min(configured overscan, 5 mm)` of monotonic `G1 F<fill feed> S0` before laser-on motion.
@@ -10598,16 +10611,18 @@ quality policy while preserving generic/Falcon output.
 - Compute Print-and-Cut/registration warnings from the prepared output-scoped project, not the
   unscoped source scene. Selecting only artwork or only the registration box therefore cannot inherit
   a false warning that both will burn in the same pass.
-- Export provenance advances to `adr-235-4040-quality-controlled-v2` because the combined controller
-  program differs from ADR-234 even though its non-overlapping split geometry remains governing.
+- At ADR-236 acceptance, export provenance advanced to
+  `adr-235-4040-quality-controlled-v2` because the combined controller program differed from
+  ADR-234 even though its non-overlapping split geometry remained governing.
 
 ### Consequences
 
 The 4040 now favors repeatable motion and aligned scan direction over minimum runtime. Bounded
 scanline entries and full-where-safe Island runways increase travel for fragmented art, and one-way
 scanning can approach twice the scan time; those costs are intentional and visible in the same
-planner used for ETA. Generic and Falcon profiles retain legacy direction, runway, and `G0` behavior
-unless explicitly configured otherwise.
+planner used for ETA. At ADR-236 acceptance, generic and Falcon profiles retained legacy direction,
+runway, and `G0` behavior unless explicitly configured otherwise; the 2026-07-28 ADR-238 amendment
+supersedes that runway statement for newly compiled generic Scan Line groups.
 Their ordinary vector bytes also remain unchanged; only paths with points equal at controller
 precision lose non-moving commands.
 
@@ -10702,10 +10717,9 @@ The maintainer directed this default on 2026-07-21.
   4040-safe dialect they engrave through ADR-234's feed-matched entry runways; that geometry is
   structurally pinned by tests but its physical burn quality remains hardware-verification
   pending, exactly as ADR-234 states.
-- Profiles that are not on the 4040-safe dialect keep ADR-234's deliberately-preserved legacy
-  fill motion (including the ADR-033 short-run overscan skip). The existing conditional
-  advisories for a suspected 4040 on a generic profile are the sanctioned mitigation; this ADR
-  does not widen any policy or add any guard.
+- At ADR-238 acceptance, profiles outside the 4040-safe dialect kept ADR-234's legacy fill motion.
+  The 2026-07-28 amendment below supersedes that statement for newly compiled generic Scan Line
+  groups while retaining the historical behavior for explicit legacy artifacts and fixtures.
 - Operators who prefer the photo-parity scan motion — the pipeline the maintainer physically
   verified as clean — pick Raster scan in the dialog; nothing about that path changes.
 
@@ -10716,6 +10730,36 @@ The maintainer directed this default on 2026-07-21.
   Raster scan; CNC tracing remains vector-only with no output picker.
 - No compiler, emitter, or G-code change: the diff is dialog state, option labels/order, the
   select parser fallback, and these tests.
+
+### Amendment (2026-07-28) - generic Scan Line every-sweep runway
+
+The original consequence that non-4040 profiles keep the ADR-033 short-run skip
+is superseded for newly compiled generic Scan Line groups. They now carry an
+explicit `feed-matched-every-sweep` plan: every independent sweep receives a
+laser-off entry and exit at burn feed, even when the powered span is shorter
+than twice the configured runway. Adjacent sweeps split the available blank gap
+symmetrically so their runways never overlap; a gap wider than both full runways
+retains a laser-off rapid across only the unused center.
+
+This does not change close-gap `S0` bridging, Raster Image motion, Island Fill,
+Follow Shape, or the qualified 4040 policy. A stored zero on a newly compiled
+generic Scan Line group now resolves to the bounded 5 mm generic fallback so it
+cannot reintroduce a rapid-to-powered start; the editor retains the stored value
+and Job Review reports the effective target separately. Newly
+committed generic traced Scan Line operations default one-way as amended under
+ADR-038 unless an explicit choice or verified/legacy-verified calibration applies.
+`computeJobMotionBounds`, and therefore the physical Frame rectangle and its
+recorded signature, consume the same
+planned entry/exit endpoints as G-code, preview, and duration estimation.
+Export provenance advances to `adr-238-generic-scanline-runway-v1`.
+
+The added travel is an explicit quality/runtime trade. A planner regression with
+twenty 0.5 mm fragments, 12 mm apart, at 1500 mm/min on the reported 2250 mm/min,
+300 mm/s² motion constraints accepts at most one second per fragment (20 seconds
+total). The current plan estimates below that bound while retaining full bounded
+runways around every sweep.
+Software establishes geometry and parity only; physical burn quality on the
+reported 440 remains controlled-test qualification work.
 
 ---
 

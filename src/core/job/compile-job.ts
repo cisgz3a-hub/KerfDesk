@@ -35,6 +35,7 @@ import {
 } from './compile-job-object-policy';
 import { compilationPolylines } from './compilation-polylines';
 import { contourEntryRunwayMm } from './contour-entry';
+import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import type { CutSegment, Group, Job, JobDiagnostic } from './job';
@@ -221,10 +222,20 @@ function offsetOrHatchFillGroups(
     : NO_DIAGNOSTICS;
   if (fill.segments.length === 0) return { groups: [], diagnostics };
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
-  return {
-    groups: [buildFillGroup({ layer, device, common, scanDirection, segments: fill.segments })],
-    diagnostics,
-  };
+  const group = buildFillGroup({
+    layer,
+    device,
+    common,
+    scanDirection,
+    segments: fill.segments,
+  });
+  if (!hasExecutableFillSweep(group, device.scanningOffsets)) {
+    return {
+      groups: [],
+      diagnostics: [...diagnostics, { kind: 'fill-collapsed-at-precision', layerName: layer.name }],
+    };
+  }
+  return { groups: [group], diagnostics };
 }
 
 function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {

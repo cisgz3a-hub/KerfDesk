@@ -27,6 +27,7 @@ import {
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateArtworkWithOperations } from './duplicate-artwork';
+import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
 
@@ -224,9 +225,10 @@ export function applyFreshImport(
   const created = createArtworkOperations(s.project.scene, positioned, {
     mode: freshArtworkMode(positioned),
   });
+  const operations = applyFreshTraceScanDirection(positioned, created.operations, s.project.device);
   positioned = created.object;
   let scene = addObject(s.project.scene, positioned);
-  for (const operation of created.operations) scene = addLayer(scene, operation);
+  for (const operation of operations) scene = addLayer(scene, operation);
   return {
     project: { ...s.project, scene },
     selectedObjectId: positioned.id,
@@ -299,10 +301,15 @@ export function applyTraceToExisting(
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
   });
+  const operations = applyFreshTraceScanDirection(
+    positionedTrace,
+    created.operations,
+    s.project.device,
+  );
   scene = replaceInPlace
     ? replaceObject(scene, positionedTrace.id, created.object)
     : addObject(scene, created.object);
-  for (const operation of created.operations) scene = addLayer(scene, operation);
+  for (const operation of operations) scene = addLayer(scene, operation);
   if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined) {
     scene = pruneOrphanLayers(scene);
   }

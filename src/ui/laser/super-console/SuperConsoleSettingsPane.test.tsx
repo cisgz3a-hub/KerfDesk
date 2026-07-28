@@ -73,15 +73,22 @@ afterEach(() => {
 });
 
 describe('SuperConsoleSettingsPane', () => {
-  it('reports whether the selected profile activates the 4040 fill-quality policy', async () => {
+  it('distinguishes generic runways from the Neotronics-qualified fill policy', async () => {
     const generic = await renderPane();
-    expect(generic.host.textContent).toContain('4040 fill-quality policy inactive');
+    expect(generic.host.textContent).toContain(
+      'Generic Scan Line feed-matched entry and exit runways are active',
+    );
+    expect(generic.host.textContent).toContain(
+      'Neotronics-qualified 4040 fill policy is not selected',
+    );
     await generic.unmount();
 
     useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     const neotronics = await renderPane();
-    expect(neotronics.host.textContent).toContain('4040 fill-quality policy active');
-    expect(neotronics.host.textContent).not.toContain('4040 fill-quality policy inactive');
+    expect(neotronics.host.textContent).toContain('Neotronics-qualified 4040 fill policy active');
+    expect(neotronics.host.textContent).not.toContain(
+      'Neotronics-qualified 4040 fill policy is not selected',
+    );
     await neotronics.unmount();
 
     useStore.getState().replaceDeviceProfile(FALCON_COMPATIBLE_PROFILE);

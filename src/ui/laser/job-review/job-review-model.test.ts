@@ -199,9 +199,9 @@ describe('buildJobReviewModel', () => {
     const model = await buildModelFromCurrentStores();
     const runway = model.stats.find((tile) => tile.label === 'Fill runway');
 
-    expect(runway?.value).toMatch(/^0 \/ \d+ full$/);
-    expect(runway?.detail).toContain('Requested 5 mm');
-    expect(runway?.detail).toMatch(/\d+ skipped/);
+    expect(runway?.value).toBe('8 / 8 full');
+    expect(runway?.detail).toContain('Effective target 5 mm');
+    expect(runway?.detail).toContain('0 skipped');
     expect(model.outputQualityFacts).toContainEqual(
       expect.objectContaining({ label: 'Fill runway coverage' }),
     );

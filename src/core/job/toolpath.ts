@@ -17,8 +17,7 @@ import type { FillGroup, Group, Job } from './job';
 import { contourEntryPoint } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
-import type { FillSpan, FillSweep } from './fill-sweeps';
-import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
+import { offsetForSpeed } from './scan-offset';
 import { appendCncGroupSteps, createCncSimState, type CncSimState } from './toolpath-cnc';
 import { appendTravelStep, dist, polylineLength } from './toolpath-math';
 import { appendRasterGroupSteps } from './toolpath-raster-steps';
@@ -101,10 +100,10 @@ function appendFillGroupSteps(
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForSpeed(options.scanningOffsets ?? [], group.speed);
   let prevEnd = initialPrevEnd;
-  const plans = planFillSweeps(group);
+  const plans = planFillSweeps(group, scanOffsetMm);
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const plan of plans) {
-      const end = appendFillSweepSteps(steps, prevEnd, plan, group.color, scanOffsetMm);
+      const end = appendFillSweepSteps(steps, prevEnd, plan, group.color);
       if (end !== null) prevEnd = end;
     }
   }
@@ -185,9 +184,8 @@ function appendFillSweepSteps(
   prevEnd: Vec2 | null,
   plan: FillSweepPlan,
   color: string,
-  scanOffsetMm: number,
 ): Vec2 | null {
-  const spans = scanOffsetSpans(plan.sweep, scanOffsetMm);
+  const spans = plan.sweep.spans;
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return null;
@@ -219,12 +217,4 @@ function appendFillSweepSteps(
     plan.runwayMotion === 'feed-matched' ? 'feed' : 'rapid',
   );
   return run.leadEnd;
-}
-
-function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<FillSpan> {
-  if (!sweep.reverse || scanOffsetMm === 0) return sweep.spans;
-  return sweep.spans.map((span) => {
-    const shifted = shiftAlongTravel(span.start, span.end, scanOffsetMm);
-    return { start: shifted.from, end: shifted.to };
-  });
 }

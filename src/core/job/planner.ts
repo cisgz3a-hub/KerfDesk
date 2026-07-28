@@ -47,7 +47,7 @@ import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Job, RasterGroup } from './job';
 import { rasterDurationMotion } from './raster-duration-motion';
-import { offsetForSpeed, shiftedScanSweepEndpoints } from './scan-offset';
+import { offsetForSpeed } from './scan-offset';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
@@ -194,30 +194,15 @@ function appendFillGroupBlocks(
   device: DeviceProfile,
 ): Vec2 {
   let cursor = initialCursor;
-  const plans = planFillSweeps(group);
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, group.speed);
+  const plans = planFillSweeps(group, scanOffsetMm);
   for (let pass = 0; pass < group.passes; pass += 1) {
     for (const plan of plans) {
-      cursor = appendFillSweepBlocks(
-        out,
-        cursor,
-        fillPlanWithScanOffset(plan, scanOffsetMm),
-        cutV,
-        travelV,
-      );
+      cursor = appendFillSweepBlocks(out, cursor, plan, cutV, travelV);
     }
   }
   return cursor;
-}
-
-function fillPlanWithScanOffset(plan: FillSweepPlan, scanOffsetMm: number): FillSweepPlan {
-  if (!plan.sweep.reverse || scanOffsetMm === 0) return plan;
-  const spans = plan.sweep.spans.map((span) => {
-    const shifted = shiftedScanSweepEndpoints(span, span, true, scanOffsetMm);
-    return { start: shifted.start, end: shifted.end };
-  });
-  return { ...plan, sweep: { ...plan.sweep, spans } };
 }
 
 function appendFillSweepBlocks(

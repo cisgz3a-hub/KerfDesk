@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createLayer, IDENTITY_TRANSFORM, type Scene, type TracedImage } from '../scene';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { grblStrategy } from '../output/grbl-strategy';
 import { fillHatchingWithMetadata } from './fill-hatching';
 import { compileJob } from './compile-job';
+
+const CALIBRATED_OFFSET_MM = 0.0004;
 
 vi.mock('./fill-hatching', () => ({
   fillHatchingWithMetadata: vi.fn(() => [
@@ -46,7 +49,11 @@ function tracedFillScene(): Scene {
   };
   return {
     layers: [
-      { ...createLayer({ id: '#000000', color: '#000000', mode: 'fill' }), hatchSpacingMm: 1 },
+      {
+        ...createLayer({ id: '#000000', color: '#000000', mode: 'fill' }),
+        hatchSpacingMm: 1,
+        fillBidirectional: true,
+      },
     ],
     objects: [traced],
   };
@@ -73,7 +80,7 @@ describe('compileJob fill hatch cache', () => {
       layers: base.layers.map((l) => ({ ...l, fillBidirectional: false })),
     };
 
-    compileJob(base, DEFAULT_DEVICE_PROFILE); // bidirectional: true (default)
+    compileJob(base, DEFAULT_DEVICE_PROFILE); // explicitly bidirectional
     compileJob(uni, DEFAULT_DEVICE_PROFILE); // bidirectional: false
 
     // The compile path threads the layer flag into fillHatching...
@@ -103,5 +110,55 @@ describe('compileJob fill hatch cache', () => {
       expect.objectContaining({ hatchAngleDeg: 90, bidirectional: true }),
     );
     expect(fillHatchingWithMetadata).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains a reverse hatch that becomes emittable after calibrated translation', () => {
+    const scene = tracedFillScene();
+    const layer = scene.layers[0];
+    if (layer === undefined) throw new Error('Expected traced fill fixture layer');
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: layer.speed, offsetMm: CALIBRATED_OFFSET_MM }],
+    };
+    vi.mocked(fillHatchingWithMetadata).mockReturnValueOnce([
+      {
+        points: [
+          { x: 10.0004, y: 0 },
+          { x: 9.9996, y: 0 },
+        ],
+        closed: false,
+        reverse: true,
+      },
+    ]);
+
+    const job = compileJob(scene, device);
+    const gcode = grblStrategy.emit(job, device);
+
+    expect(job.groups).toHaveLength(1);
+    expect(job.diagnostics).toBeUndefined();
+    expect(gcode).toContain('G1 X9.999 Y0.000');
+  });
+
+  it('removes a generic fill group when every hatch collapses at emitted precision', () => {
+    const scene = tracedFillScene();
+    vi.mocked(fillHatchingWithMetadata).mockReturnValueOnce([
+      {
+        points: [
+          { x: 10.0004, y: 0 },
+          { x: 9.9996, y: 0 },
+        ],
+        closed: false,
+        reverse: true,
+      },
+    ]);
+
+    const job = compileJob(scene, DEFAULT_DEVICE_PROFILE);
+    const gcode = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+
+    expect(job.groups).toEqual([]);
+    expect(job.diagnostics).toEqual([
+      { kind: 'fill-collapsed-at-precision', layerName: 'Operation' },
+    ]);
+    expect(gcode).not.toMatch(/^G1\b/m);
   });
 });

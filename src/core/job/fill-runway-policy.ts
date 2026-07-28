@@ -9,12 +9,14 @@ import type { LayerFillStyle } from '../scene';
 /**
  * Executable runway semantics carried by a compiled fill group.
  *
- * `feed-matched-entry` is the governing 4040 fill policy from ADR-234. The
- * remaining values are retained for explicit legacy fixtures and for the
- * raster-to-fill planner model. `raster-bounded` mirrors the emitter's
- * monotonic split-gap runways; `raster-full` preserves the former model.
+ * `feed-matched-every-sweep` is the generic Scan Line quality policy: every
+ * independent sweep gets a feed-matched laser-off entry and exit, with adjacent
+ * split runways sharing the available blank gap. `feed-matched-entry` remains
+ * the narrower 4040 policy from ADR-234. The remaining values are retained for
+ * explicit legacy fixtures and for the raster-to-fill planner model.
  */
 export type FillRunwayPolicy =
+  | 'feed-matched-every-sweep'
   | 'feed-matched-entry'
   | 'full'
   | 'raster-bounded'

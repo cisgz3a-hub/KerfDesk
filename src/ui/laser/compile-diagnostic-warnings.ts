@@ -15,6 +15,9 @@ import { assertNever } from '../../core/scene';
 type CompiledJob = ReturnType<typeof compileJob>;
 type CompileDiagnostic = NonNullable<CompiledJob['diagnostics']>[number];
 
+const FILL_COLLAPSED_AT_PRECISION_WARNING = (layerName: string): string =>
+  `Fill on layer "${layerName}" is missing from the job because every hatch sweep rounds to a stationary point at emitted G-code precision. Check the preview, and enlarge the artwork or use a Line operation if this microscopic detail must remain visible.`;
+
 export function compileDiagnosticWarnings(job: CompiledJob): ReadonlyArray<string> {
   return (job.diagnostics ?? []).map(diagnosticWarning);
 }
@@ -25,6 +28,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return offsetFillFailedWarning(diagnostic.layerName);
     case 'kerf-offset-failed':
       return kerfOffsetFailedWarning(diagnostic.layerName);
+    case 'fill-collapsed-at-precision':
+      return FILL_COLLAPSED_AT_PRECISION_WARNING(diagnostic.layerName);
     default:
       return assertNever(diagnostic, 'JobDiagnostic');
   }

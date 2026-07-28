@@ -154,7 +154,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     );
   });
 
-  it('keeps generic legacy Fill runway bytes on G0 while 4040 uses the quality policy', () => {
+  it('keeps explicitly tagged legacy Fill runway bytes on G0', () => {
     const source = twoSweepFillJob.groups[0];
     if (source?.kind !== 'fill') throw new Error('Expected fill fixture');
     const out = grblStrategy.emit(

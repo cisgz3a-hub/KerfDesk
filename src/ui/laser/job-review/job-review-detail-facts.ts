@@ -45,7 +45,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     `${formatMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
-    `overscan ${formatMm(settings.fillOverscanMm)} mm`,
+    `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
     ...powerModePart(settings),
   ].join(SEPARATOR);
 }

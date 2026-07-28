@@ -1,6 +1,7 @@
-import { planFillSweeps } from './fill-sweep-plan';
+import { genericFeedMatchedFillRunwayMm, planFillSweeps } from './fill-sweep-plan';
 import { isSensitiveIslandFillPolicy } from './island-fill-motion';
 import type { FillGroup, Job } from './job';
+import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
 
 export type FillHeatRiskSummary = {
   readonly fillSweepCount: number;
@@ -22,7 +23,10 @@ type MutableFillHeatRiskSummary = Omit<
   'fillRequestedRunwayValuesMm'
 > & { fillRequestedRunwayValuesMm: number[] };
 
-export function analyzeFillHeatRisk(job: Job): FillHeatRiskSummary {
+export function analyzeFillHeatRisk(
+  job: Job,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
+): FillHeatRiskSummary {
   const summary: MutableFillHeatRiskSummary = {
     fillSweepCount: 0,
     fillFullRunwaySweepCount: 0,
@@ -40,26 +44,38 @@ export function analyzeFillHeatRisk(job: Job): FillHeatRiskSummary {
 
   for (const group of job.groups) {
     if (group.kind !== 'fill' || (group.fillStyle ?? 'scanline') === 'offset') continue;
-    accumulateFillGroupRisk(summary, group);
+    accumulateFillGroupRisk(summary, group, scanningOffsets);
   }
   return summary;
 }
 
-function accumulateFillGroupRisk(summary: MutableFillHeatRiskSummary, group: FillGroup): void {
-  const requested = Math.max(0, group.overscanMm);
+function accumulateFillGroupRisk(
+  summary: MutableFillHeatRiskSummary,
+  group: FillGroup,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+): void {
+  const requested =
+    group.fillRunwayPolicy === 'feed-matched-every-sweep'
+      ? genericFeedMatchedFillRunwayMm(group.overscanMm)
+      : Math.max(0, group.overscanMm);
   if (!summary.fillRequestedRunwayValuesMm.includes(requested)) {
     summary.fillRequestedRunwayValuesMm.push(requested);
     summary.fillRequestedRunwayValuesMm.sort((a, b) => a - b);
   }
   const emittedPasses = Math.max(1, Math.floor(group.passes));
-  for (const plan of planFillSweeps(group)) {
+  const scanOffsetMm =
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
+  for (const plan of planFillSweeps(group, scanOffsetMm)) {
     const sweep = plan.sweep;
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
     if (first === undefined || last === undefined) continue;
     const length = Math.hypot(last.end.x - first.start.x, last.end.y - first.start.y);
     if (length <= 0) continue;
-    const effective = plan.leadInMm;
+    const effective =
+      group.fillRunwayPolicy === 'feed-matched-every-sweep'
+        ? Math.min(plan.leadInMm, plan.leadOutMm)
+        : plan.leadInMm;
     summary.fillSweepCount += emittedPasses;
     summary.minFillSweepMm =
       summary.minFillSweepMm === null ? length : Math.min(summary.minFillSweepMm, length);

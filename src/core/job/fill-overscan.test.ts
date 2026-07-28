@@ -100,7 +100,7 @@ describe('effectiveFillOverscanMm', () => {
     { x: len, y: 0 },
   ];
 
-  it('keeps scanline short-run behavior byte-stable', () => {
+  it('keeps explicit legacy scanline short-run behavior byte-stable', () => {
     expect(effectiveFillOverscanMm(hatch(3), 5, 'scanline')).toBe(0);
     expect(effectiveFillOverscanMm(hatch(3), 5, undefined)).toBe(0);
   });
@@ -129,7 +129,7 @@ describe('effectiveFillOverscanMm', () => {
 describe('fillOverscanCommentText', () => {
   const fmt = (n: number) => n.toFixed(3);
 
-  it('states the ADR-033 short-run skip threshold for scanline fill', () => {
+  it('states the ADR-033 short-run skip threshold for legacy scanline fill', () => {
     expect(fillOverscanCommentText(5, 'scanline', undefined, fmt)).toBe(
       'overscan 5.000 mm (skipped on runs shorter than 10.000 mm; ADR-033)',
     );

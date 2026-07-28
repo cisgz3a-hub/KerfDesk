@@ -2,14 +2,17 @@ import { useState } from 'react';
 import type { Layer } from '../../core/scene';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
+import { genericRunwayFallbackText } from './fill-overscan-fallback';
 
 export function CutSettingsFillFields(props: {
   readonly layer: Layer;
   readonly lineIntervalMm: number;
   readonly onLineIntervalMmChange: (lineIntervalMm: number) => void;
 }): JSX.Element {
+  const [fillStyle, setFillStyle] = useState(props.layer.fillStyle);
   const [hatchAngleDeg, setHatchAngleDeg] = useState(props.layer.hatchAngleDeg);
   const [fillCrossHatch, setFillCrossHatch] = useState(props.layer.fillCrossHatch);
+  const [fillOverscanMm, setFillOverscanMm] = useState(props.layer.fillOverscanMm);
   return (
     <fieldset className="lf-fieldset">
       <legend className="lf-legend">Fill</legend>
@@ -18,7 +21,13 @@ export function CutSettingsFillFields(props: {
         <select
           name="fillStyle"
           className="lf-select"
-          defaultValue={props.layer.fillStyle}
+          value={fillStyle}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            if (value === 'scanline' || value === 'offset' || value === 'island') {
+              setFillStyle(value);
+            }
+          }}
           aria-label="Cut settings fill style"
           title="Choose Scanline, Follow Shape, or Island Fill for filled paths."
         >
@@ -42,16 +51,11 @@ export function CutSettingsFillFields(props: {
         lineIntervalMm={props.lineIntervalMm}
         onChange={props.onLineIntervalMmChange}
       />
-      <Field label="Overscan">
-        <NumberInput
-          name="fillOverscanMm"
-          value={props.layer.fillOverscanMm}
-          min={0}
-          max={25}
-          step={0.5}
-        />
-        <span className="lf-field-unit">mm</span>
-      </Field>
+      <FillOverscanField
+        fillStyle={fillStyle}
+        value={fillOverscanMm}
+        onChange={setFillOverscanMm}
+      />
       <Field label="Bidirectional">
         <input
           name="fillBidirectional"
@@ -74,6 +78,29 @@ export function CutSettingsFillFields(props: {
         />
       </Field>
     </fieldset>
+  );
+}
+
+function FillOverscanField(props: {
+  readonly fillStyle: Layer['fillStyle'];
+  readonly value: number;
+  readonly onChange: (value: number) => void;
+}): JSX.Element {
+  return (
+    <Field label="Overscan">
+      <NumberInput
+        name="fillOverscanMm"
+        value={props.value}
+        min={0}
+        max={25}
+        step={0.5}
+        onChange={props.onChange}
+      />
+      <span className="lf-field-unit">mm</span>
+      {props.fillStyle === 'scanline' && props.value <= 0 ? (
+        <span style={FALLBACK_STYLE}>{genericRunwayFallbackText(props.value)}</span>
+      ) : null}
+    </Field>
   );
 }
 
@@ -137,3 +164,7 @@ const controlStyle: React.CSSProperties = {
   gap: 6,
 };
 const numberStyle: React.CSSProperties = { width: 96 };
+const FALLBACK_STYLE: React.CSSProperties = {
+  color: 'var(--lf-text-muted)',
+  fontSize: 11,
+};

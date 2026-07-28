@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../../core/devices';
 import { runStandaloneCncPreflight } from '../../core/preflight';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
+import { EMITTER_REVISION } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
@@ -102,7 +103,7 @@ describe('SurfacingPanel save path', () => {
     const data = write.mock.calls[0]?.[0];
     expect(typeof data).toBe('string');
     if (typeof data !== 'string') throw new Error('expected text output');
-    expect(data).toContain('; emitter: adr-235-4040-quality-controlled-v2');
+    expect(data).toContain(`; emitter: ${EMITTER_REVISION}`);
     expect(data.indexOf('G0 Z3.810')).toBeLessThan(data.indexOf('M3 S12000'));
     expect(data).toContain('F500.000');
     expect(data).not.toContain('F2500.000');

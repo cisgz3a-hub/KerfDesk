@@ -37,8 +37,14 @@ describe('laserOperationDetail', () => {
   it('summarizes a fill operation: style, hatch, direction, overscan', () => {
     const layer: Layer = { ...baseLayer, mode: 'fill', fillCrossHatch: true };
     expect(laserOperationDetail(layer)).toBe(
-      'Scanline fill · 0.1 mm hatch at 0° · bidirectional · cross-hatch · overscan 5 mm',
+      'Scanline fill · 0.1 mm hatch at 0° · bidirectional · cross-hatch · stored overscan 5 mm',
     );
+  });
+
+  it('keeps a stored zero distinct from the prepared job effective runway target', () => {
+    const layer: Layer = { ...baseLayer, mode: 'fill', fillOverscanMm: 0 };
+
+    expect(laserOperationDetail(layer)).toContain('stored overscan 0 mm');
   });
 
   it('summarizes an image operation: dither, resolution, extras only when set', () => {

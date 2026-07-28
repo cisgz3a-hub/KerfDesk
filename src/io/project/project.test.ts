@@ -70,6 +70,27 @@ describe('deserializeProject', () => {
     }
   });
 
+  it.each([false, true])(
+    'roundtrips an explicit Fill direction value (%s)',
+    (fillBidirectional) => {
+      const base = aProject();
+      const original: Project = {
+        ...base,
+        scene: {
+          ...base.scene,
+          layers: base.scene.layers.map((layer) => ({ ...layer, fillBidirectional })),
+        },
+      };
+
+      const result = deserializeProject(serializeProject(original));
+
+      expect(result.kind).toBe('ok');
+      if (result.kind === 'ok') {
+        expect(result.project.scene.layers[0]?.fillBidirectional).toBe(fillBidirectional);
+      }
+    },
+  );
+
   it('roundtrips a shape object (Phase G, ADR-051)', () => {
     const shape = createRectangle({
       id: 'S1',
