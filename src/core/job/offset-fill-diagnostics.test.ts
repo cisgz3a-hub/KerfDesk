@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { grblStrategy } from '../output';
 import { runPreflight } from '../preflight';
-import { grblStrategy } from '../output/grbl-strategy';
 import {
   createLayer,
   createProject,

@@ -1,6 +1,6 @@
 import { assertNever } from '../scene';
 import type { JobDiagnostic } from './job';
-import type { OffsetFillTermination } from './offset-fill';
+import type { OffsetFillTermination } from './offset-fill-termination';
 
 const NO_DIAGNOSTICS: ReadonlyArray<JobDiagnostic> = [];
 
