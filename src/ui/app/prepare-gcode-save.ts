@@ -26,9 +26,9 @@ export async function prepareGcodeSave(
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): Promise<PreparedGcodeSave> {
   const emission = await emitSaveGcode(ctx, placement);
-  // Preserve the preparation boundary instead of guessing from empty text or
-  // widening the global preflight-code set: these inputs produced no program.
-  if (emission.kind === 'preparation-failed') {
+  // Preserve both factual no-program boundaries instead of widening the
+  // global preflight-code set: neither result contains writable bytes.
+  if (emission.kind !== 'emitted') {
     showFailure(emission.preflight.issues);
     return { kind: 'failed' };
   }

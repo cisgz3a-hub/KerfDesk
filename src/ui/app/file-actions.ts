@@ -171,9 +171,9 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     await handleSaveRd(ctx, placement);
     return;
   }
-  // prepareGcodeSave (#481) owns the preparation-failure stop and the Rule 7 /
-  // ADR-228 blocking-vs-advisory split: it refuses only on blocking findings
-  // and hands the advisory ones back for post-save toasts.
+  // prepareGcodeSave owns factual non-writable preparation/emission outcomes
+  // plus the Rule 7 / ADR-228 blocking-vs-advisory split for emitted output.
+  // Advisory findings remain available for post-save toasts.
   const prepared = await prepareGcodeSave(ctx, placement);
   if (prepared.kind === 'failed') return;
   // Rule 7 / ADR-228: stated HERE, where the deleted confirm stood, rather than

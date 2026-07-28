@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import {
@@ -47,6 +48,40 @@ describe('output preparation worker payload', () => {
         preflight: { issues: [{ code: 'selected-output-empty' }] },
       },
     });
+    expect(() => structuredClone(response)).not.toThrow();
+  });
+
+  it('returns a cloneable non-writable Save result when rotary raster permission is absent', () => {
+    const response = prepareOutputRequest({
+      kind: 'save',
+      project: rotaryRasterSaveProject(),
+      options: {},
+    });
+
+    expect(response).toMatchObject({
+      kind: 'save',
+      result: {
+        kind: 'emission-refused',
+        gcode: '',
+        preflight: { issues: [{ code: 'rotary-raster-unsupported' }] },
+      },
+    });
+    expect(() => structuredClone(response)).not.toThrow();
+  });
+
+  it('returns emitted rotary raster bytes when worker permission is explicit', () => {
+    const response = prepareOutputRequest({
+      kind: 'save',
+      project: rotaryRasterSaveProject(),
+      options: { allowRotaryRaster: true },
+    });
+
+    expect(response).toMatchObject({
+      kind: 'save',
+      result: { kind: 'emitted', preflight: { issues: [] } },
+    });
+    if (response.kind !== 'save') throw new Error('Save did not prepare.');
+    expect(response.result.gcode).not.toBe('');
     expect(() => structuredClone(response)).not.toThrow();
   });
 
