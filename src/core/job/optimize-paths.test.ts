@@ -73,6 +73,15 @@ describe('optimizePaths', () => {
     expect(optimizePaths({ groups: [] })).toEqual({ groups: [] });
   });
 
+  it('retains compile diagnostics while reordering job geometry', () => {
+    const job: Job = {
+      groups: [group([seg([100, 0], [101, 0]), seg([0, 0], [1, 0])])],
+      diagnostics: [{ kind: 'offset-fill-pass-limit', layerName: 'Fill', passLimit: 2000 }],
+    };
+
+    expect(optimizePaths(job).diagnostics).toEqual(job.diagnostics);
+  });
+
   it('returns single-segment groups unchanged (no choice to make)', () => {
     const j: Job = { groups: [group([seg([0, 0], [10, 0])])] };
     expect(optimizePaths(j)).toEqual(j);

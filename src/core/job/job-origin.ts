@@ -166,7 +166,7 @@ function targetPoint(placement: JobOriginPlacement): Vec2 | null {
 }
 
 function translateJob(job: Job, dx: number, dy: number): Job {
-  return { groups: job.groups.map((group) => translateGroup(group, dx, dy)) };
+  return { ...job, groups: job.groups.map((group) => translateGroup(group, dx, dy)) };
 }
 
 function translateGroup(group: Group, dx: number, dy: number): Group {

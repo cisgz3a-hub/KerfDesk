@@ -236,6 +236,11 @@ export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 // list. Optional on Job so every existing Job literal stays valid.
 export type JobDiagnostic =
   | { readonly kind: 'offset-fill-failed'; readonly layerName: string }
+  | {
+      readonly kind: 'offset-fill-pass-limit';
+      readonly layerName: string;
+      readonly passLimit: number;
+    }
   // Line mode's kerf compensation failed in the geometry engine, so every
   // closed contour on the layer was dropped from the cut. Same silent-loss
   // shape as the offset fill, on the path that cuts the part itself.

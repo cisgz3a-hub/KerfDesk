@@ -67,21 +67,42 @@ describe('compileJob offset-fill diagnostics', () => {
     expect(job.diagnostics).toEqual([{ kind: 'offset-fill-failed', layerName: 'Offset Fill' }]);
   });
 
-  it('leaves diagnostics off the job entirely when the offset fill succeeds', () => {
-    offsetCheckedMock.mockImplementation(() => ({
+  it('reports the defensive pass limit while keeping the contours already generated', () => {
+    offsetCheckedMock.mockImplementation((polylines) => ({
       kind: 'ok',
-      value: [
-        {
-          points: [
-            { x: 5, y: 5 },
-            { x: 15, y: 5 },
-            { x: 15, y: 15 },
-            { x: 5, y: 15 },
-          ],
-          closed: true,
-        },
-      ],
+      value: polylines,
     }));
+
+    const job = compileJob(offsetFillScene(), DEFAULT_DEVICE_PROFILE);
+
+    expect(job.groups.filter((group) => group.kind === 'fill')).not.toEqual([]);
+    expect(job.diagnostics).toEqual([
+      { kind: 'offset-fill-pass-limit', layerName: 'Offset Fill', passLimit: 22 },
+    ]);
+  });
+
+  it('leaves diagnostics off the job entirely when the offset fill succeeds', () => {
+    let calls = 0;
+    offsetCheckedMock.mockImplementation(() => {
+      calls += 1;
+      return {
+        kind: 'ok',
+        value:
+          calls === 1
+            ? [
+                {
+                  points: [
+                    { x: 5, y: 5 },
+                    { x: 15, y: 5 },
+                    { x: 15, y: 15 },
+                    { x: 5, y: 15 },
+                  ],
+                  closed: true,
+                },
+              ]
+            : [],
+      };
+    });
 
     const job = compileJob(offsetFillScene(), DEFAULT_DEVICE_PROFILE);
 

@@ -39,6 +39,7 @@ import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import type { CutSegment, Group, Job, JobDiagnostic } from './job';
+import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
 
@@ -215,11 +216,10 @@ function offsetOrHatchFillGroups(
       ? layer
       : { ...layer, fillBidirectional: scanDirection.bidirectional };
   const fill = collectFillSegmentsForLayer(objects, hatchingLayer, device);
-  // Reported even when no segments survived: that is precisely the case where
-  // the layer would otherwise disappear from the job without a trace.
-  const diagnostics: ReadonlyArray<JobDiagnostic> = fill.offsetFailed
-    ? [{ kind: 'offset-fill-failed', layerName: layer.name }]
-    : NO_DIAGNOSTICS;
+  const diagnostics =
+    fill.offsetFillTermination === undefined
+      ? NO_DIAGNOSTICS
+      : offsetFillDiagnostics(fill.offsetFillTermination, layer.name);
   if (fill.segments.length === 0) return { groups: [], diagnostics };
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const group = buildFillGroup({
