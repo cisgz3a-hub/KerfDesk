@@ -24,6 +24,10 @@ import { bulgeCurveSegment, circleCurve, ellipseArcCurve } from './dxf-native-cu
 const DEGREES_TO_RADIANS = Math.PI / 180;
 const FULL_TURN = Math.PI * 2;
 const CLOSED_FLAG_BIT = 1;
+// Autodesk DXF SPLINE flag bit 2 means periodic. A periodic spline is
+// topologically closed even when its sampled endpoint coordinates happen not
+// to be identical after floating-point evaluation.
+const PERIODIC_SPLINE_FLAG_BIT = 2;
 const POLYLINE_MESH_FLAG_BITS = 16 | 64; // polygon/polyface meshes — 3D, skipped
 const MIN_POLYLINE_POINTS = 2;
 
@@ -130,6 +134,7 @@ export function ellipseToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): E
 
 export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const flags = Math.trunc(firstNumber(tags, 70));
+  const closed = (flags & (CLOSED_FLAG_BIT | PERIODIC_SPLINE_FLAG_BIT)) !== 0;
   const controlPoints: Vec2[] = [];
   for (const tag of tags) {
     if (tag.code === 10) controlPoints.push({ x: parseNumber(tag.value) * scale, y: 0 });
@@ -146,10 +151,9 @@ export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): En
     knots: allNumbers(tags, 40),
     controlPoints,
     weights: allNumbers(tags, 41),
-    closed: (flags & CLOSED_FLAG_BIT) !== 0,
+    closed,
   });
   if (result.kind === 'error') return { kind: 'skip', reason: `SPLINE: ${result.reason}` };
-  const closed = (flags & CLOSED_FLAG_BIT) !== 0;
   const points = [...result.points];
   if (
     closed &&
