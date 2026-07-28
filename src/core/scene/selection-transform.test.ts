@@ -90,13 +90,14 @@ describe('buildSelectionTransformEdit', () => {
     expect(result).toEqual({ kind: 'error', reason: 'non-uniform-rotated-selection' });
   });
 
-  it('rotates one object around the selected anchor without moving that anchor', () => {
+  // Rotation ignores the 9-dot anchor by construction (it carries none), so the
+  // centre stays pinned even when that anchor is the default 'nw'.
+  it('rotates one object about its centre without moving it', () => {
     const object = objectWithTransform('shape', { ...IDENTITY_TRANSFORM, x: 40, y: 25 });
     const beforeCenter = transformedCenter(object);
 
     const result = buildSelectionTransformEdit([object], {
       kind: 'rotate',
-      anchor: 'c',
       rotationDeg: 90,
     });
 
@@ -132,7 +133,6 @@ describe('buildSelectionTransformEdit', () => {
     expect(
       buildSelectionTransformEdit([object], {
         kind: 'rotate',
-        anchor: 'c',
         rotationDeg: Number.NaN,
       }),
     ).toEqual({ kind: 'error', reason: 'invalid-number' });

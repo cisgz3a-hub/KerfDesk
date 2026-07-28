@@ -38,7 +38,11 @@ export type SelectionTransformEdit =
       readonly height?: number;
       readonly preserveAspect: boolean;
     }
-  | { readonly kind: 'rotate'; readonly anchor: SelectionAnchor; readonly rotationDeg: number };
+  // Rotation always pivots about the selection centre, so it carries NO anchor:
+  // the 9-dot anchor governs the X/Y reference and the resize corner only.
+  // Pivoting rotation at that anchor shifted the artwork off its spot, because
+  // the anchor defaults to 'nw' (ui-store.ts) for the X/Y readout's sake.
+  | { readonly kind: 'rotate'; readonly rotationDeg: number };
 
 export type SelectionTransformError =
   | 'empty-selection'
@@ -172,7 +176,7 @@ function rotateSelection(
   if (object === undefined) return { kind: 'error', reason: 'empty-selection' };
   if (objects.length !== 1) return { kind: 'error', reason: 'multi-rotation' };
   if (!Number.isFinite(edit.rotationDeg)) return { kind: 'error', reason: 'invalid-number' };
-  const anchor = anchorPointForBBox(bbox, edit.anchor);
+  const anchor = anchorPointForBBox(bbox, 'c');
   const deltaDeg = edit.rotationDeg - object.transform.rotationDeg;
   const origin = rotatePoint({ x: object.transform.x, y: object.transform.y }, anchor, deltaDeg);
   return {
