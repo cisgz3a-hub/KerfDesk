@@ -1,6 +1,6 @@
 // findCncOffsetLadderFailures — output layers whose inward-offset ladder was
-// cut short by an offset-ENGINE failure rather than by the region running out
-// of interior.
+// cut short by an offset-ENGINE failure or a fixed pass budget rather than by
+// the region running out of interior.
 //
 // findDroppedCncLayers (compile-cnc-diagnostics.ts) catches the all-or-nothing
 // case: a layer with geometry that yields no toolpath at all. This catches the
@@ -44,19 +44,43 @@ export function findCncOffsetLadderFailures(
   device: DeviceProfile,
   config: CncMachineConfig,
 ): ReadonlyArray<string> {
-  const failed: string[] = [];
+  return findCncOffsetLadderDiagnostics(scene, device, config)
+    .filter((diagnostic) => diagnostic.kind === 'geometry-failed')
+    .map((diagnostic) => diagnostic.layerId);
+}
+
+export type CncOffsetLadderDiagnostic = {
+  readonly layerId: string;
+  readonly kind: 'geometry-failed' | 'pass-limit';
+};
+
+// Keeps the end reason available to the advisory UI. Existing callers that
+// only understand engine failures retain findCncOffsetLadderFailures above.
+// Neither helper participates in compile, Frame, Start, or Save authorization.
+export function findCncOffsetLadderDiagnostics(
+  scene: Scene,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): ReadonlyArray<CncOffsetLadderDiagnostic> {
+  const diagnostics: CncOffsetLadderDiagnostic[] = [];
   for (const layer of scene.layers) {
     if (!layer.output) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     const polylines = collectLayerPolylines(scene.objects, layer, device);
+    const restCompletion =
+      polylines.length === 0 ? 'complete' : restPocketCompletion(polylines, settings, config);
+    if (restCompletion !== 'complete') {
+      diagnostics.push({ layerId: layer.id, kind: restCompletion });
+      continue;
+    }
     const vectorFailed = polylines.length > 0 && vectorLadderFailed(polylines, settings, config);
     // A layer can carry both relief objects and vector shapes; either ladder
     // failing makes the layer's output incomplete.
     if (vectorFailed || reliefOffsetLadderFailed(scene.objects, layer, settings, config)) {
-      failed.push(layer.id);
+      diagnostics.push({ layerId: layer.id, kind: 'geometry-failed' });
     }
   }
-  return failed;
+  return diagnostics;
 }
 
 function vectorLadderFailed(
@@ -83,11 +107,19 @@ function pocketLadderFailed(
   // engine, and its ladder can fail where the finishing bit's does not. It also
   // runs a THIRD ladder of its own over the leftover stock region
   // (rest-pocket.ts), on raw clipper paths rather than the kerf-offset wrapper.
-  const rest = resolveRestPocketOperation(polylines, settings, config);
-  if (rest.kind === 'ok' && rest.offsetFailed) return true;
+  if (restPocketCompletion(polylines, settings, config) === 'geometry-failed') return true;
   const roughTool = toolById(config, settings.pocketRoughToolId);
   const diameters = [tool.diameterMm, ...(roughTool === null ? [] : [roughTool.diameterMm])];
   return diameters.some((diameterMm) => pocketStrategyFailed(polylines, settings, diameterMm));
+}
+
+function restPocketCompletion(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): 'complete' | 'geometry-failed' | 'pass-limit' {
+  const rest = resolveRestPocketOperation(polylines, settings, config);
+  return rest.kind === 'ok' ? rest.completion : 'complete';
 }
 
 function pocketStrategyFailed(
