@@ -47,13 +47,11 @@ import type { ScanOffsetPoint } from '../devices';
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
-import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
-import { containmentDepths } from './containment-depth';
+import type { CutGroup, FillGroup, Group, Job } from './job';
 import { offsetForSpeed } from './scan-offset';
-import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
+import { configuredSegmentOrder, startCursorForSegments } from './segment-order';
 
-const ORIGIN: Vec2 = { x: 0, y: 0 };
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
@@ -202,133 +200,6 @@ function optimizeIslandFillGroups(
     cursor = endpoint.exit;
   }
   return out.length === groups.length ? out : [...groups];
-}
-
-function configuredSegmentOrder<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  settings: PathOptimizationSettings,
-): T[] {
-  const startCursor = startCursorForSegments(segments, settings.startPoint);
-  if (!settings.insideFirst) {
-    return nearestNeighborOrderFrom(
-      segments,
-      startCursor,
-      settings.pathDirection === 'allow-reverse',
-    ).segments;
-  }
-  return insideFirstNearestNeighborOrder(
-    segments,
-    startCursor,
-    settings.pathDirection === 'allow-reverse',
-  );
-}
-
-function startCursorForSegments(
-  segments: ReadonlyArray<CutSegment>,
-  policy: PathOptimizationSettings['startPoint'],
-): Vec2 {
-  if (policy === 'machine-origin') return ORIGIN;
-  const bounds = segments
-    .map((segment) => polylineBounds(segment.polyline))
-    .filter((entry) => entry !== null);
-  if (bounds.length === 0) return ORIGIN;
-  const minX = Math.min(...bounds.map((entry) => entry.minX));
-  const minY = Math.min(...bounds.map((entry) => entry.minY));
-  if (policy === 'job-lower-left') return { x: minX, y: minY };
-  const maxX = Math.max(...bounds.map((entry) => entry.maxX));
-  const maxY = Math.max(...bounds.map((entry) => entry.maxY));
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-}
-
-function insideFirstNearestNeighborOrder<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  startCursor: Vec2,
-  allowReverse: boolean,
-): T[] {
-  const depths = containmentDepths(segments);
-  const maxDepth = depths.reduce((m, d) => Math.max(m, d), 0);
-  const out: T[] = [];
-  let cursor = startCursor;
-  for (let depth = maxDepth; depth >= 0; depth -= 1) {
-    const bucket = segments.filter((_, i) => depths[i] === depth);
-    const ordered = nearestNeighborOrderFrom(bucket, cursor, allowReverse);
-    out.push(...ordered.segments);
-    cursor = ordered.cursor;
-  }
-  return out;
-}
-
-// Greedy: at each step, pick the segment whose nearest endpoint (start
-// for forward, end for reversed) is closest to the current cursor.
-// Cursor starts at machine origin — matches the preamble's M3 S0 +
-// homed position. After picking, advance cursor to the segment's
-// far endpoint. Repeat until every segment is placed.
-function nearestNeighborOrderFrom<T extends CutSegment>(
-  segments: ReadonlyArray<T>,
-  startCursor: Vec2,
-  allowReverse: boolean,
-): { readonly segments: T[]; readonly cursor: Vec2 } {
-  // Indexed once, then queried n times. The previous scan re-examined every
-  // remaining segment on every step, which is the O(n²) that MAX_NEAREST_
-  // NEIGHBOR_SEGMENTS exists to cap. The index picks the same segment in the
-  // same order — see segment-entry-index.ts on tie-breaking.
-  const nearest = createNearestEntryQuery(collectSegmentEntries(segments, allowReverse));
-  const placed = new Set<number>();
-  const isAvailable = (index: number): boolean => !placed.has(index);
-  const out: T[] = [];
-  let cursor: Vec2 = startCursor;
-  for (;;) {
-    const pick = nearest(cursor, isAvailable);
-    if (pick === null) break;
-    placed.add(pick.segmentIndex);
-    const segment = segments[pick.segmentIndex];
-    if (segment === undefined) continue;
-    const next = pick.reverse ? reverseSegment(segment) : segment;
-    out.push(next);
-    const last = next.polyline[next.polyline.length - 1];
-    if (last !== undefined) cursor = last;
-  }
-  return { segments: out, cursor };
-}
-
-// A segment with no usable endpoint contributes no entry, so it is never
-// picked — preserving the prior behaviour, where such a segment was skipped by
-// the scan and dropped from the result.
-function collectSegmentEntries(
-  segments: ReadonlyArray<CutSegment>,
-  allowReverse: boolean,
-): SegmentEntry[] {
-  const entries: SegmentEntry[] = [];
-  for (let i = 0; i < segments.length; i += 1) {
-    const segment = segments[i];
-    if (segment === undefined) continue;
-    for (const entry of segmentEntries(segment, allowReverse)) {
-      entries.push({ point: entry.point, segmentIndex: i, reverse: entry.reverse });
-    }
-  }
-  return entries;
-}
-
-// Candidate entry points for a segment: always the polyline start;
-// also the end if the polyline is open (closed loops have first==last
-// so reverse is a no-op for travel).
-function segmentEntries(
-  seg: CutSegment,
-  allowReverse: boolean,
-): ReadonlyArray<{ readonly point: Vec2; readonly reverse: boolean }> {
-  const start = seg.polyline[0];
-  if (start === undefined) return [];
-  if (seg.closed || !allowReverse) return [{ point: start, reverse: false }];
-  const end = seg.polyline[seg.polyline.length - 1];
-  if (end === undefined) return [{ point: start, reverse: false }];
-  return [
-    { point: start, reverse: false },
-    { point: end, reverse: true },
-  ];
-}
-
-function reverseSegment<T extends CutSegment>(seg: T): T {
-  return { ...seg, polyline: [...seg.polyline].reverse(), closed: seg.closed };
 }
 
 type RouteEndpoints = { readonly entry: Vec2; readonly exit: Vec2 };
