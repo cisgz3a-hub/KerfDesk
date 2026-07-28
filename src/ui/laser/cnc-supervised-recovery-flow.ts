@@ -34,6 +34,7 @@ import {
   claimCncRecoveryCapsule,
   streamCncRecoveryProgram,
 } from './cnc-supervised-recovery-stream';
+import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
 import {
   prepareArchivedRecoverySource,
   prepareRecoverySource,
@@ -184,7 +185,7 @@ function planRecoveryProgram(
     ...context,
     source: {
       ...context.source,
-      warnings: [...context.source.warnings, ...emitSplit.warnings],
+      warnings: mergeCncRecoveryWarnings(context.source.warnings, emitSplit.warnings),
     },
     recovery,
     gcode: emitted.gcode,

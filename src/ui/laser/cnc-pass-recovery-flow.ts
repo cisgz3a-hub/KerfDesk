@@ -37,6 +37,7 @@ import {
   streamCncRecoveryProgram,
   type CncRecoveryStreamPlan,
 } from './cnc-supervised-recovery-stream';
+import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
 import { partitionEmitPreflight } from './start-job-readiness-policy';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
@@ -148,7 +149,7 @@ function planPassRecovery(
     jobAwareAlert(`Cannot start CNC recovery:\n\n${messages}`);
     return null;
   }
-  const warnings = [...source.warnings, ...emitSplit.warnings];
+  const warnings = mergeCncRecoveryWarnings(source.warnings, emitSplit.warnings);
   if (!confirmWarnings(warnings)) return null;
   if (!confirmPlan(review, resume)) return null;
   return passRecoveryStreamPlan(

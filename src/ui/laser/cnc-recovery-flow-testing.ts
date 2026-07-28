@@ -73,8 +73,8 @@ export function configureReadyCncRecovery(project: Project): void {
 }
 
 /**
- * Force every `emitPreparedGcode` call to return its real output carrying one
- * injected preflight `issue`.
+ * Force every `emitPreparedGcode` call to return its real output carrying the
+ * injected preflight `issues`.
  *
  * A recovery flow emits more than once (source re-prepare, then the resume
  * job), so a one-shot mock is consumed before the refusal check is ever
@@ -82,10 +82,15 @@ export function configureReadyCncRecovery(project: Project): void {
  * the calling suite to have `vi.mock`ed '../../io/gcode' with
  * `emitPreparedGcode: vi.fn(actual.emitPreparedGcode)`.
  */
-export async function injectPreflightIssue(issue: PreflightIssue): Promise<void> {
+export async function injectPreflightIssues(issues: ReadonlyArray<PreflightIssue>): Promise<void> {
   const actual = await vi.importActual<typeof GcodeModule>('../../io/gcode');
   vi.mocked(emitPreparedGcode).mockImplementation((prepared, options) => {
     const real = actual.emitPreparedGcode(prepared, options);
-    return { ...real, preflight: { ok: false, issues: [issue] } };
+    return { ...real, preflight: { ok: false, issues: [...issues] } };
   });
+}
+
+/** Inject one preflight issue into every recovery emission. */
+export async function injectPreflightIssue(issue: PreflightIssue): Promise<void> {
+  return injectPreflightIssues([issue]);
 }

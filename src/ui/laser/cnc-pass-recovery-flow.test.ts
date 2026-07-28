@@ -10,7 +10,6 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
-import { emitPreparedGcode } from '../../io/gcode';
 import type * as GcodeModule from '../../io/gcode';
 import { useCameraStore } from '../state/camera-store';
 import {
@@ -429,7 +428,6 @@ describe('runCncPassRecoveryFlow', () => {
 
     const started = await runCncPassRecoveryFlow(capsule, baseReview, repo);
 
-    console.log('EMIT_CALLS=' + vi.mocked(emitPreparedGcode).mock.calls.length);
     expect(started).toBe(true);
     expect(startJob).toHaveBeenCalledTimes(1);
     expect(vi.mocked(jobAwareAlert)).not.toHaveBeenCalled();
