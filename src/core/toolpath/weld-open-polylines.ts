@@ -101,6 +101,37 @@ type PairMatch = {
   readonly dist: number;
 };
 
+type EndpointMatch = Omit<PairMatch, 'i' | 'j'>;
+
+type EndpointMatchInput = {
+  readonly a: WorkChain;
+  readonly b: WorkChain;
+  readonly aEnd: PolylineEnd;
+  readonly bEnd: PolylineEnd;
+  readonly maxGapPx: number;
+  readonly tangentSamplePx: number;
+};
+
+function endpointMatch(input: EndpointMatchInput): EndpointMatch | null {
+  const pa = endpointOf(input.a, input.aEnd);
+  const pb = endpointOf(input.b, input.bEnd);
+  if (pa === undefined || pb === undefined) return null;
+  const dist = Math.hypot(pa.x - pb.x, pa.y - pb.y);
+  if (dist > input.maxGapPx) return null;
+  if (
+    !isWeldEndpointContinuous({
+      aPoints: input.a.points,
+      aEnd: input.aEnd,
+      bPoints: input.b.points,
+      bEnd: input.bEnd,
+      tangentSamplePx: input.tangentSamplePx,
+    })
+  ) {
+    return null;
+  }
+  return { aEnd: input.aEnd, bEnd: input.bEnd, dist };
+}
+
 function bestPair(
   chains: ReadonlyArray<WorkChain>,
   maxGapPx: number,
@@ -114,24 +145,16 @@ function bestPair(
       const [a, b] = pair;
       for (const aEnd of POLYLINE_ENDS) {
         for (const bEnd of POLYLINE_ENDS) {
-          const pa = endpointOf(a, aEnd);
-          const pb = endpointOf(b, bEnd);
-          if (pa === undefined || pb === undefined) continue;
-          const dist = Math.hypot(pa.x - pb.x, pa.y - pb.y);
-          if (dist > maxGapPx) continue;
-          if (
-            !isWeldEndpointContinuous({
-              aPoints: a.points,
-              aEnd,
-              bPoints: b.points,
-              bEnd,
-              tangentSamplePx,
-            })
-          ) {
-            continue;
-          }
-          if (best === null || dist < best.dist) {
-            best = { i, j, aEnd, bEnd, dist };
+          const match = endpointMatch({
+            a,
+            b,
+            aEnd,
+            bEnd,
+            maxGapPx,
+            tangentSamplePx,
+          });
+          if (match !== null && (best === null || match.dist < best.dist)) {
+            best = { i, j, ...match };
           }
         }
       }

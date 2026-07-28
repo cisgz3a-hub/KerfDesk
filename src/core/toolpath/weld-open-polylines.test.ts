@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Polyline, Vec2 } from '../scene';
 import { weldOpenPolylines } from './weld-open-polylines';
@@ -16,6 +17,8 @@ const RETURNING_START_X_PX = 24;
 const RETURNING_CORNER_X_PX = 30;
 const RETURNING_TOP_Y_PX = 10;
 const EXPECTED_COINCIDENT_JOIN_POINTS = JOINED_STROKE_END_PX + 1;
+const PROPERTY_RUNS = 50;
+const PROPERTY_SEED = 20_260_728;
 
 function line(x0: number, x1: number, y: number): Polyline {
   const points: Vec2[] = [];
@@ -105,6 +108,35 @@ describe('weldOpenPolylines', () => {
     };
 
     expect(weldOpenPolylines([nearLoop], OPTIONS)).toEqual([nearLoop]);
+  });
+
+  it('never closes an untouched chain for any return gap inside the weld threshold (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: NEAR_LOOP_EDGE_PX, max: PARALLEL_STROKE_LENGTH_PX }),
+        fc.double({
+          min: 0,
+          max: MAX_WELD_GAP_PX,
+          noNaN: true,
+          noDefaultInfinity: true,
+        }),
+        (edgePx, returnGapPx) => {
+          const nearLoop: Polyline = {
+            points: [
+              { x: 0, y: 0 },
+              { x: edgePx, y: 0 },
+              { x: edgePx, y: edgePx },
+              { x: 0, y: edgePx },
+              { x: 0, y: returnGapPx },
+            ],
+            closed: false,
+          };
+
+          expect(weldOpenPolylines([nearLoop], OPTIONS)).toEqual([nearLoop]);
+        },
+      ),
+      { numRuns: PROPERTY_RUNS, seed: PROPERTY_SEED },
+    );
   });
 
   it('does not weld nearby independent parallel strokes', () => {
