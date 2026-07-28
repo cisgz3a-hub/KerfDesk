@@ -15,7 +15,7 @@
 // `NOW`/`LATER` also stay local: the two suites deliberately use different
 // dates, so hoisting them here would silently change one suite's fixtures.
 
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { PreflightIssue } from '../../core/preflight';
 import type * as GcodeModule from '../../io/gcode';
@@ -25,6 +25,13 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { frameVerificationForProject } from './frame-verification-testing';
+
+const RECOVERY_WARNING_FIXTURE_COUNT = 130;
+const RECOVERY_WARNING_INDEX_FILL = '0';
+const RECOVERY_WARNING_INDEX_WIDTH = 3;
+const RECOVERY_WARNING_MESSAGE_PREFIX = 'Recovery bed warning ';
+const WARNING_CONFIRMATION_PREFIX = 'Controller warning:';
+const WARNING_LIST_BULLET = '• ';
 
 export const IDLE_STATUS: StatusReport = {
   state: 'Idle',
@@ -93,4 +100,43 @@ export async function injectPreflightIssues(issues: ReadonlyArray<PreflightIssue
 /** Inject one preflight issue into every recovery emission. */
 export async function injectPreflightIssue(issue: PreflightIssue): Promise<void> {
   return injectPreflightIssues([issue]);
+}
+
+/** Build enough distinct policy advisories to expose duplicate provenance inflation. */
+export function recoveryWarningFixtureIssues(): ReadonlyArray<PreflightIssue> {
+  return Array.from({ length: RECOVERY_WARNING_FIXTURE_COUNT }, (_, index) => ({
+    code: 'out-of-bed',
+    message: `${RECOVERY_WARNING_MESSAGE_PREFIX}${index
+      .toString()
+      .padStart(RECOVERY_WARNING_INDEX_WIDTH, RECOVERY_WARNING_INDEX_FILL)}`,
+  }));
+}
+
+/** Extract the warning list from the recovery confirmation shown to the operator. */
+export function recoveryWarningMessages(
+  confirmations: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  const warningConfirmation = confirmations.find((message) =>
+    message.startsWith(WARNING_CONFIRMATION_PREFIX),
+  );
+  return (
+    warningConfirmation
+      ?.split('\n')
+      .filter((line) => line.startsWith(WARNING_LIST_BULLET))
+      .map((line) => line.slice(WARNING_LIST_BULLET.length)) ?? []
+  );
+}
+
+/** Assert one ordered dialog/provenance copy of every injected warning. */
+export function expectRecoveryWarningEvidence(
+  confirmations: ReadonlyArray<string>,
+  issues: ReadonlyArray<PreflightIssue>,
+  archivedWarnings: ReadonlyArray<string> | undefined,
+): void {
+  const shownWarnings = recoveryWarningMessages(confirmations);
+  const expectedMessages = issues.map((issue) => issue.message);
+  const expectedSet = new Set(expectedMessages);
+  expect(shownWarnings.filter((message) => expectedSet.has(message))).toEqual(expectedMessages);
+  expect(new Set(shownWarnings).size).toBe(shownWarnings.length);
+  expect(archivedWarnings).toEqual(shownWarnings);
 }

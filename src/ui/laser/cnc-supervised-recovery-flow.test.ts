@@ -22,13 +22,19 @@ import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
 import {
+  createCurrentTestExecutionArtifact,
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
-import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
-import { configureReadyCncRecovery, injectPreflightIssue } from './cnc-recovery-flow-testing';
+import {
+  configureReadyCncRecovery,
+  expectRecoveryWarningEvidence,
+  injectPreflightIssue,
+  injectPreflightIssues,
+  recoveryWarningFixtureIssues,
+} from './cnc-recovery-flow-testing';
 import { runCncSupervisedRecoveryFlow } from './cnc-supervised-recovery-flow';
 import { prepareCurrentStartJob } from './start-job-source';
 
@@ -390,19 +396,24 @@ describe('runCncSupervisedRecoveryFlow', () => {
   // Rule 7 / ADR-228 regression pin. `preflight.ok` is false for ANY issue, so
   // checking it directly refused recovery over heuristic policy findings and
   // stranded a partially-cut workpiece. Only compile integrity may refuse.
-  it('starts recovery despite a policy-only preflight finding, showing it as a warning', async () => {
+  it('starts recovery with one copy of more than 128 repeated policy advisories', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
-    await injectPreflightIssue({ code: 'out-of-bed', message: 'X exceeds the bed.' });
+    const issues = recoveryWarningFixtureIssues();
+    await injectPreflightIssues(issues);
 
     const started = await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo);
 
     expect(started).toBe(true);
+    expect(startJob).toHaveBeenCalledTimes(1);
     expect(vi.mocked(jobAwareAlert)).not.toHaveBeenCalled();
-    const confirmed = vi.mocked(jobAwareConfirm).mock.calls.map(([m]) => String(m));
-    expect(confirmed.some((m) => m.includes('X exceeds the bed.'))).toBe(true);
+    expectRecoveryWarningEvidence(
+      vi.mocked(jobAwareConfirm).mock.calls.map(([message]) => String(message)),
+      issues,
+      repo.getSnapshot().activeRun?.artifact.provenance?.review?.warningsShown,
+    );
   });
 
   it('still refuses recovery on a compile-integrity failure', async () => {
