@@ -62,7 +62,7 @@ const HANDLE_RESIZE: Readonly<Record<HandleKind, HandleResizeSpec>> = {
   se: { anchor: 'nw', x: 'east', y: 'south' },
   s: { anchor: 'n', y: 'south' },
   sw: { anchor: 'ne', x: 'west', y: 'south' },
-  w: { anchor: 'e', x: 'east' },
+  w: { anchor: 'e', x: 'west' },
 };
 
 // Turn a handle drag into the core group-resize edit: corner handles resize
