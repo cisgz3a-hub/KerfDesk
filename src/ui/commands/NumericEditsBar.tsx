@@ -168,9 +168,7 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
         disabled={model.rotationValue === null}
         unit="deg"
         step={ROTATION_STEP_DEG}
-        onCommit={(rotationDeg) =>
-          model.commit({ kind: 'rotate', anchor: model.anchor, rotationDeg })
-        }
+        onCommit={(rotationDeg) => model.commit({ kind: 'rotate', rotationDeg })}
       />
     </>
   );
@@ -202,7 +200,7 @@ function AnchorGrid(props: {
 }
 
 function anchorTitle(anchor: SelectionAnchor): string {
-  return `Use the selection ${anchorPointName(anchor)} point as the X/Y reference, resize anchor, and rotation pivot.`;
+  return `Use the selection ${anchorPointName(anchor)} point as the X/Y reference and resize anchor. Rotation always pivots about the centre.`;
 }
 
 function anchorPointName(anchor: SelectionAnchor): string {
