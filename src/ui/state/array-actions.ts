@@ -85,16 +85,43 @@ function selectionIds(state: AppState): ReadonlySet<string> {
   ]);
 }
 
-function placedObject(object: SceneObject, placement: ArrayPlacement): SceneObject {
+/** Pure placement of one array copy. Exported for direct pivot coverage. */
+export function placedObject(object: SceneObject, placement: ArrayPlacement): SceneObject {
+  const moved = {
+    ...object.transform,
+    x: object.transform.x + placement.dx,
+    y: object.transform.y + placement.dy,
+  };
+  // A rotated copy must SPIN about the ring point dx/dy just centred it on.
+  // applyTransform rotates about the object's local origin, so adding
+  // rotationDeg alone swings the copy off the ring; rotate its origin about the
+  // pivot to keep the copy centred there.
+  if (placement.rotationDeg === 0 || placement.pivot === undefined) {
+    return { ...object, transform: moved } as SceneObject;
+  }
+  const origin = rotateAboutPivot(moved, placement.pivot, placement.rotationDeg);
   return {
     ...object,
     transform: {
-      ...object.transform,
-      x: object.transform.x + placement.dx,
-      y: object.transform.y + placement.dy,
+      ...moved,
+      x: origin.x,
+      y: origin.y,
       rotationDeg: normalizeDegrees(object.transform.rotationDeg + placement.rotationDeg),
     },
   } as SceneObject;
+}
+
+function rotateAboutPivot(
+  origin: { readonly x: number; readonly y: number },
+  pivot: { readonly x: number; readonly y: number },
+  deltaDeg: number,
+): { readonly x: number; readonly y: number } {
+  const rad = (deltaDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = origin.x - pivot.x;
+  const dy = origin.y - pivot.y;
+  return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos };
 }
 
 function cloneSelectedGroups(
