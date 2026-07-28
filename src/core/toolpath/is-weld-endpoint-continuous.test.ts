@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest';
+import type { Vec2 } from '../scene';
+import { isWeldEndpointContinuous } from './is-weld-endpoint-continuous';
+
+const TANGENT_SAMPLE_PX = 3;
+const CHAIN_LENGTH_PX = 10;
+const WELD_GAP_PX = 4;
+
+function horizontal(y: number, startX = 0): Vec2[] {
+  return [
+    { x: startX, y },
+    { x: startX + CHAIN_LENGTH_PX, y },
+  ];
+}
+
+describe('isWeldEndpointContinuous', () => {
+  it('accepts aligned continuations in either stored orientation', () => {
+    const left = horizontal(0);
+    const right = horizontal(0, CHAIN_LENGTH_PX + WELD_GAP_PX);
+    const reversedRight = [...right].reverse();
+
+    expect(
+      isWeldEndpointContinuous({
+        aPoints: left,
+        aEnd: 'end',
+        bPoints: right,
+        bEnd: 'start',
+        tangentSamplePx: TANGENT_SAMPLE_PX,
+      }),
+    ).toBe(true);
+    expect(
+      isWeldEndpointContinuous({
+        aPoints: left,
+        aEnd: 'end',
+        bPoints: reversedRight,
+        bEnd: 'end',
+        tangentSamplePx: TANGENT_SAMPLE_PX,
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects nearby parallel endpoints that do not continue across the gap', () => {
+    expect(
+      isWeldEndpointContinuous({
+        aPoints: horizontal(0),
+        aEnd: 'start',
+        bPoints: horizontal(WELD_GAP_PX),
+        bEnd: 'start',
+        tangentSamplePx: TANGENT_SAMPLE_PX,
+      }),
+    ).toBe(false);
+  });
+
+  it('accepts a coincident through-line but rejects a coincident corner', () => {
+    const left = horizontal(0);
+    const sharedX = CHAIN_LENGTH_PX;
+    const through = horizontal(0, sharedX);
+    const corner = [
+      { x: sharedX, y: 0 },
+      { x: sharedX, y: CHAIN_LENGTH_PX },
+    ];
+
+    expect(
+      isWeldEndpointContinuous({
+        aPoints: left,
+        aEnd: 'end',
+        bPoints: through,
+        bEnd: 'start',
+        tangentSamplePx: TANGENT_SAMPLE_PX,
+      }),
+    ).toBe(true);
+    expect(
+      isWeldEndpointContinuous({
+        aPoints: left,
+        aEnd: 'end',
+        bPoints: corner,
+        bEnd: 'start',
+        tangentSamplePx: TANGENT_SAMPLE_PX,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects degenerate endpoints without a measurable tangent', () => {
+    const duplicateOnly = [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ];
+
+    expect(
+      isWeldEndpointContinuous({
+        aPoints: duplicateOnly,
+        aEnd: 'end',
+        bPoints: horizontal(0),
+        bEnd: 'start',
+        tangentSamplePx: TANGENT_SAMPLE_PX,
+      }),
+    ).toBe(false);
+  });
+});

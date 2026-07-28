@@ -12835,6 +12835,22 @@ chain but could not join chains, so the pecking survived it.
 - No G-code snapshot changes: the pass runs at trace commit, not in the
   compiler.
 
+### Amendment (2026-07-28) - continuity-qualified welding avoids fabricated links
+
+Endpoint distance is necessary but no longer sufficient evidence that two open
+chains are fragments of one stroke. The machine-facing weld now samples each
+selected endpoint's inward tangent over 0.3 mm and requires both sides to
+continue across the gap within the existing 35-degree Centerline convention.
+This preserves crack-scale collinear and curved-ring repair without joining
+nearby independent strokes.
+
+An open chain also remains open unless it actually merged with another chain.
+After a real merge, noncoincident self-closure must satisfy the same continuity
+test as pair welding in addition to the existing absolute and proportional gap
+limits. An exact returned-to-start endpoint may close because it adds no new
+geometry. These rules narrow ADR-263's original distance-only wording; they do
+not delete trace geometry or add a Start, Frame, controller, or output gate.
+
 ---
 
 ## ADR-264 - Species-level CNC material presets apply explicitly (2026-07-26)
