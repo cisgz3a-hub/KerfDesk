@@ -34,6 +34,8 @@ const WARNING_CONFIRMATION_PREFIX = 'Controller warning:';
 const WARNING_LIST_BULLET = '• ';
 const EXPECTED_RECOVERY_SOURCE_EMISSION_COUNT = 2;
 const EXPECTED_RECOVERY_JOB_EMISSION_COUNT = 1;
+const RECOVERY_START_ALERT_PREFIX = 'Cannot start CNC recovery';
+const RECOVERY_SOURCE_ALERT_PREFIX = 'Cannot resume job';
 const RECOVERY_COMPILE_INTEGRITY_ISSUE: PreflightIssue = {
   code: 'empty-output',
   message: 'No cuts.',
@@ -135,9 +137,9 @@ export async function injectRecoveryJobCompileIntegrityFailure(): Promise<Recove
       expect(started).toBe(false);
       expect(startJobCallCount).toBe(0);
       expect(alertMessages).toHaveLength(1);
-      expect(alertMessages[0]).toContain('Cannot start CNC recovery');
+      expect(alertMessages[0]).toContain(RECOVERY_START_ALERT_PREFIX);
       expect(alertMessages[0]).toContain(RECOVERY_COMPILE_INTEGRITY_ISSUE.message);
-      expect(alertMessages[0]).not.toContain('Cannot resume job');
+      expect(alertMessages[0]).not.toContain(RECOVERY_SOURCE_ALERT_PREFIX);
     },
   };
 }
