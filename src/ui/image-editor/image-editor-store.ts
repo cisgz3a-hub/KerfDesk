@@ -7,17 +7,7 @@
 // store as exactly one undo entry.
 
 import { create } from 'zustand';
-import {
-  blitTransformedInPlace,
-  IDENTITY_AFFINE,
-  pushHistoryEntry,
-  transformedBounds,
-  type AffineTransform,
-  type PaintColor,
-  type PaintPoint,
-  type PixelRect,
-} from '../../core/image-edit';
-import { extractFloatingRegion, fillMaskedInPlace, selectAllMask } from '../../core/image-select';
+import type { AffineTransform, PaintColor, PaintPoint, PixelRect } from '../../core/image-edit';
 import {
   combineMasks,
   featherMask,
@@ -32,7 +22,6 @@ import { useToastStore } from '../state/toast-store';
 import {
   appliedBounds,
   BLACK,
-  captureScoped,
   commitCrop,
   commitFillSelection,
   commitLine,
@@ -50,6 +39,11 @@ import {
   type SelectionModifyKind,
 } from './editor-session';
 import { compositeSession, redoScoped, undoScoped } from './editor-session-layers';
+import {
+  commitEditorTransform,
+  startEditorTransform,
+  type EditorTransformSession,
+} from './editor-transform-session';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 import type { EditorView } from './image-editor-types';
 
@@ -85,7 +79,7 @@ type ImageEditorState = {
   /** Crop-tool rect awaiting Enter/✓ (Esc/✕ discards). */
   readonly pendingCrop: PixelRect | null;
   /** Ctrl+T free-transform session (Enter commits, Esc cancels). */
-  readonly transform: TransformSession | null;
+  readonly transform: EditorTransformSession | null;
   readonly openEditor: (image: RasterImage) => void;
   readonly closeEditor: () => void;
   readonly setTool: (tool: EditorTool) => void;
@@ -236,63 +230,22 @@ function strokeAction(
   });
 }
 
-type TransformSession = {
-  readonly floating: NonNullable<ReturnType<typeof extractFloatingRegion>>;
-  readonly mask: SelectionMask;
-  readonly affine: AffineTransform;
-};
-
 // Ctrl+T: lift the selection (or the whole image) into a floating region.
 // The document stays untouched until commit, so cancel is free and the
 // commit is exactly ONE history entry.
 function startTransformAction(set: Setter, get: () => ImageEditorState): void {
   const { session, transform } = get();
   if (session === null || transform !== null) return;
-  const mask = session.selection ?? selectAllMask(session.doc.width, session.doc.height);
-  const floating = extractFloatingRegion(session.doc, mask);
-  if (floating === null) return;
-  set({ transform: { floating, mask, affine: IDENTITY_AFFINE }, pendingCrop: null });
+  const next = startEditorTransform(session);
+  if (next === null) return;
+  set({ transform: next, pendingCrop: null });
 }
 
 function commitTransformAction(set: Setter, get: () => ImageEditorState): void {
   const { session, transform } = get();
   if (session === null || transform === null) return;
   set({ transform: null });
-  const identity =
-    transform.affine.translateX === 0 &&
-    transform.affine.translateY === 0 &&
-    transform.affine.scaleX === 1 &&
-    transform.affine.scaleY === 1 &&
-    transform.affine.rotateDeg === 0;
-  if (identity) return;
-  withSession(set, get, (s) => {
-    const target = transformedBounds(transform.floating, transform.affine);
-    const union = {
-      x: Math.min(transform.floating.rect.x, target.x),
-      y: Math.min(transform.floating.rect.y, target.y),
-      width:
-        Math.max(
-          transform.floating.rect.x + transform.floating.rect.width,
-          target.x + target.width,
-        ) - Math.min(transform.floating.rect.x, target.x),
-      height:
-        Math.max(
-          transform.floating.rect.y + transform.floating.rect.height,
-          target.y + target.height,
-        ) - Math.min(transform.floating.rect.y, target.y),
-    };
-    const entry = captureScoped(s, union, 'Free transform');
-    fillMaskedInPlace(s.doc, transform.mask, WHITE);
-    blitTransformedInPlace(s.doc, transform.floating, transform.affine);
-    return {
-      ...s,
-      history: pushHistoryEntry(s.history, entry),
-      selection: null,
-      revision: s.revision + 1,
-      dirtySinceApply: true,
-      lastDirtyRect: union,
-    };
-  });
+  withSession(set, get, (s) => commitEditorTransform(s, transform));
 }
 
 function commitPendingCropAction(set: Setter, get: () => ImageEditorState): void {
@@ -306,6 +259,7 @@ function closeEditorAction(set: Setter, get: () => ImageEditorState): void {
   const { session } = get();
   set((s) => ({
     session: null,
+    transform: null,
     loadState: { kind: 'idle' },
     view: null,
     isSpacePanning: false,
@@ -339,11 +293,11 @@ function openEditorAction(set: Setter, get: () => ImageEditorState, image: Raste
   if (stashed !== undefined) {
     set((s) => {
       const { [image.id]: _resumed, ...rest } = s.stash;
-      return { session: stashed, stash: rest, loadState: { kind: 'idle' } };
+      return { session: stashed, transform: null, stash: rest, loadState: { kind: 'idle' } };
     });
     return;
   }
-  set({ loadState: { kind: 'loading', objectId: image.id } });
+  set({ transform: null, loadState: { kind: 'loading', objectId: image.id } });
   decodeRasterToBuffer(image)
     .then((doc) => {
       // The open may have been superseded (closed / another image opened).
