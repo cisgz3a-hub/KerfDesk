@@ -1,4 +1,5 @@
 import { MAX_RASTER_LINES_PER_MM } from './raster-budget';
+import { compiledLinesPerMm } from './luma-resample';
 
 export const MM_PER_INCH = 25.4;
 export const MIN_RASTER_LINES_PER_MM = 5;
@@ -9,8 +10,18 @@ export function normalizeLinesPerMm(value: number): number {
   return Number(clamped.toFixed(6));
 }
 
+/**
+ * Line interval in mm for a stored density — the interval the COMPILER will
+ * burn, not the interval the recommended range would prefer.
+ *
+ * normalizeLinesPerMm is the RECOMMENDED range and belongs on input bounds.
+ * Resolving a display through it made the layers panel disagree with both the
+ * emitted program and Job Review for any stored value outside that range (a
+ * .lbrn import at a 0.5 mm interval stores 2 lines/mm and burned 2.5x coarser
+ * than the panel showed). Displays resolve through the compiler's own floor.
+ */
 export function linesPerMmToLineIntervalMm(linesPerMm: number): number {
-  return 1 / normalizeLinesPerMm(linesPerMm);
+  return 1 / compiledLinesPerMm(linesPerMm);
 }
 
 export function lineIntervalMmToLinesPerMm(intervalMm: number): number {
