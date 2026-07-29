@@ -5,6 +5,7 @@
 import { DEFAULT_CNC_TILING, type CncMachineConfig, type CncTiling } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
+import { CncTilingDisclosure, cncTilingAfterEdit } from './CncTilingDisclosure';
 
 export function CncTilingPanel(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const updateCncMachine = useStore((s) => s.updateCncMachine);
@@ -38,7 +39,7 @@ function TilingFields(props: { readonly tiling: CncTiling }): JSX.Element {
   const updateCncMachine = useStore((s) => s.updateCncMachine);
   const { tiling } = props;
   const commit = (patch: Partial<CncTiling>): void =>
-    updateCncMachine({ tiling: { ...tiling, ...patch } });
+    updateCncMachine({ tiling: cncTilingAfterEdit(tiling, patch) });
   return (
     <>
       <TilingNumberRow
@@ -75,6 +76,7 @@ function TilingFields(props: { readonly tiling: CncTiling }): JSX.Element {
         />
         <span>Registration holes</span>
       </label>
+      <CncTilingDisclosure tiling={tiling} />
     </>
   );
 }

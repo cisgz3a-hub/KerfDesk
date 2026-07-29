@@ -20,6 +20,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { buildGcodeMetadata } from './build-info';
 
 export type TileFile = { readonly name: string; readonly gcode: string };
+type ReadyTiledJobs = Extract<ReturnType<typeof tileJobs>, { readonly kind: 'ready' }>;
 
 // The tile set plus every policy finding raised while emitting it.
 export type TileEmission = {
@@ -40,7 +41,7 @@ export type TileEmission = {
 export function emitTileFiles(
   project: Project,
   machine: Extract<Project['machine'], { kind: 'cnc' }>,
-  tiles: ReturnType<typeof tileJobs>,
+  tiles: ReadyTiledJobs['tiles'],
   savedName: string | null,
 ): TileEmission | null {
   const emitted: TileFile[] = [];

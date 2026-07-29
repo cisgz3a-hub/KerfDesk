@@ -2,84 +2,9 @@
 // filter tiled exports exactly like the single-file path (audit finding #29).
 
 import { describe, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
-  DEFAULT_CNC_TILING,
-  IDENTITY_TRANSFORM,
-  createLayer,
-  createProject,
-  type Project,
-  type SceneObject,
-} from '../../core/scene';
-import type { PlatformAdapter } from '../../platform/types';
+import { DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TILING } from '../../core/scene';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
-
-function squareObject(id: string, color: string, at: number): SceneObject {
-  const size = 20;
-  return {
-    kind: 'imported-svg',
-    id,
-    source: `${id}.svg`,
-    bounds: { minX: at, minY: at, maxX: at + size, maxY: at + size },
-    transform: IDENTITY_TRANSFORM,
-    paths: [
-      {
-        color,
-        polylines: [
-          {
-            closed: true,
-            points: [
-              { x: at, y: at },
-              { x: at + size, y: at },
-              { x: at + size, y: at + size },
-              { x: at, y: at + size },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function tiledCncProject(): Project {
-  const base = createProject();
-  return {
-    ...base,
-    machine: { ...DEFAULT_CNC_MACHINE_CONFIG, tiling: DEFAULT_CNC_TILING },
-    scene: {
-      objects: [squareObject('O1', '#ff0000', 10), squareObject('O2', '#0000ff', 60)],
-      layers: [
-        // Explicit outside cuts: the maxX assertions below expect the tool to
-        // reach past the square's edge (ADR-256 made on-path the default).
-        {
-          ...createLayer({ id: 'L1', color: '#ff0000' }),
-          cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'profile-outside' as const },
-        },
-        {
-          ...createLayer({ id: 'L2', color: '#0000ff' }),
-          cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'profile-outside' as const },
-        },
-      ],
-    },
-  };
-}
-
-function capturingPlatform(written: string[]): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: async () => [],
-    pickFileForSave: async () => ({
-      displayName: 'tile.gcode',
-      write: async (data: string | Blob) => {
-        if (typeof data === 'string') written.push(data);
-      },
-    }),
-    serial: { isSupported: () => false },
-    // The tiled save path touches only pickFileForSave; the rest of the
-    // adapter surface is irrelevant to this test.
-  } as unknown as PlatformAdapter;
-}
+import { capturingPlatform, tiledCncProject } from './save-tiled-gcode-testing';
 
 // Cutter compensation shifts exact coordinates, so assert on X ranges:
 // O1 motion stays under ~35 mm; O2 motion reaches past ~55 mm.

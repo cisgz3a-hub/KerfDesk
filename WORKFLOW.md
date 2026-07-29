@@ -2844,6 +2844,18 @@ and lifts the command's CNC-only gate.)*
 1. Every tile preflights BEFORE any file is written; a failure names
    the tile and writes nothing (no-partial-output over the whole set).
 
+#### Error — the complete grid exceeds the export work budget
+1. Grid size is resolved before tile records, G-code, or file dialogs are
+   created. A grid above 500 planned cells reports a factual non-writable
+   outcome and writes nothing; increase tile size or reduce overlap.
+
+#### Edge — requested overlap leaves no positive tile step
+1. Planning uses one disclosed effective overlap that leaves a positive
+   representable step on both axes (at least 1 mm for UI-supported tile
+   sizes). Grid placement and registration holes use that same value. A
+   loaded legacy request remains unchanged until the operator makes an
+   explicit numeric tiling edit.
+
 #### Empty
 1. An empty compile toasts "Nothing to tile"; a job smaller than one
    tile exports a single (untiled-equivalent) file.

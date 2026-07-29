@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CncGroup, Job } from '../job';
 import type { CncTiling } from '../scene';
-import { planTiles, REGISTRATION_HOLE_DEPTH_MM, tileFileName, tileJobs } from './tile-plan';
+import { tileFileName, tileJobs, type TiledJob } from './tile-plan';
 
 const TILING: CncTiling = {
   tileWidthMm: 100,
@@ -48,24 +48,15 @@ function lineJob(x0: number, x1: number, y: number, zMm = -2): Job {
   };
 }
 
-describe('planTiles', () => {
-  it('covers the bounds with an indexed grid stepped by tile-minus-overlap', () => {
-    const tiles = planTiles({ minX: 0, minY: 0, maxX: 250, maxY: 80 }, TILING);
-    // Width 250 at 90 mm steps → 3 columns; height 80 fits one row.
-    expect(tiles).toHaveLength(3);
-    expect(tiles.map((tile) => `${tile.row},${tile.col}`)).toEqual(['0,0', '0,1', '0,2']);
-    expect(tiles[1]?.rect.minX).toBe(90);
-    expect(tiles[1]?.rect.maxX).toBe(190);
-  });
-
-  it('a job smaller than one tile plans a single tile', () => {
-    expect(planTiles({ minX: 0, minY: 0, maxX: 50, maxY: 50 }, TILING)).toHaveLength(1);
-  });
-});
+function readyTiledJobs(job: Job, tiling: CncTiling = TILING): ReadonlyArray<TiledJob> {
+  const result = tileJobs(job, tiling);
+  if (result.kind !== 'ready') throw new Error('expected materialized tile jobs');
+  return result.tiles;
+}
 
 describe('tileJobs clipping', () => {
   it('splits a long line across tiles, translated to each tile origin', () => {
-    const tiled = tileJobs(lineJob(0, 250, 40), TILING);
+    const tiled = readyTiledJobs(lineJob(0, 250, 40));
     expect(tiled).toHaveLength(3);
     for (const { tile, job } of tiled) {
       const group = job.groups[0];
@@ -110,7 +101,7 @@ describe('tileJobs clipping', () => {
         ],
       },
     ];
-    const tiled = tileJobs({ groups: [groupOf(passes)] }, TILING);
+    const tiled = readyTiledJobs({ groups: [groupOf(passes)] });
     expect(tiled.length).toBeGreaterThanOrEqual(2);
     // Both of the first two tiles carry a piece of the (no longer closed)
     // square, and every clipped pass is open.
@@ -140,7 +131,7 @@ describe('tileJobs clipping', () => {
         ],
       },
     ];
-    const tiled = tileJobs({ groups: [groupOf(ramp)] }, TILING);
+    const tiled = readyTiledJobs({ groups: [groupOf(ramp)] });
     const first = tiled[0]?.job.groups[0];
     if (first?.kind !== 'cnc') throw new Error('group missing');
     const pass = first.passes[0];
@@ -161,7 +152,7 @@ describe('tileJobs clipping', () => {
         closed: false,
       },
     ];
-    const tiled = tileJobs({ groups: [groupOf(arc)] }, TILING);
+    const tiled = readyTiledJobs({ groups: [groupOf(arc)] });
     expect(tiled.length).toBeGreaterThan(1);
     for (const { job } of tiled) {
       const group = job.groups[0];
@@ -195,7 +186,7 @@ describe('tileJobs clipping', () => {
         closed: false,
       },
     ];
-    const tiled = tileJobs({ groups: [groupOf(helix)] }, TILING);
+    const tiled = readyTiledJobs({ groups: [groupOf(helix)] });
     expect(tiled.length).toBeGreaterThan(1);
     const points = tiled.flatMap(({ job }) =>
       job.groups.flatMap((group) =>
@@ -211,33 +202,11 @@ describe('tileJobs clipping', () => {
 
   it('drops tiles with no motion', () => {
     // Line only in the left half of a 2-column grid.
-    const tiled = tileJobs(lineJob(0, 95, 150, -1), {
+    const tiled = readyTiledJobs(lineJob(0, 95, 150, -1), {
       ...TILING,
       tileHeightMm: 200,
     });
     expect(tiled).toHaveLength(1);
-  });
-});
-
-describe('registration holes', () => {
-  it('adjacent tiles drill the SAME stock positions inside the overlap strip', () => {
-    const tiling: CncTiling = { ...TILING, registrationHoles: true };
-    const tiled = tileJobs(lineJob(0, 190, 50, -1), tiling);
-    expect(tiled).toHaveLength(2);
-    const holesInStock = tiled.map(({ tile, job }) => {
-      const drill = job.groups.find((group) => group.kind === 'cnc' && group.cutType === 'drill');
-      if (drill?.kind !== 'cnc') throw new Error('registration group missing');
-      return drill.passes.map((pass) => {
-        if (pass.kind !== 'path3d') throw new Error('peck expected');
-        const point = pass.points[0];
-        if (point === undefined) throw new Error('peck point missing');
-        expect(point.z).toBe(-REGISTRATION_HOLE_DEPTH_MM);
-        return `${(point.x + tile.rect.minX).toFixed(3)},${(point.y + tile.rect.minY).toFixed(3)}`;
-      });
-    });
-    // Same stock coordinates appear in both tiles' files.
-    expect(new Set(holesInStock[0]).size).toBeGreaterThan(0);
-    expect(holesInStock[0]).toEqual(holesInStock[1]);
   });
 });
 

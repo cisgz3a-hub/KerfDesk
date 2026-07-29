@@ -8,76 +8,27 @@
 // positions, so dowel pins re-index the stock physically.
 
 import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
-import type { CncTiling, Vec2 } from '../scene';
+import type { CncTiling } from '../scene';
+import type { CncTile, TiledJob } from './cnc-tile';
+import type { TiledJobsResult } from './tile-plan-result';
+import { planTiles } from './plan-tiles';
+import { registrationGroupForTile } from './tile-registration';
 
-export const REGISTRATION_HOLE_DEPTH_MM = 3;
-const REGISTRATION_HOLE_EDGE_FRACTIONS = [0.25, 0.75] as const;
-const MIN_TILE_STEP_MM = 1;
 const MIN_CLIPPED_POINTS = 2;
 
-export type CncTile = {
-  readonly row: number;
-  readonly col: number;
-  readonly rect: {
-    readonly minX: number;
-    readonly minY: number;
-    readonly maxX: number;
-    readonly maxY: number;
-  };
-};
+export type { CncTile, TiledJob } from './cnc-tile';
+export type { TilePlanResult, TiledJobsResult } from './tile-plan-result';
+export { planTiles } from './plan-tiles';
+export { REGISTRATION_HOLE_DEPTH_MM } from './tile-registration';
 
-export type TiledJob = {
-  readonly tile: CncTile;
-  readonly job: Job;
-};
-
-export function planTiles(
-  bounds: {
-    readonly minX: number;
-    readonly minY: number;
-    readonly maxX: number;
-    readonly maxY: number;
-  },
-  tiling: CncTiling,
-): ReadonlyArray<CncTile> {
-  const stepX = Math.max(MIN_TILE_STEP_MM, tiling.tileWidthMm - tiling.overlapMm);
-  const stepY = Math.max(MIN_TILE_STEP_MM, tiling.tileHeightMm - tiling.overlapMm);
-  const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
-  const cols = Math.max(1, Math.ceil(Math.max(0, width - tiling.overlapMm) / stepX));
-  const rows = Math.max(1, Math.ceil(Math.max(0, height - tiling.overlapMm) / stepY));
-  const tiles: CncTile[] = [];
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
-      const minX = bounds.minX + col * stepX;
-      const minY = bounds.minY + row * stepY;
-      tiles.push({
-        row,
-        col,
-        rect: {
-          minX,
-          minY,
-          maxX: minX + tiling.tileWidthMm,
-          maxY: minY + tiling.tileHeightMm,
-        },
-      });
-    }
-  }
-  return tiles;
-}
-
-// Split the job across the tile grid. Tiles that end up with no motion are
-// dropped (their count is the caller's business to report).
-export function tileJobs(job: Job, tiling: CncTiling): ReadonlyArray<TiledJob> {
+/** Split a CNC job across a bounded effective grid, dropping motionless tiles. */
+export function tileJobs(job: Job, tiling: CncTiling): TiledJobsResult {
   const bounds = cncJobBounds(job);
-  if (bounds === null) return [];
-  const tiles = planTiles(bounds, tiling);
-  const grid = {
-    cols: Math.max(...tiles.map((tile) => tile.col)) + 1,
-    rows: Math.max(...tiles.map((tile) => tile.row)) + 1,
-  };
+  if (bounds === null) return { kind: 'empty' };
+  const plan = planTiles(bounds, tiling);
+  if (plan.kind === 'work-budget-exceeded') return plan;
   const out: TiledJob[] = [];
-  for (const tile of tiles) {
+  for (const tile of plan.tiles) {
     const groups: CncGroup[] = [];
     for (const group of job.groups) {
       if (group.kind !== 'cnc') continue;
@@ -85,14 +36,15 @@ export function tileJobs(job: Job, tiling: CncTiling): ReadonlyArray<TiledJob> {
       if (clipped !== null) groups.push(clipped);
     }
     if (tiling.registrationHoles) {
-      const registration = registrationGroup(job, tile, grid, tiling);
+      const registration = registrationGroupForTile(job, tile, plan.grid);
       if (registration !== null) groups.push(registration);
     }
     if (groups.length > 0) out.push({ tile, job: { groups } });
   }
-  return out;
+  return out.length === 0 ? { kind: 'empty' } : { kind: 'ready', grid: plan.grid, tiles: out };
 }
 
+/** Add a one-based row and column suffix to a tiled CNC output filename. */
 export function tileFileName(baseName: string, tile: CncTile): string {
   return `${baseName}_tile-r${tile.row + 1}-c${tile.col + 1}`;
 }
@@ -291,58 +243,4 @@ function translatePass(pass: CncPass, tile: CncTile): CncPass {
       z: point.z,
     })),
   };
-}
-
-// Registration holes: two pecks per shared seam, drilled at identical STOCK
-// positions in both adjacent tiles' files (the seam center of the overlap
-// strip), so dowel pins physically re-index the stock between tiles.
-function registrationGroup(
-  job: Job,
-  tile: CncTile,
-  grid: { readonly cols: number; readonly rows: number },
-  tiling: CncTiling,
-): CncGroup | null {
-  const template = job.groups.find((group) => group.kind === 'cnc');
-  if (template === undefined || template.kind !== 'cnc') return null;
-  const centers: Vec2[] = [];
-  appendSeamHoles(centers, tile, grid, tiling);
-  if (centers.length === 0) return null;
-  const passes: CncPass[] = centers.map((center) => ({
-    kind: 'path3d',
-    closed: false,
-    points: [
-      {
-        x: center.x - tile.rect.minX,
-        y: center.y - tile.rect.minY,
-        z: -REGISTRATION_HOLE_DEPTH_MM,
-      },
-      { x: center.x - tile.rect.minX, y: center.y - tile.rect.minY, z: 0 },
-    ],
-  }));
-  return {
-    ...template,
-    cutType: 'drill',
-    // Pecks run at the plunge feed like every drill group.
-    feedMmPerMin: Math.min(template.feedMmPerMin, template.plungeMmPerMin),
-    passes,
-  };
-}
-
-function appendSeamHoles(
-  centers: Vec2[],
-  tile: CncTile,
-  grid: { readonly cols: number; readonly rows: number },
-  tiling: CncTiling,
-): void {
-  const { rect } = tile;
-  const halfOverlap = tiling.overlapMm / 2;
-  // Right seam (shared with col+1) and left seam (shared with col-1).
-  for (const fraction of REGISTRATION_HOLE_EDGE_FRACTIONS) {
-    const y = rect.minY + (rect.maxY - rect.minY) * fraction;
-    if (tile.col < grid.cols - 1) centers.push({ x: rect.maxX - halfOverlap, y });
-    if (tile.col > 0) centers.push({ x: rect.minX + halfOverlap, y });
-    const x = rect.minX + (rect.maxX - rect.minX) * fraction;
-    if (tile.row < grid.rows - 1) centers.push({ x, y: rect.maxY - halfOverlap });
-    if (tile.row > 0) centers.push({ x, y: rect.minY + halfOverlap });
-  }
 }

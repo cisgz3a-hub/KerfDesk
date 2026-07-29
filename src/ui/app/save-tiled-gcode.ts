@@ -14,6 +14,7 @@ import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { emitTileFiles, pushAdvisoryToasts, type TileFile } from './tile-emission';
+import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
@@ -46,12 +47,16 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
     jobAwareAlert(`Cannot export tiles:\n\n${lines}`);
     return true;
   }
-  const tiles = tileJobs(prepared.job, machine.tiling);
-  if (tiles.length === 0) {
+  const tiled = tileJobs(prepared.job, machine.tiling);
+  if (tiled.kind === 'empty') {
     ctx.pushToast('Nothing to tile — the compiled job is empty.', 'warning');
     return true;
   }
-  const emitted = emitTileFiles(ctx.project, machine, tiles, ctx.savedName);
+  if (tiled.kind === 'work-budget-exceeded') {
+    jobAwareAlert(tiledSaveWorkBudgetMessage(tiled.grid));
+    return true;
+  }
+  const emitted = emitTileFiles(ctx.project, machine, tiled.tiles, ctx.savedName);
   if (emitted === null) return true;
   const files = emitted.files;
   // Rule 7 / ADR-228: a disagreeing $30/$32 is the same hazard whether the job
