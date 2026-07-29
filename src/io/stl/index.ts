@@ -2,4 +2,3 @@
 
 export type { ParseStlResult } from './parse-stl';
 export { parseStl } from './parse-stl';
-export { MAX_STL_TRIANGLES } from './parse-stl-binary';

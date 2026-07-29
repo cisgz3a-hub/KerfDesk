@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Vec2 } from '../../core/scene';
+import type { Polyline, Vec2 } from '../../core/scene';
 import { countPolylineSegments } from './draw-complexity';
-import { createDisplayPolylineCache } from './display-polylines';
+import { buildDisplayPolylines, createDisplayPolylineCache } from './display-polylines';
 
 describe('display polyline cache', () => {
   it('retessellates canonical curves as screen tolerance tightens and caches the zoom result', () => {
@@ -128,3 +128,51 @@ function watchedPoints(length: number, onRead: () => void): ReadonlyArray<Vec2> 
     },
   );
 }
+
+describe('polyline-count decimation (large-DXF lag fix)', () => {
+  // A 200 MB DXF of LINE entities arrives as millions of TWO-POINT polylines.
+  // Vertex decimation cannot touch those, so the budget used to do nothing and
+  // the canvas built one moveTo/lineTo pair per entity every frame.
+  const twoPointLines = (count: number): Polyline[] =>
+    Array.from({ length: count }, (_, i) => ({
+      closed: false,
+      points: [
+        { x: i, y: 0 },
+        { x: i, y: 1 },
+      ],
+    }));
+
+  it('thins short polylines as whole units when the count is the cost', () => {
+    const result = buildDisplayPolylines(twoPointLines(60_000), 1_000);
+
+    expect(result.isSimplified).toBe(true);
+    expect(result.segmentCount).toBe(60_000);
+    // Was 60_000 before the fix — the budget had no effect on 2-point lines.
+    expect(result.polylines.length).toBeLessThanOrEqual(1_100);
+    expect(result.polylines.length).toBeGreaterThan(0);
+  });
+
+  it('leaves an in-budget scene of short polylines untouched', () => {
+    const source = twoPointLines(500);
+
+    const result = buildDisplayPolylines(source, 1_000);
+
+    expect(result.isSimplified).toBe(false);
+    expect(result.polylines).toBe(source);
+  });
+
+  it('still decimates vertices (not whole polylines) for long polylines', () => {
+    const long: Polyline[] = [
+      { closed: false, points: Array.from({ length: 5_000 }, (_, i) => ({ x: i, y: i })) },
+    ];
+
+    const result = buildDisplayPolylines(long, 100);
+
+    expect(result.isSimplified).toBe(true);
+    expect(result.polylines).toHaveLength(1);
+    expect(result.polylines[0]!.points.length).toBeLessThan(5_000);
+    // Endpoints are preserved so the shape still reads as connected.
+    expect(result.polylines[0]!.points[0]).toEqual({ x: 0, y: 0 });
+    expect(result.polylines[0]!.points.at(-1)).toEqual({ x: 4_999, y: 4_999 });
+  });
+});
