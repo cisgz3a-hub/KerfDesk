@@ -46,6 +46,11 @@ jobs:
         if: github.event_name == 'push' && github.ref_type == 'tag'
         run: node scripts/validate-release-tag.mjs stable "${GITHUB_REF_NAME}"
 
+      - name: Require the tagged commit to belong to current main history
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$(git rev-parse HEAD)" refs/remotes/origin/main
+
   build-windows:
     name: Build Windows installer
     needs: validate-stable-tag

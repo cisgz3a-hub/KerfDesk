@@ -61,6 +61,32 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(environment).toBeGreaterThan(buildJob);
   });
 
+  it('requires the stable tag commit to belong to current main before production access', () => {
+    const validationJob = workflow.indexOf('validate-stable-tag:');
+    const validator = workflow.indexOf('node scripts/validate-release-tag.mjs stable');
+    const ancestry = workflow.indexOf(
+      'Require the tagged commit to belong to current main history',
+    );
+    const fetchMain = workflow.indexOf('git fetch --no-tags origin main');
+    const mergeBase = workflow.indexOf('git merge-base --is-ancestor');
+    const buildJob = workflow.indexOf('build-windows:');
+    const validationBlock = workflow.slice(validationJob, buildJob);
+
+    expect(validationJob).toBeGreaterThanOrEqual(0);
+    expect(validator).toBeGreaterThanOrEqual(0);
+    expect(ancestry).toBeGreaterThanOrEqual(0);
+    expect(fetchMain).toBeGreaterThanOrEqual(0);
+    expect(mergeBase).toBeGreaterThanOrEqual(0);
+    expect(buildJob).toBeGreaterThanOrEqual(0);
+    expect(validator).toBeGreaterThan(validationJob);
+    expect(ancestry).toBeGreaterThan(validator);
+    expect(fetchMain).toBeGreaterThan(ancestry);
+    expect(mergeBase).toBeGreaterThan(fetchMain);
+    expect(mergeBase).toBeLessThan(buildJob);
+    expect(validationBlock).not.toContain('${{ secrets.');
+    expect(validationBlock).not.toContain('environment:');
+  });
+
   it('rejects non-stable or lightweight tags before signing and R2 publication', () => {
     const validatorIndex = workflow.indexOf(
       'node scripts/validate-release-tag.mjs stable "${GITHUB_REF_NAME}"',
