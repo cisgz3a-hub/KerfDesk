@@ -17,17 +17,13 @@ import {
   type SelectionMask,
 } from '../../core/image-select';
 import type { RasterImage } from '../../core/scene';
-import { useStore } from '../state';
-import { useToastStore } from '../state/toast-store';
 import {
-  appliedBounds,
   BLACK,
   commitCrop,
   commitFillSelection,
   commitLine,
   commitMoveSelection,
   commitStroke,
-  createSession,
   modifySelectionMask,
   nudgeOutline,
   revertSession,
@@ -44,7 +40,12 @@ import {
   startEditorTransform,
   type EditorTransformSession,
 } from './editor-transform-session';
-import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
+import {
+  applyAction,
+  applyAndTraceAction,
+  closeEditorAction,
+  openEditorAction,
+} from './image-editor-lifecycle';
 import type { EditorView } from './image-editor-types';
 
 const DEFAULT_BRUSH: BrushSettings = { diameterPx: 12, hardness: 0.8, opacity: 1 };
@@ -52,10 +53,15 @@ const DEFAULT_WAND_TOLERANCE = 32;
 
 type LoadState =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'loading'; readonly objectId: string }
+  | {
+      readonly kind: 'loading';
+      readonly objectId: string;
+      readonly requestToken: symbol;
+    }
   | { readonly kind: 'failed'; readonly message: string };
 
-type ImageEditorState = {
+/** Ephemeral Image Studio state and actions owned outside project undo. */
+export type ImageEditorState = {
   readonly session: EditorSession | null;
   readonly stash: Readonly<Record<string, EditorSession>>;
   readonly loadState: LoadState;
@@ -212,7 +218,8 @@ export const useImageEditorStore = create<ImageEditorState>((set, get) => ({
   applyAndTrace: (onApplied) => applyAndTraceAction(set, get, onApplied),
 }));
 
-type Setter = (
+/** Zustand setter accepted by extracted Image Studio action modules. */
+export type Setter = (
   partial: Partial<ImageEditorState> | ((state: ImageEditorState) => Partial<ImageEditorState>),
 ) => void;
 
@@ -255,18 +262,6 @@ function commitPendingCropAction(set: Setter, get: () => ImageEditorState): void
   withSession(set, get, (session) => commitCrop(session, pendingCrop));
 }
 
-function closeEditorAction(set: Setter, get: () => ImageEditorState): void {
-  const { session } = get();
-  set((s) => ({
-    session: null,
-    transform: null,
-    loadState: { kind: 'idle' },
-    view: null,
-    isSpacePanning: false,
-    stash: session === null ? s.stash : { ...s.stash, [session.objectId]: session },
-  }));
-}
-
 function wandAtAction(
   get: () => ImageEditorState,
   x: number,
@@ -284,92 +279,6 @@ function wandAtAction(
     }),
     override,
   );
-}
-
-function openEditorAction(set: Setter, get: () => ImageEditorState, image: RasterImage): void {
-  const { stash, session } = get();
-  if (session !== null && session.objectId === image.id) return;
-  const stashed = stash[image.id];
-  if (stashed !== undefined) {
-    set((s) => {
-      const { [image.id]: _resumed, ...rest } = s.stash;
-      return { session: stashed, transform: null, stash: rest, loadState: { kind: 'idle' } };
-    });
-    return;
-  }
-  set({ transform: null, loadState: { kind: 'loading', objectId: image.id } });
-  decodeRasterToBuffer(image)
-    .then((doc) => {
-      // The open may have been superseded (closed / another image opened).
-      if (get().loadState.kind !== 'loading') return;
-      set({
-        session: createSession(image.id, image.source, doc, image.bounds),
-        loadState: { kind: 'idle' },
-      });
-    })
-    .catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      set({ loadState: { kind: 'failed', message } });
-      useToastStore.getState().pushToast(`Could not open image for editing: ${message}`, 'error');
-    });
-}
-
-function applyAction(set: Setter, get: () => ImageEditorState): void {
-  void runApply(set, get);
-}
-
-/**
- * Bake the composite into the scene raster as one project-undo entry.
- * Resolves the applied objectId on success, or null when nothing applied
- * (no session, already applying, clean, or a bake error).
- */
-function runApply(set: Setter, get: () => ImageEditorState): Promise<string | null> {
-  const { session, isApplying } = get();
-  // dirtySinceApply, not undo depth: crop clears the tile history but still
-  // needs applying (found by the 2026-07-21 interactive self-test).
-  if (session === null || isApplying) return Promise.resolve(null);
-  if (!session.dirtySinceApply) return Promise.resolve(session.objectId);
-  set({ isApplying: true });
-  const objectId = session.objectId;
-  // ADR-245: Apply always bakes the layer composite (fast-path identity for
-  // a single-layer session), never the active layer alone.
-  return bakeBufferToBitmapFields(compositeSession(session))
-    .then((fields) => {
-      const bounds = appliedBounds(session);
-      useStore.getState().applyEditedImage(objectId, {
-        ...fields,
-        ...(bounds === null
-          ? {}
-          : { pixelWidth: session.doc.width, pixelHeight: session.doc.height, bounds }),
-      });
-      set((s) => ({
-        isApplying: false,
-        session: s.session === null ? null : { ...s.session, dirtySinceApply: false },
-      }));
-      useToastStore.getState().pushToast('Image edits applied.', 'success');
-      return objectId;
-    })
-    .catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      set({ isApplying: false });
-      useToastStore.getState().pushToast(`Could not apply image edits: ${message}`, 'error');
-      return null;
-    });
-}
-
-// Apply & Trace (V2 plan F): bake pending edits, then close the editor
-// (session stashed as always) and hand the scene raster to the existing trace
-// dialog. A clean session can be re-traced immediately without a fake edit.
-function applyAndTraceAction(
-  set: Setter,
-  get: () => ImageEditorState,
-  onApplied: (objectId: string) => void,
-): void {
-  void runApply(set, get).then((objectId) => {
-    if (objectId === null) return;
-    closeEditorAction(set, get);
-    onApplied(objectId);
-  });
 }
 
 function withSession(
