@@ -10,10 +10,21 @@ import type { Viewer3dSegmentsInput } from './segment-buckets';
 
 const MARKER_RADIUS_FRACTION = 0.012;
 const MARKER_MIN_RADIUS_MM = 0.4;
-const MARKER_COLOR = 0xffffff;
-/** A colour used nowhere else in the scene, so the live head can never be
- * mistaken for a toolpath move or the playback marker. */
-const LIVE_MARKER_COLOR = 0x00e5ff;
+export const MARKER_COLOR = 0xffffff;
+/**
+ * Bright red, at full red channel (maintainer request, 2026-07-29: the previous
+ * cyan did not read clearly enough while watching a job run).
+ *
+ * It stays distinct from every other colour in the scene, but the margin is now
+ * narrower than it was: `travel` is 0xcc4444, the recessive traversal red of the
+ * LightBurn convention. The separation that keeps a live machine position from
+ * being read as a travel move is therefore no longer colour alone — it is
+ * saturation and brightness (0xff vs 0xcc red, against a far darker body), plus
+ * form: this is a filled sphere at 1.6x scale with `depthTest` off, drawn over
+ * all geometry, never a thin line. Do not darken it toward the travel red, and
+ * do not give any other scene element a bright saturated red.
+ */
+export const LIVE_MARKER_COLOR = 0xff2d2d;
 const LIVE_MARKER_SCALE = 1.6;
 
 type ThreeModule = typeof ThreeNamespace;
