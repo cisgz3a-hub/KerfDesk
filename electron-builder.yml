@@ -1,5 +1,6 @@
 appId: dev.laserforge.app
 productName: KerfDesk
+copyright: Copyright © 2026 Johann Stolk
 
 directories:
   output: release/${version}

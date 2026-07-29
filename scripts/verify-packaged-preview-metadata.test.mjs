@@ -11,6 +11,7 @@ import { verifyPackagedPreviewAsar } from './verify-packaged-preview-metadata.mj
 const PREVIEW_VERSION = '0.2.0-preview.14';
 const NEAR_COLLISION_RENDERER_VERSION = '0.2.0-preview.140';
 const WRONG_RENDERER_VERSION = '0.1.822';
+const PACKAGE_AUTHOR_NAME = 'Johann Stolk';
 const ABOUT_MARKER = 'Free and open-source under the MIT License';
 const BUILD_BADGE_MARKER = 'Build version';
 
@@ -26,6 +27,7 @@ async function createPreviewArchive(options = {}) {
     path.join(source, 'package.json'),
     JSON.stringify({
       version: PREVIEW_VERSION,
+      author: { name: options.authorName ?? PACKAGE_AUTHOR_NAME },
       kerfdeskDesktopReleaseChannel: 'preview',
       kerfdeskUpdateChannelTrusted: false,
     }),
@@ -46,6 +48,18 @@ test('accepts an archive whose renderer and package use the exact Preview versio
   const fixture = await createPreviewArchive();
   try {
     assert.doesNotThrow(() => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION));
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('rejects an archive whose package does not carry the truthful author identity', async () => {
+  const fixture = await createPreviewArchive({ authorName: 'GitHub, Inc.' });
+  try {
+    assert.throws(
+      () => verifyPackagedPreviewAsar(fixture.archive, PREVIEW_VERSION),
+      /packaged author mismatch/,
+    );
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
