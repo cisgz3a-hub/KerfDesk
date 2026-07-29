@@ -23,6 +23,21 @@ import {
 } from './file-actions';
 
 describe('file actions contextual failure handling', () => {
+  it('keeps a no-dump controller readiness advisory non-blocking', async () => {
+    const toast = toasts();
+    const pickFileForSave = vi.fn(async () => null);
+    await handleSaveGcode({
+      platform: mockPlatform({ save: pickFileForSave }),
+      project: projectWithLine(),
+      savedName: null,
+      controllerSettings: null,
+      settingsCapability: 'none',
+      pushToast: toast.pushToast,
+    });
+    expect(pickFileForSave).toHaveBeenCalledOnce();
+    expect(toast.messages).toContainEqual(expect.objectContaining({ variant: 'warning' }));
+  });
+
   it('handles import picker failures with import-specific toast copy', async () => {
     const toast = toasts();
 
@@ -117,8 +132,8 @@ describe('file actions contextual failure handling', () => {
   // "adds confirmation before an otherwise available action" in the guard
   // definition and makes controller-setting policy warn-only — so the export
   // proceeds to the picker unasked, and the $30 mismatch is stated as a
-  // post-save warning instead. The warning text itself is pinned end-to-end in
-  // file-actions.controller-readiness.test.ts.
+  // post-save warning instead. The exact warning and cancel-path behavior are
+  // pinned in file-actions.controller-readiness.test.ts.
   it('reaches the file picker unasked when the connected controller $30 disagrees', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const save = vi.fn(async () => null);

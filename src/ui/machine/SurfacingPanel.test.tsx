@@ -152,6 +152,30 @@ describe('SurfacingPanel save path', () => {
     ).toBe(true);
   });
 
+  it('states the no-dump controller assumption while still saving surfacing G-code', async () => {
+    const originalCapabilities = useLaserStore.getState().capabilities;
+    const toastCount = useToastStore.getState().toasts.length;
+    try {
+      await act(async () =>
+        useLaserStore.setState((state) => ({
+          capabilities: { ...state.capabilities, settings: 'none' },
+        })),
+      );
+      const { platform, write } = mockPlatform();
+      await clickSave(platform);
+
+      expect(write).toHaveBeenCalledOnce();
+      expect(useToastStore.getState().toasts.slice(toastCount)).toContainEqual(
+        expect.objectContaining({
+          message: expect.stringContaining('does not report GRBL $-settings'),
+          variant: 'warning',
+        }),
+      );
+    } finally {
+      await act(async () => useLaserStore.setState({ capabilities: originalCapabilities }));
+    }
+  });
+
   // Pins the exact pre/post delta without needing the old code present: for this
   // input runStandaloneCncPreflight reports ok === false, yet contributes no
   // compile-integrity issue at all. The old `if (!emitted.preflight.ok)` refusal

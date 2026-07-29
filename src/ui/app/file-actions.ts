@@ -6,7 +6,11 @@
 
 import { selectControllerDriver } from '../../core/controllers';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import type { ControllerSettingsSnapshot, PreflightIssue } from '../../core/preflight';
+import type {
+  ControllerSettingsSnapshot,
+  PreflightIssue,
+  ReadinessSettingsCapability,
+} from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
 import { importLightBurnProject } from '../../io/lightburn';
@@ -118,6 +122,9 @@ export type SaveGcodeCtx = {
   // disagreement as a warning before the picker opens (M11, demoted from a
   // confirm by rule 7 / ADR-228). Omitted = caller doesn't track it.
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  // How the active controller exposes settings. This only controls the
+  // readiness advisory interpretation; Save remains non-blocking.
+  readonly settingsCapability?: ReadinessSettingsCapability;
   // Operator-selected active WCS (C6): a non-G54 value warns the saved job's
   // G54 emission will mismatch a placement measured from the active offset.
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
@@ -125,6 +132,12 @@ export type SaveGcodeCtx = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
 };
+
+function optionalSettingsCapability(
+  settingsCapability: ReadinessSettingsCapability | undefined,
+): Pick<SaveGcodeCtx, 'settingsCapability'> | Record<never, never> {
+  return settingsCapability === undefined ? {} : { settingsCapability };
+}
 
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // H.10: tiling-enabled CNC projects export one file per tile instead
@@ -138,6 +151,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
       ...(ctx.controllerSettings === undefined
         ? {}
         : { controllerSettings: ctx.controllerSettings }),
+      ...optionalSettingsCapability(ctx.settingsCapability),
       pushToast: ctx.pushToast,
     })
   ) {
@@ -180,7 +194,11 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // with the post-save advisories. The confirm was raised on every save
   // ATTEMPT, so reporting it only after a successful write would tell the
   // operator less than the refusal did whenever the picker is cancelled.
-  for (const advisory of controllerReadinessAdvisories(ctx.project, ctx.controllerSettings)) {
+  for (const advisory of controllerReadinessAdvisories(
+    ctx.project,
+    ctx.controllerSettings,
+    ctx.settingsCapability,
+  )) {
     ctx.pushToast(advisory, 'warning');
   }
   let target: SaveTarget | null;

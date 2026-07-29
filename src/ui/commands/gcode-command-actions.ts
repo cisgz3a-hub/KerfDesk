@@ -67,6 +67,7 @@ export function saveGcodeContext(
       wcoCache: laser.wcoCache,
     },
     controllerSettings: laser.controllerSettings,
+    settingsCapability: laser.capabilities.settings,
     activeWcs: laser.activeWcs,
     allowRotaryRaster:
       useExperimentalLaserFeatures.getState().features.rotaryRaster &&

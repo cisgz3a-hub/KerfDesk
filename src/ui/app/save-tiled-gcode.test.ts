@@ -167,4 +167,20 @@ describe('handleSaveTiledGcode', () => {
     expect(toasts.some((message) => message.includes('connected controller'))).toBe(false);
     confirmSpy.mockRestore();
   });
+
+  it('reports an incomplete read-only settings dump without refusing tile export', async () => {
+    const written: string[] = [];
+    const toasts: string[] = [];
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: tiledCncProject(),
+      savedName: 'job',
+      controllerSettings: {},
+      settingsCapability: 'readonly-dump',
+      pushToast: (message) => toasts.push(message),
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    expect(toasts).toContainEqual(expect.stringContaining('settings dump did not include $30'));
+  });
 });
