@@ -8,20 +8,13 @@ import {
   cancel as cancelStreamer,
   continueToolChange as continueToolChangeStreamer,
   createStreamer,
-  findOversizedLine,
-  isSendableGcodeLine,
   markErrored,
   step,
   wipeInFlight,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { extractToolChangeLabels } from '../../core/output';
-import {
-  CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE,
-  cncControllerEpochOf,
-  cncSetupAttestationMatches,
-  type CncControllerEpoch,
-} from './cnc-setup-attestation';
+import { cncControllerEpochOf, type CncControllerEpoch } from './cnc-setup-attestation';
 import {
   assertCncLiveStartReady,
   assertCncMpgInactive,
@@ -30,7 +23,12 @@ import {
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
-import { laserModeStartEvidenceIssue } from './laser-mode-start-evidence';
+import {
+  assertCncSetupAttested,
+  assertGcodeFitsController,
+  assertProgramHasSendableLine,
+  assertStartControllerEvidence,
+} from './laser-start-program-assertions';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
@@ -88,7 +86,6 @@ const UNTRACKED_ACK_DRAIN_TIMEOUT_MS = 1_500;
 const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
 export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
   'The compiled tool plan does not match the CNC program pauses. Start was blocked so tool identity cannot drift at a change boundary.';
-const EMPTY_PROGRAM_MESSAGE = 'The job contains no sendable G-code commands.';
 
 export function jobActions(
   set: SetFn,
@@ -181,11 +178,6 @@ async function runStartJob(
         state.controllerOperation?.kind === 'start-arming' ? null : state.controllerOperation,
     }));
   }
-}
-
-function assertProgramHasSendableLine(gcode: string): void {
-  if (gcode.split('\n').some(isSendableGcodeLine)) return;
-  throw new Error(EMPTY_PROGRAM_MESSAGE);
 }
 
 async function prepareStartBoundary(
@@ -294,30 +286,6 @@ function resetCleanupLines(driver: ControllerDriver): ReadonlyArray<string> {
   return lines.some((line) => line.trim().toUpperCase() === 'M5') ? lines : ['M5', ...lines];
 }
 
-function assertStartControllerEvidence(
-  machineKind: 'laser' | 'cnc',
-  options: StartJobOptions,
-  gcode: string,
-): void {
-  // M7 support is a Job Review advisory (rule 7 / ADR-228), not a wire-boundary
-  // refusal, so there is no live controller re-check here. For laser output the
-  // reviewed evidence still gates handoff consistency ($30/$32 acknowledgement
-  // and unchanged M7 program shape).
-  if (machineKind !== 'laser') return;
-  const issue = laserModeStartEvidenceIssue(options.laserModeStartEvidence, gcode);
-  if (issue !== null) throw new Error(issue);
-}
-
-function assertGcodeFitsController(gcode: string, options: StartJobOptions): void {
-  const streamOptions = normalizeStartJobOptions(options);
-  const oversized = findOversizedLine(gcode, streamOptions.rxBufferBytes);
-  if (oversized === null) return;
-  throw new Error(
-    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
-      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
-  );
-}
-
 function prepareInitialStream(
   gcode: string,
   options: StartJobOptions,
@@ -331,16 +299,6 @@ function prepareInitialStream(
     createStreamer(gcode, { ...streamOptions, toolChangePause: options.machineKind === 'cnc' }),
   );
   return { stepped, ...toolChangeManifest(gcode, options) };
-}
-
-function assertCncSetupAttested(
-  gcode: string,
-  options: StartJobOptions,
-  controllerEpoch: CncControllerEpoch,
-): void {
-  if (options.machineKind !== 'cnc') return;
-  if (cncSetupAttestationMatches(options.cncSetupAttestation, gcode, controllerEpoch)) return;
-  throw new Error(CNC_SETUP_ATTESTATION_REQUIRED_MESSAGE);
 }
 
 function toolChangeManifest(
