@@ -291,11 +291,36 @@ describe('webSerial wire encoding (M12)', () => {
     expect(Array.from(written ?? [])).toEqual(Array.from(new TextEncoder().encode('G1 X1 S100\n')));
   });
 
+  it.each([
+    ['Delete', String.fromCharCode(0x7f), 0x7f],
+    ['A0 realtime command', String.fromCharCode(0xa0), 0xa0],
+  ])('sends raw %s as its literal one-byte code unit', async (_label, command, expected) => {
+    const port = new MockPort();
+    const conn = await openConn(port);
+
+    await conn.write(command);
+
+    const written = port.writer.write.mock.calls[0]?.[0];
+    expect(Array.from(written ?? [])).toEqual([expected]);
+  });
+
   it('refuses characters that cannot be a single GRBL wire byte', async () => {
     const port = new MockPort();
     const conn = await openConn(port);
 
     await expect(conn.write('Ω')).rejects.toThrow(/single-byte/i);
+  });
+});
+
+describe('webSerial byte-range validation', () => {
+  it('refuses one code unit above the byte range before writing', async () => {
+    const port = installMockSerial(new MockPort());
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    const connection = await ref.open({ baudRate: 115200 });
+
+    await expect(connection.write(String.fromCharCode(0x100))).rejects.toThrow(/single-byte/i);
+    expect(port.writer.write).not.toHaveBeenCalled();
   });
 });
 

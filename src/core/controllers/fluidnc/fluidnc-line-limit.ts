@@ -6,7 +6,7 @@
 // This model is deliberately limited to that current ASCII-safe emitted path;
 // high-byte policy remains an approval-dependent follow-up.
 
-/** Maximum ordinary G-code payload bytes FluidNC parses before `error:14`. */
+/** Maximum G-code-parser payload bytes FluidNC accepts before `error:14`. */
 export const FLUIDNC_GCODE_MAX_PAYLOAD_BYTES = 127;
 
 /** Maximum ordinary printable payload characters the direct Lineedit retains. */
@@ -22,12 +22,12 @@ export type FluidncLineBoundary = {
   readonly length: number;
   /** The direct collector keeps this many printable payload characters. */
   readonly retainedLength: number;
-  /** Whether ordinary G-code reaches the parser or returns `error:14`. */
+  /** Whether the G-code-parser payload is accepted or returns `error:14`. */
   readonly parserResult: 'accepted' | 'error:14';
 };
 
 /**
- * Reports ordinary G-code lines beyond FluidNC's executable parser boundary.
+ * Reports program lines routed beyond FluidNC's executable G-code-parser boundary.
  * @param gcode Emitted program text, newline separated.
  * @returns One entry per ASCII-safe line that FluidNC rejects as `error:14`.
  */
@@ -36,7 +36,15 @@ export function findFluidncNonExecutableLines(gcode: string): ReadonlyArray<Flui
     .split('\n')
     .map((rawLine, index) => ({ lineNumber: index + 1, line: rawLine.trim() }))
     .filter((candidate) => isSendableGcodeLine(candidate.line))
-    .map((candidate) => fluidncLineBoundary(candidate.lineNumber, payloadLength(candidate.line)))
+    .map((candidate) => ({
+      lineNumber: candidate.lineNumber,
+      length: executableParserPayloadLength(candidate.line),
+    }))
+    .filter(
+      (candidate): candidate is { readonly lineNumber: number; readonly length: number } =>
+        candidate.length !== null,
+    )
+    .map((candidate) => fluidncLineBoundary(candidate.lineNumber, candidate.length))
     .filter((candidate) => candidate.parserResult === 'error:14');
 }
 
@@ -58,5 +66,35 @@ export function fluidncLineBoundary(lineNumber: number, length: number): Fluidnc
 // the line on that CR rather than storing it, so it never spends payload budget.
 function payloadLength(line: string): number {
   return line.endsWith('\r') ? line.length - 1 : line.length;
+}
+
+// Pinned FluidNC ProcessSettings routes settings commands before G-code parsing.
+// Jog forms are the exception: their case-insensitive J/Jog key and value are
+// reconstructed as `$J=` plus the value before entering the G-code parser.
+function executableParserPayloadLength(line: string): number | null {
+  const settingsParts = parseSettingsCommand(line);
+  if (settingsParts !== null) {
+    const normalizedKey = settingsParts.key.toLowerCase();
+    const isJog = normalizedKey === 'j' || normalizedKey === 'jog';
+    if (!isJog || settingsParts.value.length === 0) return null;
+    return '$J='.length + settingsParts.value.length;
+  }
+  return payloadLength(line);
+}
+
+function parseSettingsCommand(
+  line: string,
+): { readonly key: string; readonly value: string } | null {
+  if (line.startsWith('$')) {
+    const separator = line.indexOf('=');
+    if (separator < 0) return { key: line.slice(1).trim(), value: '' };
+    return { key: line.slice(1, separator).trim(), value: line.slice(separator + 1) };
+  }
+  if (line.startsWith('[')) {
+    const separator = line.indexOf(']');
+    if (separator < 0) return { key: line.slice(1).trim(), value: '' };
+    return { key: line.slice(1, separator).trim(), value: line.slice(separator + 1) };
+  }
+  return null;
 }
 import { isSendableGcodeLine } from '../grbl/streamer';

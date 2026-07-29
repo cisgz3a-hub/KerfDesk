@@ -57,7 +57,35 @@ describe('detectFluidncDivergenceWarnings', () => {
     expect(boundary).toContain(String(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 20));
     expect(boundary).toContain(String(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES));
     expect(boundary).toContain('error:14');
+    expect(boundary).toContain('trims leading and trailing whitespace before transmission');
+    expect(boundary).toContain(
+      'does not apply additional shortening, splitting, or dropping because of this FluidNC boundary',
+    );
+    expect(boundary).not.toContain('does not shorten, split, or drop the prepared line');
     expect(boundary).not.toContain('silently');
+  });
+
+  it('measures the transmitted whitespace-normalized line and names that normalization', () => {
+    const padded = `  ${LONG_LINE}  `;
+    const normalized = padded.trim();
+    const paddedWarnings = detectFluidncDivergenceWarnings({
+      ...GRBL_INPUT,
+      active: 'fluidnc',
+      gcode: `${padded}\n`,
+    });
+    const normalizedWarnings = detectFluidncDivergenceWarnings({
+      ...GRBL_INPUT,
+      active: 'fluidnc',
+      gcode: `${normalized}\n`,
+    });
+
+    expect(paddedWarnings[0]).toBe(normalizedWarnings[0]);
+    expect(paddedWarnings[0]).toContain(
+      'shared streamer trims leading and trailing whitespace before transmission',
+    );
+    expect(paddedWarnings[0]).toContain(
+      'does not apply additional shortening, splitting, or dropping because of this FluidNC boundary',
+    );
   });
 
   it('omits the line-boundary warning when every line fits', () => {

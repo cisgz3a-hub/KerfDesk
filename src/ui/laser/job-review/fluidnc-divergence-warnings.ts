@@ -54,14 +54,15 @@ function lineBoundaryWarnings(input: FluidncDivergenceInput): ReadonlyArray<stri
     line.length > worst.length ? line : worst,
   );
   return [
-    `${FLUIDNC_LINE_BOUNDARY_WARNING_PREFIX} ${nonExecutable.length} ordinary G-code line(s) ` +
+    `${FLUIDNC_LINE_BOUNDARY_WARNING_PREFIX} ${nonExecutable.length} G-code-parser line(s) ` +
       `exceed FluidNC's ${FLUIDNC_GCODE_MAX_PAYLOAD_BYTES}-byte parser limit ` +
       `(first: line ${first.lineNumber} at ${first.length} characters; ` +
       `longest: line ${longest.lineNumber} at ${longest.length} characters). ` +
-      `FluidNC returns error:14 for ordinary G-code above that parser limit. Its direct Lineedit ` +
+      `FluidNC returns error:14 for parser payloads above that limit. Its direct Lineedit ` +
       `collector can retain up to ${FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS} printable characters, ` +
-      'but that does not raise executable G-code capacity. CurveDesk does not shorten, split, or ' +
-      'drop the prepared line.',
+      `but that does not raise executable G-code capacity. CurveDesk's shared streamer trims leading ` +
+      'and trailing whitespace before transmission. It does not apply additional shortening, ' +
+      'splitting, or dropping because of this FluidNC boundary.',
   ];
 }
 

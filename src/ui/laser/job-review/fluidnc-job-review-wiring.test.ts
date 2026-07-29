@@ -75,7 +75,7 @@ async function openReviewWithLongLine(): Promise<{
     },
     checkpointToReplace: null,
     completedReceipt: null,
-    purpose: 'frame',
+    purpose: 'start',
   });
   await vi.waitFor(() => expect(capture.models).toHaveLength(1));
   return { review, capture };
