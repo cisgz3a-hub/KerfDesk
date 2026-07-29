@@ -18,7 +18,7 @@
 // project-file schema-migration policy.
 
 import { deserializeProject } from '../../io/project/deserialize-project';
-import { prepareProjectForPersistence } from '../../io/project/prepare-project-persistence';
+import { prepareProjectForAutosave } from '../../io/project/prepare-project-autosave';
 import type { Project } from '../../core/scene';
 
 const LEGACY_AUTOSAVE_KEY = 'lf2:autosave:v1';
@@ -71,7 +71,7 @@ export function writeAutosave(
   if (typeof localStorage === 'undefined') {
     return { kind: 'unavailable', reason: 'storage-unavailable' };
   }
-  const prepared = prepareProjectForPersistence(project);
+  const prepared = prepareProjectForAutosave(project);
   if (prepared.kind !== 'ok') {
     return { kind: 'failed', reason: 'invalid-project', error: new Error(prepared.reason) };
   }

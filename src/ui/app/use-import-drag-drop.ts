@@ -18,7 +18,7 @@ import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
 import { isGcodeFile, openGcodeFileInInspector } from './gcode-open-action';
-import { confirmOversizeImport } from './import-size-guard';
+import { largeImportAdvisory } from './import-size-advisory';
 import { importStlFiles, isStlFile } from './stl-import-action';
 import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
@@ -180,7 +180,8 @@ async function importMany(
 ): Promise<void> {
   let successIdx = 0;
   for (const file of files) {
-    if (!confirmOversizeImport(file.name, file.size)) continue;
+    const advisory = largeImportAdvisory(file.name, file.size);
+    if (advisory !== null) pushToast(advisory, 'warning');
     try {
       const text = await file.text();
       const id = crypto.randomUUID();

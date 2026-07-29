@@ -6,8 +6,9 @@ import {
   type MaterialPreset,
 } from '../material-library';
 
-export const MAX_CLB_BYTES = 5_000_000;
-const MAX_CLB_ENTRIES = 10_000;
+// MAX_XML_DEPTH is an integrity bound (unbounded nesting overflows the recursive
+// walker) and stays. The former 5 MB byte ceiling and 10 000 entry ceiling were
+// policy caps and are gone — rule 7 / ADR-228.
 const MAX_XML_DEPTH = 64;
 
 export type ClbImportReport = {
@@ -29,8 +30,6 @@ export function importLightBurnClb(
   sourceName: string,
   parseXml: (text: string) => Document = defaultParseXml,
 ): ClbImportResult {
-  if (new TextEncoder().encode(xmlText).byteLength > MAX_CLB_BYTES)
-    return { ok: false, reason: 'CLB file exceeds the 5 MB import limit.' };
   if (/<!DOCTYPE|<!ENTITY/i.test(xmlText))
     return { ok: false, reason: 'CLB active XML declarations are not allowed.' };
   const document = parseXml(xmlText);
@@ -40,8 +39,6 @@ export function importLightBurnClb(
     return { ok: false, reason: 'CLB XML nesting is too deep.' };
   const entryElements = elementsByName(document, 'entry');
   if (entryElements.length === 0) return { ok: false, reason: 'CLB contains no material entries.' };
-  if (entryElements.length > MAX_CLB_ENTRIES)
-    return { ok: false, reason: 'CLB contains too many material entries.' };
 
   const unknownFields = new Set<string>();
   const warnings: string[] = [];

@@ -259,15 +259,21 @@ describe('parseSvg — denial-of-service guards', () => {
     expect(() => parseSvg(args(svgText))).not.toThrow();
   });
 
-  it('rejects SVGs that exceed the imported color-group budget', () => {
+  // Rule 7 / ADR-268: this budget used to THROW, making a big SVG impossible
+  // rather than slow. It now imports every color group and reports the size.
+  it('imports SVGs past the color-group budget and notes the size instead', () => {
     const lines = Array.from({ length: SVG_IMPORT_LIMITS.coloredPaths + 1 }, (_, index) => {
       const color = `#${(index + 1).toString(16).padStart(6, '0')}`;
       return `<line x1="0" y1="${index}" x2="1" y2="${index}" stroke="${color}"/>`;
     }).join('');
 
-    expect(() =>
-      parseSvg(args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 300">${lines}</svg>`)),
-    ).toThrow(/color group/);
+    const result = parseSvg(
+      args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 300">${lines}</svg>`),
+    );
+
+    expect(result.object).not.toBeNull();
+    expect(result.object?.paths).toHaveLength(SVG_IMPORT_LIMITS.coloredPaths + 1);
+    expect(result.notes.join(' ')).toMatch(/Large SVG/);
   });
 
   it('rejects SVGs with unsupported extreme coordinates', () => {

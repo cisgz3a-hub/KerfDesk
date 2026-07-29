@@ -13251,3 +13251,131 @@ whether the remaining bridges are wide enough to survive handling in a given
 stock. Nor is any claim made about how Anton's heavy strokes,
 UnifrakturMaguntia's fine blackletter detail, or Special Elite's distressed
 edges behave at a particular size or power.
+
+## ADR-268 - Imports of any size: the import size refusals become advisories, and parsing moves off the main thread (2026-07-30)
+
+**Date:** 2026-07-30
+**Status:** Accepted
+
+### Context
+
+ADR-241 removed the vector/fill segment-budget refusal, ADR-243 removed the raster budget and
+the compiled-output budget, and ADR-244 moved large-job preparation onto a Worker. Together they
+established that the software runs a job of any size, and that a size threshold may inform but
+never refuse. **Import was the one surface that line never reached.**
+
+Ten size refusals stood between the operator and a file over ~100 MB, none of them integrity
+facts (rule 7 / ADR-228, which names `import` explicitly as a guard surface):
+
+- `IMPORT_SOURCE_LIMITS` — 64 MB for `.lf2`, G-code and STL; 16 MB for material libraries.
+- `MAX_LBRN_BYTES` (20 MB), `MAX_CLB_BYTES` (5 MB), `MAX_SHAPES` (50 000), `MAX_CLB_ENTRIES` (10 000).
+- `MAX_PROGRAM_LINES` (500 000) — a 100 MB G-code program is ~3.3 M lines.
+- `RELIEF_EMBED_TRIANGLE_LIMIT` (200 000) — a 100 MB STL is ~2 M triangles.
+- `confirmOversizeImport` — a blocking 25 MB confirm on every SVG/DXF/image import, and a
+  SILENT skip in the multi-file trace batch, which has no toast channel to report it.
+
+Measured on the current tree (Node 22 / V8, the engine Chromium runs): `parseStl` 172 MB/s,
+`parseGcodeProgram` 13 MB/s (~7.6 s per 100 MB), `parseDxf` 9 MB/s (~11.4 s per 100 MB). All of
+it ran on the main thread. `text.split(/\r\n|\n|\r/)` on a 100 MB program cost a measured 570 MB
+of heap before a single line was examined. Separately, autosave called
+`prepareProjectForPersistence` every 30 s, which serializes, deserializes-and-validates,
+re-serializes, and then semantically diffs the two strings — four passes over the whole project,
+then a `localStorage` write whose ~5 MB cap discards the result.
+
+### Decision
+
+1. **Every import size refusal becomes an advisory.** `import-size-guard` and
+   `import-source-limits` are replaced by one `ui/app/import-size-advisory` module: the
+   thresholds survive, but they select WHEN the operator is told an import will be slow, never
+   WHETHER it happens. Advisories fire where the refusal stood — before the read, when the
+   adapter supplies a size — so the cost is known at the moment the old build would have stopped
+   the operator. `MAX_PROGRAM_LINES`, `RELIEF_EMBED_TRIANGLE_LIMIT`, `MAX_SHAPES`,
+   `MAX_CLB_ENTRIES` and the two LightBurn byte ceilings are deleted.
+2. **Genuine integrity bounds stay.** `MAX_XML_DEPTH` (unbounded nesting overflows the recursive
+   walker) and the `<!DOCTYPE`/`<!ENTITY` rejection (XXE) are facts about what can be parsed
+   safely, not policy, and are untouched. This is the same split ADR-243 drew when it kept
+   `materializeProgram`'s real `RangeError`.
+3. **Parsing moves off the main thread.** A new import Worker
+   (`ui/import/import-worker{,-client,-protocol}.ts`) parses DXF, G-code and STL, modelled on the
+   ADR-244 preparation worker — including its `null`-without-Worker contract, which is what keeps
+   the vitest/jsdom suite on the synchronous path. The request carries the **Blob itself**, not
+   already-read text: Blob is structured-cloneable by reference, so the worker performs the read
+   too and the main thread never materializes the file at all.
+4. **The SVG import budget is demoted too.** `SVG_IMPORT_LIMITS` threw mid-walk once an import
+   crossed 256 color groups, 50 000 polylines, or 250 000 points — found by measuring in a real
+   browser, not by grep, because it is named nothing like the other ceilings. Every one of those
+   loops is bounded by the input, so none was a termination guarantee. They are now advisory:
+   `svgImportSizeNote` reports the same measurement through `parseSvg`'s existing `notes`.
+   `assertSvgImportPoints` (non-finite / astronomically large coordinates) STAYS — that is the
+   "NaN coordinates" integrity category, and it is the one refusal this file keeps.
+5. **SVG stays on the main thread, deliberately.** `io/svg/parse-svg.ts` uses DOMPurify and
+   `new DOMParser()`, and the WHATWG HTML specification defines `DOMParser` as `[Exposed=Window]`
+   — there is no DOM in a worker. Moving SVG would mean replacing the sanitizer, which is the
+   ADR-017 security surface, so it is out of scope here and called out rather than hidden.
+6. **Line-oriented parsers stop materializing their lines.** `core/util/iterateLines` yields one
+   line at a time; `parseGcodeProgram` and the DXF tokenizer consume it. The generator is
+   property-tested to be indistinguishable from `text.split(/\r\n|\n|\r/)`, which is what makes
+   the swap a non-change to output.
+7. **Autosave stops doing save-integrity work.** A new `prepareProjectForAutosave` serializes
+   once and validates once, dropping the re-serialization and the semantic diff. Those protect
+   the operator's file of record; an autosave slot is not one, and is re-validated on read
+   anyway. Validation itself is kept, because it is what turns a broken project into a
+   "save manually" warning instead of a recovery slot that silently fails.
+8. **Relief meshes convert once.** `core/util/cachedFloat32Array` memoizes the
+   `number[] -> Float32Array` conversion on the owning object; four call sites rebuilt it
+   independently, twice per prepare in the CNC compile path.
+
+### Consequences
+
+- Any file the operator can pick now imports. Cost is time and an advisory, never a refusal.
+- Autosave preparation on a project holding a 100 MB image measured 971 ms before and 327 ms
+  after — 2.97x, on a 30-second timer.
+- A large DXF/G-code/STL import no longer blocks the UI thread. SVG still does, and it is by far
+  the worst case. Measured in real Chromium against the dev server (isolated function call, no
+  scene touched): `parseSvg` ran at **0.84 MB/s before** this ADR and **1.59 MB/s after**
+  (1 MB 719 ms, 3 MB 1904 ms, 6 MB 3780 ms). The ~2x gain is a side effect of point 4: the
+  polyline/point ceilings were checked on EVERY reserved point, so the refusal machinery was
+  itself a measurable share of the parse. Even so SVG remains ~6x slower than `parseDxf`, and a
+  100 MB SVG still implies roughly a minute of frozen main thread. Making SVG usable at that size
+  needs the sanitizer decision in point 5 and is the largest remaining gap in this work.
+- The same run is the end-to-end proof of point 4: a 6 MB SVG that previously threw
+  "SVG import exceeds 50000 polyline(s)" now imports 104,858 polylines and reports
+  "Large SVG: 104,858 polylines, 419,432 points across 1 color group(s)".
+- The `.lf2` schema is UNCHANGED. Moving raster `dataUrl` payloads out of the persisted project
+  into a Blob side-table — the remaining large-import memory cost — is deliberately not attempted
+  here: it touches ~24 files and the project schema, and needs its own ADR and migration.
+
+### Verification
+
+- `iterate-lines.test.ts` — property test pins the generator equal to `split()` over arbitrary
+  and break-heavy strings (1000 runs), plus CRLF/bare-CR/trailing-break cases.
+- `dxf-tags-streaming-parity.test.ts` — the pre-ADR-268 tokenizer is kept verbatim as an oracle
+  and pinned indistinguishable from the streamed one over 1500 property runs plus 15 edge cases
+  (missing EOF, odd line count, blank tail, content after EOF, CRLF, bare CR, binary sentinel).
+  Swapping index-based pair access for a generator is precisely the change that passes a fixture
+  corpus while mis-numbering an error or dropping the final tag, so it gets its own oracle.
+- `import-size-advisory.test.ts` — replaces the two suites that PINNED the refusals; each case
+  asserts the bytes are actually read and a warning is raised, the inverse of what it replaced.
+- `import-worker-client.test.ts` — stub-Worker: null without Worker, blob-not-text is sent,
+  concurrent requests stay independent, wrong-kind and worker errors reject rather than mis-cast.
+- `prepare-project-autosave.test.ts` — autosave JSON recovers the same project as the manual-save
+  path; validation signal and serialization-failure reason retained.
+- `cached-float32-array.test.ts` — identity reuse, no stale buffer for a rebuilt owner, and
+  recompute when the same owner presents a different array.
+- G-code snapshots unchanged, and the full DXF + G-code suites pass over the streamed tokenizers.
+- **End-to-end on real >100 MB files, in Chromium, rendered and inspected** (rule 2). Two fixtures
+  were generated as a grid of "F" glyphs — chosen because an F is asymmetric in BOTH axes, so a
+  mirror, flip, transpose, or winding error is visible rather than plausible:
+  - **DXF, 104,918,445 bytes / 1,356,600 LINE entities.** Fetched as a Blob and pushed through
+    the real `parseDxfOffThread`. Result `ok`, **1,356,600 polylines** (exactly the entity count),
+    bounds `maxX 6995 / maxY 6458` — arithmetically exact for a 700-column, 646-row grid at 10 mm
+    pitch. Parse 49.6 s; **max main-thread gap 54 ms** across 2380 heartbeat ticks, i.e. the UI
+    thread never stalled where pre-ADR-268 it would have frozen for the whole parse. The rendered
+    glyphs read as correct upright F's with the long bar on top and the short bar at mid-height.
+  - **G-code, 104,884,357 bytes / 3,998,947 lines** — 8x the deleted 500 000-line ceiling. Result
+    `ok`, 3,332,449 toolpath steps, and `cutMm` **10,663,840**, which is exactly
+    666,490 glyphs x 16 mm of modelled cut. Parse 60.8 s; **max main-thread gap 32 ms** over 3082
+    ticks. The rendered toolpath is clean upright F's in the cut color.
+- NOT verified: no hardware run — nothing was cut or engraved, so no claim is made about how any
+  of this behaves on a machine. The >100 MB raster/image and `.lf2` paths were not exercised at
+  size, and SVG was measured only up to 6 MB.

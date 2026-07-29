@@ -12,6 +12,7 @@
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
 import { DEFAULT_RELIEF_SCALLOP_MM, meshToHeightmap, reliefFinishingPasses } from '../relief';
+import { cachedFloat32Array } from '../util';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
@@ -108,7 +109,7 @@ function reliefFinishingGroup(
   const passes: CncPass[] = [];
   for (const relief of reliefs) {
     const heightmap = meshToHeightmap(
-      { positions: Float32Array.from(relief.meshPositions) },
+      { positions: cachedFloat32Array(relief, relief.meshPositions) },
       {
         targetWidthMm: relief.targetWidthMm,
         reliefDepthMm: relief.reliefDepthMm,
@@ -160,7 +161,7 @@ function reliefLadderFor(
   tool: CncTool,
 ): ReliefRoughingLadder {
   const heightmap = meshToHeightmap(
-    { positions: Float32Array.from(relief.meshPositions) },
+    { positions: cachedFloat32Array(relief, relief.meshPositions) },
     {
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,

@@ -12,7 +12,6 @@ import type { Vec2 } from '../../core/scene';
 import { ellipseSegmentCount } from '../../core/shapes/primitives';
 import { DEFAULT_FLATNESS_MM } from './flatten-curves';
 import { parsePathD, type SubPath } from './parse-path-d';
-import { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 const RECT_CORNER_SEGMENTS = 8;
 const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
@@ -94,9 +93,6 @@ function parsePointsAttr(value: string): ReadonlyArray<Vec2> {
     if (pendingX === null) {
       pendingX = number;
       continue;
-    }
-    if (points.length + 1 > SVG_IMPORT_LIMITS.points) {
-      throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.points} point(s)`);
     }
     const x = pendingX;
     const y = number;

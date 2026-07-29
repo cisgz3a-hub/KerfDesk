@@ -4,6 +4,8 @@
 // line; every higher construct (sections, tables, entities) is built from
 // runs of these tags.
 
+import { iterateLines } from '../../core/util';
+
 export type DxfTag = {
   readonly code: number;
   readonly value: string;
@@ -23,36 +25,46 @@ export function tokenizeDxf(text: string): TokenizeDxfResult {
       reason: 'Binary DXF is not supported — re-export as ASCII DXF.',
     };
   }
-  const lines = text.split(/\r\n|\n|\r/);
+  // Lines are pulled in pairs rather than split up front, so a large DXF never
+  // materializes one string per line (a 100 MB file is ~6 M of them).
+  const lines = iterateLines(text);
   const tags: DxfTag[] = [];
-  for (let i = 0; i < lines.length; i += 2) {
-    const codeLine = (lines[i] ?? '').trim();
+  let lineNumber = 0;
+  for (;;) {
+    const codeEntry = lines.next();
+    if (codeEntry.done === true) break;
+    const codeLine = codeEntry.value.trim();
+    lineNumber += 1;
     // Tolerate blank tail lines after the final tag (common in exports).
-    if (codeLine === '' && restIsBlank(lines, i)) break;
+    if (codeLine === '' && restIsBlank(lines)) break;
     if (!GROUP_CODE_PATTERN.test(codeLine)) {
       return {
         kind: 'error',
-        reason: `Malformed DXF: expected an integer group code on line ${i + 1}, got "${truncate(codeLine)}".`,
+        reason: `Malformed DXF: expected an integer group code on line ${lineNumber}, got "${truncate(codeLine)}".`,
       };
     }
-    const value = lines[i + 1];
-    if (value === undefined) {
+    const valueEntry = lines.next();
+    if (valueEntry.done === true) {
       return {
         kind: 'error',
-        reason: `Malformed DXF: group code on line ${i + 1} has no value line (truncated file).`,
+        reason: `Malformed DXF: group code on line ${lineNumber} has no value line (truncated file).`,
       };
     }
+    lineNumber += 1;
+    const value = valueEntry.value.trim();
     const code = Number.parseInt(codeLine, 10);
-    tags.push({ code, value: value.trim() });
+    tags.push({ code, value });
     // (0, EOF) is the documented terminator; ignore anything after it.
-    if (code === 0 && value.trim() === 'EOF') break;
+    if (code === 0 && value === 'EOF') break;
   }
   return { kind: 'ok', tags };
 }
 
-function restIsBlank(lines: ReadonlyArray<string>, from: number): boolean {
-  for (let i = from; i < lines.length; i += 1) {
-    if ((lines[i] ?? '').trim() !== '') return false;
+// Consumes the remainder of the iterator; only ever called when the tokenizer is
+// about to stop, so draining it is free.
+function restIsBlank(lines: Generator<string, void, undefined>): boolean {
+  for (const line of lines) {
+    if (line.trim() !== '') return false;
   }
   return true;
 }

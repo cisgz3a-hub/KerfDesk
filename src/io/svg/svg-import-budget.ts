@@ -1,3 +1,12 @@
+// Rule 7 / ADR-228 + ADR-268: coloredPaths / polylines / points were REFUSALS
+// that threw mid-import ("SVG import exceeds 50000 polyline(s)"), which made a
+// large SVG impossible rather than slow. They are policy judgements — every one
+// of those loops is bounded by the input, so none of them was a termination
+// guarantee — and are now advisory thresholds only.
+//
+// coordinateMagnitudeMm is different and STAYS a refusal: a non-finite or
+// astronomically large coordinate cannot produce meaningful G-code, which is the
+// integrity category ADR-243 kept ("NaN coordinates").
 export const SVG_IMPORT_LIMITS = {
   coloredPaths: 256,
   polylines: 50_000,
@@ -25,18 +34,25 @@ export function reserveSvgPolyline(
   pointCount: number,
   budget: SvgImportBudget,
 ): void {
-  if (!budget.colors.has(color) && budget.colors.size + 1 > SVG_IMPORT_LIMITS.coloredPaths) {
-    throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.coloredPaths} color group(s)`);
-  }
-  if (budget.polylines + 1 > SVG_IMPORT_LIMITS.polylines) {
-    throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.polylines} polyline(s)`);
-  }
-  if (budget.points + pointCount > SVG_IMPORT_LIMITS.points) {
-    throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.points} point(s)`);
-  }
   budget.colors.add(color);
   budget.polylines += 1;
   budget.points += pointCount;
+}
+
+/** Advisory when an import is large enough that the operator should know. */
+export function svgImportSizeNote(budget: SvgImportBudget): string | null {
+  if (
+    budget.colors.size <= SVG_IMPORT_LIMITS.coloredPaths &&
+    budget.polylines <= SVG_IMPORT_LIMITS.polylines &&
+    budget.points <= SVG_IMPORT_LIMITS.points
+  ) {
+    return null;
+  }
+  return (
+    `Large SVG: ${budget.polylines.toLocaleString()} polylines, ` +
+    `${budget.points.toLocaleString()} points across ${budget.colors.size} color group(s) — ` +
+    'editing and output may be slow.'
+  );
 }
 
 export function assertSvgImportPoints(points: ReadonlyArray<SvgPoint>): void {
