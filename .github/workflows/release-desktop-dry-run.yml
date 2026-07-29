@@ -66,6 +66,18 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
+      - name: Verify unsigned package identity
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $installer = "release/$env:VERSION/KerfDesk-$env:VERSION-windows-x64-setup.exe"
+          & ./scripts/verify-windows-package-identity.ps1 `
+            -Executable $installer `
+            -Kind Installer
+          $executable = "release/$env:VERSION/win-unpacked/KerfDesk.exe"
+          & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
+
       - name: Upload unsigned dry-run artifact
         uses: actions/upload-artifact@v7
         with:

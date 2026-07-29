@@ -12,6 +12,10 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   const builder = repoFile('electron-builder.preview.yml');
   const macVerifier = repoFile('scripts/verify-macos-preview-package.sh');
   const afterPack = repoFile('scripts/electron-builder-preview-after-pack.mjs');
+  // package.json is repository-controlled; this gate consumes only its optional author name.
+  const packageJson = JSON.parse(repoFile('package.json')) as {
+    readonly author?: { readonly name?: string };
+  };
 
   it('accepts only Preview tag pushes and validates the annotated tag first', () => {
     expect(workflow).toContain("tags: ['v*-preview.*']");
@@ -62,10 +66,15 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   });
 
   it('preserves Windows upgrade identity and sets the Mac bundle identity', () => {
+    expect(packageJson.author?.name).toBe('Johann Stolk');
     expect(builder).toMatch(/^appId: dev\.laserforge\.app$/m);
     expect(builder).toMatch(/mac:\s[\s\S]*appId: com\.kerfdesk\.app/);
     expect(builder).toMatch(/^productName: KerfDesk$/m);
+    expect(builder).toMatch(/^copyright: Copyright © 2026 Johann Stolk$/m);
     expect(builder).toContain('shortcutName: KerfDesk');
+    expect(workflow.match(/scripts\/verify-windows-package-identity\.ps1/g)).toHaveLength(2);
+    expect(macVerifier).toContain('NSHumanReadableCopyright');
+    expect(macVerifier).toContain('Copyright © 2026 Johann Stolk');
   });
 
   it('keeps Preview unsigned, unnotarized, and outside updater trust', () => {

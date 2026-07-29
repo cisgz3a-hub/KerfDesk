@@ -52,6 +52,8 @@ executable="${app_dir}/Contents/MacOS/KerfDesk"
 
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${plist}")" = 'com.kerfdesk.app'
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "${plist}")" = 'KerfDesk'
+test "$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' "${plist}")" = \
+  'Copyright © 2026 Johann Stolk'
 test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist}")" = '12.0'
 /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "${plist}" | grep -q 'KerfDesk'
 /usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "${plist}" | grep -q 'KerfDesk'

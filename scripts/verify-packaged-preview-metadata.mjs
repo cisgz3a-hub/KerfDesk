@@ -14,6 +14,7 @@ const RENDERER_SURFACES = [
 ];
 const SURFACE_VERSION_RADIUS = 512;
 const VERSION_TOKEN_CHARACTER = /[0-9A-Za-z.-]/;
+const PACKAGE_AUTHOR_NAME = 'Johann Stolk';
 
 export function verifyPackagedPreviewMetadata(value, expectedVersion) {
   if (typeof value !== 'object' || value === null) {
@@ -21,6 +22,9 @@ export function verifyPackagedPreviewMetadata(value, expectedVersion) {
   }
   if (value.version !== expectedVersion) {
     throw new Error(`packaged version mismatch: expected ${expectedVersion}`);
+  }
+  if (value.author?.name !== PACKAGE_AUTHOR_NAME) {
+    throw new Error(`packaged author mismatch: expected ${PACKAGE_AUTHOR_NAME}`);
   }
   if (value.kerfdeskDesktopReleaseChannel !== 'preview') {
     throw new Error('packaged Preview channel marker is missing');

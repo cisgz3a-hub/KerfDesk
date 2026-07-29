@@ -14,6 +14,9 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
   const workflow = repoFile('.github/workflows/release-desktop-stable.yml');
   const dryRunWorkflow = repoFile('.github/workflows/release-desktop-dry-run.yml');
   const deployWorkflow = repoFile('.github/workflows/deploy.yml');
+  const packageJson = JSON.parse(repoFile('package.json')) as {
+    readonly author?: { readonly name?: string };
+  };
   const tagPushPredicate = "if: github.event_name == 'push' && github.ref_type == 'tag'";
 
   it('production listens only to version-tag pushes on Windows', () => {
@@ -93,11 +96,15 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
   it('uses public KerfDesk names for the stable installer and shortcuts', () => {
     const builder = repoFile('electron-builder.yml');
 
+    expect(packageJson.author?.name).toBe('Johann Stolk');
     expect(builder).toMatch(/^productName: KerfDesk$/m);
+    expect(builder).toMatch(/^copyright: Copyright © 2026 Johann Stolk$/m);
     expect(builder).toContain('artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}');
     expect(builder).toContain('shortcutName: KerfDesk');
     expect(builder).toContain('appId: dev.laserforge.app');
     expect(builder).toMatch(/win:\s*\n\s*icon: public\/favicon\.svg/);
+    expect(workflow.match(/scripts\/verify-windows-package-identity\.ps1/g)).toHaveLength(2);
+    expect(dryRunWorkflow.match(/scripts\/verify-windows-package-identity\.ps1/g)).toHaveLength(2);
     expect(workflow).toContain('KerfDesk-$env:VERSION-windows-x64-setup.exe');
     expect(workflow).toContain('KerfDesk-${VERSION}-windows-x64-setup.exe');
     expect(workflow).not.toContain('LaserForge-2.0-${VERSION}-x64-setup.exe');

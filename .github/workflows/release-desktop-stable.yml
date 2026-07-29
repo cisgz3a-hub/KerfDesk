@@ -141,6 +141,11 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($signature.SignerCertificate.Subject)) {
             throw 'Installer signature has no publisher identity.'
           }
+          & ./scripts/verify-windows-package-identity.ps1 `
+            -Executable $installer `
+            -Kind Installer
+          $executable = "release/$env:VERSION/win-unpacked/KerfDesk.exe"
+          & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
           "Verified publisher: $($signature.SignerCertificate.Subject)"
 
       - name: Upload installer + update feed as workflow artifact

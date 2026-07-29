@@ -123,6 +123,9 @@ jobs:
           if ($signature.Status -ne 'NotSigned') {
             throw "Preview installer must be unsigned; found $($signature.Status)."
           }
+          & ./scripts/verify-windows-package-identity.ps1 `
+            -Executable $installer `
+            -Kind Installer
 
           $unexpectedMetadata = Get-ChildItem -LiteralPath $releaseDir -Recurse -File |
             Where-Object { $_.Name -match '^latest.*\.(yml|yaml|json)$' -or $_.Extension -eq '.blockmap' }
@@ -132,6 +135,7 @@ jobs:
 
           $unpacked = Join-Path $releaseDir 'win-unpacked'
           $executable = Join-Path $unpacked 'KerfDesk.exe'
+          & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
           $bytes = [IO.File]::ReadAllBytes($executable)
           $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
           $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase. MIT licensed.",
+  "author": {
+    "name": "Johann Stolk"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=22.13.0",
@@ -19,7 +22,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:release-integrity": "node --test scripts/third-party-closure.test.mjs scripts/verify-packaged-preview-metadata.test.mjs",
+    "test:release-integrity": "node --test scripts/third-party-closure.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",

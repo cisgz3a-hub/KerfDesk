@@ -222,6 +222,7 @@ test('requires an exact source identity contract on the release CLI', () => {
 test('requires exact fail-closed metadata inside every packaged Preview', () => {
   const valid = {
     version: '0.2.0-preview.1',
+    author: { name: 'Johann Stolk' },
     kerfdeskDesktopReleaseChannel: 'preview',
     kerfdeskUpdateChannelTrusted: false,
   };
@@ -229,6 +230,11 @@ test('requires exact fail-closed metadata inside every packaged Preview', () => 
   assert.throws(
     () => verifyPackagedPreviewMetadata({ ...valid, version: '0.2.0-preview.2' }, valid.version),
     /version mismatch/,
+  );
+  assert.throws(
+    () =>
+      verifyPackagedPreviewMetadata({ ...valid, author: { name: 'GitHub, Inc.' } }, valid.version),
+    /author mismatch/,
   );
   assert.throws(
     () =>
