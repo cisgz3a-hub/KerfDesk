@@ -3,6 +3,7 @@ import {
   countOutputVectorSegments,
   estimateJobDuration,
   formatDuration,
+  machineSpaceJob,
   PREPARATION_COMPILED_SEGMENT_BUDGET,
   PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
   type Job,
@@ -142,8 +143,11 @@ export function estimateLiveJobFromPrepared(
 
   const currentPosition =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
+  // ADR-127: measure the machine-space job. Identity when no rotary is active,
+  // so flat jobs are unchanged. Kept in step with buildPreparedJobMetrics so
+  // the live tile and Job Review cannot report different durations.
   const result = estimateJobDuration(
-    prepared.job,
+    machineSpaceJob(prepared.job, prepared.project.device, prepared.project.machine),
     prepared.project.device,
     currentPosition === undefined
       ? {}

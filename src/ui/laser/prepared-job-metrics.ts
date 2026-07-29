@@ -33,14 +33,20 @@ export function buildPreparedJobMetrics(
   const machineKind = machineKindOf(prepared.project.machine);
   const finishPosition =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
+  const framedJob = machineSpaceJob(prepared.job, device, prepared.project.machine);
+  // ADR-127: the rotary mapping must be applied everywhere the job is
+  // MEASURED, and the head travels machine millimetres, not design-surface
+  // millimetres. Estimating the surface job under-counted every Y component by
+  // the rotary scale (~1.91x on the shipped chuck defaults, i.e. the Time tile
+  // showed roughly half the real duration). machineSpaceJob is the identity
+  // when no rotary is active, so flat jobs are unchanged.
   const duration = estimateJobDuration(
-    prepared.job,
+    framedJob,
     device,
     finishPosition === undefined ? {} : { initialPosition: finishPosition, finishPosition },
   );
   const jobBounds = computeJobBounds(prepared.job, device);
   const motionBounds = computeJobMotionBounds(prepared.job, device);
-  const framedJob = machineSpaceJob(prepared.job, device, prepared.project.machine);
   const frameJobBounds = computeJobBounds(framedJob, device);
   const frameMotionBounds = computeJobMotionBounds(framedJob, device);
   return {
