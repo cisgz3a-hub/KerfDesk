@@ -1,3 +1,5 @@
+import type { FluidncV403RealtimeDispatch } from './fluidnc-v403-realtime-dispatch';
+
 /**
  * Literal firmware-side expectations derived from pinned FluidNC v4.0.3 source.
  * These do not model CurveDesk preparation, text encoding, acknowledgement
@@ -21,7 +23,7 @@ export const FLUIDNC_V403_DIRECT_CHANNEL_FIXTURES = [
       completedRecords: [nonemptyRecord([0x47, 0x31]), emptyRecord()],
     },
   ),
-  directFixture('an empty completed record bypasses the content parser', [[0x0a]], {
+  directFixture('an empty completed record is separately poll-ready', [[0x0a]], {
     completedRecords: [emptyRecord()],
   }),
   directFixture(
@@ -52,14 +54,15 @@ export const FLUIDNC_V403_DIRECT_CHANNEL_FIXTURES = [
     },
   ),
   directFixture(
-    'decoded pin commands retain low and high channel-event identity',
-    [[0x47, 0xc4, 0x80, 0xc4, 0xbf, 0xc5, 0xbe, 0x58, 0x0a]],
+    'decoded pin ranges stop before the pinned Last sentinel values',
+    [[0x47, 0xc4, 0x80, 0xc4, 0xbf, 0xc5, 0xbe, 0xc5, 0xbf, 0x58, 0x0a]],
     {
       completedRecords: [nonemptyRecord([0x47, 0x58])],
       realtimeCommands: [
         { command: 0x100, dispatch: 'pin-low-channel-event' },
         { command: 0x13f, dispatch: 'status-report-direct' },
         { command: 0x17e, dispatch: 'pin-high-channel-event' },
+        { command: 0x17f, dispatch: 'undefined-no-op' },
       ],
     },
   ),
@@ -98,6 +101,14 @@ export const FLUIDNC_V403_DIRECT_CHANNEL_FIXTURES = [
     },
   ),
   directFixture(
+    'F8 removal preserves a pending UTF-8 sequence before the next continuation byte',
+    [[0x47, 0xc3, 0xf8, 0x84, 0x58, 0x0a]],
+    {
+      completedRecords: [nonemptyRecord([0x47, 0x58])],
+      realtimeCommands: [{ command: 0xc4, dispatch: 'undefined-no-op' }],
+    },
+  ),
+  directFixture(
     '0x7F remains ordinary data in fresh non-editing streaming mode',
     [[0x47, 0x7f, 0x58, 0x0a]],
     {
@@ -111,7 +122,7 @@ export const FLUIDNC_V403_DIRECT_CHANNEL_FIXTURES = [
       completedRecords: [nonemptyRecord([0x58])],
       isEditing: true,
     },
-    true,
+    { isEditing: true },
   ),
   directFixture(
     'Ctrl-L leaves interactive editing before a following 0x7F arrives',
@@ -119,7 +130,7 @@ export const FLUIDNC_V403_DIRECT_CHANNEL_FIXTURES = [
     {
       completedRecords: [nonemptyRecord([0x47, 0x7f, 0x58])],
     },
-    true,
+    { isEditing: true },
   ),
   directFixture(
     'fragmented C2 A0 dispatches A0 without entering the ordinary line',
@@ -134,42 +145,6 @@ export const FLUIDNC_V403_DIRECT_CHANNEL_FIXTURES = [
   ),
 ] as const;
 
-type DirectFixtureDispatch =
-  | 'reset-event'
-  | 'status-report-direct'
-  | 'cycle-start-event'
-  | 'feed-hold-event'
-  | 'safety-door-event'
-  | 'motion-cancel-event-if-jogging'
-  | 'debug-event'
-  | 'macro-0-event'
-  | 'macro-1-event'
-  | 'macro-2-event'
-  | 'macro-3-event'
-  | 'feed-override-reset-event'
-  | 'feed-override-coarse-plus-event'
-  | 'feed-override-coarse-minus-event'
-  | 'feed-override-fine-plus-event'
-  | 'feed-override-fine-minus-event'
-  | 'rapid-override-reset-event'
-  | 'rapid-override-medium-event'
-  | 'rapid-override-low-event'
-  | 'rapid-override-extra-low-event'
-  | 'spindle-override-reset-event'
-  | 'spindle-override-coarse-plus-event'
-  | 'spindle-override-coarse-minus-event'
-  | 'spindle-override-fine-plus-event'
-  | 'spindle-override-fine-minus-event'
-  | 'spindle-override-stop-event'
-  | 'coolant-flood-toggle-event'
-  | 'coolant-mist-toggle-event'
-  | 'pin-ack-channel-control'
-  | 'pin-nak-channel-control'
-  | 'pin-reset-channel-control'
-  | 'pin-low-channel-event'
-  | 'pin-high-channel-event'
-  | 'undefined-no-op';
-
 type DirectFixtureResult = {
   readonly completedRecords?: ReadonlyArray<{
     readonly lineBytes: ReadonlyArray<number>;
@@ -177,7 +152,7 @@ type DirectFixtureResult = {
   }>;
   readonly realtimeCommands?: ReadonlyArray<{
     readonly command: number;
-    readonly dispatch: DirectFixtureDispatch;
+    readonly dispatch: FluidncV403RealtimeDispatch;
   }>;
   readonly pendingLineBytes?: ReadonlyArray<number>;
   readonly isEditing?: boolean;
@@ -187,8 +162,9 @@ function directFixture(
   name: string,
   inputChunks: ReadonlyArray<ReadonlyArray<number>>,
   expected: DirectFixtureResult,
-  isEditing = false,
+  options: { readonly isEditing?: boolean } = {},
 ) {
+  const { isEditing = false } = options;
   return {
     name,
     inputChunks,

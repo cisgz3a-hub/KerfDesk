@@ -26,10 +26,9 @@ import { captureJobReviewModels } from './job-review/testing';
 import { runStartJobFlow } from './start-job-flow';
 import { runFrameNow } from './use-frame-action';
 
-const originalFrame = useLaserStore.getState().frame;
-const originalStartJob = useLaserStore.getState().startJob;
+const ORIGINAL_FRAME = useLaserStore.getState().frame;
+const ORIGINAL_START_JOB = useLaserStore.getState().startJob;
 const CONTROLLER_EPOCH = 7;
-let uninstallAutoReview: () => void = () => undefined;
 
 function installFluidncProject(): void {
   const project = createProject(DEFAULT_DEVICE_PROFILE);
@@ -79,61 +78,63 @@ function testRepository(): RecoveryRepository {
   });
 }
 
-beforeEach(() => {
-  resetStore();
-  installFluidncProject();
-  useCameraStore.setState({
-    placementActive: false,
-    confirmedPositionEpoch: null,
-    surfaceHeightMm: 0,
-  });
-  useLaserStore.setState({
-    ...initialLaserState(),
-    connection: { kind: 'connected' },
-    activeControllerKind: 'fluidnc',
-    detectedControllerKind: 'fluidnc',
-    controllerSessionEpoch: CONTROLLER_EPOCH,
-    controllerQualification: {
-      kind: 'qualified',
-      epoch: CONTROLLER_EPOCH,
-      settings: 'verified',
-    },
-    controllerSettings: {
-      maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
-      minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
-      laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
-    },
-    controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
-    statusReport: {
-      state: 'Idle',
-      subState: null,
-      mPos: { x: 0, y: 0, z: 0 },
-      wPos: null,
-      wco: null,
-      feed: 0,
-      spindle: 0,
-    },
-    activeWcs: 'G54',
-    trustedPositionEpoch: 1,
-    startJob: vi.fn(async () => undefined),
-  });
-  useJobReviewStore.getState().close();
-  uninstallAutoReview = installAutoJobReview('confirm');
-});
-
-afterEach(() => {
-  uninstallAutoReview();
-  useJobReviewStore.getState().close();
-  useStore.getState().newProject();
-  useLaserStore.setState({
-    ...initialLaserState(),
-    frame: originalFrame,
-    startJob: originalStartJob,
-  });
-  vi.restoreAllMocks();
-});
-
 describe('runFrameNow FluidNC preparation route', () => {
+  let uninstallAutoReview: () => void = () => undefined;
+
+  beforeEach(() => {
+    resetStore();
+    installFluidncProject();
+    useCameraStore.setState({
+      placementActive: false,
+      confirmedPositionEpoch: null,
+      surfaceHeightMm: 0,
+    });
+    useLaserStore.setState({
+      ...initialLaserState(),
+      connection: { kind: 'connected' },
+      activeControllerKind: 'fluidnc',
+      detectedControllerKind: 'fluidnc',
+      controllerSessionEpoch: CONTROLLER_EPOCH,
+      controllerQualification: {
+        kind: 'qualified',
+        epoch: CONTROLLER_EPOCH,
+        settings: 'verified',
+      },
+      controllerSettings: {
+        maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
+        minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
+        laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
+      },
+      controllerSettingsObservation: { sessionEpoch: CONTROLLER_EPOCH, observedAt: 1 },
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      activeWcs: 'G54',
+      trustedPositionEpoch: 1,
+      startJob: vi.fn(async () => undefined),
+    });
+    useJobReviewStore.getState().close();
+    uninstallAutoReview = installAutoJobReview('confirm');
+  });
+
+  afterEach(() => {
+    uninstallAutoReview();
+    useJobReviewStore.getState().close();
+    useStore.getState().newProject();
+    useLaserStore.setState({
+      ...initialLaserState(),
+      frame: ORIGINAL_FRAME,
+      startJob: ORIGINAL_START_JOB,
+    });
+    vi.restoreAllMocks();
+  });
+
   it('captures an actual prepared artifact that matches shared-streamer normalization', async () => {
     let capturedCandidate: FramedRunCandidate | undefined;
     const frame = vi.fn(

@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   findFluidncNonExecutableLines,
@@ -6,6 +7,18 @@ import {
   fluidncLineBoundary,
 } from './fluidnc-line-limit';
 import { FLUIDNC_V403_LINEEDIT_FIXTURES } from '../../../__fixtures__/controllers/fluidnc-v403-lineedit-fixtures';
+
+const RECONSTRUCTED_JOG_PREFIXES = [
+  '$J=',
+  '[J]',
+  '$j=',
+  '$Jog=',
+  '[Jog]',
+  '$ J =',
+  '[ J ]',
+] as const;
+const PROPERTY_VALUE_MAX_LENGTH = 512;
+const PROPERTY_RUNS = 200;
 
 function lineOf(length: number): string {
   return 'G1 X'.padEnd(length, '0');
@@ -72,23 +85,51 @@ describe('fluidncLineBoundary', () => {
     ]);
   });
 
-  it.each(['$J=', '[J]', '$j=', '$Jog=', '[Jog]', '$ J =', '[ J ]'])(
-    'uses the reconstructed $J= length for %s',
-    (prefix) => {
-      const acceptedJogValue = lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES - '$J='.length);
-      const rejectedJogValue = lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES - '$J='.length + 1);
+  it.each(RECONSTRUCTED_JOG_PREFIXES)('uses the reconstructed $J= length for %s', (prefix) => {
+    const acceptedJogValue = lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES - '$J='.length);
+    const rejectedJogValue = lineOf(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES - '$J='.length + 1);
 
-      expect(findFluidncNonExecutableLines(`${prefix}${acceptedJogValue}\n`)).toEqual([]);
-      expect(findFluidncNonExecutableLines(`${prefix}${rejectedJogValue}\n`)).toEqual([
-        {
-          lineNumber: 1,
-          length: FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1,
-          retainedLength: FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1,
-          parserResult: 'error:14',
+    expect(findFluidncNonExecutableLines(`${prefix}${acceptedJogValue}\n`)).toEqual([]);
+    expect(findFluidncNonExecutableLines(`${prefix}${rejectedJogValue}\n`)).toEqual([
+      {
+        lineNumber: 1,
+        length: FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1,
+        retainedLength: FLUIDNC_GCODE_MAX_PAYLOAD_BYTES + 1,
+        parserResult: 'error:14',
+      },
+    ]);
+  });
+
+  it('preserves the reconstructed jog boundary across supported forms and payload lengths', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...RECONSTRUCTED_JOG_PREFIXES),
+        fc.integer({ min: 1, max: PROPERTY_VALUE_MAX_LENGTH }),
+        (prefix, valueLength) => {
+          const reconstructedLength = '$J='.length + valueLength;
+          const expected =
+            reconstructedLength <= FLUIDNC_GCODE_MAX_PAYLOAD_BYTES
+              ? []
+              : [
+                  {
+                    lineNumber: 1,
+                    length: reconstructedLength,
+                    retainedLength: Math.min(
+                      reconstructedLength,
+                      FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS,
+                    ),
+                    parserResult: 'error:14' as const,
+                  },
+                ];
+
+          expect(findFluidncNonExecutableLines(`${prefix}${'X'.repeat(valueLength)}\n`)).toEqual(
+            expected,
+          );
         },
-      ]);
-    },
-  );
+      ),
+      { numRuns: PROPERTY_RUNS },
+    );
+  });
 
   it('excludes non-jog settings from the G-code parser boundary', () => {
     const longSetting = `$Config/${'x'.repeat(FLUIDNC_GCODE_MAX_PAYLOAD_BYTES)}=1`;

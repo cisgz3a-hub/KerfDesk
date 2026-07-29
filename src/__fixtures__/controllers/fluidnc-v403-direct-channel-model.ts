@@ -14,6 +14,16 @@ const INVALID_UTF8_START = 0xf8;
 const UTF8_CONTINUATION_MASK = 0xc0;
 const UTF8_CONTINUATION_TAG = 0x80;
 const UTF8_PAYLOAD_MASK = 0x3f;
+const UTF8_VALUE_SHIFT_BITS = 6;
+const UTF8_FOUR_BYTE_START = 0xf0;
+const UTF8_FOUR_BYTE_PAYLOAD_MASK = 0x07;
+const UTF8_FOUR_BYTE_CONTINUATIONS = 3;
+const UTF8_THREE_BYTE_START = 0xe0;
+const UTF8_THREE_BYTE_PAYLOAD_MASK = 0x0f;
+const UTF8_THREE_BYTE_CONTINUATIONS = 2;
+const UTF8_TWO_BYTE_START = 0xc0;
+const UTF8_TWO_BYTE_PAYLOAD_MASK = 0x1f;
+const UTF8_TWO_BYTE_CONTINUATIONS = 1;
 const RAW_REALTIME_PASSTHROUGH_CEILING = 0xbf;
 const LINEEDIT_RETAINED_BYTES = 254;
 
@@ -132,16 +142,30 @@ function decodeRealtimeByte(state: MutableDirectChannel, byte: number): number |
       return null;
     }
     state.utf8Remaining -= 1;
-    state.utf8Value = (state.utf8Value << 6) | (byte & UTF8_PAYLOAD_MASK);
+    state.utf8Value = (state.utf8Value << UTF8_VALUE_SHIFT_BITS) | (byte & UTF8_PAYLOAD_MASK);
     if (state.utf8Remaining > 0) return null;
     const decoded = state.utf8Value;
     state.utf8Value = 0;
     return decoded;
   }
   if (byte < RAW_REALTIME_PASSTHROUGH_CEILING) return byte;
-  if (byte >= 0xf0) return beginUtf8Sequence(state, byte & 0x07, 3);
-  if (byte >= 0xe0) return beginUtf8Sequence(state, byte & 0x0f, 2);
-  if (byte >= 0xc0) return beginUtf8Sequence(state, byte & 0x1f, 1);
+  if (byte >= UTF8_FOUR_BYTE_START) {
+    return beginUtf8Sequence(
+      state,
+      byte & UTF8_FOUR_BYTE_PAYLOAD_MASK,
+      UTF8_FOUR_BYTE_CONTINUATIONS,
+    );
+  }
+  if (byte >= UTF8_THREE_BYTE_START) {
+    return beginUtf8Sequence(
+      state,
+      byte & UTF8_THREE_BYTE_PAYLOAD_MASK,
+      UTF8_THREE_BYTE_CONTINUATIONS,
+    );
+  }
+  if (byte >= UTF8_TWO_BYTE_START) {
+    return beginUtf8Sequence(state, byte & UTF8_TWO_BYTE_PAYLOAD_MASK, UTF8_TWO_BYTE_CONTINUATIONS);
+  }
   return null;
 }
 
