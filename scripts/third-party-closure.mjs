@@ -13,13 +13,28 @@ export const OUTLINE_FONTS = [
     spdx: 'Apache-2.0',
   },
   {
+    file: 'src/ui/text/fonts/Poppins-Regular.ttf',
+    name: 'Poppins',
+    spdx: 'OFL-1.1',
+  },
+  {
     file: 'src/ui/text/fonts/Tinos-Regular.ttf',
     name: 'Tinos',
     spdx: 'OFL-1.1',
   },
   {
+    file: 'src/ui/text/fonts/Tinos-Bold.ttf',
+    name: 'Tinos Bold',
+    spdx: 'OFL-1.1',
+  },
+  {
     file: 'src/ui/text/fonts/Inconsolata-Regular.ttf',
     name: 'Inconsolata',
+    spdx: 'OFL-1.1',
+  },
+  {
+    file: 'src/ui/text/fonts/CourierPrime-Regular.ttf',
+    name: 'Courier Prime',
     spdx: 'OFL-1.1',
   },
   {
@@ -30,6 +45,31 @@ export const OUTLINE_FONTS = [
   {
     file: 'src/ui/text/fonts/DancingScript-Regular.ttf',
     name: 'Dancing Script',
+    spdx: 'OFL-1.1',
+  },
+  {
+    file: 'src/ui/text/fonts/Anton-Regular.ttf',
+    name: 'Anton',
+    spdx: 'OFL-1.1',
+  },
+  {
+    file: 'src/ui/text/fonts/SpecialElite-Regular.ttf',
+    name: 'Special Elite',
+    spdx: 'Apache-2.0',
+  },
+  {
+    file: 'src/ui/text/fonts/UnifrakturMaguntia-Book.ttf',
+    name: 'UnifrakturMaguntia',
+    spdx: 'OFL-1.1',
+  },
+  {
+    file: 'src/ui/text/fonts/StardosStencil-Regular.ttf',
+    name: 'Stardos Stencil',
+    spdx: 'OFL-1.1',
+  },
+  {
+    file: 'src/ui/text/fonts/SairaStencilOne-Regular.ttf',
+    name: 'Saira Stencil One',
     spdx: 'OFL-1.1',
   },
 ];

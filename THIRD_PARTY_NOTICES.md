@@ -48,25 +48,41 @@ copyright notice and license to accompany the font in any distribution.
 | Font | License | Copyright / source attribution |
 |---|---|---|
 | Roboto Regular | Apache-2.0 | Copyright 2011 Google Inc. |
+| Poppins Regular | OFL-1.1 | Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins); Indian Type Foundry, Jonny Pinhorn, Ninad Kale |
 | Tinos Regular | OFL-1.1 | Copyright 2026 The Tinos Project Authors (https://github.com/googlefonts/tinos); designed by Steve Matteson, Monotype Imaging Inc. |
+| Tinos Bold | OFL-1.1 | Copyright 2026 The Tinos Project Authors (https://github.com/googlefonts/tinos); designed by Steve Matteson, Monotype Imaging Inc. |
 | Inconsolata Regular | OFL-1.1 | Copyright The Inconsolata Project Authors (Raph Levien) |
+| Courier Prime Regular | OFL-1.1 | Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime); Alan Dague-Greene |
 | Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
 | Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
+| Anton Regular | OFL-1.1 | Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont); Vernon Adams |
+| Special Elite Regular | Apache-2.0 | Copyright (c) 2010 by Brian J. Bonislawsky DBA Astigmatic (AOETI) |
+| UnifrakturMaguntia Book | OFL-1.1 | Copyright (c) 2010 j. 'mach' wust **with Reserved Font Name UnifrakturMaguntia** |
+| Stardos Stencil Regular | OFL-1.1 | Copyright (c) 2011 by Vernon Adams |
+| Saira Stencil One Regular | OFL-1.1 | Copyright 2019 The Saira Stencil Project Authors (https://github.com/Omnibus-Type/Saira); Hector Gatti, Omnibus-Type |
 | Relief SingleLine | OFL-1.1 | Copyright 2021/2022 The Relief SingleLine Project Authors; François Chastanet, Noëlie Dayma, Élisa Garzelli |
 | EMS Nixish | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Nixie One by Jovanny Lemonad |
 | EMS Decorous Script | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Petit Formal Script by Impallari Type |
 | EMS Casual Hand | OFL-1.1 | Created by Sheldon B. Michaels; converted by Windell H. Oskay; derivative of Covered By Your Grace by Kimberly Geswein |
 
-- **Apache-2.0** (Roboto): full text at https://www.apache.org/licenses/LICENSE-2.0 —
-  the license and any `NOTICE` file must accompany the distribution.
-- **SIL Open Font License 1.1** (the eight OFL fonts): full text at
+- **Apache-2.0** (Roboto, Special Elite): full text at
+  https://www.apache.org/licenses/LICENSE-2.0 — the license and any `NOTICE`
+  file must accompany the distribution.
+- **SIL Open Font License 1.1** (the fifteen OFL fonts): full text at
   https://openfontlicense.org — the above copyright/source notices and this
   license must be bundled with the fonts; the fonts may be redistributed but
   not sold on their own, and Reserved Font Names must not be reused for
   modified versions. The four CNC sources, pinned commits, canonical source
   hashes, and complete metadata attribution ship in
   `public/third-party-notices.txt`.
+- **Reserved Font Name declared:** UnifrakturMaguntia. We ship it unmodified
+  under its own name, which the OFL permits; a *modified* version may not reuse
+  that name. No other bundled face declares an RFN — checked against each
+  `.ttf`'s own copyright record, not against the license boilerplate, which
+  always mentions the term.
 
-> Maintainer follow-up (recommended for belt-and-suspenders): verify the exact
-> copyright strings against each `.ttf`'s `name` table and, ideally, ship the
-> verbatim `OFL.txt` / Apache `LICENSE` files alongside the fonts.
+> Maintainer follow-up (recommended for belt-and-suspenders): ship the verbatim
+> `OFL.txt` / Apache `LICENSE` files alongside the fonts. The exact copyright
+> strings are no longer a manual check — `generate-third-party-notices.mjs`
+> reads them out of each `.ttf`'s `name` table and fails the build if a
+> copyright record is missing.

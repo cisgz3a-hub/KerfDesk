@@ -17,10 +17,18 @@ const SAMPLE_LOOPS = 16;
 const FONT_DIR = 'src/ui/text/fonts';
 const FILE_BY_KEY: Readonly<Record<string, string>> = {
   'roboto-regular': 'Roboto-Regular.ttf',
+  'poppins-regular': 'Poppins-Regular.ttf',
   'tinos-regular': 'Tinos-Regular.ttf',
+  'tinos-bold': 'Tinos-Bold.ttf',
   'inconsolata-regular': 'Inconsolata-Regular.ttf',
+  'courier-prime-regular': 'CourierPrime-Regular.ttf',
   'pacifico-regular': 'Pacifico-Regular.ttf',
   'dancing-script-regular': 'DancingScript-Regular.ttf',
+  'anton-regular': 'Anton-Regular.ttf',
+  'special-elite-regular': 'SpecialElite-Regular.ttf',
+  'unifraktur-maguntia-book': 'UnifrakturMaguntia-Book.ttf',
+  'stardos-stencil-regular': 'StardosStencil-Regular.ttf',
+  'saira-stencil-one-regular': 'SairaStencilOne-Regular.ttf',
 };
 
 function fontBuffer(file: string): ArrayBuffer {
