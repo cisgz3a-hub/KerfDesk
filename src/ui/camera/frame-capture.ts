@@ -9,6 +9,9 @@ import type { RgbaImage } from '../../core/camera';
 // preview-rate budget. Full-resolution capture is used for the solve itself.
 export const LIVE_DETECT_TARGET_WIDTH_PX = 480;
 
+/** Maximum time to wait for a one-shot MediaStream frame. */
+export const STREAM_FRAME_TIMEOUT_MS = 5_000;
+
 // A live surface the detection loop can grab frames from: the wizard's
 // <video> (USB) or the machine camera's <img> (bridge-proxied, so drawing it
 // to a canvas does not taint — the bridge sends CORS for this origin).
@@ -64,15 +67,32 @@ export function liveDetectScale(videoWidth: number): number {
 export function captureStreamFrame(stream: MediaStream): Promise<RgbaImage | null> {
   return new Promise((resolve) => {
     const video = document.createElement('video');
+    let isSettled = false;
     video.muted = true;
     video.playsInline = true;
-    video.srcObject = stream;
     const done = (frame: RgbaImage | null): void => {
+      if (isSettled) return;
+      isSettled = true;
+      clearTimeout(timeoutId);
+      video.onloadeddata = null;
+      video.onerror = null;
       video.srcObject = null;
       resolve(frame);
     };
-    video.onloadeddata = () => done(captureVideoFrame(video, 1));
+    video.onloadeddata = () => {
+      try {
+        done(captureVideoFrame(video, 1));
+      } catch {
+        done(null);
+      }
+    };
     video.onerror = () => done(null);
-    void video.play().catch(() => done(null));
+    const timeoutId = setTimeout(() => done(null), STREAM_FRAME_TIMEOUT_MS);
+    video.srcObject = stream;
+    try {
+      void video.play().catch(() => done(null));
+    } catch {
+      done(null);
+    }
   });
 }
