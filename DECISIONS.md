@@ -12926,15 +12926,12 @@ flutes, RPM, operation, stock, and outcome.
 
 `src/__fixtures__/controllers/grbl-sim-machine.ts` documented its own largest
 gap in a header comment: *"Acks are immediate; real GRBL stops acking when the
-planner fills."* The 2026-07-26 LFCB-1 competitive audit
-(`docs/audits/2026-07-26-lfcb1-competitive-audit.md`, section 8) called this the
-sharpest verification finding in the project. KerfDesk streams G-code by
-character counting against the controller's receive buffer, and the one
-behaviour such a sender must get right is what happens when the controller goes
-quiet because its motion planner filled. A simulator that acks instantly can
-never produce that stall, so no test in the tree exercised it: the streaming
-path was verified against a model that could not reproduce the failure mode the
-path exists to prevent.
+planner fills."* KerfDesk streams G-code by character counting against the
+controller's receive buffer, and the sender must model what happens when the
+controller goes quiet because its motion planner filled. A simulator that acks
+instantly can never produce that stall, so no test in the tree exercised it:
+the streaming path was verified against a model that could not reproduce the
+failure mode the path exists to prevent.
 
 Firmware ground truth, read from source on 2026-07-27:
 
