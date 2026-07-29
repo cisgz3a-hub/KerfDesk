@@ -253,10 +253,15 @@ function installMockSerial(port: MockPort, pairedPorts: SerialPort[] = []): Mock
   return port;
 }
 
+// The cable-yank path runs teardown fire-and-forget (`void closeStreamsOnce()`),
+// so tests have to wait for it without a handle. A fixed count of microtask
+// turns is brittle -- the bounded writer close races a timer, which adds turns
+// -- so yield a full macrotask instead, which drains the microtask queue
+// completely and stays correct if teardown grows another await.
 async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
 
 // M12 (AUDIT-2026-06-10): GRBL extended realtime commands are single raw
