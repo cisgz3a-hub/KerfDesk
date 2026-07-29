@@ -2,6 +2,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
+import { capturedMachinePointToScene } from './print-cut-capture-frame';
 import { PrintAndCutDialog } from './PrintAndCutDialog';
 
 export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): JSX.Element {
@@ -18,7 +19,13 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
   const capture = (which: 'first' | 'second'): void => {
     const point = laser.statusReport?.mPos;
     if (!captureEnabled || point === null || point === undefined) return;
-    session.capture(which, { x: point.x, y: point.y }, epoch);
+    const scenePoint = capturedMachinePointToScene(
+      point,
+      project.device,
+      laser.controllerSettings?.reportInches === true,
+    );
+    if (scenePoint === null) return;
+    session.capture(which, scenePoint, epoch);
   };
   return (
     <PrintAndCutDialog
