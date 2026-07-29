@@ -13120,3 +13120,137 @@ machine, and this ADR makes no claim about how the hairline serifs survive at
 small sizes in a real material. Nor was the running app driven - the dev-server
 preview shares the maintainer's live scene, so verification was done against the
 engine in isolation.
+
+---
+
+## ADR-267 - Bundle eight more outline faces, including the first stencil and the first bold (2026-07-28)
+
+### Context
+
+ADR-266 added Tinos and closed the "no serif at all" gap. Reviewing what was
+still missing turned up two holes, one cosmetic and one functional.
+
+The cosmetic one: no display face for signage, no blackletter, no typewriter,
+and only one sans.
+
+The functional one matters more. **Every bundled face was Regular, and none was
+a stencil.** Stencil is not a style preference on a laser - it is a geometry
+requirement. Our own renderer makes this concrete: "Your Text Here" in Tinos
+materializes as sixteen closed loops, twelve glyphs plus the four counters in
+`o` and the three `e` (measured in ADR-266). Each counter is its own closed
+loop, therefore its own cut. Engrave that and it is fine; **cut** it out of
+plywood and the middles of `O`, `e`, `a`, `R` drop out as loose pieces. A
+stencil face bridges each counter to the outer form so nothing falls free. We
+shipped a laser CAM application with no way to do cut-out lettering.
+
+The maintainer reviewed a verified shortlist and asked for all of it.
+
+### Decision
+
+Bundle eight further outline faces, one file per family:
+
+| Font | SPDX | Class | Bytes |
+|---|---|---|---|
+| Poppins Regular | OFL-1.1 | sans | 160,316 |
+| Tinos Bold | OFL-1.1 | serif | 597,880 |
+| Courier Prime Regular | OFL-1.1 | mono | 71,188 |
+| Anton Regular | OFL-1.1 | display | 170,812 |
+| Special Elite Regular | Apache-2.0 | display | 166,180 |
+| UnifrakturMaguntia Book | OFL-1.1 | display | 88,508 |
+| Stardos Stencil Regular | OFL-1.1 | stencil | 42,624 |
+| Saira Stencil One Regular | OFL-1.1 | stencil | 109,944 |
+
+- **Pin the bytes.** Tinos Bold comes from `googlefonts/tinos`
+  `3b4482a99b80ea5fc75f187b1be3120a3f5905b3`, the same commit ADR-266 already
+  records. The other seven come from `google/fonts`
+  `7ff85c87f93ea6cca5f41c69f2e4edcb90240f26`. Every downloaded file matched the
+  byte count the GitHub API reported for that path at that commit.
+- **Read every licence from `METADATA.pb`, never from the directory or from
+  reputation.** ADR-266 was written after exactly that mistake - Tinos is
+  cited everywhere as Apache-2.0 and is in fact OFL. Seven of these report
+  `license: "OFL"`; **Special Elite reports `APACHE2`**. Both are in the
+  ADR-017 reviewed set.
+- **Add two style classes, `display` and `stencil`.** `display` follows each
+  font's own upstream `METADATA.pb` category. `stencil` deliberately does not:
+  upstream files both stencil faces under DISPLAY, and we split them out
+  because on a laser the distinction is functional, not decorative - it is the
+  difference between a part that survives the cut and one that falls apart.
+- **Take one weight per family**, matching the existing convention, with Tinos
+  Bold as the deliberate exception that closes the no-bold gap.
+- Add no runtime dependency and no project migration, exactly as ADR-266:
+  `TextObject.fontKey` is an open `string` validated by `requireString`, so old
+  `.lf2` files are untouched and new keys need no schema change.
+
+### Consequences
+
+Thirteen outline faces and four CNC stroke faces, seventeen total. The picker
+now groups sans, serif, mono, script, display, stencil, single-line.
+
+**Cut-out lettering is possible for the first time.** That is the point of the
+change; the other seven faces are breadth.
+
+**Weight: +1,407,452 bytes (~1.34 MiB), and this lands in the PWA precache.**
+`globPatterns` in `vite.config.ts` includes `ttf` and the built `sw.js` lists
+every outline font, so an installed PWA downloads all of them up front. Measured
+from the built `sw.js` manifest, not estimated: **6195.59 KiB across 47 entries
+before, 7571.70 KiB across 48 after - a 22.2% increase**, with all thirteen
+`.ttf` files precached and 2.87 MiB of the total now being fonts. Browser
+visitors are unaffected; each `.ttf` is a separate `?url` asset fetched on first
+use. Tinos Bold alone is 42% of the increase, being a full 3285-glyph WGL face;
+it is the obvious first candidate to drop if that budget is ever challenged.
+
+Two facts were checked rather than assumed, and both would have been wrong from
+intuition. **Courier Prime reports `post.isFixedPitch = 1`** and is genuinely
+monospaced. **Special Elite reports `0`** - it is a typewriter *style* face, not
+a monospaced one, so it is classed `display`, not `mono`.
+
+**UnifrakturMaguntia declares a Reserved Font Name** in its own copyright
+record. We ship it unmodified under its own name, which the OFL permits; a
+modified derivative could not reuse the name. No other bundled face declares
+one - verified against each font's copyright string, not against the licence
+boilerplate, which mentions the term regardless.
+
+**Stardos Stencil carries no `license` name record**, only a copyright. The
+notices generator already tolerates this (it omits the line rather than
+failing) and the section still carries the SPDX header and points at the full
+OFL text, so the notice stays complete. Its OFL status comes from `METADATA.pb`,
+which is authoritative.
+
+### Verification
+
+Every one of the thirteen outline faces is rendered through the real
+`textToPolylines` by `bundled-outline-fonts.test.ts` and asserted to produce
+finite, closed, non-empty geometry occupying real space - 15 tests, all passing.
+That test exists because a registry entry alone cannot detect a corrupt binary;
+`opentype.parse` was separately confirmed to throw on an HTML error page, the
+failure `.gitattributes` documents.
+
+Each file's `name` table was read before bundling: all eight carry a copyright
+record, which `generate-third-party-notices.mjs` requires and fails the build
+without. All seventeen font sections regenerate into
+`public/third-party-notices.txt`.
+
+**The stencil property is measured, not asserted.** `stencil-fonts.test.ts`
+renders the sample and counts contours nested inside another contour - the
+piece that physically drops out of a cut part. Loop count alone would have been
+misleading and nearly led this ADR astray: the stencil faces have *more* loops
+than the ordinary ones, not fewer, because their glyphs split into separate
+strokes.
+
+| Face | Loops | Enclosed contours |
+|---|---|---|
+| Tinos (control) | 16 | **4** |
+| Roboto (control) | 16 | **4** |
+| Stardos Stencil | 31 | **0** |
+| Saira Stencil One | 25 | **0** |
+
+The two controls are asserted to enclose exactly four, so a probe that always
+returned zero could not make the stencil assertions pass vacuously.
+
+**Not verified: no hardware cut, on any of the eight.** Zero enclosed contours
+is a geometric fact about the outline; it is strong evidence that nothing falls
+out, but no part has been cut in real material to confirm it, and nothing says
+whether the remaining bridges are wide enough to survive handling in a given
+stock. Nor is any claim made about how Anton's heavy strokes,
+UnifrakturMaguntia's fine blackletter detail, or Special Elite's distressed
+edges behave at a particular size or power.
