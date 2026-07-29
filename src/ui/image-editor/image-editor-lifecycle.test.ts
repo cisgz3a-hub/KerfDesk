@@ -55,8 +55,7 @@ function deferred<T>(): {
 }
 
 async function settle(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -123,6 +122,20 @@ describe('Image Studio session lifecycle', () => {
     expect(useImageEditorStore.getState().session?.objectId).toBe('newer');
     expect(useImageEditorStore.getState().loadState).toEqual({ kind: 'idle' });
     expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it('reuses the in-flight decode when the same image opens twice', async () => {
+    const pending = deferred<RgbaBuffer>();
+    vi.mocked(decodeRasterToBuffer).mockReturnValue(pending.promise);
+    const image = raster('same');
+
+    useImageEditorStore.getState().openEditor(image);
+    useImageEditorStore.getState().openEditor(image);
+
+    expect(decodeRasterToBuffer).toHaveBeenCalledOnce();
+    pending.resolve(createRgbaBuffer(4, 4));
+    await settle();
+    expect(useImageEditorStore.getState().session?.objectId).toBe('same');
   });
 
   it('ignores a decode completion after the editor closes', async () => {

@@ -32,8 +32,9 @@ export function openEditorAction(
   get: () => ImageEditorState,
   image: RasterImage,
 ): void {
-  const { stash, session } = get();
+  const { loadState, stash, session } = get();
   if (session !== null && session.objectId === image.id) return;
+  if (loadState.kind === 'loading' && loadState.objectId === image.id) return;
   const stashed = stash[image.id];
   if (stashed !== undefined) {
     set((state) => {
