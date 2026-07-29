@@ -6,10 +6,9 @@
 // machine position would be dangerous.
 
 import type * as ThreeNamespace from 'three';
+import { markerRadiusMm } from './marker-radius';
 import type { Viewer3dSegmentsInput } from './segment-buckets';
 
-const MARKER_RADIUS_FRACTION = 0.012;
-const MARKER_MIN_RADIUS_MM = 0.4;
 export const MARKER_COLOR = 0xffffff;
 /**
  * Bright red, at full red channel (maintainer request, 2026-07-29: the previous
@@ -53,11 +52,7 @@ export function createMarkers(three: ThreeModule, scene: ThreeNamespace.Scene): 
 
 /** Scale both markers to the job so they read at any program size. */
 export function sizeMarkers(markers: SceneMarkers, segments: Viewer3dSegmentsInput): void {
-  let span = 0;
-  for (let index = 0; index < segments.segmentCount * 6; index += 3) {
-    span = Math.max(span, Math.abs(segments.positions[index] ?? 0));
-  }
-  const radius = Math.max(MARKER_MIN_RADIUS_MM, span * MARKER_RADIUS_FRACTION);
+  const radius = markerRadiusMm(segments);
   markers.marker.scale.setScalar(radius);
   markers.liveMarker.scale.setScalar(radius * LIVE_MARKER_SCALE);
 }
