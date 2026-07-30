@@ -272,6 +272,44 @@ amended). Zero new runtime dependencies. Acceptance gates: total line
 accountability; own-output-clean (every built-in strategy's output parses
 with zero unsupported-word notes).
 
+### Phase N — v0.13 "Design Studio" [Approved 2026-07-30 — ADR-268; build starting at DS-0]
+
+An on-canvas design surface: draw a part to size by hand, from nothing, and cut
+it. Today the canvas places artwork; Phase G gave it rectangle/ellipse/polygon/
+star/pen and ADR-159/164 gave it bounded node editing, but there is still no
+line tool, no arc tool, no trim/extend/fillet/chamfer, no dimension you can
+type, and no geometric snapping at all (`snapping.ts` snaps bounding boxes and a
+grid — endpoint/midpoint/centre/quadrant/intersection/tangent snapping exists
+nowhere in the tree). Delivered as a lazy-loaded full-window overlay on the
+ADR-242 Image Studio template, with a new pure `src/core/design/` module and a
+new `src/ui/design-studio/` folder. Zero new runtime dependencies: the 2.5D view
+uses `THREE.Shape` + `ExtrudeGeometry` from the already-pinned `three@0.180.0`,
+and open-path offset / simplification / hole-aware booleans are reachable
+through capabilities already shipped in `clipper2-ts`. **No general constraint
+solver** — every browser-capable 2D geometric solver is GPL-family or otherwise
+license-blocked (ADR-268 Context), so precision comes from object snaps,
+ortho/polar tracking, typed numeric entry, and dimension-driven editing. The
+pipeline is untouched: the Studio materializes into ordinary `ShapeObject`
+geometry, so compile/preview/emit/serialize are unchanged and G-code stays
+byte-identical for unchanged input. Design + research:
+`docs/audits/2026-07-30-design-studio-brief.md` and
+`docs/audits/2026-07-30-design-studio-research-and-plan.md`.
+
+| Stage | Delivers | Status |
+|---|---|---|
+| DS-0 | Governance: ADR-268, this entry, `F-DS` flows in WORKFLOW.md | Done |
+| DS-1 | Pure `src/core/design/` sketch model, entity geometry, bounds | Built |
+| DS-2 | Overlay shell: host + lazy chunk + session store + local undo + Esc ladder + two-rail palette + status bar + canvas with bed/grid/geometry paint, rAF coalescing, cursor-anchored zoom | Built |
+| DS-3 | Drawing tools: Line/Rect/Circle drag gestures with Shift/Alt modifiers, second canvas layer for the live draft + dimension label, click/marquee selection, grid snap, ortho | Built |
+| DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
+| DS-3c | Typed numeric entry during a draw gesture, per-tool options bar | Planned |
+| DS-4 | Object-snap engine (`core/design/snap/`): endpoint/midpoint/centre/quadrant/intersection with per-type cursor glyphs, polar tracking | Planned |
+| DS-5 | Apply → commits `ShapeObject` geometry as one undo entry. **End-to-end slice closes here** | Planned |
+| DS-6 | Modify ops: trim, extend, fillet, chamfer (`core/design/ops/`) | Planned |
+| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
+| DS-8 | 2.5D depth per entity + three.js extrude view | Planned |
+| DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:

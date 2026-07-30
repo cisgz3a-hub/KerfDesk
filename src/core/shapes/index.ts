@@ -13,6 +13,9 @@ export {
 } from './rematerialize-shape';
 export { polylineToPolylines } from './polyline';
 export type { PolylineSpec } from './polyline';
+// Published for core/design (ADR-268): the Design Studio derives sketch extents
+// from materialized geometry and must not grow a second bounds implementation.
+export { boundsOfPolylines } from './polyline-bounds';
 export { createPolyline, CURRENT_POLYLINE_FAIRING_VERSION } from './create-polyline';
 export { shapeFromDrag, isDrawDragSignificant, MIN_DRAW_SIZE_MM } from './shape-from-drag';
 export type { DrawShapeKind, DrawShapeModifiers } from './shape-from-drag';

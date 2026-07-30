@@ -5,6 +5,7 @@
 // lf-btn pressed fill); the active name lives on each IconButton.
 
 import { IconButton, type IconName } from '../kit';
+import { useDesignStudioStore } from '../design-studio';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
@@ -57,6 +58,15 @@ export function ToolStrip(): JSX.Element {
         style={libraryButtonStyle}
       >
         Lib
+      </button>
+      <button
+        type="button"
+        aria-label="Open Design Studio"
+        title="Draw a part to size by hand — precision tools, snapping, and dimensions in a full window (ADR-268)."
+        onClick={() => useDesignStudioStore.getState().openStudio()}
+        style={studioButtonStyle}
+      >
+        Design
       </button>
     </aside>
   );
@@ -155,6 +165,11 @@ function isActive(current: ToolMode, tool: ToolMode): boolean {
 
 const libraryButtonStyle: React.CSSProperties = {
   marginTop: 'var(--lf-space-4)',
+  fontSize: 11,
+  padding: '6px 4px',
+};
+
+const studioButtonStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '6px 4px',
 };
