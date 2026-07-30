@@ -20,6 +20,15 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
       </div>
     );
   }
+  if (props.issue?.kind === 'render-limited') {
+    return (
+      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
+        2D preview shows the first {props.issue.maximum.toLocaleString()} of{' '}
+        {props.issue.observed.toLocaleString()} parsed steps. Distance and playback controls cover
+        only the shown prefix; the source file is unchanged.
+      </div>
+    );
+  }
   if (props.issue?.kind === 'preparing-large-job') {
     return (
       <div className="lf-banner" style={bannerStyle} role="status">

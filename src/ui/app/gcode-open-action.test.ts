@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
-import { handleOpenGcodeInspector, openGcodeFileInInspector } from './gcode-open-action';
+import {
+  handleOpenGcodeInspector,
+  open2dSimulatorFromSource,
+  openGcodeFileInInspector,
+} from './gcode-open-action';
 
 describe('openGcodeFileInInspector', () => {
   it('reads one accepted file and opens the existing Inspector callback', async () => {
@@ -11,7 +15,10 @@ describe('openGcodeFileInInspector', () => {
     await openGcodeFileInInspector({ name: 'part.nc', size: 15, text }, openInspector, pushToast);
 
     expect(text).toHaveBeenCalledTimes(1);
-    expect(openInspector).toHaveBeenCalledWith('part.nc', 'G21\nG1 X10');
+    expect(openInspector).toHaveBeenCalledWith('part.nc', {
+      kind: 'text',
+      text: 'G21\nG1 X10',
+    });
     expect(pushToast).not.toHaveBeenCalled();
   });
 
@@ -48,7 +55,7 @@ describe('openGcodeFileInInspector', () => {
     );
 
     expect(text).toHaveBeenCalled();
-    expect(openInspector).toHaveBeenCalledWith('huge.tap', 'G21');
+    expect(openInspector).toHaveBeenCalledWith('huge.tap', { kind: 'text', text: 'G21' });
     expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(/may take a while/i), 'warning');
   });
 });
@@ -66,6 +73,19 @@ describe('handleOpenGcodeInspector', () => {
       accept: ['.nc', '.gcode', '.tap'],
       multiple: false,
     });
-    expect(openInspector).toHaveBeenCalledWith('picked.tap', 'G21');
+    expect(openInspector).toHaveBeenCalledWith('picked.tap', { kind: 'text', text: 'G21' });
+  });
+});
+
+describe('open2dSimulatorFromSource', () => {
+  it('does not fall back to reading and parsing a Blob on the UI thread', async () => {
+    const read = vi.fn(async () => 'G21\nG1 X10');
+    const source = { text: read } as unknown as Blob;
+    const pushToast = vi.fn();
+
+    await open2dSimulatorFromSource('part.nc', { kind: 'blob', blob: source }, vi.fn(), pushToast);
+
+    expect(read).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith('part.nc: G-code import worker unavailable', 'error');
   });
 });

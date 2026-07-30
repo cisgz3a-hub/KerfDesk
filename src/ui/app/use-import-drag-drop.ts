@@ -14,23 +14,20 @@
 
 import { useEffect, useRef } from 'react';
 import type { SceneObject } from '../../core/scene';
-import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
 import { isGcodeFile, openGcodeFileInInspector } from './gcode-open-action';
-import { largeImportAdvisory } from './import-size-advisory';
 import { importStlFiles, isStlFile } from './stl-import-action';
 import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
+import type { GcodeInspectionSource } from '../gcode-inspector';
 import { useUiStore } from '../state/ui-store';
-import {
-  describeImportError,
-  describeImportResult,
-  describeReimportOutcome,
-} from './import-toasts';
+import { importSvgFiles } from './svg-import-action';
 
-export function useImportDragDrop(openGcodeInspector: (name: string, text: string) => void): void {
+export function useImportDragDrop(
+  openGcodeInspector: (name: string, source: GcodeInspectionSource) => void,
+): void {
   const importSvgObject = useStore((s) => s.importSvgObject);
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -84,7 +81,7 @@ export function useImportDragDrop(openGcodeInspector: (name: string, text: strin
 type DropImportActions = {
   readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
-  readonly openGcodeInspector: (name: string, text: string) => void;
+  readonly openGcodeInspector: (name: string, source: GcodeInspectionSource) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -122,7 +119,7 @@ function routeDroppedFiles(dt: DataTransfer, actions: DropImportActions): void {
       'warning',
     );
   }
-  void importMany(svgFiles, actions.importSvgObject, actions.pushToast);
+  void importSvgFiles(svgFiles, actions.importSvgObject, actions.pushToast);
   // H.6a: DXF → imported vector (both machine modes).
   void importDxfFiles(dxfFiles, {
     importObject: actions.importSvgObject,
@@ -170,38 +167,5 @@ async function importImagesInOrder(
     const idx = batchIdx;
     await importImageFile(file, (obj) => importRasterImage(obj, idx), pushToast);
     batchIdx += 1;
-  }
-}
-
-async function importMany(
-  files: ReadonlyArray<File>,
-  importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
-  pushToast: (message: string, variant?: ToastVariant) => void,
-): Promise<void> {
-  let successIdx = 0;
-  for (const file of files) {
-    const advisory = largeImportAdvisory(file.name, file.size);
-    if (advisory !== null) pushToast(advisory, 'warning');
-    try {
-      const text = await file.text();
-      const id = crypto.randomUUID();
-      const result = parseSvg({ svgText: text, id, source: file.name });
-      if (result.object !== null) {
-        const outcome = importSvgObject(result.object, successIdx);
-        successIdx += 1;
-        if (outcome.kind === 'replaced') {
-          const t = describeReimportOutcome(outcome);
-          pushToast(t.message, t.variant);
-          continue;
-        }
-      }
-      for (const t of describeImportResult(file.name, result)) {
-        pushToast(t.message, t.variant);
-      }
-    } catch (err) {
-      const t = describeImportError(file.name, err);
-      pushToast(t.message, t.variant);
-      console.error(`Failed to import ${file.name}:`, err);
-    }
   }
 }

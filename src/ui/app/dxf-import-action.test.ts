@@ -57,6 +57,22 @@ describe('isDxfFile', () => {
 });
 
 describe('importDxfFiles', () => {
+  it('does not fall back to reading a Blob on the UI thread when workers are unavailable', async () => {
+    const text = vi.fn(async () => dxfLine());
+    const pushToast = vi.fn();
+
+    await importDxfFiles(
+      [{ name: 'worker-required.dxf', text, blob: async () => new Blob([dxfLine()]) }],
+      { importObject: vi.fn(), pushToast },
+    );
+
+    expect(text).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'worker-required.dxf: DXF import worker unavailable',
+      'error',
+    );
+  });
+
   it('imports parsed geometry and toasts the path count', async () => {
     const imported: SceneObject[] = [];
     const pushToast = vi.fn();

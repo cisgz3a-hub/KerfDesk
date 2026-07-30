@@ -2457,21 +2457,25 @@ F-CNC19 tiling.
 #### Success
 1. In CNC mode, the user drags an `.stl` file onto the workspace. Both
    binary and ASCII STLs parse (a binary file whose header starts with
-   "solid" is detected by its length signature).
+   "solid" is detected by its length signature). Reading, parsing, and
+   the coarse relief-preparation probe run in the import worker; the
+   progress toast names the current phase and Escape cancels the request.
 2. The mesh lands as a relief object at 100 mm wide (height by aspect),
    5 mm relief depth, background carved away ('floor'), on a wood-brown
-   layer created automatically. Toast reports the triangle count.
+   layer created automatically. Toast reports the triangle count. The
+   worker transfers its typed mesh into the live object without expanding
+   it into a boxed number array on the UI thread.
 3. The canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
-   `.lf2` embeds the mesh so projects stay self-contained.
+   `.lf2` embeds the mesh as the existing JSON number-array schema so
+   projects stay self-contained and older saved projects still reopen.
 4. Roughing toolpaths compile from it starting with H.5.
 
-#### Error — wrong mode / malformed / oversized
+#### Error — wrong mode / malformed
 1. Dropping an STL in laser mode toasts "STL relief import needs CNC
    mode" and imports nothing.
 2. Truncated binaries, partial ASCII facets, and non-numeric vertices are
-   rejected with the specific reason; meshes over 200k triangles ask for
-   decimation.
+   rejected with the specific reason.
 
 #### Empty
 1. An STL with zero facets is rejected ("contains no vertices").
@@ -2586,7 +2590,10 @@ and lifts the command's CNC-only gate.)*
 1. In CNC mode, the user picks a `.nc` / `.gcode` / `.tap` file via
    File → Open G-code (Preview). The command is CNC-only (ADR-101
    gate-and-hide, first CNC-only command).
-2. The clean-room modal parser (ADR-098 §2) reads GRBL-dialect G-code:
+2. The clean-room modal parser (ADR-098 §2) reads GRBL-dialect G-code in
+   the import worker. A progress toast names the current phase; Escape
+   cancels the request. Concurrent import-worker requests wait in FIFO
+   order rather than starting overlapping whole-file reads:
    G0/G1 (including ramped XY+Z and pure-Z moves), G2/G3 arcs (I/J center
    and R radius form, helical Z), G90/G91, G20/G21 units, F/S words,
    `(...)` and `;` comments, `%` markers, and N line numbers. Unsupported
@@ -2613,8 +2620,10 @@ and lifts the command's CNC-only gate.)*
 #### Edge — relative arcs / early end / huge files / other planes
 1. G91 relative coordinates apply to XY, Z, and arc targets alike.
 2. M2 / M30 ends the program mid-file; later lines are ignored.
-3. Programs beyond 500k lines are rejected with a note (guard against
-   runaway files, not a real-world limit).
+3. The parser reads the complete program. The 2D renderer retains at most
+   the first 250,000 parsed steps and shows exact shown/observed counts;
+   playback and displayed distance are labelled as that visible prefix.
+   This display limit does not rewrite or reject the file.
 4. G18/G19 plane arcs are not supported: rejected with the line number
    (XY-plane G17 is the GRBL default and the only plane GRBL arcs use
    here).
@@ -4673,9 +4682,15 @@ validation must be supervised without cutting load.
 
 #### Edge — very large program
 
-1. Beyond the synchronous cap, the worker path parses with a progress
-   indicator; the UI stays responsive; playback uses draw-range reveal.
-   The worker path's own memory-derived cap is set at Stage 11 (ADR-255).
+1. Production file-backed and compiled-program sources parse in the
+   Inspector worker. Reading/parsing phases and FIFO queue position are
+   shown; Close cancels an active request by retiring that worker.
+2. Parsing continues through the complete program, while the 3D renderer
+   retains the first 250,000 motion segments and the source pane retains
+   the first 20,000 lines. Exact shown/observed counts state both display
+   limits. Neither limit rewrites or refuses the program.
+3. This is off-thread whole-file parsing, not streaming or a proven
+   memory ceiling. The worker still materializes a Blob as text.
 
 #### Edge — our own emitted output
 

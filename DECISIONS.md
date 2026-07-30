@@ -13379,3 +13379,97 @@ then a `localStorage` write whose ~5 MB cap discards the result.
 - NOT verified: no hardware run — nothing was cut or engraved, so no claim is made about how any
   of this behaves on a machine. The >100 MB raster/image and `.lf2` paths were not exercised at
   size, and SVG was measured only up to 6 MB.
+
+## ADR-269 - Production G-code inspection is worker-backed, render-bounded, queued, and cancellable (2026-07-30)
+
+**Date:** 2026-07-30
+**Status:** Accepted
+
+### Context
+
+ADR-268 moved DXF, 2D G-code, and STL parsing into an import worker, but it did not complete the
+large-file path:
+
+- the production 3D G-code Inspector and main-canvas G-code view still read file text and built the
+  render model on the UI thread;
+- the STL worker returned a mesh that was cloned, converted to a heightmap on the UI thread, and
+  expanded from `Float32Array` into a boxed number array;
+- worker clients allowed overlapping requests and exposed no progress or cancellation contract;
+- render/source views had no explicit retained-prefix contract; and
+- production-worker execution, queue/cancel behavior, typed-relief recovery, and quota pressure
+  lacked browser/large-fixture coverage.
+
+Those gaps meant "parsing moved off the main thread" was true only for selected entry points. They
+also made it easy to mistake off-thread whole-file reads for streaming or bounded peak memory.
+
+### Decision
+
+1. **Every production G-code Inspector render build uses a dedicated module worker.** File-backed
+   requests carry the `Blob`; already-compiled project output carries the text that already exists.
+   The synchronous parser remains only the explicit no-`Worker` fallback used by unsupported
+   environments and tests. Inside the worker, render parsing consumes the line iterator directly
+   and grows a compact typed category buffer instead of retaining an additional array containing
+   every source-line string.
+2. **Preview limits are display limits, never import guards.** The 3D renderer retains the first
+   250,000 motion segments and the source pane the first 20,000 lines. The 2D preview retains the
+   first 250,000 parsed steps. Parsing continues to the end, observed counts are preserved, and the
+   UI states exact shown/observed counts. No limit refuses open, preview, save, Frame, Start,
+   export, or streaming.
+3. **STL relief preparation stays in the worker.** Parsing and the coarse mesh-to-heightmap
+   validity/aspect probe happen before response delivery. The live relief owns the worker-produced
+   `Float32Array`; consumers reuse it. Serialization converts it to the existing JSON number-array
+   project schema only at the save/autosave boundary, preserving reopen compatibility.
+4. **Large typed results transfer ownership.** The Inspector transfers all typed render buffers,
+   and STL transfers its prepared mesh buffer. DXF scene objects and 2D `Toolpath` results remain
+   structured-cloned object graphs; this ADR does not replace those domain models with packed
+   protocols.
+5. **Each worker client runs one active request and an explicit FIFO queue.** Queued requests
+   report their one-based position. Workers report honest phases (`reading`, `parsing`, and STL
+   `preparing`), not invented percentages. Cancelling a queued request removes it before posting.
+   Cancelling active synchronous parser work terminates that worker, rejects with `AbortError`, and
+   starts the next queued request on a fresh worker. Queue advancement follows worker retirement,
+   and response/error callbacks are instance-scoped so late events from a retired worker are inert.
+6. **The scalability claim remains narrow.** G-code and STL work covered here is production
+   worker-backed and UI-responsive under the recorded fixtures. It is not streaming and has no
+   proven constant memory ceiling: G-code still uses `Blob.text()`, STL still uses
+   `Blob.arrayBuffer()`, and project persistence still materializes JSON.
+7. **Unchanged main-thread routes are named, not implied safe.** Native `.lf2`, SVG, LightBurn
+   `.lbrn`/`.lbrn2`, native `.lfml.json`, and LightBurn `.clb` still perform whole-file UI-thread
+   reads plus JSON/DOM parsing. Their size advisories inform but do not prove large-file safety.
+
+### Consequences
+
+- Opening a large program in the 3D Inspector no longer performs whole-file text/render parsing on
+  the UI thread. The main-canvas G-code view shares the same production worker path.
+- Large previews have deterministic retained prefixes and explicit accountability instead of
+  silently growing render/source memory without a UI contract.
+- The Inspector no longer duplicates the complete worker text as a second all-lines string array;
+  line accountability remains exact in a growable `Uint8Array`.
+- STL import avoids the former UI-thread heightmap probe, boxed-array expansion, and cloned typed
+  mesh result. Save/autosave retains the existing self-contained `.lf2` format at the unavoidable
+  JSON persistence cost.
+- Queueing prevents concurrent whole-file reads on a shared worker client. Cancellation is
+  immediate at the worker boundary but not cooperative inside the synchronous parser.
+- Moving the remaining JSON/XML/SVG routes off the UI thread, packing DXF/2D toolpaths, or creating
+  incremental parsers are separate architecture changes. Nothing in this ADR authorizes a
+  streaming or memory-bounded claim for them.
+- No controller, firmware, settings, machine command, Frame/Start behavior, or physical-output
+  semantics change.
+
+### Verification
+
+- Focused Vitest coverage: 48 queue/progress/cancel and worker-lifecycle tests; 13 transfer
+  protocol tests; 33 Inspector/2D-limit/file-entry tests; 31 STL/typed-mesh/persistence tests; and
+  3 typed-relief save/autosave/recovery/quota-pressure tests. The final line-retention audit added
+  13 render/accountability tests, including a 600,001-line program.
+- Playwright against the production Vite worker bundle:
+  - a 260,100-segment program completed with a live 10 ms UI heartbeat and disclosed the retained
+    250,000-segment prefix;
+  - closing during an 800,000-segment program cancelled the active real-worker request; and
+  - two production-client requests reported queue position 1 and completed in FIFO order.
+- `pnpm typecheck`, `pnpm typecheck:e2e`, `pnpm lint`, focused formatting checks,
+  `git diff --check`, and production web builds passed during the sequential implementation.
+- The implementation-and-audit record is
+  `docs/audits/2026-07-30-large-file-repair-ledger.md`.
+- NOT verified: constant peak-memory behavior, incremental/streaming parsing, every
+  operating-system storage/OOM threshold, a hardware air-cut, or physical output.

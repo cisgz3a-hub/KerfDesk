@@ -12,9 +12,12 @@
 // [Exposed=Window] — there is no DOM in a worker, so SVG cannot be moved here
 // without replacing the sanitizer, which is a security surface (ADR-017).
 
-import type { ParseDxfResult } from '../../io/dxf';
-import type { ParseGcodeProgramResult } from '../../io/gcode';
-import type { ParseStlResult } from '../../io/stl';
+import type { PackedDxfResult } from './packed-dxf-result';
+import type { PackedGcodeResult } from './packed-gcode-result';
+import type {
+  PreparedStlImportResult,
+  StlImportPreparationOptions,
+} from './stl-import-preparation';
 
 export type ImportWorkerRequest =
   | {
@@ -25,10 +28,22 @@ export type ImportWorkerRequest =
       readonly source: string;
     }
   | { readonly id: number; readonly kind: 'gcode'; readonly blob: Blob }
-  | { readonly id: number; readonly kind: 'stl'; readonly blob: Blob };
+  | {
+      readonly id: number;
+      readonly kind: 'stl';
+      readonly blob: Blob;
+      readonly options: StlImportPreparationOptions;
+    };
 
 export type ImportWorkerResponse =
-  | { readonly id: number; readonly kind: 'dxf'; readonly result: ParseDxfResult }
-  | { readonly id: number; readonly kind: 'gcode'; readonly result: ParseGcodeProgramResult }
-  | { readonly id: number; readonly kind: 'stl'; readonly result: ParseStlResult }
+  | {
+      readonly id: number;
+      readonly kind: 'progress';
+      readonly phase: 'reading' | 'parsing' | 'preparing';
+      readonly bytesRead?: number;
+      readonly totalBytes?: number;
+    }
+  | { readonly id: number; readonly kind: 'dxf'; readonly result: PackedDxfResult }
+  | { readonly id: number; readonly kind: 'gcode'; readonly result: PackedGcodeResult }
+  | { readonly id: number; readonly kind: 'stl'; readonly result: PreparedStlImportResult }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };

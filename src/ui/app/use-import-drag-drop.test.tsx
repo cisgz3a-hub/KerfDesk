@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useImportDragDrop } from './use-import-drag-drop';
+import type { GcodeInspectionSource } from '../gcode-inspector';
 
 const imageMocks = vi.hoisted(() => ({
   importImageFile: vi.fn(async () => undefined),
@@ -17,7 +18,7 @@ vi.mock('../commands/import-image-action', () => ({
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-type OpenGcodeInspector = (name: string, text: string) => void;
+type OpenGcodeInspector = (name: string, source: GcodeInspectionSource) => void;
 
 function Harness(props: { readonly openGcodeInspector: OpenGcodeInspector }): null {
   useImportDragDrop(props.openGcodeInspector);
@@ -133,12 +134,14 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     async (name) => {
       const openGcodeInspector = vi.fn<OpenGcodeInspector>();
       const { unmount } = await renderHarness(openGcodeInspector);
+      const file = gcodeFile(name);
 
-      await dropFiles([gcodeFile(name)]);
+      await dropFiles([file]);
 
       await vi.waitFor(() => {
-        expect(openGcodeInspector).toHaveBeenCalledWith(name, 'G21\nG1 X10');
+        expect(openGcodeInspector).toHaveBeenCalledWith(name, { kind: 'blob', blob: file });
       });
+      expect(file.text).not.toHaveBeenCalled();
       expect(toastMessages().some((message) => message.includes('Drop ignored'))).toBe(false);
       expect(useStore.getState().project.scene.objects).toHaveLength(0);
 
@@ -150,13 +153,14 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     const openGcodeInspector = vi.fn<OpenGcodeInspector>();
     const { unmount } = await renderHarness(openGcodeInspector);
 
-    await dropFiles([
-      gcodeFile('part.gcode'),
-      new File(['pixels'], 'photo.png', { type: 'image/png' }),
-    ]);
+    const gcode = gcodeFile('part.gcode');
+    await dropFiles([gcode, new File(['pixels'], 'photo.png', { type: 'image/png' })]);
 
     await vi.waitFor(() => {
-      expect(openGcodeInspector).toHaveBeenCalledWith('part.gcode', 'G21\nG1 X10');
+      expect(openGcodeInspector).toHaveBeenCalledWith('part.gcode', {
+        kind: 'blob',
+        blob: gcode,
+      });
     });
     expect(imageMocks.importImageFile).toHaveBeenCalledTimes(1);
     expect(toastMessages().some((message) => message.startsWith('Ignored '))).toBe(false);
@@ -164,7 +168,7 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     await unmount();
   });
 
-  it('surfaces the existing read error and does not open the Inspector', async () => {
+  it('passes the Blob without calling its main-thread text reader', async () => {
     const openGcodeInspector = vi.fn<OpenGcodeInspector>();
     const file = gcodeFile('broken.nc');
     Object.defineProperty(file, 'text', {
@@ -176,10 +180,8 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
 
     await dropFiles([file]);
 
-    await vi.waitFor(() => {
-      expect(toastMessages()).toContain('broken.nc: read failed');
-    });
-    expect(openGcodeInspector).not.toHaveBeenCalled();
+    expect(openGcodeInspector).toHaveBeenCalledWith('broken.nc', { kind: 'blob', blob: file });
+    expect(file.text).not.toHaveBeenCalled();
 
     await unmount();
   });
@@ -196,7 +198,7 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     await dropFiles([file]);
 
     expect(toastMessages().some((m) => /may take a while/i.test(m))).toBe(true);
-    expect(read).toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
     expect(openGcodeInspector).toHaveBeenCalled();
 
     await unmount();
@@ -206,14 +208,18 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     const openGcodeInspector = vi.fn<OpenGcodeInspector>();
     const { unmount } = await renderHarness(openGcodeInspector);
 
+    const first = gcodeFile('first.nc', 'G21\nG1 X1');
     await dropFiles([
-      gcodeFile('first.nc', 'G21\nG1 X1'),
+      first,
       gcodeFile('second.gcode', 'G21\nG1 X2'),
       gcodeFile('third.tap', 'G21\nG1 X3'),
     ]);
 
     await vi.waitFor(() => {
-      expect(openGcodeInspector).toHaveBeenCalledWith('first.nc', 'G21\nG1 X1');
+      expect(openGcodeInspector).toHaveBeenCalledWith('first.nc', {
+        kind: 'blob',
+        blob: first,
+      });
     });
     expect(openGcodeInspector).toHaveBeenCalledTimes(1);
     expect(toastMessages()).toContain('Ignored 2 additional G-code files: second.gcode, third.tap');

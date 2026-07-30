@@ -4,19 +4,24 @@
 // CNC-only handoff back to the retained F-CNC10 2D simulator (ADR-255).
 
 import { useCallback, useState } from 'react';
-import { open2dSimulatorFromText } from '../app/gcode-open-action';
+import { open2dSimulatorFromSource } from '../app/gcode-open-action';
+import { createImportWorkerControls } from '../app/import-worker-controls';
 import { GcodeInspectorDialog } from '../gcode-inspector';
+import type { GcodeInspectionSource } from '../gcode-inspector';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 
-type InspectorProgram = { readonly name: string; readonly text: string };
+type InspectorProgram = { readonly name: string; readonly source: GcodeInspectionSource };
 
 export function useGcodeInspectorSlot(): {
-  readonly open: (name: string, text: string) => void;
+  readonly open: (name: string, source: GcodeInspectionSource) => void;
   readonly element: JSX.Element | null;
 } {
   const [program, setProgram] = useState<InspectorProgram | null>(null);
-  const open = useCallback((name: string, text: string) => setProgram({ name, text }), []);
+  const open = useCallback(
+    (name: string, source: GcodeInspectionSource) => setProgram({ name, source }),
+    [],
+  );
   const element =
     program === null ? null : <InspectorHost program={program} onClose={() => setProgram(null)} />;
   return { open, element };
@@ -33,20 +38,23 @@ function InspectorHost(props: {
     machineKind === 'cnc'
       ? {
           onOpen2dSimulator: () => {
-            open2dSimulatorFromText(
+            const controls = createImportWorkerControls(props.program.name, pushToast);
+            void open2dSimulatorFromSource(
               props.program.name,
-              props.program.text,
+              props.program.source,
               openExternalGcodePreview,
               pushToast,
-            );
-            props.onClose();
+              controls.options,
+            )
+              .then(props.onClose)
+              .finally(controls.dispose);
           },
         }
       : {};
   return (
     <GcodeInspectorDialog
       programName={props.program.name}
-      text={props.program.text}
+      source={props.program.source}
       machineKind={machineKind}
       onClose={props.onClose}
       {...handoff}

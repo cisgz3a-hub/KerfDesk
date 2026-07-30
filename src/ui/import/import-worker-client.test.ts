@@ -5,6 +5,7 @@
 // rejection rather than a hang.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ParseGcodeProgramResult } from '../../io/gcode';
 import {
   parseDxfOffThread,
   parseGcodeOffThread,
@@ -12,9 +13,11 @@ import {
   resetImportWorkerForTests,
 } from './import-worker-client';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
+import { packGcodeResult } from './packed-gcode-result';
 
 class StubWorker {
   static instances: StubWorker[] = [];
+  static beforePostFailure: (() => void) | null = null;
   onmessage: ((e: MessageEvent<ImportWorkerResponse>) => void) | null = null;
   onerror: (() => void) | null = null;
   readonly posted: ImportWorkerRequest[] = [];
@@ -25,6 +28,12 @@ class StubWorker {
   }
 
   postMessage(request: ImportWorkerRequest): void {
+    if (StubWorker.beforePostFailure !== null) {
+      const beforeFailure = StubWorker.beforePostFailure;
+      StubWorker.beforePostFailure = null;
+      beforeFailure();
+      throw new Error('post failed');
+    }
     this.posted.push(request);
   }
 
@@ -44,10 +53,12 @@ function latest(): StubWorker {
 }
 
 const blob = (): Blob => new Blob(['0\nSECTION\n']);
+const stlOptions = { targetWidthMm: 100, reliefDepthMm: 5, mmPerCell: 1 };
 
 describe('import worker client', () => {
   beforeEach(() => {
     StubWorker.instances = [];
+    StubWorker.beforePostFailure = null;
     vi.stubGlobal('Worker', StubWorker);
   });
 
@@ -61,7 +72,7 @@ describe('import worker client', () => {
 
     expect(parseDxfOffThread(blob(), 'id', 'a.dxf')).toBeNull();
     expect(parseGcodeOffThread(blob())).toBeNull();
-    expect(parseStlOffThread(blob())).toBeNull();
+    expect(parseStlOffThread(blob(), stlOptions)).toBeNull();
   });
 
   it('sends the blob itself rather than pre-read text', () => {
@@ -90,24 +101,101 @@ describe('import worker client', () => {
     await expect(promise).resolves.toEqual({ kind: 'error', reason: 'nope' });
   });
 
-  it('keeps concurrent imports independent', async () => {
+  it('unpacks a successful typed G-code response before resolving', async () => {
+    const promise = parseGcodeOffThread(blob());
+    const id = latest().posted[0]?.id ?? -1;
+    const result: ParseGcodeProgramResult = {
+      kind: 'ok',
+      toolpath: {
+        totalLength: 1,
+        steps: [
+          {
+            kind: 'travel',
+            from: { x: 0, y: 0 },
+            to: { x: 1, y: 0 },
+            length: 1,
+          },
+        ],
+      },
+      summary: { lineCount: 1, cutMm: 0, travelMm: 1, plungeMm: 0 },
+      notes: [],
+    };
+
+    latest().reply({ id, kind: 'gcode', result: packGcodeResult(result) });
+
+    await expect(promise).resolves.toEqual(result);
+  });
+
+  it('queues concurrent imports and starts the next only after completion', async () => {
     const first = parseDxfOffThread(blob(), 'a', 'a.dxf');
     const second = parseGcodeOffThread(blob());
-    const [firstId, secondId] = latest().posted.map((r) => r.id);
+    const firstId = latest().posted[0]?.id ?? -1;
 
-    latest().reply({ id: secondId ?? -1, kind: 'gcode', result: { kind: 'error', reason: 'g' } });
+    expect(latest().posted).toHaveLength(1);
     latest().reply({
-      id: firstId ?? -1,
+      id: firstId,
       kind: 'dxf',
       result: { kind: 'error', reason: 'd' },
     });
+    const secondId = latest().posted[1]?.id ?? -1;
+    latest().reply({ id: secondId, kind: 'gcode', result: { kind: 'error', reason: 'g' } });
 
-    await expect(second).resolves.toEqual({ kind: 'error', reason: 'g' });
     await expect(first).resolves.toEqual({ kind: 'error', reason: 'd' });
+    await expect(second).resolves.toEqual({ kind: 'error', reason: 'g' });
+  });
+
+  it('reports queue position and worker phases without completing early', async () => {
+    const progress = vi.fn();
+    const first = parseGcodeOffThread(blob());
+    const second = parseGcodeOffThread(blob(), { onProgress: progress });
+    const worker = latest();
+    const firstId = worker.posted[0]?.id ?? -1;
+
+    expect(progress).toHaveBeenCalledWith({ phase: 'queued', queuePosition: 1 });
+    worker.reply({ id: firstId, kind: 'gcode', result: { kind: 'error', reason: 'first' } });
+    const secondId = worker.posted[1]?.id ?? -1;
+    worker.reply({ id: secondId, kind: 'progress', phase: 'reading' });
+    expect(progress).toHaveBeenCalledWith({ phase: 'reading', queuePosition: 0 });
+    worker.reply({ id: secondId, kind: 'gcode', result: { kind: 'error', reason: 'second' } });
+
+    await expect(first).resolves.toMatchObject({ reason: 'first' });
+    await expect(second).resolves.toMatchObject({ reason: 'second' });
+  });
+
+  it('cancels a queued request without posting it', async () => {
+    const first = parseGcodeOffThread(blob());
+    const controller = new AbortController();
+    const second = parseGcodeOffThread(blob(), { signal: controller.signal });
+    controller.abort();
+
+    expect(latest().posted).toHaveLength(1);
+    await expect(second).rejects.toMatchObject({ name: 'AbortError' });
+    const firstId = latest().posted[0]?.id ?? -1;
+    latest().reply({ id: firstId, kind: 'gcode', result: { kind: 'error', reason: 'done' } });
+    await expect(first).resolves.toMatchObject({ reason: 'done' });
+  });
+
+  it('terminates an active parse on cancel and continues the queue on a fresh worker', async () => {
+    const controller = new AbortController();
+    const first = parseGcodeOffThread(blob(), { signal: controller.signal });
+    const firstWorker = latest();
+    const second = parseGcodeOffThread(blob());
+
+    controller.abort();
+
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    expect(firstWorker.terminated).toBe(true);
+    const secondWorker = latest();
+    expect(secondWorker).not.toBe(firstWorker);
+    firstWorker.onerror?.();
+    expect(secondWorker.terminated).toBe(false);
+    const secondId = secondWorker.posted[0]?.id ?? -1;
+    secondWorker.reply({ id: secondId, kind: 'gcode', result: { kind: 'error', reason: 'next' } });
+    await expect(second).resolves.toMatchObject({ reason: 'next' });
   });
 
   it('rejects on a worker-reported error', async () => {
-    const promise = parseStlOffThread(blob());
+    const promise = parseStlOffThread(blob(), stlOptions);
     const id = latest().posted[0]?.id ?? -1;
 
     latest().reply({ id, kind: 'error', message: 'boom' });
@@ -116,7 +204,7 @@ describe('import worker client', () => {
   });
 
   it('rejects rather than mis-casting when the worker answers the wrong kind', async () => {
-    const promise = parseStlOffThread(blob());
+    const promise = parseStlOffThread(blob(), stlOptions);
     const id = latest().posted[0]?.id ?? -1;
 
     latest().reply({ id, kind: 'gcode', result: { kind: 'error', reason: 'mismatched' } });
@@ -132,5 +220,28 @@ describe('import worker client', () => {
 
     await expect(promise).rejects.toThrow('import worker errored');
     expect(worker.terminated).toBe(true);
+  });
+
+  it('retires a postMessage failure before advancing queued work', async () => {
+    let second: Promise<ParseGcodeProgramResult> | null = null;
+    StubWorker.beforePostFailure = () => {
+      second = parseGcodeOffThread(blob());
+      void second?.catch(() => undefined);
+    };
+
+    const first = parseGcodeOffThread(blob());
+    const failedWorker = StubWorker.instances[0];
+    await expect(first).rejects.toThrow('post failed');
+    expect(failedWorker?.terminated).toBe(true);
+
+    const freshWorker = latest();
+    expect(freshWorker).not.toBe(failedWorker);
+    const secondId = freshWorker.posted[0]?.id ?? -1;
+    freshWorker.reply({
+      id: secondId,
+      kind: 'gcode',
+      result: { kind: 'error', reason: 'next' },
+    });
+    await expect(second).resolves.toEqual({ kind: 'error', reason: 'next' });
   });
 });

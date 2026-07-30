@@ -33,7 +33,7 @@ function sha256File(file) {
   return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
-test('collects the complete pnpm production closure with the exact reviewed fallback', () => {
+test('collects the complete pnpm production closure with the exact reviewed fallbacks', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'));
   assert.ok(packages.length > Object.keys(packageJson.dependencies).length);
   assert.ok(packages.some(({ name }) => name === 'builder-util-runtime'));
@@ -41,7 +41,7 @@ test('collects the complete pnpm production closure with the exact reviewed fall
     packages
       .filter(({ sourceFiles }) => sourceFiles[0].startsWith('reviewed fallback:'))
       .map(({ name, version }) => `${name}@${version}`),
-    ['lazy-val@1.0.5'],
+    ['lazy-val@1.0.5', 'saxes@6.0.0'],
   );
   const dompurify = packages.find(({ name }) => name === 'dompurify');
   assert.deepEqual(dompurify?.sourceFiles, ['LICENSE', 'LICENSE-MPL']);
@@ -49,7 +49,7 @@ test('collects the complete pnpm production closure with the exact reviewed fall
   assert.deepEqual(electronPackage.sourceFiles, ['LICENSE']);
 });
 
-test('fails closed for a missing package license outside exact lazy-val 1.0.5', () => {
+test('fails closed for missing package licenses outside exact reviewed fallbacks', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-license-fixture-'));
   try {
     assert.throws(
@@ -70,6 +70,14 @@ test('fails closed for a missing package license outside exact lazy-val 1.0.5', 
     });
     assert.match(fallback.sourceFiles[0], /reviewed fallback/);
     assert.match(fallback.text, /MIT License/);
+    const saxesFallback = readPackageLicense({
+      depDir: temp,
+      license: 'ISC',
+      name: 'saxes',
+      version: '6.0.0',
+    });
+    assert.match(saxesFallback.sourceFiles[0], /reviewed fallback/);
+    assert.match(saxesFallback.text, /The ISC License/);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

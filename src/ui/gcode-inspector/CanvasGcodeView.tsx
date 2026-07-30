@@ -8,15 +8,16 @@
 // it stays available during a job (watching what is running is the point).
 
 import { useMemo } from 'react';
-import { buildGcodeRenderModel } from '../../core/gcode-view';
 import { InspectorView } from './InspectorView';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
+import { useGcodeInspection, type InspectionState } from './use-gcode-inspection';
+import { InspectionLimitNotice } from './InspectionLimitNotice';
 
 export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Element {
   const { state, stale, refresh } = useCurrentGcode(props.active);
   const text = state.kind === 'ready' ? state.text : '';
-  const parsed = useMemo(() => (text === '' ? null : buildGcodeRenderModel(text)), [text]);
-  const lines = useMemo(() => (text === '' ? [] : text.split(/\r\n|\n|\r/)), [text]);
+  const source = useMemo(() => (text === '' ? null : { kind: 'text' as const, text }), [text]);
+  const inspection = useGcodeInspection(source);
 
   return (
     <div style={wrapStyle} aria-label="G-code canvas view">
@@ -36,14 +37,13 @@ export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Elemen
           {state.kind === 'compiling' ? 'Compiling…' : 'Refresh'}
         </button>
       </div>
-      <Body parsed={parsed} lines={lines} state={state} />
+      <Body inspection={inspection} state={state} />
     </div>
   );
 }
 
 function Body(props: {
-  readonly parsed: ReturnType<typeof buildGcodeRenderModel> | null;
-  readonly lines: ReadonlyArray<string>;
+  readonly inspection: InspectionState;
   readonly state: CurrentGcode;
 }): JSX.Element {
   if (props.state.kind === 'compiling') {
@@ -52,13 +52,32 @@ function Body(props: {
   if (props.state.kind === 'empty') {
     return <p style={messageStyle}>This design produces no G-code yet. Add artwork to see it.</p>;
   }
-  if (props.parsed === null) {
+  if (props.inspection.kind === 'idle') {
     return <p style={messageStyle}>Switch to G-code to compile this design.</p>;
   }
-  if (props.parsed.kind !== 'ok') {
-    return <p style={messageStyle}>{props.parsed.reason}</p>;
+  if (props.inspection.kind === 'loading') {
+    const queued =
+      props.inspection.phase === 'queued' && props.inspection.queuePosition > 0
+        ? ` (${props.inspection.queuePosition} ahead)`
+        : '';
+    return <p style={messageStyle}>Preparing preview in worker{queued}…</p>;
   }
-  return <InspectorView model={props.parsed.model} lines={props.lines} variant="preview" />;
+  if (props.inspection.kind === 'error') {
+    return <p style={messageStyle}>{props.inspection.reason}</p>;
+  }
+  if (props.inspection.result.parsed.kind !== 'ok') {
+    return <p style={messageStyle}>{props.inspection.result.parsed.reason}</p>;
+  }
+  return (
+    <>
+      <InspectionLimitNotice result={props.inspection.result} />
+      <InspectorView
+        model={props.inspection.result.parsed.model}
+        lines={props.inspection.result.lines}
+        variant="preview"
+      />
+    </>
+  );
 }
 
 const wrapStyle: React.CSSProperties = {

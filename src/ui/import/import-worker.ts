@@ -11,10 +11,14 @@
 
 /// <reference lib="webworker" />
 
-import { parseDxf } from '../../io/dxf';
-import { parseGcodeProgram } from '../../io/gcode';
-import { parseStl } from '../../io/stl';
+import { parseStlBlob } from '../../io/stl/parse-stl-blob';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
+import { packDxfResult } from './packed-dxf-result';
+import { packGcodeResult } from './packed-gcode-result';
+import { parseDxfBlob } from './parse-dxf-blob';
+import { parseGcodeBlob } from './parse-gcode-blob';
+import { prepareParsedStlImport } from './stl-import-preparation';
+import { importWorkerTransferables } from './import-worker-transferables';
 
 self.onmessage = (e: MessageEvent<ImportWorkerRequest>): void => {
   void handleRequest(e.data);
@@ -22,7 +26,8 @@ self.onmessage = (e: MessageEvent<ImportWorkerRequest>): void => {
 
 async function handleRequest(request: ImportWorkerRequest): Promise<void> {
   try {
-    self.postMessage(await parseRequest(request));
+    const response = await parseRequest(request);
+    self.postMessage(response, { transfer: [...importWorkerTransferables(response)] });
   } catch (err) {
     const response: ImportWorkerResponse = {
       id: request.id,
@@ -34,20 +39,56 @@ async function handleRequest(request: ImportWorkerRequest): Promise<void> {
 }
 
 async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerResponse> {
+  postProgress(request.id, 'reading');
   if (request.kind === 'dxf') {
-    const dxfText = await request.blob.text();
     return {
       id: request.id,
       kind: 'dxf',
-      result: parseDxf({ dxfText, id: request.objectId, source: request.source }),
+      result: packDxfResult(
+        await parseDxfBlob(
+          request.blob,
+          { id: request.objectId, source: request.source },
+          ({ bytesRead, totalBytes }) => {
+            postProgress(request.id, 'parsing', bytesRead, totalBytes);
+          },
+        ),
+      ),
     };
   }
   if (request.kind === 'gcode') {
     return {
       id: request.id,
       kind: 'gcode',
-      result: parseGcodeProgram(await request.blob.text()),
+      result: packGcodeResult(
+        await parseGcodeBlob(request.blob, ({ bytesRead, totalBytes }) => {
+          postProgress(request.id, 'parsing', bytesRead, totalBytes);
+        }),
+      ),
     };
   }
-  return { id: request.id, kind: 'stl', result: parseStl(await request.blob.arrayBuffer()) };
+  const parsed = await parseStlBlob(request.blob, ({ bytesRead, totalBytes }) => {
+    postProgress(request.id, 'parsing', bytesRead, totalBytes);
+  });
+  postProgress(request.id, 'preparing');
+  return {
+    id: request.id,
+    kind: 'stl',
+    result: prepareParsedStlImport(parsed, request.options),
+  };
+}
+
+function postProgress(
+  id: number,
+  phase: Extract<ImportWorkerResponse, { kind: 'progress' }>['phase'],
+  bytesRead?: number,
+  totalBytes?: number,
+): void {
+  const response: ImportWorkerResponse = {
+    id,
+    kind: 'progress',
+    phase,
+    ...(bytesRead === undefined ? {} : { bytesRead }),
+    ...(totalBytes === undefined ? {} : { totalBytes }),
+  };
+  self.postMessage(response);
 }

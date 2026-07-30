@@ -200,4 +200,17 @@ describe('buildGcodeRenderModel — forgiving motion policy', () => {
       segmentLimit: { maximum: 1 },
     });
   });
+
+  it('keeps parsing while limiting only the render payload', () => {
+    const program = ['G21 G90', 'G1 X1', 'G1 X2', 'G1 X3', 'M2'].join('\n');
+    const result = buildGcodeRenderModel(program, { renderSegmentLimit: 2 });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.model.segmentCount).toBe(2);
+    expect(result.model.observedSegmentCount).toBe(3);
+    expect(result.model.renderLimit).toEqual({ maximum: 2, observed: 3 });
+    expect(result.model.lineCount).toBe(5);
+    expect(result.model.events.some((event) => event.kind === 'program-end')).toBe(true);
+  });
 });

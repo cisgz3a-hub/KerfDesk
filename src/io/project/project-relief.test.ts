@@ -44,6 +44,24 @@ describe('.lf2 relief round-trip (H.4)', () => {
     expect(result.project.scene.objects[0]).toEqual(relief());
   });
 
+  it('serializes a worker-owned Float32Array mesh and reopens it as project JSON', () => {
+    const typedRelief = {
+      ...relief(),
+      meshPositions: Float32Array.from(relief().meshPositions),
+    };
+    const project = reliefProject();
+    const result = deserializeProject(
+      serializeProject({
+        ...project,
+        scene: { ...project.scene, objects: [typedRelief] },
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.scene.objects[0]).toEqual(relief());
+  });
+
   it('rejects a relief whose mesh is not a whole number of triangles', () => {
     const raw = JSON.parse(serializeProject(reliefProject())) as {
       scene: { objects: Array<Record<string, unknown>> };

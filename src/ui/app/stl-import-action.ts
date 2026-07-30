@@ -5,7 +5,6 @@
 // layer color; width/depth/background are edited afterwards in the Relief
 // properties panel (SelectedReliefProperties).
 
-import { meshToHeightmap } from '../../core/relief';
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
@@ -15,15 +14,24 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
-import { parseStl, type ParseStlResult } from '../../io/stl';
 import { parseStlOffThread } from '../import/import-worker-client';
+import {
+  type PreparedStlImportResult,
+  type StlImportPreparationOptions,
+} from '../import/stl-import-preparation';
 import type { ToastVariant } from '../state/toast-store';
 import { importSourceSizeAdvisory } from './import-size-advisory';
+import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 export const DEFAULT_RELIEF_WIDTH_MM = 100;
 export const DEFAULT_RELIEF_DEPTH_MM = 5;
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
 const PROBE_CELL_MM = 1;
+const STL_PREPARATION_OPTIONS: StlImportPreparationOptions = {
+  targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
+  reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
+  mmPerCell: PROBE_CELL_MM,
+};
 
 export function isStlFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.stl');
@@ -49,12 +57,14 @@ export async function importStlFiles(
   for (const file of files) {
     const sizeAdvisory = importSourceSizeAdvisory(file, 'stl');
     if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
+    const controls = createImportWorkerControls(file.name, ctx.pushToast);
     try {
-      // parseStl itself is fast (~172 MB/s measured), but a 100 MB mesh still
-      // allocates heavily; running it in the import worker keeps that off the
-      // UI thread. Falls back to the main thread when Worker is unavailable.
-      const parsed = (await parseStlOffThread(file)) ?? parseStl(await file.arrayBuffer());
-      const relief = reliefFromParsedStl(parsed, file.name);
+      // Parsing and the aspect-ratio heightmap probe stay in the import worker;
+      // a Blob is never materialized and converted on the UI thread.
+      const pending = parseStlOffThread(file, STL_PREPARATION_OPTIONS, controls.options);
+      if (pending === null) throw new Error('STL import worker unavailable');
+      const prepared = await pending;
+      const relief = reliefFromPreparedStl(prepared, file.name);
       if (typeof relief === 'string') {
         ctx.pushToast(`${file.name}: ${relief}`, 'error');
         continue;
@@ -69,7 +79,14 @@ export async function importStlFiles(
         'success',
       );
     } catch (err) {
-      ctx.pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      ctx.pushToast(
+        isImportCancellation(err)
+          ? `${file.name}: import cancelled.`
+          : `${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+        isImportCancellation(err) ? 'warning' : 'error',
+      );
+    } finally {
+      controls.dispose();
     }
   }
 }
@@ -87,24 +104,21 @@ function denseMeshAdvisory(name: string, triangles: number): string | null {
 }
 
 // Returns the ReliefObject, or a human-readable rejection reason.
-function reliefFromParsedStl(parsed: ParseStlResult, source: string): ReliefObject | string {
-  if (parsed.kind === 'error') return parsed.reason;
-  const probe = meshToHeightmap(parsed.mesh, {
-    targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
-    reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
-    mmPerCell: PROBE_CELL_MM,
-  });
-  if (probe.kind === 'error') return probe.reason;
+function reliefFromPreparedStl(
+  prepared: PreparedStlImportResult,
+  source: string,
+): ReliefObject | string {
+  if (prepared.kind === 'error') return prepared.reason;
   return {
     kind: 'relief',
     id: crypto.randomUUID(),
     source,
-    meshPositions: Array.from(parsed.mesh.positions),
+    meshPositions: prepared.positions,
     targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
     reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
     emptyCells: 'floor',
     color: DEFAULT_RELIEF_LAYER_COLOR,
-    bounds: { minX: 0, minY: 0, maxX: probe.widthMm, maxY: probe.heightMm },
+    bounds: { minX: 0, minY: 0, maxX: prepared.widthMm, maxY: prepared.heightMm },
     transform: IDENTITY_TRANSFORM,
   };
 }
