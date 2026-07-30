@@ -12,8 +12,7 @@ import {
 } from '../../core/image-select';
 import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster/raster-sweep-plan';
 import type { Project } from '../../core/scene';
-import { useStore } from '../state';
-import { useToastStore } from '../state/toast-store';
+import { useStore, useToastStore } from '../state';
 import { BLACK, captureScoped, type EditorSession } from './editor-session';
 import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';

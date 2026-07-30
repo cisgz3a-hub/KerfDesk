@@ -22,8 +22,6 @@ const COLOR = '#808080';
 const SIZE_PX = 20;
 const BOUNDS = { minX: 0, minY: 0, maxX: 20, maxY: 20 };
 const DEBOUNCE_MS = 400;
-let root: Root | null = null;
-let host: HTMLDivElement | null = null;
 
 function image(id: string): RasterImage {
   return {
@@ -75,25 +73,28 @@ function Harness(): JSX.Element {
   return <output>{check?.removedPixels ?? 'none'}</output>;
 }
 
-beforeEach(async () => {
-  vi.useFakeTimers();
-  useStore.setState({ project: project() });
-  useImageEditorStore.setState({ session: session('R1') });
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
-  await act(async () => root?.render(<Harness />));
-});
-
-afterEach(async () => {
-  if (root !== null) await act(async () => root?.unmount());
-  host?.remove();
-  root = null;
-  host = null;
-  vi.useRealTimers();
-});
-
 describe('useKerfCheck', () => {
+  let root: Root | null = null;
+  let host: HTMLDivElement | null = null;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    useStore.setState({ project: project() });
+    useImageEditorStore.setState({ session: session('R1') });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root?.render(<Harness />));
+  });
+
+  afterEach(async () => {
+    if (root !== null) await act(async () => root?.unmount());
+    host?.remove();
+    root = null;
+    host = null;
+    vi.useRealTimers();
+  });
+
   it('hides a completed result immediately when the editor session changes', async () => {
     await act(async () => vi.advanceTimersByTime(DEBOUNCE_MS));
     expect(host?.textContent).not.toBe('none');

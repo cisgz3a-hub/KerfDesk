@@ -11,8 +11,7 @@ import {
 import { applyThicken, computeKerfCheck } from './editor-kerf-check';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
-import { useStore } from '../state';
-import { useToastStore } from '../state/toast-store';
+import { useStore, useToastStore } from '../state';
 
 // 60×60 px on 60×60 mm (1 px = 1 mm).
 const BOUNDS = { minX: 0, minY: 0, maxX: 60, maxY: 60 };
