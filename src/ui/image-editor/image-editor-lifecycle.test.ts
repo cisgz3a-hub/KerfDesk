@@ -5,6 +5,7 @@ import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { createSession, type EditorSession } from './editor-session';
+import { commitImageSize } from './editor-session-resize';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 import { useImageEditorStore } from './image-editor-store';
 
@@ -188,6 +189,25 @@ describe('Image Studio session lifecycle', () => {
     await settle();
 
     expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(true);
+  });
+
+  it('applies a pure Image Size resample with its new pixel dimensions', async () => {
+    const resized = commitImageSize(session('resized', 1, true), 8, 6);
+    vi.mocked(bakeBufferToBitmapFields).mockResolvedValue({
+      dataUrl: 'data:image/png;base64,resized',
+      lumaBase64: 'AAA=',
+    });
+    useImageEditorStore.setState({ session: resized });
+
+    useImageEditorStore.getState().apply();
+    await settle();
+
+    expect(useStore.getState().applyEditedImage).toHaveBeenCalledWith('resized', {
+      dataUrl: 'data:image/png;base64,resized',
+      lumaBase64: 'AAA=',
+      pixelWidth: 8,
+      pixelHeight: 6,
+    });
   });
 
   it('does not close a newer session or trace stale intent after Apply and Trace', async () => {

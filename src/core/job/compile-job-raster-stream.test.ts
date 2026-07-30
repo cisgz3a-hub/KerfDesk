@@ -3,11 +3,8 @@ import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { applyImageMaskToLuma, dither, resampleLumaNearest } from '../raster';
 import type { DitherAlgorithm } from '../raster/dither';
 import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
-import {
-  originFlipsRasterX,
-  originFlipsRasterY,
-  streamedRasterRowProvider,
-} from './compile-job-raster-stream';
+import { streamedRasterRowProvider } from './compile-job-raster-stream';
+import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import { rotatedMaskedRasterLuma } from './raster-rotated-sample';
 
 const SOURCE_W = 12;

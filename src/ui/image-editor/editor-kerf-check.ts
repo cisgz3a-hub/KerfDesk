@@ -1,107 +1,138 @@
-// Dot-width advisory (ADR-246, V2 plan E2) — warnings, never blocks. It uses
-// the same horizontal-run survival rule as the raster emitter. Detection and
-// one-click Thicken share the active layer, so another visible layer can never
-// cause pixels to be painted into the current one. Thicken is one undo entry.
+// Dot-width advisory (ADR-246, V2 plan E2) — warnings, never blocks. It
+// compiles the virtual Apply raster through the same adjustment, resampling,
+// mask, orientation, dither, and exact-S sweep semantics as raster emission.
+// One-click Thicken appears only for a reversible active-layer target.
 
-import { pushHistoryEntry, RGBA_CHANNELS } from '../../core/image-edit';
-import { compositeLayersInPlace } from '../../core/image-layers';
+import { pushHistoryEntry, type RgbaBuffer } from '../../core/image-edit';
+import { fillMaskedInPlace, maskBounds } from '../../core/image-select';
+import type { SelectionMask } from '../../core/image-select';
+import type { JobPlacementSettings } from '../../core/job';
+import type { OutputScope, Project } from '../../core/scene';
+import { currentOutputScope, useStore, useToastStore } from '../state';
 import {
-  expandMask,
-  fillMaskedInPlace,
-  maskBounds,
-  type SelectionMask,
-} from '../../core/image-select';
-import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster/raster-sweep-plan';
-import type { Project } from '../../core/scene';
-import { useStore, useToastStore } from '../state';
-import { BLACK, captureScoped, type EditorSession } from './editor-session';
+  computeKerfOutputParity,
+  type KerfOutputParity,
+  type KerfOutputParityInput,
+} from './editor-kerf-output-parity';
+import { editorKerfThickenTarget } from './editor-kerf-thicken-target';
+import { BLACK, appliedBounds, captureScoped, type EditorSession } from './editor-session';
+import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
 import {
   isKerfCheckContextCurrent,
   kerfCheckContext,
+  kerfOperationLayer,
   type KerfCheckContext,
 } from './kerf-check-context';
 
-const INK_LUMA_THRESHOLD = 128;
-const LUMA_R = 0.299;
-const LUMA_G = 0.587;
-const LUMA_B = 0.114;
-const OPAQUE_WHITE = 255;
-
+/** Output-facing dot-width loss plus any reversible editor repair. */
 export type KerfCheck = {
-  /** Active-layer ink pixels in runs that dot-width correction fully removes. */
+  /** Compiled output samples in exact-S runs erased by dot-width correction. */
   readonly removedPixels: number;
-  readonly thresholdMm: number;
-  readonly removedMask: SelectionMask;
-  readonly correctionPx: number;
+  readonly minCorrectionMm: number;
+  readonly maxCorrectionMm: number;
+  /** Null when no reversible active-layer edit target can be proven. */
+  readonly removedMask: SelectionMask | null;
   readonly context: KerfCheckContext;
 };
 
 /**
- * Null when the object has no Image-mode assignment or no effective
- * dot-width correction. Line-mode kerf offset is intentionally irrelevant.
+ * Synchronous pure entry for focused ownership tests. Product UI runs the
+ * output-parity core in a dedicated worker instead of calling this path.
  */
-export function computeKerfCheck(session: EditorSession, project: Project): KerfCheck | null {
-  const context = kerfCheckContext(session, project);
+export function computeKerfCheck(
+  session: EditorSession,
+  project: Project,
+  outputScope: OutputScope,
+  jobPlacement: JobPlacementSettings,
+): KerfCheck | null {
+  const context = kerfCheckContext(session, project, outputScope, jobPlacement);
   if (context === null) return null;
-  const { thresholdMm } = context;
-  const mmPerPx =
-    (session.sourceBounds.maxX - session.sourceBounds.minX) / Math.max(1, session.base.width);
-  if (!Number.isFinite(mmPerPx) || mmPerPx <= 0) return null;
-  const correctionPx = Math.max(1, Math.ceil(thresholdMm / mmPerPx));
-  const ink = inkMask(session);
-  const removed = removedRunMask(ink, mmPerPx, thresholdMm);
+  const parity = computeKerfOutputParity(
+    kerfOutputParityInput(session, compositeSession(session), context),
+  );
+  return parity === null ? null : kerfCheckFromParity(session, context, parity);
+}
+
+/** Build the minimal worker input from one cached Apply-equivalent composite. */
+export function kerfOutputParityInput(
+  session: EditorSession,
+  composite: RgbaBuffer,
+  context: KerfCheckContext,
+): KerfOutputParityInput {
   return {
-    removedPixels: removed.pixels,
-    thresholdMm,
-    removedMask: removed.mask,
-    correctionPx,
+    composite,
+    object: workerRasterObject(context.object),
+    layers: context.layers,
+    maskObject: context.maskObject,
+    device: context.device,
+    appliedBounds: appliedBounds(session) ?? context.object.bounds,
+  };
+}
+
+function workerRasterObject(object: KerfCheckContext['object']): KerfCheckContext['object'] {
+  const { dataUrl: _dataUrl, lumaBase64: _lumaBase64, ...metadata } = object;
+  // The worker replaces luma from the transferred Apply composite. Avoid
+  // synchronously cloning the redundant source bitmap/base64 payload.
+  return { ...metadata, dataUrl: '' };
+}
+
+/** Bind one worker result back to its still-current main-thread ownership. */
+export function kerfCheckFromParity(
+  session: EditorSession,
+  context: KerfCheckContext,
+  parity: KerfOutputParity,
+): KerfCheck | null {
+  if (parity.removedPixels === 0) return null;
+  const candidate = parity.thickenCandidate;
+  const layer = candidate === null ? null : kerfOperationLayer(context, candidate.group.layerId);
+  const target =
+    candidate === null || layer === null
+      ? null
+      : editorKerfThickenTarget({
+          session,
+          object: context.object,
+          layer,
+          group: candidate.group,
+          device: context.device,
+          removed: candidate.removed,
+        });
+  return {
+    removedPixels: parity.removedPixels,
+    minCorrectionMm: parity.minCorrectionMm,
+    maxCorrectionMm: parity.maxCorrectionMm,
+    removedMask: target?.mask ?? null,
     context,
   };
 }
 
-function removedRunMask(
-  ink: SelectionMask,
-  mmPerPx: number,
-  thresholdMm: number,
-): { readonly mask: SelectionMask; readonly pixels: number } {
-  let pixels = 0;
-  const alpha = new Uint8Array(ink.alpha.length);
-  for (let y = 0; y < ink.height; y += 1) {
-    let runStart = -1;
-    for (let x = 0; x <= ink.width; x += 1) {
-      const isInk = x < ink.width && (ink.alpha[y * ink.width + x] ?? 0) > 0;
-      if (isInk && runStart === -1) runStart = x;
-      if (isInk || runStart === -1) continue;
-      const runPixels = x - runStart;
-      if (!rasterRunSurvivesDotWidthCorrection(0, runPixels * mmPerPx, false, thresholdMm)) {
-        for (let markX = runStart; markX < x; markX += 1) {
-          alpha[y * ink.width + markX] = 255;
-          pixels += 1;
-        }
-      }
-      runStart = -1;
-    }
-  }
-  return { mask: { width: ink.width, height: ink.height, alpha }, pixels };
-}
-
-/** Thicken every removed run enough to survive correction — one undo entry. */
+/** Thicken every reversibly mapped removed run in one undo entry. */
 export function applyThicken(check: KerfCheck): void {
   const store = useImageEditorStore.getState();
   const session = store.session;
-  if (session === null || check.removedPixels === 0) return;
-  if (!isKerfCheckContextCurrent(check.context, session, useStore.getState().project)) {
+  if (session === null || check.removedPixels === 0 || check.removedMask === null) return;
+  const app = useStore.getState();
+  if (
+    !isKerfCheckContextCurrent(
+      check.context,
+      session,
+      app.project,
+      currentOutputScope(app),
+      app.jobPlacement,
+    )
+  ) {
     useToastStore
       .getState()
-      .pushToast('The image changed; the dot-width check is refreshing.', 'info');
+      .pushToast(
+        'The image or output selection changed; the dot-width check is refreshing.',
+        'info',
+      );
     return;
   }
-  const grown = expandMask(check.removedMask, check.correctionPx);
-  const bounds = maskBounds(grown);
+  const bounds = maskBounds(check.removedMask);
   if (bounds === null) return;
   const entry = captureScoped(session, bounds, 'Thicken dot-width runs');
-  fillMaskedInPlace(session.doc, grown, BLACK);
+  fillMaskedInPlace(session.doc, check.removedMask, BLACK);
   useImageEditorStore.setState({
     session: {
       ...session,
@@ -111,22 +142,4 @@ export function applyThicken(check: KerfCheck): void {
       lastDirtyRect: bounds,
     },
   });
-}
-
-function inkMask(session: EditorSession): SelectionMask {
-  const data = new Uint8ClampedArray(session.doc.width * session.doc.height * RGBA_CHANNELS);
-  data.fill(OPAQUE_WHITE);
-  const composite = { width: session.doc.width, height: session.doc.height, data };
-  const active = session.layers.find((layer) => layer.id === session.activeLayerId);
-  if (active !== undefined) compositeLayersInPlace(composite, [active]);
-  const alpha = new Uint8Array(composite.width * composite.height);
-  for (let i = 0; i < alpha.length; i += 1) {
-    const base = i * 4;
-    const luma =
-      LUMA_R * (composite.data[base] ?? 0) +
-      LUMA_G * (composite.data[base + 1] ?? 0) +
-      LUMA_B * (composite.data[base + 2] ?? 0);
-    if (luma < INK_LUMA_THRESHOLD) alpha[i] = 255;
-  }
-  return { width: composite.width, height: composite.height, alpha };
 }

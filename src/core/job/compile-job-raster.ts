@@ -9,14 +9,11 @@ import {
   resampleLumaNearest,
 } from '../raster';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
+import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import { sceneObjectUsesOperation, type Layer, type RasterImage, type SceneObject } from '../scene';
 import type { RasterGroup } from './job';
 import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
-import {
-  originFlipsRasterX,
-  originFlipsRasterY,
-  streamedRasterRowProvider,
-} from './compile-job-raster-stream';
+import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { layerWithObjectOverride } from './compile-job-object-policy';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
@@ -27,11 +24,17 @@ import { validatedScanOffsetMm } from './scan-offset';
 
 const WHITE_LUMA_BYTE = 255;
 
+/**
+ * Compile raster groups for one materialized operation and object set.
+ * Optional luma overrides let worker-owned transient rasters avoid JSON/base64
+ * serialization without changing persisted RasterImage data.
+ */
 export function compileRasterGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
   sceneObjects: ReadonlyArray<SceneObject> = objects,
+  sourceLumaByObjectId?: ReadonlyMap<string, Uint8Array>,
 ): RasterGroup[] {
   const groups: RasterGroup[] = [];
   for (const obj of objects) {
@@ -39,7 +42,15 @@ export function compileRasterGroupsForLayer(
     if (obj.role === 'trace-source') continue;
     const effectiveLayer = layerWithObjectOverride(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
-    groups.push(compileRasterGroup(obj, effectiveLayer, device, sceneObjects));
+    groups.push(
+      compileRasterGroup(
+        obj,
+        effectiveLayer,
+        device,
+        sceneObjects,
+        sourceLumaByObjectId?.get(obj.id),
+      ),
+    );
   }
   return groups;
 }
@@ -49,10 +60,11 @@ function compileRasterGroup(
   layer: Layer,
   device: DeviceProfile,
   objects: ReadonlyArray<SceneObject>,
+  sourceLumaOverride?: Uint8Array,
 ): RasterGroup {
   const bidirectionalScanOffsetMm = validatedScanOffsetMm(device, layer.bidirectionalScanOffsetMm);
   const scanDirection = resolveImageScanDirection(device, layer);
-  const sourceLuma = decodeRasterLuma(obj);
+  const sourceLuma = sourceLumaForRaster(obj, sourceLumaOverride);
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
@@ -124,6 +136,17 @@ function compileRasterGroup(
     scanDirection,
     ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
   };
+}
+
+function sourceLumaForRaster(
+  obj: RasterImage,
+  sourceLumaOverride: Uint8Array | undefined,
+): Uint8Array {
+  const sourceLuma = sourceLumaOverride ?? decodeRasterLuma(obj);
+  if (sourceLuma.length !== obj.pixelWidth * obj.pixelHeight) {
+    throw new Error('compileRasterGroup: source luma dimensions do not match the raster');
+  }
+  return sourceLuma;
 }
 
 type MaterializedRasterInput = {
