@@ -175,10 +175,17 @@ describe('buildGcodeRenderModel — forgiving motion policy', () => {
     expect(model.segKind[0]).toBe(SEG_KIND.cut);
   });
 
-  it('rejects only not-G-code and oversized programs', () => {
+  // ADR-268: only not-G-code is refused now. The line ceiling was a policy cap,
+  // and keeping it here meant a program the parser accepted could not be viewed.
+  it('rejects not-G-code, and renders a long program rather than refusing it', () => {
     expect(buildGcodeRenderModel('hello world\nthis is prose').kind).toBe('error');
-    const capped = buildGcodeRenderModel('G0 X1\nG0 X2\nG0 X3', { maxLines: 2 });
-    expect(capped.kind).toBe('error');
+
+    const body = 'G1 X1 Y1\nG1 X2 Y2\n'.repeat(300_000);
+    const model = buildGcodeRenderModel('G21 G90\n' + body);
+
+    expect(model.kind).toBe('ok');
+    if (model.kind !== 'ok') return;
+    expect(model.model.segmentCount).toBeGreaterThan(500_000);
   });
 
   it('keeps the default Inspector model uncapped while honoring an explicit segment budget', () => {

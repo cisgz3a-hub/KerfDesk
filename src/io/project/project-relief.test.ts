@@ -7,6 +7,7 @@ import {
   type ReliefObject,
 } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
+import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';
 
 function relief(): ReliefObject {
@@ -71,5 +72,34 @@ describe('.lf2 relief round-trip (H.4)', () => {
     obj['reliefDepthMm'] = 0;
     const result = deserializeProject(`${JSON.stringify(raw)}\n`);
     expect(result.kind).not.toBe('ok');
+  });
+});
+
+// ADR-268 follow-up: import demoted the RELIEF_EMBED_TRIANGLE_LIMIT refusal to an
+// advisory but the project validator kept refusing, so a dense STL imported and
+// then could neither be saved nor reloaded — worse than the consistent refusal it
+// replaced. Both ceilings are policy; the shape and finiteness checks are not.
+describe('dense relief round-trips (no embed ceiling)', () => {
+  it('serializes and reloads a relief far past the old 200k-triangle limit', () => {
+    const triangles = 200_001;
+    const meshPositions = new Array<number>(triangles * 9).fill(1);
+    const base = createProject();
+    const denseRelief = { ...relief(), meshPositions };
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [denseRelief] },
+    };
+
+    const prepared = prepareProjectForPersistence(project);
+
+    expect(prepared.kind).toBe('ok');
+    if (prepared.kind !== 'ok') return;
+    const reloaded = deserializeProject(prepared.json);
+    expect(reloaded.kind).toBe('ok');
+    if (reloaded.kind !== 'ok') return;
+    const restored = reloaded.project.scene.objects[0];
+    expect(restored?.kind).toBe('relief');
+    if (restored?.kind !== 'relief') return;
+    expect(restored.meshPositions).toHaveLength(triangles * 9);
   });
 });

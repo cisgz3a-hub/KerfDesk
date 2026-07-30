@@ -139,7 +139,6 @@ export type GcodeRenderModel = {
 
 export type BuildRenderModelOptions = {
   /** Line cap for the synchronous path; the Stage-11 worker path raises it. */
-  readonly maxLines?: number;
   /** Optional segment cap for bounded synchronous consumers. The parser
    * checks after each source line, so one expanded line may cross the cap. */
   readonly maxSegments?: number;

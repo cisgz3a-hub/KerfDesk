@@ -4,6 +4,7 @@
 // Composes the shared engine (core/gcode); forgiving by design — bad arcs and
 // unknown words become findings, never failures (ADR-255 §5).
 
+import { iterateLines } from '../util';
 import {
   ARC_EPSILON,
   arcSweepAngle,
@@ -28,7 +29,6 @@ import {
   type UnsupportedWordCount,
 } from './render-model-types';
 
-const DEFAULT_MAX_LINES = 500_000;
 const AXIS_EPSILON = 1e-9;
 // GRBL validates R-form/IJ arcs to ~0.005 in (mirrors the F-CNC10 parser).
 const ARC_RADIUS_TOLERANCE_MM = 0.127;
@@ -47,11 +47,12 @@ export function buildGcodeRenderModel(
   text: string,
   options: BuildRenderModelOptions = {},
 ): BuildRenderModelResult {
-  const lines = text.split(/\r\n|\n|\r/);
-  const maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
-  if (lines.length > maxLines) {
-    return { kind: 'error', reason: `Program exceeds ${maxLines} lines.` };
-  }
+  // No line ceiling (rule 7 / ADR-268). The parser stopped refusing at 500 000
+  // lines, so the VIEWER refusing there meant the same file could be simulated
+  // but not looked at. `maxSegments` stays because it is opt-in: only the live
+  // countdown passes it, as a responsiveness budget it degrades from, never a
+  // refusal of the job itself (the ADR-241 preview-gate pattern).
+  const lines = [...iterateLines(text)];
   const context: BuildContext = {
     modal: freshModal(options.initialPositionMm),
     segments: createSegmentBuilder(),
