@@ -53,6 +53,10 @@ export type DesignSession = {
   readonly orthoEnabled: boolean;
   readonly showGrid: boolean;
   readonly gridMm: number;
+  // Sizes the corner tools apply. Kept on the session so they persist across a
+  // close, like every other tool setting.
+  readonly filletRadiusMm: number;
+  readonly chamferDistanceMm: number;
   // True once the sketch has changed since the last Apply. Apply gates on THIS,
   // not on undo depth, because a view-only step must not look like a change and
   // a change that was undone-then-redone must still apply.
@@ -60,6 +64,8 @@ export type DesignSession = {
 };
 
 export const DEFAULT_DESIGN_GRID_MM = 10;
+export const DEFAULT_FILLET_RADIUS_MM = 5;
+export const DEFAULT_CHAMFER_DISTANCE_MM = 5;
 
 export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSession {
   return {
@@ -76,6 +82,8 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     orthoEnabled: false,
     showGrid: true,
     gridMm: DEFAULT_DESIGN_GRID_MM,
+    filletRadiusMm: DEFAULT_FILLET_RADIUS_MM,
+    chamferDistanceMm: DEFAULT_CHAMFER_DISTANCE_MM,
     dirtySinceApply: false,
   };
 }

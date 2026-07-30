@@ -11,6 +11,7 @@
 import { useCallback } from 'react';
 import type { Vec2 } from '../../core/scene';
 import { isDraftTool, NO_MODIFIERS, type DraftModifiers } from './design-draft';
+import { CORNER_PICK_RADIUS_PX, pickCorner } from './design-corner-pick';
 import { hitTestSketch, HIT_RADIUS_PX } from './design-hit-test';
 import { useDesignStudioStore } from './design-studio-store';
 import { applyOrthoMm, snapPointMm } from './design-snap';
@@ -49,8 +50,13 @@ export function useDesignPointer(
         });
         return;
       }
+      const pxPerMm = session.view === null ? 1 : session.view.pxPerMm;
+      if (session.tool === 'fillet' || session.tool === 'chamfer') {
+        applyCornerAt(at, session.tool, pxPerMm);
+        return;
+      }
       if (session.tool !== 'select') return;
-      beginSelect(at, event, session.view === null ? 1 : session.view.pxPerMm);
+      beginSelect(at, event, pxPerMm);
     },
     [pointMm],
   );
@@ -120,6 +126,19 @@ function resolvePointerMm(
   });
   store.setActiveSnap(resolved.target);
   return resolved.pointMm;
+}
+
+// The corner tools are click-to-apply rather than drag: pick the nearest corner and
+// run the op at the size the tool is set to. A click that finds no corner does
+// nothing at all.
+function applyCornerAt(at: Vec2, op: 'fillet' | 'chamfer', pxPerMm: number): void {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return;
+  const toleranceMm = CORNER_PICK_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1);
+  const pick = pickCorner(session.history.present, at, toleranceMm);
+  if (pick === null) return;
+  store.applyCorner(pick, op);
 }
 
 // Click an entity to select it (Shift adds); click empty space to start a

@@ -16,6 +16,8 @@ import {
 } from '../../core/design';
 import type { SnapTarget } from '../../core/design/snap';
 import type { Vec2 } from '../../core/scene';
+import { applyCornerOp, type CornerOp } from './design-corner-apply';
+import type { CornerPick } from './design-corner-pick';
 import { draftToEntity, type DesignDraft } from './design-draft';
 import { applyEntityField } from './design-entity-edit';
 import type { MeasurementKey } from './design-entity-fields';
@@ -55,6 +57,10 @@ type DesignStudioState = {
   // caller because pure core may not generate identity.
   readonly commitDraft: (id: string) => void;
   readonly setActiveMeasurement: (key: MeasurementKey | null) => void;
+  // Applies the armed corner tool at a picked corner, as one history step.
+  readonly applyCorner: (pick: CornerPick, op: CornerOp) => void;
+  readonly setFilletRadiusMm: (radiusMm: number) => void;
+  readonly setChamferDistanceMm: (distanceMm: number) => void;
   // Types an exact value into one dimension of one entity.
   readonly editEntityField: (id: string, key: MeasurementKey, value: number) => void;
   readonly setMarquee: (marquee: DesignMarquee | null) => void;
@@ -104,6 +110,16 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
 
   setDraft: (draft) => set(mapSession((session) => ({ ...session, draft }))),
   commitDraft: (id) => set(mapSession((session) => commitSessionDraft(session, id))),
+
+  applyCorner: (pick, op) => set(mapSession((session) => applyCornerToSession(session, pick, op))),
+  setFilletRadiusMm: (filletRadiusMm) =>
+    set(mapSession((session) => (filletRadiusMm > 0 ? { ...session, filletRadiusMm } : session))),
+  setChamferDistanceMm: (chamferDistanceMm) =>
+    set(
+      mapSession((session) =>
+        chamferDistanceMm > 0 ? { ...session, chamferDistanceMm } : session,
+      ),
+    ),
 
   setActiveMeasurement: (activeMeasurement) =>
     set(mapSession((session) => ({ ...session, activeMeasurement }))),
@@ -189,6 +205,18 @@ function setSessionConstruction(
   const entity = sketch.entities.find((candidate) => candidate.id === id);
   if (entity === undefined) return session;
   return withSketch(session, replaceEntity(sketch, { ...entity, construction }));
+}
+
+// Uses the size the tool is currently set to, so the click carries no size of its
+// own. A corner that cannot take that size leaves the sketch untouched.
+function applyCornerToSession(
+  session: DesignSession,
+  pick: CornerPick,
+  op: CornerOp,
+): DesignSession {
+  const sizeMm = op === 'fillet' ? session.filletRadiusMm : session.chamferDistanceMm;
+  const next = applyCornerOp(sessionSketch(session), pick, op, sizeMm);
+  return next === null ? session : withSketch(session, next);
 }
 
 // One typed value becomes one history step, so Ctrl+Z steps back through edits

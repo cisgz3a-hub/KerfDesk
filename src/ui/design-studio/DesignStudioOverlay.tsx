@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { DesignCanvas } from './DesignCanvas';
+import { DesignOptionsBar } from './DesignOptionsBar';
 import { DesignStatusBar } from './DesignStatusBar';
 import { DesignToolRails } from './DesignToolRails';
 import { DesignTopBar } from './DesignTopBar';
@@ -57,6 +58,7 @@ export function DesignStudioOverlay(): JSX.Element | null {
       onKeyDown={(event) => handleDesignStudioKey(event, handleFit)}
     >
       <DesignTopBar onFit={handleFit} />
+      <DesignOptionsBar />
       <div style={bodyStyle}>
         <DesignToolRails />
         <div style={mainColumnStyle}>
