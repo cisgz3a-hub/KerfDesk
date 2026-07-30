@@ -6,7 +6,7 @@
 
 **Audit branch:** `codex/box-generator-audit`
 
-**Status:** audit and visualization contract complete; three narrow repairs implemented and locally verified; review PR pending
+**Status:** audit and visualization contract complete; three narrow repairs implemented and locally verified; review PR #529 open
 
 **Scope:** Box Generator math, fabrication semantics, preview, insertion, persistence, and
 downstream project/output handoff only
@@ -506,3 +506,4 @@ clearance, relief choice, layer settings, exported artifact hash, and result.
 | 2026-07-31 | BG-005 repaired test-first. | Cancel and Escape persistence both failed on baseline; after the shared close hook, dialog/draft suites passed 23 / 23. |
 | 2026-07-31 | Repaired Box bundle verified. | 21 files / 134 tests; benchmark 1,114 / 1,114; laser IoU 1.0000; CNC IoU 0.9693. |
 | 2026-07-31 | Final repository and release-gate components passed. | 1,359 test files / 8,190 tests passed (14 files / 22 tests skipped); typecheck, format, both linters, ADR/licence/integrity/size/export checks, web build, and Electron-main build passed. Three chunk 704.87 KB minified; the unrelated 1,006.57 KB UI-workbench build warning remains. |
+| 2026-07-31 | Review PR opened; no merge performed. | [PR #529](https://github.com/cisgz3a-hub/KerfDesk/pull/529), base `main`, head `codex/box-generator-audit`. |
