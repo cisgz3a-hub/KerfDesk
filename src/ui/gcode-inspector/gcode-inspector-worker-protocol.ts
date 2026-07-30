@@ -1,8 +1,7 @@
 import type { BuildRenderModelResult } from '../../core/gcode-view';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 
-export const INSPECTOR_RENDER_SEGMENT_LIMIT = 250_000;
-export const INSPECTOR_SOURCE_LINE_LIMIT = 20_000;
+export const INSPECTOR_RENDER_PRESSURE_THRESHOLD = 250_000;
 
 export type GcodeInspectorWorkerRequest = {
   readonly id: number;

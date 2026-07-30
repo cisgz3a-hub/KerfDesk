@@ -2620,10 +2620,10 @@ and lifts the command's CNC-only gate.)*
 #### Edge — relative arcs / early end / huge files / other planes
 1. G91 relative coordinates apply to XY, Z, and arc targets alike.
 2. M2 / M30 ends the program mid-file; later lines are ignored.
-3. The parser reads the complete program. The 2D renderer retains at most
-   the first 250,000 parsed steps and shows exact shown/observed counts;
-   playback and displayed distance are labelled as that visible prefix.
-   This display limit does not rewrite or reject the file.
+3. The parser reads the complete program and the 2D renderer retains every
+   parsed step. Above 250,000 steps a visible pressure advisory states the
+   exact count and warns that drawing may use substantial memory or respond
+   slowly. The advisory never reduces, rewrites, or rejects the preview.
 4. G18/G19 plane arcs are not supported: rejected with the line number
    (XY-plane G17 is the GRBL default and the only plane GRBL arcs use
    here).
@@ -4685,12 +4685,13 @@ validation must be supervised without cutting load.
 1. Production file-backed and compiled-program sources parse in the
    Inspector worker. Reading/parsing phases and FIFO queue position are
    shown; Close cancels an active request by retiring that worker.
-2. Parsing continues through the complete program, while the 3D renderer
-   retains the first 250,000 motion segments and the source pane retains
-   the first 20,000 lines. Exact shown/observed counts state both display
-   limits. Neither limit rewrites or refuses the program.
-3. This is off-thread whole-file parsing, not streaming or a proven
-   memory ceiling. The worker still materializes a Blob as text.
+2. Parsing continues through the complete program. The 3D renderer and
+   source pane retain every motion segment and source line. Above 250,000
+   segments a visible pressure advisory states the exact count and warns
+   that drawing may use substantial memory or respond slowly.
+3. File-backed input is decoded incrementally from `Blob.stream()`. The
+   complete render model and source-line result still scale with output, so
+   this is not a proven constant-memory ceiling.
 
 #### Edge — our own emitted output
 

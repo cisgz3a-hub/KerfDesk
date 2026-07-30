@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Toolpath } from '../../core/job';
-import { limitGcode2dPreview } from './gcode-2d-preview-limit';
+import { annotateGcode2dPreviewPressure } from './gcode-2d-preview-pressure';
 
-describe('limitGcode2dPreview', () => {
+describe('annotateGcode2dPreviewPressure', () => {
   it('keeps small previews unchanged', () => {
     const toolpath: Toolpath = {
       steps: [{ kind: 'travel', from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, length: 1 }],
       totalLength: 1,
     };
-    expect(limitGcode2dPreview(toolpath, 2)).toBe(toolpath);
+    expect(annotateGcode2dPreviewPressure(toolpath, 2)).toBe(toolpath);
   });
 
-  it('returns an honest visible prefix without refusing the preview', () => {
+  it('warns about a large preview without dropping any parsed step', () => {
     const toolpath: Toolpath = {
       steps: [
         { kind: 'travel', from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, length: 1 },
@@ -20,12 +20,12 @@ describe('limitGcode2dPreview', () => {
       ],
       totalLength: 6,
     };
-    const limited = limitGcode2dPreview(toolpath, 2);
-    expect(limited.steps).toHaveLength(2);
-    expect(limited.totalLength).toBe(3);
-    expect(limited.previewIssue).toEqual({
-      kind: 'render-limited',
-      maximum: 2,
+    const annotated = annotateGcode2dPreviewPressure(toolpath, 2);
+    expect(annotated.steps).toBe(toolpath.steps);
+    expect(annotated.totalLength).toBe(6);
+    expect(annotated.previewIssue).toEqual({
+      kind: 'render-pressure',
+      threshold: 2,
       observed: 3,
     });
   });

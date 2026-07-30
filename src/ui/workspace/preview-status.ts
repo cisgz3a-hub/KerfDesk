@@ -10,8 +10,8 @@ import type { Project } from '../../core/scene';
 export type PreviewIssue =
   | { readonly kind: 'too-complex' }
   | {
-      readonly kind: 'render-limited';
-      readonly maximum: number;
+      readonly kind: 'render-pressure';
+      readonly threshold: number;
       readonly observed: number;
     }
   // The scene is over the responsiveness budget and the ADR-244 preparation

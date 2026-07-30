@@ -6,7 +6,7 @@ import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
 import { Dialog } from '../kit/Dialog';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
-import { InspectionLimitNotice } from './InspectionLimitNotice';
+import { InspectionPressureNotice } from './InspectionPressureNotice';
 import { InspectorView } from './InspectorView';
 import { useGcodeInspection } from './use-gcode-inspection';
 
@@ -45,7 +45,7 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
       {state.kind === 'ready' ? (
         state.result.parsed.kind === 'ok' ? (
           <>
-            <InspectionLimitNotice result={state.result} />
+            <InspectionPressureNotice result={state.result} />
             <InspectorView model={state.result.parsed.model} lines={state.result.lines} />
           </>
         ) : (

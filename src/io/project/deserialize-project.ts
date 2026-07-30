@@ -20,12 +20,11 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   type CncCoolantMode,
   type CncTiling,
-  DEFAULT_PROJECT_OPTIMIZATION,
   DEFAULT_CNC_TOOLS,
   isCncCoolantMode,
-  PROJECT_SCHEMA_VERSION,
   type Project,
 } from '../../core/scene';
+import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeLayer } from './normalize-layer';

@@ -1,4 +1,5 @@
-import { createLayer, createProject, type Layer, type Project } from '../../core/scene';
+import { createLayer, type Layer, type Project } from '../../core/scene';
+import { createProject } from '../../core/scene/project';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
 
 // MAX_XML_DEPTH is an integrity bound, not a policy cap: unbounded nesting

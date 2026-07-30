@@ -15,4 +15,12 @@ describe('inspectGcodeSource', () => {
     expect(streamed).toEqual(inspectGcodeText(text));
     expect(progress).toHaveBeenLastCalledWith({ bytesRead: text.length, totalBytes: text.length });
   });
+
+  it('retains every source line instead of capping the source pane', () => {
+    const text = Array.from({ length: 20_005 }, (_, index) => `G1 X${index}`).join('\n');
+    const result = inspectGcodeText(text);
+
+    expect(result.sourceLineCount).toBe(20_005);
+    expect(result.lines).toHaveLength(20_005);
+  });
 });

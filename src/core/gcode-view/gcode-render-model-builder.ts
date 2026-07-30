@@ -55,14 +55,12 @@ export type GcodeRenderModelBuilder = {
 export function createGcodeRenderModelBuilder(
   options: BuildRenderModelOptions = {},
 ): GcodeRenderModelBuilder {
-  // No line ceiling (rule 7 / ADR-268). The parser stopped refusing at 500 000
-  // lines, so the VIEWER refusing there meant the same file could be simulated
-  // but not looked at. `maxSegments` stays because it is opt-in: only the live
-  // countdown passes it, as a responsiveness budget it degrades from, never a
-  // refusal of the job itself (the ADR-241 preview-gate pattern).
+  // No line or display ceiling (rule 7 / ADR-268). `maxSegments` stays because
+  // it is opt-in: only the live countdown passes it as a responsiveness budget
+  // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
     modal: freshModal(options.initialPositionMm),
-    segments: createSegmentBuilder(1024, options.renderSegmentLimit),
+    segments: createSegmentBuilder(1024),
     events: [],
     skipped: [],
     unsupported: new Map(),
@@ -76,7 +74,7 @@ export function createGcodeRenderModelBuilder(
     if (terminalResult !== null) return;
     categories.push(processLine(context, raw, lineCount));
     lineCount += 1;
-    const segmentCount = context.segments.observedCount();
+    const segmentCount = context.segments.count();
     if (options.maxSegments !== undefined && segmentCount > options.maxSegments) {
       terminalResult = {
         kind: 'error',
@@ -95,16 +93,16 @@ export function createGcodeRenderModelBuilder(
       return { kind: 'error', reason: 'This does not look like G-code.' };
     }
     const finished = context.segments.finish();
-    const renderLimit =
-      options.renderSegmentLimit !== undefined &&
-      finished.observedSegmentCount > options.renderSegmentLimit
-        ? { maximum: options.renderSegmentLimit, observed: finished.observedSegmentCount }
+    const renderPressure =
+      options.renderPressureThreshold !== undefined &&
+      finished.segmentCount > options.renderPressureThreshold
+        ? { threshold: options.renderPressureThreshold, observed: finished.segmentCount }
         : null;
     return {
       kind: 'ok',
       model: {
         ...finished,
-        renderLimit,
+        renderPressure,
         lineCount,
         lineCategories: categories.finish(),
         events: context.events,

@@ -5,13 +5,13 @@ import { parseDocumentImportText } from './document-import-parse';
 const blob = new Blob();
 
 describe('parseDocumentImportText', () => {
-  it('matches the LightBurn project importer on worker-safe XML DOM', () => {
+  it('matches the LightBurn project importer on worker-safe XML DOM', async () => {
     const text = `<LightBurnProject AppVersion="1.7">
       <Shape Type="Rect" CutIndex="2" W="10" H="6">
         <XForm>1 0 0 1 5 5</XForm>
       </Shape>
     </LightBurnProject>`;
-    const response = parseDocumentImportText(
+    const response = await parseDocumentImportText(
       { id: 1, kind: 'lightburn-project', blob, source: 'sample.lbrn2' },
       text,
     );
@@ -22,11 +22,11 @@ describe('parseDocumentImportText', () => {
     }
   });
 
-  it('matches CLB material conversion on worker-safe XML DOM', () => {
+  it('matches CLB material conversion on worker-safe XML DOM', async () => {
     const text = `<Library><Material Name="Birch"><Entry Thickness="3" Desc="Cut">
       <CutSetting Type="Cut" Speed="8" MaxPower="75"/>
     </Entry></Material></Library>`;
-    const response = parseDocumentImportText(
+    const response = await parseDocumentImportText(
       { id: 2, kind: 'lightburn-clb', blob, source: 'sample.clb' },
       text,
     );
@@ -37,8 +37,8 @@ describe('parseDocumentImportText', () => {
     }
   });
 
-  it('rejects malformed XML instead of accepting the worker DOM repair', () => {
-    const response = parseDocumentImportText(
+  it('rejects malformed XML instead of accepting the worker DOM repair', async () => {
+    const response = await parseDocumentImportText(
       { id: 3, kind: 'lightburn-clb', blob, source: 'broken.clb' },
       '<Library><Entry></Library>',
     );

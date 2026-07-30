@@ -1,19 +1,19 @@
-import { DOMParser as WorkerDomParser } from 'linkedom/worker';
 import { SaxesParser } from 'saxes';
-import { deserializeProject } from '../../io/project';
+import type { DOMParser as WorkerDomParser } from 'linkedom/worker';
 import { parseSvgInWorker } from '../../io/svg/parse-svg-worker';
-import { importLightBurnClb, importLightBurnProject } from '../../io/lightburn';
-import { deserializeMaterialLibrary } from '../../io/material-library';
 import type {
   DocumentImportWorkerRequest,
   DocumentImportWorkerResponse,
 } from './document-import-worker-protocol';
 
-export function parseDocumentImportText(
+type WorkerDomParserConstructor = typeof WorkerDomParser;
+
+export async function parseDocumentImportText(
   request: DocumentImportWorkerRequest,
   text: string,
-): DocumentImportWorkerResponse {
+): Promise<DocumentImportWorkerResponse> {
   if (request.kind === 'project') {
+    const { deserializeProject } = await import('../../io/project/deserialize-project');
     return { id: request.id, kind: request.kind, result: deserializeProject(text) };
   }
   if (request.kind === 'svg') {
@@ -29,6 +29,10 @@ export function parseDocumentImportText(
     };
   }
   if (request.kind === 'lightburn-project') {
+    const [{ DOMParser }, { importLightBurnProject }] = await Promise.all([
+      import('linkedom/worker'),
+      import('../../io/lightburn/lbrn-import'),
+    ]);
     if (!isWellFormedXml(text)) {
       return {
         id: request.id,
@@ -39,12 +43,18 @@ export function parseDocumentImportText(
     return {
       id: request.id,
       kind: request.kind,
-      result: importLightBurnProject(text, request.source, parseXml),
+      result: importLightBurnProject(text, request.source, (xml) => parseXml(xml, DOMParser)),
     };
   }
   if (request.kind === 'material-library') {
+    const { deserializeMaterialLibrary } =
+      await import('../../io/material-library/material-library-io');
     return { id: request.id, kind: request.kind, result: deserializeMaterialLibrary(text) };
   }
+  const [{ DOMParser }, { importLightBurnClb }] = await Promise.all([
+    import('linkedom/worker'),
+    import('../../io/lightburn/clb-import'),
+  ]);
   if (!isWellFormedXml(text)) {
     return {
       id: request.id,
@@ -55,7 +65,7 @@ export function parseDocumentImportText(
   return {
     id: request.id,
     kind: request.kind,
-    result: importLightBurnClb(text, request.source, parseXml),
+    result: importLightBurnClb(text, request.source, (xml) => parseXml(xml, DOMParser)),
   };
 }
 
@@ -78,6 +88,6 @@ function isWellFormedXml(text: string): boolean {
   }
 }
 
-function parseXml(text: string): Document {
-  return new WorkerDomParser().parseFromString(text, 'text/xml') as unknown as Document;
+function parseXml(text: string, DOMParser: WorkerDomParserConstructor): Document {
+  return new DOMParser().parseFromString(text, 'text/xml') as unknown as Document;
 }

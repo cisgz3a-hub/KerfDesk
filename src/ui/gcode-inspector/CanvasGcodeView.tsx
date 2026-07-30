@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 import { InspectorView } from './InspectorView';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
 import { useGcodeInspection, type InspectionState } from './use-gcode-inspection';
-import { InspectionLimitNotice } from './InspectionLimitNotice';
+import { InspectionPressureNotice } from './InspectionPressureNotice';
 
 export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Element {
   const { state, stale, refresh } = useCurrentGcode(props.active);
@@ -70,7 +70,7 @@ function Body(props: {
   }
   return (
     <>
-      <InspectionLimitNotice result={props.inspection.result} />
+      <InspectionPressureNotice result={props.inspection.result} />
       <InspectorView
         model={props.inspection.result.parsed.model}
         lines={props.inspection.result.lines}

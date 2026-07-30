@@ -15,7 +15,7 @@ async function parseRequest(request: DocumentImportWorkerRequest): Promise<void>
     postProgress(request.id, 'reading');
     const text = await request.blob.text();
     postProgress(request.id, 'parsing');
-    const response = parseDocumentImportText(request, text);
+    const response = await parseDocumentImportText(request, text);
     self.postMessage(response);
   } catch (error) {
     const response: DocumentImportWorkerResponse = {

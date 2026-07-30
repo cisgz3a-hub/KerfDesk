@@ -21,7 +21,6 @@ export type SegmentRecord = {
 
 export type FinishedSegments = {
   readonly segmentCount: number;
-  readonly observedSegmentCount: number;
   readonly positions: Float32Array;
   readonly segKind: Uint8Array;
   readonly segMotion: Uint8Array;
@@ -35,14 +34,12 @@ export type FinishedSegments = {
 export type SegmentBuilder = {
   readonly push: (segment: SegmentRecord) => void;
   readonly count: () => number;
-  readonly observedCount: () => number;
   readonly finish: () => FinishedSegments;
 };
 
-export function createSegmentBuilder(initialCapacity = 1024, maximum?: number): SegmentBuilder {
-  let capacity = Math.max(1, Math.min(initialCapacity, maximum ?? initialCapacity));
+export function createSegmentBuilder(initialCapacity = 1024): SegmentBuilder {
+  let capacity = Math.max(1, initialCapacity);
   let count = 0;
-  let observedCount = 0;
   let routeMm = 0;
   // Annotated as the unparameterized (ArrayBufferLike) typed-array types so
   // grow/slice results assign cleanly under TS's generic TypedArrays.
@@ -83,8 +80,6 @@ export function createSegmentBuilder(initialCapacity = 1024, maximum?: number): 
   };
 
   const push = (segment: SegmentRecord): void => {
-    observedCount += 1;
-    if (maximum !== undefined && count >= maximum) return;
     if (count === capacity) grow();
     const base = count * FLOATS_PER_SEGMENT;
     positions[base] = segment.x0;
@@ -105,7 +100,6 @@ export function createSegmentBuilder(initialCapacity = 1024, maximum?: number): 
 
   const finish = (): FinishedSegments => ({
     segmentCount: count,
-    observedSegmentCount: observedCount,
     positions: positions.slice(0, count * FLOATS_PER_SEGMENT),
     segKind: segKind.slice(0, count),
     segMotion: segMotion.slice(0, count),
@@ -116,5 +110,5 @@ export function createSegmentBuilder(initialCapacity = 1024, maximum?: number): 
     totalRouteMm: routeMm,
   });
 
-  return { push, count: () => count, observedCount: () => observedCount, finish };
+  return { push, count: () => count, finish };
 }

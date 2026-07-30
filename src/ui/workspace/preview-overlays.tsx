@@ -20,12 +20,12 @@ function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX
       </div>
     );
   }
-  if (props.issue?.kind === 'render-limited') {
+  if (props.issue?.kind === 'render-pressure') {
     return (
       <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
-        2D preview shows the first {props.issue.maximum.toLocaleString()} of{' '}
-        {props.issue.observed.toLocaleString()} parsed steps. Distance and playback controls cover
-        only the shown prefix; the source file is unchanged.
+        Large 2D preview: all {props.issue.observed.toLocaleString()} parsed steps are shown.
+        Drawing more than {props.issue.threshold.toLocaleString()} steps can use substantial memory
+        and may respond slowly.
       </div>
     );
   }

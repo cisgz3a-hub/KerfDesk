@@ -3,7 +3,8 @@
 **Date:** 2026-07-30
 **Branch:** `codex/large-file-repair`
 **Base:** `e3ace9928163fcd696d074c9f0a54024f8215948` (`origin/main`, PR #525 merge)
-**Publication:** local only; no commit, push, PR, deployment, or hardware operation.
+**Publication:** draft PR #527, initially published at commit `fb4f92f5`; corrective work remains
+in the same review PR. No merge, deployment, or hardware operation.
 
 This ledger records each repair only after its focused tests and audit complete. “Worker-backed”
 means CPU work is moved off the browser UI thread. It does **not** mean streaming or
@@ -22,13 +23,10 @@ memory-bounded parsing unless the entry separately proves that property.
 - The existing import worker parses the 2D simulator toolpath. File-backed requests carry the
   `Blob`; compiled in-memory programs are wrapped for the worker because their string already
   exists as compiler output.
-- The 3D render payload retains at most 250,000 segments while parsing continues through the
-  complete program. The model records both shown and observed counts.
-- The Inspector source pane retains the first 20,000 lines. The UI states the exact source and
-  segment counts when either display limit applies.
-- The 2D simulator retains the first 250,000 parsed steps and displays a persistent warning with
-  shown/observed counts. Playback and displayed distance are explicitly labelled as applying only
-  to that visible prefix. The file and parsed result are not rewritten.
+- The 3D render payload and source pane retain every parsed segment and source line.
+- The 2D simulator retains every parsed toolpath step.
+- Above 250,000 render items, both preview surfaces display the exact count and an advisory that
+  drawing may use substantial memory or respond slowly. The advisory does not cap or alter data.
 
 ### Focused verification
 
@@ -50,8 +48,9 @@ memory-bounded parsing unless the entry separately proves that property.
   `buildGcodeRenderModel` on the UI thread.
 - **Confirmed:** production 2D file Preview parsing uses `parseGcodeOffThread`; the UI-thread
   parser remains only as the explicit no-Worker fallback.
-- **Confirmed:** render limits degrade what is displayed and are disclosed; they do not refuse
-  open, parse, preview, save, Frame, Start, export, or stream.
+- **Superseded by the final guard audit:** the initial retained-prefix implementation was a preview
+  cap prohibited by the repository's frame-only-guard rule. The draft PR now retains every item
+  and uses a non-blocking pressure advisory instead.
 - **Not established:** the workers still materialize the complete Blob as text. Step 1 is
   off-thread, not streaming and not memory-bounded.
 - **Not established:** real browser worker execution and very-large fixture behavior remain for
@@ -197,7 +196,7 @@ memory-bounded parsing unless the entry separately proves that property.
 ### Coverage added
 
 - A Playwright production-path fixture opens a 260,100-segment G-code file through the actual
-  Inspector worker bundle, observes the disclosed 250,000-segment render boundary, and verifies
+  Inspector worker bundle, observes the disclosed 250,000-segment pressure advisory, and verifies
   that a 10 ms UI heartbeat continues while parsing.
 - A second large fixture begins an 800,000-segment parse and closes the Inspector while the worker
   is active, verifying the real worker is present and the dialog closes through the cancellation
@@ -220,8 +219,8 @@ memory-bounded parsing unless the entry separately proves that property.
 
 - **Confirmed:** the production browser path creates `gcode-inspector-worker`, not the synchronous
   no-Worker fallback.
-- **Confirmed:** the large render limit is disclosed with exact shown/observed counts; the file is
-  still parsed through its final 260,100th motion segment.
+- **Confirmed after the final guard audit:** the large render advisory gives the exact observed
+  count while retaining every segment through the final 260,100th motion.
 - **Confirmed:** real-worker active cancellation and FIFO continuation are now covered in addition
   to deterministic worker-client unit tests.
 - **Confirmed:** typed live STL meshes preserve their geometry across manual save, autosave, and
@@ -393,12 +392,11 @@ Frame/Start, or operate hardware. Publication remains unauthorized.
 - **Honest memory boundary:** input decoding retains the current stream chunk plus the unfinished
   logical line. Parsed output still scales with the retained toolpath/render model; an individual
   unbounded-length line can itself be large. This is not a constant-total-memory claim.
-- **Preview limits unchanged and disclosed:** Inspector retains the first 250,000 render segments
-  and first 20,000 source lines while continuing to count the whole input; its notice gives exact
-  retained/observed counts. The 2D Preview retains its previously disclosed 250,000-step display
-  boundary.
-- **No silent loss or new policy guard:** validation and parser results are unchanged; display
-  sampling remains an explicit preview degradation, not an import or machine-action refusal.
+- **Preview pressure disclosed without a cap:** Inspector retains every render segment and source
+  line; 2D Preview retains every parsed step. Above 250,000 render items, the UI gives the exact
+  count and warns about memory/responsiveness without reducing the result.
+- **No silent loss or new policy guard:** validation and parser results are unchanged; the pressure
+  advisory does not sample, cap, delay, or refuse preview or any machine action.
 - **No hardware or publication action:** none.
 
 ### Expansion Step 2B — incremental production DXF input
@@ -593,3 +591,97 @@ Frame/Start, or operate hardware. Publication remains unauthorized.
   sources report phase progress without fabricating byte totals.
 - **Publication boundary:** this ledger and all completed slices form one draft review PR. No merge
   to `main` and no deployment or hardware action are part of this step.
+
+## Corrective audit 1 — remove preview truncation guards
+
+**Status:** completed and audited.
+
+### Finding
+
+- The first published review boundary retained only 20,000 Inspector source lines and 250,000
+  Inspector/2D render items. Repository policy defines caps, truncation, and hidden output as
+  guards, so those limits were not acceptable even though the UI disclosed them.
+
+### Repair
+
+- Inspector parsing now retains every source line and render segment returned by the parser.
+- 2D Preview now retains every parsed toolpath step.
+- Above 250,000 render items the existing surfaces display an informational render-pressure
+  advisory with the exact count. The advisory does not cap, delay, hide, refuse, or rewrite the
+  preview.
+- The core render model, worker protocol, overlay status, docs, and real-worker fixture now use
+  pressure terminology rather than a render-limit contract.
+
+### Test-first verification
+
+- Red: the pre-repair Inspector stream test received only 20,000 of 20,005 source lines.
+- Red: the pre-repair render-model test had no `renderPressure` result because its protocol still
+  modeled truncation.
+- Red: the replacement 2D pressure module did not exist while the old prefix-returning module did.
+- Green focused progression: 4 files / 16 tests, then 9 files / 41 tests, then the exact affected
+  7 files / 24 tests passed.
+- Green real-browser verification: all 3 production G-code worker cases passed, including a
+  260,100-segment preview that retains every segment while showing the pressure advisory.
+- Green full release gate on the corrected pre-SVG-repair tree: 1,380 Vitest files / 8,248 tests,
+  14 skipped files / 22 skipped tests, release integrity 14/14, typecheck, lint, formatting,
+  license checks, web build, Electron build, and policy checks passed.
+
+### Audit
+
+- **Confirmed:** no preview or source data is sampled or truncated by these UI paths.
+- **Confirmed:** the advisory is informational only and does not affect import, preview, save,
+  compile, Frame, Start, or transport behavior.
+- **Remaining memory boundary:** retained render output still scales with content. This repair
+  removes silent loss; it does not claim constant-memory rendering.
+- **No hardware or merge action:** none.
+
+## Corrective audit 2 — PR #527 Chrome SVG worker cold-start repair
+
+**Status:** completed and audited locally; GitHub rerun pending publication of this correction.
+
+### Finding
+
+- PR #527 browser smoke failed 1 of 15 cases on GitHub: after importing the synthetic SVG,
+  `Objects: 1` did not become visible before the 10-second assertion timeout.
+- The retained Playwright trace showed the document worker cold-loading native-project,
+  LightBurn, material, and SVG parser graphs before it could service the SVG request.
+- A deterministic browser reproduction delayed only
+  `src/io/project/deserialize-project.ts` for 12 seconds when requested by the document worker.
+  Before the repair, the SVG case failed at the same `Objects: 1` timeout, proving that an
+  unrelated parser graph blocked SVG startup.
+
+### Repair
+
+- The document worker keeps only the shared SVG XML/parser path in its startup graph.
+- Native project, LightBurn project, native material, and LightBurn CLB parsers are loaded with
+  request-kind-specific dynamic imports.
+- Canonical direct imports in the project and LightBurn modules avoid circular re-export chunks.
+- `parseDocumentImportText` is asynchronous so the worker can await only the requested parser
+  family without changing validation or result semantics.
+- The real-Chrome SVG test retains the 12-second unrelated-project-module delay as regression
+  coverage.
+
+### Verification
+
+- Green focused parser/import suite on the final tree: 7 files / 44 tests.
+- Green final-tree `pnpm typecheck`, `pnpm typecheck:e2e`, and `pnpm lint`.
+- Green final-tree `pnpm format:check` after formatting the direct-import change.
+- Green final-tree production web build. It emitted a 270.20 kB document-worker entry plus
+  request-specific project, LightBurn, CLB, and material chunks; the circular chunk warnings are
+  gone. The existing application chunk-size advisory remains.
+- Green final-tree real-Chrome smoke: 15/15 passed in 1.6 minutes. The synthetic SVG case passed
+  in 8.0 seconds with the deterministic 12-second unrelated-module delay active; the three
+  production G-code worker cases also passed.
+- The exact-current monolithic `release:check` was not rerun after this SVG cold-start repair.
+  Its last complete green run is the 8,248-test corrected tree recorded above; all directly
+  affected final-tree suites and downstream checks are listed here without extending that claim.
+
+### Audit
+
+- **Confirmed:** SVG startup no longer waits for the unrelated native-project parser graph.
+- **Confirmed:** the worker migration retains the existing XML/JSON validation and error paths.
+- **Honest memory boundary:** document imports still call `Blob.text()` and build JSON or XML/DOM
+  structures inside the worker. They remove UI-thread parse stalls but remain whole-Blob,
+  output-scaled, and not memory-bounded.
+- **Publication boundary:** update draft PR #527 only. No merge to `main`, deployment, hardware,
+  controller, settings, Frame, or Start action is part of this correction.

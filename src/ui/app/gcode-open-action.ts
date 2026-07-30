@@ -14,7 +14,7 @@ import {
 import { resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ToastVariant } from '../state/toast-store';
 import { importSourceSizeAdvisory } from './import-size-advisory';
-import { limitGcode2dPreview } from './gcode-2d-preview-limit';
+import { annotateGcode2dPreviewPressure } from './gcode-2d-preview-pressure';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
@@ -150,7 +150,7 @@ function open2dSimulatorFromResult(
     pushToast(`${name}: no motion found — nothing to simulate.`, 'warning');
     return;
   }
-  openPreview(name, limitGcode2dPreview(result.toolpath));
+  openPreview(name, annotateGcode2dPreviewPressure(result.toolpath));
   const skipped = result.notes.length > 0 ? ` (${result.notes.join(', ')})` : '';
   pushToast(
     `Simulating ${name}: ${result.summary.cutMm.toFixed(0)} mm cut, ` +
