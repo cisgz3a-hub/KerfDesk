@@ -304,7 +304,7 @@ byte-identical for unchanged input. Design + research:
 | DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
 | DS-3c | Typed numeric entry during a draw gesture, per-tool options bar | Planned |
 | DS-4 | Object-snap engine (`core/design/snap/`): endpoint/midpoint/centre/quadrant/intersection with per-type cursor glyphs, polar tracking | Planned |
-| DS-5 | Apply → commits `ShapeObject` geometry as one undo entry. **End-to-end slice closes here** | Planned |
+| DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
 | DS-6 | Modify ops: trim, extend, fillet, chamfer (`core/design/ops/`) | Planned |
 | DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
 | DS-8 | 2.5D depth per entity + three.js extrude view | Planned |

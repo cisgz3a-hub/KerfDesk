@@ -90,6 +90,13 @@ export function withSketch(session: DesignSession, next: Sketch): DesignSession 
   };
 }
 
+// Called after a successful Apply. History is deliberately NOT cleared: undo
+// inside the Studio still walks the drawing, while the project keeps its own
+// single undo entry for the apply itself.
+export function markSessionApplied(session: DesignSession): DesignSession {
+  return session.dirtySinceApply ? { ...session, dirtySinceApply: false } : session;
+}
+
 export function undoSession(session: DesignSession): DesignSession {
   if (!canUndo(session.history)) return session;
   const history = undoSketch(session.history);

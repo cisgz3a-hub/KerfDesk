@@ -6,10 +6,12 @@
 // LightBurn's shared convention and is what keeps any one bar from becoming a
 // junk drawer.
 //
-// Apply is deliberately NOT rendered yet: it lands at DS-5 with the commit
-// path, and a button that does nothing is worse than a button that is not there.
+// Apply is the session-level action, so it lives here. It stays enabled only
+// while there is output geometry that has changed since the last Apply — an
+// inert control, not a policy gate (rule 7).
 
 import { canRedo, canUndo } from './design-history';
+import { useDesignApply } from './use-design-apply';
 import { useDesignStudioStore } from './design-studio-store';
 
 export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element | null {
@@ -20,6 +22,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
   const toggleSnap = useDesignStudioStore((state) => state.toggleSnap);
   const toggleOrtho = useDesignStudioStore((state) => state.toggleOrtho);
   const toggleGrid = useDesignStudioStore((state) => state.toggleGrid);
+  const applyHandlers = useDesignApply();
   if (session === null) return null;
   return (
     <header style={barStyle}>
@@ -63,8 +66,20 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
       <span style={spacerStyle} />
 
       <BarButton
+        label="Apply"
+        title="Add this drawing to the project as cuttable artwork. One undo step; the Studio stays open."
+        onClick={applyHandlers.apply}
+        disabled={!applyHandlers.canApply}
+      />
+      <BarButton
+        label="Apply & Close"
+        title="Add the drawing to the project, then close the Studio. Your drawing is kept."
+        onClick={applyHandlers.applyAndClose}
+        disabled={!applyHandlers.canApply}
+      />
+      <BarButton
         label="Close"
-        title="Close the Studio (Esc). Your drawing is kept."
+        title="Close the Studio (Esc). Nothing is applied and your drawing is kept."
         onClick={closeStudio}
       />
     </header>

@@ -21,6 +21,7 @@ import type { MeasurementKey } from './design-entity-fields';
 import { entitiesInRectMm } from './design-hit-test';
 import {
   createDesignSession,
+  markSessionApplied,
   redoSession,
   sessionSketch,
   undoSession,
@@ -59,6 +60,8 @@ type DesignStudioState = {
   readonly deleteSelected: () => void;
   readonly duplicateEntity: (id: string, newId: string, offsetMm: number) => void;
   readonly setConstruction: (id: string, construction: boolean) => void;
+  // Clears the dirty flag after the sketch has been written to the project.
+  readonly markApplied: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
 };
@@ -119,6 +122,8 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
     set(mapSession((session) => duplicateSessionEntity(session, id, newId, offsetMm))),
   setConstruction: (id, construction) =>
     set(mapSession((session) => setSessionConstruction(session, id, construction))),
+
+  markApplied: () => set(mapSession(markSessionApplied)),
 
   undo: () => set(mapSession(undoSession)),
   redo: () => set(mapSession(redoSession)),

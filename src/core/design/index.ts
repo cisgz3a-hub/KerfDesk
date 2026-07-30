@@ -20,5 +20,6 @@ export type {
 } from './sketch-entity';
 export { EMPTY_SKETCH, MIN_ENTITY_SIZE_MM, sanitizeEntity } from './sketch-entity';
 export { entityToPolylines } from './entity-geometry';
+export { designEntityToSceneObject } from './to-scene-object';
 export { entityBounds, outputSketchBounds, sketchBounds } from './sketch-bounds';
 export { addEntity, findEntity, removeEntities, replaceEntity } from './sketch-edit';

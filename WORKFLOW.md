@@ -4942,3 +4942,39 @@ radius doubled. Each committed value is one undo step.
 3. A freehand path exposes X and Y (which translate it) plus read-only extents,
    node count and run length; it has no parametric dimension to call out, so no
    arrow is drawn.
+
+### F-DS8. Apply the drawing to the project (DS-5)
+
+1. With output geometry drawn, **Apply** in the title row adds it to the project as
+   cuttable artwork. **Apply & Close** does the same and then closes.
+2. Every entity becomes one scene object. A rectangle and a circle stay
+   **parametric** — they arrive as ordinary drawn shapes the main canvas can still
+   edit through Shape properties. A line, arc, or path arrives as exact baked
+   geometry, deliberately never re-fitted.
+3. All of it shares one auto-created `Design` cut operation, and everything
+   inserted is selected so it can be moved or re-assigned immediately.
+4. The whole apply is **one** project undo step, however many drawing steps went
+   into it. The Studio keeps its own separate history.
+5. The Studio stays open after Apply, so you can check the canvas and keep drawing.
+
+#### Success
+
+Objects appear on the main canvas at the millimetre positions drawn, on a `Design`
+layer, and the project is marked dirty. Apply goes inert until the drawing changes
+again.
+
+#### Error — nothing to apply
+
+1. An empty sketch, or one containing only construction guides, applies nothing and
+   leaves the project untouched. Apply is inert rather than refusing.
+
+#### Empty — first Apply of a session
+
+1. A fresh session has nothing to apply until something is drawn.
+
+#### Edge — applying twice
+
+1. A second Apply inserts a second copy on its own `Design 2` operation rather than
+   replacing the first, so re-applying never silently destroys earlier work.
+2. Construction guides are excluded from output every time; they exist to design
+   against, not to cut.
