@@ -25,6 +25,7 @@ import {
   assertSvgImportPoints,
   createSvgImportBudget,
   reserveSvgPolyline,
+  svgImportSizeNote,
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
@@ -439,6 +440,10 @@ export function parseSvg(args: { svgText: string; id: string; source: string }):
 
   const notes: string[] = [];
   if (paths.length === 0) notes.push('SVG has no drawable geometry');
+  // Rule 7 / ADR-268: this used to THROW mid-walk once the polyline/point/color
+  // ceilings were crossed. It now reports the same measurement and imports.
+  const sizeNote = svgImportSizeNote(budget);
+  if (sizeNote !== null) notes.push(sizeNote);
   if (counts.text > 0) {
     notes.push(`Ignored ${counts.text} text element(s) — convert to paths or wait for Phase D`);
   }

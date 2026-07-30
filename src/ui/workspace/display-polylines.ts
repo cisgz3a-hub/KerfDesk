@@ -74,20 +74,40 @@ export function buildDisplayPolylines(
 // CONNECTED shapes. The previous sampler kept every Nth SEGMENT as its own
 // two-point polyline, which rendered a freshly traced logo as disconnected
 // dashes — indistinguishable from broken geometry (2026-07-05 report).
+//
+// Vertex decimation alone cannot bound a scene whose cost is the POLYLINE
+// COUNT rather than the vertices inside each one: a 200 MB DXF of LINE
+// entities arrives as millions of TWO-POINT polylines, and those have no
+// interior vertices to drop, so the budget silently did nothing and the canvas
+// built one moveTo/lineTo pair per entity every frame. Short polylines are
+// therefore thinned as whole units — the only lever that reduces their cost —
+// while anything with interior vertices keeps its shape and is decimated as
+// before. Both paths set `isSimplified`, which surfaces the on-canvas
+// large-scene notice, and neither affects emitted output.
+const MIN_DECIMATABLE_POINTS = 3;
+
 function decimatePolylines(
   polylines: ReadonlyArray<Polyline>,
   stride: number,
 ): ReadonlyArray<Polyline> {
-  return polylines.map((polyline) => {
+  const kept: Polyline[] = [];
+  let shortSeen = 0;
+  for (const polyline of polylines) {
     const points = polyline.points;
-    if (points.length <= 2) return polyline;
-    const kept: Polyline['points'][number][] = [];
+    if (points.length < MIN_DECIMATABLE_POINTS) {
+      // Thin whole short polylines, keeping every Nth.
+      if (shortSeen % stride === 0) kept.push(polyline);
+      shortSeen += 1;
+      continue;
+    }
+    const keptPoints: Polyline['points'][number][] = [];
     for (let i = 0; i < points.length; i += stride) {
       const p = points[i];
-      if (p !== undefined) kept.push(p);
+      if (p !== undefined) keptPoints.push(p);
     }
     const last = points[points.length - 1];
-    if (last !== undefined && kept[kept.length - 1] !== last) kept.push(last);
-    return { closed: polyline.closed, points: kept };
-  });
+    if (last !== undefined && keptPoints[keptPoints.length - 1] !== last) keptPoints.push(last);
+    kept.push({ closed: polyline.closed, points: keptPoints });
+  }
+  return kept;
 }

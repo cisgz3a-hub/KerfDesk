@@ -8,7 +8,6 @@ import {
   type TraceOptions,
 } from '../../core/trace';
 import type { PlatformAdapter } from '../../platform/types';
-import { confirmOversizeImport as defaultConfirmOversizeImport } from '../app/import-size-guard';
 import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
 import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
@@ -27,7 +26,6 @@ export type MultiFileTraceDeps = {
   ) => Promise<ReadonlyArray<ColoredPath>>;
   readonly write?: (file: BatchTraceSvgFile) => Promise<boolean> | boolean;
   readonly options?: TraceOptions;
-  readonly confirmOversizeImport?: (name: string, sizeBytes: number) => boolean;
 };
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
@@ -43,12 +41,11 @@ export async function buildMultiFileTraceExports(
   const readNatural =
     deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null);
   const options = deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS;
-  const confirmOversizeImport = deps.confirmOversizeImport ?? defaultConfirmOversizeImport;
   const jobs = [];
   for (const file of files) {
-    if (!confirmOversizeImport(file.name, file.size)) {
-      continue;
-    }
+    // Rule 7 / ADR-228: this batch used to SILENTLY skip any file over 25 MB
+    // (no toast channel here to say so). A size cap is a policy judgement, so
+    // every selected file is now traced regardless of size.
     const image = await loadImage(file);
     const natural =
       readNatural === null ? { width: image.width, height: image.height } : await readNatural(file);

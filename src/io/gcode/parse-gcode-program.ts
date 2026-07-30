@@ -19,13 +19,13 @@ import {
   stripInlineComments,
 } from '../../core/gcode';
 import { sampleArcPoints } from '../../core/geometry';
+import { iterateLines } from '../../core/util';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
 
 // Display color for external-program cut steps (no scene layers to key on).
 export const GCODE_PREVIEW_CUT_COLOR = '#7c3aed';
 
-const MAX_PROGRAM_LINES = 500_000;
 const AXIS_EPSILON = 1e-9;
 // GRBL validates R-form/IJ arcs to ~0.005 in; allow the same order. Mirrors
 // CIRCULAR_ARC_RADIUS_TOLERANCE_MM in core/geometry/circular-arc.ts.
@@ -60,10 +60,12 @@ type ModalState = {
 type LineWords = ReadonlyMap<string, number>;
 
 export function parseGcodeProgram(text: string): ParseGcodeProgramResult {
-  const lines = text.split(/\r\n|\n|\r/);
-  if (lines.length > MAX_PROGRAM_LINES) {
-    return { kind: 'error', reason: `Program exceeds ${MAX_PROGRAM_LINES} lines.` };
-  }
+  // The former 500 000-line ceiling was a policy cap (rule 7 / ADR-228): a
+  // larger program parses correctly, it merely takes longer. A 100 MB program is
+  // roughly 3.3 M lines and is now simulated rather than refused.
+  //
+  // Lines are pulled one at a time rather than split up front: the split alone
+  // cost a measured 570 MB of heap on a 100 MB program, before any parsing.
   const state: ModalState = {
     motion: 0,
     unitScale: 1,
@@ -78,16 +80,19 @@ export function parseGcodeProgram(text: string): ParseGcodeProgramResult {
   let recognizedWords = 0;
   let firstJunkLine: { line: number; text: string } | null = null;
 
-  for (let i = 0; i < lines.length && !state.ended; i += 1) {
-    const stripped = stripInlineComments(lines[i] ?? '');
+  let lineCount = 0;
+  for (const line of iterateLines(text)) {
+    lineCount += 1;
+    if (state.ended) continue;
+    const stripped = stripInlineComments(line);
     if (stripped === '' || stripped === '%') continue;
     const words = readWords(stripped);
     if (words === null) {
-      if (firstJunkLine === null) firstJunkLine = { line: i + 1, text: stripped };
+      if (firstJunkLine === null) firstJunkLine = { line: lineCount, text: stripped };
       continue;
     }
     recognizedWords += words.size;
-    const issue = executeLine(state, words, steps, unsupported, i + 1);
+    const issue = executeLine(state, words, steps, unsupported, lineCount);
     if (issue !== null) return { kind: 'error', reason: issue };
   }
   if (recognizedWords === 0) {
@@ -100,7 +105,7 @@ export function parseGcodeProgram(text: string): ParseGcodeProgramResult {
   return {
     kind: 'ok',
     toolpath: { steps, totalLength: steps.reduce((sum, step) => sum + step.length, 0) },
-    summary: summarize(lines.length, steps),
+    summary: summarize(lineCount, steps),
     notes: [...unsupported.entries()].map(([word, count]) => `${count}× unsupported ${word}`),
   };
 }

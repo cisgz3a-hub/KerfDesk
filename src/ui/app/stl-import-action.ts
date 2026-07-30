@@ -5,7 +5,7 @@
 // layer color; width/depth/background are edited afterwards in the Relief
 // properties panel (SelectedReliefProperties).
 
-import { meshToHeightmap, triangleCount } from '../../core/relief';
+import { meshToHeightmap } from '../../core/relief';
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
@@ -15,9 +15,10 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
-import { parseStl } from '../../io/stl';
+import { parseStl, type ParseStlResult } from '../../io/stl';
+import { parseStlOffThread } from '../import/import-worker-client';
 import type { ToastVariant } from '../state/toast-store';
-import { importSourceSizeIssue } from './import-source-limits';
+import { importSourceSizeAdvisory } from './import-size-advisory';
 
 export const DEFAULT_RELIEF_WIDTH_MM = 100;
 export const DEFAULT_RELIEF_DEPTH_MM = 5;
@@ -46,17 +47,20 @@ export async function importStlFiles(
   }
   let successIdx = 0;
   for (const file of files) {
-    const sizeIssue = importSourceSizeIssue(file, 'stl');
-    if (sizeIssue !== null) {
-      ctx.pushToast(sizeIssue, 'error');
-      continue;
-    }
+    const sizeAdvisory = importSourceSizeAdvisory(file, 'stl');
+    if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
     try {
-      const relief = reliefFromStlBytes(await file.arrayBuffer(), file.name);
+      // parseStl itself is fast (~172 MB/s measured), but a 100 MB mesh still
+      // allocates heavily; running it in the import worker keeps that off the
+      // UI thread. Falls back to the main thread when Worker is unavailable.
+      const parsed = (await parseStlOffThread(file)) ?? parseStl(await file.arrayBuffer());
+      const relief = reliefFromParsedStl(parsed, file.name);
       if (typeof relief === 'string') {
         ctx.pushToast(`${file.name}: ${relief}`, 'error');
         continue;
       }
+      const denseAdvisory = denseMeshAdvisory(file.name, relief.meshPositions.length / 9);
+      if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
       ctx.importObject(relief, successIdx);
       successIdx += 1;
       ctx.pushToast(
@@ -70,17 +74,21 @@ export async function importStlFiles(
   }
 }
 
+// Rule 7 / ADR-228: the RELIEF_EMBED_TRIANGLE_LIMIT refusal ("decimate the mesh
+// and re-export") was a policy cap, not an integrity fact — a dense mesh embeds
+// and carves correctly, it is merely slower and heavier in the .lf2. It now
+// advises at the point the refusal stood, and the import proceeds.
+function denseMeshAdvisory(name: string, triangles: number): string | null {
+  if (triangles <= RELIEF_EMBED_TRIANGLE_LIMIT) return null;
+  return (
+    `${name} carries ${triangles.toLocaleString()} triangles — the project file will be large ` +
+    'and editing this relief may be slow. Decimating the mesh in your CAD tool will speed it up.'
+  );
+}
+
 // Returns the ReliefObject, or a human-readable rejection reason.
-function reliefFromStlBytes(bytes: ArrayBuffer, source: string): ReliefObject | string {
-  const parsed = parseStl(bytes);
+function reliefFromParsedStl(parsed: ParseStlResult, source: string): ReliefObject | string {
   if (parsed.kind === 'error') return parsed.reason;
-  const triangles = triangleCount(parsed.mesh);
-  if (triangles > RELIEF_EMBED_TRIANGLE_LIMIT) {
-    return (
-      `${triangles} triangles is beyond the ${RELIEF_EMBED_TRIANGLE_LIMIT} embed limit — ` +
-      'decimate the mesh in your CAD tool and re-export.'
-    );
-  }
   const probe = meshToHeightmap(parsed.mesh, {
     targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
     reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,

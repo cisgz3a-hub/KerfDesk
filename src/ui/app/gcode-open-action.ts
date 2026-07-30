@@ -7,7 +7,7 @@ import type { Toolpath } from '../../core/job';
 import { parseGcodeProgram } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { ToastVariant } from '../state/toast-store';
-import { importSourceSizeIssue } from './import-source-limits';
+import { importSourceSizeAdvisory } from './import-size-advisory';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 type GcodeSourceFile = {
@@ -42,11 +42,8 @@ async function pickGcodeFile(
 }
 
 async function readGcodeFile(file: GcodeSourceFile, pushToast: PushToast): Promise<string | null> {
-  const sizeIssue = importSourceSizeIssue(file, 'gcode');
-  if (sizeIssue !== null) {
-    pushToast(sizeIssue, 'error');
-    return null;
-  }
+  const sizeAdvisory = importSourceSizeAdvisory(file, 'gcode');
+  if (sizeAdvisory !== null) pushToast(sizeAdvisory, 'warning');
   try {
     return await file.text();
   } catch (err) {

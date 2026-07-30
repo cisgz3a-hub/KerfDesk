@@ -1,9 +1,11 @@
 import { createLayer, createProject, type Layer, type Project } from '../../core/scene';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
 
-export const MAX_LBRN_BYTES = 20_000_000;
+// MAX_XML_DEPTH is an integrity bound, not a policy cap: unbounded nesting
+// overflows the recursive walker. It stays. The former 20 MB byte ceiling and
+// 50 000 shape ceiling were policy caps and are gone (rule 7 / ADR-228) — the
+// UI advises on size at the picker instead.
 const MAX_XML_DEPTH = 64;
-const MAX_SHAPES = 50_000;
 
 export type LbrnImportReport = {
   readonly sourceName: string;
@@ -26,9 +28,6 @@ export function importLightBurnProject(
 ): LbrnImportResult {
   if (!/\.lbrn2?$/i.test(sourceName))
     return { ok: false, reason: 'Expected a .lbrn or .lbrn2 project.' };
-  if (new TextEncoder().encode(xmlText).byteLength > MAX_LBRN_BYTES) {
-    return { ok: false, reason: 'LightBurn project exceeds the 20 MB import limit.' };
-  }
   if (/<!DOCTYPE|<!ENTITY/i.test(xmlText)) {
     return { ok: false, reason: 'Active XML declarations are not allowed.' };
   }
@@ -43,10 +42,6 @@ export function importLightBurnProject(
   }
   if (xmlDepth(root) > MAX_XML_DEPTH)
     return { ok: false, reason: 'LightBurn XML nesting is too deep.' };
-  const shapeCount = [...root.querySelectorAll('Shape, shape')].length;
-  if (shapeCount > MAX_SHAPES)
-    return { ok: false, reason: 'LightBurn project contains too many shapes.' };
-
   const geometry = importLbrnGeometry(root, sourceName);
   if (geometry.objects.length === 0) {
     return { ok: false, reason: 'LightBurn project contains no supported vector geometry.' };

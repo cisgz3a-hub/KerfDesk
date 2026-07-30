@@ -87,24 +87,20 @@ describe('buildMultiFileTraceExports', () => {
     expect(files[1]?.svg).toContain('viewBox="0 0 6 5"');
   });
 
-  it('asks before decoding oversized files and skips declined ones', async () => {
+  // Rule 7 / ADR-228: this batch used to skip any file over 25 MB SILENTLY —
+  // there is no toast channel here, so a declined file just vanished from the
+  // output. Size is a policy judgement, so every selected file now traces.
+  it('traces oversized files instead of skipping them', async () => {
     const oversized = new File(['x'], 'oversized.png');
     Object.defineProperty(oversized, 'size', { value: 30 * 1024 * 1024 });
     const small = new File(['x'], 'small.png');
     const loadImage = vi.fn(async () => rawImage(4, 3));
-    const confirmOversizeImport = vi.fn((name: string) => name !== 'oversized.png');
     const trace = vi.fn(async () => [SQUARE_PATH]);
 
-    const files = await buildMultiFileTraceExports([oversized, small], {
-      loadImage,
-      confirmOversizeImport,
-      trace,
-    });
+    const files = await buildMultiFileTraceExports([oversized, small], { loadImage, trace });
 
-    expect(confirmOversizeImport).toHaveBeenCalledWith('oversized.png', oversized.size);
-    expect(loadImage).toHaveBeenCalledTimes(1);
-    expect(loadImage).toHaveBeenCalledWith(small);
-    expect(files.map((file) => file.filename)).toEqual(['small-trace.svg']);
+    expect(loadImage).toHaveBeenCalledTimes(2);
+    expect(files.map((file) => file.filename)).toEqual(['oversized-trace.svg', 'small-trace.svg']);
   });
 });
 

@@ -48,8 +48,21 @@ export function burnDecodeMaxEdge(naturalWidth: number, naturalHeight: number): 
 
 const PAPER_WHITE = 255;
 const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
-const MAX_SAFE_DECODE_EDGE_PX = 32_768;
-const MAX_SAFE_DECODE_PIXELS = 100_000_000;
+// The PLATFORM's real 2D-canvas ceiling, measured in Chromium rather than
+// assumed: a 16384x16384 OffscreenCanvas allocates, draws and reads back;
+// 16385x16385 fails outright. Above these the browser factually cannot
+// rasterize the image, which is the integrity category rule 7 / ADR-228 allows
+// to refuse (and ADR-268 kept for non-finite coordinates).
+//
+// Both previous numbers were wrong, in opposite directions. The pixel cap was
+// 100_000_000 — 2.7x STRICTER than the platform, so a 12000x9000 PNG of just
+// 2 MB was refused with "too large to decode safely" even though Chromium
+// builds that exact canvas without complaint; that was a policy cap wearing an
+// integrity label. The edge cap was 32_768 — twice as PERMISSIVE as the real
+// limit, so an image the canvas genuinely cannot take passed this check and
+// failed later somewhere less explicable.
+const MAX_SAFE_DECODE_EDGE_PX = 16_384;
+const MAX_SAFE_DECODE_PIXELS = 268_435_456;
 
 type ImageDimensions = { readonly width: number; readonly height: number };
 

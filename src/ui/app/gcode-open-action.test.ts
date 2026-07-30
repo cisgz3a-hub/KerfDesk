@@ -35,7 +35,8 @@ describe('openGcodeFileInInspector', () => {
     expect(pushToast).toHaveBeenCalledWith('broken.gcode: read failed', 'error');
   });
 
-  it('applies the shared 64 MB G-code limit before reading', async () => {
+  // Rule 7 / ADR-228: the 64 MB ceiling was a policy cap and is now an advisory.
+  it('advises on a very large G-code file, then opens it', async () => {
     const openInspector = vi.fn();
     const pushToast = vi.fn();
     const text = vi.fn(async () => 'G21');
@@ -46,12 +47,9 @@ describe('openGcodeFileInInspector', () => {
       pushToast,
     );
 
-    expect(text).not.toHaveBeenCalled();
-    expect(openInspector).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith(
-      'huge.tap exceeds the 64 MB G-code import limit.',
-      'error',
-    );
+    expect(text).toHaveBeenCalled();
+    expect(openInspector).toHaveBeenCalledWith('huge.tap', 'G21');
+    expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(/may take a while/i), 'warning');
   });
 });
 

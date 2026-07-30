@@ -184,7 +184,9 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     await unmount();
   });
 
-  it('reuses the G-code source-size limit before reading the dropped file', async () => {
+  // Rule 7 / ADR-228: the dropped-file size ceiling became an advisory. A very
+  // large program is opened in the Inspector; the operator is only warned first.
+  it('advises on a very large dropped G-code file, then opens it', async () => {
     const openGcodeInspector = vi.fn<OpenGcodeInspector>();
     const file = gcodeFile('huge.tap');
     Object.defineProperty(file, 'size', { value: 64 * 1024 * 1024 + 1 });
@@ -193,9 +195,9 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
 
     await dropFiles([file]);
 
-    expect(toastMessages()).toContain('huge.tap exceeds the 64 MB G-code import limit.');
-    expect(read).not.toHaveBeenCalled();
-    expect(openGcodeInspector).not.toHaveBeenCalled();
+    expect(toastMessages().some((m) => /may take a while/i.test(m))).toBe(true);
+    expect(read).toHaveBeenCalled();
+    expect(openGcodeInspector).toHaveBeenCalled();
 
     await unmount();
   });

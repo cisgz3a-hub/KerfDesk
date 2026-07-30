@@ -38,8 +38,7 @@ import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
-import { confirmOversizeImport } from './import-size-guard';
-import { importSourceSizeIssue } from './import-source-limits';
+import { importSourceSizeAdvisory, largeImportAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
 
 export async function handleImportDxf(
@@ -80,12 +79,16 @@ export async function handleImportSvg(
   let successIdx = 0;
   for (const file of files) {
     try {
-      // F-A4 oversize confirm. Gate on the file size BEFORE reading when the
-      // adapter supplies it, so a huge file can't OOM the tab before the user is
-      // asked; adapters without size fall back to the post-read length gate.
-      if (file.size !== undefined && !confirmOversizeImport(file.name, file.size)) continue;
+      // F-A4 large-import advisory (rule 7: informs, never refuses). Raised
+      // BEFORE the read when the adapter supplies a size, so the operator learns
+      // the cost up front; adapters without size fall back to the post-read length.
+      const advisory = file.size === undefined ? null : largeImportAdvisory(file.name, file.size);
+      if (advisory !== null) pushToast(advisory, 'warning');
       const text = await file.text();
-      if (file.size === undefined && !confirmOversizeImport(file.name, text.length)) continue;
+      if (file.size === undefined) {
+        const postReadAdvisory = largeImportAdvisory(file.name, text.length);
+        if (postReadAdvisory !== null) pushToast(postReadAdvisory, 'warning');
+      }
       const id = crypto.randomUUID();
       const result = parseSvg({ svgText: text, id, source: file.name });
       if (result.object !== null) {
@@ -356,14 +359,11 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   }
   const file = files[0];
   if (file === undefined) return;
-  const sizeIssue = importSourceSizeIssue(
+  const sizeAdvisory = importSourceSizeAdvisory(
     file,
     /\.lbrn2?$/i.test(file.name) ? 'lightburn-project' : 'native-project',
   );
-  if (sizeIssue !== null) {
-    ctx.pushToast(`Could not open ${file.name}: ${sizeIssue}`, 'error');
-    return;
-  }
+  if (sizeAdvisory !== null) ctx.pushToast(sizeAdvisory, 'warning');
   let text: string;
   try {
     text = await file.text();

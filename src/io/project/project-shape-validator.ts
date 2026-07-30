@@ -1,4 +1,4 @@
-import { DITHER_ALGORITHMS, RELIEF_EMBED_TRIANGLE_LIMIT } from '../../core/scene';
+import { DITHER_ALGORITHMS } from '../../core/scene';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateCurveSubpaths } from './project-curve-shape-validator';
@@ -39,8 +39,8 @@ import {
 
 // Bound source allocation before the target burn-grid budget runs. 256M pixels
 // remains far above real imports while blocking hand-edited allocation bombs.
-const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
+const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 
 // which the G-code bounds-check regex can't read — defeating the bounds
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
@@ -202,9 +202,6 @@ function validateMeshPositions(value: unknown, path: string): string | null {
   if (value.length % 9 !== 0) {
     return `\`${path}\` length must be a multiple of 9 (three xyz vertices per triangle)`;
   }
-  if (value.length > RELIEF_EMBED_TRIANGLE_LIMIT * 9) {
-    return `\`${path}\` exceeds the ${RELIEF_EMBED_TRIANGLE_LIMIT}-triangle embed limit`;
-  }
   for (const n of value) {
     if (typeof n !== 'number' || !Number.isFinite(n)) {
       return `non-finite number in \`${path}\``;
@@ -272,9 +269,13 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);
   if (fieldError !== null) return fieldError;
-  // Cross-field DoS guard: bound the source luma allocation (see
-  // MAX_RASTER_SOURCE_PIXELS). pixelWidth/pixelHeight are validated positive
-  // integers above, so the typeof guards only satisfy the type checker.
+  // Cross-field DoS guard, and a genuine one — NOT a policy cap, so ADR-268 left
+  // it alone. pixelWidth/pixelHeight are two NUMBERS: a hostile .lf2 can declare
+  // 10^9 x 10^9 in a hundred-byte file and lumaBase64 is optional, so nothing
+  // forces the pixels to actually be present. Downstream raster work allocates
+  // from these, which is real amplification. Contrast relief meshPositions, whose
+  // ceiling ADR-268 DID remove: that array must physically exist in the file, so
+  // its size is bounded by the file and there is nothing to amplify.
   const pixelWidth = obj['pixelWidth'];
   const pixelHeight = obj['pixelHeight'];
   if (

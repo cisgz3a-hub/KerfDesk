@@ -7,7 +7,6 @@
 
 import type { CurveSubpath, PathSegment, Vec2 } from '../../core/scene';
 import { DEFAULT_FLATNESS_MM, flattenArc, flattenCubic, flattenQuadratic } from './flatten-curves';
-import { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 export type SubPath = {
   readonly points: ReadonlyArray<Vec2>;
@@ -73,8 +72,9 @@ const NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 // G-code emitter as a literal `XInfinity`/`XNaN` word and slip past the
 // out-of-bounds preflight, which cannot parse a non-numeric coordinate (S04-001).
 // Reject at the import boundary, mirroring io/project's `requireCoordinate`
-// finiteness guard on `.lf2` load. Throwing matches this parser's existing
-// SVG_IMPORT_LIMITS point-cap throw (both surface through the import flow).
+// finiteness guard on `.lf2` load. This is an INTEGRITY refusal, not a policy
+// cap: it survived ADR-268, which removed the point/polyline/color-group
+// ceilings this parser used to throw on alongside it.
 function finiteNumber(raw: string): number {
   const value = Number(raw);
   if (!Number.isFinite(value)) {
@@ -227,10 +227,10 @@ function appendPoints(state: State, sub: MutableSubPath, points: ReadonlyArray<V
   sub.points.push(...points);
 }
 
+// The point ceiling was a policy cap and no longer refuses (rule 7 / ADR-268);
+// the count is kept because parse state carries it and the import advisory
+// reports it. This loop is bounded by the `d` attribute either way.
 function reservePathPoints(state: State, count: number): void {
-  if (state.pointCount + count > SVG_IMPORT_LIMITS.points) {
-    throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.points} point(s)`);
-  }
   state.pointCount += count;
 }
 
