@@ -10,6 +10,7 @@ import {
 } from '../../core/scene';
 import { applyThicken, computeKerfCheck } from './editor-kerf-check';
 import { createSession } from './editor-session';
+import { addLayerAboveActive } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
 import { useStore, useToastStore } from '../state';
 
@@ -120,6 +121,34 @@ describe('computeKerfCheck', () => {
     // Re-checking the thickened document finds no thin strokes left.
     const recheck = computeKerfCheck(next ?? session, projectWithDotWidth(3));
     expect(recheck?.removedPixels).toBe(0);
+  });
+
+  it('ignores affected pixels that belong only to another visible layer', () => {
+    const layered = addLayerAboveActive(strokesSession(), 'upper');
+    expect(computeKerfCheck(layered, projectWithDotWidth(3))?.removedPixels ?? 0).toBe(0);
+  });
+
+  it('thickens an affected upper layer without editing the visible background', () => {
+    const project = projectWithDotWidth(3);
+    const layered = addLayerAboveActive(strokesSession(), 'upper');
+    const upper = layered.layers.find((layer) => layer.id === 'upper');
+    const background = layered.layers[0];
+    if (upper === undefined || background === undefined) throw new Error('expected two layers');
+    const backgroundBefore = Uint8ClampedArray.from(background.buffer.data);
+    for (let y = 5; y < 55; y += 1) {
+      const base = (y * 60 + 20) * 4;
+      upper.buffer.data[base + 3] = 255;
+    }
+    const check = computeKerfCheck(layered, project);
+    if (check === null) throw new Error('expected an upper-layer check');
+    useStore.setState({ project });
+    useImageEditorStore.setState({ session: layered });
+    applyThicken(check);
+
+    const next = useImageEditorStore.getState().session;
+    expect(next?.activeLayerId).toBe('upper');
+    expect(next?.history.undoStack.at(-1)?.scope).toBe('upper');
+    expect(background.buffer.data).toEqual(backgroundBefore);
   });
 
   it('does not apply a stale result to a different editor session', () => {
