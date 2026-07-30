@@ -52,12 +52,31 @@ describe('design library catalog', () => {
     expect(cc0.length).toBeGreaterThanOrEqual(8);
     for (const entry of cc0) {
       expect(entry.provenance.sourceUrl).toMatch(/^https:\/\/openclipart\.org\/detail\//);
-      expect(entry.provenance.license).toBe('CC0-1.0 / Public Domain');
+      expect(entry.provenance.sourceName).toBe('Openclipart');
+      expect(entry.provenance.licenseId).toBe('CC0-1.0');
+      expect(entry.provenance.licenseUrl).toBe(
+        'https://creativecommons.org/publicdomain/zero/1.0/',
+      );
       expect(entry.provenance.assetHash).toMatch(/^sha256:/);
       expect(entry.provenance.downloadedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(entry.previewSvgText).not.toContain('FILL_ME');
       expect(entry.previewSvgText).not.toContain('PENDING_ASSET');
       expect(entry.provenance.assetHash).not.toBe('sha256:0000');
+    }
+  });
+
+  it('records dual Lucide and Feather licensing only for the selected Feather-derived icons', () => {
+    const featherDerived = new Set(['arrow', 'compass', 'key', 'moon', 'music', 'smile']);
+    const lucideEntries = DESIGN_LIBRARY.filter(
+      (entry) => entry.provenance.sourceKind === 'lucide',
+    );
+
+    for (const entry of lucideEntries) {
+      expect(entry.provenance.sourceName).toBe('Lucide');
+      expect(entry.provenance.sourceVersion).toBe('lucide-static@1.23.0');
+      expect(entry.provenance.licenseId).toBe(
+        featherDerived.has(entry.id.replace(/^icon-/, '')) ? 'ISC AND MIT' : 'ISC',
+      );
     }
   });
 });

@@ -57,7 +57,30 @@ describe('DesignLibraryDialog', () => {
     const before = useStore.getState().project.scene.objects.length;
     const insert = h.querySelector('button[aria-label^="Insert Kerf"]') as HTMLButtonElement;
     await act(async () => insert.click());
-    expect(useStore.getState().project.scene.objects.length).toBeGreaterThan(before);
+    const { objects, layers } = useStore.getState().project.scene;
+    expect(objects.length).toBeGreaterThan(before);
+    const inserted = objects.at(-1);
+    expect(inserted?.kind).toBe('imported-svg');
+    if (inserted?.kind === 'imported-svg') {
+      expect(inserted.libraryProvenance).toMatchObject({
+        schemaVersion: 1,
+        assetId: 'laser-kerf-comb',
+        sourceName: 'CurveDesk',
+        licenseId: 'MIT',
+      });
+      expect(inserted).not.toHaveProperty('operationOverride');
+      expect(inserted).not.toHaveProperty('powerScale');
+    }
+    expect(layers.length).toBeGreaterThan(0);
+    expect(
+      layers.every(
+        (layer) =>
+          layer.mode === 'line' &&
+          layer.cnc === undefined &&
+          layer.materialBinding === undefined &&
+          layer.scanOffsetCalibrationMode === undefined,
+      ),
+    ).toBe(true);
   });
 
   it('imports only the currently visible filtered entries', async () => {

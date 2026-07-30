@@ -67,12 +67,33 @@ export const LIBRARY_CATEGORIES: ReadonlyArray<LibraryCategory> = [
   'Icons & Symbols',
 ];
 
-const LUCIDE_PROVENANCE = {
-  sourceKind: 'lucide',
-  license: 'ISC',
-  sourceUrl: 'https://lucide.dev/license',
-  notice: 'Lucide icons are distributed under the ISC license.',
-} as const;
+const FEATHER_DERIVED_LUCIDE_IDS: ReadonlySet<string> = new Set([
+  'arrow',
+  'compass',
+  'key',
+  'moon',
+  'music',
+  'smile',
+]);
+
+function lucideProvenance(id: string): LibraryEntry['provenance'] {
+  const featherDerived = FEATHER_DERIVED_LUCIDE_IDS.has(id);
+  return {
+    sourceKind: 'lucide',
+    sourceName: 'Lucide',
+    creator: featherDerived
+      ? 'Lucide contributors; Feather icon by Cole Bemis'
+      : 'Lucide contributors',
+    license: featherDerived ? 'ISC and MIT (Feather-derived)' : 'ISC',
+    licenseId: featherDerived ? 'ISC AND MIT' : 'ISC',
+    sourceUrl: 'https://github.com/lucide-icons/lucide',
+    licenseUrl: 'https://lucide.dev/license',
+    sourceVersion: 'lucide-static@1.23.0',
+    notice: featherDerived
+      ? 'Lucide ISC terms apply; this Feather-derived icon also carries the Feather MIT terms.'
+      : 'Lucide icons are distributed under the ISC license.',
+  };
+}
 
 function lucideEntry(args: {
   readonly id: string;
@@ -91,7 +112,7 @@ function lucideEntry(args: {
     machineModes: ['laser', 'cnc'],
     operations: ['line'],
     tags: ['icon', 'line-art', subcategoryTag, ...(args.tags ?? [])],
-    provenance: LUCIDE_PROVENANCE,
+    provenance: lucideProvenance(args.id),
     previewSvgText: args.svgText,
     insert: { kind: 'svg', svgText: args.svgText },
   };

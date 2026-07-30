@@ -3,7 +3,6 @@
 // designs remain normal editable scene objects.
 
 import { useMemo, useState } from 'react';
-import { parseSvg } from '../../io/svg';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -16,6 +15,7 @@ import type {
   LibraryOperation,
   LibrarySourceKind,
 } from './design-library-types';
+import { librarySvgObjectFor } from './library-entry-insert';
 
 const OPERATIONS: ReadonlyArray<LibraryOperation> = [
   'line',
@@ -53,21 +53,13 @@ export function DesignLibraryDialog(): JSX.Element | null {
   };
 
   const insertEntry = (item: LibraryEntry, batchOffsetIdx = 0): boolean => {
-    if (item.insert.kind !== 'svg') {
+    const object = librarySvgObjectFor(item, crypto.randomUUID());
+    if (object === null) {
       pushToast(`Could not insert ${item.title}.`, 'error');
       return false;
     }
-    const result = parseSvg({
-      svgText: item.insert.svgText,
-      id: crypto.randomUUID(),
-      source: `Library: ${item.title}`,
-    });
-    if (result.object === null) {
-      pushToast(`Could not insert ${item.title}.`, 'error');
-      return false;
-    }
-    importSvgObject(result.object, batchOffsetIdx);
-    return true;
+    const outcome = importSvgObject(object, batchOffsetIdx);
+    return outcome.kind === 'added';
   };
 
   const insertOne = (item: LibraryEntry): void => {

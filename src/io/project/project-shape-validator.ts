@@ -14,6 +14,7 @@ import { validateCncTabAnchors } from './project-cnc-tab-validator';
 import { validateOptionalArtworkOrder } from './project-artwork-order-validator';
 import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
+import { validateLibraryAssetProvenance } from './project-library-provenance-validator';
 import {
   firstError,
   isObject,
@@ -214,6 +215,7 @@ function validateVectorObject(obj: Record<string, unknown>, path: string): strin
   return firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
+    validateLibraryAssetProvenance(obj['libraryProvenance'], `${path}.libraryProvenance`),
     optionalPercent(obj, `${path}.powerScale`),
     validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
