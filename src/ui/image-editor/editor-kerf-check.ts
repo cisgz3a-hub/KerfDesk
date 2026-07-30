@@ -3,7 +3,7 @@
 // one-click Thicken share the active layer, so another visible layer can never
 // cause pixels to be painted into the current one. Thicken is one undo entry.
 
-import { pushHistoryEntry } from '../../core/image-edit';
+import { pushHistoryEntry, RGBA_CHANNELS } from '../../core/image-edit';
 import { compositeLayersInPlace } from '../../core/image-layers';
 import {
   expandMask,
@@ -26,6 +26,7 @@ const INK_LUMA_THRESHOLD = 128;
 const LUMA_R = 0.299;
 const LUMA_G = 0.587;
 const LUMA_B = 0.114;
+const OPAQUE_WHITE = 255;
 
 export type KerfCheck = {
   /** Active-layer ink pixels in runs that dot-width correction fully removes. */
@@ -113,8 +114,8 @@ export function applyThicken(check: KerfCheck): void {
 }
 
 function inkMask(session: EditorSession): SelectionMask {
-  const data = new Uint8ClampedArray(session.doc.width * session.doc.height * 4);
-  data.fill(255);
+  const data = new Uint8ClampedArray(session.doc.width * session.doc.height * RGBA_CHANNELS);
+  data.fill(OPAQUE_WHITE);
   const composite = { width: session.doc.width, height: session.doc.height, data };
   const active = session.layers.find((layer) => layer.id === session.activeLayerId);
   if (active !== undefined) compositeLayersInPlace(composite, [active]);

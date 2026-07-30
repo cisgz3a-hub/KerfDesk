@@ -135,10 +135,12 @@ describe('computeKerfCheck', () => {
     const background = layered.layers[0];
     if (upper === undefined || background === undefined) throw new Error('expected two layers');
     const backgroundBefore = Uint8ClampedArray.from(background.buffer.data);
+    const undoCountBefore = layered.history.undoStack.length;
     for (let y = 5; y < 55; y += 1) {
       const base = (y * 60 + 20) * 4;
       upper.buffer.data[base + 3] = 255;
     }
+    const upperBefore = Uint8ClampedArray.from(upper.buffer.data);
     const check = computeKerfCheck(layered, project);
     if (check === null) throw new Error('expected an upper-layer check');
     useStore.setState({ project });
@@ -146,8 +148,11 @@ describe('computeKerfCheck', () => {
     applyThicken(check);
 
     const next = useImageEditorStore.getState().session;
+    const nextUpper = next?.layers.find((layer) => layer.id === 'upper');
     expect(next?.activeLayerId).toBe('upper');
     expect(next?.history.undoStack.at(-1)?.scope).toBe('upper');
+    expect(next?.history.undoStack).toHaveLength(undoCountBefore + 1);
+    expect(nextUpper?.buffer.data).not.toEqual(upperBefore);
     expect(background.buffer.data).toEqual(backgroundBefore);
   });
 
