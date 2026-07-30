@@ -637,7 +637,8 @@ Frame/Start, or operate hardware. Publication remains unauthorized.
 
 ## Corrective audit 2 — PR #527 Chrome SVG worker cold-start repair
 
-**Status:** completed and audited locally; GitHub rerun pending publication of this correction.
+**Status:** completed and audited locally; second GitHub rerun pending publication of the
+cold-optimizer correction.
 
 ### Finding
 
@@ -649,6 +650,11 @@ Frame/Start, or operate hardware. Publication remains unauthorized.
   `src/io/project/deserialize-project.ts` for 12 seconds when requested by the document worker.
   Before the repair, the SVG case failed at the same `Objects: 1` timeout, proving that an
   unrelated parser graph blocked SVG startup.
+- Commit `721890f5` removed that unrelated worker graph and passed 15/15 locally, but its first
+  GitHub rerun still failed the SVG case 1/15. The second retained trace showed the page's Vite
+  client connecting twice: the cold dev dependency optimizer first discovered `saxes` and
+  `linkedom/worker` only after the SVG click, then reloaded the page and discarded the in-flight
+  import. The final snapshot therefore showed `Objects: 0` with no application error.
 
 ### Repair
 
@@ -660,6 +666,9 @@ Frame/Start, or operate hardware. Publication remains unauthorized.
   family without changing validation or result semantics.
 - The real-Chrome SVG test retains the 12-second unrelated-project-module delay as regression
   coverage.
+- Vite now explicitly pre-bundles `saxes` and `linkedom/worker`, so a cold development server
+  cannot discover those worker-only dependencies during the first import and reload the page.
+- A repository-policy test pins that pre-bundle contract.
 
 ### Verification
 
@@ -672,6 +681,15 @@ Frame/Start, or operate hardware. Publication remains unauthorized.
 - Green final-tree real-Chrome smoke: 15/15 passed in 1.6 minutes. The synthetic SVG case passed
   in 8.0 seconds with the deterministic 12-second unrelated-module delay active; the three
   production G-code worker cases also passed.
+- Red live check after the first repair: GitHub run `30571939808`, job `90970561660`, passed
+  14/15 and failed only the SVG `Objects: 1` assertion. Its network trace recorded the two
+  post-click dependency requests followed by the second Vite connection/page reset.
+- Green forced-cold verification after the pre-bundle repair: a separate Vite server started
+  with `--force`, and the exact SVG Playwright case passed 1/1 in 12.1 seconds without a
+  mid-import reload.
+- Green final forced-cold browser audit: a second `--force` server ran the complete real-Chrome
+  suite; all 15/15 cases passed in 1.3 minutes, including SVG in 6.5 seconds and all three
+  production G-code worker cases.
 - The exact-current monolithic `release:check` was not rerun after this SVG cold-start repair.
   Its last complete green run is the 8,248-test corrected tree recorded above; all directly
   affected final-tree suites and downstream checks are listed here without extending that claim.
