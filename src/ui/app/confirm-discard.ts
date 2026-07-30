@@ -9,9 +9,6 @@
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { useConfirmSaveStore, type ConfirmSaveChoice } from '../state/confirm-save-store';
-import { JOB_ACTIVE_CONFIRM_BLOCKED } from '../state/job-aware-dialogs';
-import { isActiveJob } from '../state/laser-store-helpers';
-import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { handleSaveProject, type SaveProjectOutcome } from './file-actions';
 
@@ -21,13 +18,6 @@ export async function confirmDiscardAsync(
 ): Promise<boolean> {
   const state = useStore.getState();
   if (!state.dirty) return true;
-  // Fail closed while a job is active (H13 / non-negotiable #9): the
-  // dialog backdrop would cover Pause/Abort with the beam live. Same
-  // policy as jobAwareConfirm; Ctrl+. still stops without confirmation.
-  if (isActiveJob(useLaserStore.getState().streamer)) {
-    useToastStore.getState().pushToast(JOB_ACTIVE_CONFIRM_BLOCKED, 'warning');
-    return false;
-  }
   const choice = await requestChoice(state.savedName ?? 'this project', action);
   if (choice === 'cancel') return false;
   if (choice === 'discard') return true;

@@ -304,6 +304,18 @@ describe('LiveMotionBar', () => {
       await act(async () => root.unmount());
     }
   });
+
+  it('stays topmost so Abort remains reachable when a File dialog is presented', async () => {
+    useLaserStore.setState({ streamer: streamingStreamer() });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      const bar = host.querySelector<HTMLElement>('section[aria-label="Live Motion"]');
+      expect(bar?.style.zIndex).toBe('2147483647');
+      expect(buttonByText(host, 'ABORT JOB')?.disabled).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
 });
 
 function buttonsByText(host: HTMLElement, text: string): ReadonlyArray<HTMLButtonElement> {

@@ -79,13 +79,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// H13 (AUDIT-2026-06-10): the dirty-discard prompt must never open while a
-// job is active — its backdrop would cover Pause/Abort with the beam live.
-// LU18 replaced the native confirm with the in-app Save / Don't Save /
-// Cancel dialog; the fail-closed policy carries over.
-describe('file shortcuts while a job is streaming (H13)', () => {
-  it('Ctrl+N opens no confirm dialog and keeps the project mid-job', async () => {
-    useStore.setState({ dirty: true });
+// File shortcuts remain available while a job is active. LiveMotionBar stays
+// above dialogs so Abort remains reachable without refusing File operations.
+describe('file shortcuts while a job is streaming', () => {
+  it('Ctrl+N starts a clean new project mid-job', async () => {
+    useStore.setState({ dirty: false });
     const project = useStore.getState().project;
     useLaserStore.setState({
       streamer: step(createStreamer('G1 X1 S100')).state,
@@ -95,10 +93,31 @@ describe('file shortcuts while a job is streaming (H13)', () => {
     await pressKey({ key: 'n', ctrlKey: true });
 
     expect(useConfirmSaveStore.getState().request).toBeNull();
+    expect(useStore.getState().project).not.toBe(project);
+    expect(useToastStore.getState().toasts.some((t) => t.message.includes('job is running'))).toBe(
+      false,
+    );
+
+    await unmount();
+  });
+
+  it('Ctrl+N opens the normal confirmation for a dirty project mid-job', async () => {
+    useStore.setState({ dirty: true });
+    const project = useStore.getState().project;
+    useLaserStore.setState({
+      streamer: step(createStreamer('G1 X1 S100')).state,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const unmount = await renderHarness();
+
+    await pressKey({ key: 'n', ctrlKey: true });
+
+    expect(useConfirmSaveStore.getState().request?.action).toBe('start a new project');
     expect(useStore.getState().project).toBe(project);
     expect(useToastStore.getState().toasts.some((t) => t.message.includes('job is running'))).toBe(
-      true,
+      false,
     );
+    await chooseAndFlush('cancel');
+    expect(useStore.getState().project).toBe(project);
 
     await unmount();
   });

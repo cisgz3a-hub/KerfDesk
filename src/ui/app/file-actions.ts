@@ -405,7 +405,7 @@ function openLightBurnMigration(ctx: OpenProjectCtx, fileName: string, text: str
     return;
   }
   const loadResult = ctx.setProject(result.project);
-  markCapabilityAwareLoad(ctx, fileName.replace(/\.lbrn2?$/i, '.lf2'), loadResult);
+  ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
   clearAutosave();
   const unsupported = result.report.unsupportedShapeTypes.length;
   const warnings = result.report.warnings.length;
