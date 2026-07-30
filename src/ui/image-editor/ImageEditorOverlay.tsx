@@ -165,16 +165,16 @@ function KerfStatus(): JSX.Element | null {
   return (
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
       <span
-        title={`These Image-mode raster pixels are in horizontal runs that the current ${check.thresholdMm} mm dot-width correction would remove`}
+        title={`These active-layer Image-mode raster pixels are in horizontal runs that the current ${check.thresholdMm} mm dot-width correction would remove`}
       >
-        ⚠ {check.removedPixels} px removed by {check.thresholdMm} mm dot correction
+        ⚠ {check.removedPixels} px on active layer removed by {check.thresholdMm} mm dot correction
       </span>
       <button
         type="button"
         className="lf-btn"
         style={{ padding: '0 8px', fontSize: 11 }}
         onClick={() => applyThicken(check)}
-        title="Thicken affected runs enough to survive dot-width correction (one undo step)"
+        title="Thicken affected runs on the active layer enough to survive dot-width correction (one undo step)"
       >
         Thicken
       </button>

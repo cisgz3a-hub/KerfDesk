@@ -1,9 +1,10 @@
 // Dot-width advisory (ADR-246, V2 plan E2) — warnings, never blocks. It uses
-// the same horizontal-run survival rule as the raster emitter and reports
-// only ink runs that current Image-mode dot-width correction would erase.
-// One-click Thicken restores those runs as one undoable history entry.
+// the same horizontal-run survival rule as the raster emitter. Detection and
+// one-click Thicken share the active layer, so another visible layer can never
+// cause pixels to be painted into the current one. Thicken is one undo entry.
 
-import { pushHistoryEntry } from '../../core/image-edit';
+import { pushHistoryEntry, RGBA_CHANNELS } from '../../core/image-edit';
+import { compositeLayersInPlace } from '../../core/image-layers';
 import {
   expandMask,
   fillMaskedInPlace,
@@ -14,7 +15,6 @@ import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster/raster-sw
 import type { Project } from '../../core/scene';
 import { useStore, useToastStore } from '../state';
 import { BLACK, captureScoped, type EditorSession } from './editor-session';
-import { compositeSession } from './editor-session-layers';
 import { useImageEditorStore } from './image-editor-store';
 import {
   isKerfCheckContextCurrent,
@@ -26,9 +26,10 @@ const INK_LUMA_THRESHOLD = 128;
 const LUMA_R = 0.299;
 const LUMA_G = 0.587;
 const LUMA_B = 0.114;
+const OPAQUE_WHITE = 255;
 
 export type KerfCheck = {
-  /** Ink pixels in runs that dot-width correction fully removes. */
+  /** Active-layer ink pixels in runs that dot-width correction fully removes. */
   readonly removedPixels: number;
   readonly thresholdMm: number;
   readonly removedMask: SelectionMask;
@@ -113,7 +114,11 @@ export function applyThicken(check: KerfCheck): void {
 }
 
 function inkMask(session: EditorSession): SelectionMask {
-  const composite = compositeSession(session);
+  const data = new Uint8ClampedArray(session.doc.width * session.doc.height * RGBA_CHANNELS);
+  data.fill(OPAQUE_WHITE);
+  const composite = { width: session.doc.width, height: session.doc.height, data };
+  const active = session.layers.find((layer) => layer.id === session.activeLayerId);
+  if (active !== undefined) compositeLayersInPlace(composite, [active]);
   const alpha = new Uint8Array(composite.width * composite.height);
   for (let i = 0; i < alpha.length; i += 1) {
     const base = i * 4;
