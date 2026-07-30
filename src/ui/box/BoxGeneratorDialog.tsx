@@ -34,6 +34,7 @@ import {
 import { BoxGeneratorFields } from './BoxGeneratorFields';
 import { BoxAssembledPreview } from './BoxAssembledPreview';
 import { BoxPreview } from './BoxPreview';
+import { useBoxDraftClose } from './use-box-draft-close';
 
 export function BoxGeneratorDialog(props: {
   readonly machine: BoxMachineContext;
@@ -50,6 +51,7 @@ export function BoxGeneratorDialog(props: {
   const [lockedAutoFitFields, setLockedAutoFitFields] = useState<ReadonlySet<BoxAutoFitField>>(
     () => new Set(),
   );
+  const handleCancel = useBoxDraftClose(draft, props.onCancel);
   // Keeps the last valid sheet visible while the draft is invalid (F-K1).
   // Render-time ref write is an idempotent cache, safe under StrictMode.
   const lastValidPanels = useRef<ReadonlyArray<BoxPanel> | null>(null);
@@ -81,7 +83,7 @@ export function BoxGeneratorDialog(props: {
   if (panels !== null && parsed.kind === 'spec') lastValidSpec.current = parsed.spec;
   return (
     <Dialog
-      onClose={props.onCancel}
+      onClose={handleCancel}
       title="Box Generator"
       as="form"
       onSubmit={(event) => {
@@ -105,7 +107,7 @@ export function BoxGeneratorDialog(props: {
       )}
       <IssueList issues={issueLines(parsed, generation)} warnings={warningLines(parsed)} />
       <DialogActions>
-        <Button onClick={props.onCancel}>Cancel</Button>
+        <Button onClick={handleCancel}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={panels === null}>
           Generate
         </Button>
